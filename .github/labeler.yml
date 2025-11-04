@@ -1,0 +1,65 @@
+# Auto-labeling configuration for pull requests
+# See: https://github.com/actions/labeler
+
+# Source code categories
+devices:
+- changed-files:
+  - any-glob-to-any-file: src/lifx/devices/**
+
+network:
+- changed-files:
+  - any-glob-to-any-file: src/lifx/network/**
+
+protocol:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/lifx/protocol/**
+    - protocol.yml
+
+api:
+- changed-files:
+  - any-glob-to-any-file: src/lifx/api.py
+
+# Testing
+tests:
+- changed-files:
+  - any-glob-to-any-file: tests/**
+
+# Documentation
+documentation:
+- changed-files:
+  - any-glob-to-any-file:
+    - '*.md'
+    - docs/**
+    - examples/**
+
+# Examples
+examples:
+- changed-files:
+  - any-glob-to-any-file: examples/**
+
+# CI/CD
+ci/cd:
+- changed-files:
+  - any-glob-to-any-file:
+    - .github/**
+    - scripts/**
+
+# Dependencies
+dependencies:
+- changed-files:
+  - any-glob-to-any-file:
+    - pyproject.toml
+    - requirements*.txt
+    - uv.lock
+
+# Configuration
+configuration:
+- changed-files:
+  - any-glob-to-any-file:
+    - .*rc
+    - .*rc.js
+    - .*rc.json
+    - .*.yml
+    - .*.yaml
+    - pyproject.toml

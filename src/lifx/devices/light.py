@@ -1,0 +1,677 @@
+"""Light device class for LIFX color lights."""
+
+from __future__ import annotations
+
+import logging
+
+from lifx.color import HSBK
+from lifx.devices.base import Device
+from lifx.protocol import packets
+from lifx.protocol.protocol_types import LightWaveform
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class Light(Device):
+    """LIFX light device with color control.
+
+    Extends the base Device class with light-specific functionality:
+    - Color control (HSBK)
+    - Brightness control
+    - Color temperature control
+    - Waveform effects
+
+    Example:
+        ```python
+        light = Light(serial="d073d5123456", ip="192.168.1.100")
+
+        async with light:
+            # Set color
+            await light.set_color(HSBK.from_rgb(255, 0, 0))
+
+            # Set brightness
+            await light.set_brightness(0.5)
+
+            # Set temperature
+            await light.set_temperature(3500)
+        ```
+
+        Using the simplified connect method (without knowing the serial):
+        ```python
+        async with await Light.from_ip(ip="192.168.1.100") as light:
+            await light.set_color(HSBK.from_rgb(255, 0, 0))
+        ```
+    """
+
+    async def get_color(self, use_cache: bool = True) -> HSBK:
+        """Get current light color.
+
+        Note: This method also caches label and power state from the StateColor
+        response, reducing the need for separate get_label() and get_power() calls.
+
+        Args:
+            use_cache: Use cached value if available (default True)
+
+        Returns:
+            HSBK color
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxProtocolError: If response is invalid
+
+        Example:
+            ```python
+            color = await light.get_color()
+            print(f"Hue: {color.hue}°, Brightness: {color.brightness * 100}%")
+            ```
+        """
+        if use_cache:
+            cached = self._get_cached("color")
+            if cached is not None:
+                return cached
+
+        # Request automatically unpacks response and decodes labels
+        state = await self.connection.request(packets.Light.GetColor())
+
+        # Convert from protocol HSBK to user-friendly HSBK
+        color = HSBK.from_protocol(state.color)
+
+        # Cache color and other fields from StateColor response
+        self._set_cached("color", color)
+        self._set_cached("label", state.label)  # Already decoded to string
+        self._set_cached("power", state.power > 0)
+
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "get_color",
+                "action": "query",
+                "reply": {
+                    "hue": state.color.hue,
+                    "saturation": state.color.saturation,
+                    "brightness": state.color.brightness,
+                    "kelvin": state.color.kelvin,
+                    "power": state.power,
+                    "label": state.label,
+                },
+            }
+        )
+
+        return color
+
+    async def set_color(
+        self,
+        color: HSBK,
+        duration: float = 0.0,
+    ) -> None:
+        """Set light color.
+
+        Args:
+            color: HSBK color to set
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            # Set to red instantly
+            await light.set_color(HSBK.from_rgb(255, 0, 0))
+
+            # Fade to blue over 2 seconds
+            await light.set_color(HSBK.from_rgb(0, 0, 255), duration=2.0)
+            ```
+        """
+        # Convert to protocol HSBK
+        protocol_color = color.to_protocol()
+
+        # Convert duration to milliseconds
+        duration_ms = int(duration * 1000)
+
+        # Request automatically handles acknowledgement
+        await self.connection.request(
+            packets.Light.SetColor(
+                color=protocol_color,
+                duration=duration_ms,
+            ),
+        )
+
+        # Update cache
+        self._set_cached("color", color)
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "set_color",
+                "action": "change",
+                "values": {
+                    "hue": protocol_color.hue,
+                    "saturation": protocol_color.saturation,
+                    "brightness": protocol_color.brightness,
+                    "kelvin": protocol_color.kelvin,
+                    "duration": duration_ms,
+                },
+            }
+        )
+
+    async def set_brightness(self, brightness: float, duration: float = 0.0) -> None:
+        """Set light brightness only, preserving hue, saturation, and temperature.
+
+        Args:
+            brightness: Brightness level (0.0-1.0)
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If brightness is out of range
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            # Set to 50% brightness
+            await light.set_brightness(0.5)
+
+            # Fade to full brightness over 1 second
+            await light.set_brightness(1.0, duration=1.0)
+            ```
+        """
+        if not (0.0 <= brightness <= 1.0):
+            raise ValueError(
+                f"Brightness must be between 0.0 and 1.0, got {brightness}"
+            )
+
+        # Get current color
+        current_color = await self.get_color(use_cache=True)
+
+        # Create new color with modified brightness
+        new_color = current_color.with_brightness(brightness)
+
+        # Set the new color
+        await self.set_color(new_color, duration=duration)
+
+    async def set_kelvin(self, kelvin: int, duration: float = 0.0) -> None:
+        """Set light color temperature, preserving brightness. Saturation is
+           automatically set to 0 to switch the light to color temperature mode.
+
+        Args:
+            kelvin: Color temperature in Kelvin (1500-9000)
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If kelvin is out of range
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            # Set to warm white
+            await light.set_kelvin(2500)
+
+            # Fade to cool white over 2 seconds
+            await light.set_kelvin(6500, duration=2.0)
+            ```
+        """
+        if not (HSBK.MIN_KELVIN <= kelvin <= HSBK.MAX_KELVIN):
+            raise ValueError(f"Kelvin must be 1500-9000, got {kelvin}")
+
+        # Get current color
+        current_color = await self.get_color(use_cache=True)
+
+        # Create new color with modified temperature and no saturation
+        new_color = current_color.with_kelvin(kelvin).with_saturation(0)
+
+        # Set the new color
+        await self.set_color(new_color, duration=duration)
+
+    async def set_hue(self, hue: float, duration: float = 0.0) -> None:
+        """Set light hue only, preserving saturation, brightness, and temperature.
+
+        Args:
+            hue: Hue in degrees (0-360)
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If hue is out of range
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            # Set to red (0 degrees)
+            await light.set_hue(0)
+
+            # Cycle through rainbow
+            for hue in range(0, 360, 10):
+                await light.set_hue(hue, duration=0.5)
+            ```
+        """
+        if not (HSBK.MIN_HUE <= hue <= HSBK.MAX_HUE):
+            raise ValueError(
+                f"Hue must be between {HSBK.MIN_HUE} and {HSBK.MAX_HUE}, got {hue}"
+            )
+
+        # Get current color
+        current_color = await self.get_color(use_cache=True)
+
+        # Create new color with modified hue
+        new_color = current_color.with_hue(hue)
+
+        # Set the new color
+        await self.set_color(new_color, duration=duration)
+
+    async def set_saturation(self, saturation: float, duration: float = 0.0) -> None:
+        """Set light saturation only, preserving hue, brightness, and temperature.
+
+        Args:
+            saturation: Saturation level (0.0-1.0)
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If saturation is out of range
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            # Set to fully saturated
+            await light.set_saturation(1.0)
+
+            # Fade to white (no saturation) over 2 seconds
+            await light.set_saturation(0.0, duration=2.0)
+            ```
+        """
+        if not (HSBK.MIN_SATURATION <= saturation <= HSBK.MAX_SATURATION):
+            raise ValueError(f"Saturation must be 0.0-1.0, got {saturation}")
+
+        # Get current color
+        current_color = await self.get_color(use_cache=True)
+
+        # Create new color with modified saturation
+        new_color = current_color.with_saturation(saturation)
+
+        # Set the new color
+        await self.set_color(new_color, duration=duration)
+
+    async def get_power(self, use_cache: bool = True) -> bool:
+        """Get light power state (specific to light, not device).
+
+        This overrides Device.get_power() as it queries the light-specific
+        power state (packet type 116/118) instead of device power (packet type 20/22).
+
+        Args:
+            use_cache: Use cached value if available (default True)
+
+        Returns:
+            True if light is powered on, False otherwise
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxProtocolError: If response is invalid
+
+        Example:
+            ```python
+            is_on = await light.get_power()
+            print(f"Light power: {'ON' if is_on else 'OFF'}")
+            ```
+        """
+        if use_cache:
+            cached = self._get_cached("power")
+            if cached is not None:
+                return cached
+
+        # Request automatically unpacks response
+        state = await self.connection.request(packets.Light.GetPower())
+
+        # Power level is uint16 (0 or 65535)
+        is_on = state.level > 0
+
+        self._set_cached("power", is_on)
+
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "get_power",
+                "action": "query",
+                "reply": {"level": state.level},
+            }
+        )
+
+        return is_on
+
+    async def set_power(self, on: bool, duration: float = 0.0) -> None:
+        """Set light power state (specific to light, not device).
+
+        This overrides Device.set_power() as it uses the light-specific
+        power packet (type 117) which supports transition duration.
+
+        Args:
+            on: True to turn on, False to turn off
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            # Turn on instantly
+            await light.set_power(True)
+
+            # Fade off over 3 seconds
+            await light.set_power(False, duration=3.0)
+            ```
+        """
+        # Power level: 0 for off, 65535 for on
+        level = 65535 if on else 0
+
+        # Convert duration to milliseconds
+        duration_ms = int(duration * 1000)
+
+        # Request automatically handles acknowledgement
+        await self.connection.request(
+            packets.Light.SetPower(level=level, duration=duration_ms),
+        )
+
+        # Update cache
+        self._set_cached("power", on)
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "set_power",
+                "action": "change",
+                "values": {"level": level, "duration": duration_ms},
+            }
+        )
+
+    async def set_waveform(
+        self,
+        color: HSBK,
+        period: float,
+        cycles: float,
+        waveform: LightWaveform,
+        transient: bool = True,
+        skew_ratio: float = 0.5,
+    ) -> None:
+        """Apply a waveform effect to the light.
+
+        Waveforms create repeating color transitions. Useful for effects like
+        pulsing, breathing, or blinking.
+
+        Args:
+            color: Target color for the waveform
+            period: Period of one cycle in seconds
+            cycles: Number of cycles
+            waveform: Waveform type (SAW, SINE, HALF_SINE, TRIANGLE, PULSE)
+            transient: If True, return to original color after effect (default True)
+            skew_ratio: Waveform skew (0.0-1.0, default 0.5 for symmetric)
+
+        Raises:
+            ValueError: If parameters are out of range
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            from lifx.protocol.protocol_types import LightWaveform
+
+            # Pulse red 5 times
+            await light.set_waveform(
+                color=HSBK.from_rgb(255, 0, 0),
+                period=1.0,
+                cycles=5,
+                waveform=LightWaveform.SINE,
+            )
+
+            # Breathe white once
+            await light.set_waveform(
+                color=HSBK(0, 0, 1.0, 3500),
+                period=2.0,
+                cycles=1,
+                waveform=LightWaveform.SINE,
+                transient=False,
+            )
+            ```
+        """
+        if period <= 0:
+            raise ValueError(f"Period must be positive, got {period}")
+        if cycles < 1:
+            raise ValueError(f"Cycles must be 1 or higher, got {cycles}")
+        if not (0.0 <= skew_ratio <= 1.0):
+            raise ValueError(
+                f"Skew ratio must be between 0.0 and 1.0, got {skew_ratio}"
+            )
+
+        # Convert to protocol values
+        protocol_color = color.to_protocol()
+        period_ms = int(period * 1000)
+        skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
+
+        # Send request
+        await self.connection.request(
+            packets.Light.SetWaveform(
+                transient=bool(transient),
+                color=protocol_color,
+                period=period_ms,
+                cycles=cycles,
+                skew_ratio=skew_ratio_i16,
+                waveform=waveform,
+            ),
+        )
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "set_waveform",
+                "action": "change",
+                "values": {
+                    "transient": transient,
+                    "hue": protocol_color.hue,
+                    "saturation": protocol_color.saturation,
+                    "brightness": protocol_color.brightness,
+                    "kelvin": protocol_color.kelvin,
+                    "period": period_ms,
+                    "cycles": cycles,
+                    "skew_ratio": skew_ratio_i16,
+                    "waveform": waveform.value,
+                },
+            }
+        )
+
+    async def set_waveform_optional(
+        self,
+        color: HSBK,
+        period: float,
+        cycles: float,
+        waveform: LightWaveform,
+        transient: bool = True,
+        skew_ratio: float = 0.5,
+        set_hue: bool = True,
+        set_saturation: bool = True,
+        set_brightness: bool = True,
+        set_kelvin: bool = True,
+    ) -> None:
+        """Apply a waveform effect with selective color component control.
+
+        Similar to set_waveform() but allows fine-grained control over which
+        color components (hue, saturation, brightness, kelvin) are affected
+        by the waveform. This enables effects like pulsing brightness while
+        keeping hue constant, or cycling hue while maintaining brightness.
+
+        Args:
+            color: Target color for the waveform
+            period: Period of one cycle in seconds
+            cycles: Number of cycles
+            waveform: Waveform type (SAW, SINE, HALF_SINE, TRIANGLE, PULSE)
+            transient: If True, return to original color after effect (default True)
+            skew_ratio: Waveform skew (0.0-1.0, default 0.5 for symmetric)
+            set_hue: Apply waveform to hue component (default True)
+            set_saturation: Apply waveform to saturation component (default True)
+            set_brightness: Apply waveform to brightness component (default True)
+            set_kelvin: Apply waveform to kelvin component (default True)
+
+        Raises:
+            ValueError: If parameters are out of range
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            from lifx.protocol.protocol_types import LightWaveform
+
+            # Pulse brightness only, keeping hue/saturation constant
+            await light.set_waveform_optional(
+                color=HSBK(0, 1.0, 1.0, 3500),
+                period=1.0,
+                cycles=5,
+                waveform=LightWaveform.SINE,
+                set_hue=False,
+                set_saturation=False,
+                set_brightness=True,
+                set_kelvin=False,
+            )
+
+            # Cycle hue while maintaining brightness
+            await light.set_waveform_optional(
+                color=HSBK(180, 1.0, 1.0, 3500),
+                period=5.0,
+                cycles=0,  # Infinite
+                waveform=LightWaveform.SAW,
+                set_hue=True,
+                set_saturation=False,
+                set_brightness=False,
+                set_kelvin=False,
+            )
+            ```
+        """
+        if period <= 0:
+            raise ValueError(f"Period must be positive, got {period}")
+        if cycles < 0:
+            raise ValueError(f"Cycles must be non-negative, got {cycles}")
+        if not (0.0 <= skew_ratio <= 1.0):
+            raise ValueError(
+                f"Skew ratio must be between 0.0 and 1.0, got {skew_ratio}"
+            )
+
+        # Convert to protocol values
+        protocol_color = color.to_protocol()
+        period_ms = int(period * 1000)
+        skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
+
+        # Send request
+        await self.connection.request(
+            packets.Light.SetWaveformOptional(
+                transient=bool(transient),
+                color=protocol_color,
+                period=period_ms,
+                cycles=cycles,
+                skew_ratio=skew_ratio_i16,
+                waveform=waveform,
+                set_hue=set_hue,
+                set_saturation=set_saturation,
+                set_brightness=set_brightness,
+                set_kelvin=set_kelvin,
+            ),
+        )
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "set_waveform_optional",
+                "action": "change",
+                "values": {
+                    "transient": transient,
+                    "hue": protocol_color.hue,
+                    "saturation": protocol_color.saturation,
+                    "brightness": protocol_color.brightness,
+                    "kelvin": protocol_color.kelvin,
+                    "period": period_ms,
+                    "cycles": cycles,
+                    "skew_ratio": skew_ratio_i16,
+                    "waveform": waveform.value,
+                    "set_hue": set_hue,
+                    "set_saturation": set_saturation,
+                    "set_brightness": set_brightness,
+                    "set_kelvin": set_kelvin,
+                },
+            }
+        )
+
+    async def pulse(
+        self,
+        color: HSBK,
+        period: float = 1.0,
+        cycles: float = 1,
+        transient: bool = True,
+    ) -> None:
+        """Pulse the light to a specific color.
+
+        Convenience method for creating a pulse effect using SINE waveform.
+
+        Args:
+            color: Target color to pulse to
+            period: Period of one pulse in seconds (default 1.0)
+            cycles: Number of pulses (default 1)
+            transient: If True, return to original color after effect (default True)
+
+        Example:
+            ```python
+            # Pulse red once
+            await light.pulse(HSBK.from_rgb(255, 0, 0))
+
+            # Pulse blue 3 times, 2 seconds per pulse
+            await light.pulse(HSBK.from_rgb(0, 0, 255), period=2.0, cycles=3)
+            ```
+        """
+        await self.set_waveform(
+            color=color,
+            period=period,
+            cycles=cycles,
+            waveform=LightWaveform.PULSE,
+            transient=transient,
+        )
+
+    async def breathe(
+        self,
+        color: HSBK,
+        period: float = 2.0,
+        cycles: float = 1,
+    ) -> None:
+        """Make the light breathe to a specific color.
+
+        Convenience method for creating a breathing effect using SINE waveform.
+
+        Args:
+            color: Target color to breathe to
+            period: Period of one breath in seconds (default 2.0)
+            cycles: Number of breaths (default 1)
+
+        Example:
+            ```python
+            # Breathe white once
+            await light.breathe(HSBK(0, 0, 1.0, 3500))
+
+            # Breathe purple 10 times
+            await light.breathe(HSBK.from_rgb(128, 0, 128), cycles=10)
+            ```
+        """
+        await self.set_waveform(
+            color=color,
+            period=period,
+            cycles=cycles,
+            waveform=LightWaveform.SINE,
+            transient=True,
+        )
+
+    # Cached value properties
+    @property
+    def color(self) -> HSBK | None:
+        """Get cached light color if available.
+
+        Returns:
+            Cached color or None if not cached. Use get_color() to fetch from device.
+        """
+        return self._get_cached("color")
+
+    def __repr__(self) -> str:
+        """String representation of light."""
+        return f"Light(serial={self.serial}, ip={self.ip}, port={self.port})"

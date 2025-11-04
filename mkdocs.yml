@@ -1,0 +1,180 @@
+site_name: lifx-async
+site_description: A modern, type-safe, async Python library for controlling LIFX lights
+site_author: Avi Miller <me@dje.li>
+site_url: https://lifx-async.readthedocs.io
+
+repo_name: Djelibeybi/lifx-async
+repo_url: https://github.com/Djelibeybi/lifx-async
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Light mode
+  - scheme: default
+    primary: indigo
+    accent: blue
+    toggle:
+      icon: material/brightness-7
+      name: Switch to dark mode
+    # Dark mode
+  - scheme: slate
+    primary: indigo
+    accent: blue
+    toggle:
+      icon: material/brightness-4
+      name: Switch to light mode
+  features:
+  - navigation.instant
+  - navigation.tracking
+  - navigation.tabs
+  - navigation.tabs.sticky
+  - navigation.sections
+  - navigation.expand
+  - navigation.path
+  - navigation.indexes
+  - toc.follow
+  - toc.integrate
+  - search.suggest
+  - search.highlight
+  - search.share
+  - content.code.copy
+  - content.code.annotate
+  - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/lightbulb
+  favicon: assets/favicon.png
+
+plugins:
+- search:
+    lang: en
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [src]    # Add source path for imports
+          # Load object inventories to enable cross-references to other projects.
+        inventories:
+        - https://docs.python.org/3/objects.inv
+        options:
+          docstring_options:
+            ignore_init_summary: true
+
+            # Docstring parsing
+          docstring_style: google
+          docstring_section_style: spacy
+
+            # Headings and structure
+          show_root_heading: true
+          show_root_full_path: false
+          show_root_members_full_path: false
+          show_object_full_path: false
+          show_category_heading: true
+          heading_level: 2
+
+            # Signatures
+          show_signature: true
+          show_signature_annotations: true
+          separate_signature: true
+          signature_crossrefs: true
+
+            # Members
+          members_order: source
+          group_by_category: true
+          show_if_no_docstring: false
+          show_docstring_attributes: true
+          show_docstring_functions: true
+          show_docstring_classes: true
+          show_docstring_modules: true
+
+            # Source code
+          show_source: true
+
+            # Inheritance
+          show_bases: true
+          show_inheritance_diagram: false
+
+            # Special members
+          merge_init_into_class: true
+          show_labels: true
+
+            # Additional improvements
+          annotations_path: brief
+          line_length: 80
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          summary: true
+
+- git-revision-date-localized:
+    enable_creation_date: true
+
+markdown_extensions:
+- admonition
+- pymdownx.details
+- pymdownx.superfences:
+    custom_fences:
+    - name: mermaid
+      class: mermaid
+      format: !!python/name:pymdownx.superfences.fence_code_format
+- pymdownx.highlight:
+    anchor_linenums: true
+    line_spans: __span
+    pygments_lang_class: true
+- pymdownx.inlinehilite
+- pymdownx.snippets
+- pymdownx.tabbed:
+    alternate_style: true
+- pymdownx.tasklist:
+    custom_checkbox: true
+- attr_list
+- md_in_html
+- tables
+- footnotes
+- def_list
+- pymdownx.emoji:
+    emoji_index: !!python/name:material.extensions.emoji.twemoji
+    emoji_generator: !!python/name:material.extensions.emoji.to_svg
+- pymdownx.critic
+- pymdownx.caret
+- pymdownx.keys
+- pymdownx.mark
+- pymdownx.tilde
+- toc:
+    permalink: true
+    toc_depth: 3
+
+nav:
+- Home: index.md
+- Getting Started:
+  - Installation: getting-started/installation.md
+  - Quick Start: getting-started/quickstart.md
+- User Guide:
+  - Advanced Usage: user-guide/advanced-usage.md
+  - Troubleshooting: user-guide/troubleshooting.md
+  - Protocol Deep Dive: user-guide/protocol-deep-dive.md
+- Architecture:
+  - Overview: architecture/overview.md
+- API Reference:
+  - Overview: api/index.md
+  - High-Level API: api/high-level.md
+  - Color Utilities: api/colors.md
+  - Device Classes: api/devices.md
+  - Network Layer: api/network.md
+  - Protocol Layer: api/protocol.md
+  - Exceptions: api/exceptions.md
+- FAQ: faq.md
+- Changelog: changelog.md
+
+extra:
+  social:
+  - icon: fontawesome/brands/github
+    link: https://github.com/Djelibeybi/lifx-async
+  - icon: fontawesome/brands/python
+    link: https://pypi.org/project/lifx-async/
+  version:
+    provider: mike
+
+extra_css:
+- stylesheets/extra.css
+
+copyright: Copyright &copy; 2025 Avi Miller

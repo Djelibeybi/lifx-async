@@ -1,0 +1,156 @@
+name: PR Automation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # Auto-label PRs based on files changed
+  auto-label:
+    name: Auto Label PR
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/labeler@v5
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        configuration-path: .github/labeler.yml
+
+  # Size label based on lines changed
+  size-label:
+    name: Add Size Label
+    runs-on: ubuntu-latest
+    steps:
+    - uses: codelytv/pr-size-labeler@v1
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        xs_label: size/xs
+        xs_max_size: '10'
+        s_label: size/s
+        s_max_size: '100'
+        m_label: size/m
+        m_max_size: '500'
+        l_label: size/l
+        l_max_size: '1000'
+        xl_label: size/xl
+        fail_if_xl: 'false'
+
+  # Validate PR title follows conventional commits
+  validate-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+    - uses: amannn/action-semantic-pull-request@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        types: |
+          feat
+          fix
+          docs
+          style
+          refactor
+          perf
+          test
+          build
+          ci
+          chore
+          revert
+        scopes: |
+          devices
+          discovery
+          network
+          protocol
+          api
+          examples
+          tests
+          docs
+          ci
+          deps
+        requireScope: false
+        subjectPattern: ^(?![A-Z]).+$
+        subjectPatternError: |
+          The subject "{subject}" found in the pull request title "{title}"
+          didn't match the configured pattern. Please ensure that the subject
+          does not start with an uppercase character.
+
+  # Comment on first-time contributors
+  welcome:
+    name: Welcome First-Time Contributors
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        pr-message: |
+          👋 Thanks for opening your first pull request! We're excited to have you contributing to lifx-async.
+
+          Here are a few things to check:
+          - [ ] All tests are passing
+          - [ ] Code follows our style guide (Ruff + Pyright)
+          - [ ] Documentation is updated if needed
+          - [ ] Conventional commit format is used
+
+          A maintainer will review your PR soon. Feel free to ask questions!
+
+  # Check for breaking changes
+  breaking-changes:
+    name: Check for Breaking Changes
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for breaking changes
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: files } = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+
+          // Check for potential breaking changes
+          const breakingPatterns = [
+            /src\/lifx\/api\.py/,
+            /src\/lifx\/devices\/.*\.py/,
+            /src\/lifx\/protocol\/packets\.py/
+          ];
+
+          const breakingFiles = files.filter(file =>
+            breakingPatterns.some(pattern => pattern.test(file.filename))
+          );
+
+          if (breakingFiles.length > 0) {
+            const comment = `## ⚠️ Potential Breaking Changes Detected
+
+          This PR modifies public API files:
+          ${breakingFiles.map(f => `- \`${f.filename}\``).join('\n')}
+
+          **Please ensure:**
+          - [ ] Changes are backward compatible, OR
+          - [ ] This is a major version bump (v2.0.0, v3.0.0, etc.)
+          - [ ] Migration guide is provided
+          - [ ] Breaking changes are documented in PR description`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+
+            // Add label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['breaking-change']
+            });
+          }

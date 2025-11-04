@@ -1,0 +1,49 @@
+/* Custom styling for lifx-async documentation */
+
+/* Code block enhancements */
+.highlight {
+    border-radius: 0.4em;
+}
+
+/* Improve grid card spacing */
+.grid.cards {
+    margin-top: 1.5em;
+}
+
+/* Better admonition styling */
+.admonition {
+    border-radius: 0.4em;
+}
+
+/* Mermaid diagram styling */
+.mermaid {
+    text-align: center;
+    margin: 2em 0;
+}
+
+/* Table improvements */
+table {
+    border-radius: 0.4em;
+    overflow: hidden;
+}
+
+/* Code annotation improvements */
+.md-annotation {
+    font-size: 0.85em;
+}
+
+/* Improve inline code appearance */
+code {
+    border-radius: 0.2em;
+    padding: 0.1em 0.4em;
+}
+
+/* Better spacing for navigation */
+.md-nav__item--nested > .md-nav__link {
+    font-weight: 500;
+}
+
+/* Highlight current page in navigation */
+.md-nav__item--active > .md-nav__link {
+    font-weight: 600;
+}

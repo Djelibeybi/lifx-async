@@ -1,0 +1,62 @@
+# Dependabot configuration for automated dependency updates
+# Docs: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # Python dependencies (via pip)
+- package-ecosystem: pip
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: 09:00
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  - python
+  commit-message:
+    prefix: chore(deps)
+    include: scope
+    # Group updates for easier review
+  groups:
+    dev-dependencies:
+      patterns:
+      - pytest*
+      - ruff*
+      - pyright*
+      - mkdocs*
+      - hatchling*
+      - pyyaml*
+      update-types:
+      - minor
+      - patch
+
+  # GitHub Actions
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: 09:00
+  open-pull-requests-limit: 3
+  labels:
+  - dependencies
+  - github-actions
+  commit-message:
+    prefix: ci
+    include: scope
+    # Auto-merge minor and patch updates for actions
+  groups:
+    github-actions:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+
+# Dependabot will:
+# 1. Check for updates weekly on Monday at 9am
+# 2. Create PRs for outdated dependencies
+# 3. Group related updates together
+# 4. Auto-label PRs for easier triage
+# 5. Limit concurrent PRs to avoid overwhelming maintainers

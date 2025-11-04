@@ -1,0 +1,396 @@
+"""Color utilities for LIFX devices.
+
+This module provides user-friendly color conversion utilities for working with
+LIFX devices, which use the HSBK (Hue, Saturation, Brightness, Kelvin) color space.
+"""
+
+from __future__ import annotations
+
+import colorsys
+from dataclasses import dataclass
+from typing import ClassVar
+
+from lifx.protocol.protocol_types import LightHsbk
+
+
+@dataclass
+class HSBK:
+    """User-friendly HSBK color representation.
+
+    LIFX devices use HSBK (Hue, Saturation, Brightness, Kelvin) color space.
+    This class provides a convenient interface with normalized values and
+    conversion to/from RGB.
+
+    Attributes:
+        hue: Hue value in degrees (0-360)
+        saturation: Saturation (0.0-1.0, where 0 is white and 1 is fully saturated)
+        brightness: Brightness (0.0-1.0, where 0 is off and 1 is full brightness)
+        kelvin: Color temperature in Kelvin (1500-9000, typically 2500-9000 for LIFX)
+
+    Example:
+        ```python
+        # Create a red color
+        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        # Create from RGB
+        purple = HSBK.from_rgb(128, 0, 128)
+
+        # Convert to RGB
+        r, g, b = purple.to_rgb()
+        ```
+    """
+
+    hue: float
+    saturation: float
+    brightness: float
+    kelvin: int
+
+    # Common color temperature presets
+    KELVIN_WARM: ClassVar[int] = 2500
+    KELVIN_NEUTRAL: ClassVar[int] = 3500
+    KELVIN_COOL: ClassVar[int] = 5000
+    KELVIN_DAYLIGHT: ClassVar[int] = 6500
+
+    # Valid ranges
+    MIN_HUE: ClassVar[float] = 0.0
+    MAX_HUE: ClassVar[float] = 360.0
+    MIN_SATURATION: ClassVar[float] = 0.0
+    MAX_SATURATION: ClassVar[float] = 1.0
+    MIN_BRIGHTNESS: ClassVar[float] = 0.0
+    MAX_BRIGHTNESS: ClassVar[float] = 1.0
+    MIN_KELVIN: ClassVar[int] = 1500
+    MAX_KELVIN: ClassVar[int] = 9000
+
+    def __post_init__(self) -> None:
+        """Validate all fields after initialization."""
+        self._validate_hue(self.hue)
+        self._validate_saturation(self.saturation)
+        self._validate_brightness(self.brightness)
+        self._validate_kelvin(self.kelvin)
+
+    @staticmethod
+    def _validate_hue(value: float) -> None:
+        """Validate hue value is in range 0-360 degrees.
+
+        Args:
+            value: Hue value to validate
+
+        Raises:
+            ValueError: If hue is out of range
+        """
+        if not (HSBK.MIN_HUE <= value <= HSBK.MAX_HUE):
+            raise ValueError(
+                f"Hue must be between {HSBK.MIN_HUE} and {HSBK.MAX_HUE}, got {value}"
+            )
+
+    @staticmethod
+    def _validate_saturation(value: float) -> None:
+        """Validate saturation value is in range 0.0-1.0.
+
+        Args:
+            value: Saturation value to validate
+
+        Raises:
+            ValueError: If saturation is out of range
+        """
+        if not (HSBK.MIN_SATURATION <= value <= HSBK.MAX_SATURATION):
+            raise ValueError(f"Saturation must be 0.0-1.0, got {value}")
+
+    @staticmethod
+    def _validate_brightness(value: float) -> None:
+        """Validate brightness value is in range 0.0-1.0.
+
+        Args:
+            value: Brightness value to validate
+
+        Raises:
+            ValueError: If brightness is out of range
+        """
+        if not (HSBK.MIN_BRIGHTNESS <= value <= HSBK.MAX_BRIGHTNESS):
+            raise ValueError(f"Brightness must be 0.0-1.0, got {value}")
+
+    @staticmethod
+    def _validate_kelvin(value: int) -> None:
+        """Validate kelvin temperature is in range 1500-9000.
+
+        Args:
+            value: Kelvin temperature to validate
+
+        Raises:
+            ValueError: If kelvin is out of range
+        """
+        if not (HSBK.MIN_KELVIN <= value <= HSBK.MAX_KELVIN):
+            raise ValueError(f"Kelvin must be 1500-9000, got {value}")
+
+    @staticmethod
+    def _validate_rgb_component(value: int, name: str) -> None:
+        """Validate RGB component is in range 0-255.
+
+        Args:
+            value: RGB component value to validate
+            name: Name of the component (for error messages)
+
+        Raises:
+            ValueError: If value is out of range
+        """
+        if not (0 <= value <= 255):
+            raise ValueError(f"{name} must be between 0 and 255, got {value}")
+
+    @classmethod
+    def from_rgb(
+        cls,
+        r: int,
+        g: int,
+        b: int,
+        kelvin: int = KELVIN_NEUTRAL,
+    ) -> HSBK:
+        """Create HSBK from RGB values.
+
+        Args:
+            r: Red component (0-255)
+            g: Green component (0-255)
+            b: Blue component (0-255)
+            kelvin: Color temperature in Kelvin (default: 3500)
+
+        Returns:
+            HSBK instance
+
+        Raises:
+            ValueError: If RGB values are out of range (0-255)
+
+        Example:
+            ```python
+            # Pure red
+            red = HSBK.from_rgb(255, 0, 0)
+
+            # Purple with warm white
+            purple = HSBK.from_rgb(128, 0, 128, kelvin=2500)
+            ```
+        """
+        cls._validate_rgb_component(r, "Red")
+        cls._validate_rgb_component(g, "Green")
+        cls._validate_rgb_component(b, "Blue")
+
+        # Normalize to 0-1
+        r_norm = r / 255.0
+        g_norm = g / 255.0
+        b_norm = b / 255.0
+
+        # Convert to HSV using colorsys
+        h, s, v = colorsys.rgb_to_hsv(r_norm, g_norm, b_norm)
+
+        # Convert to LIFX ranges
+        hue = h * 360.0  # 0-1 -> 0-360
+        saturation = s  # Already 0-1
+        brightness = v  # Already 0-1
+
+        return cls(hue=hue, saturation=saturation, brightness=brightness, kelvin=kelvin)
+
+    def to_rgb(self) -> tuple[int, int, int]:
+        """Convert HSBK to RGB values.
+
+        Color temperature (kelvin) is not considered in this conversion,
+        as it only affects the white point of the device.
+
+        Returns:
+            Tuple of (red, green, blue) with values 0-255
+
+        Example:
+            ```python
+            color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+            r, g, b = color.to_rgb()  # Returns (0, 255, 0) - green
+            ```
+        """
+        # Convert to colorsys ranges
+        h = self.hue / 360.0  # 0-360 -> 0-1
+        s = self.saturation  # Already 0-1
+        v = self.brightness  # Already 0-1
+
+        # Convert using colorsys
+        r_norm, g_norm, b_norm = colorsys.hsv_to_rgb(h, s, v)
+
+        # Scale to 0-255 and round
+        r = int(round(r_norm * 255))
+        g = int(round(g_norm * 255))
+        b = int(round(b_norm * 255))
+
+        return (r, g, b)
+
+    def to_protocol(self) -> LightHsbk:
+        """Convert to protocol HSBK for packet serialization.
+
+        LIFX protocol uses uint16 values for all HSBK components:
+        - Hue: 0-65535 (represents 0-360 degrees)
+        - Saturation: 0-65535 (represents 0-100%)
+        - Brightness: 0-65535 (represents 0-100%)
+        - Kelvin: Direct value in Kelvin
+
+        Returns:
+            LightHsbk instance for packet serialization
+
+        Example:
+            ```python
+            color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+            protocol_color = color.to_protocol()
+            # Use in packet: LightSetColor(color=protocol_color, ...)
+            ```
+        """
+        # Convert to uint16 ranges with overflow protection
+        # Clamp values to prevent overflow
+        hue_u16 = max(0, min(65535, int(round((self.hue / 360.0) * 65535))))
+        saturation_u16 = max(0, min(65535, int(round(self.saturation * 65535))))
+        brightness_u16 = max(0, min(65535, int(round(self.brightness * 65535))))
+
+        return LightHsbk(
+            hue=hue_u16,
+            saturation=saturation_u16,
+            brightness=brightness_u16,
+            kelvin=self.kelvin,
+        )
+
+    @classmethod
+    def from_protocol(cls, protocol: LightHsbk) -> HSBK:
+        """Create HSBK from protocol HSBK.
+
+        Args:
+            protocol: LightHsbk instance from packet deserialization
+
+        Returns:
+            User-friendly HSBK instance
+
+        Example:
+            ```python
+            # After receiving LightState packet
+            state = await device.get_state()
+            color = HSBK.from_protocol(state.color)
+            print(f"Hue: {color.hue}°, Brightness: {color.brightness * 100}%")
+            ```
+        """
+        # Convert from uint16 ranges to user-friendly ranges
+        hue = (protocol.hue / 65535.0) * 360.0
+        saturation = protocol.saturation / 65535.0
+        brightness = protocol.brightness / 65535.0
+
+        return cls(
+            hue=hue,
+            saturation=saturation,
+            brightness=brightness,
+            kelvin=protocol.kelvin,
+        )
+
+    def with_hue(self, hue: float) -> HSBK:
+        """Create a new HSBK with modified hue.
+
+        Args:
+            hue: New hue value (0-360)
+
+        Returns:
+            New HSBK instance
+        """
+        return HSBK(
+            hue=hue,
+            saturation=self.saturation,
+            brightness=self.brightness,
+            kelvin=self.kelvin,
+        )
+
+    def with_saturation(self, saturation: float) -> HSBK:
+        """Create a new HSBK with modified saturation.
+
+        Args:
+            saturation: New saturation value (0.0-1.0)
+
+        Returns:
+            New HSBK instance
+        """
+        return HSBK(
+            hue=self.hue,
+            saturation=saturation,
+            brightness=self.brightness,
+            kelvin=self.kelvin,
+        )
+
+    def with_brightness(self, brightness: float) -> HSBK:
+        """Create a new HSBK with modified brightness.
+
+        Args:
+            brightness: New brightness value (0.0-1.0)
+
+        Returns:
+            New HSBK instance
+        """
+        return HSBK(
+            hue=self.hue,
+            saturation=self.saturation,
+            brightness=brightness,
+            kelvin=self.kelvin,
+        )
+
+    def with_kelvin(self, kelvin: int) -> HSBK:
+        """Create a new HSBK with modified color temperature.
+
+        Args:
+            kelvin: New kelvin value (1500-9000)
+
+        Returns:
+            New HSBK instance
+        """
+        return HSBK(
+            hue=self.hue,
+            saturation=self.saturation,
+            brightness=self.brightness,
+            kelvin=kelvin,
+        )
+
+
+# Common color presets
+class Colors:
+    """Common color presets for convenience."""
+
+    # Primary colors
+    RED = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    ORANGE = HSBK(hue=30, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    YELLOW = HSBK(hue=60, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    GREEN = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    CYAN = HSBK(hue=180, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    BLUE = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    PURPLE = HSBK(hue=270, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    MAGENTA = HSBK(hue=300, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    PINK = HSBK(hue=330, saturation=1.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+
+    # White variants
+    WHITE_WARM = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=HSBK.KELVIN_WARM)
+    WHITE_NEUTRAL = HSBK(
+        hue=0, saturation=0.0, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    WHITE_COOL = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=HSBK.KELVIN_COOL)
+    WHITE_DAYLIGHT = HSBK(
+        hue=0, saturation=0.0, brightness=1.0, kelvin=HSBK.KELVIN_DAYLIGHT
+    )
+
+    # Pastels
+    PASTEL_RED = HSBK(hue=0, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL)
+    PASTEL_ORANGE = HSBK(
+        hue=30, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_YELLOW = HSBK(
+        hue=60, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_GREEN = HSBK(
+        hue=120, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_CYAN = HSBK(
+        hue=180, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_BLUE = HSBK(
+        hue=240, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_PURPLE = HSBK(
+        hue=270, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_MAGENTA = HSBK(
+        hue=300, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
+    PASTEL_PINK = HSBK(
+        hue=330, saturation=0.3, brightness=1.0, kelvin=HSBK.KELVIN_NEUTRAL
+    )
