@@ -1,0 +1,186 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for lifx-async - Advanced dependency automation",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separateMajorReleases",
+    ":combinePatchMinorReleases",
+    ":ignoreUnstable",
+    ":prImmediately",
+    ":updateNotScheduled",
+    ":automergeDisabled",
+    ":maintainLockFilesWeekly",
+    ":rebaseStalePrs"
+  ],
+  "timezone": "Australia/Melbourne",
+  "schedule": [
+    "after 10pm every weekday",
+    "before 5am every weekday",
+    "every weekend"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "commitMessagePrefix": "chore(deps):",
+  "prConcurrentLimit": 5,
+  "prCreation": "not-pending",
+  "prHourlyLimit": 2,
+  "rebaseWhen": "behind-base-branch",
+  "semanticCommitScope": "deps",
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security",
+      "dependencies"
+    ],
+    "automerge": true,
+    "stabilityDays": 0
+  },
+  "packageRules": [
+    {
+      "description": "Group all dev dependencies",
+      "matchDepTypes": [
+        "dev"
+      ],
+      "groupName": "dev dependencies",
+      "automerge": true,
+      "labels": [
+        "dependencies",
+        "dev-dependencies"
+      ]
+    },
+    {
+      "description": "Auto-merge patch and minor updates for test dependencies",
+      "matchPackagePatterns": [
+        "^pytest",
+        "^pytest-"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true,
+      "labels": [
+        "dependencies",
+        "testing"
+      ]
+    },
+    {
+      "description": "Group linting and formatting tools",
+      "matchPackagePatterns": [
+        "^ruff",
+        "^pyright"
+      ],
+      "groupName": "code quality tools",
+      "automerge": true,
+      "labels": [
+        "dependencies",
+        "code-quality"
+      ]
+    },
+    {
+      "description": "Python version - manual updates only",
+      "matchPackageNames": [
+        "python"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Major updates - create separate PRs and require review",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "major-update"
+      ],
+      "reviewers": [
+        "Djelibeybi"
+      ]
+    },
+    {
+      "description": "GitHub Actions - group and auto-merge minor/patch",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true,
+      "labels": [
+        "dependencies",
+        "github-actions"
+      ]
+    },
+    {
+      "description": "Pin digests for GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "pinDigests": true
+    }
+  ],
+  "regexManagers": [
+    {
+      "description": "Update Python version in README examples",
+      "fileMatch": [
+        "^README\\.md$"
+      ],
+      "matchStrings": [
+        "python-version: [\"']?(?<currentValue>[0-9.]+)[\"']?"
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "python-version"
+    },
+    {
+      "description": "Update uv version in workflows",
+      "fileMatch": [
+        "^\\.github/workflows/.+\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "UV_VERSION: [\"']?(?<currentValue>[0-9.]+)[\"']?"
+      ],
+      "depNameTemplate": "uv",
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "astral-sh/uv"
+    }
+  ],
+  "pip_requirements": {
+    "fileMatch": [
+      "^pyproject\\.toml$"
+    ]
+  },
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "customManagers": [
+    {
+      "description": "Update versions in CLAUDE.md",
+      "customType": "regex",
+      "fileMatch": [
+        "^CLAUDE\\.md$"
+      ],
+      "matchStrings": [
+        "uv add --dev (?<depName>[a-zA-Z0-9-]+)(?:>=(?<currentValue>[0-9.]+))?"
+      ],
+      "datasourceTemplate": "pypi"
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 5am on monday"
+    ],
+    "commitMessageAction": "Update",
+    "commitMessageTopic": "lock file",
+    "automerge": true
+  },
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "dependencyDashboardHeader": "This dashboard shows all pending dependency updates for lifx-async.",
+  "dependencyDashboardFooter": "Configure Renovate by editing `renovate.json`"
+}

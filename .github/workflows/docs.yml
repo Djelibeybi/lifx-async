@@ -1,0 +1,111 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - docs/**
+    - src/lifx/**
+    - mkdocs.yml
+    - .github/workflows/docs.yml
+  pull_request:
+    paths:
+    - docs/**
+    - mkdocs.yml
+
+env:
+  PYTHON_VERSION: '3.11'
+  UV_VERSION: 0.9.4
+
+permissions:
+  contents: write
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0    # Fetch all history for git-revision-date-localized
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: ${{ env.UV_VERSION }}
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        uv sync --frozen
+
+    - name: Build documentation
+      run: uv run mkdocs build
+
+    - name: Upload docs artifact
+      if: github.event_name == 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: docs
+        path: site/
+
+  deploy-docs:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build-docs
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: ${{ env.UV_VERSION }}
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        uv sync --frozen
+
+    - name: Configure Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Deploy to GitHub Pages
+      run: uv run mkdocs gh-deploy --force
+
+  validate-links:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: ${{ env.UV_VERSION }}
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        uv sync --frozen
+
+    - name: Build and check links
+      run: |
+        uv run mkdocs build

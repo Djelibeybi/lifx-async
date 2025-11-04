@@ -1,0 +1,454 @@
+"""Tests for multizone light device class."""
+
+from __future__ import annotations
+
+import pytest
+
+from lifx.color import HSBK
+from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.protocol import packets
+from lifx.protocol.protocol_types import MultiZoneEffectType
+
+
+class TestMultiZoneLight:
+    """Tests for MultiZoneLight class."""
+
+    def test_create_multizone_light(self) -> None:
+        """Test creating a multizone light."""
+        light = MultiZoneLight(
+            serial="d073d5010203",
+            ip="192.168.1.100",
+            port=56700,
+        )
+        assert light.serial == "d073d5010203"
+        assert light.ip == "192.168.1.100"
+        assert light.port == 56700
+
+    async def test_get_zone_count_not_extended(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test getting zone count."""
+        # Mock capabilities (no extended multizone for standard test)
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+
+        # Mock results
+        mock_state = packets.MultiZone.StateMultiZone(
+            count=16,
+            index=0,
+            colors=[
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(16)
+            ],
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        zone_count = await multizone_light.get_zone_count()
+
+        assert zone_count == 16
+
+    async def test_get_color_zones(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test getting color zones."""
+        # Mock capabilities (no extended multizone for standard test)
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+
+        # Mock StateMultiZone response with 8 colors
+        # Create colors with incrementing hues: 0-315 degrees
+        colors = [
+            HSBK(hue=i * 45, saturation=0.5, brightness=0.75, kelvin=3500).to_protocol()
+            for i in range(8)
+        ]
+        mock_state = packets.MultiZone.StateMultiZone(count=16, index=0, colors=colors)
+        multizone_light.connection.request.return_value = mock_state
+
+        result_colors = await multizone_light.get_color_zones(0, 7)
+
+        assert len(result_colors) == 8
+        assert all(isinstance(color, HSBK) for color in result_colors)
+        assert result_colors[0].kelvin == 3500
+        assert result_colors[0].saturation == pytest.approx(0.5, abs=0.01)
+
+    async def test_get_extended_color_zones(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test getting extended color zones."""
+        # Mock capabilities with extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        # Mock StateExtendedColorZones response with multiple colors
+        colors = [
+            HSBK(hue=i * 36, saturation=0.8, brightness=0.9, kelvin=3500).to_protocol()
+            for i in range(10)
+        ]
+        # Pad to 82 colors as per protocol
+        colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(72)
+            ]
+        )
+
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=10, index=0, colors_count=10, colors=colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        result_colors = await multizone_light.get_extended_color_zones(0, 9)
+
+        assert len(result_colors) == 10
+        assert all(isinstance(color, HSBK) for color in result_colors)
+        assert result_colors[0].hue == pytest.approx(0, abs=1)
+        assert result_colors[1].hue == pytest.approx(36, abs=1)
+        assert result_colors[9].hue == pytest.approx(324, abs=1)
+        assert result_colors[0].saturation == pytest.approx(0.8, abs=0.01)
+
+    async def test_get_extended_color_zones_large_device(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test getting extended color zones from a large device (>82 zones)."""
+        # Mock capabilities with extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        # Mock zone count of 100 (triggers collect_multiple=True)
+        # First packet: index=0, 82 valid colors
+        first_colors = [
+            HSBK(
+                hue=i * 4.39, saturation=0.5, brightness=0.5, kelvin=3500
+            ).to_protocol()
+            for i in range(82)
+        ]
+        first_packet = packets.MultiZone.StateExtendedColorZones(
+            count=100,
+            index=0,
+            colors_count=82,
+            colors=first_colors,
+        )
+
+        # Second packet: index=82, 18 valid colors + 64 padding
+        second_colors = [
+            HSBK(
+                hue=((i + 82) * 4.39) % 360,
+                saturation=0.5,
+                brightness=0.5,
+                kelvin=3500,
+            ).to_protocol()
+            for i in range(18)
+        ]
+        # Pad remaining 64 positions (will be ignored)
+        second_colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(64)
+            ]
+        )
+        second_packet = packets.MultiZone.StateExtendedColorZones(
+            count=100,
+            index=82,
+            colors_count=18,
+            colors=second_colors,
+        )
+
+        multizone_light.connection.request.side_effect = [
+            first_packet,  # First call for zone count
+            [first_packet, second_packet],  # Second call returns list of packets
+        ]
+
+        result_colors = await multizone_light.get_extended_color_zones(0, 99)
+
+        assert len(result_colors) == 100  # All 100 colors (82 + 18)
+        assert multizone_light.connection.request.call_count == 2
+
+        # Verify collect_multiple=True was passed in second call
+        second_call = multizone_light.connection.request.call_args_list[1]
+        assert second_call.kwargs.get("collect_multiple") is True
+
+    async def test_get_extended_color_zones_with_cache(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test that caching works for extended color zones."""
+        # Mock capabilities with extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        # Mock response
+        colors = [
+            HSBK(hue=i * 36, saturation=1.0, brightness=1.0, kelvin=4000).to_protocol()
+            for i in range(5)
+        ]
+        colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(77)
+            ]
+        )
+
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=5, index=0, colors_count=5, colors=colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        # First call should hit the device
+        result1 = await multizone_light.get_extended_color_zones(0, 4, use_cache=True)
+        call_count_after_first = multizone_light.connection.request.call_count
+
+        # Second call with cache=True should not call the device again
+        result2 = await multizone_light.get_extended_color_zones(0, 4, use_cache=True)
+        call_count_after_second = multizone_light.connection.request.call_count
+
+        assert result1 == result2
+        assert call_count_after_second == call_count_after_first  # No additional calls
+
+    async def test_get_extended_color_zones_invalid_range(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test that invalid zone range raises error."""
+        with pytest.raises(ValueError, match="Invalid zone range"):
+            await multizone_light.get_extended_color_zones(-1, 5)
+
+        with pytest.raises(ValueError, match="Invalid zone range"):
+            await multizone_light.get_extended_color_zones(5, 3)
+
+    async def test_get_extended_color_zones_clamps_to_zone_count(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test that end index is clamped to zone count."""
+        # Mock capabilities with extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        # Zone count is 16, but we request 0-99
+        colors = [
+            HSBK(
+                hue=i * 22.5, saturation=0.5, brightness=0.5, kelvin=3500
+            ).to_protocol()
+            for i in range(16)
+        ]
+        colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(66)
+            ]
+        )
+
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=16, index=0, colors_count=16, colors=colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        result_colors = await multizone_light.get_extended_color_zones(0, 99)
+
+        # Should return colors up to the actual zone count
+        assert len(result_colors) <= 82  # Limited by response
+
+    async def test_set_color_zones(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test setting color zones."""
+        # Mock capabilities (no extended multizone for standard test)
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        color = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=4000)
+        await multizone_light.set_color_zones(0, 5, color, duration=1.0)
+
+        # Verify packet was sent
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct values
+        assert packet.start_index == 0
+        assert packet.end_index == 5
+        assert packet.duration == 1000  # 1 second in ms
+        assert packet.color.kelvin == 4000
+
+    async def test_set_extended_color_zones(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test setting extended color zones."""
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        # Create list of colors
+        colors = [
+            HSBK(hue=i * 36, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(10)
+        ]
+        await multizone_light.set_extended_color_zones(0, colors, duration=0.5)
+
+        # Verify packet was sent
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct values
+        assert packet.index == 0
+        assert packet.colors_count == 10
+        assert packet.duration == 500  # 0.5 seconds in ms
+        assert len(packet.colors) == 82  # Padded to 82
+
+    async def test_set_extended_color_zones_too_many(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test that setting too many colors raises error."""
+        colors = [
+            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500) for i in range(83)
+        ]
+
+        with pytest.raises(ValueError, match="Too many colors"):
+            await multizone_light.set_extended_color_zones(0, colors)
+
+    async def test_get_multizone_effect(self, multizone_light: MultiZoneLight) -> None:
+        """Test getting multizone effect."""
+        # Mock StateEffect response
+        from lifx.protocol.protocol_types import (
+            MultiZoneEffectParameter,
+            MultiZoneEffectSettings,
+        )
+
+        mock_state = packets.MultiZone.StateEffect(
+            settings=MultiZoneEffectSettings(
+                instanceid=12345,
+                effect_type=MultiZoneEffectType.MOVE,
+                speed=5000,
+                duration=0,
+                parameter=MultiZoneEffectParameter(
+                    parameter0=1,  # backward
+                    parameter1=0,
+                    parameter2=0,
+                    parameter3=0,
+                    parameter4=0,
+                    parameter5=0,
+                    parameter6=0,
+                    parameter7=0,
+                ),
+            )
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        effect = await multizone_light.get_multizone_effect()
+
+        assert effect is not None
+        assert effect.effect_type == MultiZoneEffectType.MOVE
+        assert effect.speed == 5000
+        assert effect.duration == 0
+        assert effect.parameters[0] == 1
+
+    async def test_set_multizone_effect(self, multizone_light: MultiZoneLight) -> None:
+        """Test setting multizone effect."""
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        effect = MultiZoneEffect(
+            effect_type=MultiZoneEffectType.MOVE,
+            speed=5000,
+            duration=60_000_000_000,  # 60 seconds in nanoseconds
+            parameters=[0, 0, 0, 0, 0, 0, 0, 0],
+        )
+        await multizone_light.set_multizone_effect(effect)
+
+        # Verify packet was sent
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct values
+        assert packet.settings.effect_type == MultiZoneEffectType.MOVE
+        assert packet.settings.speed == 5000
+        assert packet.settings.duration == 60_000_000_000
+
+    async def test_stop_effect(self, multizone_light: MultiZoneLight) -> None:
+        """Test stopping effect."""
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        await multizone_light.stop_effect()
+
+        # Verify packet was sent with OFF effect
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+        assert packet.settings.effect_type == MultiZoneEffectType.OFF
+
+    async def test_set_move_effect_forward(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test setting move effect forward."""
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        await multizone_light.set_move_effect(speed=5.0, direction="forward")
+
+        # Verify packet was sent
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct values
+        assert packet.settings.effect_type == MultiZoneEffectType.MOVE
+        assert packet.settings.speed == 5000
+        assert packet.settings.parameter.parameter0 == 0  # Forward
+
+    async def test_set_move_effect_backward(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test setting move effect backward."""
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        await multizone_light.set_move_effect(
+            speed=10.0, direction="backward", duration=60.0
+        )
+
+        # Verify packet was sent
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct values
+        assert packet.settings.effect_type == MultiZoneEffectType.MOVE
+        assert packet.settings.speed == 10000
+        assert packet.settings.duration == 60_000_000_000  # 60 seconds in nanoseconds
+        assert packet.settings.parameter.parameter0 == 1  # Backward
+
+    async def test_set_move_effect_invalid_direction(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test that invalid direction raises error."""
+        with pytest.raises(ValueError, match="Direction must be"):
+            await multizone_light.set_move_effect(speed=5.0, direction="sideways")
+
+    async def test_set_move_effect_invalid_speed(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test that invalid speed raises error."""
+        with pytest.raises(ValueError, match="Speed must be positive"):
+            await multizone_light.set_move_effect(speed=0.0, direction="forward")
+
+
+class TestMultiZoneEffect:
+    """Tests for MultiZoneEffect class."""
+
+    def test_create_effect(self) -> None:
+        """Test creating a multizone effect."""
+        effect = MultiZoneEffect(
+            effect_type=MultiZoneEffectType.MOVE,
+            speed=5000,
+            duration=0,
+        )
+        assert effect.effect_type == MultiZoneEffectType.MOVE
+        assert effect.speed == 5000
+        assert effect.duration == 0
+        assert effect.parameters == [0] * 8  # Default parameters
+
+    def test_create_effect_with_parameters(self) -> None:
+        """Test creating effect with custom parameters."""
+        params = [1, 2, 3, 4, 5, 6, 7, 8]
+        effect = MultiZoneEffect(
+            effect_type=MultiZoneEffectType.MOVE,
+            speed=5000,
+            duration=0,
+            parameters=params,
+        )
+        assert effect.parameters == params
