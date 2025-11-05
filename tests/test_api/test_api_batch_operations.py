@@ -68,7 +68,7 @@ class TestDeviceGroupBatchOperations:
             # Verify color was set (check one device)
             await asyncio.sleep(0.1)
             async with lights[0]:
-                light_color = await lights[0].get_color()
+                light_color, _, _ = await lights[0].get_color()
                 # Color should be approximately what we set
                 assert abs(light_color.hue - 180) < 5
 
@@ -94,7 +94,7 @@ class TestDeviceGroupBatchOperations:
             # Verify brightness was set
             await asyncio.sleep(0.1)
             async with lights[0]:
-                color = await lights[0].get_color()
+                color, _, _ = await lights[0].get_color()
                 # Brightness should be approximately 0.25
                 assert abs(color.brightness - 0.25) < 0.05
 

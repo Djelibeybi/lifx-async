@@ -200,7 +200,7 @@ except LifxDeviceNotFoundError:
 - **Async Context Managers**: All devices and connections use `async with` for automatic cleanup
 - **Type Safety**: Full type hints with strict Pyright validation
 - **Auto-Generation**: Protocol structures generated from YAML specification
-- **State Caching**: Device state cached with TTL to minimize network requests
+- **State Storage**: Device state stored with TTL to minimize network requests
 - **Connection Pooling**: LRU cache for connection reuse across operations
 - **Background Response Dispatcher**: Concurrent request handling via asyncio tasks
 

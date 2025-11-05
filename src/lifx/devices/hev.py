@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from lifx.devices.light import Light
@@ -42,11 +43,26 @@ class HevLight(Light):
         ```
     """
 
-    async def get_hev_cycle(self, use_cache: bool = True) -> HevCycleState:
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize HevLight with additional state attributes."""
+        super().__init__(*args, **kwargs)
+        # HEV-specific state storage
+        self._hev_cycle: tuple[HevCycleState, float] | None = None
+        self._hev_config: tuple[HevConfig, float] | None = None
+        self._hev_result: tuple[LightLastHevCycleResult, float] | None = None
+
+    async def _setup(self) -> None:
+        """Populate HEV light capabilities, state and metadata."""
+        await super()._setup()
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(self.get_hev_config())
+            tg.create_task(self.get_hev_cycle())
+            tg.create_task(self.get_last_hev_result())
+
+    async def get_hev_cycle(self) -> HevCycleState:
         """Get current HEV cycle state.
 
-        Args:
-            use_cache: Use cached value if available (default True)
+        Always fetches from device. Use the `hev_cycle` property to access stored value.
 
         Returns:
             HevCycleState with duration, remaining time, and last power state
@@ -65,11 +81,6 @@ class HevLight(Light):
                 print("No active cleaning cycle")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("hev_cycle")
-            if cached is not None:
-                return cached
-
         # Request HEV cycle state
         state = await self.connection.request(packets.Light.GetHevCycle())
 
@@ -80,8 +91,10 @@ class HevLight(Light):
             last_power=state.last_power,
         )
 
-        # Cache the result
-        self._set_cached("hev_cycle", cycle_state)
+        # Store state with timestamp
+        import time
+
+        self._hev_cycle = (cycle_state, time.time())
 
         _LOGGER.debug(
             {
@@ -130,8 +143,8 @@ class HevLight(Light):
             ),
         )
 
-        # Invalidate cache since state changed
-        self._invalidate_cache("hev_cycle")
+        # Invalidate state since it changed
+        self._hev_cycle = None
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -141,11 +154,8 @@ class HevLight(Light):
             }
         )
 
-    async def get_hev_config(self, use_cache: bool = True) -> HevConfig:
+    async def get_hev_config(self) -> HevConfig:
         """Get HEV cycle configuration.
-
-        Args:
-            use_cache: Use cached value if available (default True)
 
         Returns:
             HevConfig with indication and default duration settings
@@ -162,11 +172,6 @@ class HevLight(Light):
             print(f"Visual indication: {config.indication}")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("hev_config")
-            if cached is not None:
-                return cached
-
         # Request HEV configuration
         state = await self.connection.request(packets.Light.GetHevCycleConfiguration())
 
@@ -176,8 +181,10 @@ class HevLight(Light):
             duration_s=state.duration_s,
         )
 
-        # Cache the result
-        self._set_cached("hev_config", config)
+        # Store state with timestamp
+        import time
+
+        self._hev_config = (config, time.time())
 
         _LOGGER.debug(
             {
@@ -222,9 +229,12 @@ class HevLight(Light):
             ),
         )
 
-        # Update cache
-        self._set_cached(
-            "hev_config", HevConfig(indication=indication, duration_s=duration_seconds)
+        # Update state with timestamp
+        import time
+
+        self._hev_config = (
+            HevConfig(indication=indication, duration_s=duration_seconds),
+            time.time(),
         )
         _LOGGER.debug(
             {
@@ -236,12 +246,9 @@ class HevLight(Light):
         )
 
     async def get_last_hev_result(
-        self, use_cache: bool = True
+        self,
     ) -> LightLastHevCycleResult:
         """Get result of the last HEV cleaning cycle.
-
-        Args:
-            use_cache: Use cached value if available (default True)
 
         Returns:
             LightLastHevCycleResult enum value indicating success or interruption reason
@@ -260,16 +267,13 @@ class HevLight(Light):
                 print("Cycle was interrupted by network command")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("hev_result")
-            if cached is not None:
-                return cached
-
         # Request last HEV result
         state = await self.connection.request(packets.Light.GetLastHevCycleResult())
 
-        # Cache the result
-        self._set_cached("hev_result", state.result)
+        # Store state with timestamp
+        import time
+
+        self._hev_result = (state.result, time.time())
 
         _LOGGER.debug(
             {
@@ -283,28 +287,31 @@ class HevLight(Light):
         return state.result
 
     @property
-    def hev_cycle(self) -> HevCycleState | None:
-        """Get cached HEV cycle state if available.
+    def hev_cycle(self) -> tuple[HevCycleState, float] | None:
+        """Get stored HEV cycle state with timestamp if available.
 
         Returns:
-            Cached cycle state (use get_hev_cycle() for fresh data)
+            Tuple of (cycle_state, timestamp) or None if never fetched.
+            Use get_hev_cycle() to fetch from device.
         """
-        return self._get_cached("hev_cycle")
+        return self._hev_cycle
 
     @property
-    def hev_config(self) -> HevConfig | None:
-        """Get cached HEV configuration if available.
+    def hev_config(self) -> tuple[HevConfig, float] | None:
+        """Get stored HEV configuration with timestamp if available.
 
         Returns:
-            Cached config (use get_hev_config() for fresh data)
+            Tuple of (config, timestamp) or None if never fetched.
+            Use get_hev_config() to fetch from device.
         """
-        return self._get_cached("hev_config")
+        return self._hev_config
 
     @property
-    def hev_result(self) -> LightLastHevCycleResult | None:
-        """Get cached last HEV cycle result if available.
+    def hev_result(self) -> tuple[LightLastHevCycleResult, float] | None:
+        """Get stored last HEV cycle result with timestamp if available.
 
         Returns:
-            Cached result (use get_last_hev_result() for fresh data)
+            Tuple of (result, timestamp) or None if never fetched.
+            Use get_last_hev_result() to fetch from device.
         """
-        return self._get_cached("hev_result")
+        return self._hev_result
