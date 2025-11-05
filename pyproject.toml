@@ -110,30 +110,18 @@ exclude_lines = [
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-commit_parser = "conventional"
 build_command = """
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    source $HOME/.local/bin/env
     uv lock --upgrade-package "$PACKAGE_NAME"
     git add uv.lock
     uv build
 """
 
-[tool.semantic_release.remote]
-ignore_token_for_push = true
-
 [tool.semantic_release.branches.main]
 match = "main"
 prerelease = false
 
-[tool.semantic_release.branches.alpha]
-# Matches branches with the prefixes 'feat/', 'fix/', or 'perf/'.
-match = "^(feat|fix|perf)/.+"
-prerelease = true
-prerelease_token = "alpha"
-
 [tool.semantic_release.branches.dev]
-match = "dev"
+match = "(?!main$).*"
 prerelease = true
 prerelease_token = "dev"
 

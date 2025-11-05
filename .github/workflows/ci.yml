@@ -97,12 +97,18 @@ jobs:
     - quality
     - test
     runs-on: ubuntu-latest
+
     permissions:
       id-token: write
       contents: write
+
     concurrency:
       group: ${{ github.workflow }}-release-${{ github.ref_name }}
       cancel-in-progress: false
+
+    outputs:
+      released: ${{ steps.release.outputs.released || 'false' }}
+
 
     steps:
     - name: Checkout repository on release branch
@@ -112,30 +118,37 @@ jobs:
         fetch-depth: 0
         ssh-key: ${{ secrets.DEPLOY_KEY }}
 
-    - name: Test Python Semantic Release
-      id: test-release
-      uses: python-semantic-release/python-semantic-release@v10.4.1
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: ${{ env.UV_VERSION }}
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Configure git
+      run: |
+        git config --local user.email "github-actions@github.com"
+        git config --local user.name "GitHub Actions"
+
+    - name: Run Python Semantic Release (NOOP)
+      id: psr-noop
       if: github.ref_name != 'main'
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        no_operation_mode: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        uv run --with python-semantic-release semantic-release --noop version
 
-    - name: Run Semantic Version Release
+    - name: Run Python Semantic Release
       id: release
-      uses: python-semantic-release/python-semantic-release@v10.4.1
       if: github.ref_name == 'main'
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        git_committer_name: github-actions
-        git_committer_email: actions@users.noreply.github.com
-
-
-    - name: Upload to GitHub Release Assets
-      uses: python-semantic-release/publish-action@v10.4.1
-      if: steps.release.outputs.released == 'true'
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ steps.release.outputs.tag }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        uv run --with python-semantic-release semantic-release version
 
     - name: Upload Distribution Artifacts
       uses: actions/upload-artifact@v5
@@ -143,8 +156,6 @@ jobs:
         name: distribution-artifacts
         path: dist
 
-    outputs:
-      released: ${{ steps.release.outputs.released || 'false' }}
 
   deploy:
     runs-on: ubuntu-latest
