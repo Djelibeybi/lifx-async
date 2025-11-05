@@ -15,7 +15,7 @@ jobs:
     name: Auto Label PR
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/labeler@v5
+    - uses: actions/labeler@v6
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         configuration-path: .github/labeler.yml
@@ -44,7 +44,7 @@ jobs:
     name: Validate PR Title
     runs-on: ubuntu-latest
     steps:
-    - uses: amannn/action-semantic-pull-request@v5
+    - uses: amannn/action-semantic-pull-request@v6
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -83,10 +83,10 @@ jobs:
     name: Welcome First-Time Contributors
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/first-interaction@v1
+    - uses: actions/first-interaction@v3
       with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        pr-message: |
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        pr_message: |
           👋 Thanks for opening your first pull request! We're excited to have you contributing to lifx-async.
 
           Here are a few things to check:
@@ -102,12 +102,12 @@ jobs:
     name: Check for Breaking Changes
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
 
     - name: Check for breaking changes
-      uses: actions/github-script@v7
+      uses: actions/github-script@v8
       with:
         script: |
           const { data: files } = await github.rest.pulls.listFiles({
