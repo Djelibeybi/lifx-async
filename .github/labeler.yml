@@ -12,9 +12,7 @@ network:
 
 protocol:
 - changed-files:
-  - any-glob-to-any-file:
-    - src/lifx/protocol/**
-    - protocol.yml
+  - any-glob-to-any-file: src/lifx/protocol/**
 
 api:
 - changed-files:
@@ -43,7 +41,6 @@ ci/cd:
 - changed-files:
   - any-glob-to-any-file:
     - .github/**
-    - scripts/**
 
 # Dependencies
 dependencies:
