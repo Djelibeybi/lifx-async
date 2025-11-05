@@ -146,12 +146,13 @@ class TestBatchOperationEdgeCases:
             for i in range(3)
         ]
         group = DeviceGroup(light_devices)
+        device_count = len(group.devices)
 
         # Should raise ExceptionGroup with all 3 failing
         with pytest.raises(ExceptionGroup) as exc_info:
             await group.set_power(True, duration=0.0)
 
-        assert len(exc_info.value.exceptions) == 3
+        assert len(exc_info.value.exceptions) == device_count
 
     async def test_batch_operation_mixed_success_failure(self, emulator_server):
         """Test that successful devices complete even when others fail."""
