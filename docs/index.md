@@ -113,7 +113,7 @@ uv sync
 
 - **Comprehensive Tests**: over 500 tests covering over 80% of the source code
 - **Connection Pooling**: Efficient connection reuse
-- **State Caching**: Reduces network traffic
+- **Stores State**: Reduces network traffic
 
 ### Developer Friendly
 
