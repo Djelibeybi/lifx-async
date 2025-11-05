@@ -140,3 +140,6 @@ exclude_commit_patterns = [
 [tool.semantic_release.changelog.default_templates]
 changelog_file = "docs/changelog.md"
 output_format = "md"
+
+[tool.semantic_release.remote]
+ignore_token_for_push = true

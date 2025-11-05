@@ -139,16 +139,18 @@ jobs:
       if: github.ref_name != 'main'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        uv run --with python-semantic-release semantic-release --noop version
+        uv run --with python-semantic-release semantic-release --noop --verbose version
 
     - name: Run Python Semantic Release
       id: release
       if: github.ref_name == 'main'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        uv run --with python-semantic-release semantic-release version
+        uv run --with python-semantic-release --verbose semantic-release version
 
     - name: Upload Distribution Artifacts
       uses: actions/upload-artifact@v5
