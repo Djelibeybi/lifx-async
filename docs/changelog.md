@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.1 (2025-11-05)
+
+### Bug Fixes
+
+- Dummy fix to trigger semantic release
+  ([`12786b5`](https://github.com/Djelibeybi/lifx-async/commit/12786b54e76cd51c023d64f7a23fc963252421f8))
+
+
 ## v1.1.0 (2025-11-05)
 
 ### Features
