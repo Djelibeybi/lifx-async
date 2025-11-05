@@ -119,6 +119,9 @@ build_command = """
     uv build
 """
 
+[tool.semantic_release.remote]
+ignore_token_for_push = true
+
 [tool.semantic_release.branches.main]
 match = "main"
 prerelease = false
