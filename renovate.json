@@ -35,7 +35,7 @@
       "dependencies"
     ],
     "automerge": true,
-    "stabilityDays": 0
+    "minimumReleaseAge": null
   },
   "packageRules": [
     {
@@ -52,10 +52,6 @@
     },
     {
       "description": "Auto-merge patch and minor updates for test dependencies",
-      "matchPackagePatterns": [
-        "^pytest",
-        "^pytest-"
-      ],
       "matchUpdateTypes": [
         "patch",
         "minor"
@@ -64,19 +60,23 @@
       "labels": [
         "dependencies",
         "testing"
+      ],
+      "matchPackageNames": [
+        "/^pytest/",
+        "/^pytest-/"
       ]
     },
     {
       "description": "Group linting and formatting tools",
-      "matchPackagePatterns": [
-        "^ruff",
-        "^pyright"
-      ],
       "groupName": "code quality tools",
       "automerge": true,
       "labels": [
         "dependencies",
         "code-quality"
+      ],
+      "matchPackageNames": [
+        "/^ruff/",
+        "/^pyright/"
       ]
     },
     {
@@ -124,34 +124,9 @@
       "pinDigests": true
     }
   ],
-  "regexManagers": [
-    {
-      "description": "Update Python version in README examples",
-      "fileMatch": [
-        "^README\\.md$"
-      ],
-      "matchStrings": [
-        "python-version: [\"']?(?<currentValue>[0-9.]+)[\"']?"
-      ],
-      "depNameTemplate": "python",
-      "datasourceTemplate": "python-version"
-    },
-    {
-      "description": "Update uv version in workflows",
-      "fileMatch": [
-        "^\\.github/workflows/.+\\.ya?ml$"
-      ],
-      "matchStrings": [
-        "UV_VERSION: [\"']?(?<currentValue>[0-9.]+)[\"']?"
-      ],
-      "depNameTemplate": "uv",
-      "datasourceTemplate": "github-releases",
-      "packageNameTemplate": "astral-sh/uv"
-    }
-  ],
   "pip_requirements": {
-    "fileMatch": [
-      "^pyproject\\.toml$"
+    "managerFilePatterns": [
+      "/^pyproject\\.toml$/"
     ]
   },
   "postUpdateOptions": [
@@ -161,8 +136,8 @@
     {
       "description": "Update versions in CLAUDE.md",
       "customType": "regex",
-      "fileMatch": [
-        "^CLAUDE\\.md$"
+      "managerFilePatterns": [
+        "/^CLAUDE\\.md$/"
       ],
       "matchStrings": [
         "uv add --dev (?<depName>[a-zA-Z0-9-]+)(?:>=(?<currentValue>[0-9.]+))?"
