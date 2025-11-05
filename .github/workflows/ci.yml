@@ -110,6 +110,7 @@ jobs:
       with:
         ref: ${{ github.head_ref || github.ref_name }}
         fetch-depth: 0
+        ssh-key: ${{ secrets.DEPLOY_KEY }}
 
     - name: Test Python Semantic Release
       id: test-release
@@ -127,6 +128,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         git_committer_name: github-actions
         git_committer_email: actions@users.noreply.github.com
+
 
     - name: Upload to GitHub Release Assets
       uses: python-semantic-release/publish-action@v10.4.1
