@@ -482,8 +482,6 @@ async def discover_device_by_label(
             print(f"Found device at {device.ip}:{device.port}")
         ```
     """
-    import asyncio
-
     from lifx.devices.base import Device
     from lifx.exceptions import LifxError
 
@@ -503,15 +501,10 @@ async def discover_device_by_label(
             )
 
             async with device:
-                device_label = await asyncio.wait_for(
-                    device.get_label(use_cache=False),
-                    timeout=timeout
-                    / len(devices),  # Divide remaining time among devices
-                )
-
                 # Match label (case-insensitive)
-                if device_label.lower() == label.lower():
-                    return discovered_device
+                if device.label is not None:
+                    if device.label[0].lower() == label.lower():
+                        return discovered_device
 
         except (LifxError, TimeoutError):
             # Skip devices that don't respond or error out

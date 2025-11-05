@@ -37,11 +37,19 @@ class InfraredLight(Light):
         ```
     """
 
-    async def get_infrared(self, use_cache: bool = True) -> float:
-        """Get current infrared brightness.
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize InfraredLight with additional state attributes."""
+        super().__init__(*args, **kwargs)
+        # Infrared-specific state storage
+        self._infrared: tuple[float, float] | None = None
 
-        Args:
-            use_cache: Use cached value if available (default True)
+    async def _setup(self) -> None:
+        """Populate Infrared light capabilities, state and metadata."""
+        await super()._setup()
+        await self.get_infrared()
+
+    async def get_infrared(self) -> float:
+        """Get current infrared brightness.
 
         Returns:
             Infrared brightness (0.0-1.0)
@@ -58,19 +66,16 @@ class InfraredLight(Light):
                 print(f"IR LEDs active at {brightness * 100}%")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("infrared")
-            if cached is not None:
-                return cached
-
         # Request infrared state
         state = await self.connection.request(packets.Light.GetInfrared())
 
         # Convert from uint16 (0-65535) to float (0.0-1.0)
         brightness = state.brightness / 65535.0
 
-        # Cache the result
-        self._set_cached("infrared", brightness)
+        # Store state with timestamp
+        import time
+
+        self._infrared = (brightness, time.time())
 
         _LOGGER.debug(
             {
@@ -116,8 +121,10 @@ class InfraredLight(Light):
             packets.Light.SetInfrared(brightness=brightness_u16),
         )
 
-        # Update cache
-        self._set_cached("infrared", brightness)
+        # Update state with timestamp
+        import time
+
+        self._infrared = (brightness, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -128,10 +135,11 @@ class InfraredLight(Light):
         )
 
     @property
-    def infrared(self) -> float | None:
-        """Get cached infrared brightness if available.
+    def infrared(self) -> tuple[float, float] | None:
+        """Get stored infrared brightness with timestamp if available.
 
         Returns:
-            Cached brightness (use get_infrared() for fresh data)
+            Tuple of (brightness, timestamp) or None if never fetched.
+            Use get_infrared() to fetch from device.
         """
-        return self._get_cached("infrared")
+        return self._infrared

@@ -57,18 +57,25 @@ class TestDevice:
         label = await device.get_label()
 
         assert label == "Living Room Light"
-        # Verify it was cached
-        cached = device._get_cached("label")
-        assert cached == "Living Room Light"
+        # Verify it was stored with timestamp
+        stored = device.label
+        assert stored is not None
+        stored_label, timestamp = stored
+        assert stored_label == "Living Room Light"
+        assert isinstance(timestamp, float)
 
-    async def test_get_label_use_cache(self, device: Device) -> None:
-        """Test getting label from cache."""
-        device._set_cached("label", "Cached Label")
+    async def test_label_property_with_timestamp(self, device: Device) -> None:
+        """Test label property returns tuple with timestamp."""
+        # Set stored label with timestamp
+        test_time = time.time()
+        device._label = ("Stored Label", test_time)
 
-        # Should not make network request
-        label = await device.get_label(use_cache=True)
-
-        assert label == "Cached Label"
+        # Access property
+        stored = device.label
+        assert stored is not None
+        label_text, timestamp = stored
+        assert label_text == "Stored Label"
+        assert timestamp == test_time
 
     async def test_set_label(self, device: Device) -> None:
         """Test setting device label."""
@@ -84,9 +91,12 @@ class TestDevice:
         packet = call_args[0][0]
         assert packet.label.startswith(b"New Label")
 
-        # Verify cache was updated
-        cached = device._get_cached("label")
-        assert cached == "New Label"
+        # Verify store was updated with timestamp
+        stored = device.label
+        assert stored is not None
+        stored_label, timestamp = stored
+        assert stored_label == "New Label"
+        assert isinstance(timestamp, float)
 
     async def test_set_label_too_long(self, device: Device) -> None:
         """Test setting label that's too long."""
@@ -205,35 +215,17 @@ class TestDevice:
         assert firmware.version_major == 3
         assert firmware.version_minor == 5
 
-    def test_cache_expiration(self, device: Device) -> None:
-        """Test that cache entries expire."""
-        import time
+    def test_label_property_none_when_not_fetched(self, device: Device) -> None:
+        """Test that label property is None when not yet fetched."""
+        assert device.label is None
 
-        # Cache a value with very short TTL
-        device._set_cached("test", "value", ttl=0.1)
+    def test_power_property_none_when_not_fetched(self, device: Device) -> None:
+        """Test that power property is None when not yet fetched."""
+        assert device.power is None
 
-        # Should be available immediately
-        assert device._get_cached("test") == "value"
-
-        # Wait for expiration
-        time.sleep(0.15)
-
-        # Should be expired
-        assert device._get_cached("test") is None
-
-    def test_invalidate_cache(self, device: Device) -> None:
-        """Test cache invalidation."""
-        device._set_cached("key1", "value1")
-        device._set_cached("key2", "value2")
-
-        # Invalidate one key
-        device._invalidate_cache("key1")
-        assert device._get_cached("key1") is None
-        assert device._get_cached("key2") == "value2"
-
-        # Invalidate all
-        device._invalidate_cache()
-        assert device._get_cached("key2") is None
+    def test_version_property_none_when_not_fetched(self, device: Device) -> None:
+        """Test that version property is None when not yet fetched."""
+        assert device.version is None
 
     def test_repr(self, device: Device) -> None:
         """Test string representation."""
@@ -330,11 +322,12 @@ class TestLocationAndGroupManagement:
         assert packet.location == expected_uuid.bytes
         assert packet.label == label.encode("utf-8")[:32].ljust(32, b"\x00")
 
-        # Verify cache was updated
-        cached_location = device.location
-        assert cached_location is not None
-        assert cached_location.location == expected_uuid.bytes
-        assert cached_location.label == label
+        # Verify store was updated (location property returns location name as string)
+        stored_location = device.location
+        assert stored_location is not None
+        location_name, timestamp = stored_location
+        assert location_name == label
+        assert isinstance(timestamp, float)
 
     async def test_set_group_generates_uuid(self, device: Device) -> None:
         """Test that set_group generates deterministic UUID from label."""
@@ -361,11 +354,12 @@ class TestLocationAndGroupManagement:
         assert packet.group == expected_uuid.bytes
         assert packet.label == label.encode("utf-8")[:32].ljust(32, b"\x00")
 
-        # Verify cache was updated
-        cached_group = device.group
-        assert cached_group is not None
-        assert cached_group.group == expected_uuid.bytes
-        assert cached_group.label == label
+        # Verify store was updated (group property returns group name as string)
+        stored_group = device.group
+        assert stored_group is not None
+        group_name, timestamp = stored_group
+        assert group_name == label
+        assert isinstance(timestamp, float)
 
     async def test_multiple_devices_same_location_label(self) -> None:
         """Test that multiple devices with same location label get same UUID."""
@@ -389,11 +383,12 @@ class TestLocationAndGroupManagement:
             mock_conn.request.reset_mock()
             await device2.set_location(label)
 
-        # Both devices should have the same location UUID
+        # Both devices should have the same location name
         assert device1.location is not None
         assert device2.location is not None
-        assert device1.location.location == device2.location.location
-        assert device1.location.label == device2.location.label == label
+        loc1_name, ts1 = device1.location
+        loc2_name, ts2 = device2.location
+        assert loc1_name == loc2_name == label
 
     async def test_multiple_devices_same_group_label(self) -> None:
         """Test that multiple devices with same group label get same UUID."""
@@ -417,11 +412,12 @@ class TestLocationAndGroupManagement:
             mock_conn.request.reset_mock()
             await device2.set_group(label)
 
-        # Both devices should have the same group UUID
+        # Both devices should have the same group name
         assert device1.group is not None
         assert device2.group is not None
-        assert device1.group.group == device2.group.group
-        assert device1.group.label == device2.group.label == label
+        grp1_name, ts1 = device1.group
+        grp2_name, ts2 = device2.group
+        assert grp1_name == grp2_name == label
 
     async def test_set_location_empty_label_fails(self, device: Device) -> None:
         """Test that empty location label raises ValueError."""
@@ -570,11 +566,12 @@ class TestLocationAndGroupManagement:
         assert packet.location == existing_uuid
         assert packet.label == label.encode("utf-8")[:32].ljust(32, b"\x00")
 
-        # Verify cache was updated with existing UUID
-        cached_location = device.location
-        assert cached_location is not None
-        assert cached_location.location == existing_uuid
-        assert cached_location.label == label
+        # Verify store was updated with location name
+        stored_location = device.location
+        assert stored_location is not None
+        location_name, timestamp = stored_location
+        assert location_name == label
+        assert isinstance(timestamp, float)
 
     async def test_set_location_creates_new_uuid_when_not_found(
         self, device: Device
@@ -668,11 +665,12 @@ class TestLocationAndGroupManagement:
         assert packet.group == existing_uuid
         assert packet.label == label.encode("utf-8")[:32].ljust(32, b"\x00")
 
-        # Verify cache was updated with existing UUID
-        cached_group = device.group
-        assert cached_group is not None
-        assert cached_group.group == existing_uuid
-        assert cached_group.label == label
+        # Verify store was updated with group name
+        stored_group = device.group
+        assert stored_group is not None
+        group_name, timestamp = stored_group
+        assert group_name == label
+        assert isinstance(timestamp, float)
 
     async def test_set_group_creates_new_uuid_when_not_found(
         self, device: Device

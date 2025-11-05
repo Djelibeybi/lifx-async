@@ -39,7 +39,7 @@ class MultiZoneEffect:
 
     def __post_init__(self) -> None:
         """Initialize defaults and validate fields."""
-        # Initialize default parameters if not provided
+
         if self.parameters is None:
             self.parameters = [0] * 8
 
@@ -131,11 +131,26 @@ class MultiZoneLight(Light):
         ```
     """
 
-    async def get_zone_count(self, use_cache: bool = True) -> int:
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize MultiZoneLight with additional state attributes."""
+        super().__init__(*args, **kwargs)
+        # MultiZone-specific state storage
+        self._zone_count: tuple[int, float] | None = None
+        self._multizone_effect: tuple[MultiZoneEffect | None, float] | None = None
+        # Zone colors - list of all zone colors with single timestamp
+        # Updated whenever any zone query is performed
+        self._zones: tuple[list[HSBK], float] | None = None
+
+    async def _setup(self) -> None:
+        """Populate MultiZone light capabilities, state and metadata."""
+        await super()._setup()
+        await self.get_extended_color_zones(start=0, end=255)
+
+    async def get_zone_count(self) -> int:
         """Get the number of zones in the device.
 
-        Args:
-            use_cache: Use cached value if available (default True)
+        Always fetches from device.
+        Use the `zone_count` property to access stored value.
 
         Returns:
             Number of zones
@@ -151,10 +166,6 @@ class MultiZoneLight(Light):
             print(f"Device has {zone_count} zones")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("zone_count")
-            if cached is not None:
-                return cached  # Query zone 0 to get count
         # Request automatically unpacks response
         if self.capabilities and self.capabilities.has_extended_multizone:
             state = await self.connection.request(
@@ -167,7 +178,9 @@ class MultiZoneLight(Light):
 
         count = state.count
 
-        self._set_cached("zone_count", count)
+        import time
+
+        self._zone_count = (count, time.time())
 
         _LOGGER.debug(
             {
@@ -186,14 +199,15 @@ class MultiZoneLight(Light):
         self,
         start: int,
         end: int,
-        use_cache: bool = False,
     ) -> list[HSBK]:
         """Get colors for a range of zones using GetColorZones.
+
+        Always fetches from device.
+        Use `zones` property to access stored values.
 
         Args:
             start: Start zone index (inclusive)
             end: End zone index (inclusive)
-            use_cache: Use cached value if available (default False)
 
         Returns:
             List of HSBK colors, one per zone
@@ -222,12 +236,6 @@ class MultiZoneLight(Light):
         zone_count = await self.get_zone_count()
         end = min(zone_count - 1, end)
 
-        cache_key = f"zones_{start}_{end}"
-        if use_cache:
-            cached = self._get_cached(cache_key)
-            if cached is not None:
-                return cached
-
         colors = []
         current_start = start
 
@@ -251,7 +259,26 @@ class MultiZoneLight(Light):
 
         result = colors
 
-        self._set_cached(cache_key, result)
+        # Update zone storage with fetched colors
+        import time
+
+        timestamp = time.time()
+
+        # Initialize or get existing zones array
+        if self._zones is None:
+            zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
+        else:
+            zones_array, _ = self._zones
+            # Ensure array is the right size
+            if len(zones_array) != zone_count:
+                zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
+
+        # Update the fetched range
+        for i, color in enumerate(result):
+            zones_array[start + i] = color
+
+        # Store updated zones with new timestamp
+        self._zones = (zones_array, timestamp)
 
         _LOGGER.debug(
             {
@@ -277,15 +304,15 @@ class MultiZoneLight(Light):
 
         return result
 
-    async def get_extended_color_zones(
-        self, start: int, end: int, use_cache: bool = False
-    ) -> list[HSBK]:
+    async def get_extended_color_zones(self, start: int, end: int) -> list[HSBK]:
         """Get colors for a range of zones using GetExtendedColorZones.
+
+        Always fetches from device.
+        Use `zones` property to access stored values.
 
         Args:
             start: Start zone index (inclusive)
             end: End zone index (inclusive)
-            use_cache: Use cached value if available (default False)
 
         Returns:
             List of HSBK colors, one per zone
@@ -314,14 +341,8 @@ class MultiZoneLight(Light):
         zone_count = await self.get_zone_count()
         end = min(zone_count - 1, end)
 
-        cache_key = f"zones_{start}_{end}"
-        if use_cache:
-            cached = self._get_cached(cache_key)
-            if cached is not None:
-                return cached
-
         if self.capabilities and not self.capabilities.has_extended_multizone:
-            return await self.get_color_zones(start=start, end=end, use_cache=use_cache)
+            return await self.get_color_zones(start=start, end=end)
 
         colors = []
 
@@ -341,8 +362,16 @@ class MultiZoneLight(Light):
                 protocol_hsbk = packet.colors[i]
                 colors.append(HSBK.from_protocol(protocol_hsbk))
 
-        result = colors
-        self._set_cached(cache_key, result)
+        # Update _zones attribute
+        import time
+
+        timestamp = time.time()
+
+        # Store all zones directly - device sent complete state
+        self._zones = (colors, timestamp)
+
+        # Return only the requested range to caller
+        result = colors[start : end + 1]
 
         _LOGGER.debug(
             {
@@ -350,18 +379,10 @@ class MultiZoneLight(Light):
                 "method": "get_extended_color_zones",
                 "action": "query",
                 "reply": {
-                    "start": start,
-                    "end": end,
-                    "zone_count": len(result),
-                    "colors": [
-                        {
-                            "hue": c.hue,
-                            "saturation": c.saturation,
-                            "brightness": c.brightness,
-                            "kelvin": c.kelvin,
-                        }
-                        for c in result
-                    ],
+                    "total_zones": len(colors),
+                    "requested_start": start,
+                    "requested_end": end,
+                    "returned_count": len(result),
                 },
             }
         )
@@ -430,8 +451,28 @@ class MultiZoneLight(Light):
             ),
         )
 
-        # Invalidate cache for affected zones
-        self._invalidate_cache(f"zones_{start}_{end}")
+        # Update _zones attribute with the values we just set
+        import time
+
+        timestamp = time.time()
+
+        # Initialize or get existing zones array
+        if self._zones is None:
+            # Need zone_count to initialize array
+            if self._zone_count is None:
+                zone_count = await self.get_zone_count()
+            else:
+                zone_count, _ = self._zone_count
+            zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
+        else:
+            zones_array, _ = self._zones
+
+        # Update the zones we just set
+        for i in range(start, min(end + 1, len(zones_array))):
+            zones_array[i] = color
+
+        # Store updated zones with new timestamp
+        self._zones = (zones_array, timestamp)
 
         _LOGGER.debug(
             {
@@ -512,9 +553,30 @@ class MultiZoneLight(Light):
             ),
         )
 
-        # Invalidate cache
-        end_index = zone_index + len(colors) - 1
-        self._invalidate_cache(f"zones_{zone_index}_{end_index}")
+        # Update _zones attribute with the values we just set
+        import time
+
+        timestamp = time.time()
+
+        # Initialize or get existing zones array
+        if self._zones is None:
+            # Need zone_count to initialize array
+            if self._zone_count is None:
+                zone_count = await self.get_zone_count()
+            else:
+                zone_count, _ = self._zone_count
+            zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
+        else:
+            zones_array, _ = self._zones
+
+        # Update the zones we just set
+        for i, color in enumerate(colors):
+            zone_idx = zone_index + i
+            if zone_idx < len(zones_array):
+                zones_array[zone_idx] = color
+
+        # Store updated zones with new timestamp
+        self._zones = (zones_array, timestamp)
 
         _LOGGER.debug(
             {
@@ -539,13 +601,11 @@ class MultiZoneLight(Light):
             }
         )
 
-    async def get_multizone_effect(
-        self, use_cache: bool = True
-    ) -> MultiZoneEffect | None:
+    async def get_multizone_effect(self) -> MultiZoneEffect | None:
         """Get current multizone effect.
 
-        Args:
-            use_cache: Use cached value if available (default True)
+        Always fetches from device.
+        Use the `multizone_effect` property to access stored value.
 
         Returns:
             MultiZoneEffect if an effect is active, None if no effect
@@ -562,11 +622,6 @@ class MultiZoneLight(Light):
                 print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("multizone_effect")
-            if cached is not None:
-                return cached
-
         # Request automatically unpacks response
         state = await self.connection.request(packets.MultiZone.GetEffect())
 
@@ -595,7 +650,9 @@ class MultiZoneLight(Light):
                 parameters=parameters,
             )
 
-        self._set_cached("multizone_effect", result)
+        import time
+
+        self._multizone_effect = (result, time.time())
 
         _LOGGER.debug(
             {
@@ -664,11 +721,11 @@ class MultiZoneLight(Light):
             ),
         )
 
-        # Update cache
-        self._set_cached(
-            "multizone_effect",
-            effect if effect.effect_type != MultiZoneEffectType.OFF else None,
-        )
+        # Update state attribute
+        import time
+
+        result = effect if effect.effect_type != MultiZoneEffectType.OFF else None
+        self._multizone_effect = (result, time.time())
 
         _LOGGER.debug(
             {
@@ -772,24 +829,36 @@ class MultiZoneLight(Light):
             }
         )
 
-    # Cached value properties
+    # Stored value properties
     @property
-    def zone_count(self) -> int | None:
-        """Get cached zone count if available.
+    def zone_count(self) -> tuple[int, float] | None:
+        """Get stored zone count with timestamp if available.
 
         Returns:
-            Cached zone count (use get_zone_count() for fresh data)
+            Tuple of (zone_count, timestamp) or None if never fetched.
+            Use get_zone_count() to fetch from device.
         """
-        return self._get_cached("zone_count")
+        return self._zone_count
 
     @property
-    def multizone_effect(self) -> MultiZoneEffect | None:
-        """Get cached multizone effect if available.
+    def multizone_effect(self) -> tuple[MultiZoneEffect | None, float] | None:
+        """Get stored multizone effect with timestamp if available.
 
         Returns:
-            Cached multizone effect (use get_multizone_effect() for fresh data)
+            Tuple of (effect, timestamp) or None if never fetched.
+            Use get_multizone_effect() to fetch from device.
         """
-        return self._get_cached("multizone_effect")
+        return self._multizone_effect
+
+    @property
+    def zones(self) -> tuple[list[HSBK], float] | None:
+        """Get stored zone colors with timestamp if available.
+
+        Returns:
+            Tuple of (zone_colors, timestamp) or None if never fetched.
+            Use get_color_zones() or get_extended_color_zones() to fetch from device.
+        """
+        return self._zones
 
     def __repr__(self) -> str:
         """String representation of multizone light."""

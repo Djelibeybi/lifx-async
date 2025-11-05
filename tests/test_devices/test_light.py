@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from lifx.color import HSBK
@@ -37,13 +39,23 @@ class TestLight:
         )
         light.connection.request.return_value = mock_state
 
-        color = await light.get_color()
+        color, power, label = await light.get_color()
 
         assert isinstance(color, HSBK)
         assert color.hue == pytest.approx(180, abs=1)
         assert color.saturation == pytest.approx(0.5, abs=0.01)
         assert color.brightness == pytest.approx(0.75, abs=0.01)
         assert color.kelvin == 3500
+        assert power is True
+        assert label == "Test Light"
+
+        # Verify it was stored with timestamp
+        stored = light.color
+        assert stored is not None
+        stored_color, timestamp = stored
+        assert isinstance(stored_color, HSBK)
+        assert stored_color.hue == pytest.approx(180, abs=1)
+        assert isinstance(timestamp, float)
 
     async def test_set_color(self, light: Light) -> None:
         """Test setting light color."""
@@ -64,19 +76,25 @@ class TestLight:
 
     async def test_set_brightness(self, light: Light) -> None:
         """Test setting brightness."""
-        # Mock SET operation returns True
-        light.connection.request.return_value = True
-
-        # Cache current color
-        current_color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
-        light._set_cached("color", current_color)
+        # Mock get_color response
+        color_response = packets.Light.StateColor(
+            color=HSBK(
+                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
+            ).to_protocol(),
+            power=65535,
+            label="Test Light",
+        )
+        # Mock set_color response (returns True)
+        light.connection.request.side_effect = [color_response, True]
 
         await light.set_brightness(0.25, duration=2.0)
 
         # Verify set_color was called with modified brightness
-        light.connection.request.assert_called_once()
-        call_args = light.connection.request.call_args
-        packet = call_args[0][0]
+        assert light.connection.request.call_count == 2  # get_color + set_color
+
+        # Get the set_color call (second call)
+        calls = light.connection.request.call_args_list
+        packet = calls[1][0][0]  # Second call, first arg, first element
 
         # Convert back to verify
         result_color = HSBK.from_protocol(packet.color)
@@ -85,69 +103,93 @@ class TestLight:
 
     async def test_set_brightness_invalid(self, light: Light) -> None:
         """Test setting invalid brightness."""
-        light._set_cached("color", HSBK(hue=0, saturation=1, brightness=1, kelvin=3500))
+        light._color = (
+            HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+            time.time(),
+        )
 
         with pytest.raises(ValueError, match="Brightness must be between"):
             await light.set_brightness(1.5)
 
     async def test_set_kelvin(self, light: Light) -> None:
         """Test setting color temperature."""
-        # Mock SET operation returns True
-        light.connection.request.return_value = True
-
-        # Cache current color
-        current_color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
-        light._set_cached("color", current_color)
+        # Mock get_color response
+        color_response = packets.Light.StateColor(
+            color=HSBK(
+                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
+            ).to_protocol(),
+            power=65535,
+            label="Test Light",
+        )
+        # Mock set_color response
+        light.connection.request.side_effect = [color_response, True]
 
         await light.set_kelvin(6500, duration=1.0)
 
         # Verify set_color was called with modified kelvin
-        light.connection.request.assert_called_once()
-        call_args = light.connection.request.call_args
-        packet = call_args[0][0]
+        assert light.connection.request.call_count == 2
+
+        # Get the set_color call (second call)
+        calls = light.connection.request.call_args_list
+        packet = calls[1][0][0]
         assert packet.color.kelvin == 6500
 
     async def test_set_kelvin_invalid(self, light: Light) -> None:
         """Test setting invalid temperature."""
-        light._set_cached("color", HSBK(hue=0, saturation=1, brightness=1, kelvin=3500))
+        light._color = (
+            HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+            time.time(),
+        )
 
         with pytest.raises(ValueError, match="Kelvin must be"):
             await light.set_kelvin(10000)
 
     async def test_set_hue(self, light: Light) -> None:
         """Test setting hue."""
-        # Mock SET operation returns True
-        light.connection.request.return_value = True
-
-        # Cache current color
-        current_color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
-        light._set_cached("color", current_color)
+        # Mock get_color response
+        color_response = packets.Light.StateColor(
+            color=HSBK(
+                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
+            ).to_protocol(),
+            power=65535,
+            label="Test Light",
+        )
+        # Mock set_color response
+        light.connection.request.side_effect = [color_response, True]
 
         await light.set_hue(240)
 
         # Verify set_color was called with modified hue
-        light.connection.request.assert_called_once()
-        call_args = light.connection.request.call_args
-        packet = call_args[0][0]
+        assert light.connection.request.call_count == 2
+
+        # Get the set_color call (second call)
+        calls = light.connection.request.call_args_list
+        packet = calls[1][0][0]
 
         result_color = HSBK.from_protocol(packet.color)
         assert result_color.hue == pytest.approx(240, abs=1)
 
     async def test_set_saturation(self, light: Light) -> None:
         """Test setting saturation."""
-        # Mock SET operation returns True
-        light.connection.request.return_value = True
-
-        # Cache current color
-        current_color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
-        light._set_cached("color", current_color)
+        # Mock get_color response
+        color_response = packets.Light.StateColor(
+            color=HSBK(
+                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
+            ).to_protocol(),
+            power=65535,
+            label="Test Light",
+        )
+        # Mock set_color response
+        light.connection.request.side_effect = [color_response, True]
 
         await light.set_saturation(1.0)
 
         # Verify set_color was called with modified saturation
-        light.connection.request.assert_called_once()
-        call_args = light.connection.request.call_args
-        packet = call_args[0][0]
+        assert light.connection.request.call_count == 2
+
+        # Get the set_color call (second call)
+        calls = light.connection.request.call_args_list
+        packet = calls[1][0][0]
 
         result_color = HSBK.from_protocol(packet.color)
         assert result_color.saturation == pytest.approx(1.0, abs=0.01)

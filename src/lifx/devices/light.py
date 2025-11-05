@@ -43,17 +43,29 @@ class Light(Device):
         ```
     """
 
-    async def get_color(self, use_cache: bool = True) -> HSBK:
-        """Get current light color.
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize Light with additional state attributes."""
+        super().__init__(*args, **kwargs)
+        # Light-specific state storage
+        self._color: tuple[HSBK, float] | None = None
 
-        Note: This method also caches label and power state from the StateColor
-        response, reducing the need for separate get_label() and get_power() calls.
+    async def _setup(self) -> None:
+        """Populate light capabilities, state and metadata."""
+        await super()._setup()
+        await self.get_color()
 
-        Args:
-            use_cache: Use cached value if available (default True)
+    async def get_color(self) -> tuple[HSBK, bool, str]:
+        """Get current light color, power, and label.
+
+        Always fetches from device. Use the `color` property to access stored value.
+
+        Returns a tuple containing:
+        - color: HSBK color
+        - power: Power state (True=on, False=off)
+        - label: Device label/name
 
         Returns:
-            HSBK color
+            Tuple of (color, power, label)
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -62,25 +74,25 @@ class Light(Device):
 
         Example:
             ```python
-            color = await light.get_color()
-            print(f"Hue: {color.hue}°, Brightness: {color.brightness * 100}%")
+            color, power, label = await light.get_color()
+            print(f"{label}: Hue: {color.hue}°, Power: {power}")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("color")
-            if cached is not None:
-                return cached
-
         # Request automatically unpacks response and decodes labels
         state = await self.connection.request(packets.Light.GetColor())
 
         # Convert from protocol HSBK to user-friendly HSBK
         color = HSBK.from_protocol(state.color)
+        power = state.power > 0
+        label = state.label
 
-        # Cache color and other fields from StateColor response
-        self._set_cached("color", color)
-        self._set_cached("label", state.label)  # Already decoded to string
-        self._set_cached("power", state.power > 0)
+        # Store color and other fields from StateColor response with timestamps
+        import time
+
+        timestamp = time.time()
+        self._color = (color, timestamp)
+        self._label = (label, timestamp)  # Already decoded to string
+        self._power = (power, timestamp)
 
         _LOGGER.debug(
             {
@@ -98,7 +110,7 @@ class Light(Device):
             }
         )
 
-        return color
+        return color, power, label
 
     async def set_color(
         self,
@@ -138,8 +150,10 @@ class Light(Device):
             ),
         )
 
-        # Update cache
-        self._set_cached("color", color)
+        # Update state with timestamp
+        import time
+
+        self._color = (color, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -182,7 +196,7 @@ class Light(Device):
             )
 
         # Get current color
-        current_color = await self.get_color(use_cache=True)
+        current_color, _, _ = await self.get_color()
 
         # Create new color with modified brightness
         new_color = current_color.with_brightness(brightness)
@@ -216,7 +230,7 @@ class Light(Device):
             raise ValueError(f"Kelvin must be 1500-9000, got {kelvin}")
 
         # Get current color
-        current_color = await self.get_color(use_cache=True)
+        current_color, _, _ = await self.get_color()
 
         # Create new color with modified temperature and no saturation
         new_color = current_color.with_kelvin(kelvin).with_saturation(0)
@@ -252,7 +266,7 @@ class Light(Device):
             )
 
         # Get current color
-        current_color = await self.get_color(use_cache=True)
+        current_color, _, _ = await self.get_color()
 
         # Create new color with modified hue
         new_color = current_color.with_hue(hue)
@@ -285,7 +299,7 @@ class Light(Device):
             raise ValueError(f"Saturation must be 0.0-1.0, got {saturation}")
 
         # Get current color
-        current_color = await self.get_color(use_cache=True)
+        current_color, _, _ = await self.get_color()
 
         # Create new color with modified saturation
         new_color = current_color.with_saturation(saturation)
@@ -293,14 +307,13 @@ class Light(Device):
         # Set the new color
         await self.set_color(new_color, duration=duration)
 
-    async def get_power(self, use_cache: bool = True) -> bool:
+    async def get_power(self) -> bool:
         """Get light power state (specific to light, not device).
+
+        Always fetches from device. Use the `power` property to access stored value.
 
         This overrides Device.get_power() as it queries the light-specific
         power state (packet type 116/118) instead of device power (packet type 20/22).
-
-        Args:
-            use_cache: Use cached value if available (default True)
 
         Returns:
             True if light is powered on, False otherwise
@@ -316,18 +329,15 @@ class Light(Device):
             print(f"Light power: {'ON' if is_on else 'OFF'}")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("power")
-            if cached is not None:
-                return cached
-
         # Request automatically unpacks response
         state = await self.connection.request(packets.Light.GetPower())
 
         # Power level is uint16 (0 or 65535)
         is_on = state.level > 0
 
-        self._set_cached("power", is_on)
+        import time
+
+        self._power = (is_on, time.time())
 
         _LOGGER.debug(
             {
@@ -374,8 +384,10 @@ class Light(Device):
             packets.Light.SetPower(level=level, duration=duration_ms),
         )
 
-        # Update cache
-        self._set_cached("power", on)
+        # Update state with timestamp
+        import time
+
+        self._power = (on, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -662,15 +674,42 @@ class Light(Device):
             transient=True,
         )
 
-    # Cached value properties
+    # Stored value properties
     @property
-    def color(self) -> HSBK | None:
-        """Get cached light color if available.
+    def color(self) -> tuple[HSBK, float] | None:
+        """Get stored light color with timestamp if available.
 
         Returns:
-            Cached color or None if not cached. Use get_color() to fetch from device.
+            Tuple of (color, timestamp) or None if never fetched.
+            Use get_color() to fetch from device.
         """
-        return self._get_cached("color")
+        return self._color
+
+    @property
+    def min_kelvin(self) -> int | None:
+        """Get the minimum supported kelvin value if available.
+
+        Returns:
+            Minimum kelvin value from product registry.
+        """
+        if (
+            self.capabilities is not None
+            and self.capabilities.temperature_range is not None
+        ):
+            return self.capabilities.temperature_range.min
+
+    @property
+    def max_kelvin(self) -> int | None:
+        """Get the maximum supported kelvin value if available.
+
+        Returns:
+            Maximum kelvin value from product registry.
+        """
+        if (
+            self.capabilities is not None
+            and self.capabilities.temperature_range is not None
+        ):
+            return self.capabilities.temperature_range.max
 
     def __repr__(self) -> str:
         """String representation of light."""

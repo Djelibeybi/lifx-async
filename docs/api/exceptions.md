@@ -312,7 +312,7 @@ Causes:
 ```python
 # Raises: LifxUnsupportedCommandError
 async with await Light.from_ip(ip) as light:
-    await light.set_zone_color(0, 5, Colors.RED)  # Not a multizone device
+    await light.set_color_zones(0, 5, Colors.RED)  # Not a multizone device
 ```
 
 Causes:

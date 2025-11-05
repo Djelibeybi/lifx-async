@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from lifx.color import HSBK
@@ -163,7 +165,7 @@ class TestMultiZoneLight:
         second_call = multizone_light.connection.request.call_args_list[1]
         assert second_call.kwargs.get("collect_multiple") is True
 
-    async def test_get_extended_color_zones_with_cache(
+    async def test_get_extended_color_zones_with_store(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
         """Test that caching works for extended color zones."""
@@ -187,16 +189,18 @@ class TestMultiZoneLight:
         )
         multizone_light.connection.request.return_value = mock_state
 
-        # First call should hit the device
-        result1 = await multizone_light.get_extended_color_zones(0, 4, use_cache=True)
+        # First call should hit the device and store the result
+        result1 = await multizone_light.get_extended_color_zones(0, 4)
         call_count_after_first = multizone_light.connection.request.call_count
 
-        # Second call with cache=True should not call the device again
-        result2 = await multizone_light.get_extended_color_zones(0, 4, use_cache=True)
+        # Each call hits the device (no automatic caching for range queries)
+        result2 = await multizone_light.get_extended_color_zones(0, 4)
         call_count_after_second = multizone_light.connection.request.call_count
 
         assert result1 == result2
-        assert call_count_after_second == call_count_after_first  # No additional calls
+        assert (
+            call_count_after_second > call_count_after_first
+        )  # Calls device each time
 
     async def test_get_extended_color_zones_invalid_range(
         self, multizone_light: MultiZoneLight
@@ -246,7 +250,11 @@ class TestMultiZoneLight:
         # Mock capabilities (no extended multizone for standard test)
         multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
 
-        # Mock SET operation returns True
+        # Pre-populate zone count store so get_zone_count() doesn't
+        # need to call the device
+        multizone_light._zone_count = (8, time.time())
+
+        # Mock set_color_zones response
         multizone_light.connection.request.return_value = True
 
         color = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=4000)
@@ -254,6 +262,8 @@ class TestMultiZoneLight:
 
         # Verify packet was sent
         multizone_light.connection.request.assert_called_once()
+
+        # Get the set_color_zones call
         call_args = multizone_light.connection.request.call_args
         packet = call_args[0][0]
 
@@ -267,6 +277,14 @@ class TestMultiZoneLight:
         self, multizone_light: MultiZoneLight
     ) -> None:
         """Test setting extended color zones."""
+        # Pre-populate zone count and zones store to avoid internal
+        # get_zone_count() calls
+        multizone_light._zone_count = (82, time.time())
+        multizone_light._zones = (
+            [HSBK(0, 0, 0, 3500)] * 82,
+            time.time(),
+        )
+
         # Mock SET operation returns True
         multizone_light.connection.request.return_value = True
 
@@ -279,6 +297,8 @@ class TestMultiZoneLight:
 
         # Verify packet was sent
         multizone_light.connection.request.assert_called_once()
+
+        # Get the set_extended_color_zones call
         call_args = multizone_light.connection.request.call_args
         packet = call_args[0][0]
 

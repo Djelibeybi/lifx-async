@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from lifx.devices.infrared import InfraredLight
@@ -109,37 +111,44 @@ class TestInfraredLight:
         mock_state = packets.Light.StateInfrared(brightness=32768)
         infrared_light.connection.request.return_value = mock_state
 
-        # First call should hit the device
+        # First call should hit the device and store the value
         brightness1 = await infrared_light.get_infrared()
         assert infrared_light.connection.request.call_count == 1
 
-        # Second call with use_cache=True should use cached value
-        brightness2 = await infrared_light.get_infrared(use_cache=True)
-        assert infrared_light.connection.request.call_count == 1  # No additional call
-        assert brightness1 == brightness2
-
-        # Call with use_cache=False should hit the device again
-        _ = await infrared_light.get_infrared(use_cache=False)
-        assert infrared_light.connection.request.call_count == 2
+        # Check that value is stored as a tuple with timestamp
+        stored = infrared_light.infrared
+        assert stored is not None
+        stored_brightness, timestamp = stored
+        assert stored_brightness == pytest.approx(brightness1, abs=0.01)
+        assert isinstance(timestamp, float)
 
     async def test_infrared_property(self, infrared_light: InfraredLight) -> None:
-        """Test infrared property returns cached value."""
-        # Initially no cached value
+        """Test infrared property returns stored value with timestamp."""
+        # Initially no stored value
         assert infrared_light.infrared is None
 
-        # Set cached value
-        infrared_light._set_cached("infrared", 0.6)
+        # Set stored value with timestamp
+        test_time = time.time()
+        infrared_light._infrared = (0.6, test_time)
 
-        # Property should return cached value
-        assert infrared_light.infrared == pytest.approx(0.6, abs=0.01)
+        # Property should return stored value as tuple
+        stored = infrared_light.infrared
+        assert stored is not None
+        brightness, timestamp = stored
+        assert brightness == pytest.approx(0.6, abs=0.01)
+        assert timestamp == test_time
 
-    async def test_set_infrared_updates_cache(
+    async def test_set_infrared_updates_store(
         self, infrared_light: InfraredLight
     ) -> None:
-        """Test that setting infrared updates the cache."""
+        """Test that setting infrared updates the store."""
         infrared_light.connection.request.return_value = True
 
         await infrared_light.set_infrared(0.8)
 
-        # Check cache was updated
-        assert infrared_light.infrared == pytest.approx(0.8, abs=0.01)
+        # Check store was updated as tuple with timestamp
+        stored = infrared_light.infrared
+        assert stored is not None
+        brightness, timestamp = stored
+        assert brightness == pytest.approx(0.8, abs=0.01)
+        assert isinstance(timestamp, float)

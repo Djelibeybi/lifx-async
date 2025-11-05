@@ -186,7 +186,7 @@ class TestGetUnassignedDevices:
                 group.get_unassigned_devices(metadata_type=metadata_type)
 
 
-class TestMetadataCache:
+class TestMetadataStore:
     """Test metadata caching and invalidation."""
 
     async def test_metadata_refetch_after_invalidation(self, emulator_server):

@@ -201,7 +201,8 @@ from lifx import Light
 
 # Increase timeout for slow devices
 async with await Light.from_ip(ip, timeout=5.0) as light:
-    light.get_color()
+    # get_color() returns (color, power, label)
+    color, power, label = await light.get_color()
 ```
 
 ### Discovery Timeout Too Short
@@ -285,15 +286,17 @@ async def measure_latency():
            await light.set_color(HSBK(hue=(360/10)*i), saturation=1.0, brightness=1.0, kelvin=3500)
    ```
 
-3. **Cache disabled or TTL too short**
+3. **Need fresh data?**
+
+   Use `get_*()` methods to always fetch from the device:
 
    ```python
-   # Use appropriate cache TTL
-   light = Light(
-       serial="d073d5000001",
-       ip="192.168.1.100",
-       cache_ttl=5.0  # Cache for 5 seconds
-   )
+   # Always fetch fresh data
+   # get_color() returns all three values in one call
+   color, power, label = await light.get_color()
+
+   # Or fetch other device info
+   version = await light.get_version()
    ```
 
 ### Docker / Container Networking
@@ -392,7 +395,7 @@ If you're still experiencing issues:
 | `LifxDeviceNotFoundError` | Device not discovered | Check network, increase timeout |
 | `LifxProtocolError` | Invalid response | Update firmware, check device type |
 | `LifxUnsupportedCommandError` | Device doesn't support command | Check device capabilities |
-| `AttributeError: 'Light' has no attribute 'set_zone_color'` | Wrong device class | Use `MultiZoneLight` |
+| `AttributeError: 'Light' has no attribute 'set_color_zones'` | Wrong device class | Use `MultiZoneLight` |
 
 ## Next Steps
 
