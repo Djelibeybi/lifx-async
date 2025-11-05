@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -171,6 +172,92 @@ class TileEffect:
 
 
 @dataclass
+class TileColors:
+    """Color data for a single tile.
+
+    Attributes:
+        colors: Flat list of HSBK colors in row-major order
+        width: Tile width in zones
+        height: Tile height in zones
+    """
+
+    colors: list[HSBK]
+    width: int
+    height: int
+
+    def get_color(self, x: int, y: int) -> HSBK:
+        """Get color at specific coordinate.
+
+        Args:
+            x: X coordinate (0-based)
+            y: Y coordinate (0-based)
+
+        Returns:
+            HSBK color at that position
+        """
+        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            raise ValueError(
+                f"Coordinates ({x}, {y}) out of bounds for"
+                f"{self.width}x{self.height} tile"
+            )
+        index = y * self.width + x
+        return self.colors[index]
+
+    def set_color(self, x: int, y: int, color: HSBK) -> None:
+        """Set color at specific coordinate.
+
+        Args:
+            x: X coordinate (0-based)
+            y: Y coordinate (0-based)
+            color: HSBK color to set
+        """
+        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            raise ValueError(
+                f"Coordinates ({x}, {y}) out of bounds for"
+                f"{self.width}x{self.height} tile"
+            )
+        index = y * self.width + x
+        self.colors[index] = color
+
+    def to_2d(self) -> list[list[HSBK]]:
+        """Convert flat color list to 2D array.
+
+        Returns:
+            2D list of colors [row][col]
+        """
+        result = []
+        for row_idx in range(self.height):
+            row = []
+            for col_idx in range(self.width):
+                index = row_idx * self.width + col_idx
+                row.append(self.colors[index])
+            result.append(row)
+        return result
+
+    @classmethod
+    def from_2d(cls, colors_2d: list[list[HSBK]]) -> TileColors:
+        """Create TileColors from 2D array.
+
+        Args:
+            colors_2d: 2D list of colors [row][col]
+
+        Returns:
+            TileColors instance
+        """
+        if not colors_2d or not colors_2d[0]:
+            raise ValueError("2D colors array cannot be empty")
+        height = len(colors_2d)
+        width = len(colors_2d[0])
+        # Flatten to 1D
+        colors_flat = []
+        for row in colors_2d:
+            if len(row) != width:
+                raise ValueError("All rows must have the same width")
+            colors_flat.extend(row)
+        return cls(colors=colors_flat, width=width, height=height)
+
+
+@dataclass
 class TileRect:
     """Rectangle area on a tile.
 
@@ -270,11 +357,34 @@ class TileDevice(Light):
         ```
     """
 
-    async def get_tile_chain(self, use_cache: bool = True) -> list[TileInfo]:
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize TileDevice with additional state attributes."""
+        super().__init__(*args, **kwargs)
+        # Tile-specific state storage
+        self._tile_chain: tuple[list[TileInfo], float] | None = None
+        self._tile_effect: tuple[TileEffect | None, float] | None = None
+        # Tile colors: dict indexed by tile_index with TileColors for each tile
+        # Structure: dict[tile_index] -> TileColors(colors, width, height)
+        self._tile_colors: tuple[dict[int, TileColors], float] | None = None
+
+    async def _setup(self) -> None:
+        """Populate Tile light capabilities, state and metadata."""
+        await super()._setup()
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(self.get_tile_chain())
+            tg.create_task(self.get_tile_effect())
+        async with asyncio.TaskGroup() as tg:
+            if self.tile_count is not None:
+                tile_count, _ = self.tile_count
+            else:
+                tile_count = await self.get_tile_count()
+            [tg.create_task(self.get_tile_colors(i)) for i in range(tile_count)]
+
+    async def get_tile_chain(self) -> list[TileInfo]:
         """Get information about all tiles in the chain.
 
-        Args:
-            use_cache: Use cached value if available (default True)
+        Always fetches from device.
+        Use the `tile_chain` property to access stored value.
 
         Returns:
             List of TileInfo objects, one per tile
@@ -291,11 +401,6 @@ class TileDevice(Light):
                 print(f"Tile {i}: {tile_info.width}x{tile_info.height}")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("tile_chain")
-            if cached is not None:
-                return cached
-
         # Request automatically unpacks response
         state = await self.connection.request(packets.Tile.GetDeviceChain())
 
@@ -305,8 +410,9 @@ class TileDevice(Light):
             for tile_device in state.tile_devices[: state.tile_devices_count]
         ]
 
-        # Tile chain is immutable (hardware configuration) - cache permanently
-        self._set_cached("tile_chain", tiles, ttl=self.PERMANENT_CACHE_TTL)
+        import time
+
+        self._tile_chain = (tiles, time.time())
 
         _LOGGER.debug(
             {
@@ -332,11 +438,11 @@ class TileDevice(Light):
 
         return tiles
 
-    async def get_tile_count(self, use_cache: bool = True) -> int:
+    async def get_tile_count(self) -> int:
         """Get the number of tiles in the chain.
 
-        Args:
-            use_cache: Use cached value if available (default True)
+        Always fetches from device.
+        Use the `tile_count` property to access stored value.
 
         Returns:
             Number of tiles
@@ -347,7 +453,7 @@ class TileDevice(Light):
             print(f"Device has {count} tiles")
             ```
         """
-        chain = await self.get_tile_chain(use_cache=use_cache)
+        chain = await self.get_tile_chain()
         count = len(chain)
 
         _LOGGER.debug(
@@ -370,9 +476,11 @@ class TileDevice(Light):
         y: int = 0,
         width: int | None = None,
         height: int | None = None,
-        use_cache: bool = False,
     ) -> list[list[HSBK]]:
         """Get colors from a tile.
+
+        Always fetches from device.
+        Use the `tile_colors` property to access stored value.
 
         Returns a 2D array of colors representing the zones.
         For tiles with >64 zones, multiple Get64 requests are sent sequentially.
@@ -383,7 +491,6 @@ class TileDevice(Light):
             y: Starting Y coordinate (default 0)
             width: Rectangle width in zones (default: tile width)
             height: Rectangle height in zones (default: tile height)
-            use_cache: Use cached value if available (default False)
 
         Returns:
             2D list of HSBK colors
@@ -410,7 +517,7 @@ class TileDevice(Light):
             raise ValueError(f"Invalid coordinates: x={x}, y={y}")
 
         # Get tile info to determine dimensions
-        chain = await self.get_tile_chain(use_cache=True)
+        chain = await self.get_tile_chain()
         if tile_index >= len(chain):
             raise ValueError(
                 f"Tile index {tile_index} out of range (chain has {len(chain)} tiles)"
@@ -432,12 +539,6 @@ class TileDevice(Light):
                 f"Rectangle exceeds tile dimensions ({x},{y},{width},{height}) "
                 f"vs ({tile_info.width}x{tile_info.height})"
             )
-
-        cache_key = f"tile_{tile_index}_colors_{x}_{y}_{width}_{height}"
-        if use_cache:
-            cached = self._get_cached(cache_key)
-            if cached is not None:
-                return cached
 
         total_zones = width * height
 
@@ -498,7 +599,47 @@ class TileDevice(Light):
                     row.append(HSBK(0, 0, 0, 3500))
             colors_2d.append(row)
 
-        self._set_cached(cache_key, colors_2d)
+        # Update tile colors with fetched data
+        import time
+
+        timestamp = time.time()
+
+        # Get tile chain to know dimensions
+        if self._tile_chain is None:
+            chain = await self.get_tile_chain()
+        else:
+            chain, _ = self._tile_chain
+
+        # Get tile info for this specific tile
+        tile_info = chain[tile_index]
+
+        # Initialize or get existing colors dict
+        if self._tile_colors is None:
+            tiles_colors_dict = {}
+        else:
+            tiles_colors_dict, _ = self._tile_colors
+
+        # Get or create TileColors for this tile
+        if tile_index not in tiles_colors_dict:
+            # Create new TileColors with default black colors
+            num_zones = tile_info.width * tile_info.height
+            default_colors = [HSBK(0, 0, 0, 3500)] * num_zones
+            tiles_colors_dict[tile_index] = TileColors(
+                colors=default_colors, width=tile_info.width, height=tile_info.height
+            )
+
+        tile_colors = tiles_colors_dict[tile_index]
+
+        # Update the specific tile region with fetched colors
+        for row_idx in range(height):
+            for col_idx in range(width):
+                tile_x = x + col_idx
+                tile_y = y + row_idx
+                if tile_y < tile_colors.height and tile_x < tile_colors.width:
+                    tile_colors.set_color(tile_x, tile_y, colors_2d[row_idx][col_idx])
+
+        # Store updated colors with new timestamp
+        self._tile_colors = (tiles_colors_dict, timestamp)
 
         _LOGGER.debug(
             {
@@ -588,7 +729,12 @@ class TileDevice(Light):
 
         # Check power state to optimize duration handling
         # If device is off, set colors instantly then power on with duration
-        is_powered_on = await self.get_power(use_cache=True)
+        # Use stored power state if available, otherwise fetch
+        power_tuple = self.power
+        if power_tuple is not None:
+            is_powered_on, _ = power_tuple
+        else:
+            is_powered_on = await self.get_power()
 
         # Convert duration to milliseconds
         duration_ms = int(duration * 1000)
@@ -662,8 +808,47 @@ class TileDevice(Light):
                 duration=copy_duration,
             )
 
-        # Invalidate cache
-        self._invalidate_cache(f"tile_{tile_index}_colors_{x}_{y}_{width}_{height}")
+        # Update tile colors with the values we just set
+        import time
+
+        timestamp = time.time()
+
+        # Get tile chain to know dimensions
+        if self._tile_chain is None:
+            chain = await self.get_tile_chain()
+        else:
+            chain, _ = self._tile_chain
+
+        # Get tile info for this specific tile
+        tile_info = chain[tile_index]
+
+        # Initialize or get existing colors dict
+        if self._tile_colors is None:
+            tiles_colors_dict = {}
+        else:
+            tiles_colors_dict, _ = self._tile_colors
+
+        # Get or create TileColors for this tile
+        if tile_index not in tiles_colors_dict:
+            # Create new TileColors with default black colors
+            num_zones = tile_info.width * tile_info.height
+            default_colors = [HSBK(0, 0, 0, 3500)] * num_zones
+            tiles_colors_dict[tile_index] = TileColors(
+                colors=default_colors, width=tile_info.width, height=tile_info.height
+            )
+
+        tile_colors = tiles_colors_dict[tile_index]
+
+        # Update the specific tile region with colors we just set
+        for row_idx in range(height):
+            for col_idx in range(width):
+                tile_x = x + col_idx
+                tile_y = y + row_idx
+                if tile_y < tile_colors.height and tile_x < tile_colors.width:
+                    tile_colors.set_color(tile_x, tile_y, colors[row_idx][col_idx])
+
+        # Store updated colors with new timestamp
+        self._tile_colors = (tiles_colors_dict, timestamp)
 
         _LOGGER.debug(
             {
@@ -686,11 +871,11 @@ class TileDevice(Light):
         if not is_powered_on and duration > 0:
             await self.set_power(True, duration=duration)
 
-    async def get_tile_effect(self, use_cache: bool = True) -> TileEffect | None:
+    async def get_tile_effect(self) -> TileEffect | None:
         """Get current tile effect.
 
-        Args:
-            use_cache: Use cached value if available (default True)
+        Always fetches from device.
+        Use the `tile_effect` property to access stored value.
 
         Returns:
             TileEffect if an effect is active, None if no effect
@@ -707,11 +892,6 @@ class TileDevice(Light):
                 print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
             ```
         """
-        if use_cache:
-            cached = self._get_cached("tile_effect")
-            if cached is not None:
-                return cached
-
         # Request automatically unpacks response
         state = await self.connection.request(packets.Tile.GetEffect())
 
@@ -747,7 +927,9 @@ class TileDevice(Light):
                 parameters=parameters,
             )
 
-        self._set_cached("tile_effect", result)
+        import time
+
+        self._tile_effect = (result, time.time())
 
         _LOGGER.debug(
             {
@@ -833,10 +1015,11 @@ class TileDevice(Light):
             ),
         )
 
-        # Update cache
-        self._set_cached(
-            "tile_effect", effect if effect.effect_type != TileEffectType.OFF else None
-        )
+        # Update state attribute
+        import time
+
+        result = effect if effect.effect_type != TileEffectType.OFF else None
+        self._tile_effect = (result, time.time())
 
         _LOGGER.debug(
             {
@@ -946,7 +1129,7 @@ class TileDevice(Light):
             raise ValueError(f"Invalid dimensions: {width}x{height}")
 
         # Get tile info to validate dimensions
-        chain = await self.get_tile_chain(use_cache=True)
+        chain = await self.get_tile_chain()
         if tile_index >= len(chain):
             raise ValueError(
                 f"Tile index {tile_index} out of range (chain has {len(chain)} tiles)"
@@ -987,12 +1170,6 @@ class TileDevice(Light):
                 duration=duration_ms,
             ),
         )
-
-        # Invalidate cache for destination area if copying to visible buffer
-        if dst_fb_index == 0:
-            self._invalidate_cache(
-                f"tile_{tile_index}_colors_{dst_x}_{dst_y}_{width}_{height}"
-            )
 
         _LOGGER.debug(
             {
@@ -1137,33 +1314,60 @@ class TileDevice(Light):
             }
         )
 
-    # Cached value properties
+    # Stored value properties
     @property
-    def tile_chain(self) -> list[TileInfo] | None:
-        """Get cached tile chain if available.
+    def tile_chain(self) -> tuple[list[TileInfo], float] | None:
+        """Get stored tile chain if available.
 
         Returns:
-            Cached tile chain (use get_tile_chain() for fresh data)
+            Stored tile chain (use get_tile_chain() for fresh data)
         """
-        return self._get_cached("tile_chain")
+        return self._tile_chain
 
     @property
-    def tile_count(self) -> int | None:
-        """Get cached tile count if available.
+    def tile_count(self) -> tuple[int, float] | None:
+        """Get stored tile count with timestamp if available.
 
         Returns:
-            Cached tile count (use get_tile_count() for fresh data)
+            Tuple of (tile_count, timestamp) or None if never fetched.
+            Derived from tile_chain property.
         """
-        return self._get_cached("tile_count")
+        if self._tile_chain is not None:
+            chain, timestamp = self._tile_chain
+            return (len(chain), timestamp)
+        return None
 
     @property
-    def tile_effect(self) -> TileEffect | None:
-        """Get cached tile effect if available.
+    def tile_effect(self) -> tuple[TileEffect | None, float] | None:
+        """Get stored tile effect if available.
 
         Returns:
-            Cached tile effect (use get_tile_effect() for fresh data)
+            Stored tile effect (use get_tile_effect() for fresh data)
         """
-        return self._get_cached("tile_effect")
+        return self._tile_effect
+
+    @property
+    def tile_colors(self) -> tuple[dict[int, TileColors], float] | None:
+        """Get stored tile colors with timestamp if available.
+
+        Returns:
+            Tuple of (tile_colors_dict, timestamp) or None if never fetched.
+            The dict maps tile_index -> TileColors(colors, width, height).
+            Each TileColors contains a flat list of colors and dimensions.
+            Use get_tile_colors() to fetch from device.
+
+        Example:
+            ```python
+            if tile.tile_colors:
+                colors_dict, timestamp = tile.tile_colors
+                tile_0 = colors_dict[0]
+                # Access flat list: tile_0.colors
+                # Get dimensions: tile_0.width, tile_0.height
+                # Get 2D array: tile_0.to_2d()
+                # Get specific color: tile_0.get_color(x, y)
+            ```
+        """
+        return self._tile_colors
 
     def __repr__(self) -> str:
         """String representation of tile device."""

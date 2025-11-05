@@ -185,16 +185,39 @@ Yes! Key performance features:
 - **State Caching**: Reduces redundant network requests
 - **Concurrent Requests**: Multiple requests per connection
 
-### Does lifx-async cache device state?
+### How is state stored?
 
-Yes! Device state (label, power, color, etc.) is cached with a 5-second TTL by default. This reduces
-network traffic and improves performance.
-
-To force a fresh read:
+Device properties return `(value, timestamp)` tuples with the timestamp reflecting
+when the value was last retrieved from the device. This gives you explicit
+control over data freshness:
 
 ```python
-light.invalidate_cache()
-label = await light.get_label()  # Fresh from device
+import time
+
+# Check current stored state
+state = light.color
+if state:
+    color, timestamp = state
+    age = time.time() - timestamp
+    if age < 5.0:  # Use stored value if less than 5 seconds old
+        # Use state color
+    else:
+        # Data is stale, fetch fresh
+        color, _, _ = await light.get_color()
+else:
+    # Ignore state, fetch from device
+    color, _, _ = await light.get_color()
+```
+
+To always get fresh data:
+
+```python
+# Use get_* methods to always fetch from device
+# get_color() returns all three values in one call
+color, power, label = await light.get_color()  # Returns (color, power, label)
+
+# Or fetch specific info separately
+version = await light.get_version()  # Get firmware and hardware version
 ```
 
 ### Can I control devices from multiple computers?

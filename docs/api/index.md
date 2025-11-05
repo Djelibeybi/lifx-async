@@ -129,10 +129,13 @@ Devices support concurrent requests via asyncio.gather:
 ```python
 # Execute multiple operations concurrently
 async with await Light.from_ip("192.168.1.100") as light:
-    color, brightness = await asyncio.gather(
+    # Note: get_color() returns (color, power, label) tuple
+    (color, power, label), version = await asyncio.gather(
         light.get_color(),
-        light.get_brightness()
+        light.get_version()
     )
+    brightness = color.brightness
+    print(f"{label}: Brightness={brightness}, Firmware={version.firmware}")
 ```
 
 ## Type Hints

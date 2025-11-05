@@ -128,7 +128,7 @@ response = await conn.request_response(packet, response_type)
 **Purpose**: Device abstractions with high-level operations
 
 - **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, TileDevice
-- **State Caching**: Cache with configurable TTL
+- **State Storage**: Timestamped state properties with explicit freshness control
 - **Type Detection**: Automatic capability detection
 - **Async Context Managers**: Automatic resource cleanup
 
@@ -249,16 +249,26 @@ async with await Light.from_ip("192.168.1.100") as light:
     await light.get_label()  # Reuses Connection 1
 ```
 
-### State Caching
+### Storing State with Timestamps
 
-**Why**: Reduces network traffic
+**Why**: Reduces network traffic while keeping you in control of data freshness
 
 ```python
-# First call: network request
-label1 = await light.get_label()
+import time
 
-# Second call within TTL: uses cache
-label2 = await light.get_label()  # No network request
+# Properties return (value, timestamp) tuples when stored:
+stored_color = light.color
+if stored_state:
+    color, timestamp = stored_color
+    age = time.time() - timestamp
+    if age < 5.0:  # Still fresh
+        # Use stored color
+    else:
+        # Data is stale, fetch fresh from device
+        color, _, _ = await light.get_color()
+else:
+    # No stored data yet
+    color, _, _ = await light.get_color()
 ```
 
 ### Code Generation
@@ -278,11 +288,12 @@ uv run python -m lifx.protocol.generator
 - **Max Size**: Configurable (default: 128)
 - **Metrics**: Track hits, misses, evictions
 
-### State Caching
+### Storing State as Properties
 
-- **TTL**: Configurable per device
-- **Default**: 5 seconds
-- **Invalidation**: Manual via `invalidate_cache()`
+- **Format**: `(value, timestamp)` tuples for explicit freshness control
+- **Properties**: All device state available as properties
+- **Freshness**: Application explicitly manages data age via timestamp
+- **Getting Fresh Data**: Use `get_*()` methods to always fetch from device
 
 ## Concurrency Model
 

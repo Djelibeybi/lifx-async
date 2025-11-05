@@ -388,43 +388,19 @@ class DeviceGroup:
         Skips devices with empty UUID (b'\\x00' * 16).
         Logs warnings for failed queries but continues gracefully.
         """
-        # Collect location info from all devices concurrently
         location_data: dict[bytes, list[tuple[Device, LocationInfo]]] = defaultdict(
             list
         )
 
-        async def fetch_location(device: Device) -> tuple[Device, LocationInfo | None]:
-            try:
-                location_info = await device.get_location()
-                return device, location_info
-            except Exception as e:
-                _LOGGER.warning(
-                    {
-                        "class": "DeviceGroup",
-                        "method": "_fetch_location_metadata",
-                        "action": "fetch_failed",
-                        "serial": device.serial,
-                        "reason": str(e),
-                    }
-                )
-                return device, None
-
         # Fetch all location info concurrently
+        tasks: dict[str, asyncio.Task[LocationInfo | None]] = {}
+        async with asyncio.TaskGroup() as tg:
+            for device in self._devices:
+                tasks[device.serial] = tg.create_task(device.get_location())
+
         results: list[tuple[Device, LocationInfo | None]] = []
-        async with asyncio.TaskGroup() as tg:
-            for device in self._devices:
-                tg.create_task(fetch_location(device))
-
-        # Gather results manually since we can't easily collect from task group
-        results = []
-        async with asyncio.TaskGroup() as tg:
-
-            async def collect(device: Device) -> None:
-                result = await fetch_location(device)
-                results.append(result)
-
-            for device in self._devices:
-                tg.create_task(collect(device))
+        for device in self._devices:
+            results.append((device, tasks[device.serial].result()))
 
         # Group by location UUID
         for device, location_info in results:
@@ -469,32 +445,15 @@ class DeviceGroup:
         # Collect group info from all devices concurrently
         group_data: dict[bytes, list[tuple[Device, GroupInfo]]] = defaultdict(list)
 
-        async def fetch_group(device: Device) -> tuple[Device, GroupInfo | None]:
-            try:
-                group_info = await device.get_group()
-                return device, group_info
-            except Exception as e:
-                _LOGGER.warning(
-                    {
-                        "class": "DeviceGroup",
-                        "method": "_fetch_group_metadata",
-                        "action": "fetch_failed",
-                        "serial": device.serial,
-                        "reason": str(e),
-                    }
-                )
-                return device, None
+        tasks: dict[str, asyncio.Task[GroupInfo | None]] = {}
+        async with asyncio.TaskGroup() as tg:
+            for device in self._devices:
+                tasks[device.serial] = tg.create_task(device.get_group())
 
         # Fetch all group info concurrently
         results: list[tuple[Device, GroupInfo | None]] = []
-
-        async def collect(device: Device) -> None:
-            result = await fetch_group(device)
-            results.append(result)
-
-        async with asyncio.TaskGroup() as tg:
-            for device in self._devices:
-                tg.create_task(collect(device))
+        for device in self._devices:
+            results.append((device, tasks[device.serial].result()))
 
         # Group by group UUID
         for device, group_info in results:

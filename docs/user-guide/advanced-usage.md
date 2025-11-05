@@ -4,13 +4,144 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 
 ## Table of Contents
 
+- [Storing State](#storing-state)
 - [Connection Management](#connection-management)
 - [Concurrency Patterns](#concurrency-patterns)
-- [State Caching](#state-caching)
 - [Error Handling](#error-handling)
 - [Device Capabilities](#device-capabilities)
 - [Custom Effects](#custom-effects)
 - [Performance Optimization](#performance-optimization)
+
+## Storing State
+
+Device properties return stored state as `(value, timestamp)` tuples, giving you explicit control over data freshness.
+
+lifx-async tries to automatically populate initial state values when a device is used as an async context manager.
+
+Non-state related properties including `version`, `model`, `min_kelvin`, and `max_kelvin` do not return a timestamp.
+
+
+### Understanding Stored State
+
+All device state properties return timestamped tuples:
+
+```python
+from lifx import Light
+import time
+
+async def check_stored_state():
+    async with await Light.from_ip("192.168.1.100") as light:
+        # Property returns tuple with (value, timestamp)
+        result = light.label
+        if result:
+            label_text, timestamp = result
+            age = time.time() - timestamp
+            print(f"Label: {label_text} (stored {age:.1f}s ago)")
+        else:
+            print("No stored label - fetching from device")
+            label_text = await light.get_label()
+            print(f"Label: {label_text}")
+```
+
+### Fetching Fresh Data
+
+Use the `get_*()` methods to always fetch from the device:
+
+```python
+async def always_fresh():
+    async with await Light.from_ip("192.168.1.100") as light:
+        # Always fetches from device
+        # Note: get_color() returns a tuple of (color, power, label)
+        color, power, label = await light.get_color()
+
+        # Get other device info
+        version = await light.get_version()
+
+        # Properties also get updated with new timestamp
+        stored_color = light.color  # Now has fresh data
+        stored_label = light.label  # Also updated from get_color()
+```
+
+### Checking Data Freshness
+
+Determine if stored data is still relevant:
+
+```python
+import time
+
+async def use_fresh_or_stored():
+    async with await Light.from_ip("192.168.1.100") as light:
+        MAX_AGE = 5.0  # Maximum age in seconds
+
+        # Check if we have stored color
+        stored = light.color
+        if stored:
+            color, timestamp = stored
+            age = time.time() - timestamp
+
+            if age < MAX_AGE:
+                print(f"Using stored color (age: {age:.1f}s)")
+            else:
+                print("Stored color too old, fetching fresh color")
+                # get_color() returns (color, power, label)
+                color, _, _ = await light.get_color()
+        else:
+            print("No stored color, fetching from device")
+            # get_color() returns (color, power, label)
+            color, _, _ = await light.get_color()
+```
+
+### Available Properties
+
+#### Device Properties
+
+- `Device.label` - Device name/label
+- `Device.power` - Power state (on/off)
+- `Device.version` - Vendor ID and Product ID
+- `Device.host_firmware` - Major and minor host firmware version and build number
+- `Device.wifi_firmware` - Major and minor wifi firmware version and build number
+- `Device.location` - Device location name/label
+- `Device.group` - Device group name/label
+
+##### Non-State Properties
+
+- `Device.model` - Device product model
+
+#### Light properties
+
+- `Light.color` - Current color
+
+##### Non-State Properties
+
+- `Light.min_kelvin` - Lowest supported kelvin value
+- `Light.max_kelvin` - Highest supported kelvin value
+
+#### InfraredLight properties
+
+- `InfraredLight.infrared` - Infrared brightness
+
+#### HevLight properties:
+
+- `HevLight.hev_cycle` - HEV cycle state
+- `HevLight.hev_config` - HEV configuration
+- `HevLight.hev_result` - Last HEV result
+
+#### MultiZoneLight properties:
+
+- `MultiZoneLight.zone_count` - Number of zones
+- `MultiZoneLight.zone_effect` - Either MOVE or OFF
+- `MultiZoneLight.zones` - List of zone colors
+
+#### TileDevice properties:
+
+- `TileDevice.tile_count` - Number of tiles on the chain
+- `TileDevice.tile_chain` - Details of each tile on the chain
+- `TileDevice.tile_effect` - Either MORPH, FLAME, SKY or OFF
+- `TileDevice.tile_colors` - Dictionary of colors, width, and height indexed by tile
+
+
+All state properties return `None` if no data has been stored yet, or `(value, timestamp)` if data is available.
+
 
 ## Connection Management
 
@@ -49,13 +180,13 @@ from lifx import Light
 async def concurrent_operations():
     async with await Light.from_ip("192.168.1.100") as light:
         # These execute concurrently!
-        label, power, color = await asyncio.gather(
-            light.get_label(),
-            light.get_power(),
+        # get_color() returns (color, power, label)
+        (color, power, label), version = await asyncio.gather(
             light.get_color(),
+            light.get_version(),
         )
 
-        print(f"{label}: Power={power}, Color={color}")
+        print(f"{label}: Power={power}, Color={color}, Firmware={version.firmware}")
 ```
 
 **Performance Note:** Concurrent requests execute with maximum parallelism. However, per the LIFX protocol specification, devices can handle approximately 20 messages per second. When sending many concurrent requests to a single device, consider implementing rate limiting in your application to avoid overwhelming the device.
@@ -104,56 +235,6 @@ async def discover_in_batches():
         return devices_full
 
     return devices_quick
-```
-
-## State Caching
-
-### Cache Configuration
-
-Configure cache TTL per device:
-
-```python
-from lifx import Light
-
-# Short cache for frequently changing state
-light = Light(
-    serial="d073d5000001",
-    ip="192.168.1.100",
-    cache_ttl=1.0  # 1 second cache
-)
-
-# Longer cache for stable metadata
-light_stable = Light(
-    serial="d073d5000001",
-    ip="192.168.1.100",
-    cache_ttl=60.0  # 1 minute cache
-)
-```
-
-### Manual Cache Control
-
-```python
-async def cache_management():
-    async with await Light.from_ip("192.168.1.100") as light:
-        # First call: network request
-        color1 = await light.get_color()
-
-        # Second call within TTL: uses cache
-        color2 = await light.get_color()  # No network request!
-
-        # Force refresh by invalidating cache
-        light.invalidate_cache()
-        color3 = await light.get_color()  # Network request
-```
-
-### Cache TTL Categories
-
-lifx-async uses different TTLs for different data types:
-
-```python
-# Built-in TTL values (in Device class)
-STATE_CACHE_TTL = 5.0        # Color, power, zones (changes frequently)
-METADATA_CACHE_TTL = 180.0   # Label, version, info (rarely changes)
 ```
 
 ## Error Handling
@@ -269,7 +350,7 @@ async def capability_aware_control():
 
             # Multizone devices
             if ProductCapability.MULTIZONE in device.capabilities:
-                await device.set_zone_color(0, 8, Colors.RED)
+                await device.set_color_zones(0, 8, Colors.RED)
 ```
 
 ## Custom Effects
@@ -361,23 +442,6 @@ async def sequential():
 async def parallel():
     async with discover() as group:
         await group.set_color(Colors.GREEN)
-```
-
-### Cache Warm-Up
-
-```python
-async def warm_up_cache():
-    async with discover() as group:
-        # Pre-fetch frequently accessed data
-        await asyncio.gather(
-            *[device.get_label() for device in group.devices],
-            *[device.get_version() for device in group.devices],
-        )
-
-        # Now cached data is available instantly
-        for device in group.devices:
-            label = await device.get_label()  # From cache
-            print(f"Device: {label}")
 ```
 
 ### Connection Reuse
