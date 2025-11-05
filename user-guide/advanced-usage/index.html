@@ -676,6 +676,57 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#storing-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Storing State
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Storing State">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#understanding-stored-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Understanding Stored State
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-fresh-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching Fresh Data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-data-freshness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Checking Data Freshness
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available Properties
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#connection-management" class="md-nav__link">
     <span class="md-ellipsis">
       Connection Management
@@ -731,48 +782,6 @@
   <a href="#batched-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       Batched Discovery
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#state-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      State Caching
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="State Caching">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cache-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cache Configuration
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#manual-cache-control" class="md-nav__link">
-    <span class="md-ellipsis">
-      Manual Cache Control
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cache-ttl-categories" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cache TTL Categories
     </span>
   </a>
   
@@ -923,15 +932,6 @@
   <a href="#batch-operations" class="md-nav__link">
     <span class="md-ellipsis">
       Batch Operations
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cache-warm-up" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cache Warm-Up
     </span>
   </a>
   
@@ -1385,26 +1385,136 @@
 <p>This guide covers advanced lifx patterns and techniques for building robust LIFX integrations.</p>
 <h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="#storing-state">Storing State</a></li>
 <li><a href="#connection-management">Connection Management</a></li>
 <li><a href="#concurrency-patterns">Concurrency Patterns</a></li>
-<li><a href="#state-caching">State Caching</a></li>
 <li><a href="#error-handling">Error Handling</a></li>
 <li><a href="#device-capabilities">Device Capabilities</a></li>
 <li><a href="#custom-effects">Custom Effects</a></li>
 <li><a href="#performance-optimization">Performance Optimization</a></li>
 </ul>
+<h2 id="storing-state">Storing State<a class="headerlink" href="#storing-state" title="Permanent link">&para;</a></h2>
+<p>Device properties return stored state as <code>(value, timestamp)</code> tuples, giving you explicit control over data freshness.</p>
+<p>lifx-async tries to automatically populate initial state values when a device is used as an async context manager.</p>
+<p>Non-state related properties including <code>version</code>, <code>model</code>, <code>min_kelvin</code>, and <code>max_kelvin</code> do not return a timestamp.</p>
+<h3 id="understanding-stored-state">Understanding Stored State<a class="headerlink" href="#understanding-stored-state" title="Permanent link">&para;</a></h3>
+<p>All device state properties return timestamped tuples:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">check_stored_state</span><span class="p">():</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="c1"># Property returns tuple with (value, timestamp)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>            <span class="n">label_text</span><span class="p">,</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">result</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>            <span class="n">age</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">timestamp</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Label: </span><span class="si">{</span><span class="n">label_text</span><span class="si">}</span><span class="s2"> (stored </span><span class="si">{</span><span class="n">age</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s ago)&quot;</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No stored label - fetching from device&quot;</span><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            <span class="n">label_text</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Label: </span><span class="si">{</span><span class="n">label_text</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="fetching-fresh-data">Fetching Fresh Data<a class="headerlink" href="#fetching-fresh-data" title="Permanent link">&para;</a></h3>
+<p>Use the <code>get_*()</code> methods to always fetch from the device:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">always_fresh</span><span class="p">():</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="c1"># Always fetches from device</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="c1"># Note: get_color() returns a tuple of (color, power, label)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="c1"># Get other device info</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">version</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_version</span><span class="p">()</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="c1"># Properties also get updated with new timestamp</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">stored_color</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">color</span>  <span class="c1"># Now has fresh data</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="n">stored_label</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>  <span class="c1"># Also updated from get_color()</span>
+</span></code></pre></div>
+<h3 id="checking-data-freshness">Checking Data Freshness<a class="headerlink" href="#checking-data-freshness" title="Permanent link">&para;</a></h3>
+<p>Determine if stored data is still relevant:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">use_fresh_or_stored</span><span class="p">():</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">MAX_AGE</span> <span class="o">=</span> <span class="mf">5.0</span>  <span class="c1"># Maximum age in seconds</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="c1"># Check if we have stored color</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">stored</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">color</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">if</span> <span class="n">stored</span><span class="p">:</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="n">color</span><span class="p">,</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">stored</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>            <span class="n">age</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">timestamp</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>            <span class="k">if</span> <span class="n">age</span> <span class="o">&lt;</span> <span class="n">MAX_AGE</span><span class="p">:</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using stored color (age: </span><span class="si">{</span><span class="n">age</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s)&quot;</span><span class="p">)</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Stored color too old, fetching fresh color&quot;</span><span class="p">)</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>                <span class="c1"># get_color() returns (color, power, label)</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>                <span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No stored color, fetching from device&quot;</span><span class="p">)</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="c1"># get_color() returns (color, power, label)</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>            <span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+</span></code></pre></div>
+<h3 id="available-properties">Available Properties<a class="headerlink" href="#available-properties" title="Permanent link">&para;</a></h3>
+<h4 id="device-properties">Device Properties<a class="headerlink" href="#device-properties" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>Device.label</code> - Device name/label</li>
+<li><code>Device.power</code> - Power state (on/off)</li>
+<li><code>Device.version</code> - Vendor ID and Product ID</li>
+<li><code>Device.host_firmware</code> - Major and minor host firmware version and build number</li>
+<li><code>Device.wifi_firmware</code> - Major and minor wifi firmware version and build number</li>
+<li><code>Device.location</code> - Device location name/label</li>
+<li><code>Device.group</code> - Device group name/label</li>
+</ul>
+<h5 id="non-state-properties">Non-State Properties<a class="headerlink" href="#non-state-properties" title="Permanent link">&para;</a></h5>
+<ul>
+<li><code>Device.model</code> - Device product model</li>
+</ul>
+<h4 id="light-properties">Light properties<a class="headerlink" href="#light-properties" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>Light.color</code> - Current color</li>
+</ul>
+<h5 id="non-state-properties_1">Non-State Properties<a class="headerlink" href="#non-state-properties_1" title="Permanent link">&para;</a></h5>
+<ul>
+<li><code>Light.min_kelvin</code> - Lowest supported kelvin value</li>
+<li><code>Light.max_kelvin</code> - Highest supported kelvin value</li>
+</ul>
+<h4 id="infraredlight-properties">InfraredLight properties<a class="headerlink" href="#infraredlight-properties" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>InfraredLight.infrared</code> - Infrared brightness</li>
+</ul>
+<h4 id="hevlight-properties">HevLight properties:<a class="headerlink" href="#hevlight-properties" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>HevLight.hev_cycle</code> - HEV cycle state</li>
+<li><code>HevLight.hev_config</code> - HEV configuration</li>
+<li><code>HevLight.hev_result</code> - Last HEV result</li>
+</ul>
+<h4 id="multizonelight-properties">MultiZoneLight properties:<a class="headerlink" href="#multizonelight-properties" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>MultiZoneLight.zone_count</code> - Number of zones</li>
+<li><code>MultiZoneLight.zone_effect</code> - Either MOVE or OFF</li>
+<li><code>MultiZoneLight.zones</code> - List of zone colors</li>
+</ul>
+<h4 id="tiledevice-properties">TileDevice properties:<a class="headerlink" href="#tiledevice-properties" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>TileDevice.tile_count</code> - Number of tiles on the chain</li>
+<li><code>TileDevice.tile_chain</code> - Details of each tile on the chain</li>
+<li><code>TileDevice.tile_effect</code> - Either MORPH, FLAME, SKY or OFF</li>
+<li><code>TileDevice.tile_colors</code> - Dictionary of colors, width, and height indexed by tile</li>
+</ul>
+<p>All state properties return <code>None</code> if no data has been stored yet, or <code>(value, timestamp)</code> if data is available.</p>
 <h2 id="connection-management">Connection Management<a class="headerlink" href="#connection-management" title="Permanent link">&para;</a></h2>
 <h3 id="understanding-connection-pooling">Understanding Connection Pooling<a class="headerlink" href="#understanding-connection-pooling" title="Permanent link">&para;</a></h3>
 <p>lifx-async automatically pools connections for efficient reuse:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="c1"># All these operations reuse the same connection</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="c1"># Connection automatically closed when exiting context</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="c1"># All these operations reuse the same connection</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="c1"># Connection automatically closed when exiting context</span>
 </span></code></pre></div>
 <p><strong>Benefits:</strong></p>
 <ul>
@@ -1415,96 +1525,58 @@
 <h2 id="concurrency-patterns">Concurrency Patterns<a class="headerlink" href="#concurrency-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="concurrent-requests-single-device">Concurrent Requests (Single Device)<a class="headerlink" href="#concurrent-requests-single-device" title="Permanent link">&para;</a></h3>
 <p>Send multiple requests concurrently to one device:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">concurrent_operations</span><span class="p">():</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="c1"># These execute concurrently!</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">label</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">color</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>            <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">(),</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>            <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">(),</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>            <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">(),</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="p">)</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">: Power=</span><span class="si">{</span><span class="n">power</span><span class="si">}</span><span class="s2">, Color=</span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">concurrent_operations</span><span class="p">():</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="c1"># These execute concurrently!</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="c1"># get_color() returns (color, power, label)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">label</span><span class="p">),</span> <span class="n">version</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>            <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">(),</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>            <span class="n">light</span><span class="o">.</span><span class="n">get_version</span><span class="p">(),</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="p">)</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">: Power=</span><span class="si">{</span><span class="n">power</span><span class="si">}</span><span class="s2">, Color=</span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">, Firmware=</span><span class="si">{</span><span class="n">version</span><span class="o">.</span><span class="n">firmware</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Performance Note:</strong> Concurrent requests execute with maximum parallelism. However, per the LIFX protocol specification, devices can handle approximately 20 messages per second. When sending many concurrent requests to a single device, consider implementing rate limiting in your application to avoid overwhelming the device.</p>
 <h3 id="multi-device-control">Multi-Device Control<a class="headerlink" href="#multi-device-control" title="Permanent link">&para;</a></h3>
 <p>Control multiple devices in parallel:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">Colors</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">multi_device_control</span><span class="p">():</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">discover</span><span class="p">()</span> <span class="k">as</span> <span class="n">group</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="c1"># Create different tasks for different devices</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>            <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">RED</span><span class="p">),</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>            <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">GREEN</span><span class="p">),</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">),</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="p">]</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="c1"># Execute all at once</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="n">tasks</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">Colors</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">multi_device_control</span><span class="p">():</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">discover</span><span class="p">()</span> <span class="k">as</span> <span class="n">group</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="c1"># Create different tasks for different devices</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>            <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">RED</span><span class="p">),</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">GREEN</span><span class="p">),</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>            <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">),</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="p">]</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="c1"># Execute all at once</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="n">tasks</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="batched-discovery">Batched Discovery<a class="headerlink" href="#batched-discovery" title="Permanent link">&para;</a></h3>
 <p>Discover devices in batches for large networks:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.network.discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_devices</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">discover_in_batches</span><span class="p">():</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="c1"># First batch: quick discovery</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">devices_quick</span> <span class="o">=</span> <span class="k">await</span> <span class="n">discover_devices</span><span class="p">(</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">timeout</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="s2">&quot;255.255.255.255&quot;</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="p">)</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="c1"># Second batch: thorough discovery</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">devices_quick</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">expected_count</span><span class="p">:</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="n">devices_full</span> <span class="o">=</span> <span class="k">await</span> <span class="n">discover_devices</span><span class="p">(</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>            <span class="n">timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>            <span class="n">broadcast_address</span><span class="o">=</span><span class="s2">&quot;255.255.255.255&quot;</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        <span class="p">)</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="k">return</span> <span class="n">devices_full</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="k">return</span> <span class="n">devices_quick</span>
-</span></code></pre></div>
-<h2 id="state-caching">State Caching<a class="headerlink" href="#state-caching" title="Permanent link">&para;</a></h2>
-<h3 id="cache-configuration">Cache Configuration<a class="headerlink" href="#cache-configuration" title="Permanent link">&para;</a></h3>
-<p>Configure cache TTL per device:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Short cache for frequently changing state</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">light</span> <span class="o">=</span> <span class="n">Light</span><span class="p">(</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">serial</span><span class="o">=</span><span class="s2">&quot;d073d5000001&quot;</span><span class="p">,</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mf">1.0</span>  <span class="c1"># 1 second cache</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">)</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Longer cache for stable metadata</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">light_stable</span> <span class="o">=</span> <span class="n">Light</span><span class="p">(</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">serial</span><span class="o">=</span><span class="s2">&quot;d073d5000001&quot;</span><span class="p">,</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mf">60.0</span>  <span class="c1"># 1 minute cache</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="manual-cache-control">Manual Cache Control<a class="headerlink" href="#manual-cache-control" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">cache_management</span><span class="p">():</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="c1"># First call: network request</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="n">color1</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="c1"># Second call within TTL: uses cache</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="n">color2</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>  <span class="c1"># No network request!</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="c1"># Force refresh by invalidating cache</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="n">light</span><span class="o">.</span><span class="n">invalidate_cache</span><span class="p">()</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="n">color3</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>  <span class="c1"># Network request</span>
-</span></code></pre></div>
-<h3 id="cache-ttl-categories">Cache TTL Categories<a class="headerlink" href="#cache-ttl-categories" title="Permanent link">&para;</a></h3>
-<p>lifx-async uses different TTLs for different data types:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Built-in TTL values (in Device class)</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">STATE_CACHE_TTL</span> <span class="o">=</span> <span class="mf">5.0</span>        <span class="c1"># Color, power, zones (changes frequently)</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">METADATA_CACHE_TTL</span> <span class="o">=</span> <span class="mf">180.0</span>   <span class="c1"># Label, version, info (rarely changes)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.network.discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_devices</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">discover_in_batches</span><span class="p">():</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="c1"># First batch: quick discovery</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">devices_quick</span> <span class="o">=</span> <span class="k">await</span> <span class="n">discover_devices</span><span class="p">(</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">timeout</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="s2">&quot;255.255.255.255&quot;</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="c1"># Second batch: thorough discovery</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">devices_quick</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">expected_count</span><span class="p">:</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>        <span class="n">devices_full</span> <span class="o">=</span> <span class="k">await</span> <span class="n">discover_devices</span><span class="p">(</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>            <span class="n">timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>            <span class="n">broadcast_address</span><span class="o">=</span><span class="s2">&quot;255.255.255.255&quot;</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>        <span class="p">)</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        <span class="k">return</span> <span class="n">devices_full</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="k">return</span> <span class="n">devices_quick</span>
 </span></code></pre></div>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <h3 id="exception-hierarchy">Exception Hierarchy<a class="headerlink" href="#exception-hierarchy" title="Permanent link">&para;</a></h3>
@@ -1602,7 +1674,7 @@
 </span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>
 </span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>            <span class="c1"># Multizone devices</span>
 </span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>            <span class="k">if</span> <span class="n">ProductCapability</span><span class="o">.</span><span class="n">MULTIZONE</span> <span class="ow">in</span> <span class="n">device</span><span class="o">.</span><span class="n">capabilities</span><span class="p">:</span>
-</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>                <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_zone_color</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="n">Colors</span><span class="o">.</span><span class="n">RED</span><span class="p">)</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>                <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_color_zones</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="n">Colors</span><span class="o">.</span><span class="n">RED</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="custom-effects">Custom Effects<a class="headerlink" href="#custom-effects" title="Permanent link">&para;</a></h2>
 <h3 id="creating-smooth-transitions">Creating Smooth Transitions<a class="headerlink" href="#creating-smooth-transitions" title="Permanent link">&para;</a></h3>
@@ -1678,34 +1750,20 @@
 </span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">discover</span><span class="p">()</span> <span class="k">as</span> <span class="n">group</span><span class="p">:</span>
 </span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>        <span class="k">await</span> <span class="n">group</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">GREEN</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="cache-warm-up">Cache Warm-Up<a class="headerlink" href="#cache-warm-up" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">warm_up_cache</span><span class="p">():</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">discover</span><span class="p">()</span> <span class="k">as</span> <span class="n">group</span><span class="p">:</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>        <span class="c1"># Pre-fetch frequently accessed data</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>            <span class="o">*</span><span class="p">[</span><span class="n">device</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">],</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>            <span class="o">*</span><span class="p">[</span><span class="n">device</span><span class="o">.</span><span class="n">get_version</span><span class="p">()</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">],</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>        <span class="p">)</span>
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
-</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>        <span class="c1"># Now cached data is available instantly</span>
-</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>        <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">:</span>
-</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>            <span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>  <span class="c1"># From cache</span>
-</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Device: </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span></code></pre></div>
 <h3 id="connection-reuse">Connection Reuse<a class="headerlink" href="#connection-reuse" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># ❌ Creates new connection each time</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">no_reuse</span><span class="p">():</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>        <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>            <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>        <span class="c1"># Connection closed here</span>
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="c1"># ✅ Reuses connection</span>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">with_reuse</span><span class="p">():</span>
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
-</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>            <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
-</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>        <span class="c1"># Connection closed once at end</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># ❌ Creates new connection each time</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">no_reuse</span><span class="p">():</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>        <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>            <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>        <span class="c1"># Connection closed here</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="c1"># ✅ Reuses connection</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">with_reuse</span><span class="p">():</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>            <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>        <span class="c1"># Connection closed once at end</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
@@ -1735,7 +1793,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 4, 2025 03:35:18 UTC">November 4, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 5, 2025 08:07:30 UTC">November 5, 2025</span>
   </span>
 
     

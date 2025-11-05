@@ -1226,9 +1226,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#does-lifx-async-cache-device-state" class="md-nav__link">
+  <a href="#how-is-state-stored" class="md-nav__link">
     <span class="md-ellipsis">
-      Does lifx-async cache device state?
+      How is state stored?
     </span>
   </a>
   
@@ -1579,12 +1579,33 @@ account required.</p>
 <li><strong>State Caching</strong>: Reduces redundant network requests</li>
 <li><strong>Concurrent Requests</strong>: Multiple requests per connection</li>
 </ul>
-<h3 id="does-lifx-async-cache-device-state">Does lifx-async cache device state?<a class="headerlink" href="#does-lifx-async-cache-device-state" title="Permanent link">&para;</a></h3>
-<p>Yes! Device state (label, power, color, etc.) is cached with a 5-second TTL by default. This reduces
-network traffic and improves performance.</p>
-<p>To force a fresh read:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">light</span><span class="o">.</span><span class="n">invalidate_cache</span><span class="p">()</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>  <span class="c1"># Fresh from device</span>
+<h3 id="how-is-state-stored">How is state stored?<a class="headerlink" href="#how-is-state-stored" title="Permanent link">&para;</a></h3>
+<p>Device properties return <code>(value, timestamp)</code> tuples with the timestamp reflecting
+when the value was last retrieved from the device. This gives you explicit
+control over data freshness:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Check current stored state</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">state</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">color</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="k">if</span> <span class="n">state</span><span class="p">:</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">color</span><span class="p">,</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">state</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">age</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">timestamp</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="k">if</span> <span class="n">age</span> <span class="o">&lt;</span> <span class="mf">5.0</span><span class="p">:</span>  <span class="c1"># Use stored value if less than 5 seconds old</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>        <span class="c1"># Use state color</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>        <span class="c1"># Data is stale, fetch fresh</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>        <span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="k">else</span><span class="p">:</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>    <span class="c1"># Ignore state, fetch from device</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>    <span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+</span></code></pre></div>
+<p>To always get fresh data:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Use get_* methods to always fetch from device</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># get_color() returns all three values in one call</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>  <span class="c1"># Returns (color, power, label)</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Or fetch specific info separately</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="n">version</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_version</span><span class="p">()</span>  <span class="c1"># Get firmware and hardware version</span>
 </span></code></pre></div>
 <h3 id="can-i-control-devices-from-multiple-computers">Can I control devices from multiple computers?<a class="headerlink" href="#can-i-control-devices-from-multiple-computers" title="Permanent link">&para;</a></h3>
 <p>Yes! lifx-async doesn't require exclusive access. Multiple instances (even on different computers) can
@@ -1608,11 +1629,11 @@ control the same devices.</p>
 </ol>
 <h3 id="effects-dont-work-as-expected">Effects don't work as expected<a class="headerlink" href="#effects-dont-work-as-expected" title="Permanent link">&para;</a></h3>
 <p>Make sure you're using the correct duration/period values:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Period is in seconds</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Duration is in seconds (milliseconds * 1000)</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Period is in seconds</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Duration is in seconds (milliseconds * 1000)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="type-checker-errors">Type checker errors<a class="headerlink" href="#type-checker-errors" title="Permanent link">&para;</a></h3>
 <p>lifx-async is fully type-hinted. If you get type errors:</p>
@@ -1631,10 +1652,10 @@ control the same devices.</p>
 <li>Submit a pull request</li>
 </ol>
 <h3 id="how-do-i-run-tests">How do I run tests?<a class="headerlink" href="#how-do-i-run-tests" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--frozen<span class="w"> </span>pytest
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--frozen<span class="w"> </span>pytest
 </span></code></pre></div>
 <h3 id="how-do-i-generate-protocol-code">How do I generate protocol code?<a class="headerlink" href="#how-do-i-generate-protocol-code" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>lifx.protocol.generator
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>lifx.protocol.generator
 </span></code></pre></div>
 <p>This downloads the latest <code>protocol.yml</code> from LIFX and regenerates Python code.</p>
 <h3 id="where-is-the-protocol-specification">Where is the protocol specification?<a class="headerlink" href="#where-is-the-protocol-specification" title="Permanent link">&para;</a></h3>
@@ -1645,17 +1666,17 @@ https://github.com/LIFX/public-protocol/blob/main/protocol.yml</p>
 <h3 id="can-i-use-lifx-async-without-async">Can I use lifx-async without async?<a class="headerlink" href="#can-i-use-lifx-async-without-async" title="Permanent link">&para;</a></h3>
 <p>No.</p>
 <h3 id="how-do-i-access-low-level-protocol">How do I access low-level protocol?<a class="headerlink" href="#how-do-i-access-low-level-protocol" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.protocol.packets</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.protocol.protocol_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">HSBK</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Create a packet directly</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="n">packet</span> <span class="o">=</span> <span class="n">Light</span><span class="o">.</span><span class="n">SetColor</span><span class="p">(</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>    <span class="n">color</span><span class="o">=</span><span class="n">HSBK</span><span class="p">(</span><span class="n">hue</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">kelvin</span><span class="o">=</span><span class="mi">3500</span><span class="p">),</span> <span class="n">duration</span><span class="o">=</span><span class="mf">1.0</span>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="p">)</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
-</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="c1"># Send via connection</span>
-</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="k">async</span> <span class="k">with</span> <span class="n">DeviceConnection</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="n">ip</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
-</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>    <span class="n">reply</span> <span class="o">=</span> <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.protocol.packets</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.protocol.protocol_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">HSBK</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Create a packet directly</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="n">packet</span> <span class="o">=</span> <span class="n">Light</span><span class="o">.</span><span class="n">SetColor</span><span class="p">(</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="n">color</span><span class="o">=</span><span class="n">HSBK</span><span class="p">(</span><span class="n">hue</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">kelvin</span><span class="o">=</span><span class="mi">3500</span><span class="p">),</span> <span class="n">duration</span><span class="o">=</span><span class="mf">1.0</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="p">)</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="c1"># Send via connection</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="k">async</span> <span class="k">with</span> <span class="n">DeviceConnection</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="n">ip</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="n">reply</span> <span class="o">=</span> <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="how-does-connection-pooling-work">How does connection pooling work?<a class="headerlink" href="#how-does-connection-pooling-work" title="Permanent link">&para;</a></h3>
 <p>lifx-async maintains an LRU cache of connections. When you open a connection to a device, it's
@@ -1690,7 +1711,7 @@ full (default maximum: 100 connections).</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 4, 2025 03:35:18 UTC">November 4, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 5, 2025 08:07:30 UTC">November 5, 2025</span>
   </span>
 
     
