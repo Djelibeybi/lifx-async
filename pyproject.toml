@@ -143,4 +143,3 @@ output_format = "md"
 
 [tool.semantic_release.remote]
 ignore_token_for_push = true
-token = "GITHUB_TOKEN"
