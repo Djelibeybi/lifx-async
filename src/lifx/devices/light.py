@@ -195,14 +195,21 @@ class Light(Device):
                 f"Brightness must be between 0.0 and 1.0, got {brightness}"
             )
 
-        # Get current color
-        current_color, _, _ = await self.get_color()
+        # Use set_waveform_optional with HALF_SINE waveform to set brightness
+        # without needing to query current color values. Convert duration to seconds.
+        color = HSBK(hue=0, saturation=0, brightness=brightness, kelvin=3500)
 
-        # Create new color with modified brightness
-        new_color = current_color.with_brightness(brightness)
-
-        # Set the new color
-        await self.set_color(new_color, duration=duration)
+        await self.set_waveform_optional(
+            color=color,
+            period=max(duration, 0.001),
+            cycles=1,
+            waveform=LightWaveform.HALF_SINE,
+            transient=False,
+            set_hue=False,
+            set_saturation=False,
+            set_brightness=True,
+            set_kelvin=False,
+        )
 
     async def set_kelvin(self, kelvin: int, duration: float = 0.0) -> None:
         """Set light color temperature, preserving brightness. Saturation is
@@ -229,14 +236,21 @@ class Light(Device):
         if not (HSBK.MIN_KELVIN <= kelvin <= HSBK.MAX_KELVIN):
             raise ValueError(f"Kelvin must be 1500-9000, got {kelvin}")
 
-        # Get current color
-        current_color, _, _ = await self.get_color()
+        # Use set_waveform_optional with HALF_SINE waveform to set kelvin
+        # and saturation without needing to query current color values
+        color = HSBK(hue=0, saturation=0, brightness=1.0, kelvin=kelvin)
 
-        # Create new color with modified temperature and no saturation
-        new_color = current_color.with_kelvin(kelvin).with_saturation(0)
-
-        # Set the new color
-        await self.set_color(new_color, duration=duration)
+        await self.set_waveform_optional(
+            color=color,
+            period=max(duration, 0.001),
+            cycles=1,
+            waveform=LightWaveform.HALF_SINE,
+            transient=False,
+            set_hue=False,
+            set_saturation=True,
+            set_brightness=False,
+            set_kelvin=True,
+        )
 
     async def set_hue(self, hue: float, duration: float = 0.0) -> None:
         """Set light hue only, preserving saturation, brightness, and temperature.
@@ -265,14 +279,21 @@ class Light(Device):
                 f"Hue must be between {HSBK.MIN_HUE} and {HSBK.MAX_HUE}, got {hue}"
             )
 
-        # Get current color
-        current_color, _, _ = await self.get_color()
+        # Use set_waveform_optional with HALF_SINE waveform to set hue
+        # without needing to query current color values
+        color = HSBK(hue=hue, saturation=1.0, brightness=1.0, kelvin=3500)
 
-        # Create new color with modified hue
-        new_color = current_color.with_hue(hue)
-
-        # Set the new color
-        await self.set_color(new_color, duration=duration)
+        await self.set_waveform_optional(
+            color=color,
+            period=max(duration, 0.001),
+            cycles=1,
+            waveform=LightWaveform.HALF_SINE,
+            transient=False,
+            set_hue=True,
+            set_saturation=False,
+            set_brightness=False,
+            set_kelvin=False,
+        )
 
     async def set_saturation(self, saturation: float, duration: float = 0.0) -> None:
         """Set light saturation only, preserving hue, brightness, and temperature.
@@ -298,14 +319,21 @@ class Light(Device):
         if not (HSBK.MIN_SATURATION <= saturation <= HSBK.MAX_SATURATION):
             raise ValueError(f"Saturation must be 0.0-1.0, got {saturation}")
 
-        # Get current color
-        current_color, _, _ = await self.get_color()
+        # Use set_waveform_optional with HALF_SINE waveform to set saturation
+        # without needing to query current color values
+        color = HSBK(hue=0, saturation=saturation, brightness=1.0, kelvin=3500)
 
-        # Create new color with modified saturation
-        new_color = current_color.with_saturation(saturation)
-
-        # Set the new color
-        await self.set_color(new_color, duration=duration)
+        await self.set_waveform_optional(
+            color=color,
+            period=max(duration, 0.001),
+            cycles=1,
+            waveform=LightWaveform.HALF_SINE,
+            transient=False,
+            set_hue=False,
+            set_saturation=True,
+            set_brightness=False,
+            set_kelvin=False,
+        )
 
     async def get_power(self) -> bool:
         """Get light power state (specific to light, not device).
