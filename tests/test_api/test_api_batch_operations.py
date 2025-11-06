@@ -11,55 +11,30 @@ from __future__ import annotations
 
 import asyncio
 
-from lifx.api import DeviceGroup, discover
+from lifx.api import DeviceGroup
 from lifx.color import HSBK
-from lifx.devices import Light
-from lifx.network.discovery import discover_devices
 
 
 class TestDeviceGroupBatchOperations:
     """Test DeviceGroup batch operations."""
 
-    async def test_batch_set_power(self, emulator_server):
+    async def test_batch_set_power(self, emulator_devices: DeviceGroup):
         """Test setting power on all devices."""
-        devices = await discover_devices(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server.port,
-            idle_timeout_multiplier=0.5,
-        )
-
-        lights = [
-            Light(serial=dev.serial, ip="127.0.0.1", port=emulator_server.port)
-            for dev in devices
-        ]
-
-        group = DeviceGroup(lights)
+        group = emulator_devices
 
         async with group:
             await group.set_power(True, duration=0.0)
 
             # Verify power is on (spot check one device)
             await asyncio.sleep(0.1)  # Give time for updates
-            async with lights[0]:
-                power = await lights[0].get_power()
+            device = group.devices[0]
+            async with device:
+                power = await device.get_power()
                 assert power is True
 
-    async def test_batch_set_color(self, emulator_server):
+    async def test_batch_set_color(self, emulator_devices: DeviceGroup):
         """Test setting color on all devices."""
-        devices = await discover_devices(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server.port,
-            idle_timeout_multiplier=0.5,
-        )
-
-        lights = [
-            Light(serial=dev.serial, ip="127.0.0.1", port=emulator_server.port)
-            for dev in devices
-        ]
-
-        group = DeviceGroup(lights)
+        group = emulator_devices
 
         async with group:
             color = HSBK(hue=180, saturation=1.0, brightness=0.5, kelvin=3500)
@@ -67,52 +42,30 @@ class TestDeviceGroupBatchOperations:
 
             # Verify color was set (check one device)
             await asyncio.sleep(0.1)
-            async with lights[0]:
-                light_color, _, _ = await lights[0].get_color()
+            device = group.devices[0]
+            async with device:
+                light_color, _, _ = await device.get_color()
                 # Color should be approximately what we set
                 assert abs(light_color.hue - 180) < 5
 
-    async def test_batch_set_brightness(self, emulator_server):
+    async def test_batch_set_brightness(self, emulator_devices: DeviceGroup):
         """Test setting brightness on all devices."""
-        devices = await discover_devices(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server.port,
-            idle_timeout_multiplier=0.5,
-        )
-
-        lights = [
-            Light(serial=dev.serial, ip="127.0.0.1", port=emulator_server.port)
-            for dev in devices
-        ]
-
-        group = DeviceGroup(lights)
+        group = emulator_devices
 
         async with group:
             await group.set_brightness(0.25, duration=0.0)
 
             # Verify brightness was set
             await asyncio.sleep(0.1)
-            async with lights[0]:
-                color, _, _ = await lights[0].get_color()
+            device = group.devices[0]
+            async with device:
+                color, _, _ = await device.get_color()
                 # Brightness should be approximately 0.25
                 assert abs(color.brightness - 0.25) < 0.05
 
-    async def test_batch_pulse(self, emulator_server):
+    async def test_batch_pulse(self, emulator_devices: DeviceGroup):
         """Test pulse effect on all devices."""
-        devices = await discover_devices(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server.port,
-            idle_timeout_multiplier=0.5,
-        )
-
-        lights = [
-            Light(serial=dev.serial, ip="127.0.0.1", port=emulator_server.port)
-            for dev in devices
-        ]
-
-        group = DeviceGroup(lights)
+        group = emulator_devices
 
         async with group:
             color = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
@@ -135,28 +88,20 @@ class TestDeviceGroupBatchOperations:
             await group.set_brightness(0.5)
             await group.pulse(HSBK(hue=180, saturation=1, brightness=1, kelvin=3500))
 
-    async def test_mixed_device_types(self, emulator_server):
+    async def test_mixed_device_types(self, emulator_devices: DeviceGroup):
         """Test batch operations with heterogeneous device types."""
-        # Use emulator_server which has all device types
-        from lifx.network.connection import DeviceConnection
+        group = emulator_devices
 
-        await DeviceConnection.close_all_connections()
+        # Should have mix of device types
+        assert len(group.lights) > 0
+        assert len(group.multizone_lights) > 0
+        assert len(group.tiles) > 0
 
-        async with discover(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server.port,
-            idle_timeout_multiplier=0.5,
-        ) as group:
-            # Should have mix of device types
-            assert len(group.lights) > 0
-            assert len(group.multizone_lights) > 0
-            assert len(group.tiles) > 0
+        # Test batch operation works on mixed types
+        await group.set_power(True, duration=0.0)
 
-            # Test batch operation works on mixed types
-            await group.set_power(True, duration=0.0)
-
-            # Verify operation succeeded on at least one device
-            async with group.lights[0]:
-                is_on = await group.lights[0].get_power()
-                assert is_on
+        # Verify operation succeeded on at least one device
+        device = group.lights[0]
+        async with device:
+            is_on = await device.get_power()
+            assert is_on
