@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.3 (2025-11-06)
+
+### Performance Improvements
+
+- Reduce network traffic when updating individual color values
+  ([`679b717`](https://github.com/Djelibeybi/lifx-async/commit/679b7176abd7634644e9395281ffa28dde26ebec))
+
+
 ## v1.1.2 (2025-11-05)
 
 ### Bug Fixes
