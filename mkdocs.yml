@@ -1,7 +1,7 @@
 site_name: lifx-async
 site_description: A modern, type-safe, async Python library for controlling LIFX lights
 site_author: Avi Miller <me@dje.li>
-site_url: https://lifx-async.readthedocs.io
+site_url: https://djelibeybi.github.io/lifx-async
 
 repo_name: Djelibeybi/lifx-async
 repo_url: https://github.com/Djelibeybi/lifx-async
