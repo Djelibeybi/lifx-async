@@ -1,7 +1,6 @@
 """Tests for device discovery."""
 
 from lifx.network.discovery import DiscoveredDevice, discover_devices
-from tests.conftest import EmulatorServer
 
 
 class TestDiscoveredDevice:
@@ -62,26 +61,22 @@ class TestDiscoveredDevice:
 class TestDiscoverDevices:
     """Test device discovery function."""
 
-    async def test_discover_devices_timeout(
-        self, emulator_server: EmulatorServer
-    ) -> None:
+    async def test_discover_devices_timeout(self, emulator_server: int) -> None:
         """Test discovery with short timeout using mock server."""
         devices = await discover_devices(
             timeout=0.5,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
         assert isinstance(devices, list)
         # Should discover the 7 mock devices
         assert len(devices) == 7
 
-    async def test_discover_devices_default(
-        self, emulator_server: EmulatorServer
-    ) -> None:
+    async def test_discover_devices_default(self, emulator_server: int) -> None:
         """Test discovery with mock server."""
         devices = await discover_devices(
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
         assert isinstance(devices, list)
         # Should discover the 7 mock devices

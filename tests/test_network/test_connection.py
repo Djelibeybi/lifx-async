@@ -397,75 +397,57 @@ class TestConnectionPoolMetrics:
 class TestMultiResponse:
     """Test multi-response collection functionality."""
 
-    async def test_multizone_returns_multiple_responses(self, emulator_server) -> None:
+    async def test_multizone_returns_multiple_responses(self, emulator_devices) -> None:
         """Test multizone GetColorZones auto-collection of multiple responses.
 
         GetColorZones requests that return multiple responses are collected
         automatically into a list if multiple packets arrive within 200ms.
         """
-        from lifx.api import discover
         from lifx.protocol import packets
 
-        server = emulator_server
+        # Get multizone devices from the cached emulator devices
+        multizone_devices = emulator_devices.multizone_lights
 
-        # Discover a multizone device from the emulator
-        async with discover(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=server.port,
-            idle_timeout_multiplier=0.5,
-        ) as group:
-            multizone_devices = group.multizone_lights
+        if not multizone_devices:
+            pytest.skip("No multizone devices available in emulator")
 
-            if not multizone_devices:
-                pytest.skip("No multizone devices available in emulator")
+        device = multizone_devices[0]
 
-            device = multizone_devices[0]
+        # Get color zones for all zones (may return multiple packets)
+        request = packets.MultiZone.GetColorZones(start_index=0, end_index=255)
+        response = await device.connection.request(
+            request, timeout=2.0, collect_multiple=True
+        )
 
-            # Get color zones for all zones (may return multiple packets)
-            request = packets.MultiZone.GetColorZones(start_index=0, end_index=255)
-            response = await device.connection.request(
-                request, timeout=2.0, collect_multiple=True
-            )
+        # Should get list or single response depending on emulator
+        # The connection waits for additional responses if available
+        if isinstance(response, list):
+            # Multiple responses - verify they all have the expected fields
+            assert len(response) >= 1
+            for pkt in response:
+                assert isinstance(pkt, packets.MultiZone.StateMultiZone)
+        else:
+            # Single response
+            assert isinstance(response, packets.MultiZone.StateMultiZone)
 
-            # Should get list or single response depending on emulator
-            # The connection waits for additional responses if available
-            if isinstance(response, list):
-                # Multiple responses - verify they all have the expected fields
-                assert len(response) >= 1
-                for pkt in response:
-                    assert isinstance(pkt, packets.MultiZone.StateMultiZone)
-            else:
-                # Single response
-                assert isinstance(response, packets.MultiZone.StateMultiZone)
-
-    async def test_single_response_automatic_collection(self, emulator_server) -> None:
+    async def test_single_response_automatic_collection(self, emulator_devices) -> None:
         """Test single-response requests return single packet (not a list).
 
         Single-response requests like GetLabel return the packet directly
         as a single object, not wrapped in a list.
         """
-        from lifx.api import discover
         from lifx.protocol import packets
 
-        server = emulator_server
+        # Get lights from the cached emulator devices
+        lights = emulator_devices.lights
 
-        # Discover a multizone device from the emulator
-        async with discover(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=server.port,
-            idle_timeout_multiplier=0.5,
-        ) as group:
-            lights = group.lights
+        if not lights:
+            pytest.skip("No lights available in emulator")
 
-            if not lights:
-                pytest.skip("No lights available in emulator")
+        light = lights[0]
 
-            light = lights[0]
-
-            # GetLabel() should only return a single response
-            response = await light.connection.request(
-                packets.Device.GetLabel(), timeout=2.0
-            )
-            assert isinstance(response, packets.Device.StateLabel)
+        # GetLabel() should only return a single response
+        response = await light.connection.request(
+            packets.Device.GetLabel(), timeout=2.0
+        )
+        assert isinstance(response, packets.Device.StateLabel)
