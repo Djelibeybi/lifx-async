@@ -17,14 +17,12 @@ from tests.conftest import get_free_port
 class TestDiscover:
     """Test discover() context manager."""
 
-    async def test_discover_basic(self, emulator_server):
+    async def test_discover_basic(self, emulator_server: int):
         """Test basic discovery with context manager."""
-        server = emulator_server
-
         async with discover(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         ) as group:
             # Should discover all 7 devices from emulator
@@ -33,14 +31,12 @@ class TestDiscover:
             # Should be able to perform operations
             assert len(group.lights) == 7  # All devices are lights
 
-    async def test_discover_with_timeout(self, emulator_server):
+    async def test_discover_with_timeout(self, emulator_server: int):
         """Test discovery with custom timeout."""
-        server = emulator_server
-
         async with discover(
             timeout=0.5,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         ) as group:
             # Should complete within timeout
@@ -53,18 +49,15 @@ class TestDiscover:
             timeout=0.5,
             broadcast_address="127.0.0.1",
             port=get_free_port(),
-            idle_timeout_multiplier=0.5,
         ) as group:
             # Should return empty group
             assert len(group.devices) == 0
 
-    async def test_discover_context_manager_cleanup(self, emulator_server):
+    async def test_discover_context_manager_cleanup(self, emulator_server: int):
         """Test that context manager properly cleans up."""
-        server = emulator_server
-
         # Enter and exit context
         async with discover(
-            timeout=1.0, broadcast_address="127.0.0.1", port=server.port
+            timeout=1.0, broadcast_address="127.0.0.1", port=emulator_server
         ) as group:
             devices = group.devices
             assert len(devices) > 0
@@ -77,14 +70,12 @@ class TestDiscover:
 class TestFindLights:
     """Test find_lights() helper function."""
 
-    async def test_find_lights_all(self, emulator_server):
+    async def test_find_lights_all(self, emulator_server: int):
         """Test finding all lights without filtering."""
-        server = emulator_server
-
         lights = await find_lights(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
@@ -92,16 +83,14 @@ class TestFindLights:
         assert len(lights) == 7
         assert all(isinstance(light, Light) for light in lights)
 
-    async def test_find_lights_by_label_exact(self, emulator_server):
+    async def test_find_lights_by_label_exact(self, emulator_server: int):
         """Test finding lights with exact label match."""
-        server = emulator_server
-
         # Emulator devices have default labels, we can search for "LIFX"
         lights = await find_lights(
             label_contains="LIFX",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
@@ -112,61 +101,53 @@ class TestFindLights:
             label = await lights[0].get_label()
             assert "LIFX" in label or "lifx" in label.lower()
 
-    async def test_find_lights_by_label_partial(self, emulator_server):
+    async def test_find_lights_by_label_partial(self, emulator_server: int):
         """Test finding lights with partial label match (case-insensitive)."""
-        server = emulator_server
-
         # Search for common term in emulator device names
         lights = await find_lights(
             label_contains="Color",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
         # Should find at least the color light devices
         assert len(lights) >= 1
 
-    async def test_find_lights_by_label_case_insensitive(self, emulator_server):
+    async def test_find_lights_by_label_case_insensitive(self, emulator_server: int):
         """Test that label filtering is case-insensitive."""
-        server = emulator_server
-
         # Search with different case
         lights = await find_lights(
             label_contains="COLOR",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
         # Should find devices with "color" in label (case-insensitive)
         assert len(lights) >= 1
 
-    async def test_find_lights_not_found(self, emulator_server):
+    async def test_find_lights_not_found(self, emulator_server: int):
         """Test finding lights with non-existent label."""
-        server = emulator_server
-
         lights = await find_lights(
             label_contains="NonExistentDeviceName12345",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
         # Should return empty list
         assert len(lights) == 0
 
-    async def test_find_lights_includes_multizone(self, emulator_server):
+    async def test_find_lights_includes_multizone(self, emulator_server: int):
         """Test that find_lights includes MultiZoneLight devices."""
-        server = emulator_server
-
         lights = await find_lights(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
@@ -183,7 +164,6 @@ class TestFindLights:
             timeout=0.5,
             broadcast_address="127.0.0.1",
             port=get_free_port(),
-            idle_timeout_multiplier=0.5,
         )
         assert len(lights) == 0
 
@@ -191,15 +171,13 @@ class TestFindLights:
 class TestFindBySerial:
     """Test find_by_serial() helper function."""
 
-    async def test_find_by_serial_found_string(self, emulator_server):
+    async def test_find_by_serial_found_string(self, emulator_server: int):
         """Test finding device by serial number (string format)."""
-        server = emulator_server
-
         # First discover devices to get a real serial number
         devices = await discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
         assert len(devices) > 0
@@ -210,7 +188,7 @@ class TestFindBySerial:
             target_serial,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
@@ -218,15 +196,13 @@ class TestFindBySerial:
         assert device.serial == target_serial
         assert isinstance(device, Light)
 
-    async def test_find_by_serial_found_bytes(self, emulator_server):
+    async def test_find_by_serial_found_bytes(self, emulator_server: int):
         """Test finding device by serial number (bytes format)."""
-        server = emulator_server
-
         # Discover devices to get a real serial
         devices = await discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
         assert len(devices) >= 2
@@ -238,22 +214,20 @@ class TestFindBySerial:
             serial_bytes,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
         assert device is not None
         assert device.serial == target_serial
 
-    async def test_find_by_serial_with_colons(self, emulator_server):
+    async def test_find_by_serial_with_colons(self, emulator_server: int):
         """Test finding device by serial with colon separators."""
-        server = emulator_server
-
         # Discover multizone device
         devices = await discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
@@ -267,37 +241,33 @@ class TestFindBySerial:
             serial_with_colons,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
         assert device is not None
         assert device.serial == target_serial
 
-    async def test_find_by_serial_not_found(self, emulator_server):
+    async def test_find_by_serial_not_found(self, emulator_server: int):
         """Test finding device with non-existent serial."""
-        server = emulator_server
-
         device = await find_by_serial(
             "d073d5999999",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
         # Should return None
         assert device is None
 
-    async def test_find_by_serial_case_insensitive(self, emulator_server):
+    async def test_find_by_serial_case_insensitive(self, emulator_server: int):
         """Test that serial matching is case-insensitive."""
-        server = emulator_server
-
         # Discover devices first
         devices = await discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
         assert len(devices) > 0
@@ -310,7 +280,7 @@ class TestFindBySerial:
             uppercase_serial,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=server.port,
+            port=emulator_server,
             idle_timeout_multiplier=0.5,
         )
 
@@ -325,6 +295,5 @@ class TestFindBySerial:
             timeout=0.5,
             broadcast_address="127.0.0.1",
             port=get_free_port(),
-            idle_timeout_multiplier=0.5,
         )
         assert device is None

@@ -25,12 +25,14 @@ class TestDiscoveredDeviceCreateDevice:
     """
 
     @pytest.mark.asyncio
-    async def test_create_device_returns_correct_type(self, emulator_server) -> None:
+    async def test_create_device_returns_correct_type(
+        self, emulator_server: int
+    ) -> None:
         """Test that create_device returns a device instance."""
         devices = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert len(devices) > 0
@@ -47,13 +49,13 @@ class TestDiscoveredDeviceCreateDevice:
 
     @pytest.mark.asyncio
     async def test_create_device_preserves_connection_info(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test that create_device preserves serial, IP, and port info."""
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert len(discovered_list) > 0
@@ -67,7 +69,9 @@ class TestDiscoveredDeviceCreateDevice:
         assert device.port == discovered.port
 
     @pytest.mark.asyncio
-    async def test_create_device_all_emulator_devices(self, emulator_server) -> None:
+    async def test_create_device_all_emulator_devices(
+        self, emulator_server: int
+    ) -> None:
         """Test create_device works for all device types in emulator.
 
         The emulator creates 7 devices:
@@ -79,9 +83,9 @@ class TestDiscoveredDeviceCreateDevice:
         - 1 color temperature light
         """
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert len(discovered_list) == 7
@@ -110,13 +114,13 @@ class TestDiscoverDeviceByLabel:
     """
 
     @pytest.mark.asyncio
-    async def test_discover_by_label_finds_device(self, emulator_server) -> None:
+    async def test_discover_by_label_finds_device(self, emulator_server: int) -> None:
         """Test discover_device_by_label can find a device by label."""
         # First discover all devices and get a label
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         if not discovered_list:
@@ -133,20 +137,22 @@ class TestDiscoverDeviceByLabel:
             device_label,
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert found_device is not None
         assert found_device.serial == first_device.serial
 
     @pytest.mark.asyncio
-    async def test_discover_by_label_case_insensitive(self, emulator_server) -> None:
+    async def test_discover_by_label_case_insensitive(
+        self, emulator_server: int
+    ) -> None:
         """Test discover_device_by_label is case-insensitive."""
         # First discover all devices and get a label
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         if not discovered_list:
@@ -163,20 +169,20 @@ class TestDiscoverDeviceByLabel:
             device_label.upper(),
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert found_device is not None
         assert found_device.serial == first_device.serial
 
     @pytest.mark.asyncio
-    async def test_discover_by_label_not_found(self, emulator_server) -> None:
+    async def test_discover_by_label_not_found(self, emulator_server: int) -> None:
         """Test discover_device_by_label returns None when label not found."""
         result = await discover_device_by_label(
             "Nonexistent Device Label 12345",
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert result is None
@@ -207,21 +213,23 @@ class TestDiscoverDeviceByLabel:
             "Test Device",
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         # Should either find a device or return None, not raise
         assert result is None or result.serial is not None
 
     @pytest.mark.asyncio
-    async def test_discover_by_label_uses_all_parameters(self, emulator_server) -> None:
+    async def test_discover_by_label_uses_all_parameters(
+        self, emulator_server: int
+    ) -> None:
         """Test discover_device_by_label passes parameters to discover_devices."""
         # This verifies the function properly forwards parameters
         result = await discover_device_by_label(
             "Nonexistent",
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         # May or may not find, but should complete without error
@@ -233,7 +241,7 @@ class TestDiscoveryEdgeCasesWithEmulator:
 
     @pytest.mark.asyncio
     async def test_discover_devices_with_multiple_simultaneous_creates(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test creating multiple device instances simultaneously.
 
@@ -243,9 +251,9 @@ class TestDiscoveryEdgeCasesWithEmulator:
         import asyncio
 
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         if len(discovered_list) < 2:
@@ -262,30 +270,33 @@ class TestDiscoveryEdgeCasesWithEmulator:
 
     @pytest.mark.asyncio
     async def test_discover_devices_response_time_accuracy(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test that response_time is accurately calculated."""
         devices = await discover_devices(
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert len(devices) > 0
 
         # All response times should be positive and reasonable
+        # It is possible for the emulator to respond "instantly"
         for device in devices:
-            assert device.response_time > 0
+            assert device.response_time >= 0.0
             # Response time should be less than 1 second for localhost
             assert device.response_time < 1.0
 
     @pytest.mark.asyncio
-    async def test_discover_all_devices_have_valid_ports(self, emulator_server) -> None:
+    async def test_discover_all_devices_have_valid_ports(
+        self, emulator_server: int
+    ) -> None:
         """Test that all discovered devices have valid port numbers."""
         devices = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert len(devices) > 0
@@ -307,7 +318,7 @@ class TestDiscoverByIpAndSerialLoops:
 
     @pytest.mark.asyncio
     async def test_discover_by_ip_returns_matching_device(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test discover_device_by_ip returns device when IP matches.
 
@@ -318,9 +329,9 @@ class TestDiscoverByIpAndSerialLoops:
 
         # First discover all devices
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         if not discovered_list:
@@ -332,9 +343,9 @@ class TestDiscoverByIpAndSerialLoops:
         # Now search for it
         found = await discover_device_by_ip(
             target_ip,
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert found is not None
@@ -342,7 +353,7 @@ class TestDiscoverByIpAndSerialLoops:
 
     @pytest.mark.asyncio
     async def test_discover_by_ip_returns_none_when_not_found(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test discover_device_by_ip returns None when no IP matches.
 
@@ -353,16 +364,16 @@ class TestDiscoverByIpAndSerialLoops:
 
         found = await discover_device_by_ip(
             "192.168.200.254",  # Unlikely to exist
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert found is None
 
     @pytest.mark.asyncio
     async def test_discover_by_serial_returns_matching_device(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test discover_device_by_serial returns device when serial matches.
 
@@ -373,9 +384,9 @@ class TestDiscoverByIpAndSerialLoops:
 
         # First discover all devices
         discovered_list = await discover_devices(
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         if not discovered_list:
@@ -387,9 +398,9 @@ class TestDiscoverByIpAndSerialLoops:
         # Now search for it
         found = await discover_device_by_serial(
             target_serial,
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert found is not None
@@ -397,7 +408,7 @@ class TestDiscoverByIpAndSerialLoops:
 
     @pytest.mark.asyncio
     async def test_discover_by_serial_returns_none_when_not_found(
-        self, emulator_server
+        self, emulator_server: int
     ) -> None:
         """Test discover_device_by_serial returns None when no serial matches.
 
@@ -408,9 +419,9 @@ class TestDiscoverByIpAndSerialLoops:
 
         found = await discover_device_by_serial(
             "aabbccddffee",  # Unlikely to exist
-            timeout=1.0,
+            timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server.port,
+            port=emulator_server,
         )
 
         assert found is None

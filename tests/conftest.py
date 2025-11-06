@@ -5,14 +5,14 @@ from __future__ import annotations
 import os
 import shutil
 import socket
-import subprocess
-import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from typing import ClassVar
 
 import pytest
+from xprocess import ProcessStarter
 
-# Import DeviceConnection for cleanup
+from lifx.api import DeviceGroup
 from lifx.network.connection import DeviceConnection
 
 
@@ -37,122 +37,6 @@ def find_lifx_emulator() -> Path | None:
     return None
 
 
-class EmulatorServer:
-    """Manages lifx-emulator subprocess for testing."""
-
-    def __init__(self, port: int = 56700, verbose: bool = False):
-        """Initialize emulator server manager.
-
-        Args:
-            port: UDP port for emulator to listen on
-            verbose: Enable verbose logging from emulator
-        """
-        self.port = port
-        self.verbose = verbose
-        self.process: subprocess.Popen[bytes] | None = None
-        self.emulator_path: Path | None = None
-
-    def start(self) -> bool:
-        """Start the emulator process.
-
-        Returns:
-            True if emulator started successfully, False otherwise
-        """
-        # Find emulator
-        self.emulator_path = find_lifx_emulator()
-        if not self.emulator_path:
-            return False
-
-        # Build command - bind to 127.0.0.1 for security
-        # Enables API for runtime reconfiguration
-        # Creates 7 devices to match test expectations:
-        # - 1 color light
-        # - 1 infrared light
-        # - 1 HEV light
-        # - 2 multizone lights
-        # - 1 tile device
-        # - 1 color temperature (white-only) light
-        cmd = [
-            str(self.emulator_path),
-            "--bind",
-            "127.0.0.1",  # bind emulator to localhost
-            "--port",
-            str(self.port),
-            "--api",  # start the API
-            "--api-host",
-            "127.0.0.1",  # bind API to localhost
-            "--color",
-            "1",  # 1 color light
-            "--multizone",
-            "2",  # 2 multizone devices
-            "--tile",
-            "1",  # 1 tile device
-            "--hev",
-            "1",  # 1 HEV light
-            "--infrared",
-            "1",  # 1 infrared light
-            "--color-temperature",
-            "1",  # 1 color temperature (white-only) light
-        ]
-
-        if self.verbose:
-            cmd.append("--verbose")
-
-        # Start process
-        self.process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE if not self.verbose else None,
-            stderr=subprocess.PIPE if not self.verbose else None,
-            stdin=subprocess.DEVNULL,
-        )
-
-        # Wait for emulator to be ready (check if port is bound)
-        self._wait_for_ready(timeout=5.0)
-        return True
-
-    def _wait_for_ready(self, timeout: float = 5.0) -> None:
-        """Wait for emulator to be ready to accept connections.
-
-        Args:
-            timeout: Maximum time to wait in seconds
-        """
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if self.process and self.process.poll() is not None:
-                # Process terminated
-                code = self.process.returncode
-                raise RuntimeError(f"Emulator process terminated (exit code: {code})")
-
-            # Try to connect to check if server is ready
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                sock.settimeout(0.1)
-                sock.sendto(b"", ("127.0.0.1", self.port))
-                sock.close()
-                # If we can send, assume emulator is ready
-                time.sleep(1.0)  # Give it more time to fully initialize all devices
-                return
-            except (ConnectionRefusedError, OSError):
-                time.sleep(0.1)
-
-        raise TimeoutError(f"Emulator did not become ready within {timeout}s")
-
-    def stop(self) -> None:
-        """Stop the emulator process."""
-        if self.process:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-            self.process = None
-
-    def is_running(self) -> bool:
-        """Check if emulator process is running."""
-        return self.process is not None and self.process.poll() is None
-
-
 @pytest.fixture(scope="session")
 def emulator_available() -> bool:
     """Check if lifx-emulator is available."""
@@ -160,7 +44,7 @@ def emulator_available() -> bool:
 
 
 @pytest.fixture(scope="session")
-def emulator_server(emulator_available: bool) -> Any:
+def emulator_server(emulator_available: bool, xprocess) -> Generator[int]:
     """Start lifx-emulator as a subprocess for the entire test session.
 
     The emulator starts once at the beginning and stops when all tests complete.
@@ -169,6 +53,8 @@ def emulator_server(emulator_available: bool) -> Any:
     Only starts if lifx-emulator is available. Tests that require the emulator
     should check emulator_available or will be skipped automatically.
 
+    Uses pytest-xprocess for robust process management and cleanup.
+
     External emulator mode:
         Set LIFX_EMULATOR_EXTERNAL=1 to skip starting the emulator subprocess.
         Use LIFX_EMULATOR_PORT to specify the port (default: 56700).
@@ -176,7 +62,7 @@ def emulator_server(emulator_available: bool) -> Any:
         emulator instance with custom configuration.
 
     Yields:
-        EmulatorServer instance with .port attribute
+        UDP port number where the emulator is listening
     """
     # Check if using external emulator
     use_external = os.environ.get("LIFX_EMULATOR_EXTERNAL", "").lower() in (
@@ -188,28 +74,98 @@ def emulator_server(emulator_available: bool) -> Any:
     if use_external:
         # Use external emulator - don't start subprocess
         port = int(os.environ.get("LIFX_EMULATOR_PORT", "56700"))
-        emulator = EmulatorServer(port=port, verbose=False)
-        # Don't start the subprocess, just provide the port
-        yield emulator
+        yield port
         # No cleanup needed for external emulator
         return
 
-    # Standard mode: start emulator subprocess
+    # Standard mode: use xprocess to start emulator subprocess
     if not emulator_available:
-        pytest.skip(
-            "lifx-emulator not available - install from ../lifx-emulator or system PATH"
-        )
+        pytest.skip("lifx-emulator not available")
+
+    emulator_path = find_lifx_emulator()
+    if not emulator_path:
+        pytest.skip("Failed to find lifx-emulator")
 
     port = get_free_port()
-    emulator = EmulatorServer(port=port, verbose=False)
 
-    started = emulator.start()
-    if not started:
-        pytest.skip("Failed to start lifx-emulator")
+    class EmulatorServer(ProcessStarter):
+        """Process starter for use with pytest-xprocess."""
 
-    yield emulator
+        pattern = "LIFX emulated server listening"
+        args: ClassVar[list[str]] = [
+            str(emulator_path),
+            "--bind",
+            "127.0.0.1",  # bind emulator to localhost
+            "--port",
+            str(port),
+            "--color",
+            "1",  # 1 color light
+            "--multizone",
+            "2",  # 2 multizone devices
+            "--tile",
+            "1",  # 1 tile device
+            "--hev",
+            "1",  # 1 HEV light
+            "--infrared",
+            "1",  # 1 infrared light
+            "--color-temperature",
+            "1",  # 1 color temperature light
+        ]
 
-    emulator.stop()
+        # Terminate the process on interrupt
+        terminate_on_interrupt = True
+
+    # Use xprocess to manage the emulator subprocess
+    _ = xprocess.ensure("lifx_emulator", EmulatorServer)
+
+    yield port
+
+    xprocess.getinfo("lifx_emulator").terminate()
+
+
+@pytest.fixture(scope="session")
+def emulator_devices(emulator_server: int) -> DeviceGroup:
+    """Return a DeviceGroup with the 7 hardcoded emulated devices.
+
+    This fixture hard-codes the seven devices created by the emulator to avoid
+    the overhead of running discovery for every test. All devices connect to
+    127.0.0.1 on the emulator's port.
+
+    Returns:
+        DeviceGroup containing the 7 emulated devices:
+        - 2 regular Light devices (d073d5000001, d073d5000002)
+        - 1 InfraredLight (d073d5000003)
+        - 1 HevLight (d073d5000004)
+        - 2 MultiZoneLight devices (d073d5000005, d073d5000006)
+        - 1 TileDevice (d073d5000007)
+    """
+    import ipaddress
+
+    from lifx.devices import HevLight, InfraredLight, Light, MultiZoneLight, TileDevice
+
+    # Temporarily allow localhost for device creation
+    original_is_loopback = ipaddress.IPv4Address.is_loopback.fget
+
+    def fake_is_loopback(_addr_self):
+        return False
+
+    # Patch the property
+    ipaddress.IPv4Address.is_loopback = property(fake_is_loopback)
+
+    try:
+        devices = [
+            Light(serial="d073d5000001", ip="127.0.0.1", port=emulator_server),
+            Light(serial="d073d5000002", ip="127.0.0.1", port=emulator_server),
+            InfraredLight(serial="d073d5000003", ip="127.0.0.1", port=emulator_server),
+            HevLight(serial="d073d5000004", ip="127.0.0.1", port=emulator_server),
+            MultiZoneLight(serial="d073d5000005", ip="127.0.0.1", port=emulator_server),
+            MultiZoneLight(serial="d073d5000006", ip="127.0.0.1", port=emulator_server),
+            TileDevice(serial="d073d5000007", ip="127.0.0.1", port=emulator_server),
+        ]
+        return DeviceGroup(devices)
+    finally:
+        # Restore original
+        ipaddress.IPv4Address.is_loopback = property(original_is_loopback)
 
 
 @pytest.fixture(autouse=True)
@@ -229,7 +185,7 @@ def allow_localhost_for_tests(monkeypatch):
         # Temporarily replace is_loopback check
         original_is_loopback = ipaddress.IPv4Address.is_loopback.fget
 
-        def fake_is_loopback(addr_self):
+        def fake_is_loopback(_addr_self):
             # Allow loopback addresses in tests
             return False
 
