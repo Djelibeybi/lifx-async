@@ -76,30 +76,31 @@ class TestLight:
 
     async def test_set_brightness(self, light: Light) -> None:
         """Test setting brightness."""
-        # Mock get_color response
-        color_response = packets.Light.StateColor(
-            color=HSBK(
-                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
-            ).to_protocol(),
-            power=65535,
-            label="Test Light",
-        )
-        # Mock set_color response (returns True)
-        light.connection.request.side_effect = [color_response, True]
+        # Mock set_waveform_optional response (returns True)
+        light.connection.request.return_value = True
 
         await light.set_brightness(0.25, duration=2.0)
 
-        # Verify set_color was called with modified brightness
-        assert light.connection.request.call_count == 2  # get_color + set_color
+        # Verify set_waveform_optional was called with only brightness set
+        light.connection.request.assert_called_once()
+        call_args = light.connection.request.call_args
+        packet = call_args[0][0]
 
-        # Get the set_color call (second call)
-        calls = light.connection.request.call_args_list
-        packet = calls[1][0][0]  # Second call, first arg, first element
+        # Verify it's a SetWaveformOptional packet
+        assert isinstance(packet, packets.Light.SetWaveformOptional)
 
-        # Convert back to verify
+        # Verify brightness is set correctly
         result_color = HSBK.from_protocol(packet.color)
         assert result_color.brightness == pytest.approx(0.25, abs=0.01)
-        assert result_color.hue == pytest.approx(180, abs=1)
+
+        # Verify only brightness flag is set
+        assert packet.set_brightness is True
+        assert packet.set_hue is False
+        assert packet.set_saturation is False
+        assert packet.set_kelvin is False
+
+        # Verify duration is passed as period
+        assert packet.period == 2000  # 2 seconds in ms
 
     async def test_set_brightness_invalid(self, light: Light) -> None:
         """Test setting invalid brightness."""
@@ -113,26 +114,31 @@ class TestLight:
 
     async def test_set_kelvin(self, light: Light) -> None:
         """Test setting color temperature."""
-        # Mock get_color response
-        color_response = packets.Light.StateColor(
-            color=HSBK(
-                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
-            ).to_protocol(),
-            power=65535,
-            label="Test Light",
-        )
-        # Mock set_color response
-        light.connection.request.side_effect = [color_response, True]
+        # Mock set_waveform_optional response (returns True)
+        light.connection.request.return_value = True
 
         await light.set_kelvin(6500, duration=1.0)
 
-        # Verify set_color was called with modified kelvin
-        assert light.connection.request.call_count == 2
+        # Verify set_waveform_optional was called with only kelvin set
+        light.connection.request.assert_called_once()
+        call_args = light.connection.request.call_args
+        packet = call_args[0][0]
 
-        # Get the set_color call (second call)
-        calls = light.connection.request.call_args_list
-        packet = calls[1][0][0]
+        # Verify it's a SetWaveformOptional packet
+        assert isinstance(packet, packets.Light.SetWaveformOptional)
+
+        # Verify saturation and kelvin are set correctly
+        assert packet.color.saturation == 0
         assert packet.color.kelvin == 6500
+
+        # Verify both saturation and kelvin flags are set
+        assert packet.set_kelvin is True
+        assert packet.set_hue is False
+        assert packet.set_saturation is True
+        assert packet.set_brightness is False
+
+        # Verify duration is passed as period
+        assert packet.period == 1000  # 1 second in ms
 
     async def test_set_kelvin_invalid(self, light: Light) -> None:
         """Test setting invalid temperature."""
@@ -146,53 +152,53 @@ class TestLight:
 
     async def test_set_hue(self, light: Light) -> None:
         """Test setting hue."""
-        # Mock get_color response
-        color_response = packets.Light.StateColor(
-            color=HSBK(
-                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
-            ).to_protocol(),
-            power=65535,
-            label="Test Light",
-        )
-        # Mock set_color response
-        light.connection.request.side_effect = [color_response, True]
+        # Mock set_waveform_optional response (returns True)
+        light.connection.request.return_value = True
 
         await light.set_hue(240)
 
-        # Verify set_color was called with modified hue
-        assert light.connection.request.call_count == 2
+        # Verify set_waveform_optional was called with only hue set
+        light.connection.request.assert_called_once()
+        call_args = light.connection.request.call_args
+        packet = call_args[0][0]
 
-        # Get the set_color call (second call)
-        calls = light.connection.request.call_args_list
-        packet = calls[1][0][0]
+        # Verify it's a SetWaveformOptional packet
+        assert isinstance(packet, packets.Light.SetWaveformOptional)
 
+        # Verify hue is set correctly
         result_color = HSBK.from_protocol(packet.color)
         assert result_color.hue == pytest.approx(240, abs=1)
 
+        # Verify only hue flag is set
+        assert packet.set_hue is True
+        assert packet.set_saturation is False
+        assert packet.set_brightness is False
+        assert packet.set_kelvin is False
+
     async def test_set_saturation(self, light: Light) -> None:
         """Test setting saturation."""
-        # Mock get_color response
-        color_response = packets.Light.StateColor(
-            color=HSBK(
-                hue=180, saturation=0.5, brightness=0.75, kelvin=3500
-            ).to_protocol(),
-            power=65535,
-            label="Test Light",
-        )
-        # Mock set_color response
-        light.connection.request.side_effect = [color_response, True]
+        # Mock set_waveform_optional response (returns True)
+        light.connection.request.return_value = True
 
         await light.set_saturation(1.0)
 
-        # Verify set_color was called with modified saturation
-        assert light.connection.request.call_count == 2
+        # Verify set_waveform_optional was called with only saturation set
+        light.connection.request.assert_called_once()
+        call_args = light.connection.request.call_args
+        packet = call_args[0][0]
 
-        # Get the set_color call (second call)
-        calls = light.connection.request.call_args_list
-        packet = calls[1][0][0]
+        # Verify it's a SetWaveformOptional packet
+        assert isinstance(packet, packets.Light.SetWaveformOptional)
 
+        # Verify saturation is set correctly
         result_color = HSBK.from_protocol(packet.color)
         assert result_color.saturation == pytest.approx(1.0, abs=0.01)
+
+        # Verify only saturation flag is set
+        assert packet.set_saturation is True
+        assert packet.set_hue is False
+        assert packet.set_brightness is False
+        assert packet.set_kelvin is False
 
     async def test_get_power(self, light: Light) -> None:
         """Test getting light power state."""
