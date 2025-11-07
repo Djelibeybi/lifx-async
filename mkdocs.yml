@@ -148,7 +148,9 @@ nav:
 - Getting Started:
   - Installation: getting-started/installation.md
   - Quick Start: getting-started/quickstart.md
+  - Themes: getting-started/themes.md
 - User Guide:
+  - Themes: user-guide/themes.md
   - Advanced Usage: user-guide/advanced-usage.md
   - Troubleshooting: user-guide/troubleshooting.md
   - Protocol Deep Dive: user-guide/protocol-deep-dive.md
@@ -157,6 +159,7 @@ nav:
 - API Reference:
   - Overview: api/index.md
   - High-Level API: api/high-level.md
+  - Themes: api/themes.md
   - Color Utilities: api/colors.md
   - Device Classes: api/devices.md
   - Network Layer: api/network.md

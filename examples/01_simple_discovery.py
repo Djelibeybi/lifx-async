@@ -14,49 +14,43 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    """Discover devices and display information."""
-    print("Discovering LIFX devices...")
+    """Discover lights and display information."""
+    print("Discovering LIFX lights...")
     print("This will broadcast on your network and wait for responses.")
     print()
 
-    # Discover devices with 3 second timeout
-    async with discover(timeout=3.0) as group:
-        if not group.devices:
-            print("No devices found!")
+    # Discover lights with 5 second timeout
+    async with discover(timeout=5.0, broadcast_address="192.168.19.255") as group:
+        if not group.lights:
+            print("No lights found!")
             print("\nTroubleshooting:")
-            print("1. Ensure devices are powered on")
-            print("2. Check that devices are on the same network")
+            print("1. Ensure lights are powered on")
+            print("2. Check that lights are on the same network")
             print("3. Verify firewall allows UDP port 56700")
             return
 
-        print(f"Found {len(group.devices)} device(s):\n")
+        print(f"Found {len(group.lights)} lights(s):\n")
 
         # Display information about each device
-        for i, device in enumerate(group.devices, 1):
-            print(f"Device {i}:")
-            print(f"  Serial: {device.serial}")
-            print(f"  IP: {device.ip}")
-            print(f"  Port: {device.port}")
+        for i, light in enumerate(group.lights, 1):
+            print(f"Light {i}:")
+            print(f"  Serial: {light.serial}")
+            print(f"  IP: {light.ip}")
+            print(f"  Port: {light.port}")
 
-            try:
-                # Get device label
-                label = await device.get_label()
-                print(f"  Label: {label}")
-
-                # Get power state
-                power = await device.get_power()
-                print(f"  Power: {'ON' if power else 'OFF'}")
-
-                # Get version info
-                version = await device.get_version()
-                print(f"  Product ID: {version.product}")
-
-                # Get firmware info
-                firmware = await device.get_host_firmware()
-                print(f"  Firmware: {firmware.version_major}.{firmware.version_minor}")
-
-            except Exception as e:
-                print(f"  Error querying device: {e}")
+            async with light:
+                print(f"  Product: {light.model}")
+                if light.label is not None:
+                    print(f"  Label: {light.label[0]}")
+                if light.power is not None:
+                    print(f"  Power: {'ON' if light.power[0] else 'OFF'}")
+                if light.host_firmware is not None:
+                    firmware = light.host_firmware[0]
+                    print(
+                        f"  Firmware: {firmware.version_major}.{firmware.version_minor}"
+                    )
+                if light.color is not None:
+                    print(f"  Color: {light.color[0].as_dict()}")
 
             print()
 

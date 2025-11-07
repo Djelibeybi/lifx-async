@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
 from lifx.devices.light import Light
@@ -16,6 +17,9 @@ from lifx.protocol.protocol_types import (
     TileEffectType,
 )
 from lifx.protocol.protocol_types import TileStateDevice as LifxProtocolTileDevice
+
+if TYPE_CHECKING:
+    from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -982,6 +986,7 @@ class TileDevice(Light):
 
         # Convert palette to protocol HSBK and pad to 16
         protocol_palette = [color.to_protocol() for color in palette]
+
         while len(protocol_palette) < 16:
             protocol_palette.append(HSBK(0, 0, 0, 3500).to_protocol())
 
@@ -1368,6 +1373,80 @@ class TileDevice(Light):
             ```
         """
         return self._tile_colors
+
+    async def apply_theme(
+        self,
+        theme: Theme,
+        power_on: bool = False,
+        duration: float = 0.0,
+    ) -> None:
+        """Apply a theme to this tile device.
+
+        Distributes theme colors across all tiles in the chain using Canvas-based
+        rendering to create natural color splotches that grow outward.
+
+        Args:
+            theme: Theme to apply
+            power_on: Turn on the device
+            duration: Transition duration in seconds
+
+        Example:
+            ```python
+            from lifx.theme import get_theme
+
+            theme = get_theme("sunset")
+            await tile.apply_theme(theme, power_on=True, duration=2.0)
+            ```
+        """
+        from lifx.theme.generators import MatrixGenerator
+
+        # Get tile dimensions
+        tiles = await self.get_tile_chain()
+        if not tiles:
+            _LOGGER.warning("No tiles available, skipping theme application")
+            return
+
+        # Build coords_and_sizes for all tiles
+        left_x = 0
+        coords_and_sizes = []
+        for tile in tiles:
+            coords_and_sizes.append(((left_x, 0), (tile.width, tile.height)))
+            left_x += tile.width
+
+        # Create generator with all tile coordinates
+        generator = MatrixGenerator(coords_and_sizes)
+
+        # Generate colors for all tiles at once
+        tile_colors_list = generator.get_theme_colors(theme)
+
+        # Check if device is on
+        is_on = await self.get_power()
+
+        # Determine duration for color setting
+        color_duration = 0 if (power_on and not is_on) else duration
+
+        # Apply colors to each tile
+        for tile_idx, colors_flat in enumerate(tile_colors_list):
+            tile_info = tiles[tile_idx]
+
+            # Convert to 2D grid for set_tile_colors
+            colors_2d = []
+            for y in range(tile_info.height):
+                row = []
+                for x in range(tile_info.width):
+                    idx = y * tile_info.width + x
+                    if idx < len(colors_flat):
+                        row.append(colors_flat[idx])
+                    else:
+                        row.append(HSBK(0, 0, 1.0, 3500))  # White fallback
+                colors_2d.append(row)
+
+            # Apply colors to tile
+            await self.set_tile_colors(tile_idx, colors_2d, duration=color_duration)
+
+        # Turn on if requested
+        if power_on and not is_on:
+            await self.set_power(True, duration=duration)
 
     def __repr__(self) -> str:
         """String representation of tile device."""
