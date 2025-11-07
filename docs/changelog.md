@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2025-11-07)
+
+### Features
+
+- Add theme support
+  ([`82477cd`](https://github.com/Djelibeybi/lifx-async/commit/82477cd078004c37ad5b538ed8a261ac5fbece78))
+
+
 ## v1.1.3 (2025-11-06)
 
 ### Performance Improvements
