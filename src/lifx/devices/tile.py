@@ -14,6 +14,7 @@ from lifx.protocol.protocol_types import (
     TileBufferRect,
     TileEffectParameter,
     TileEffectSettings,
+    TileEffectSkyType,
     TileEffectType,
 )
 from lifx.protocol.protocol_types import TileStateDevice as LifxProtocolTileDevice
@@ -87,7 +88,8 @@ class TileEffect:
         speed: Effect speed in milliseconds
         duration: Total effect duration in nanoseconds (0 for infinite)
         palette: Color palette for the effect (max 16 colors)
-        parameters: Effect-specific parameters (8 uint32 values)
+        parameters: Effect-specific parameters (sky_type, cloud_saturation_min,
+                    cloud_saturation_max)
     """
 
     effect_type: TileEffectType
@@ -103,7 +105,7 @@ class TileEffect:
             # Default palette: single white color
             self.palette = [HSBK(0, 0, 1.0, 3500)]
         if self.parameters is None:
-            self.parameters = [0] * 8
+            self.parameters = [0] * 3
 
         # Validate all fields
         self._validate_speed(self.speed)
@@ -159,20 +161,18 @@ class TileEffect:
         """Validate effect parameters list.
 
         Args:
-            value: List of 8 uint32 parameters
+            value: sky_type, cloud_saturation_min, cloud_saturation_max
 
         Raises:
             ValueError: If parameters list is invalid
         """
-        if len(value) != 8:
+        if len(value) != 3:
             raise ValueError(
-                f"Effect parameters must be a list of 8 values, got {len(value)}"
+                f"Effect parameters must be a list of 3 values, got {len(value)}"
             )
         for i, param in enumerate(value):
-            if not (0 <= param < 2**32):
-                raise ValueError(
-                    f"Parameter {i} must be a uint32 (0-{2**32 - 1}), got {param}"
-                )
+            if not (0 <= param < 256):
+                raise ValueError(f"Parameter {i} must be a uint8 (0-255), got {param}")
 
 
 @dataclass
@@ -904,14 +904,9 @@ class TileDevice(Light):
 
         # Extract parameters from the settings parameter field
         parameters = [
-            settings.parameter.parameter0,
-            settings.parameter.parameter1,
-            settings.parameter.parameter2,
-            settings.parameter.parameter3,
-            settings.parameter.parameter4,
-            settings.parameter.parameter5,
-            settings.parameter.parameter6,
-            settings.parameter.parameter7,
+            int(settings.parameter.sky_type),
+            settings.parameter.cloud_saturation_min,
+            settings.parameter.cloud_saturation_max,
         ]
 
         # Convert palette from protocol HSBK to HSBK
@@ -990,11 +985,11 @@ class TileDevice(Light):
         while len(protocol_palette) < 16:
             protocol_palette.append(HSBK(0, 0, 0, 3500).to_protocol())
 
-        # Ensure parameters list is 8 elements
-        parameters = effect.parameters or [0] * 8
-        if len(parameters) < 8:
-            parameters.extend([0] * (8 - len(parameters)))
-        parameters = parameters[:8]
+        # Ensure parameters list is 3 elements (sky_type, cloud_sat_min, cloud_sat_max)
+        parameters = effect.parameters or [0] * 3
+        if len(parameters) < 3:
+            parameters.extend([0] * (3 - len(parameters)))
+        parameters = parameters[:3]
 
         # Request automatically handles acknowledgement
         await self.connection.request(
@@ -1005,14 +1000,9 @@ class TileDevice(Light):
                     speed=effect.speed,
                     duration=effect.duration,
                     parameter=TileEffectParameter(
-                        parameter0=parameters[0],
-                        parameter1=parameters[1],
-                        parameter2=parameters[2],
-                        parameter3=parameters[3],
-                        parameter4=parameters[4],
-                        parameter5=parameters[5],
-                        parameter6=parameters[6],
-                        parameter7=parameters[7],
+                        sky_type=TileEffectSkyType(value=parameters[0]),
+                        cloud_saturation_min=parameters[1],
+                        cloud_saturation_max=parameters[2],
                     ),
                     palette_count=len(palette),
                     palette=protocol_palette,

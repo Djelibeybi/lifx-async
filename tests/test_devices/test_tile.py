@@ -9,7 +9,7 @@ import pytest
 from lifx.color import HSBK
 from lifx.devices.tile import TileDevice, TileEffect, TileInfo, TileRect
 from lifx.protocol import packets
-from lifx.protocol.protocol_types import TileEffectType
+from lifx.protocol.protocol_types import TileEffectSkyType, TileEffectType
 
 
 class TestTileDevice:
@@ -625,14 +625,9 @@ class TestTileDevice:
                 speed=5000,
                 duration=0,
                 parameter=TileEffectParameter(
-                    parameter0=0,
-                    parameter1=0,
-                    parameter2=0,
-                    parameter3=0,
-                    parameter4=0,
-                    parameter5=0,
-                    parameter6=0,
-                    parameter7=0,
+                    sky_type=TileEffectSkyType.SUNRISE,
+                    cloud_saturation_min=0,
+                    cloud_saturation_max=0,
                 ),
                 palette_count=3,
                 palette=palette,
@@ -1075,6 +1070,48 @@ class TestTileDevice:
         assert packet.settings.effect_type == TileEffectType.FLAME
         assert packet.settings.palette_count == 2
 
+    async def test_set_sky_effect_with_parameters(
+        self, tile_device: TileDevice
+    ) -> None:
+        """Test setting sky effect with TileEffectParameter (cloud saturation)."""
+        # Mock SET operation returns True
+        tile_device.connection.request.return_value = True
+
+        palette = [
+            HSBK.from_rgb(255, 0, 0),
+            HSBK.from_rgb(0, 255, 0),
+        ]
+
+        # Create effect with custom parameters for SKY effect
+        effect = TileEffect(
+            effect_type=TileEffectType.SKY,
+            speed=5000,
+            duration=0,
+            palette=palette,
+            parameters=[
+                int(TileEffectSkyType.SUNSET),  # sky_type
+                100,  # cloud_saturation_min
+                200,  # cloud_saturation_max
+            ],
+        )
+
+        await tile_device.set_tile_effect(effect)
+
+        # Verify packet was sent
+        tile_device.connection.request.assert_called_once()
+        call_args = tile_device.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct effect type and parameters
+        assert packet.settings.effect_type == TileEffectType.SKY
+        assert packet.settings.speed == 5000
+        assert packet.settings.palette_count == 2
+
+        # Verify TileEffectParameter is correctly set
+        assert packet.settings.parameter.sky_type == TileEffectSkyType.SUNSET
+        assert packet.settings.parameter.cloud_saturation_min == 100
+        assert packet.settings.parameter.cloud_saturation_max == 200
+
 
 class TestTileRect:
     """Tests for TileRect class."""
@@ -1132,7 +1169,7 @@ class TestTileEffect:
         assert effect.speed == 5000
         assert effect.duration == 0
         assert len(effect.palette) == 1  # Default palette
-        assert len(effect.parameters) == 8  # Default parameters
+        assert len(effect.parameters) == 3  # Default parameters
 
     def test_create_effect_with_palette(self) -> None:
         """Test creating effect with custom palette."""
