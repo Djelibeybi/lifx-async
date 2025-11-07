@@ -507,14 +507,9 @@ class TileBufferRect:
 class TileEffectParameter:
     """Auto-generated field structure."""
 
-    parameter0: int
-    parameter1: int
-    parameter2: int
-    parameter3: int
-    parameter4: int
-    parameter5: int
-    parameter6: int
-    parameter7: int
+    sky_type: TileEffectSkyType
+    cloud_saturation_min: int
+    cloud_saturation_max: int
 
     def pack(self) -> bytes:
         """Pack to bytes."""
@@ -522,22 +517,18 @@ class TileEffectParameter:
 
         result = b""
 
-        # parameter0: uint32
-        result += serializer.pack_value(self.parameter0, "uint32")
-        # parameter1: uint32
-        result += serializer.pack_value(self.parameter1, "uint32")
-        # parameter2: uint32
-        result += serializer.pack_value(self.parameter2, "uint32")
-        # parameter3: uint32
-        result += serializer.pack_value(self.parameter3, "uint32")
-        # parameter4: uint32
-        result += serializer.pack_value(self.parameter4, "uint32")
-        # parameter5: uint32
-        result += serializer.pack_value(self.parameter5, "uint32")
-        # parameter6: uint32
-        result += serializer.pack_value(self.parameter6, "uint32")
-        # parameter7: uint32
-        result += serializer.pack_value(self.parameter7, "uint32")
+        # sky_type: TileEffectSkyType (enum)
+        result += serializer.pack_value(int(self.sky_type), "uint8")
+        # Reserved 3 bytes
+        result += serializer.pack_reserved(3)
+        # cloud_saturation_min: uint8
+        result += serializer.pack_value(self.cloud_saturation_min, "uint8")
+        # Reserved 3 bytes
+        result += serializer.pack_reserved(3)
+        # cloud_saturation_max: uint8
+        result += serializer.pack_value(self.cloud_saturation_max, "uint8")
+        # Reserved 23 bytes
+        result += serializer.pack_reserved(23)
 
         return result
 
@@ -547,49 +538,31 @@ class TileEffectParameter:
         from lifx.protocol import serializer
 
         current_offset = offset
-        # parameter0: uint32
-        parameter0, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
+        # sky_type: TileEffectSkyType (enum)
+        sky_type_raw, current_offset = serializer.unpack_value(
+            data, "uint8", current_offset
         )
-        # parameter1: uint32
-        parameter1, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
+        sky_type = TileEffectSkyType(sky_type_raw)
+        # Skip reserved 3 bytes
+        current_offset += 3
+        # cloud_saturation_min: uint8
+        cloud_saturation_min, current_offset = serializer.unpack_value(
+            data, "uint8", current_offset
         )
-        # parameter2: uint32
-        parameter2, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
+        # Skip reserved 3 bytes
+        current_offset += 3
+        # cloud_saturation_max: uint8
+        cloud_saturation_max, current_offset = serializer.unpack_value(
+            data, "uint8", current_offset
         )
-        # parameter3: uint32
-        parameter3, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
-        )
-        # parameter4: uint32
-        parameter4, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
-        )
-        # parameter5: uint32
-        parameter5, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
-        )
-        # parameter6: uint32
-        parameter6, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
-        )
-        # parameter7: uint32
-        parameter7, current_offset = serializer.unpack_value(
-            data, "uint32", current_offset
-        )
+        # Skip reserved 23 bytes
+        current_offset += 23
 
         return (
             cls(
-                parameter0=parameter0,
-                parameter1=parameter1,
-                parameter2=parameter2,
-                parameter3=parameter3,
-                parameter4=parameter4,
-                parameter5=parameter5,
-                parameter6=parameter6,
-                parameter7=parameter7,
+                sky_type=sky_type,
+                cloud_saturation_min=cloud_saturation_min,
+                cloud_saturation_max=cloud_saturation_max,
             ),
             current_offset,
         )
@@ -814,14 +787,9 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
     "TileAccelMeas": {"x": "X", "y": "Y", "z": "Z"},
     "TileBufferRect": {"fb_index": "FbIndex", "x": "X", "y": "Y", "width": "Width"},
     "TileEffectParameter": {
-        "parameter0": "Parameter0",
-        "parameter1": "Parameter1",
-        "parameter2": "Parameter2",
-        "parameter3": "Parameter3",
-        "parameter4": "Parameter4",
-        "parameter5": "Parameter5",
-        "parameter6": "Parameter6",
-        "parameter7": "Parameter7",
+        "cloud_saturation_max": "CloudSaturationMax",
+        "cloud_saturation_min": "CloudSaturationMin",
+        "sky_type": "SkyType",
     },
     "TileEffectSettings": {
         "duration": "Duration",

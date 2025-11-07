@@ -183,6 +183,42 @@ def apply_extended_multizone_packet_quirks(
     return packet_name
 
 
+def apply_tile_effect_parameter_quirk(
+    fields: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply local quirk to fix TileEffectParameter structure.
+
+    The upstream protocol.yml doesn't provide enough detail for TileEffectParameter.
+    This quirk replaces it with the correct structure:
+    - TileEffectSkyType (enum, uint8)
+    - 3 reserved bytes
+    - cloudSaturationMin (uint8)
+    - 3 reserved bytes
+    - cloudSaturationMax (uint8)
+    - 23 reserved bytes
+    Total: 32 bytes
+
+    Args:
+        fields: Dictionary of field definitions
+
+    Returns:
+        Dictionary with TileEffectParameter quirk applied
+    """
+    if "TileEffectParameter" in fields:
+        fields["TileEffectParameter"] = {
+            "size_bytes": 32,
+            "fields": [
+                {"name": "SkyType", "type": "<TileEffectSkyType>"},
+                {"size_bytes": 3},
+                {"name": "CloudSaturationMin", "type": "uint8"},
+                {"size_bytes": 3},
+                {"name": "CloudSaturationMax", "type": "uint8"},
+                {"size_bytes": 23},
+            ],
+        }
+    return fields
+
+
 def format_long_import(
     items: list[str], prefix: str = "from lifx.protocol.protocol_types import "
 ) -> str:
@@ -1360,6 +1396,10 @@ def main() -> None:
     compound_fields = filter_button_relay_items(compound_fields)
     unions = filter_button_relay_items(unions)
     packets = filter_button_relay_packets(packets)
+
+    # Apply local quirks to fix protocol issues
+    print("Applying local protocol quirks...")
+    fields = apply_tile_effect_parameter_quirk(fields)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {

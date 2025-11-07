@@ -97,9 +97,18 @@ addopts = """\
     --cov-report=xml
     --cov-report=term-missing:skip-covered
     --junitxml=junit.xml -o junit_family=legacy
+    --cov-context=test
     """
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+omit = [
+    "src/lifx/protocol/generator.py",
+    "src/lifx/protocol/protocol_types.py",
+    "src/lifx/products/generator.py",
+
+]
 
 [tool.coverage.report]
 exclude_lines = [
