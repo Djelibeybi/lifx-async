@@ -7,6 +7,7 @@ LIFX devices, which use the HSBK (Hue, Saturation, Brightness, Kelvin) color spa
 from __future__ import annotations
 
 import colorsys
+import math
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -341,6 +342,144 @@ class HSBK:
             brightness=self.brightness,
             kelvin=kelvin,
         )
+
+    def clone(self) -> HSBK:
+        """Create a copy of this color.
+
+        Returns:
+            New HSBK instance with the same values
+        """
+        return HSBK(
+            hue=self.hue,
+            saturation=self.saturation,
+            brightness=self.brightness,
+            kelvin=self.kelvin,
+        )
+
+    def as_tuple(self) -> tuple[int, int, int, int]:
+        """Return HSBK values as a tuple of protocol uint16 values.
+
+        Returns:
+            Tuple of (hue_u16, saturation_u16, brightness_u16, kelvin)
+            where u16 values are in range 0-65535
+
+        Example:
+            ```python
+            color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+            hue, sat, bri, kel = color.as_tuple()
+            # Use in protocol operations
+            ```
+        """
+        protocol = self.to_protocol()
+        return (protocol.hue, protocol.saturation, protocol.brightness, protocol.kelvin)
+
+    def as_dict(self) -> dict[str, float | int]:
+        """Return HSBK values as a dictionary of user-friendly values.
+
+        Returns:
+            Dictionary with keys: hue (float), saturation (float),
+            brightness (float), kelvin (int)
+
+        Example:
+            ```python
+            color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+            color_dict = color.as_dict()
+            # {'hue': 180.0, 'saturation': 0.5, 'brightness': 0.75, 'kelvin': 3500}
+            ```
+        """
+        return {
+            "hue": self.hue,
+            "saturation": self.saturation,
+            "brightness": self.brightness,
+            "kelvin": self.kelvin,
+        }
+
+    def limit_distance_to(self, other: HSBK) -> HSBK:
+        """Return a new color with hue limited to 90 degrees from another color.
+
+        This is useful for preventing large hue jumps when interpolating between colors.
+        If the hue difference is greater than 90 degrees, the hue is adjusted to be
+        within 90 degrees of the target hue.
+
+        Args:
+            other: Reference color to limit distance to
+
+        Returns:
+            New HSBK instance with limited hue distance
+
+        Example:
+            ```python
+            red = HSBK(hue=10, saturation=1.0, brightness=1.0, kelvin=3500)
+            blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+
+            # Limit red's hue to be within 90 degrees of blue's hue
+            adjusted = red.limit_distance_to(blue)
+            # Result: hue is adjusted to be within 90 degrees of 240
+            ```
+        """
+        raw_dist = (
+            self.hue - other.hue if self.hue > other.hue else other.hue - self.hue
+        )
+        dist = 360 - raw_dist if raw_dist > 180 else raw_dist
+        if abs(dist) > 90:
+            h = self.hue + 90 if (other.hue + dist) % 360 == self.hue else self.hue - 90
+            h = h + 360 if h < 0 else h
+            return HSBK(h, self.saturation, self.brightness, self.kelvin)
+        else:
+            return self
+
+    @classmethod
+    def average(cls, colors: list[HSBK]) -> HSBK:
+        """Calculate the average color of a list of HSBK colors.
+
+        Uses circular mean for hue to correctly handle hue wraparound
+        (e.g., average of 10° and 350° is 0°, not 180°).
+
+        Args:
+            colors: List of HSBK colors to average (must not be empty)
+
+        Returns:
+            New HSBK instance with averaged values
+
+        Raises:
+            ValueError: If colors list is empty
+
+        Example:
+            ```python
+            red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+            green = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+            blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+
+            avg_color = HSBK.average([red, green, blue])
+            # Result: average of the three primary colors
+            ```
+        """
+        if not colors:
+            raise ValueError("Cannot average an empty list of colors")
+
+        hue_x_total = 0.0
+        hue_y_total = 0.0
+        saturation_total = 0.0
+        brightness_total = 0.0
+        kelvin_total = 0.0
+
+        for color in colors:
+            hue_x_total += math.sin(color.hue * 2.0 * math.pi / 360)
+            hue_y_total += math.cos(color.hue * 2.0 * math.pi / 360)
+            saturation_total += color.saturation
+            brightness_total += color.brightness
+            kelvin_total += color.kelvin
+
+        hue = math.atan2(hue_x_total, hue_y_total) / (2.0 * math.pi)
+        if hue < 0.0:
+            hue += 1.0
+        hue *= 360
+        hue = round(hue, 4)
+        saturation = round(saturation_total / len(colors), 4)
+        brightness = round(brightness_total / len(colors), 4)
+        kelvin = round(kelvin_total / len(colors))
+
+        return cls(hue, saturation, brightness, kelvin)
 
 
 # Common color presets

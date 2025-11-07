@@ -254,3 +254,133 @@ class TestColors:
         assert Colors.PASTEL_RED.saturation == 0.3
         assert Colors.PASTEL_GREEN.hue == 120
         assert Colors.PASTEL_BLUE.hue == 240
+
+
+class TestHSBKThemeMethods:
+    """Tests for theme-specific HSBK methods."""
+
+    def test_clone(self) -> None:
+        """Test cloning a color."""
+        original = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+        cloned = original.clone()
+
+        # Values should be the same
+        assert cloned.hue == original.hue
+        assert cloned.saturation == original.saturation
+        assert cloned.brightness == original.brightness
+        assert cloned.kelvin == original.kelvin
+
+        # Should be different objects
+        assert cloned is not original
+
+    def test_as_tuple(self) -> None:
+        """Test converting color to protocol tuple."""
+        color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+        hue_u16, sat_u16, bri_u16, kelvin = color.as_tuple()
+
+        # Should return protocol uint16 values
+        assert isinstance(hue_u16, int)
+        assert isinstance(sat_u16, int)
+        assert isinstance(bri_u16, int)
+        assert isinstance(kelvin, int)
+
+        # Values should be in valid ranges
+        assert 0 <= hue_u16 <= 65535
+        assert 0 <= sat_u16 <= 65535
+        assert 0 <= bri_u16 <= 65535
+        assert 1500 <= kelvin <= 9000
+
+        # Verify approximate values
+        assert hue_u16 == pytest.approx(32768, abs=1)  # 180/360 * 65535
+        assert sat_u16 == pytest.approx(32768, abs=1)  # 0.5 * 65535
+        assert bri_u16 == pytest.approx(49151, abs=1)  # 0.75 * 65535
+
+    def test_as_dict(self) -> None:
+        """Test converting color to dictionary."""
+        color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+        color_dict = color.as_dict()
+
+        assert isinstance(color_dict, dict)
+        assert color_dict["hue"] == 180
+        assert color_dict["saturation"] == 0.5
+        assert color_dict["brightness"] == 0.75
+        assert color_dict["kelvin"] == 3500
+
+    def test_limit_distance_to_no_adjustment_needed(self) -> None:
+        """Test limit_distance_to when hue is already within range."""
+        color1 = HSBK(hue=100, saturation=1.0, brightness=1.0, kelvin=3500)
+        color2 = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        result = color1.limit_distance_to(color2)
+        # Difference is only 20 degrees, so no adjustment needed
+        assert result.hue == color1.hue
+
+    def test_limit_distance_to_adjustment_needed(self) -> None:
+        """Test limit_distance_to when hue adjustment is needed."""
+        red = HSBK(hue=10, saturation=1.0, brightness=1.0, kelvin=3500)
+        blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        result = red.limit_distance_to(blue)
+        # Hue should be adjusted when difference is > 90 degrees
+        # The result should be different from the original
+        assert abs(result.hue - red.hue) == 90
+
+    def test_average_single_color(self) -> None:
+        """Test averaging a single color."""
+        color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+        avg = HSBK.average([color])
+
+        assert avg.hue == pytest.approx(color.hue, abs=1)
+        assert avg.saturation == pytest.approx(color.saturation, abs=0.01)
+        assert avg.brightness == pytest.approx(color.brightness, abs=0.01)
+        assert avg.kelvin == color.kelvin
+
+    def test_average_two_colors(self) -> None:
+        """Test averaging two colors."""
+        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        avg = HSBK.average([red, blue])
+
+        # Average saturation and brightness should be simple mean
+        assert avg.saturation == pytest.approx(1.0, abs=0.01)
+        assert avg.brightness == pytest.approx(1.0, abs=0.01)
+        assert avg.kelvin == 3500
+
+        # Hue should use circular mean (average of 0 and 240 should be 300 or 120)
+        assert avg.hue == pytest.approx(120, abs=5) or avg.hue == pytest.approx(
+            300, abs=5
+        )
+
+    def test_average_multiple_colors(self) -> None:
+        """Test averaging multiple colors."""
+        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        yellow = HSBK(hue=60, saturation=1.0, brightness=1.0, kelvin=3500)
+        green = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        avg = HSBK.average([red, yellow, green])
+
+        # All saturation and brightness should be 1.0
+        assert avg.saturation == pytest.approx(1.0, abs=0.01)
+        assert avg.brightness == pytest.approx(1.0, abs=0.01)
+
+        # Hue should be somewhere between 0 and 120
+        assert 0 <= avg.hue <= 120
+
+    def test_average_wraparound_hues(self) -> None:
+        """Test circular mean handles hue wraparound correctly."""
+        # Hues close to 0 and 360 should average near 0, not 180
+        color1 = HSBK(hue=10, saturation=1.0, brightness=1.0, kelvin=3500)
+        color2 = HSBK(hue=350, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        avg = HSBK.average([color1, color2])
+
+        # Average should be close to 0 (or 360), not 180
+        assert avg.hue == pytest.approx(0, abs=10) or avg.hue == pytest.approx(
+            360, abs=10
+        )
+
+    def test_average_empty_list(self) -> None:
+        """Test averaging empty list raises error."""
+        with pytest.raises(ValueError, match="Cannot average an empty list"):
+            HSBK.average([])

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
 from lifx.devices.base import Device
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
+
+if TYPE_CHECKING:
+    from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -738,6 +742,50 @@ class Light(Device):
             and self.capabilities.temperature_range is not None
         ):
             return self.capabilities.temperature_range.max
+
+    async def apply_theme(
+        self,
+        theme: Theme,
+        power_on: bool = False,
+        duration: float = 0.0,
+    ) -> None:
+        """Apply a theme to this light.
+
+        Selects a random color from the theme and applies it to the light.
+
+        Args:
+            theme: Theme to apply
+            power_on: Turn on the light
+            duration: Transition duration in seconds
+
+        Example:
+            ```python
+            from lifx.theme import get_theme
+
+            theme = get_theme("evening")
+            await light.apply_theme(theme, power_on=True, duration=0.5)
+            ```
+        """
+        if self.capabilities is None:
+            await self._ensure_capabilities()
+
+        if self.capabilities and not self.capabilities.has_color:
+            return
+
+        # Select a random color from theme
+        color = theme.random()
+
+        # Check if light is on
+        is_on = await self.get_power()
+
+        # Apply color to light
+        # If light is off and we're turning it on, set color immediately then fade on
+        if power_on and not is_on:
+            await self.set_color(color, duration=0)
+            await self.set_power(True, duration=duration)
+        else:
+            # Light is already on, or we're not turning it on - apply with duration
+            await self.set_color(color, duration=duration)
 
     def __repr__(self) -> str:
         """String representation of light."""
