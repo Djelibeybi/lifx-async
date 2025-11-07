@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
 from lifx.devices.light import Light
 from lifx.protocol import packets
+
+if TYPE_CHECKING:
+    from lifx.theme import Theme
 from lifx.protocol.protocol_types import (
     MultiZoneApplicationRequest,
     MultiZoneEffectParameter,
@@ -859,6 +863,53 @@ class MultiZoneLight(Light):
             Use get_color_zones() or get_extended_color_zones() to fetch from device.
         """
         return self._zones
+
+    async def apply_theme(
+        self,
+        theme: Theme,
+        power_on: bool = False,
+        duration: float = 0,
+        strategy: str | None = None,
+    ) -> None:
+        """Apply a theme across zones.
+
+        Distributes theme colors evenly across the light's zones with smooth
+        color blending between theme colors.
+
+        Args:
+            theme: Theme to apply
+            power_on: Turn on the light
+            duration: Transition duration in seconds
+            strategy: Color distribution strategy (not used yet, for future)
+
+        Example:
+            ```python
+            from lifx.theme import get_theme
+
+            theme = get_theme("evening")
+            await strip.apply_theme(theme, power_on=True, duration=0.5)
+            ```
+        """
+        from lifx.theme.generators import MultiZoneGenerator
+
+        # Get number of zones
+        zone_count = await self.get_zone_count()
+
+        # Use proper multizone generator with blending
+        generator = MultiZoneGenerator()
+        colors = generator.get_theme_colors(theme, zone_count)
+
+        # Check if light is on
+        is_on = await self.get_power()
+
+        # Apply colors to zones using extended format for efficiency
+        # If light is off and we're turning it on, set colors immediately then fade on
+        if power_on and not is_on:
+            await self.set_extended_color_zones(0, colors, duration=0)
+            await self.set_power(True, duration=duration)
+        else:
+            # Light is already on, or we're not turning it on - apply with duration
+            await self.set_extended_color_zones(0, colors, duration=duration)
 
     def __repr__(self) -> str:
         """String representation of multizone light."""

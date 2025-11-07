@@ -92,3 +92,4 @@ Thumbs.db
 # Local storage
 .notes/
 .claude/settings.local.json
+.mcp.json

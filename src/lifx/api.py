@@ -38,6 +38,7 @@ from lifx.network.connection import DeviceConnection
 from lifx.network.discovery import DiscoveredDevice, discover_devices
 from lifx.products import get_device_class_name
 from lifx.protocol import packets
+from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -781,6 +782,44 @@ class DeviceGroup:
                     "Group metadata not fetched. Call organize_by_group() first."
                 )
             return [d for d in self._devices if not self._has_group(d)]
+
+    async def apply_theme(
+        self, theme: Theme, power_on: bool = False, duration: float = 0.0
+    ) -> None:
+        """Apply a theme to all devices in the group.
+
+        Each device applies the theme according to its capabilities:
+        - Light: Selects random color from theme
+        - MultiZoneLight: Distributes colors evenly across zones
+        - TileDevice: Uses interpolation for smooth gradients
+        - Other devices: No action (themes only apply to color devices)
+
+        Args:
+            theme: Theme to apply
+            power_on: Turn on devices if True
+            duration: Transition duration in seconds
+
+        Example:
+            ```python
+            from lifx.theme import get_theme
+
+            async with discover() as group:
+                evening = get_theme("evening")
+                await group.apply_theme(evening, power_on=True, duration=1.0)
+            ```
+        """
+        async with asyncio.TaskGroup() as tg:
+            # Apply theme to all lights
+            for light in self.lights:
+                tg.create_task(light.apply_theme(theme, power_on, duration))
+
+            # Apply theme to all multizone lights
+            for multizone in self.multizone_lights:
+                tg.create_task(multizone.apply_theme(theme, power_on, duration))
+
+            # Apply theme to all tile devices
+            for tile in self.tiles:
+                tg.create_task(tile.apply_theme(theme, power_on, duration))
 
     def invalidate_metadata_cache(self) -> None:
         """Clear all cached location and group metadata.
