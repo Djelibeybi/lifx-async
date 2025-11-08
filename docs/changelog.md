@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.1 (2025-11-08)
+
+### Bug Fixes
+
+- Implement tile effect parameters as local quirk
+  ([`f4ada9b`](https://github.com/Djelibeybi/lifx-async/commit/f4ada9b13f63060459ed80b4961eb9339559a8ea))
+
+
 ## v1.2.0 (2025-11-07)
 
 ### Features
