@@ -1,0 +1,2284 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A modern, type-safe, async Python library for controlling LIFX lights">
+      
+      
+        <meta name="author" content="Avi Miller <me@dje.li>">
+      
+      
+        <link rel="canonical" href="https://djelibeybi.github.io/lifx-async/api/effects/">
+      
+      
+        <link rel="prev" href="../themes/">
+      
+      
+        <link rel="next" href="../colors/">
+      
+      
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
+    
+    
+      
+        <title>Effects - lifx-async</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#effects-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lifx-async" class="md-header__button md-logo" aria-label="lifx-async" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lifx-async
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Effects
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Djelibeybi/lifx-async" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Djelibeybi/lifx-async
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/themes/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../effects-release-notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Effects Release Notes
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lifx-async" class="md-nav__button md-logo" aria-label="lifx-async" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+
+    </a>
+    lifx-async
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Djelibeybi/lifx-async" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Djelibeybi/lifx-async
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Themes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/effects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Light Effects
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Themes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Advanced Usage
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Custom Effects
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/effects-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Effects Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/protocol-deep-dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Protocol Deep Dive
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/effects-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Effects System
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../high-level/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    High-Level API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Themes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Effects
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Effects
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      Table of Contents
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conductor" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conductor
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Conductor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#class-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Definition
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      State Management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timing-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Timing Considerations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#effectpulse" class="md-nav__link">
+    <span class="md-ellipsis">
+      EffectPulse
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EffectPulse">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#class-definition_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Definition
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulse-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pulse Modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#color-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Color Selection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-type-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      Device Type Behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Notes
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#effectcolorloop" class="md-nav__link">
+    <span class="md-ellipsis">
+      EffectColorloop
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EffectColorloop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#class-definition_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Definition
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      Behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-type-behavior_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Device Type Behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stopping-colorloop" class="md-nav__link">
+    <span class="md-ellipsis">
+      Stopping ColorLoop
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prestate-inheritance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prestate Inheritance
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-notes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Notes
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lifxeffect-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      LIFXEffect (Base Class)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LIFXEffect (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#class-definition_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Definition
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Attributes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating Custom Effects
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      See Also
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../colors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Color Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Device Classes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Network Layer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Protocol Layer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Exceptions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../effects-release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Effects Release Notes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="effects-reference">Effects Reference<a class="headerlink" href="#effects-reference" title="Permanent link">&para;</a></h1>
+<p>This reference guide provides comprehensive documentation for all built-in effect classes in the Light Effects Framework.</p>
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="#conductor">Conductor</a></li>
+<li><a href="#effectpulse">EffectPulse</a></li>
+<li><a href="#effectcolorloop">EffectColorloop</a></li>
+<li><a href="#lifxeffect-base-class">LIFXEffect (Base Class)</a></li>
+</ul>
+<h2 id="conductor">Conductor<a class="headerlink" href="#conductor" title="Permanent link">&para;</a></h2>
+<p>The <code>Conductor</code> class is the central orchestrator for managing light effects across multiple devices.</p>
+<h3 id="class-definition">Class Definition<a class="headerlink" href="#class-definition" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">Conductor</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span></code></pre></div>
+<h3 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h3>
+<h4 id="effectlight-light-lifxeffect-none"><code>effect(light: Light) -&gt; LIFXEffect | None</code><a class="headerlink" href="#effectlight-light-lifxeffect-none" title="Permanent link">&para;</a></h4>
+<p>Return the effect currently running on a device, or None if idle.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>light</code> (Light): The device to check</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<ul>
+<li><code>LIFXEffect | None</code>: Currently running effect instance, or None</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">current_effect</span> <span class="o">=</span> <span class="n">conductor</span><span class="o">.</span><span class="n">effect</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">current_effect</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_effect</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">else</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No effect running&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="starteffect-lifxeffect-participants-listlight-none"><code>start(effect: LIFXEffect, participants: list[Light]) -&gt; None</code><a class="headerlink" href="#starteffect-lifxeffect-participants-listlight-none" title="Permanent link">&para;</a></h4>
+<p>Start an effect on one or more lights.</p>
+<p>Captures current light state, powers on if needed, and launches the effect. State is automatically restored when effect completes or <code>stop()</code> is called.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>effect</code> (LIFXEffect): The effect instance to execute</li>
+<li><code>participants</code> (list[Light]): List of Light instances to apply effect to</li>
+</ul>
+<p><strong>Raises:</strong></p>
+<ul>
+<li><code>LifxTimeoutError</code>: If light state capture times out</li>
+<li><code>LifxDeviceNotFoundError</code>: If light becomes unreachable</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
+</span></code></pre></div>
+<h4 id="stoplights-listlight-none"><code>stop(lights: list[Light]) -&gt; None</code><a class="headerlink" href="#stoplights-listlight-none" title="Permanent link">&para;</a></h4>
+<p>Stop effects and restore light state.</p>
+<p>Halts any running effects on the specified lights and restores them to their pre-effect state (power, color, zones).</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>lights</code> (list[Light]): List of lights to stop</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Stop specific lights</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">([</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Stop all lights in a group</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="state-management">State Management<a class="headerlink" href="#state-management" title="Permanent link">&para;</a></h3>
+<p>The conductor automatically handles:</p>
+<ol>
+<li><strong>State Capture</strong>: Power state, current color (HSBK), and multizone colors (if applicable)</li>
+<li><strong>Power Management</strong>: Powers on devices if needed for effect visibility</li>
+<li><strong>Effect Execution</strong>: Runs effect logic on all participants</li>
+<li><strong>State Restoration</strong>: Restores all captured state after effect completes</li>
+</ol>
+<h3 id="timing-considerations">Timing Considerations<a class="headerlink" href="#timing-considerations" title="Permanent link">&para;</a></h3>
+<ul>
+<li>State capture: &lt;1 second per device (mostly network I/O)</li>
+<li>State restoration: 0.6-1.0 seconds per device (includes required 0.3s delays)</li>
+<li>All operations use concurrent execution for multiple devices</li>
+</ul>
+<hr />
+<h2 id="effectpulse">EffectPulse<a class="headerlink" href="#effectpulse" title="Permanent link">&para;</a></h2>
+<p>Pulse/blink/breathe effects using LIFX waveform modes. Supports five distinct modes with configurable timing and colors.</p>
+<h3 id="class-definition_1">Class Definition<a class="headerlink" href="#class-definition_1" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">EffectPulse</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">HSBK</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">power_on</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">period</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">cycles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">hsbk</span><span class="o">=</span><span class="kc">None</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
+<h4 id="power_on-bool-default-true"><code>power_on</code> (bool, default: <code>True</code>)<a class="headerlink" href="#power_on-bool-default-true" title="Permanent link">&para;</a></h4>
+<p>Whether to power on devices during effect. If <code>True</code>, devices that are off will be powered on before the effect starts.</p>
+<h4 id="mode-str-default-blink"><code>mode</code> (str, default: <code>'blink'</code>)<a class="headerlink" href="#mode-str-default-blink" title="Permanent link">&para;</a></h4>
+<p>Pulse mode to use. Must be one of:</p>
+<ul>
+<li><code>'blink'</code>: Standard on/off toggle</li>
+<li><code>'strobe'</code>: Rapid flashing</li>
+<li><code>'breathe'</code>: Smooth breathing effect</li>
+<li><code>'ping'</code>: Single pulse with asymmetric duty cycle</li>
+<li><code>'solid'</code>: Minimal brightness variation</li>
+</ul>
+<h4 id="period-float-none-default-mode-dependent"><code>period</code> (float | None, default: mode-dependent)<a class="headerlink" href="#period-float-none-default-mode-dependent" title="Permanent link">&para;</a></h4>
+<p>Effect period in seconds. If not specified, uses mode default:</p>
+<ul>
+<li><code>'strobe'</code>: 0.1 seconds</li>
+<li>All others: 1.0 second</li>
+</ul>
+<h4 id="cycles-int-none-default-mode-dependent"><code>cycles</code> (int | None, default: mode-dependent)<a class="headerlink" href="#cycles-int-none-default-mode-dependent" title="Permanent link">&para;</a></h4>
+<p>Number of cycles to execute. If not specified, uses mode default:</p>
+<ul>
+<li><code>'strobe'</code>: 10 cycles</li>
+<li>All others: 1 cycle</li>
+</ul>
+<h4 id="hsbk-hsbk-none-default-none"><code>hsbk</code> (HSBK | None, default: <code>None</code>)<a class="headerlink" href="#hsbk-hsbk-none-default-none" title="Permanent link">&para;</a></h4>
+<p>Optional color override. If provided, this color is used instead of automatic color selection. If <code>None</code>, the effect intelligently selects colors based on mode and device capabilities.</p>
+<h3 id="pulse-modes">Pulse Modes<a class="headerlink" href="#pulse-modes" title="Permanent link">&para;</a></h3>
+<h4 id="blink-mode">Blink Mode<a class="headerlink" href="#blink-mode" title="Permanent link">&para;</a></h4>
+<p>Standard on/off toggle effect.</p>
+<p><strong>Defaults:</strong></p>
+<ul>
+<li>Period: 1.0 second</li>
+<li>Cycles: 1</li>
+<li>Waveform: PULSE</li>
+<li>Behavior: Toggles between current color and off</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Basic blink - 5 cycles</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>  <span class="c1"># 5 cycles * 1s + buffer</span>
+</span></code></pre></div>
+<p><strong>Best for:</strong> Notifications, alerts, attention-getting</p>
+<h4 id="strobe-mode">Strobe Mode<a class="headerlink" href="#strobe-mode" title="Permanent link">&para;</a></h4>
+<p>Rapid flashing effect.</p>
+<p><strong>Defaults:</strong></p>
+<ul>
+<li>Period: 0.1 second</li>
+<li>Cycles: 10</li>
+<li>Waveform: PULSE</li>
+<li>Behavior: Rapid flashing from dark (cold white)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Rapid strobe - 20 flashes</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;strobe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># 20 * 0.1s + buffer</span>
+</span></code></pre></div>
+<p><strong>Best for:</strong> Emergency notifications, dramatic effects</p>
+<p><strong>Note:</strong> Strobe mode starts from dark (0 brightness, cold white) for maximum impact.</p>
+<h4 id="breathe-mode">Breathe Mode<a class="headerlink" href="#breathe-mode" title="Permanent link">&para;</a></h4>
+<p>Smooth, gentle breathing effect using SINE waveform.</p>
+<p><strong>Defaults:</strong></p>
+<ul>
+<li>Period: 1.0 second</li>
+<li>Cycles: 1</li>
+<li>Waveform: SINE (smooth)</li>
+<li>Behavior: Smooth fade in and out</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Slow breathing effect</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span>  <span class="c1"># 5 * 2s + buffer</span>
+</span></code></pre></div>
+<p><strong>Best for:</strong> Relaxation, meditation, ambient effects</p>
+<h4 id="ping-mode">Ping Mode<a class="headerlink" href="#ping-mode" title="Permanent link">&para;</a></h4>
+<p>Single pulse with asymmetric duty cycle.</p>
+<p><strong>Defaults:</strong></p>
+<ul>
+<li>Period: 1.0 second</li>
+<li>Cycles: 1</li>
+<li>Waveform: PULSE</li>
+<li>Skew: 0.1 (10% on, 90% off)</li>
+<li>Behavior: Quick flash followed by longer off period</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Quick ping notification</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">red</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;ping&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">red</span><span class="p">)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Best for:</strong> Quick notifications, heartbeat effects</p>
+<h4 id="solid-mode">Solid Mode<a class="headerlink" href="#solid-mode" title="Permanent link">&para;</a></h4>
+<p>Minimal brightness variation, almost solid color.</p>
+<p><strong>Defaults:</strong></p>
+<ul>
+<li>Period: 1.0 second</li>
+<li>Cycles: 1</li>
+<li>Waveform: PULSE</li>
+<li>Skew: 0.0 (minimum variation)</li>
+<li>Behavior: Very subtle brightness change</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Subtle solid pulse</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">green</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;solid&#39;</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">green</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Best for:</strong> Subtle ambient effects, status indicators</p>
+<h3 id="color-selection">Color Selection<a class="headerlink" href="#color-selection" title="Permanent link">&para;</a></h3>
+<h4 id="with-color-parameter">With <code>color</code> Parameter<a class="headerlink" href="#with-color-parameter" title="Permanent link">&para;</a></h4>
+<p>When you provide a <code>color</code> parameter, that exact color is used:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Always use red</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">red</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">red</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="without-color-parameter-automatic">Without <code>color</code> Parameter (Automatic)<a class="headerlink" href="#without-color-parameter-automatic" title="Permanent link">&para;</a></h4>
+<p>The effect intelligently selects colors based on mode and device:</p>
+<ul>
+<li><strong>Strobe mode</strong>: Starts from dark (cold white, 0 brightness)</li>
+<li><strong>Other modes</strong>: Preserves current device color</li>
+<li><strong>Color devices</strong>: Full HSBK color used</li>
+<li><strong>Monochrome devices</strong>: Brightness toggled, kelvin preserved</li>
+</ul>
+<h3 id="device-type-behavior">Device Type Behavior<a class="headerlink" href="#device-type-behavior" title="Permanent link">&para;</a></h3>
+<h4 id="color-lights">Color Lights<a class="headerlink" href="#color-lights" title="Permanent link">&para;</a></h4>
+<p>All modes work as expected with full color support.</p>
+<h4 id="multizone-lights">Multizone Lights<a class="headerlink" href="#multizone-lights" title="Permanent link">&para;</a></h4>
+<p>Pulse effects apply to entire device, not individual zones. All zones pulse together.</p>
+<h4 id="tile-devices">Tile Devices<a class="headerlink" href="#tile-devices" title="Permanent link">&para;</a></h4>
+<p>Pulse effects apply to all tiles uniformly.</p>
+<h4 id="monochromewhite-lights">Monochrome/White Lights<a class="headerlink" href="#monochromewhite-lights" title="Permanent link">&para;</a></h4>
+<p>Effects adapt to brightness changes only:</p>
+<ul>
+<li>Color components are ignored</li>
+<li>Brightness is toggled or faded</li>
+<li>Kelvin temperature is preserved</li>
+</ul>
+<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
+<h4 id="custom-color-pulse">Custom Color Pulse<a class="headerlink" href="#custom-color-pulse" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">HSBK</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Purple breathe effect</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">purple</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">period</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="n">hsbk</span><span class="o">=</span><span class="n">purple</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="p">)</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="emergency-alert">Emergency Alert<a class="headerlink" href="#emergency-alert" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Rapid red strobe</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">red</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;strobe&#39;</span><span class="p">,</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">period</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">cycles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">hsbk</span><span class="o">=</span><span class="n">red</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="p">)</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="meditation-breathing">Meditation Breathing<a class="headerlink" href="#meditation-breathing" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Slow blue breathing</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">blue</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">period</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>  <span class="c1"># 4 second cycle</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">cycles</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">hsbk</span><span class="o">=</span><span class="n">blue</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">)</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>  <span class="c1"># 10 * 4s + buffer</span>
+</span></code></pre></div>
+<h3 id="performance-notes">Performance Notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Effect starts within 100ms</li>
+<li>Duration is precisely <code>period * cycles</code></li>
+<li>State restoration adds 0.6-1.0 seconds after completion</li>
+<li>Multiple devices execute concurrently</li>
+</ul>
+<hr />
+<h2 id="effectcolorloop">EffectColorloop<a class="headerlink" href="#effectcolorloop" title="Permanent link">&para;</a></h2>
+<p>Continuous color rotation effect cycling through the hue spectrum. Runs indefinitely until manually stopped.</p>
+<h3 id="class-definition_2">Class Definition<a class="headerlink" href="#class-definition_2" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">EffectColorloop</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">power_on</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">period</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">change</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="n">spread</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="n">brightness</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="n">saturation_min</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>    <span class="n">saturation_max</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>    <span class="n">transition</span><span class="o">=</span><span class="kc">None</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="parameters_1">Parameters<a class="headerlink" href="#parameters_1" title="Permanent link">&para;</a></h3>
+<h4 id="power_on-bool-default-true_1"><code>power_on</code> (bool, default: <code>True</code>)<a class="headerlink" href="#power_on-bool-default-true_1" title="Permanent link">&para;</a></h4>
+<p>Whether to power on devices if they're off.</p>
+<h4 id="period-float-default-60"><code>period</code> (float, default: <code>60</code>)<a class="headerlink" href="#period-float-default-60" title="Permanent link">&para;</a></h4>
+<p>Seconds per full 360-degree hue cycle. Lower values = faster color changes.</p>
+<p><strong>Range:</strong> Must be positive</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>period=60</code>: One full rainbow per minute (slow)</li>
+<li><code>period=30</code>: Two full rainbows per minute (medium)</li>
+<li><code>period=15</code>: Four full rainbows per minute (fast)</li>
+</ul>
+<h4 id="change-float-default-20"><code>change</code> (float, default: <code>20</code>)<a class="headerlink" href="#change-float-default-20" title="Permanent link">&para;</a></h4>
+<p>Hue degrees to shift per iteration. Larger values = larger color jumps.</p>
+<p><strong>Range:</strong> 0-360 degrees</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>change=10</code>: Small, smooth color transitions</li>
+<li><code>change=20</code>: Medium color steps (default)</li>
+<li><code>change=45</code>: Large, dramatic color jumps</li>
+</ul>
+<p><strong>Calculation:</strong> iterations_per_cycle = 360 / change</p>
+<h4 id="spread-float-default-30"><code>spread</code> (float, default: <code>30</code>)<a class="headerlink" href="#spread-float-default-30" title="Permanent link">&para;</a></h4>
+<p>Hue degrees spread across devices. Creates rainbow effect across multiple lights.</p>
+<p><strong>Range:</strong> 0-360 degrees</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>spread=0</code>: All lights same color</li>
+<li><code>spread=30</code>: Slight color variation (default)</li>
+<li><code>spread=60</code>: Rainbow spread across devices</li>
+<li><code>spread=120</code>: Wide spectrum spread</li>
+</ul>
+<h4 id="brightness-float-none-default-none"><code>brightness</code> (float | None, default: <code>None</code>)<a class="headerlink" href="#brightness-float-none-default-none" title="Permanent link">&para;</a></h4>
+<p>Fixed brightness level. If <code>None</code>, preserves current brightness for each device.</p>
+<p><strong>Range:</strong> 0.0-1.0</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>brightness=None</code>: Keeps original brightness (default)</li>
+<li><code>brightness=0.5</code>: Locks to 50% brightness</li>
+<li><code>brightness=1.0</code>: Full brightness</li>
+</ul>
+<h4 id="saturation_min-float-default-08"><code>saturation_min</code> (float, default: <code>0.8</code>)<a class="headerlink" href="#saturation_min-float-default-08" title="Permanent link">&para;</a></h4>
+<p>Minimum saturation for random saturation selection.</p>
+<p><strong>Range:</strong> 0.0-1.0</p>
+<p>Must be ≤ <code>saturation_max</code></p>
+<h4 id="saturation_max-float-default-10"><code>saturation_max</code> (float, default: <code>1.0</code>)<a class="headerlink" href="#saturation_max-float-default-10" title="Permanent link">&para;</a></h4>
+<p>Maximum saturation for random saturation selection.</p>
+<p><strong>Range:</strong> 0.0-1.0</p>
+<p>Must be ≥ <code>saturation_min</code></p>
+<p><strong>Note:</strong> Each iteration randomly selects saturation within this range.</p>
+<h4 id="transition-float-none-default-none"><code>transition</code> (float | None, default: <code>None</code>)<a class="headerlink" href="#transition-float-none-default-none" title="Permanent link">&para;</a></h4>
+<p>Color transition time in seconds. If <code>None</code>, uses random transition time per device.</p>
+<p><strong>Range:</strong> Non-negative</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>transition=None</code>: Random transitions (0 to 2x iteration period)</li>
+<li><code>transition=0.5</code>: Quick 0.5-second transitions</li>
+<li><code>transition=2.0</code>: Slow 2-second transitions</li>
+</ul>
+<h3 id="behavior">Behavior<a class="headerlink" href="#behavior" title="Permanent link">&para;</a></h3>
+<h4 id="continuous-operation">Continuous Operation<a class="headerlink" href="#continuous-operation" title="Permanent link">&para;</a></h4>
+<p>ColorLoop effects run <strong>indefinitely</strong> until explicitly stopped:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Runs forever until you call:</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="random-elements">Random Elements<a class="headerlink" href="#random-elements" title="Permanent link">&para;</a></h4>
+<p>For visual variety, ColorLoop randomizes:</p>
+<ol>
+<li><strong>Initial direction</strong>: Forward or backward through hue spectrum</li>
+<li><strong>Device order</strong>: Shuffled each cycle</li>
+<li><strong>Saturation</strong>: Random value between saturation_min and saturation_max</li>
+<li><strong>Transition time</strong>: Random if <code>transition=None</code></li>
+</ol>
+<h4 id="hue-calculation">Hue Calculation<a class="headerlink" href="#hue-calculation" title="Permanent link">&para;</a></h4>
+<p>For each device at each iteration:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">new_hue</span> <span class="o">=</span> <span class="p">(</span><span class="n">base_hue</span> <span class="o">+</span> <span class="n">iteration_offset</span> <span class="o">+</span> <span class="n">device_spread_offset</span><span class="p">)</span> <span class="o">%</span> <span class="mi">360</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="c1"># Where:</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># - base_hue: Initial hue when effect started</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># - iteration_offset: iteration * change * direction</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="c1"># - device_spread_offset: device_index * spread</span>
+</span></code></pre></div>
+<h3 id="device-type-behavior_1">Device Type Behavior<a class="headerlink" href="#device-type-behavior_1" title="Permanent link">&para;</a></h3>
+<h4 id="color-lights_1">Color Lights<a class="headerlink" href="#color-lights_1" title="Permanent link">&para;</a></h4>
+<p>Full color cycling with all parameters supported.</p>
+<h4 id="multizone-lights_1">Multizone Lights<a class="headerlink" href="#multizone-lights_1" title="Permanent link">&para;</a></h4>
+<p>Entire device cycles as one unit (all zones same color at each iteration).</p>
+<h4 id="tile-devices_1">Tile Devices<a class="headerlink" href="#tile-devices_1" title="Permanent link">&para;</a></h4>
+<p>All tiles cycle together with same color.</p>
+<h4 id="monochromewhite-lights_1">Monochrome/White Lights<a class="headerlink" href="#monochromewhite-lights_1" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Hue changes are ignored (monochrome devices can't display colors)</li>
+<li>Brightness and saturation parameters are ignored</li>
+<li>Effect still runs but with no visible changes</li>
+<li><strong>Recommendation</strong>: Don't use ColorLoop on monochrome devices</li>
+</ul>
+<h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
+<h4 id="classic-rainbow">Classic Rainbow<a class="headerlink" href="#classic-rainbow" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Slow rainbow across multiple lights</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">period</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>      <span class="c1"># Full rainbow per minute</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">change</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>      <span class="c1"># Smooth color steps</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">spread</span><span class="o">=</span><span class="mi">60</span>       <span class="c1"># Spread colors across devices</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="p">)</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">120</span><span class="p">)</span>  <span class="c1"># Run for 2 minutes</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="fast-party-mode">Fast Party Mode<a class="headerlink" href="#fast-party-mode" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Fast, dramatic color changes</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">period</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>          <span class="c1"># Fast rotation</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">change</span><span class="o">=</span><span class="mi">45</span><span class="p">,</span>          <span class="c1"># Large color jumps</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">spread</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span>         <span class="c1"># Wide spread</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>     <span class="c1"># Fixed brightness</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="n">saturation_min</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="c1"># High saturation only</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="n">transition</span><span class="o">=</span><span class="mf">0.5</span>      <span class="c1"># Quick transitions</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="p">)</span>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="ambient-pastels">Ambient Pastels<a class="headerlink" href="#ambient-pastels" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Subtle pastel color cycling</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">period</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span>          <span class="c1"># Very slow</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="n">change</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>          <span class="c1"># Small steps</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">spread</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>          <span class="c1"># Slight variation</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="n">brightness</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>     <span class="c1"># Dim</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>    <span class="n">saturation_min</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="c1"># Low saturation (pastels)</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    <span class="n">saturation_max</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    <span class="n">transition</span><span class="o">=</span><span class="mf">3.0</span>      <span class="c1"># Very slow transitions</span>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="p">)</span>
+</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="c1"># Let it run indefinitely</span>
+</span></code></pre></div>
+<h3 id="stopping-colorloop">Stopping ColorLoop<a class="headerlink" href="#stopping-colorloop" title="Permanent link">&para;</a></h3>
+<p>Always explicitly stop ColorLoop effects:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Start effect</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="c1"># Do other things...</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="c1"># Must stop manually</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The <code>conductor.stop()</code> call will:</p>
+<ol>
+<li>Signal the effect to stop</li>
+<li>Wait for current iteration to complete</li>
+<li>Restore all lights to pre-effect state (power, color, zones)</li>
+</ol>
+<h3 id="prestate-inheritance">Prestate Inheritance<a class="headerlink" href="#prestate-inheritance" title="Permanent link">&para;</a></h3>
+<p>ColorLoop effects support state inheritance optimization. If you start a ColorLoop while another ColorLoop is already running, the new effect inherits the existing prestate instead of resetting:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Start first colorloop</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">effect1</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">change</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="c1"># Switch to different colorloop - no reset, seamless transition</span>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="n">effect2</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">change</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>  <span class="c1"># Inherits state, no flash</span>
+</span></code></pre></div>
+<p>This prevents the lights from briefly returning to their original state between consecutive ColorLoop effects.</p>
+<h3 id="performance-notes_1">Performance Notes<a class="headerlink" href="#performance-notes_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Iteration period: <code>period / (360 / change)</code></li>
+<li>State capture: &lt;1 second per device</li>
+<li>Effect startup: &lt;100ms</li>
+<li>Multiple devices update concurrently</li>
+<li>No cycle limit - runs until stopped</li>
+</ul>
+<hr />
+<h2 id="lifxeffect-base-class">LIFXEffect (Base Class)<a class="headerlink" href="#lifxeffect-base-class" title="Permanent link">&para;</a></h2>
+<p>Abstract base class for all light effects. Subclass this to create custom effects.</p>
+<h3 id="class-definition_3">Class Definition<a class="headerlink" href="#class-definition_3" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">LIFXEffect</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyEffect</span><span class="p">(</span><span class="n">LIFXEffect</span><span class="p">):</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">power_on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">power_on</span><span class="o">=</span><span class="n">power_on</span><span class="p">)</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_play</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>        <span class="c1"># Custom effect logic here</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>        <span class="k">pass</span>
+</span></code></pre></div>
+<h3 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">&para;</a></h3>
+<h4 id="power_on-bool"><code>power_on</code> (bool)<a class="headerlink" href="#power_on-bool" title="Permanent link">&para;</a></h4>
+<p>Whether to power on devices during effect.</p>
+<h4 id="conductor-conductor-none"><code>conductor</code> (Conductor | None)<a class="headerlink" href="#conductor-conductor-none" title="Permanent link">&para;</a></h4>
+<p>Reference to the conductor managing this effect. Set automatically by conductor.</p>
+<h4 id="participants-listlight"><code>participants</code> (list[Light])<a class="headerlink" href="#participants-listlight" title="Permanent link">&para;</a></h4>
+<p>List of lights participating in the effect. Set automatically by conductor.</p>
+<h3 id="methods_1">Methods<a class="headerlink" href="#methods_1" title="Permanent link">&para;</a></h3>
+<h4 id="async_performparticipants-listlight-none"><code>async_perform(participants: list[Light]) -&gt; None</code><a class="headerlink" href="#async_performparticipants-listlight-none" title="Permanent link">&para;</a></h4>
+<p>Perform common setup and play the effect. Called by conductor.</p>
+<p><strong>Do not override this method.</strong> Override <code>async_play()</code> instead.</p>
+<h4 id="async_play-none-abstract"><code>async_play() -&gt; None</code> (abstract)<a class="headerlink" href="#async_play-none-abstract" title="Permanent link">&para;</a></h4>
+<p>Play the effect logic. <strong>Override this in subclasses.</strong></p>
+<p>This is where you implement your custom effect behavior.</p>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_play</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    <span class="c1"># Flash all lights 3 times</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="p">[</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>            <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>        <span class="p">])</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="p">[</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>            <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>        <span class="p">])</span>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>
+</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="c1"># Restore via conductor</span>
+</span><span id="__span-23-14"><a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conductor</span><span class="p">:</span>
+</span><span id="__span-23-15"><a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participants</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="from_poweroff_hsbklight-light-hsbk"><code>from_poweroff_hsbk(light: Light) -&gt; HSBK</code><a class="headerlink" href="#from_poweroff_hsbklight-light-hsbk" title="Permanent link">&para;</a></h4>
+<p>Return startup color when light is powered off.</p>
+<p><strong>Override this</strong> to customize the color used when powering on a light.</p>
+<p><strong>Default behavior:</strong> Returns random hue, full saturation, zero brightness, neutral white.</p>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">from_poweroff_hsbk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">light</span><span class="p">:</span> <span class="n">Light</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HSBK</span><span class="p">:</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="c1"># Always start with red</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="k">return</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">kelvin</span><span class="o">=</span><span class="n">HSBK</span><span class="o">.</span><span class="n">KELVIN_NEUTRAL</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="inherit_prestateother-lifxeffect-bool"><code>inherit_prestate(other: LIFXEffect) -&gt; bool</code><a class="headerlink" href="#inherit_prestateother-lifxeffect-bool" title="Permanent link">&para;</a></h4>
+<p>Whether this effect can skip device state restoration.</p>
+<p><strong>Override this</strong> if your effect can run without resetting when following certain other effects.</p>
+<p><strong>Default behavior:</strong> Returns <code>False</code> (always reset)</p>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">inherit_prestate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">LIFXEffect</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="c1"># Can inherit from same effect type</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">==</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="creating-custom-effects">Creating Custom Effects<a class="headerlink" href="#creating-custom-effects" title="Permanent link">&para;</a></h3>
+<p>See the <a href="../../user-guide/effects-custom/">Custom Effects Guide</a> for detailed instructions on creating your own effects.</p>
+<hr />
+<h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../getting-started/effects/">Getting Started</a> - Basic usage and common patterns</li>
+<li><a href="../../user-guide/effects-custom/">Custom Effects</a> - Creating your own effects</li>
+<li><a href="../../architecture/effects-architecture/">Architecture</a> - How the system works</li>
+<li><a href="../../user-guide/effects-troubleshooting/">Troubleshooting</a> - Common issues and solutions</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 10, 2025 14:40:41 UTC">November 10, 2025</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 10, 2025 14:40:41 UTC">November 10, 2025</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 Avi Miller
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/Djelibeybi/lifx-async" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/lifx-async/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "toc.follow", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>
