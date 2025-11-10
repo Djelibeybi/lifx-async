@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2025-11-10)
+
+### Features
+
+- Add software effects
+  ([`be768fb`](https://github.com/Djelibeybi/lifx-async/commit/be768fbb4c2984646da4a0ee954b36930ca6261d))
+
+
 ## v1.2.1 (2025-11-08)
 
 ### Bug Fixes
