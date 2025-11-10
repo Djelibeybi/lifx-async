@@ -91,13 +91,14 @@ def emulator_server(emulator_available: bool, xprocess) -> Generator[int]:
     class EmulatorServer(ProcessStarter):
         """Process starter for use with pytest-xprocess."""
 
-        pattern = "LIFX emulated server listening"
+        pattern = "Application startup complete"
         args: ClassVar[list[str]] = [
             str(emulator_path),
             "--bind",
             "127.0.0.1",  # bind emulator to localhost
             "--port",
             str(port),
+            "--api",  # Enable HTTP API on port 8080
             "--color",
             "1",  # 1 color light
             "--multizone",
@@ -216,3 +217,137 @@ async def cleanup_connection_pool():
     yield
     # Close all connections in the pool after test completes
     await DeviceConnection.close_all_connections()
+
+
+@pytest.fixture(scope="session")
+def emulator_api_url(emulator_server: int) -> str:
+    """Return the base URL for the emulator's HTTP API.
+
+    The API is enabled with the --api flag and runs on port 8080.
+
+    Returns:
+        Base URL like "http://127.0.0.1:8080/api"
+    """
+    return "http://127.0.0.1:8080/api"
+
+
+@pytest.fixture
+def scenario_manager(emulator_api_url: str):
+    """Provide a context manager for scenario management.
+
+    Automatically cleans up scenarios after each test to prevent
+    test contamination.
+
+    Usage:
+        def test_example(scenario_manager):
+            with scenario_manager("devices", "d073d5000001", {...}):
+                # Test code with scenario active
+                pass
+            # Scenario automatically cleaned up
+    """
+    from contextlib import contextmanager
+
+    import requests
+
+    active_scenarios = []
+
+    @contextmanager
+    def manage_scenario(scope: str, identifier: str, config: dict):
+        """Add a scenario and ensure cleanup.
+
+        Args:
+            scope: "global", "devices", "types", "locations", or "groups"
+            identifier: The scope identifier (serial, type name, etc.)
+                       Use empty string for "global"
+            config: Scenario configuration dict with keys like:
+                   - drop_packets: {pkt_type: drop_rate}
+                   - response_delays: {pkt_type: delay_seconds}
+                   - malformed_packets: [pkt_types]
+                   - etc.
+        """
+        url = f"{emulator_api_url}/scenarios/{scope}"
+        if identifier:
+            url = f"{url}/{identifier}"
+
+        # Add the scenario
+        response = requests.put(url, json=config, timeout=5.0)
+        response.raise_for_status()
+        active_scenarios.append(url)
+
+        try:
+            yield
+        finally:
+            # Clean up this scenario
+            try:
+                requests.delete(url, timeout=5.0)
+                active_scenarios.remove(url)
+            except Exception:
+                pass  # Best effort cleanup
+
+    yield manage_scenario
+
+    # Clean up any remaining scenarios
+    for url in active_scenarios:
+        try:
+            requests.delete(url, timeout=5.0)
+        except Exception:
+            pass
+
+
+@pytest.fixture
+async def emulator_server_with_scenarios(emulator_server: int, emulator_api_url: str):
+    """Create devices with specific scenario configurations.
+
+    This fixture provides a callable that applies scenarios to devices
+    and returns server/device info for testing.
+
+    Usage:
+        async def test_example(emulator_server_with_scenarios):
+            server, device = await emulator_server_with_scenarios(
+                device_type="color",
+                serial="d073d5000001",
+                scenarios={"drop_packets": {"20": 1.0}}
+            )
+            # Test code using server.port and device info
+    """
+    from types import SimpleNamespace
+
+    import requests
+
+    applied_scenarios = []
+
+    async def create_device_with_scenario(
+        device_type: str, serial: str, scenarios: dict
+    ):
+        """Apply scenarios to a device.
+
+        Args:
+            device_type: Device type (color, multizone, tile, hev, infrared)
+            serial: Device serial number
+            scenarios: Scenario configuration dict
+
+        Returns:
+            Tuple of (server_info, device_info) where:
+            - server_info has .port attribute
+            - device_info has device details
+        """
+        # Apply scenario to the specified device
+        url = f"{emulator_api_url}/scenarios/devices/{serial}"
+        response = requests.put(url, json=scenarios, timeout=5.0)
+        response.raise_for_status()
+        applied_scenarios.append(url)
+
+        # Create namespace objects for server and device info
+        server_info = SimpleNamespace(port=emulator_server)
+        device_info = SimpleNamespace(serial=serial, type=device_type)
+
+        return server_info, device_info
+
+    yield create_device_with_scenario
+
+    # Clean up all scenarios after test
+    for url in applied_scenarios:
+        try:
+            requests.delete(url, timeout=5.0)
+        except Exception:
+            pass  # Best effort cleanup
