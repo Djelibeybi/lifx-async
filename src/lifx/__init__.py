@@ -31,6 +31,7 @@ from lifx.devices import (
     TileRect,
     WifiInfo,
 )
+from lifx.effects import Conductor, EffectColorloop, EffectPulse, LIFXEffect
 from lifx.exceptions import (
     LifxConnectionError,
     LifxDeviceNotFoundError,
@@ -74,6 +75,11 @@ __all__ = [
     "TileEffect",
     "TileInfo",
     "TileRect",
+    # Effects
+    "Conductor",
+    "LIFXEffect",
+    "EffectPulse",
+    "EffectColorloop",
     # High-level API
     "DiscoveryContext",
     "DeviceGroup",
