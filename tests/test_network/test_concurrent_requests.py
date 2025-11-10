@@ -177,42 +177,52 @@ class TestSequenceNumberHandling:
 class TestErrorHandling:
     """Test error handling in concurrent scenarios using DeviceConnection."""
 
-    @pytest.mark.skip(reason="emulator_server_with_scenarios fixture not implemented")
     async def test_timeout_when_server_drops_packets(
         self, emulator_server_with_scenarios
     ):
         """Test handling timeout when server drops packets (simulating no response)."""
-        # Create a server that drops DeviceGetPower packets
+        # Create a scenario that drops Device.GetPower packets (pkt_type 20)
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
             serial="d073d5000001",
-            scenarios={"drop_packets": [20]},  # Drop DeviceGetPower (pkt_type 20)
+            scenarios={
+                "drop_packets": {
+                    "20": 1.0  # Drop 100% of GetPower responses (pkt_type 20)
+                }
+            },
         )
 
         from lifx.network.connection import DeviceConnection
 
-        # Use DeviceConnection like users would - no context manager needed
-        conn = DeviceConnection(serial="d073d5000001", ip="127.0.0.1", port=server.port)
+        conn = DeviceConnection(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=server.port,
+            timeout=0.5,
+            max_retries=0,  # No retries for faster test
+        )
 
-        # This should timeout since server drops the packet
+        # This should timeout since server drops all GetPower packets
         with pytest.raises(LifxTimeoutError):
             await conn.request(Device.GetPower(), timeout=0.5)
 
-    @pytest.mark.skip(reason="emulator_server_with_scenarios fixture not implemented")
     async def test_concurrent_requests_with_one_timing_out(
         self, emulator_server_with_scenarios
     ):
         """Test timeout isolation between concurrent requests."""
-        # Create a server that drops only GetPower packets
+        # Create a scenario that drops ONLY GetPower packets
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
             serial="d073d5000001",
-            scenarios={"drop_packets": [20]},  # Drop DeviceGetPower (pkt_type 20)
+            scenarios={
+                "drop_packets": {
+                    "20": 1.0  # Drop 100% of GetPower responses (pkt_type 20)
+                }
+            },
         )
 
         from lifx.network.connection import DeviceConnection
 
-        # Use DeviceConnection like users would
         conn = DeviceConnection(serial="d073d5000001", ip="127.0.0.1", port=server.port)
 
         # Create multiple concurrent requests where one will timeout
