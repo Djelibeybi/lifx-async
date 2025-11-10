@@ -149,17 +149,22 @@ nav:
   - Installation: getting-started/installation.md
   - Quick Start: getting-started/quickstart.md
   - Themes: getting-started/themes.md
+  - Light Effects: getting-started/effects.md
 - User Guide:
   - Themes: user-guide/themes.md
   - Advanced Usage: user-guide/advanced-usage.md
+  - Custom Effects: user-guide/effects-custom.md
   - Troubleshooting: user-guide/troubleshooting.md
+  - Effects Troubleshooting: user-guide/effects-troubleshooting.md
   - Protocol Deep Dive: user-guide/protocol-deep-dive.md
 - Architecture:
   - Overview: architecture/overview.md
+  - Effects System: architecture/effects-architecture.md
 - API Reference:
   - Overview: api/index.md
   - High-Level API: api/high-level.md
   - Themes: api/themes.md
+  - Effects: api/effects.md
   - Color Utilities: api/colors.md
   - Device Classes: api/devices.md
   - Network Layer: api/network.md
@@ -167,6 +172,7 @@ nav:
   - Exceptions: api/exceptions.md
 - FAQ: faq.md
 - Changelog: changelog.md
+- Effects Release Notes: effects-release-notes.md
 
 extra:
   social:
