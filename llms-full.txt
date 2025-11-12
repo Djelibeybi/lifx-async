@@ -349,8 +349,7 @@ Themes allow you to apply professionally-curated color palettes to your LIFX dev
 ## Apply a Theme
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async with discover() as lights:
     # Get a theme by name
@@ -363,7 +362,7 @@ async with discover() as lights:
 ## List Available Themes
 
 ```python
-from lifx.theme import ThemeLibrary
+from lifx import ThemeLibrary
 
 # Get all 42 theme names
 themes = ThemeLibrary.list()
@@ -389,8 +388,7 @@ The library includes 42 official LIFX app themes:
 ## Common Options
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async with discover() as lights:
     theme = ThemeLibrary.get("christmas")
@@ -406,9 +404,7 @@ async with discover() as lights:
 ## Create a Custom Theme
 
 ```python
-from lifx.color import HSBK
-from lifx.theme import Theme
-from lifx.api import discover
+from lifx import HSBK, Theme, discover
 
 # Create custom theme with specific colors
 custom_theme = Theme([
@@ -812,8 +808,7 @@ Themes enable coordinated color schemes across your LIFX devices. This guide cov
 ### Apply Theme to All Devices
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def apply_evening_mode():
     async with discover() as lights:
@@ -824,8 +819,7 @@ async def apply_evening_mode():
 ### Apply Different Themes to Different Device Types
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def themed_lighting():
     async with discover() as lights:
@@ -849,8 +843,7 @@ async def themed_lighting():
 ### Morning to Night Transition
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def daily_lighting_schedule():
@@ -875,8 +868,7 @@ async def daily_lighting_schedule():
 ### Holiday Mode Manager
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 from datetime import datetime
 
 async def activate_holiday_theme():
@@ -902,8 +894,7 @@ async def activate_holiday_theme():
 ### Multi-Room Holiday Setup
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def decorate_house_for_christmas():
     """Apply Christmas theme throughout the house."""
@@ -934,8 +925,7 @@ async def decorate_house_for_christmas():
 ### Smooth Theme Cycling
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def cycle_moods():
@@ -958,8 +948,7 @@ async def cycle_moods():
 ### Theme Playlist
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def theme_playlist(themes: list[str], duration: float = 5.0):
@@ -982,8 +971,7 @@ async def theme_playlist(themes: list[str], duration: float = 5.0):
 ### Multi-Room Coordination
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def set_room_theme(room_name: str, theme_name: str):
@@ -1009,8 +997,7 @@ async def set_room_theme(room_name: str, theme_name: str):
 ### Home Scene Presets
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def activate_scene(scene: str):
     """Activate a pre-defined home scene."""
@@ -1065,9 +1052,7 @@ async def activate_scene(scene: str):
 ### Create Branded Theme
 
 ```python
-from lifx.color import HSBK
-from lifx.theme import Theme
-from lifx.api import discover
+from lifx import HSBK, Theme, discover
 
 # Create corporate branding theme
 corporate_theme = Theme([
@@ -1083,9 +1068,7 @@ async with discover() as lights:
 ### Sunset Gradient
 
 ```python
-from lifx.color import HSBK
-from lifx.theme import Theme
-from lifx.api import discover
+from lifx import HSBK, Theme, discover
 
 # Create sunset-inspired gradient
 sunset_theme = Theme([
@@ -1104,9 +1087,7 @@ async with discover() as lights:
 ### Robust Theme Application
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
-from lifx.exceptions import LifxTimeoutError, LifxDeviceNotFoundError
+from lifx import discover, ThemeLibrary, LifxTimeoutError, LifxDeviceNotFoundError
 
 async def safe_apply_theme(theme_name: str):
     """Apply theme with comprehensive error handling."""
@@ -1145,8 +1126,7 @@ async def safe_apply_theme(theme_name: str):
 When applying themes to many devices, use `DeviceGroup.apply_theme()` for concurrent execution:
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async with discover() as lights:
     theme = ThemeLibrary.get("evening")
@@ -1157,8 +1137,7 @@ async with discover() as lights:
 ### Avoid Rapid Transitions
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async with discover() as lights:
@@ -1419,7 +1398,7 @@ async def discover_in_batches():
 ### Exception Hierarchy
 
 ```python
-from lifx.exceptions import (
+from lifx import (
     LifxError,              # Base exception
     LifxTimeoutError,       # Request timeout
     LifxConnectionError,    # Connection failed
@@ -1434,8 +1413,7 @@ from lifx.exceptions import (
 
 ```python
 import asyncio
-from lifx import Light, Colors
-from lifx.exceptions import LifxTimeoutError, LifxConnectionError
+from lifx import Light, Colors, LifxTimeoutError, LifxConnectionError
 
 async def resilient_control():
     max_retries = 3
@@ -1462,8 +1440,7 @@ async def resilient_control():
 ### Graceful Degradation
 
 ```python
-from lifx import discover
-from lifx.exceptions import LifxError
+from lifx import discover, LifxError
 
 async def best_effort_control():
     async with discover() as group:
@@ -1675,8 +1652,7 @@ The conductor handles all state management automatically - you just focus on the
 Every custom effect follows this pattern:
 
 ```python
-from lifx.effects import LIFXEffect
-from lifx.devices.light import Light
+from lifx import LIFXEffect, Light
 
 class MyCustomEffect(LIFXEffect):
     """Brief description of what this effect does."""
@@ -1983,8 +1959,7 @@ async def async_play(self) -> None:
 Flash all lights in unison with configurable count and duration:
 
 ```python
-from lifx.effects import LIFXEffect
-from lifx.devices.light import Light
+from lifx import LIFXEffect
 import asyncio
 
 class FlashEffect(LIFXEffect):
@@ -2352,7 +2327,7 @@ Full type hints improve IDE support and catch bugs:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lifx.devices.light import Light
+    from lifx import Light
 
 class MyEffect(LIFXEffect):
     def __init__(self, duration: float, power_on: bool = True) -> None:
@@ -2595,8 +2570,7 @@ async def thorough_discovery():
 **Solution:**
 
 ```python
-from lifx import Light
-from lifx.exceptions import LifxConnectionError
+from lifx import Light, LifxConnectionError
 import asyncio
 
 async def test_connection(ip: str):
@@ -2632,8 +2606,7 @@ asyncio.run(test_connection("192.168.1.100"))
 
 ```python
 import asyncio
-from lifx import Light
-from lifx.exceptions import LifxError
+from lifx import Light, LifxError
 
 async def resilient_operation(ip: str, max_retries: int = 3):
     """Retry operations with exponential backoff"""
@@ -3598,7 +3571,7 @@ Current implementation treats multizone device as a single unit.
 **Example:**
 
 ```python
-from lifx.devices.multizone import MultiZoneLight
+from lifx import MultiZoneLight
 
 async def async_play(self) -> None:
     for light in self.participants:
@@ -3841,7 +3814,7 @@ sequenceDiagram
 LIFX uses HSBK color space:
 
 ```python
-from lifx.color import HSBK
+from lifx import HSBK
 
 color = HSBK(
     hue=180.0,         # 0-360 degrees
@@ -4088,7 +4061,7 @@ graph TB
 
 ```python
 from lifx.protocol.packets import Light
-from lifx.color import HSBK
+from lifx import HSBK
 
 # Create a packet
 packet = Light.SetColor(
@@ -4146,7 +4119,7 @@ response = await conn.request_response(packet, response_type)
 **Example**:
 
 ```python
-from lifx.devices.light import Light
+from lifx import Light
 
 async with Light(serial, ip) as light:
     # High-level operations
@@ -7885,7 +7858,7 @@ The `Conductor` class is the central orchestrator for managing light effects acr
 ### Class Definition
 
 ```python
-from lifx.effects import Conductor
+from lifx import Conductor
 
 conductor = Conductor()
 ```
@@ -7981,8 +7954,7 @@ Pulse/blink/breathe effects using LIFX waveform modes. Supports five distinct mo
 ### Class Definition
 
 ```python
-from lifx.effects import EffectPulse
-from lifx import HSBK
+from lifx import EffectPulse, HSBK
 
 effect = EffectPulse(
     power_on=True,
@@ -8253,7 +8225,7 @@ Continuous color rotation effect cycling through the hue spectrum. Runs indefini
 ### Class Definition
 
 ```python
-from lifx.effects import EffectColorloop
+from lifx import EffectColorloop
 
 effect = EffectColorloop(
     power_on=True,
@@ -8517,7 +8489,7 @@ Abstract base class for all light effects. Subclass this to create custom effect
 ### Class Definition
 
 ```python
-from lifx.effects import LIFXEffect
+from lifx import LIFXEffect
 
 class MyEffect(LIFXEffect):
     def __init__(self, power_on: bool = True):

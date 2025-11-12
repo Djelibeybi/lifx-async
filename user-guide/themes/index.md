@@ -7,8 +7,7 @@ Themes enable coordinated color schemes across your LIFX devices. This guide cov
 ### Apply Theme to All Devices
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def apply_evening_mode():
     async with discover() as lights:
@@ -19,8 +18,7 @@ async def apply_evening_mode():
 ### Apply Different Themes to Different Device Types
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def themed_lighting():
     async with discover() as lights:
@@ -44,8 +42,7 @@ async def themed_lighting():
 ### Morning to Night Transition
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def daily_lighting_schedule():
@@ -70,8 +67,7 @@ async def daily_lighting_schedule():
 ### Holiday Mode Manager
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 from datetime import datetime
 
 async def activate_holiday_theme():
@@ -97,8 +93,7 @@ async def activate_holiday_theme():
 ### Multi-Room Holiday Setup
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def decorate_house_for_christmas():
     """Apply Christmas theme throughout the house."""
@@ -129,8 +124,7 @@ async def decorate_house_for_christmas():
 ### Smooth Theme Cycling
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def cycle_moods():
@@ -153,8 +147,7 @@ async def cycle_moods():
 ### Theme Playlist
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def theme_playlist(themes: list[str], duration: float = 5.0):
@@ -177,8 +170,7 @@ async def theme_playlist(themes: list[str], duration: float = 5.0):
 ### Multi-Room Coordination
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async def set_room_theme(room_name: str, theme_name: str):
@@ -204,8 +196,7 @@ async def set_room_theme(room_name: str, theme_name: str):
 ### Home Scene Presets
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async def activate_scene(scene: str):
     """Activate a pre-defined home scene."""
@@ -260,9 +251,7 @@ async def activate_scene(scene: str):
 ### Create Branded Theme
 
 ```python
-from lifx.color import HSBK
-from lifx.theme import Theme
-from lifx.api import discover
+from lifx import HSBK, Theme, discover
 
 # Create corporate branding theme
 corporate_theme = Theme([
@@ -278,9 +267,7 @@ async with discover() as lights:
 ### Sunset Gradient
 
 ```python
-from lifx.color import HSBK
-from lifx.theme import Theme
-from lifx.api import discover
+from lifx import HSBK, Theme, discover
 
 # Create sunset-inspired gradient
 sunset_theme = Theme([
@@ -299,9 +286,7 @@ async with discover() as lights:
 ### Robust Theme Application
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
-from lifx.exceptions import LifxTimeoutError, LifxDeviceNotFoundError
+from lifx import discover, ThemeLibrary, LifxTimeoutError, LifxDeviceNotFoundError
 
 async def safe_apply_theme(theme_name: str):
     """Apply theme with comprehensive error handling."""
@@ -340,8 +325,7 @@ async def safe_apply_theme(theme_name: str):
 When applying themes to many devices, use `DeviceGroup.apply_theme()` for concurrent execution:
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async with discover() as lights:
     theme = ThemeLibrary.get("evening")
@@ -352,8 +336,7 @@ async with discover() as lights:
 ### Avoid Rapid Transitions
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 import asyncio
 
 async with discover() as lights:

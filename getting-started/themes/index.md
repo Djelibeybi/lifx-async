@@ -5,8 +5,7 @@ Themes allow you to apply professionally-curated color palettes to your LIFX dev
 ## Apply a Theme
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async with discover() as lights:
     # Get a theme by name
@@ -19,7 +18,7 @@ async with discover() as lights:
 ## List Available Themes
 
 ```python
-from lifx.theme import ThemeLibrary
+from lifx import ThemeLibrary
 
 # Get all 42 theme names
 themes = ThemeLibrary.list()
@@ -45,8 +44,7 @@ The library includes 42 official LIFX app themes:
 ## Common Options
 
 ```python
-from lifx.api import discover
-from lifx.theme import ThemeLibrary
+from lifx import discover, ThemeLibrary
 
 async with discover() as lights:
     theme = ThemeLibrary.get("christmas")
@@ -62,9 +60,7 @@ async with discover() as lights:
 ## Create a Custom Theme
 
 ```python
-from lifx.color import HSBK
-from lifx.theme import Theme
-from lifx.api import discover
+from lifx import HSBK, Theme, discover
 
 # Create custom theme with specific colors
 custom_theme = Theme([
