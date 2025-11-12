@@ -108,6 +108,51 @@ plugins:
 - git-revision-date-localized:
     enable_creation_date: true
 
+- llmstxt:
+    markdown_description: |
+      lifx-async is a modern, type-safe, async Python library for controlling LIFX smart devices
+      over the local network. Built with Python's built-in asyncio for async/await patterns and
+      features auto-generated protocol structures from a YAML specification.
+
+      Key features:
+      - Zero runtime dependencies
+      - Full async/await support with asyncio
+      - Type-safe with strict Pyright validation
+      - Auto-generated protocol from official LIFX specification
+      - Supports all LIFX device types: Light, HevLight, InfraredLight, MultiZoneLight, and TileDevice
+      - High-level API with device discovery and batch operations
+      - Concurrent request handling with connection pooling
+    sections:
+      Getting Started:
+      - getting-started/installation.md: Installation instructions and requirements
+      - getting-started/quickstart.md: Quick start guide with basic examples
+      - getting-started/themes.md: Using predefined color themes
+      - getting-started/effects.md: Light effects and animations
+      User Guide:
+      - user-guide/themes.md: Working with color themes
+      - user-guide/advanced-usage.md: Advanced usage patterns and best practices
+      - user-guide/effects-custom.md: Creating custom light effects
+      - user-guide/troubleshooting.md: Common issues and solutions
+      - user-guide/effects-troubleshooting.md: Effects-specific troubleshooting
+      - user-guide/protocol-deep-dive.md: Understanding the LIFX protocol
+      Architecture:
+      - architecture/overview.md: System architecture and design
+      - architecture/effects-architecture.md: Effects system architecture
+      API Reference:
+      - api/index.md: API reference overview
+      - api/high-level.md: High-level discovery and batch operations API
+      - api/themes.md: Theme system API
+      - api/effects.md: Effects API
+      - api/colors.md: Color utilities and HSBK conversion
+      - api/devices.md: Device classes and capabilities
+      - api/network.md: Network layer components
+      - api/protocol.md: Protocol layer and packet structures
+      - api/exceptions.md: Exception hierarchy
+      Additional Resources:
+      - faq.md: Frequently asked questions
+      - changelog.md: Version history and release notes
+    full_output: llms-full.txt
+
 markdown_extensions:
 - admonition
 - pymdownx.details
