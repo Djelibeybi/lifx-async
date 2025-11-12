@@ -155,7 +155,7 @@ sequenceDiagram
 LIFX uses HSBK color space:
 
 ```python
-from lifx.color import HSBK
+from lifx import HSBK
 
 color = HSBK(
     hue=180.0,         # 0-360 degrees

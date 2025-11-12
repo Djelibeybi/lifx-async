@@ -9,8 +9,7 @@ Requirements:
 
 import asyncio
 
-from lifx import HSBK, discover
-from lifx.effects import Conductor, EffectPulse
+from lifx import HSBK, Conductor, EffectPulse, discover
 
 
 async def main() -> None:

@@ -242,7 +242,7 @@ async def discover_in_batches():
 ### Exception Hierarchy
 
 ```python
-from lifx.exceptions import (
+from lifx import (
     LifxError,              # Base exception
     LifxTimeoutError,       # Request timeout
     LifxConnectionError,    # Connection failed
@@ -257,8 +257,7 @@ from lifx.exceptions import (
 
 ```python
 import asyncio
-from lifx import Light, Colors
-from lifx.exceptions import LifxTimeoutError, LifxConnectionError
+from lifx import Light, Colors, LifxTimeoutError, LifxConnectionError
 
 async def resilient_control():
     max_retries = 3
@@ -285,8 +284,7 @@ async def resilient_control():
 ### Graceful Degradation
 
 ```python
-from lifx import discover
-from lifx.exceptions import LifxError
+from lifx import discover, LifxError
 
 async def best_effort_control():
     async with discover() as group:

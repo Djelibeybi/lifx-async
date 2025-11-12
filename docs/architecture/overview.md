@@ -86,7 +86,7 @@ graph TB
 
 ```python
 from lifx.protocol.packets import Light
-from lifx.color import HSBK
+from lifx import HSBK
 
 # Create a packet
 packet = Light.SetColor(
@@ -144,7 +144,7 @@ response = await conn.request_response(packet, response_type)
 **Example**:
 
 ```python
-from lifx.devices.light import Light
+from lifx import Light
 
 async with Light(serial, ip) as light:
     # High-level operations

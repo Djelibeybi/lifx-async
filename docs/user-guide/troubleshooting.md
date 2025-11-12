@@ -123,8 +123,7 @@ async def thorough_discovery():
 **Solution:**
 
 ```python
-from lifx import Light
-from lifx.exceptions import LifxConnectionError
+from lifx import Light, LifxConnectionError
 import asyncio
 
 async def test_connection(ip: str):
@@ -160,8 +159,7 @@ asyncio.run(test_connection("192.168.1.100"))
 
 ```python
 import asyncio
-from lifx import Light
-from lifx.exceptions import LifxError
+from lifx import Light, LifxError
 
 async def resilient_operation(ip: str, max_retries: int = 3):
     """Retry operations with exponential backoff"""

@@ -16,7 +16,7 @@ The `Conductor` class is the central orchestrator for managing light effects acr
 ### Class Definition
 
 ```python
-from lifx.effects import Conductor
+from lifx import Conductor
 
 conductor = Conductor()
 ```
@@ -112,8 +112,7 @@ Pulse/blink/breathe effects using LIFX waveform modes. Supports five distinct mo
 ### Class Definition
 
 ```python
-from lifx.effects import EffectPulse
-from lifx import HSBK
+from lifx import EffectPulse, HSBK
 
 effect = EffectPulse(
     power_on=True,
@@ -384,7 +383,7 @@ Continuous color rotation effect cycling through the hue spectrum. Runs indefini
 ### Class Definition
 
 ```python
-from lifx.effects import EffectColorloop
+from lifx import EffectColorloop
 
 effect = EffectColorloop(
     power_on=True,
@@ -648,7 +647,7 @@ Abstract base class for all light effects. Subclass this to create custom effect
 ### Class Definition
 
 ```python
-from lifx.effects import LIFXEffect
+from lifx import LIFXEffect
 
 class MyEffect(LIFXEffect):
     def __init__(self, power_on: bool = True):
