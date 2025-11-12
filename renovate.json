@@ -134,7 +134,7 @@
   ],
   "customManagers": [
     {
-      "description": "Update versions in CLAUDE.md",
+      "description": "update versions in CLAUDE.md",
       "customType": "regex",
       "managerFilePatterns": [
         "/^CLAUDE\\.md$/"
@@ -150,7 +150,7 @@
     "schedule": [
       "before 5am on monday"
     ],
-    "commitMessageAction": "Update",
+    "commitMessageAction": "update",
     "commitMessageTopic": "lock file",
     "automerge": true
   },
