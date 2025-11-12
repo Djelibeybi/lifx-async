@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v1.3.1 (2025-11-12)
+
+### Bug Fixes
+
+- Add Theme, ThemeLibrary, get_theme to main lifx package exports ([`6b41bb8`](https://github.com/Djelibeybi/lifx-async/commit/6b41bb8b052a0447d5a667681eb3bedcfd1e7218))
+
+### Documentation
+
+- Add mkdocs-llmstxt to create llms.txt and llms-full.txt ([`4dd378c`](https://github.com/Djelibeybi/lifx-async/commit/4dd378cacf4e9904dc64e2e59936f4a9e325fc47))
+- Remove effects release notes ([`2fdabc0`](https://github.com/Djelibeybi/lifx-async/commit/2fdabc04a3abba507bbee3f93721a8814296e269))
+
 ## v1.3.0 (2025-11-10)
 
 ### Features
