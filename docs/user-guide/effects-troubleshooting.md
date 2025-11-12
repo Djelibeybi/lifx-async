@@ -718,7 +718,7 @@ Current implementation treats multizone device as a single unit.
 **Example:**
 
 ```python
-from lifx.devices.multizone import MultiZoneLight
+from lifx import MultiZoneLight
 
 async def async_play(self) -> None:
     for light in self.participants:

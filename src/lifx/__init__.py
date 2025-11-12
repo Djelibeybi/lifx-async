@@ -48,6 +48,7 @@ from lifx.protocol.protocol_types import (
     MultiZoneEffectType,
     TileEffectType,
 )
+from lifx.theme import Theme, ThemeLibrary, get_theme
 
 __version__ = get_version("lifx-async")  # type: ignore
 
@@ -80,6 +81,10 @@ __all__ = [
     "LIFXEffect",
     "EffectPulse",
     "EffectColorloop",
+    # Themes
+    "Theme",
+    "ThemeLibrary",
+    "get_theme",
     # High-level API
     "DiscoveryContext",
     "DeviceGroup",

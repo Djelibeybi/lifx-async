@@ -28,8 +28,7 @@ The conductor handles all state management automatically - you just focus on the
 Every custom effect follows this pattern:
 
 ```python
-from lifx.effects import LIFXEffect
-from lifx.devices.light import Light
+from lifx import LIFXEffect, Light
 
 class MyCustomEffect(LIFXEffect):
     """Brief description of what this effect does."""
@@ -336,8 +335,7 @@ async def async_play(self) -> None:
 Flash all lights in unison with configurable count and duration:
 
 ```python
-from lifx.effects import LIFXEffect
-from lifx.devices.light import Light
+from lifx import LIFXEffect
 import asyncio
 
 class FlashEffect(LIFXEffect):
@@ -705,7 +703,7 @@ Full type hints improve IDE support and catch bugs:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lifx.devices.light import Light
+    from lifx import Light
 
 class MyEffect(LIFXEffect):
     def __init__(self, duration: float, power_on: bool = True) -> None:
