@@ -1,0 +1,56 @@
+# lifx-async
+
+> A modern, type-safe, async Python library for controlling LIFX lights
+
+lifx-async is a modern, type-safe, async Python library for controlling LIFX smart devices
+over the local network. Built with Python's built-in asyncio for async/await patterns and
+features auto-generated protocol structures from a YAML specification.
+
+Key features:
+- Zero runtime dependencies
+- Full async/await support with asyncio
+- Type-safe with strict Pyright validation
+- Auto-generated protocol from official LIFX specification
+- Supports all LIFX device types: Light, HevLight, InfraredLight, MultiZoneLight, and TileDevice
+- High-level API with device discovery and batch operations
+- Concurrent request handling with connection pooling
+
+
+## Getting Started
+
+- [Installation](https://djelibeybi.github.io/lifx-async/getting-started/installation/index.md): Installation instructions and requirements
+- [Quick Start](https://djelibeybi.github.io/lifx-async/getting-started/quickstart/index.md): Quick start guide with basic examples
+- [Themes](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md): Using predefined color themes
+- [Light Effects](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md): Light effects and animations
+
+## User Guide
+
+- [Themes](https://djelibeybi.github.io/lifx-async/user-guide/themes/index.md): Working with color themes
+- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md): Advanced usage patterns and best practices
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md): Creating custom light effects
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md): Common issues and solutions
+- [Effects Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md): Effects-specific troubleshooting
+- [Protocol Deep Dive](https://djelibeybi.github.io/lifx-async/user-guide/protocol-deep-dive/index.md): Understanding the LIFX protocol
+
+## Architecture
+
+- [Overview](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md): System architecture and design
+- [Effects System](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md): Effects system architecture
+
+## API Reference
+
+- [Overview](https://djelibeybi.github.io/lifx-async/api/index.md): API reference overview
+- [High-Level API](https://djelibeybi.github.io/lifx-async/api/high-level/index.md): High-level discovery and batch operations API
+- [Themes](https://djelibeybi.github.io/lifx-async/api/themes/index.md): Theme system API
+- [Effects](https://djelibeybi.github.io/lifx-async/api/effects/index.md): Effects API
+- [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md): Color utilities and HSBK conversion
+- [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md): Device classes and capabilities
+- [Network Layer](https://djelibeybi.github.io/lifx-async/api/network/index.md): Network layer components
+- [Protocol Layer](https://djelibeybi.github.io/lifx-async/api/protocol/index.md): Protocol layer and packet structures
+- [Exceptions](https://djelibeybi.github.io/lifx-async/api/exceptions/index.md): Exception hierarchy
+
+## Additional Resources
+
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md): Frequently asked questions
+- [Changelog](https://djelibeybi.github.io/lifx-async/changelog/index.md): Version history and release notes
+
