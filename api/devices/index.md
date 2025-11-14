@@ -24,9 +24,9 @@ This class provides common functionality for all LIFX devices:
 
 - Connection management
 - Basic device queries (label, power, version, info)
-- State storage with timestamps (no automatic expiration)
+- State caching for reduced network traffic
 
-All properties return a tuple of (value, timestamp) or None if never fetched. Callers can use the timestamp to determine if data needs refreshing.
+Properties return cached values or None if never fetched. Use get\_\*() methods to fetch fresh data from the device.
 
 Example
 
@@ -38,19 +38,16 @@ async with device:
     label = await device.get_label()
     print(f"Device: {label}")
 
-    # Check label and its age
+    # Use cached label value
     if device.label is not None:
-        label_value, updated_at = device.label
-        age = time.time() - updated_at
-        print(f"Label '{label_value}' is {age:.1f}s old")
+        print(f"Cached label: {device.label}")
 
-    # Turn on device and auto-refresh power state
-    await device.set_power(True, refresh=True)
+    # Turn on device
+    await device.set_power(True)
 
-    # Get power state with timestamp
-    power_result = device.power
-    if power_result:
-        is_on, timestamp = power_result
+    # Get power state
+    is_on = await device.get_power()
+    if is_on is not None:
         print(f"Power: {'ON' if is_on else 'OFF'}")
 ```
 
@@ -84,17 +81,16 @@ async with device:
 | `set_group`         | Set device group information.                           |
 | `set_reboot`        | Reboot the device.                                      |
 
-| ATTRIBUTE       | DESCRIPTION                                                                                  |
-| --------------- | -------------------------------------------------------------------------------------------- |
-| `capabilities`  | Get device product capabilities. **TYPE:** \`ProductInfo                                     |
-| `label`         | Get stored label with timestamp if available. **TYPE:** \`tuple[str, float]                  |
-| `power`         | Get stored power state with timestamp if available. **TYPE:** \`tuple[bool, float]           |
-| `version`       | Get stored version with timestamp if available. **TYPE:** \`tuple[DeviceVersion, float]      |
-| `host_firmware` | Get stored host firmware with timestamp if available. **TYPE:** \`tuple[FirmwareInfo, float] |
-| `wifi_firmware` | Get stored wifi firmware with timestamp if available. **TYPE:** \`tuple[FirmwareInfo, float] |
-| `location`      | Get stored location name with timestamp if available. **TYPE:** \`tuple[str, float]          |
-| `group`         | Get stored group name with timestamp if available. **TYPE:** \`tuple[str, float]             |
-| `model`         | Get LIFX friendly model name if available. **TYPE:** \`str                                   |
+| ATTRIBUTE       | DESCRIPTION                                                     |
+| --------------- | --------------------------------------------------------------- |
+| `capabilities`  | Get device product capabilities. **TYPE:** \`ProductInfo        |
+| `label`         | Get cached label if available. **TYPE:** \`str                  |
+| `version`       | Get cached version if available. **TYPE:** \`DeviceVersion      |
+| `host_firmware` | Get cached host firmware if available. **TYPE:** \`FirmwareInfo |
+| `wifi_firmware` | Get cached wifi firmware if available. **TYPE:** \`FirmwareInfo |
+| `location`      | Get cached location name if available. **TYPE:** \`str          |
+| `group`         | Get cached group name if available. **TYPE:** \`str             |
+| `model`         | Get LIFX friendly model name if available. **TYPE:** \`str      |
 
 Source code in `src/lifx/devices/base.py`
 
@@ -201,15 +197,13 @@ def __init__(
         max_retries=max_retries,
     )
 
-    # State storage: Each value stored as (value, timestamp) tuple
-    # Values never expire automatically - caller decides when to refresh
-    self._label: tuple[str, float] | None = None
-    self._power: tuple[bool, float] | None = None
-    self._version: tuple[DeviceVersion, float] | None = None
-    self._host_firmware: tuple[FirmwareInfo, float] | None = None
-    self._wifi_firmware: tuple[FirmwareInfo, float] | None = None
-    self._location: tuple[LocationInfo, float] | None = None
-    self._group: tuple[GroupInfo, float] | None = None
+    # State storage: Cached values from device
+    self._label: str | None = None
+    self._version: DeviceVersion | None = None
+    self._host_firmware: FirmwareInfo | None = None
+    self._wifi_firmware: FirmwareInfo | None = None
+    self._location: LocationInfo | None = None
+    self._group: GroupInfo | None = None
 
     # Product capabilities for device features (populated on first use)
     self._capabilities: ProductInfo | None = None
@@ -250,100 +244,86 @@ async with device:
 ##### label
 
 ```python
-label: tuple[str, float] | None
+label: str | None
 ```
 
-Get stored label with timestamp if available.
+Get cached label if available.
 
 Use get_label() to fetch from device.
 
-| RETURNS             | DESCRIPTION |
-| ------------------- | ----------- |
-| \`tuple[str, float] | None\`      |
-
-##### power
-
-```python
-power: tuple[bool, float] | None
-```
-
-Get stored power state with timestamp if available.
-
-Use get_power() to fetch from device.
-
-| RETURNS              | DESCRIPTION |
-| -------------------- | ----------- |
-| \`tuple[bool, float] | None\`      |
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`str   | None\`      |
 
 ##### version
 
 ```python
-version: tuple[DeviceVersion, float] | None
+version: DeviceVersion | None
 ```
 
-Get stored version with timestamp if available.
+Get cached version if available.
 
 Use get_version() to fetch from device.
 
-| RETURNS                       | DESCRIPTION |
-| ----------------------------- | ----------- |
-| \`tuple[DeviceVersion, float] | None\`      |
+| RETURNS         | DESCRIPTION |
+| --------------- | ----------- |
+| \`DeviceVersion | None\`      |
 
 ##### host_firmware
 
 ```python
-host_firmware: tuple[FirmwareInfo, float] | None
+host_firmware: FirmwareInfo | None
 ```
 
-Get stored host firmware with timestamp if available.
+Get cached host firmware if available.
 
 Use get_host_firmware() to fetch from device.
 
-| RETURNS                      | DESCRIPTION |
-| ---------------------------- | ----------- |
-| \`tuple[FirmwareInfo, float] | None\`      |
+| RETURNS        | DESCRIPTION |
+| -------------- | ----------- |
+| \`FirmwareInfo | None\`      |
 
 ##### wifi_firmware
 
 ```python
-wifi_firmware: tuple[FirmwareInfo, float] | None
+wifi_firmware: FirmwareInfo | None
 ```
 
-Get stored wifi firmware with timestamp if available.
+Get cached wifi firmware if available.
 
 Use get_wifi_firmware() to fetch from device.
 
-| RETURNS                      | DESCRIPTION |
-| ---------------------------- | ----------- |
-| \`tuple[FirmwareInfo, float] | None\`      |
+| RETURNS        | DESCRIPTION |
+| -------------- | ----------- |
+| \`FirmwareInfo | None\`      |
 
 ##### location
 
 ```python
-location: tuple[str, float] | None
+location: str | None
 ```
 
-Get stored location name with timestamp if available.
+Get cached location name if available.
 
 Use get_location() to fetch from device.
 
-| RETURNS             | DESCRIPTION |
-| ------------------- | ----------- |
-| \`tuple[str, float] | None\`      |
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`str   | None\`      |
 
 ##### group
 
 ```python
-group: tuple[str, float] | None
+group: str | None
 ```
 
-Get stored group name with timestamp if available.
+Get cached group name if available.
 
 Use get_group() to fetch from device.
 
-| RETURNS             | DESCRIPTION |
-| ------------------- | ----------- |
-| \`tuple[str, float] | None\`      |
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`str   | None\`      |
 
 ##### model
 
@@ -463,10 +443,9 @@ Example
 label = await device.get_label()
 print(f"Device name: {label}")
 
-# Or use stored value
+# Or use cached value
 if device.label:
-    label, timestamp = device.label
-    print(f"Stored label: {label}")
+    print(f"Cached label: {device.label}")
 ```
 
 Source code in `src/lifx/devices/base.py`
@@ -490,17 +469,16 @@ async def get_label(self) -> str:
         label = await device.get_label()
         print(f"Device name: {label}")
 
-        # Or use stored value
+        # Or use cached value
         if device.label:
-            label, timestamp = device.label
-            print(f"Stored label: {label}")
+            print(f"Cached label: {device.label}")
         ```
     """
     # Request automatically unpacks and decodes label
     state = await self.connection.request(packets.Device.GetLabel())
 
-    # Store label with timestamp
-    self._label = (state.label, time.time())
+    # Store label
+    self._label = state.label
     _LOGGER.debug(
         {
             "class": "Device",
@@ -570,8 +548,8 @@ async def set_label(self, label: str) -> None:
         packets.Device.SetLabel(label=label_bytes),
     )
 
-    # Update state with timestamp
-    self._label = (label, time.time())
+    # Update cached state
+    self._label = label
     _LOGGER.debug(
         {
             "class": "Device",
@@ -637,7 +615,6 @@ async def get_power(self) -> bool:
     # Power level is uint16 (0 or 65535)
     is_on = state.level > 0
 
-    self._power = (is_on, time.time())
     _LOGGER.debug(
         {
             "class": "Device",
@@ -700,8 +677,6 @@ async def set_power(self, on: bool) -> None:
         packets.Device.SetPower(level=level),
     )
 
-    # Update state with timestamp
-    self._power = (on, time.time())
     _LOGGER.debug(
         {
             "class": "Device",
@@ -769,7 +744,7 @@ async def get_version(self) -> DeviceVersion:
         product=state.product,
     )
 
-    self._version = (version, time.time())
+    self._version = version
 
     _LOGGER.debug(
         {
@@ -979,7 +954,7 @@ async def get_host_firmware(self) -> FirmwareInfo:
         version_minor=state.version_minor,
     )
 
-    self._host_firmware = (firmware, time.time())
+    self._host_firmware = firmware
 
     _LOGGER.debug(
         {
@@ -1054,7 +1029,7 @@ async def get_wifi_firmware(self) -> FirmwareInfo:
         version_minor=state.version_minor,
     )
 
-    self._wifi_firmware = (firmware, time.time())
+    self._wifi_firmware = firmware
 
     _LOGGER.debug(
         {
@@ -1131,7 +1106,7 @@ async def get_location(self) -> LocationInfo:
         updated_at=state.updated_at,
     )
 
-    self._location = (location, time.time())
+    self._location = location
 
     _LOGGER.debug(
         {
@@ -1290,11 +1265,11 @@ async def set_location(self, label: str, *, discover_timeout: float = 3.0) -> No
         ),
     )
 
-    # Update state with timestamp
+    # Update cached state
     location_info = LocationInfo(
         location=location_uuid_to_use, label=label, updated_at=updated_at
     )
-    self._location = (location_info, time.time())
+    self._location = location_info
     _LOGGER.debug(
         {
             "class": "Device",
@@ -1369,7 +1344,7 @@ async def get_group(self) -> GroupInfo:
         updated_at=state.updated_at,
     )
 
-    self._group = (group, time.time())
+    self._group = group
 
     _LOGGER.debug(
         {
@@ -1528,11 +1503,11 @@ async def set_group(self, label: str, *, discover_timeout: float = 3.0) -> None:
         ),
     )
 
-    # Update state with timestamp
+    # Update cached state
     group_info = GroupInfo(
         group=group_uuid_to_use, label=label, updated_at=updated_at
     )
-    self._group = (group_info, time.time())
+    self._group = group_info
     _LOGGER.debug(
         {
             "class": "Device",
@@ -1672,11 +1647,10 @@ async with await Light.from_ip(ip="192.168.1.100") as light:
 | `breathe`               | Make the light breathe to a specific color.                             |
 | `apply_theme`           | Apply a theme to this light.                                            |
 
-| ATTRIBUTE    | DESCRIPTION                                                                        |
-| ------------ | ---------------------------------------------------------------------------------- |
-| `color`      | Get stored light color with timestamp if available. **TYPE:** \`tuple[HSBK, float] |
-| `min_kelvin` | Get the minimum supported kelvin value if available. **TYPE:** \`int               |
-| `max_kelvin` | Get the maximum supported kelvin value if available. **TYPE:** \`int               |
+| ATTRIBUTE    | DESCRIPTION                                                          |
+| ------------ | -------------------------------------------------------------------- |
+| `min_kelvin` | Get the minimum supported kelvin value if available. **TYPE:** \`int |
+| `max_kelvin` | Get the maximum supported kelvin value if available. **TYPE:** \`int |
 
 Source code in `src/lifx/devices/light.py`
 
@@ -1684,24 +1658,9 @@ Source code in `src/lifx/devices/light.py`
 def __init__(self, *args, **kwargs) -> None:
     """Initialize Light with additional state attributes."""
     super().__init__(*args, **kwargs)
-    # Light-specific state storage
-    self._color: tuple[HSBK, float] | None = None
 ```
 
 #### Attributes
-
-##### color
-
-```python
-color: tuple[HSBK, float] | None
-```
-
-Get stored light color with timestamp if available.
-
-| RETURNS              | DESCRIPTION |
-| -------------------- | ----------- |
-| \`tuple[HSBK, float] | None\`      |
-| \`tuple[HSBK, float] | None\`      |
 
 ##### min_kelvin
 
@@ -1797,13 +1756,8 @@ async def get_color(self) -> tuple[HSBK, bool, str]:
     power = state.power > 0
     label = state.label
 
-    # Store color and other fields from StateColor response with timestamps
-    import time
-
-    timestamp = time.time()
-    self._color = (color, timestamp)
-    self._label = (label, timestamp)  # Already decoded to string
-    self._power = (power, timestamp)
+    # Store label from StateColor response
+    self._label = label  # Already decoded to string
 
     _LOGGER.debug(
         {
@@ -1893,10 +1847,6 @@ async def set_color(
         ),
     )
 
-    # Update state with timestamp
-    import time
-
-    self._color = (color, time.time())
     _LOGGER.debug(
         {
             "class": "Device",
@@ -2272,10 +2222,6 @@ async def get_power(self) -> bool:
     # Power level is uint16 (0 or 65535)
     is_on = state.level > 0
 
-    import time
-
-    self._power = (is_on, time.time())
-
     _LOGGER.debug(
         {
             "class": "Device",
@@ -2355,10 +2301,6 @@ async def set_power(self, on: bool, duration: float = 0.0) -> None:
         packets.Light.SetPower(level=level, duration=duration_ms),
     )
 
-    # Update state with timestamp
-    import time
-
-    self._power = (on, time.time())
     _LOGGER.debug(
         {
             "class": "Device",
@@ -2966,11 +2908,10 @@ async with await HevLight.from_ip(ip="192.168.1.100") as light:
 | `set_hev_config`      | Configure HEV cycle defaults.              |
 | `get_last_hev_result` | Get result of the last HEV cleaning cycle. |
 
-| ATTRIBUTE    | DESCRIPTION                                                                                                     |
-| ------------ | --------------------------------------------------------------------------------------------------------------- |
-| `hev_cycle`  | Get stored HEV cycle state with timestamp if available. **TYPE:** \`tuple[HevCycleState, float]                 |
-| `hev_config` | Get stored HEV configuration with timestamp if available. **TYPE:** \`tuple[HevConfig, float]                   |
-| `hev_result` | Get stored last HEV cycle result with timestamp if available. **TYPE:** \`tuple[LightLastHevCycleResult, float] |
+| ATTRIBUTE    | DESCRIPTION                                                                        |
+| ------------ | ---------------------------------------------------------------------------------- |
+| `hev_config` | Get cached HEV configuration if available. **TYPE:** \`HevConfig                   |
+| `hev_result` | Get cached last HEV cycle result if available. **TYPE:** \`LightLastHevCycleResult |
 
 Source code in `src/lifx/devices/hev.py`
 
@@ -2979,51 +2920,37 @@ def __init__(self, *args, **kwargs) -> None:
     """Initialize HevLight with additional state attributes."""
     super().__init__(*args, **kwargs)
     # HEV-specific state storage
-    self._hev_cycle: tuple[HevCycleState, float] | None = None
-    self._hev_config: tuple[HevConfig, float] | None = None
-    self._hev_result: tuple[LightLastHevCycleResult, float] | None = None
+    self._hev_config: HevConfig | None = None
+    self._hev_result: LightLastHevCycleResult | None = None
 ```
 
 #### Attributes
 
-##### hev_cycle
-
-```python
-hev_cycle: tuple[HevCycleState, float] | None
-```
-
-Get stored HEV cycle state with timestamp if available.
-
-| RETURNS                       | DESCRIPTION |
-| ----------------------------- | ----------- |
-| \`tuple[HevCycleState, float] | None\`      |
-| \`tuple[HevCycleState, float] | None\`      |
-
 ##### hev_config
 
 ```python
-hev_config: tuple[HevConfig, float] | None
+hev_config: HevConfig | None
 ```
 
-Get stored HEV configuration with timestamp if available.
+Get cached HEV configuration if available.
 
-| RETURNS                   | DESCRIPTION |
-| ------------------------- | ----------- |
-| \`tuple[HevConfig, float] | None\`      |
-| \`tuple[HevConfig, float] | None\`      |
+| RETURNS     | DESCRIPTION |
+| ----------- | ----------- |
+| \`HevConfig | None\`      |
+| \`HevConfig | None\`      |
 
 ##### hev_result
 
 ```python
-hev_result: tuple[LightLastHevCycleResult, float] | None
+hev_result: LightLastHevCycleResult | None
 ```
 
-Get stored last HEV cycle result with timestamp if available.
+Get cached last HEV cycle result if available.
 
-| RETURNS                                 | DESCRIPTION |
-| --------------------------------------- | ----------- |
-| \`tuple[LightLastHevCycleResult, float] | None\`      |
-| \`tuple[LightLastHevCycleResult, float] | None\`      |
+| RETURNS                   | DESCRIPTION |
+| ------------------------- | ----------- |
+| \`LightLastHevCycleResult | None\`      |
+| \`LightLastHevCycleResult | None\`      |
 
 #### Functions
 
@@ -3091,11 +3018,6 @@ async def get_hev_cycle(self) -> HevCycleState:
         remaining_s=state.remaining_s,
         last_power=state.last_power,
     )
-
-    # Store state with timestamp
-    import time
-
-    self._hev_cycle = (cycle_state, time.time())
 
     _LOGGER.debug(
         {
@@ -3177,8 +3099,6 @@ async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
         ),
     )
 
-    # Invalidate state since it changed
-    self._hev_cycle = None
     _LOGGER.debug(
         {
             "class": "Device",
@@ -3245,10 +3165,8 @@ async def get_hev_config(self) -> HevConfig:
         duration_s=state.duration_s,
     )
 
-    # Store state with timestamp
-    import time
-
-    self._hev_config = (config, time.time())
+    # Store cached state
+    self._hev_config = config
 
     _LOGGER.debug(
         {
@@ -3323,13 +3241,8 @@ async def set_hev_config(self, indication: bool, duration_seconds: int) -> None:
         ),
     )
 
-    # Update state with timestamp
-    import time
-
-    self._hev_config = (
-        HevConfig(indication=indication, duration_s=duration_seconds),
-        time.time(),
-    )
+    # Update cached state
+    self._hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
     _LOGGER.debug(
         {
             "class": "Device",
@@ -3396,10 +3309,8 @@ async def get_last_hev_result(
     # Request last HEV result
     state = await self.connection.request(packets.Light.GetLastHevCycleResult())
 
-    # Store state with timestamp
-    import time
-
-    self._hev_result = (state.result, time.time())
+    # Store cached state
+    self._hev_result = state.result
 
     _LOGGER.debug(
         {
@@ -3455,9 +3366,9 @@ async with await InfraredLight.from_ip(ip="192.168.1.100") as light:
 | `get_infrared` | Get current infrared brightness. |
 | `set_infrared` | Set infrared brightness.         |
 
-| ATTRIBUTE  | DESCRIPTION                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| `infrared` | Get stored infrared brightness with timestamp if available. **TYPE:** \`tuple[float, float] |
+| ATTRIBUTE  | DESCRIPTION                                                    |
+| ---------- | -------------------------------------------------------------- |
+| `infrared` | Get cached infrared brightness if available. **TYPE:** \`float |
 
 Source code in `src/lifx/devices/infrared.py`
 
@@ -3466,7 +3377,7 @@ def __init__(self, *args, **kwargs) -> None:
     """Initialize InfraredLight with additional state attributes."""
     super().__init__(*args, **kwargs)
     # Infrared-specific state storage
-    self._infrared: tuple[float, float] | None = None
+    self._infrared: float | None = None
 ```
 
 #### Attributes
@@ -3474,15 +3385,15 @@ def __init__(self, *args, **kwargs) -> None:
 ##### infrared
 
 ```python
-infrared: tuple[float, float] | None
+infrared: float | None
 ```
 
-Get stored infrared brightness with timestamp if available.
+Get cached infrared brightness if available.
 
-| RETURNS               | DESCRIPTION |
-| --------------------- | ----------- |
-| \`tuple[float, float] | None\`      |
-| \`tuple[float, float] | None\`      |
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`float | None\`      |
+| \`float | None\`      |
 
 #### Functions
 
@@ -3539,10 +3450,8 @@ async def get_infrared(self) -> float:
     # Convert from uint16 (0-65535) to float (0.0-1.0)
     brightness = state.brightness / 65535.0
 
-    # Store state with timestamp
-    import time
-
-    self._infrared = (brightness, time.time())
+    # Store cached state
+    self._infrared = brightness
 
     _LOGGER.debug(
         {
@@ -3620,10 +3529,8 @@ async def set_infrared(self, brightness: float) -> None:
         packets.Light.SetInfrared(brightness=brightness_u16),
     )
 
-    # Update state with timestamp
-    import time
-
-    self._infrared = (brightness, time.time())
+    # Update cached state
+    self._infrared = brightness
     _LOGGER.debug(
         {
             "class": "Device",
@@ -3688,6 +3595,7 @@ async with await MultiZoneLight.from_ip(ip="192.168.1.100") as light:
 | `get_zone_count`           | Get the number of zones in the device.                               |
 | `get_color_zones`          | Get colors for a range of zones using GetColorZones.                 |
 | `get_extended_color_zones` | Get colors for a range of zones using GetExtendedColorZones.         |
+| `get_all_color_zones`      | Get colors for all zones, automatically using the best method.       |
 | `set_color_zones`          | Set color for a range of zones.                                      |
 | `set_extended_color_zones` | Set colors for multiple zones efficiently (up to 82 zones per call). |
 | `get_multizone_effect`     | Get current multizone effect.                                        |
@@ -3696,11 +3604,10 @@ async with await MultiZoneLight.from_ip(ip="192.168.1.100") as light:
 | `set_move_effect`          | Apply a moving effect that shifts colors along the strip.            |
 | `apply_theme`              | Apply a theme across zones.                                          |
 
-| ATTRIBUTE          | DESCRIPTION                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| `zone_count`       | Get stored zone count with timestamp if available. **TYPE:** \`tuple[int, float]            |
-| `multizone_effect` | Get stored multizone effect with timestamp if available. **TYPE:** \`tuple\[MultiZoneEffect |
-| `zones`            | Get stored zone colors with timestamp if available. **TYPE:** \`tuple\[list[HSBK], float\]  |
+| ATTRIBUTE          | DESCRIPTION                                                           |
+| ------------------ | --------------------------------------------------------------------- |
+| `zone_count`       | Get cached zone count if available. **TYPE:** \`int                   |
+| `multizone_effect` | Get cached multizone effect if available. **TYPE:** \`MultiZoneEffect |
 
 Source code in `src/lifx/devices/multizone.py`
 
@@ -3709,11 +3616,8 @@ def __init__(self, *args, **kwargs) -> None:
     """Initialize MultiZoneLight with additional state attributes."""
     super().__init__(*args, **kwargs)
     # MultiZone-specific state storage
-    self._zone_count: tuple[int, float] | None = None
-    self._multizone_effect: tuple[MultiZoneEffect | None, float] | None = None
-    # Zone colors - list of all zone colors with single timestamp
-    # Updated whenever any zone query is performed
-    self._zones: tuple[list[HSBK], float] | None = None
+    self._zone_count: int | None = None
+    self._multizone_effect: MultiZoneEffect | None | None = None
 ```
 
 #### Attributes
@@ -3721,41 +3625,28 @@ def __init__(self, *args, **kwargs) -> None:
 ##### zone_count
 
 ```python
-zone_count: tuple[int, float] | None
+zone_count: int | None
 ```
 
-Get stored zone count with timestamp if available.
+Get cached zone count if available.
 
-| RETURNS             | DESCRIPTION |
-| ------------------- | ----------- |
-| \`tuple[int, float] | None\`      |
-| \`tuple[int, float] | None\`      |
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`int   | None\`      |
+| \`int   | None\`      |
 
 ##### multizone_effect
 
 ```python
-multizone_effect: tuple[MultiZoneEffect | None, float] | None
+multizone_effect: MultiZoneEffect | None | None
 ```
 
-Get stored multizone effect with timestamp if available.
+Get cached multizone effect if available.
 
-| RETURNS                  | DESCRIPTION   |
-| ------------------------ | ------------- |
-| \`tuple\[MultiZoneEffect | None, float\] |
-| \`tuple\[MultiZoneEffect | None, float\] |
-
-##### zones
-
-```python
-zones: tuple[list[HSBK], float] | None
-```
-
-Get stored zone colors with timestamp if available.
-
-| RETURNS                      | DESCRIPTION |
-| ---------------------------- | ----------- |
-| \`tuple\[list[HSBK], float\] | None\`      |
-| \`tuple\[list[HSBK], float\] | None\`      |
+| RETURNS           | DESCRIPTION |
+| ----------------- | ----------- |
+| \`MultiZoneEffect | None        |
+| \`MultiZoneEffect | None        |
 
 #### Functions
 
@@ -3821,9 +3712,7 @@ async def get_zone_count(self) -> int:
 
     count = state.count
 
-    import time
-
-    self._zone_count = (count, time.time())
+    self._zone_count = count
 
     _LOGGER.debug(
         {
@@ -3842,17 +3731,17 @@ async def get_zone_count(self) -> int:
 ##### get_color_zones
 
 ```python
-get_color_zones(start: int, end: int) -> list[HSBK]
+get_color_zones(start: int = 0, end: int = 255) -> list[HSBK]
 ```
 
 Get colors for a range of zones using GetColorZones.
 
 Always fetches from device. Use `zones` property to access stored values.
 
-| PARAMETER | DESCRIPTION                                  |
-| --------- | -------------------------------------------- |
-| `start`   | Start zone index (inclusive) **TYPE:** `int` |
-| `end`     | End zone index (inclusive) **TYPE:** `int`   |
+| PARAMETER | DESCRIPTION                                                                |
+| --------- | -------------------------------------------------------------------------- |
+| `start`   | Start zone index (inclusive, default 0) **TYPE:** `int` **DEFAULT:** `0`   |
+| `end`     | End zone index (inclusive, default 255) **TYPE:** `int` **DEFAULT:** `255` |
 
 | RETURNS      | DESCRIPTION                       |
 | ------------ | --------------------------------- |
@@ -3868,6 +3757,9 @@ Always fetches from device. Use `zones` property to access stored values.
 Example
 
 ```python
+# Get colors for all zones (default)
+colors = await light.get_color_zones()
+
 # Get colors for first 10 zones
 colors = await light.get_color_zones(0, 9)
 for i, color in enumerate(colors):
@@ -3879,8 +3771,8 @@ Source code in `src/lifx/devices/multizone.py`
 ````python
 async def get_color_zones(
     self,
-    start: int,
-    end: int,
+    start: int = 0,
+    end: int = 255,
 ) -> list[HSBK]:
     """Get colors for a range of zones using GetColorZones.
 
@@ -3888,8 +3780,8 @@ async def get_color_zones(
     Use `zones` property to access stored values.
 
     Args:
-        start: Start zone index (inclusive)
-        end: End zone index (inclusive)
+        start: Start zone index (inclusive, default 0)
+        end: End zone index (inclusive, default 255)
 
     Returns:
         List of HSBK colors, one per zone
@@ -3902,6 +3794,9 @@ async def get_color_zones(
 
     Example:
         ```python
+        # Get colors for all zones (default)
+        colors = await light.get_color_zones()
+
         # Get colors for first 10 zones
         colors = await light.get_color_zones(0, 9)
         for i, color in enumerate(colors):
@@ -3941,27 +3836,6 @@ async def get_color_zones(
 
     result = colors
 
-    # Update zone storage with fetched colors
-    import time
-
-    timestamp = time.time()
-
-    # Initialize or get existing zones array
-    if self._zones is None:
-        zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
-    else:
-        zones_array, _ = self._zones
-        # Ensure array is the right size
-        if len(zones_array) != zone_count:
-            zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
-
-    # Update the fetched range
-    for i, color in enumerate(result):
-        zones_array[start + i] = color
-
-    # Store updated zones with new timestamp
-    self._zones = (zones_array, timestamp)
-
     _LOGGER.debug(
         {
             "class": "Device",
@@ -3990,17 +3864,17 @@ async def get_color_zones(
 ##### get_extended_color_zones
 
 ```python
-get_extended_color_zones(start: int, end: int) -> list[HSBK]
+get_extended_color_zones(start: int = 0, end: int = 255) -> list[HSBK]
 ```
 
 Get colors for a range of zones using GetExtendedColorZones.
 
 Always fetches from device. Use `zones` property to access stored values.
 
-| PARAMETER | DESCRIPTION                                  |
-| --------- | -------------------------------------------- |
-| `start`   | Start zone index (inclusive) **TYPE:** `int` |
-| `end`     | End zone index (inclusive) **TYPE:** `int`   |
+| PARAMETER | DESCRIPTION                                                                |
+| --------- | -------------------------------------------------------------------------- |
+| `start`   | Start zone index (inclusive, default 0) **TYPE:** `int` **DEFAULT:** `0`   |
+| `end`     | End zone index (inclusive, default 255) **TYPE:** `int` **DEFAULT:** `255` |
 
 | RETURNS      | DESCRIPTION                       |
 | ------------ | --------------------------------- |
@@ -4016,8 +3890,11 @@ Always fetches from device. Use `zones` property to access stored values.
 Example
 
 ```python
+# Get colors for all zones (default)
+colors = await light.get_extended_color_zones()
+
 # Get colors for first 10 zones
-colors = await light.get_color_zones(0, 9)
+colors = await light.get_extended_color_zones(0, 9)
 for i, color in enumerate(colors):
     print(f"Zone {i}: {color}")
 ```
@@ -4025,15 +3902,17 @@ for i, color in enumerate(colors):
 Source code in `src/lifx/devices/multizone.py`
 
 ````python
-async def get_extended_color_zones(self, start: int, end: int) -> list[HSBK]:
+async def get_extended_color_zones(
+    self, start: int = 0, end: int = 255
+) -> list[HSBK]:
     """Get colors for a range of zones using GetExtendedColorZones.
 
     Always fetches from device.
     Use `zones` property to access stored values.
 
     Args:
-        start: Start zone index (inclusive)
-        end: End zone index (inclusive)
+        start: Start zone index (inclusive, default 0)
+        end: End zone index (inclusive, default 255)
 
     Returns:
         List of HSBK colors, one per zone
@@ -4046,8 +3925,11 @@ async def get_extended_color_zones(self, start: int, end: int) -> list[HSBK]:
 
     Example:
         ```python
+        # Get colors for all zones (default)
+        colors = await light.get_extended_color_zones()
+
         # Get colors for first 10 zones
-        colors = await light.get_color_zones(0, 9)
+        colors = await light.get_extended_color_zones(0, 9)
         for i, color in enumerate(colors):
             print(f"Zone {i}: {color}")
         ```
@@ -4055,15 +3937,8 @@ async def get_extended_color_zones(self, start: int, end: int) -> list[HSBK]:
     if start < 0 or end < start:
         raise ValueError(f"Invalid zone range: {start}-{end}")
 
-    # Ensure capabilities are loaded
-    if self.capabilities is None:
-        await self._ensure_capabilities()
-
     zone_count = await self.get_zone_count()
     end = min(zone_count - 1, end)
-
-    if self.capabilities and not self.capabilities.has_extended_multizone:
-        return await self.get_color_zones(start=start, end=end)
 
     colors = []
 
@@ -4083,14 +3958,6 @@ async def get_extended_color_zones(self, start: int, end: int) -> list[HSBK]:
             protocol_hsbk = packet.colors[i]
             colors.append(HSBK.from_protocol(protocol_hsbk))
 
-    # Update _zones attribute
-    import time
-
-    timestamp = time.time()
-
-    # Store all zones directly - device sent complete state
-    self._zones = (colors, timestamp)
-
     # Return only the requested range to caller
     result = colors[start : end + 1]
 
@@ -4109,6 +3976,74 @@ async def get_extended_color_zones(self, start: int, end: int) -> list[HSBK]:
     )
 
     return result
+````
+
+##### get_all_color_zones
+
+```python
+get_all_color_zones() -> list[HSBK]
+```
+
+Get colors for all zones, automatically using the best method.
+
+This method automatically chooses between get_extended_color_zones() and get_color_zones() based on device capabilities. Always returns all zones on the device.
+
+Always fetches from device.
+
+| RETURNS      | DESCRIPTION                       |
+| ------------ | --------------------------------- |
+| `list[HSBK]` | List of HSBK colors for all zones |
+
+| RAISES                    | DESCRIPTION                |
+| ------------------------- | -------------------------- |
+| `LifxDeviceNotFoundError` | If device is not connected |
+| `LifxTimeoutError`        | If device does not respond |
+| `LifxProtocolError`       | If response is invalid     |
+
+Example
+
+```python
+# Get all zones (automatically uses best method)
+colors = await light.get_all_color_zones()
+print(f"Device has {len(colors)} zones")
+```
+
+Source code in `src/lifx/devices/multizone.py`
+
+````python
+async def get_all_color_zones(self) -> list[HSBK]:
+    """Get colors for all zones, automatically using the best method.
+
+    This method automatically chooses between get_extended_color_zones()
+    and get_color_zones() based on device capabilities. Always returns
+    all zones on the device.
+
+    Always fetches from device.
+
+    Returns:
+        List of HSBK colors for all zones
+
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxProtocolError: If response is invalid
+
+    Example:
+        ```python
+        # Get all zones (automatically uses best method)
+        colors = await light.get_all_color_zones()
+        print(f"Device has {len(colors)} zones")
+        ```
+    """
+    # Ensure capabilities are loaded
+    if self.capabilities is None:
+        await self._ensure_capabilities()
+
+    # Use extended multizone if available, otherwise fall back to standard
+    if self.capabilities and self.capabilities.has_extended_multizone:
+        return await self.get_extended_color_zones()
+    else:
+        return await self.get_color_zones()
 ````
 
 ##### set_color_zones
@@ -4221,29 +4156,6 @@ async def set_color_zones(
             apply=apply,
         ),
     )
-
-    # Update _zones attribute with the values we just set
-    import time
-
-    timestamp = time.time()
-
-    # Initialize or get existing zones array
-    if self._zones is None:
-        # Need zone_count to initialize array
-        if self._zone_count is None:
-            zone_count = await self.get_zone_count()
-        else:
-            zone_count, _ = self._zone_count
-        zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
-    else:
-        zones_array, _ = self._zones
-
-    # Update the zones we just set
-    for i in range(start, min(end + 1, len(zones_array))):
-        zones_array[i] = color
-
-    # Store updated zones with new timestamp
-    self._zones = (zones_array, timestamp)
 
     _LOGGER.debug(
         {
@@ -4367,31 +4279,6 @@ async def set_extended_color_zones(
         ),
     )
 
-    # Update _zones attribute with the values we just set
-    import time
-
-    timestamp = time.time()
-
-    # Initialize or get existing zones array
-    if self._zones is None:
-        # Need zone_count to initialize array
-        if self._zone_count is None:
-            zone_count = await self.get_zone_count()
-        else:
-            zone_count, _ = self._zone_count
-        zones_array = [HSBK(0, 0, 0, 3500)] * zone_count
-    else:
-        zones_array, _ = self._zones
-
-    # Update the zones we just set
-    for i, color in enumerate(colors):
-        zone_idx = zone_index + i
-        if zone_idx < len(zones_array):
-            zones_array[zone_idx] = color
-
-    # Store updated zones with new timestamp
-    self._zones = (zones_array, timestamp)
-
     _LOGGER.debug(
         {
             "class": "Device",
@@ -4496,9 +4383,7 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
             parameters=parameters,
         )
 
-    import time
-
-    self._multizone_effect = (result, time.time())
+    self._multizone_effect = result
 
     _LOGGER.debug(
         {
@@ -4600,11 +4485,9 @@ async def set_multizone_effect(
         ),
     )
 
-    # Update state attribute
-    import time
-
+    # Update cached state
     result = effect if effect.effect_type != MultiZoneEffectType.OFF else None
-    self._multizone_effect = (result, time.time())
+    self._multizone_effect = result
 
     _LOGGER.debug(
         {
@@ -4907,12 +4790,11 @@ async with await TileDevice.from_ip(ip="192.168.1.100") as light:
 | `set_flame_effect`  | Apply a flame effect.                                          |
 | `apply_theme`       | Apply a theme to this tile device.                             |
 
-| ATTRIBUTE     | DESCRIPTION                                                                                           |
-| ------------- | ----------------------------------------------------------------------------------------------------- |
-| `tile_chain`  | Get stored tile chain if available. **TYPE:** \`tuple\[list[TileInfo], float\]                        |
-| `tile_count`  | Get stored tile count with timestamp if available. **TYPE:** \`tuple[int, float]                      |
-| `tile_effect` | Get stored tile effect if available. **TYPE:** \`tuple\[TileEffect                                    |
-| `tile_colors` | Get stored tile colors with timestamp if available. **TYPE:** \`tuple\[dict[int, TileColors], float\] |
+| ATTRIBUTE     | DESCRIPTION                                                    |
+| ------------- | -------------------------------------------------------------- |
+| `tile_chain`  | Get cached tile chain if available. **TYPE:** \`list[TileInfo] |
+| `tile_count`  | Get cached tile count if available. **TYPE:** \`int            |
+| `tile_effect` | Get cached tile effect if available. **TYPE:** \`TileEffect    |
 
 Source code in `src/lifx/devices/tile.py`
 
@@ -4921,11 +4803,8 @@ def __init__(self, *args, **kwargs) -> None:
     """Initialize TileDevice with additional state attributes."""
     super().__init__(*args, **kwargs)
     # Tile-specific state storage
-    self._tile_chain: tuple[list[TileInfo], float] | None = None
-    self._tile_effect: tuple[TileEffect | None, float] | None = None
-    # Tile colors: dict indexed by tile_index with TileColors for each tile
-    # Structure: dict[tile_index] -> TileColors(colors, width, height)
-    self._tile_colors: tuple[dict[int, TileColors], float] | None = None
+    self._tile_chain: list[TileInfo] | None = None
+    self._tile_effect: TileEffect | None | None = None
 ```
 
 #### Attributes
@@ -4933,66 +4812,39 @@ def __init__(self, *args, **kwargs) -> None:
 ##### tile_chain
 
 ```python
-tile_chain: tuple[list[TileInfo], float] | None
+tile_chain: list[TileInfo] | None
 ```
 
-Get stored tile chain if available.
+Get cached tile chain if available.
 
-| RETURNS                          | DESCRIPTION |
-| -------------------------------- | ----------- |
-| \`tuple\[list[TileInfo], float\] | None\`      |
+| RETURNS          | DESCRIPTION |
+| ---------------- | ----------- |
+| \`list[TileInfo] | None\`      |
 
 ##### tile_count
 
 ```python
-tile_count: tuple[int, float] | None
+tile_count: int | None
 ```
 
-Get stored tile count with timestamp if available.
+Get cached tile count if available.
 
-| RETURNS             | DESCRIPTION |
-| ------------------- | ----------- |
-| \`tuple[int, float] | None\`      |
-| \`tuple[int, float] | None\`      |
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`int   | None\`      |
+| \`int   | None\`      |
 
 ##### tile_effect
 
 ```python
-tile_effect: tuple[TileEffect | None, float] | None
+tile_effect: TileEffect | None | None
 ```
 
-Get stored tile effect if available.
+Get cached tile effect if available.
 
-| RETURNS             | DESCRIPTION   |
-| ------------------- | ------------- |
-| \`tuple\[TileEffect | None, float\] |
-
-##### tile_colors
-
-```python
-tile_colors: tuple[dict[int, TileColors], float] | None
-```
-
-Get stored tile colors with timestamp if available.
-
-| RETURNS                                 | DESCRIPTION |
-| --------------------------------------- | ----------- |
-| \`tuple\[dict[int, TileColors], float\] | None\`      |
-| \`tuple\[dict[int, TileColors], float\] | None\`      |
-| \`tuple\[dict[int, TileColors], float\] | None\`      |
-| \`tuple\[dict[int, TileColors], float\] | None\`      |
-
-Example
-
-```python
-if tile.tile_colors:
-    colors_dict, timestamp = tile.tile_colors
-    tile_0 = colors_dict[0]
-    # Access flat list: tile_0.colors
-    # Get dimensions: tile_0.width, tile_0.height
-    # Get 2D array: tile_0.to_2d()
-    # Get specific color: tile_0.get_color(x, y)
-```
+| RETURNS      | DESCRIPTION |
+| ------------ | ----------- |
+| \`TileEffect | None        |
 
 #### Functions
 
@@ -5057,9 +4909,7 @@ async def get_tile_chain(self) -> list[TileInfo]:
         for tile_device in state.tile_devices[: state.tile_devices_count]
     ]
 
-    import time
-
-    self._tile_chain = (tiles, time.time())
+    self._tile_chain = tiles
 
     _LOGGER.debug(
         {
@@ -5323,48 +5173,6 @@ async def get_tile_colors(
                 row.append(HSBK(0, 0, 0, 3500))
         colors_2d.append(row)
 
-    # Update tile colors with fetched data
-    import time
-
-    timestamp = time.time()
-
-    # Get tile chain to know dimensions
-    if self._tile_chain is None:
-        chain = await self.get_tile_chain()
-    else:
-        chain, _ = self._tile_chain
-
-    # Get tile info for this specific tile
-    tile_info = chain[tile_index]
-
-    # Initialize or get existing colors dict
-    if self._tile_colors is None:
-        tiles_colors_dict = {}
-    else:
-        tiles_colors_dict, _ = self._tile_colors
-
-    # Get or create TileColors for this tile
-    if tile_index not in tiles_colors_dict:
-        # Create new TileColors with default black colors
-        num_zones = tile_info.width * tile_info.height
-        default_colors = [HSBK(0, 0, 0, 3500)] * num_zones
-        tiles_colors_dict[tile_index] = TileColors(
-            colors=default_colors, width=tile_info.width, height=tile_info.height
-        )
-
-    tile_colors = tiles_colors_dict[tile_index]
-
-    # Update the specific tile region with fetched colors
-    for row_idx in range(height):
-        for col_idx in range(width):
-            tile_x = x + col_idx
-            tile_y = y + row_idx
-            if tile_y < tile_colors.height and tile_x < tile_colors.width:
-                tile_colors.set_color(tile_x, tile_y, colors_2d[row_idx][col_idx])
-
-    # Store updated colors with new timestamp
-    self._tile_colors = (tiles_colors_dict, timestamp)
-
     _LOGGER.debug(
         {
             "class": "Device",
@@ -5507,12 +5315,7 @@ async def set_tile_colors(
 
     # Check power state to optimize duration handling
     # If device is off, set colors instantly then power on with duration
-    # Use stored power state if available, otherwise fetch
-    power_tuple = self.power
-    if power_tuple is not None:
-        is_powered_on, _ = power_tuple
-    else:
-        is_powered_on = await self.get_power()
+    is_powered_on = await self.get_power()
 
     # Convert duration to milliseconds
     duration_ms = int(duration * 1000)
@@ -5585,48 +5388,6 @@ async def set_tile_colors(
             height=height,
             duration=copy_duration,
         )
-
-    # Update tile colors with the values we just set
-    import time
-
-    timestamp = time.time()
-
-    # Get tile chain to know dimensions
-    if self._tile_chain is None:
-        chain = await self.get_tile_chain()
-    else:
-        chain, _ = self._tile_chain
-
-    # Get tile info for this specific tile
-    tile_info = chain[tile_index]
-
-    # Initialize or get existing colors dict
-    if self._tile_colors is None:
-        tiles_colors_dict = {}
-    else:
-        tiles_colors_dict, _ = self._tile_colors
-
-    # Get or create TileColors for this tile
-    if tile_index not in tiles_colors_dict:
-        # Create new TileColors with default black colors
-        num_zones = tile_info.width * tile_info.height
-        default_colors = [HSBK(0, 0, 0, 3500)] * num_zones
-        tiles_colors_dict[tile_index] = TileColors(
-            colors=default_colors, width=tile_info.width, height=tile_info.height
-        )
-
-    tile_colors = tiles_colors_dict[tile_index]
-
-    # Update the specific tile region with colors we just set
-    for row_idx in range(height):
-        for col_idx in range(width):
-            tile_x = x + col_idx
-            tile_y = y + row_idx
-            if tile_y < tile_colors.height and tile_x < tile_colors.width:
-                tile_colors.set_color(tile_x, tile_y, colors[row_idx][col_idx])
-
-    # Store updated colors with new timestamp
-    self._tile_colors = (tiles_colors_dict, timestamp)
 
     _LOGGER.debug(
         {
@@ -5732,9 +5493,7 @@ async def get_tile_effect(self) -> TileEffect | None:
             parameters=parameters,
         )
 
-    import time
-
-    self._tile_effect = (result, time.time())
+    self._tile_effect = result
 
     _LOGGER.debug(
         {
@@ -5856,11 +5615,9 @@ async def set_tile_effect(self, effect: TileEffect) -> None:
         ),
     )
 
-    # Update state attribute
-    import time
-
+    # Update cached state
     result = effect if effect.effect_type != TileEffectType.OFF else None
-    self._tile_effect = (result, time.time())
+    self._tile_effect = result
 
     _LOGGER.debug(
         {
@@ -6492,10 +6249,9 @@ from lifx import find_lights, Colors
 async def main():
     async with find_lights() as lights:
         for light in lights:
-            if light.has_extended_multizone:
-                await light.get_extended_color_zones()
-            elif light.has_multizone:
-                await light.get_color_zones()
+            # Get all zones - automatically uses best method
+            colors = await light.get_all_color_zones()
+            print(f"Device has {len(colors)} zones")
 ```
 
 ### Tile Control

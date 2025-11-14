@@ -783,9 +783,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#checking-data-freshness" class="md-nav__link">
+  <a href="#working-with-cached-data" class="md-nav__link">
     <span class="md-ellipsis">
-      Checking Data Freshness
+      Working with Cached Data
     </span>
   </a>
   
@@ -1594,26 +1594,22 @@
 <li><a href="#performance-optimization">Performance Optimization</a></li>
 </ul>
 <h2 id="storing-state">Storing State<a class="headerlink" href="#storing-state" title="Permanent link">&para;</a></h2>
-<p>Device properties return stored state as <code>(value, timestamp)</code> tuples, giving you explicit control over data freshness.</p>
-<p>lifx-async tries to automatically populate initial state values when a device is used as an async context manager.</p>
-<p>Non-state related properties including <code>version</code>, <code>model</code>, <code>min_kelvin</code>, and <code>max_kelvin</code> do not return a timestamp.</p>
+<p>Device properties return cached values that were last retrieved from the device.</p>
+<p>lifx-async automatically populates initial state values when a device is used as an async context manager.</p>
 <h3 id="understanding-stored-state">Understanding Stored State<a class="headerlink" href="#understanding-stored-state" title="Permanent link">&para;</a></h3>
-<p>All device state properties return timestamped tuples:</p>
+<p>All device state properties return cached values or <code>None</code> if not yet fetched:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">check_stored_state</span><span class="p">():</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="c1"># Property returns tuple with (value, timestamp)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>            <span class="n">label_text</span><span class="p">,</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">result</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>            <span class="n">age</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">timestamp</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Label: </span><span class="si">{</span><span class="n">label_text</span><span class="si">}</span><span class="s2"> (stored </span><span class="si">{</span><span class="n">age</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s ago)&quot;</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No stored label - fetching from device&quot;</span><span class="p">)</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            <span class="n">label_text</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Label: </span><span class="si">{</span><span class="n">label_text</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">check_stored_state</span><span class="p">():</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="c1"># Property returns cached value or None</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">label</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="k">if</span> <span class="n">label</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cached label: </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No cached label - fetching from device&quot;</span><span class="p">)</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>            <span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Label: </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="fetching-fresh-data">Fetching Fresh Data<a class="headerlink" href="#fetching-fresh-data" title="Permanent link">&para;</a></h3>
 <p>Use the <code>get_*()</code> methods to always fetch from the device:</p>
@@ -1626,40 +1622,31 @@
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="c1"># Get other device info</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">version</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_version</span><span class="p">()</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="c1"># Properties also get updated with new timestamp</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">stored_color</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">color</span>  <span class="c1"># Now has fresh data</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="n">stored_label</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>  <span class="c1"># Also updated from get_color()</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="c1"># Some properties cache semi-static data</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">cached_label</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>  <span class="c1"># Updated from get_color()</span>
 </span></code></pre></div>
-<h3 id="checking-data-freshness">Checking Data Freshness<a class="headerlink" href="#checking-data-freshness" title="Permanent link">&para;</a></h3>
-<p>Determine if stored data is still relevant:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">use_fresh_or_stored</span><span class="p">():</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">MAX_AGE</span> <span class="o">=</span> <span class="mf">5.0</span>  <span class="c1"># Maximum age in seconds</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="c1"># Check if we have stored color</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">stored</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">color</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">if</span> <span class="n">stored</span><span class="p">:</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="n">color</span><span class="p">,</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">stored</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>            <span class="n">age</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">timestamp</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>            <span class="k">if</span> <span class="n">age</span> <span class="o">&lt;</span> <span class="n">MAX_AGE</span><span class="p">:</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using stored color (age: </span><span class="si">{</span><span class="n">age</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s)&quot;</span><span class="p">)</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Stored color too old, fetching fresh color&quot;</span><span class="p">)</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>                <span class="c1"># get_color() returns (color, power, label)</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>                <span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No stored color, fetching from device&quot;</span><span class="p">)</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="c1"># get_color() returns (color, power, label)</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>            <span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+<h3 id="working-with-cached-data">Working with Cached Data<a class="headerlink" href="#working-with-cached-data" title="Permanent link">&para;</a></h3>
+<p>Use cached values when available for semi-static data, always fetch volatile state:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">use_cached_or_fetch</span><span class="p">():</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">async</span> <span class="k">with</span> <span class="k">await</span> <span class="n">Light</span><span class="o">.</span><span class="n">from_ip</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">light</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="c1"># Check if we have cached label (semi-static)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="n">label</span> <span class="o">=</span> <span class="n">light</span><span class="o">.</span><span class="n">label</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="k">if</span> <span class="n">label</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using cached label: </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No cached label, fetching from device&quot;</span><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>            <span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fetched label: </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="c1"># For volatile state (power, color), always fetch fresh data</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="c1"># get_color() will only cache the label</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current state of </span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2"> - Power: </span><span class="si">{</span><span class="n">power</span><span class="si">}</span><span class="s2">, Color: </span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="available-properties">Available Properties<a class="headerlink" href="#available-properties" title="Permanent link">&para;</a></h3>
 <h4 id="device-properties">Device Properties<a class="headerlink" href="#device-properties" title="Permanent link">&para;</a></h4>
 <ul>
 <li><code>Device.label</code> - Device name/label</li>
-<li><code>Device.power</code> - Power state (on/off)</li>
 <li><code>Device.version</code> - Vendor ID and Product ID</li>
 <li><code>Device.host_firmware</code> - Major and minor host firmware version and build number</li>
 <li><code>Device.wifi_firmware</code> - Major and minor wifi firmware version and build number</li>
@@ -1671,9 +1658,6 @@
 <li><code>Device.model</code> - Device product model</li>
 </ul>
 <h4 id="light-properties">Light properties<a class="headerlink" href="#light-properties" title="Permanent link">&para;</a></h4>
-<ul>
-<li><code>Light.color</code> - Current color</li>
-</ul>
 <h5 id="non-state-properties_1">Non-State Properties<a class="headerlink" href="#non-state-properties_1" title="Permanent link">&para;</a></h5>
 <ul>
 <li><code>Light.min_kelvin</code> - Lowest supported kelvin value</li>
@@ -1685,24 +1669,22 @@
 </ul>
 <h4 id="hevlight-properties">HevLight properties:<a class="headerlink" href="#hevlight-properties" title="Permanent link">&para;</a></h4>
 <ul>
-<li><code>HevLight.hev_cycle</code> - HEV cycle state</li>
 <li><code>HevLight.hev_config</code> - HEV configuration</li>
 <li><code>HevLight.hev_result</code> - Last HEV result</li>
 </ul>
 <h4 id="multizonelight-properties">MultiZoneLight properties:<a class="headerlink" href="#multizonelight-properties" title="Permanent link">&para;</a></h4>
 <ul>
 <li><code>MultiZoneLight.zone_count</code> - Number of zones</li>
-<li><code>MultiZoneLight.zone_effect</code> - Either MOVE or OFF</li>
-<li><code>MultiZoneLight.zones</code> - List of zone colors</li>
+<li><code>MultiZoneLight.multizone_effect</code> - Either MOVE or OFF</li>
 </ul>
 <h4 id="tiledevice-properties">TileDevice properties:<a class="headerlink" href="#tiledevice-properties" title="Permanent link">&para;</a></h4>
 <ul>
 <li><code>TileDevice.tile_count</code> - Number of tiles on the chain</li>
 <li><code>TileDevice.tile_chain</code> - Details of each tile on the chain</li>
 <li><code>TileDevice.tile_effect</code> - Either MORPH, FLAME, SKY or OFF</li>
-<li><code>TileDevice.tile_colors</code> - Dictionary of colors, width, and height indexed by tile</li>
 </ul>
-<p>All state properties return <code>None</code> if no data has been stored yet, or <code>(value, timestamp)</code> if data is available.</p>
+<p><strong>Note</strong>: Volatile state properties (power, color, hev_cycle, zones, tile_colors) have been removed. Always use <code>get_*()</code> methods to fetch these values from devices as they change too frequently to benefit from caching.</p>
+<p>All cached properties return <code>None</code> if no data has been cached yet, or the cached value if available.</p>
 <h2 id="connection-management">Connection Management<a class="headerlink" href="#connection-management" title="Permanent link">&para;</a></h2>
 <h3 id="understanding-connection-pooling">Understanding Connection Pooling<a class="headerlink" href="#understanding-connection-pooling" title="Permanent link">&para;</a></h3>
 <p>lifx-async automatically pools connections for efficient reuse:</p>
@@ -1991,7 +1973,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 12, 2025 15:21:48 UTC">November 12, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 14, 2025 02:16:49 UTC">November 14, 2025</span>
   </span>
 
     

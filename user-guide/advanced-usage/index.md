@@ -14,32 +14,27 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 
 ## Storing State
 
-Device properties return stored state as `(value, timestamp)` tuples, giving you explicit control over data freshness.
+Device properties return cached values that were last retrieved from the device.
 
-lifx-async tries to automatically populate initial state values when a device is used as an async context manager.
-
-Non-state related properties including `version`, `model`, `min_kelvin`, and `max_kelvin` do not return a timestamp.
+lifx-async automatically populates initial state values when a device is used as an async context manager.
 
 ### Understanding Stored State
 
-All device state properties return timestamped tuples:
+All device state properties return cached values or `None` if not yet fetched:
 
 ```python
 from lifx import Light
-import time
 
 async def check_stored_state():
     async with await Light.from_ip("192.168.1.100") as light:
-        # Property returns tuple with (value, timestamp)
-        result = light.label
-        if result:
-            label_text, timestamp = result
-            age = time.time() - timestamp
-            print(f"Label: {label_text} (stored {age:.1f}s ago)")
+        # Property returns cached value or None
+        label = light.label
+        if label:
+            print(f"Cached label: {label}")
         else:
-            print("No stored label - fetching from device")
-            label_text = await light.get_label()
-            print(f"Label: {label_text}")
+            print("No cached label - fetching from device")
+            label = await light.get_label()
+            print(f"Label: {label}")
 ```
 
 ### Fetching Fresh Data
@@ -56,38 +51,30 @@ async def always_fresh():
         # Get other device info
         version = await light.get_version()
 
-        # Properties also get updated with new timestamp
-        stored_color = light.color  # Now has fresh data
-        stored_label = light.label  # Also updated from get_color()
+        # Some properties cache semi-static data
+        cached_label = light.label  # Updated from get_color()
 ```
 
-### Checking Data Freshness
+### Working with Cached Data
 
-Determine if stored data is still relevant:
+Use cached values when available for semi-static data, always fetch volatile state:
 
 ```python
-import time
-
-async def use_fresh_or_stored():
+async def use_cached_or_fetch():
     async with await Light.from_ip("192.168.1.100") as light:
-        MAX_AGE = 5.0  # Maximum age in seconds
-
-        # Check if we have stored color
-        stored = light.color
-        if stored:
-            color, timestamp = stored
-            age = time.time() - timestamp
-
-            if age < MAX_AGE:
-                print(f"Using stored color (age: {age:.1f}s)")
-            else:
-                print("Stored color too old, fetching fresh color")
-                # get_color() returns (color, power, label)
-                color, _, _ = await light.get_color()
+        # Check if we have cached label (semi-static)
+        label = light.label
+        if label:
+            print(f"Using cached label: {label}")
         else:
-            print("No stored color, fetching from device")
-            # get_color() returns (color, power, label)
-            color, _, _ = await light.get_color()
+            print("No cached label, fetching from device")
+            label = await light.get_label()
+            print(f"Fetched label: {label}")
+
+        # For volatile state (power, color), always fetch fresh data
+        # get_color() will only cache the label
+        color, power, label = await light.get_color()
+        print(f"Current state of {light.label} - Power: {power}, Color: {color}")
 ```
 
 ### Available Properties
@@ -95,7 +82,6 @@ async def use_fresh_or_stored():
 #### Device Properties
 
 - `Device.label` - Device name/label
-- `Device.power` - Power state (on/off)
 - `Device.version` - Vendor ID and Product ID
 - `Device.host_firmware` - Major and minor host firmware version and build number
 - `Device.wifi_firmware` - Major and minor wifi firmware version and build number
@@ -108,8 +94,6 @@ async def use_fresh_or_stored():
 
 #### Light properties
 
-- `Light.color` - Current color
-
 ##### Non-State Properties
 
 - `Light.min_kelvin` - Lowest supported kelvin value
@@ -121,24 +105,23 @@ async def use_fresh_or_stored():
 
 #### HevLight properties:
 
-- `HevLight.hev_cycle` - HEV cycle state
 - `HevLight.hev_config` - HEV configuration
 - `HevLight.hev_result` - Last HEV result
 
 #### MultiZoneLight properties:
 
 - `MultiZoneLight.zone_count` - Number of zones
-- `MultiZoneLight.zone_effect` - Either MOVE or OFF
-- `MultiZoneLight.zones` - List of zone colors
+- `MultiZoneLight.multizone_effect` - Either MOVE or OFF
 
 #### TileDevice properties:
 
 - `TileDevice.tile_count` - Number of tiles on the chain
 - `TileDevice.tile_chain` - Details of each tile on the chain
 - `TileDevice.tile_effect` - Either MORPH, FLAME, SKY or OFF
-- `TileDevice.tile_colors` - Dictionary of colors, width, and height indexed by tile
 
-All state properties return `None` if no data has been stored yet, or `(value, timestamp)` if data is available.
+**Note**: Volatile state properties (power, color, hev_cycle, zones, tile_colors) have been removed. Always use `get_*()` methods to fetch these values from devices as they change too frequently to benefit from caching.
+
+All cached properties return `None` if no data has been cached yet, or the cached value if available.
 
 ## Connection Management
 
