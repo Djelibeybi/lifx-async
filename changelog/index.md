@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.2.0 (2025-11-14)
+
+### Features
+
+- **network**: Add jitter to backoff and consolidate retry logic ([`0dfb1a2`](https://github.com/Djelibeybi/lifx-async/commit/0dfb1a2847330270c635f91c9b63577c7aad2598))
+
 ## v2.1.0 (2025-11-14)
 
 ### Features
