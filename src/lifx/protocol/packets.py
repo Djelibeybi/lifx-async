@@ -50,6 +50,7 @@ class Device(Packet):
         """Packet type 58."""
 
         PKT_TYPE: ClassVar[int] = 58
+        STATE_TYPE: ClassVar[int] = 59
         _fields: ClassVar[list[dict[str, Any]]] = [
             {"name": "Payload", "type": "[64]byte", "size_bytes": 64}
         ]
@@ -82,6 +83,7 @@ class Device(Packet):
         """Packet type 51."""
 
         PKT_TYPE: ClassVar[int] = 51
+        STATE_TYPE: ClassVar[int] = 53
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -96,6 +98,7 @@ class Device(Packet):
         """Packet type 14."""
 
         PKT_TYPE: ClassVar[int] = 14
+        STATE_TYPE: ClassVar[int] = 15
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -110,6 +113,7 @@ class Device(Packet):
         """Packet type 34."""
 
         PKT_TYPE: ClassVar[int] = 34
+        STATE_TYPE: ClassVar[int] = 35
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -124,6 +128,7 @@ class Device(Packet):
         """Packet type 23."""
 
         PKT_TYPE: ClassVar[int] = 23
+        STATE_TYPE: ClassVar[int] = 25
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -138,6 +143,7 @@ class Device(Packet):
         """Packet type 48."""
 
         PKT_TYPE: ClassVar[int] = 48
+        STATE_TYPE: ClassVar[int] = 50
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -152,6 +158,7 @@ class Device(Packet):
         """Packet type 20."""
 
         PKT_TYPE: ClassVar[int] = 20
+        STATE_TYPE: ClassVar[int] = 22
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -166,6 +173,7 @@ class Device(Packet):
         """Packet type 2."""
 
         PKT_TYPE: ClassVar[int] = 2
+        STATE_TYPE: ClassVar[int] = 3
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -180,6 +188,7 @@ class Device(Packet):
         """Packet type 32."""
 
         PKT_TYPE: ClassVar[int] = 32
+        STATE_TYPE: ClassVar[int] = 33
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -194,6 +203,7 @@ class Device(Packet):
         """Packet type 18."""
 
         PKT_TYPE: ClassVar[int] = 18
+        STATE_TYPE: ClassVar[int] = 19
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -208,6 +218,7 @@ class Device(Packet):
         """Packet type 16."""
 
         PKT_TYPE: ClassVar[int] = 16
+        STATE_TYPE: ClassVar[int] = 17
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -518,6 +529,7 @@ class Light(Packet):
         """Packet type 101."""
 
         PKT_TYPE: ClassVar[int] = 101
+        STATE_TYPE: ClassVar[int] = 107
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -532,6 +544,7 @@ class Light(Packet):
         """Packet type 142."""
 
         PKT_TYPE: ClassVar[int] = 142
+        STATE_TYPE: ClassVar[int] = 144
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -546,6 +559,7 @@ class Light(Packet):
         """Packet type 145."""
 
         PKT_TYPE: ClassVar[int] = 145
+        STATE_TYPE: ClassVar[int] = 147
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -560,6 +574,7 @@ class Light(Packet):
         """Packet type 120."""
 
         PKT_TYPE: ClassVar[int] = 120
+        STATE_TYPE: ClassVar[int] = 121
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -574,6 +589,7 @@ class Light(Packet):
         """Packet type 148."""
 
         PKT_TYPE: ClassVar[int] = 148
+        STATE_TYPE: ClassVar[int] = 149
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -588,6 +604,7 @@ class Light(Packet):
         """Packet type 116."""
 
         PKT_TYPE: ClassVar[int] = 116
+        STATE_TYPE: ClassVar[int] = 118
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -865,6 +882,7 @@ class MultiZone(Packet):
         """Packet type 511."""
 
         PKT_TYPE: ClassVar[int] = 511
+        STATE_TYPE: ClassVar[int] = 512
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -929,6 +947,7 @@ class MultiZone(Packet):
         """Packet type 502."""
 
         PKT_TYPE: ClassVar[int] = 502
+        STATE_TYPE: ClassVar[int] = 506
         _fields: ClassVar[list[dict[str, Any]]] = [
             {"name": "StartIndex", "type": "uint8", "size_bytes": 1},
             {"name": "EndIndex", "type": "uint8", "size_bytes": 1},
@@ -947,6 +966,7 @@ class MultiZone(Packet):
         """Packet type 507."""
 
         PKT_TYPE: ClassVar[int] = 507
+        STATE_TYPE: ClassVar[int] = 509
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -1098,6 +1118,7 @@ class Tile(Packet):
         """Packet type 707."""
 
         PKT_TYPE: ClassVar[int] = 707
+        STATE_TYPE: ClassVar[int] = 711
         _fields: ClassVar[list[dict[str, Any]]] = [
             {"name": "TileIndex", "type": "uint8", "size_bytes": 1},
             {"name": "Length", "type": "uint8", "size_bytes": 1},
@@ -1118,6 +1139,7 @@ class Tile(Packet):
         """Packet type 701."""
 
         PKT_TYPE: ClassVar[int] = 701
+        STATE_TYPE: ClassVar[int] = 702
         _fields: ClassVar[list[dict[str, Any]]] = []
 
         # Packet metadata for automatic handling
@@ -1132,6 +1154,7 @@ class Tile(Packet):
         """Packet type 718."""
 
         PKT_TYPE: ClassVar[int] = 718
+        STATE_TYPE: ClassVar[int] = 720
         _fields: ClassVar[list[dict[str, Any]]] = [
             {"type": "reserved", "size_bytes": 1},
             {"type": "reserved", "size_bytes": 1},

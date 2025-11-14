@@ -214,10 +214,15 @@ class TestMessageBuilder:
         assert builder.source > 0
 
     def test_builder_next_sequence(self) -> None:
-        """Test next_sequence method."""
+        """Test next_sequence method allocates and increments atomically."""
         builder = MessageBuilder(source=12345)
-        assert builder.next_sequence() == 0
 
-        # Create message and check sequence incremented
-        builder.create_message(Device.GetService())
+        # next_sequence() returns 0 and increments to 1
+        seq = builder.next_sequence()
+        assert seq == 0
+
+        # Create message with explicit sequence
+        builder.create_message(Device.GetService(), sequence=seq)
+
+        # next_sequence() returns 1 and increments to 2
         assert builder.next_sequence() == 1
