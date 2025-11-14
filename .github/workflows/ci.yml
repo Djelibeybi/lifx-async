@@ -177,6 +177,8 @@ jobs:
         if echo "$output" | grep -q "No release will be made"; then
           echo "released=false" >> $GITHUB_OUTPUT
         else
+          # Publish distribution artifacts to release
+          uv run --with python-semantic-release semantic-release publish
           echo "released=true" >> $GITHUB_OUTPUT
         fi
 
