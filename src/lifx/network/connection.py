@@ -59,6 +59,7 @@ class PendingRequest:
         event: Event to signal when response(s) arrive
         collect_multiple: Whether to wait for multiple responses (default: False)
         collection_timeout: Timeout for additional responses after first
+        expected_pkt_type: Expected response packet type for validation (optional)
         results: List of response data (header, payload) when successful
         error: Exception if an error occurred
         first_response_time: Time when first response was received
@@ -68,6 +69,7 @@ class PendingRequest:
     event: asyncio.Event
     collect_multiple: bool = False
     collection_timeout: float = MULTI_RESPONSE_COLLECTION_TIMEOUT
+    expected_pkt_type: int | None = None
     results: list[tuple[LifxHeader, bytes]] = field(default_factory=list)
     error: Exception | None = None
     first_response_time: float | None = field(default=None)
@@ -264,6 +266,7 @@ class _ActualConnection:
         packet: Any,
         ack_required: bool = False,
         res_required: bool = False,
+        sequence: int | None = None,
     ) -> None:
         """Send a packet to the device.
 
@@ -271,6 +274,7 @@ class _ActualConnection:
             packet: Packet dataclass instance
             ack_required: Request acknowledgement
             res_required: Request response
+            sequence: Explicit sequence number (allocates new one if None)
 
         Raises:
             ConnectionError: If connection is not open or send fails
@@ -278,12 +282,12 @@ class _ActualConnection:
         if not self._is_open or self._transport is None:
             raise LifxConnectionError("Connection not open")
 
-        # Create message
         message = self._builder.create_message(
             packet=packet,
             target=Serial.from_string(self.serial).to_protocol(),
             ack_required=ack_required,
             res_required=res_required,
+            sequence=sequence,
         )
 
         # Send to device
@@ -400,21 +404,36 @@ class _ActualConnection:
                             self._pending_requests.pop(sequence)
                             pending.event.set()
                         else:
-                            # Success - add response to results
-                            pending.results.append((header, payload))
-
-                            # Handle based on collection mode
-                            if pending.collect_multiple:
-                                # Multi-response mode: track time for collection timeout
-                                current_time = time.monotonic()
-                                if pending.first_response_time is None:
-                                    # First response - record time and wait for more
-                                    pending.first_response_time = current_time
-                                # Don't signal yet - wait for collection timeout
-                            else:
-                                # Single-response mode: signal immediately
-                                self._pending_requests.pop(sequence, None)
+                            # Validate packet type if expected type is specified
+                            if (
+                                pending.expected_pkt_type is not None
+                                and header.pkt_type != pending.expected_pkt_type
+                            ):
+                                # Received unexpected packet type
+                                pending.error = LifxProtocolError(
+                                    f"Received unexpected packet type "
+                                    f"{header.pkt_type} for sequence {sequence}, "
+                                    f"expected {pending.expected_pkt_type}"
+                                )
+                                # Remove from pending and signal completion
+                                self._pending_requests.pop(sequence)
                                 pending.event.set()
+                            else:
+                                # Success - add response to results
+                                pending.results.append((header, payload))
+
+                                # Handle based on collection mode
+                                if pending.collect_multiple:
+                                    # Multi-response mode: track time for timeout
+                                    current_time = time.monotonic()
+                                    if pending.first_response_time is None:
+                                        # First response - record time and wait for more
+                                        pending.first_response_time = current_time
+                                    # Don't signal yet - wait for collection timeout
+                                else:
+                                    # Single-response mode: signal immediately
+                                    self._pending_requests.pop(sequence, None)
+                                    pending.event.set()
 
                     # else: orphaned response (timeout, cancelled, etc.)
                     # We silently discard these
@@ -527,23 +546,28 @@ class _ActualConnection:
             current_timeout = base_timeout * (2**attempt)
 
             try:
-                # Get sequence number BEFORE creating pending request
+                # Atomically allocate sequence number BEFORE creating pending request
                 sequence = self._builder.next_sequence()
 
-                # Create pending request
+                # Get expected response type from packet (if defined)
+                expected_pkt_type = getattr(request, "STATE_TYPE", None)
+
+                # Create pending request with optional validation
                 pending = PendingRequest(
                     sequence=sequence,
                     event=asyncio.Event(),
                     collect_multiple=collect_multiple,
+                    expected_pkt_type=expected_pkt_type,
                 )
                 self._pending_requests[sequence] = pending
 
                 try:
-                    # Send request with specified flags
+                    # Send request with the allocated sequence number
                     await self.send_packet(
                         request,
                         ack_required=ack_required,
                         res_required=res_required,
+                        sequence=sequence,
                     )
 
                     # Wait for response(s) with timeout
