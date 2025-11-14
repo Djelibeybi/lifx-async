@@ -13,8 +13,8 @@ Device(
     serial: str,
     ip: str,
     port: int = LIFX_UDP_PORT,
-    timeout: float = 1.0,
-    max_retries: int = 3,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 )
 ```
 
@@ -51,13 +51,13 @@ async with device:
         print(f"Power: {'ON' if is_on else 'OFF'}")
 ```
 
-| PARAMETER     | DESCRIPTION                                                                            |
-| ------------- | -------------------------------------------------------------------------------------- |
-| `serial`      | Device serial number as 12-digit hex string (e.g., "d073d5123456") **TYPE:** `str`     |
-| `ip`          | Device IP address **TYPE:** `str`                                                      |
-| `port`        | Device UDP port **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                           |
-| `timeout`     | Overall timeout for network requests in seconds **TYPE:** `float` **DEFAULT:** `1.0`   |
-| `max_retries` | Maximum number of retry attempts for network requests **TYPE:** `int` **DEFAULT:** `3` |
+| PARAMETER     | DESCRIPTION                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `serial`      | Device serial number as 12-digit hex string (e.g., "d073d5123456") **TYPE:** `str`                       |
+| `ip`          | Device IP address **TYPE:** `str`                                                                        |
+| `port`        | Device UDP port **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                                             |
+| `timeout`     | Overall timeout for network requests in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retry attempts for network requests **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES` |
 
 | RAISES       | DESCRIPTION                 |
 | ------------ | --------------------------- |
@@ -101,8 +101,8 @@ def __init__(
     serial: str,
     ip: str,
     port: int = LIFX_UDP_PORT,
-    timeout: float = 1.0,
-    max_retries: int = 3,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> None:
     """Initialize device.
 
@@ -363,7 +363,7 @@ from_ip(
     ip: str,
     port: int = LIFX_UDP_PORT,
     serial: str | None = None,
-    timeout: float = 1.0,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> Self
 ```
 
@@ -371,12 +371,12 @@ Create and return an instance for the given IP address.
 
 This is a convenience class method for connecting to a known device by IP address. The returned instance can be used as a context manager.
 
-| PARAMETER | DESCRIPTION                                                                      |
-| --------- | -------------------------------------------------------------------------------- |
-| `ip`      | IP address of the device **TYPE:** `str`                                         |
-| `port`    | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT` |
-| `serial`  | Serial number as 12-digit hex string **TYPE:** \`str                             |
-| `timeout` | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `1.0`    |
+| PARAMETER | DESCRIPTION                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------- |
+| `ip`      | IP address of the device **TYPE:** `str`                                                          |
+| `port`    | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
+| `serial`  | Serial number as 12-digit hex string **TYPE:** \`str                                              |
+| `timeout` | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
 | RETURNS | DESCRIPTION                                             |
 | ------- | ------------------------------------------------------- |
@@ -398,7 +398,7 @@ async def from_ip(
     ip: str,
     port: int = LIFX_UDP_PORT,
     serial: str | None = None,
-    timeout: float = 1.0,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> Self:
     """Create and return an instance for the given IP address.
 
@@ -422,7 +422,9 @@ async def from_ip(
     """
     if serial is None:
         temp_conn = DeviceConnection(serial="000000000000", ip=ip, port=port)
-        response = await temp_conn.request(packets.Device.GetService(), timeout=2.0)
+        response = await temp_conn.request(
+            packets.Device.GetService(), timeout=DISCOVERY_TIMEOUT
+        )
         if response and isinstance(response, packets.Device.StateService):
             if temp_conn.serial and temp_conn.serial != "000000000000":
                 return cls(
@@ -1146,7 +1148,9 @@ async def get_location(self) -> LocationInfo:
 ##### set_location
 
 ```python
-set_location(label: str, *, discover_timeout: float = 3.0) -> None
+set_location(
+    label: str, *, discover_timeout: float = DISCOVERY_TIMEOUT
+) -> None
 ```
 
 Set device location information.
@@ -1156,7 +1160,7 @@ Automatically discovers devices on the network to check if any device already ha
 | PARAMETER          | DESCRIPTION                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------------ |
 | `label`            | Location label (max 32 characters) **TYPE:** `str`                                         |
-| `discover_timeout` | Timeout for device discovery in seconds (default 3.0) **TYPE:** `float` **DEFAULT:** `3.0` |
+| `discover_timeout` | Timeout for device discovery in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT` |
 
 | RAISES                    | DESCRIPTION                |
 | ------------------------- | -------------------------- |
@@ -1178,7 +1182,9 @@ await device.set_location("Kitchen")
 Source code in `src/lifx/devices/base.py`
 
 ````python
-async def set_location(self, label: str, *, discover_timeout: float = 3.0) -> None:
+async def set_location(
+    self, label: str, *, discover_timeout: float = DISCOVERY_TIMEOUT
+) -> None:
     """Set device location information.
 
     Automatically discovers devices on the network to check if any device already
@@ -1188,7 +1194,7 @@ async def set_location(self, label: str, *, discover_timeout: float = 3.0) -> No
 
     Args:
         label: Location label (max 32 characters)
-        discover_timeout: Timeout for device discovery in seconds (default 3.0)
+        discover_timeout: Timeout for device discovery in seconds
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -1384,7 +1390,7 @@ async def get_group(self) -> GroupInfo:
 ##### set_group
 
 ```python
-set_group(label: str, *, discover_timeout: float = 3.0) -> None
+set_group(label: str, *, discover_timeout: float = DISCOVERY_TIMEOUT) -> None
 ```
 
 Set device group information.
@@ -1394,7 +1400,7 @@ Automatically discovers devices on the network to check if any device already ha
 | PARAMETER          | DESCRIPTION                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------------ |
 | `label`            | Group label (max 32 characters) **TYPE:** `str`                                            |
-| `discover_timeout` | Timeout for device discovery in seconds (default 3.0) **TYPE:** `float` **DEFAULT:** `3.0` |
+| `discover_timeout` | Timeout for device discovery in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT` |
 
 | RAISES                    | DESCRIPTION                |
 | ------------------------- | -------------------------- |
@@ -1416,7 +1422,9 @@ await device.set_group("Upstairs")
 Source code in `src/lifx/devices/base.py`
 
 ````python
-async def set_group(self, label: str, *, discover_timeout: float = 3.0) -> None:
+async def set_group(
+    self, label: str, *, discover_timeout: float = DISCOVERY_TIMEOUT
+) -> None:
     """Set device group information.
 
     Automatically discovers devices on the network to check if any device already
@@ -1426,7 +1434,7 @@ async def set_group(self, label: str, *, discover_timeout: float = 3.0) -> None:
 
     Args:
         label: Group label (max 32 characters)
-        discover_timeout: Timeout for device discovery in seconds (default 3.0)
+        discover_timeout: Timeout for device discovery in seconds
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
