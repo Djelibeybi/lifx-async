@@ -91,6 +91,7 @@ async with device:
 | `location`      | Get cached location name if available. **TYPE:** \`str          |
 | `group`         | Get cached group name if available. **TYPE:** \`str             |
 | `model`         | Get LIFX friendly model name if available. **TYPE:** \`str      |
+| `mac_address`   | Get cached MAC address if available. **TYPE:** \`str            |
 
 Source code in `src/lifx/devices/base.py`
 
@@ -204,6 +205,7 @@ def __init__(
     self._wifi_firmware: FirmwareInfo | None = None
     self._location: LocationInfo | None = None
     self._group: GroupInfo | None = None
+    self._mac_address: str | None = None
 
     # Product capabilities for device features (populated on first use)
     self._capabilities: ProductInfo | None = None
@@ -335,6 +337,21 @@ Get LIFX friendly model name if available.
 
 | RETURNS | DESCRIPTION |
 | ------- | ----------- |
+| \`str   | None\`      |
+
+##### mac_address
+
+```python
+mac_address: str | None
+```
+
+Get cached MAC address if available.
+
+Use get_host_firmware() to calculate MAC address from device firmware.
+
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`str   | None\`      |
 | \`str   | None\`      |
 
 #### Functions
@@ -955,6 +972,9 @@ async def get_host_firmware(self) -> FirmwareInfo:
     )
 
     self._host_firmware = firmware
+
+    # Calculate MAC address now that we have firmware info
+    self._calculate_mac_address()
 
     _LOGGER.debug(
         {
@@ -6169,6 +6189,34 @@ async def apply_theme(
     if power_on and not is_on:
         await self.set_power(True, duration=duration)
 ````
+
+## Device Properties
+
+### MAC Address
+
+The `mac_address` property provides the device's MAC address, calculated from the serial number and host firmware version. The calculation is performed automatically when the device is used as a context manager or when `get_host_firmware()` is called.
+
+**Calculation Logic** (based on host firmware major version):
+
+- **Version 2 or 4**: MAC address matches the serial number
+- **Version 3**: MAC address is the serial number with the least significant byte incremented by 1 (with wraparound from 0xFF to 0x00)
+- **Unknown versions**: Defaults to the serial number
+
+The MAC address is returned in colon-separated lowercase hexadecimal format (e.g., `d0:73:d5:01:02:03`) to visually distinguish it from the serial number format.
+
+```python
+from lifx import Device
+
+async def main():
+    async with await Device.from_ip("192.168.1.100") as device:
+        # MAC address is automatically calculated during setup
+        if device.mac_address:
+            print(f"Serial: {device.serial}")
+            print(f"MAC:    {device.mac_address}")
+
+        # Returns None before host_firmware is fetched
+        assert device.mac_address is not None
+```
 
 ## Examples
 
