@@ -21560,6 +21560,12 @@ lifx-async maintains an LRU cache of connections. When you open a connection to 
 
 # CHANGELOG
 
+## v2.1.0 (2025-11-14)
+
+### Features
+
+- Add mac_address property to Device class ([`bd101a0`](https://github.com/Djelibeybi/lifx-async/commit/bd101a0af3eec021304d39de699e8ea0e59934c1))
+
 ## v2.0.0 (2025-11-14)
 
 ### Refactoring
