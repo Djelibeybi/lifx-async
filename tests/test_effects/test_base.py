@@ -28,7 +28,6 @@ def mock_light():
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
-    light.color = None
     return light
 
 
@@ -59,26 +58,11 @@ def test_effect_repr(effect):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_from_cached(effect, mock_light):
-    """Test fetching color from cached light.color."""
-    # Setup cached color
-    cached_color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-    mock_light.color = (cached_color, 100)
-
-    # Fetch color
-    result = await effect.fetch_light_color(mock_light)
-
-    # Should use cached color
-    assert result == cached_color
-    assert not mock_light.get_color.called
-
-
-@pytest.mark.asyncio
 async def test_fetch_light_color_from_device(effect, mock_light):
-    """Test fetching color from device when not cached."""
+    """Test fetching color from device."""
     # Setup device color
     device_color = HSBK(hue=240, saturation=0.9, brightness=0.7, kelvin=4000)
-    mock_light.get_color = AsyncMock(return_value=(device_color, 100, 200))
+    mock_light.get_color = AsyncMock(return_value=(device_color, True, "Test Light"))
 
     # Fetch color
     result = await effect.fetch_light_color(mock_light)
@@ -91,9 +75,9 @@ async def test_fetch_light_color_from_device(effect, mock_light):
 @pytest.mark.asyncio
 async def test_fetch_light_color_brightness_boost(effect, mock_light):
     """Test brightness boost when color is too dim."""
-    # Setup dim color
+    # Setup dim color from device
     dim_color = HSBK(hue=180, saturation=1.0, brightness=0.05, kelvin=3500)
-    mock_light.color = (dim_color, 100)
+    mock_light.get_color = AsyncMock(return_value=(dim_color, True, "Test Light"))
 
     # Fetch color with default fallback
     result = await effect.fetch_light_color(mock_light)
@@ -108,9 +92,9 @@ async def test_fetch_light_color_brightness_boost(effect, mock_light):
 @pytest.mark.asyncio
 async def test_fetch_light_color_custom_fallback(effect, mock_light):
     """Test brightness boost with custom fallback brightness."""
-    # Setup dim color
+    # Setup dim color from device
     dim_color = HSBK(hue=90, saturation=0.8, brightness=0.02, kelvin=2700)
-    mock_light.color = (dim_color, 100)
+    mock_light.get_color = AsyncMock(return_value=(dim_color, True, "Test Light"))
 
     # Fetch color with custom fallback
     result = await effect.fetch_light_color(
@@ -124,9 +108,9 @@ async def test_fetch_light_color_custom_fallback(effect, mock_light):
 @pytest.mark.asyncio
 async def test_fetch_light_color_custom_min_threshold(effect, mock_light):
     """Test custom minimum brightness threshold."""
-    # Setup color just below custom threshold
+    # Setup color just below custom threshold from device
     color = HSBK(hue=45, saturation=0.7, brightness=0.15, kelvin=3000)
-    mock_light.color = (color, 100)
+    mock_light.get_color = AsyncMock(return_value=(color, True, "Test Light"))
 
     # Fetch with higher minimum threshold
     result = await effect.fetch_light_color(

@@ -160,10 +160,9 @@ from lifx import find_lights, Colors
 async def main():
     async with find_lights() as lights:
         for light in lights:
-            if light.has_extended_multizone:
-                await light.get_extended_color_zones()
-            elif light.has_multizone:
-                await light.get_color_zones()
+            # Get all zones - automatically uses best method
+            colors = await light.get_all_color_zones()
+            print(f"Device has {len(colors)} zones")
 
 ```
 

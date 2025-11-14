@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from lifx.color import HSBK
@@ -71,6 +69,30 @@ class TestMultiZoneLight:
         assert result_colors[0].kelvin == 3500
         assert result_colors[0].saturation == pytest.approx(0.5, abs=0.01)
 
+    async def test_get_color_zones_default_params(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test getting all color zones using default parameters."""
+        # Mock capabilities (no extended multizone for standard test)
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+
+        # Mock StateMultiZone response - device has 16 zones
+        colors = [
+            HSBK(
+                hue=i * 22.5, saturation=0.5, brightness=0.75, kelvin=3500
+            ).to_protocol()
+            for i in range(8)
+        ]
+        mock_state = packets.MultiZone.StateMultiZone(count=16, index=0, colors=colors)
+        multizone_light.connection.request.return_value = mock_state
+
+        # Call without parameters - should get all zones
+        result_colors = await multizone_light.get_color_zones()
+
+        # Should request all zones (implementation handles pagination)
+        assert len(result_colors) >= 8
+        assert all(isinstance(color, HSBK) for color in result_colors)
+
     async def test_get_extended_color_zones(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
@@ -104,6 +126,39 @@ class TestMultiZoneLight:
         assert result_colors[1].hue == pytest.approx(36, abs=1)
         assert result_colors[9].hue == pytest.approx(324, abs=1)
         assert result_colors[0].saturation == pytest.approx(0.8, abs=0.01)
+
+    async def test_get_extended_color_zones_default_params(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test getting all extended color zones using default parameters."""
+        # Mock capabilities with extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        # Mock StateExtendedColorZones response - device has 16 zones
+        colors = [
+            HSBK(
+                hue=i * 22.5, saturation=0.8, brightness=0.9, kelvin=3500
+            ).to_protocol()
+            for i in range(16)
+        ]
+        # Pad to 82 colors as per protocol
+        colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(66)
+            ]
+        )
+
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=16, index=0, colors_count=16, colors=colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        # Call without parameters - should get all zones
+        result_colors = await multizone_light.get_extended_color_zones()
+
+        assert len(result_colors) == 16
+        assert all(isinstance(color, HSBK) for color in result_colors)
 
     async def test_get_extended_color_zones_large_device(
         self, multizone_light: MultiZoneLight, mock_product_info
@@ -243,6 +298,63 @@ class TestMultiZoneLight:
         # Should return colors up to the actual zone count
         assert len(result_colors) <= 82  # Limited by response
 
+    async def test_get_all_color_zones_with_extended(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test get_all_color_zones with extended multizone support."""
+        # Mock capabilities with extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        # Mock StateExtendedColorZones response - device has 16 zones
+        colors = [
+            HSBK(
+                hue=i * 22.5, saturation=0.8, brightness=0.9, kelvin=3500
+            ).to_protocol()
+            for i in range(16)
+        ]
+        # Pad to 82 colors as per protocol
+        colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(66)
+            ]
+        )
+
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=16, index=0, colors_count=16, colors=colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        # Call get_all_color_zones - should use extended method
+        result_colors = await multizone_light.get_all_color_zones()
+
+        assert len(result_colors) == 16
+        assert all(isinstance(color, HSBK) for color in result_colors)
+
+    async def test_get_all_color_zones_without_extended(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test get_all_color_zones without extended multizone support."""
+        # Mock capabilities without extended multizone support
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+
+        # Mock StateMultiZone response - device has 16 zones
+        colors = [
+            HSBK(
+                hue=i * 22.5, saturation=0.5, brightness=0.75, kelvin=3500
+            ).to_protocol()
+            for i in range(8)
+        ]
+        mock_state = packets.MultiZone.StateMultiZone(count=16, index=0, colors=colors)
+        multizone_light.connection.request.return_value = mock_state
+
+        # Call get_all_color_zones - should use standard method
+        result_colors = await multizone_light.get_all_color_zones()
+
+        # Should return all zones (method handles pagination internally)
+        assert len(result_colors) >= 8
+        assert all(isinstance(color, HSBK) for color in result_colors)
+
     async def test_set_color_zones(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
@@ -252,7 +364,7 @@ class TestMultiZoneLight:
 
         # Pre-populate zone count store so get_zone_count() doesn't
         # need to call the device
-        multizone_light._zone_count = (8, time.time())
+        multizone_light._zone_count = 8
 
         # Mock set_color_zones response
         multizone_light.connection.request.return_value = True
@@ -277,13 +389,8 @@ class TestMultiZoneLight:
         self, multizone_light: MultiZoneLight
     ) -> None:
         """Test setting extended color zones."""
-        # Pre-populate zone count and zones store to avoid internal
-        # get_zone_count() calls
-        multizone_light._zone_count = (82, time.time())
-        multizone_light._zones = (
-            [HSBK(0, 0, 0, 3500)] * 82,
-            time.time(),
-        )
+        # Pre-populate zone count to avoid internal get_zone_count() calls
+        multizone_light._zone_count = 82
 
         # Mock SET operation returns True
         multizone_light.connection.request.return_value = True

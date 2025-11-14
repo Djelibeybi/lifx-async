@@ -333,18 +333,9 @@ For `MultiZoneLight` devices, zone colors are captured:
 
 ```python
 if isinstance(light, MultiZoneLight):
-    zone_count = await light.get_zone_count()
-
-    # Try extended multizone first (more efficient)
-    if light.capabilities.has_extended_multizone:
-        zone_colors = await light.get_extended_color_zones(
-            start=0, end=zone_count - 1
-        )
-    else:
-        # Fall back to standard multizone
-        zone_colors = await light.get_color_zones(
-            start=0, end=zone_count - 1
-        )
+    # Get all zones using the convenience method
+    # Automatically uses the best method based on capabilities
+    zone_colors = await light.get_all_color_zones()
 ```
 
 **Extended Multizone:**

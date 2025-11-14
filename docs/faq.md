@@ -187,27 +187,21 @@ Yes! Key performance features:
 
 ### How is state stored?
 
-Device properties return `(value, timestamp)` tuples with the timestamp reflecting
-when the value was last retrieved from the device. This gives you explicit
-control over data freshness:
+Selected device properties cache semi-static values that were last retrieved from the device.
+Properties return `None` if no value has been fetched yet:
 
 ```python
-import time
-
-# Check current stored state
-state = light.color
-if state:
-    color, timestamp = state
-    age = time.time() - timestamp
-    if age < 5.0:  # Use stored value if less than 5 seconds old
-        # Use state color
-    else:
-        # Data is stale, fetch fresh
-        color, _, _ = await light.get_color()
+# Check cached semi-static state (label, version, firmware, etc.)
+label = light.label
+if label:
+    # Use cached label value
+    print(f"Cached label: {label}")
 else:
-    # Ignore state, fetch from device
-    color, _, _ = await light.get_color()
+    # No cached value, fetch from device
+    label = await light.get_label()
 ```
+
+**Note**: Volatile state (power, color, hev_cycle, zones, tile_colors) is **not** cached and must always be fetched using `get_*()` methods.
 
 To always get fresh data:
 

@@ -57,25 +57,20 @@ class TestDevice:
         label = await device.get_label()
 
         assert label == "Living Room Light"
-        # Verify it was stored with timestamp
+        # Verify it was stored in cache
         stored = device.label
         assert stored is not None
-        stored_label, timestamp = stored
-        assert stored_label == "Living Room Light"
-        assert isinstance(timestamp, float)
+        assert stored == "Living Room Light"
 
-    async def test_label_property_with_timestamp(self, device: Device) -> None:
-        """Test label property returns tuple with timestamp."""
-        # Set stored label with timestamp
-        test_time = time.time()
-        device._label = ("Stored Label", test_time)
+    async def test_label_property_cached(self, device: Device) -> None:
+        """Test label property returns cached value."""
+        # Set stored label
+        device._label = "Stored Label"
 
         # Access property
         stored = device.label
         assert stored is not None
-        label_text, timestamp = stored
-        assert label_text == "Stored Label"
-        assert timestamp == test_time
+        assert stored == "Stored Label"
 
     async def test_set_label(self, device: Device) -> None:
         """Test setting device label."""
@@ -91,12 +86,10 @@ class TestDevice:
         packet = call_args[0][0]
         assert packet.label.startswith(b"New Label")
 
-        # Verify store was updated with timestamp
+        # Verify store was updated in cache
         stored = device.label
         assert stored is not None
-        stored_label, timestamp = stored
-        assert stored_label == "New Label"
-        assert isinstance(timestamp, float)
+        assert stored == "New Label"
 
     async def test_set_label_too_long(self, device: Device) -> None:
         """Test setting label that's too long."""
@@ -219,10 +212,6 @@ class TestDevice:
         """Test that label property is None when not yet fetched."""
         assert device.label is None
 
-    def test_power_property_none_when_not_fetched(self, device: Device) -> None:
-        """Test that power property is None when not yet fetched."""
-        assert device.power is None
-
     def test_version_property_none_when_not_fetched(self, device: Device) -> None:
         """Test that version property is None when not yet fetched."""
         assert device.version is None
@@ -325,9 +314,7 @@ class TestLocationAndGroupManagement:
         # Verify store was updated (location property returns location name as string)
         stored_location = device.location
         assert stored_location is not None
-        location_name, timestamp = stored_location
-        assert location_name == label
-        assert isinstance(timestamp, float)
+        assert stored_location == label
 
     async def test_set_group_generates_uuid(self, device: Device) -> None:
         """Test that set_group generates deterministic UUID from label."""
@@ -357,9 +344,7 @@ class TestLocationAndGroupManagement:
         # Verify store was updated (group property returns group name as string)
         stored_group = device.group
         assert stored_group is not None
-        group_name, timestamp = stored_group
-        assert group_name == label
-        assert isinstance(timestamp, float)
+        assert stored_group == label
 
     async def test_multiple_devices_same_location_label(self) -> None:
         """Test that multiple devices with same location label get same UUID."""
@@ -386,9 +371,7 @@ class TestLocationAndGroupManagement:
         # Both devices should have the same location name
         assert device1.location is not None
         assert device2.location is not None
-        loc1_name, ts1 = device1.location
-        loc2_name, ts2 = device2.location
-        assert loc1_name == loc2_name == label
+        assert device1.location == device2.location == label
 
     async def test_multiple_devices_same_group_label(self) -> None:
         """Test that multiple devices with same group label get same UUID."""
@@ -415,9 +398,7 @@ class TestLocationAndGroupManagement:
         # Both devices should have the same group name
         assert device1.group is not None
         assert device2.group is not None
-        grp1_name, ts1 = device1.group
-        grp2_name, ts2 = device2.group
-        assert grp1_name == grp2_name == label
+        assert device1.group == device2.group == label
 
     async def test_set_location_empty_label_fails(self, device: Device) -> None:
         """Test that empty location label raises ValueError."""
@@ -569,9 +550,7 @@ class TestLocationAndGroupManagement:
         # Verify store was updated with location name
         stored_location = device.location
         assert stored_location is not None
-        location_name, timestamp = stored_location
-        assert location_name == label
-        assert isinstance(timestamp, float)
+        assert stored_location == label
 
     async def test_set_location_creates_new_uuid_when_not_found(
         self, device: Device
@@ -668,9 +647,7 @@ class TestLocationAndGroupManagement:
         # Verify store was updated with group name
         stored_group = device.group
         assert stored_group is not None
-        group_name, timestamp = stored_group
-        assert group_name == label
-        assert isinstance(timestamp, float)
+        assert stored_group == label
 
     async def test_set_group_creates_new_uuid_when_not_found(
         self, device: Device
