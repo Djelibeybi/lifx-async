@@ -16633,10 +16633,10 @@ This class maintains state for source ID and sequence numbers, making it easier 
 | --------- | -------------------------------------------------- |
 | `source`  | Client identifier (random if None) **TYPE:** \`int |
 
-| METHOD           | DESCRIPTION                                        |
-| ---------------- | -------------------------------------------------- |
-| `create_message` | Create a message with auto-incrementing sequence.  |
-| `next_sequence`  | Get the next sequence number without incrementing. |
+| METHOD           | DESCRIPTION                                                    |
+| ---------------- | -------------------------------------------------------------- |
+| `create_message` | Create a message with specified or auto-incrementing sequence. |
+| `next_sequence`  | Atomically allocate and return the next sequence number.       |
 
 Source code in `src/lifx/network/message.py`
 
@@ -16663,10 +16663,11 @@ create_message(
     target: bytes = b"\x00" * 8,
     ack_required: bool = False,
     res_required: bool = True,
+    sequence: int | None = None,
 ) -> bytes
 ```
 
-Create a message with auto-incrementing sequence.
+Create a message with specified or auto-incrementing sequence.
 
 | PARAMETER      | DESCRIPTION                                                                |
 | -------------- | -------------------------------------------------------------------------- |
@@ -16674,6 +16675,7 @@ Create a message with auto-incrementing sequence.
 | `target`       | Device serial number in bytes **TYPE:** `bytes` **DEFAULT:** `b'\x00' * 8` |
 | `ack_required` | Request acknowledgement **TYPE:** `bool` **DEFAULT:** `False`              |
 | `res_required` | Request response **TYPE:** `bool` **DEFAULT:** `True`                      |
+| `sequence`     | Explicit sequence number (allocates new one if None) **TYPE:** \`int       |
 
 | RETURNS | DESCRIPTION            |
 | ------- | ---------------------- |
@@ -16688,27 +16690,32 @@ def create_message(
     target: bytes = b"\x00" * 8,
     ack_required: bool = False,
     res_required: bool = True,
+    sequence: int | None = None,
 ) -> bytes:
-    """Create a message with auto-incrementing sequence.
+    """Create a message with specified or auto-incrementing sequence.
 
     Args:
         packet: Packet dataclass instance
         target: Device serial number in bytes
         ack_required: Request acknowledgement
         res_required: Request response
+        sequence: Explicit sequence number (allocates new one if None)
 
     Returns:
         Complete message bytes
     """
+    # If sequence not provided, allocate atomically
+    if sequence is None:
+        sequence = self.next_sequence()
+
     msg = create_message(
         packet=packet,
         source=self.source,
         target=target,
-        sequence=self._sequence,
+        sequence=sequence,
         ack_required=ack_required,
         res_required=res_required,
     )
-    self._sequence = (self._sequence + 1) % 256
     return msg
 ```
 
@@ -16718,22 +16725,29 @@ def create_message(
 next_sequence() -> int
 ```
 
-Get the next sequence number without incrementing.
+Atomically allocate and return the next sequence number.
 
-| RETURNS | DESCRIPTION          |
-| ------- | -------------------- |
-| `int`   | Next sequence number |
+This method increments the internal counter immediately to prevent race conditions in concurrent request handling.
+
+| RETURNS | DESCRIPTION                                |
+| ------- | ------------------------------------------ |
+| `int`   | Allocated sequence number for this request |
 
 Source code in `src/lifx/network/message.py`
 
 ```python
 def next_sequence(self) -> int:
-    """Get the next sequence number without incrementing.
+    """Atomically allocate and return the next sequence number.
+
+    This method increments the internal counter immediately to prevent
+    race conditions in concurrent request handling.
 
     Returns:
-        Next sequence number
+        Allocated sequence number for this request
     """
-    return self._sequence
+    seq = self._sequence
+    self._sequence = (self._sequence + 1) % 256
+    return seq
 ```
 
 ## Examples
@@ -19723,6 +19737,26 @@ def generate_nested_packet_code(
             categories[category] = []
         categories[category].append((packet_name, packet_def))
 
+    # Build lookup table for request-to-response mapping
+    # Maps (category, short_name) -> pkt_type
+    packet_lookup: dict[tuple[str, str], int] = {}
+    for category, packets_list in categories.items():
+        parts = category.split("_")
+        category_class = "".join(part.capitalize() for part in parts)
+        for packet_name, packet_def in packets_list:
+            short_name = packet_name
+            if packet_name.lower().startswith(category_class.lower()):
+                short_name = packet_name[len(category_class) :]
+            if category_class == "Light":
+                if short_name == "Get":
+                    short_name = "GetColor"
+                elif short_name == "State":
+                    short_name = "StateColor"
+            short_name = apply_extended_multizone_packet_quirks(
+                short_name, category_class
+            )
+            packet_lookup[(category, short_name)] = packet_def["pkt_type"]
+
     # Generate category classes with nested packet classes
     for category in sorted(categories.keys()):
         # Generate category class
@@ -19765,6 +19799,24 @@ def generate_nested_packet_code(
             code.append(f'        """Packet type {pkt_type}."""')
             code.append("")
             code.append(f"        PKT_TYPE: ClassVar[int] = {pkt_type}")
+
+            # Add STATE_TYPE for Get*/Request packets (expected response packet type)
+            state_pkt_type = None
+            if short_name.startswith("Get"):
+                # Special case: GetColorZones → StateMultiZone (not StateColorZones)
+                if category_class == "MultiZone" and short_name == "GetColorZones":
+                    state_pkt_type = packet_lookup.get((category, "StateMultiZone"))
+                else:
+                    # Standard naming: GetXxx → StateXxx
+                    state_name = short_name.replace("Get", "State", 1)
+                    state_pkt_type = packet_lookup.get((category, state_name))
+            elif short_name.endswith("Request"):
+                # XxxRequest → XxxResponse
+                response_name = short_name.replace("Request", "Response")
+                state_pkt_type = packet_lookup.get((category, response_name))
+
+            if state_pkt_type is not None:
+                code.append(f"        STATE_TYPE: ClassVar[int] = {state_pkt_type}")
 
             # Format fields_data - split long lists across multiple lines
             # Account for the prefix "        _fields: ClassVar[list[dict[str, Any]]] = " which is ~50 chars

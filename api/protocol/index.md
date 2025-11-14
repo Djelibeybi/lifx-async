@@ -2457,6 +2457,26 @@ def generate_nested_packet_code(
             categories[category] = []
         categories[category].append((packet_name, packet_def))
 
+    # Build lookup table for request-to-response mapping
+    # Maps (category, short_name) -> pkt_type
+    packet_lookup: dict[tuple[str, str], int] = {}
+    for category, packets_list in categories.items():
+        parts = category.split("_")
+        category_class = "".join(part.capitalize() for part in parts)
+        for packet_name, packet_def in packets_list:
+            short_name = packet_name
+            if packet_name.lower().startswith(category_class.lower()):
+                short_name = packet_name[len(category_class) :]
+            if category_class == "Light":
+                if short_name == "Get":
+                    short_name = "GetColor"
+                elif short_name == "State":
+                    short_name = "StateColor"
+            short_name = apply_extended_multizone_packet_quirks(
+                short_name, category_class
+            )
+            packet_lookup[(category, short_name)] = packet_def["pkt_type"]
+
     # Generate category classes with nested packet classes
     for category in sorted(categories.keys()):
         # Generate category class
@@ -2499,6 +2519,24 @@ def generate_nested_packet_code(
             code.append(f'        """Packet type {pkt_type}."""')
             code.append("")
             code.append(f"        PKT_TYPE: ClassVar[int] = {pkt_type}")
+
+            # Add STATE_TYPE for Get*/Request packets (expected response packet type)
+            state_pkt_type = None
+            if short_name.startswith("Get"):
+                # Special case: GetColorZones → StateMultiZone (not StateColorZones)
+                if category_class == "MultiZone" and short_name == "GetColorZones":
+                    state_pkt_type = packet_lookup.get((category, "StateMultiZone"))
+                else:
+                    # Standard naming: GetXxx → StateXxx
+                    state_name = short_name.replace("Get", "State", 1)
+                    state_pkt_type = packet_lookup.get((category, state_name))
+            elif short_name.endswith("Request"):
+                # XxxRequest → XxxResponse
+                response_name = short_name.replace("Request", "Response")
+                state_pkt_type = packet_lookup.get((category, response_name))
+
+            if state_pkt_type is not None:
+                code.append(f"        STATE_TYPE: ClassVar[int] = {state_pkt_type}")
 
             # Format fields_data - split long lists across multiple lines
             # Account for the prefix "        _fields: ClassVar[list[dict[str, Any]]] = " which is ~50 chars
