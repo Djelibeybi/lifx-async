@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.2.1 (2025-11-14)
+
+### Bug Fixes
+
+- **network**: Resolve race condition in concurrent request handling ([`8bb7bc6`](https://github.com/Djelibeybi/lifx-async/commit/8bb7bc68bf1c8baad0c9d96ba3034e40176f50e3))
+
 ## v2.2.0 (2025-11-14)
 
 ### Features
