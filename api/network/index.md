@@ -1043,8 +1043,8 @@ DeviceConnection(
     ip: str,
     port: int = LIFX_UDP_PORT,
     source: int | None = None,
-    max_retries: int = 3,
-    timeout: float = 1.0,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
 )
 ```
 
@@ -1069,14 +1069,14 @@ state = await conn.request(packets.Light.GetColor())
 
 This is lightweight - doesn't actually create a connection. Connection is created/retrieved from pool on first request().
 
-| PARAMETER     | DESCRIPTION                                                                          |
-| ------------- | ------------------------------------------------------------------------------------ |
-| `serial`      | Device serial number as 12-digit hex string **TYPE:** `str`                          |
-| `ip`          | Device IP address **TYPE:** `str`                                                    |
-| `port`        | Device UDP port (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT` |
-| `source`      | Client source identifier (random if None) **TYPE:** \`int                            |
-| `max_retries` | Maximum retry attempts **TYPE:** `int` **DEFAULT:** `3`                              |
-| `timeout`     | Overall timeout for requests in seconds **TYPE:** `float` **DEFAULT:** `1.0`         |
+| PARAMETER     | DESCRIPTION                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `serial`      | Device serial number as 12-digit hex string **TYPE:** `str`                                                     |
+| `ip`          | Device IP address **TYPE:** `str`                                                                               |
+| `port`        | Device UDP port (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
+| `source`      | Client source identifier (random if None) **TYPE:** \`int                                                       |
+| `max_retries` | Maximum retry attempts (default: 8) **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                          |
+| `timeout`     | Default timeout for requests in seconds (default: 8.0) **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
 | METHOD                  | DESCRIPTION                                   |
 | ----------------------- | --------------------------------------------- |
@@ -1093,8 +1093,8 @@ def __init__(
     ip: str,
     port: int = LIFX_UDP_PORT,
     source: int | None = None,
-    max_retries: int = 3,
-    timeout: float = 1.0,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> None:
     """Initialize connection handle.
 
@@ -1106,8 +1106,8 @@ def __init__(
         ip: Device IP address
         port: Device UDP port (default LIFX_UDP_PORT)
         source: Client source identifier (random if None)
-        max_retries: Maximum retry attempts
-        timeout: Overall timeout for requests in seconds
+        max_retries: Maximum retry attempts (default: 8)
+        timeout: Default timeout for requests in seconds (default: 8.0)
     """
     self.serial = serial
     self.ip = ip
@@ -1173,7 +1173,9 @@ def get_pool_metrics(cls) -> ConnectionPoolMetrics | None:
 
 ```python
 request(
-    packet: Any, timeout: float = 2.0, collect_multiple: bool = False
+    packet: Any,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    collect_multiple: bool = False,
 ) -> Any
 ```
 
@@ -1195,7 +1197,7 @@ By default, GET requests return immediately after the first response. Set collec
 | PARAMETER          | DESCRIPTION                                                                                   |
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | `packet`           | Packet instance to send **TYPE:** `Any`                                                       |
-| `timeout`          | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `2.0`                               |
+| `timeout`          | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`           |
 | `collect_multiple` | Whether to wait for multiple responses (default: False) **TYPE:** `bool` **DEFAULT:** `False` |
 
 | RETURNS | DESCRIPTION                                                         |
@@ -1240,7 +1242,10 @@ Source code in `src/lifx/network/connection.py`
 
 ````python
 async def request(
-    self, packet: Any, timeout: float = 2.0, collect_multiple: bool = False
+    self,
+    packet: Any,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    collect_multiple: bool = False,
 ) -> Any:
     """Send request and return unpacked response(s).
 
