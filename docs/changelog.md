@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.0.0 (2025-11-14)
+
+### Refactoring
+
+- Simplify state caching and remove TTL system
+  ([`fd15587`](https://github.com/Djelibeybi/lifx-async/commit/fd155873e9d9b56cdfa38cae3ec9bbdc9bfe283b))
+
+
 ## v1.3.1 (2025-11-12)
 
 ### Bug Fixes
