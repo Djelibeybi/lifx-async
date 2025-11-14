@@ -10,6 +10,7 @@ import asyncio
 
 import pytest
 
+from lifx.const import MULTI_RESPONSE_COLLECTION_TIMEOUT
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.network.connection import PendingRequest
 from lifx.protocol.header import LifxHeader
@@ -28,7 +29,8 @@ class TestPendingRequest:
         assert pending.event is event
         assert pending.results == []  # Empty list for collecting responses
         assert pending.error is None
-        assert pending.collection_timeout == 0.2  # Default collection timeout
+        # Default uses MULTI_RESPONSE_COLLECTION_TIMEOUT from const.py
+        assert pending.collection_timeout == MULTI_RESPONSE_COLLECTION_TIMEOUT
         assert (
             pending.first_response_time is None
         )  # No response time until first response

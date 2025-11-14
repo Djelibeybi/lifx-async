@@ -23,16 +23,30 @@ MIN_PACKET_SIZE: Final[int] = 36
 LIFX_VENDOR_PREFIX: Final[bytes] = bytes([0xD0, 0x73, 0xD5])
 
 # Overall discovery timeout for local network devices in seconds
-DISCOVERY_TIMEOUT: Final[float] = 5.0  # Max response time * idle timeout
+DISCOVERY_TIMEOUT: Final[float] = 15.0
 
 # Maximum response time for local network devices in seconds
-MAX_RESPONSE_TIME: Final[float] = 0.5  # 500ms
+MAX_RESPONSE_TIME: Final[float] = 1.0  # 1 second
 
 # Idle timeout multiplier - wait this many times MAX_RESPONSE_TIME after last response
-IDLE_TIMEOUT_MULTIPLIER: Final[float] = 4.0  # Wait 2s (4 × 500ms) after last response
+IDLE_TIMEOUT_MULTIPLIER: Final[float] = 4.0  # 4 seconds (1.0 x 4.0)
 
 # Maximum number of connections in a ConnectionPool
 MAX_CONNECTIONS: Final[int] = 100
+
+# Default timeout for device requests in seconds
+DEFAULT_REQUEST_TIMEOUT: Final[float] = 8.0
+
+# Default maximum number of retry attempts for failed requests
+DEFAULT_MAX_RETRIES: Final[int] = 8
+
+# Background receiver polling interval in seconds
+# This is the timeout used when checking for new responses in the background task
+RECEIVER_POLL_INTERVAL: Final[float] = 0.5
+
+# Multi-response collection timeout in seconds
+# After receiving the first response, wait this long for additional responses
+MULTI_RESPONSE_COLLECTION_TIMEOUT: Final[float] = 0.5
 
 # ============================================================================
 # UUID Namespaces

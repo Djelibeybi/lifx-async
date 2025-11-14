@@ -182,17 +182,16 @@ class TestBatchOperationErrorDetails:
         exceptions = exc_info.value.exceptions
         assert len(exceptions) > 0
 
-        # Exceptions should be informative
+        # Exceptions should be specific LIFX exception types
         for exc in exceptions:
-            # Should contain keywords indicating failure
-            exc_str = str(exc).lower()
-            assert any(
-                keyword in exc_str
-                for keyword in [
-                    "timeout",
-                    "connection",
-                    "error",
-                    "failed",
-                    "acknowledgement",
-                ]
+            # Should be a LIFX exception type
+            from lifx.exceptions import (
+                LifxConnectionError,
+                LifxProtocolError,
+                LifxTimeoutError,
             )
+
+            assert isinstance(
+                exc,
+                LifxTimeoutError | LifxConnectionError | LifxProtocolError,
+            ), f"Expected LIFX exception type, got {type(exc).__name__}: {exc}"
