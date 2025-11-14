@@ -261,6 +261,32 @@ serial_bytes = serial.value            # 6 bytes
 serial = Serial.from_protocol(protocol_bytes)
 ```
 
+### MAC Address Calculation
+
+The `mac_address` property on `Device` provides the device's MAC address, calculated from the serial
+number and host firmware version. The calculation is automatically performed when `get_host_firmware()`
+is called or when using the device as a context manager.
+
+**Calculation Logic** (based on host firmware major version):
+- **Version 2 or 4**: MAC address matches the serial
+- **Version 3**: MAC address is serial with LSB + 1 (with wraparound from 0xFF to 0x00)
+- **Unknown versions**: Defaults to serial
+
+**Format**: MAC address is returned in colon-separated lowercase hex format (e.g., `d0:73:d5:01:02:03`)
+to visually distinguish it from the serial number format.
+
+```python
+from lifx.devices import Device
+
+async with await Device.from_ip("192.168.1.100") as device:
+    # MAC address is automatically calculated during device setup
+    if device.mac_address:
+        print(f"MAC: {device.mac_address}")  # e.g., "d0:73:d5:01:02:04"
+
+    # Returns None before host_firmware is fetched
+    assert device.mac_address is not None
+```
+
 ### Color Representation
 
 The `HSBK` class (in `color.py`) provides user-friendly color handling:

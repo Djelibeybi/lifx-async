@@ -255,6 +255,7 @@ class Device:
         self._wifi_firmware: FirmwareInfo | None = None
         self._location: LocationInfo | None = None
         self._group: GroupInfo | None = None
+        self._mac_address: str | None = None
 
         # Product capabilities for device features (populated on first use)
         self._capabilities: ProductInfo | None = None
@@ -325,6 +326,40 @@ class Device:
             tg.create_task(self.get_label())
             tg.create_task(self.get_location())
             tg.create_task(self.get_group())
+
+    def _calculate_mac_address(self) -> None:
+        """Calculate MAC address from serial and host firmware version.
+
+        The MAC address calculation depends on the major version of the host firmware:
+        - Version 2 or 4: MAC address matches the serial
+        - Version 3: MAC address is serial with LSB + 1 (with wraparound from FF to 00)
+        - Unknown versions: Default to serial
+
+        This method is called automatically when host firmware is fetched.
+        """
+        if self._host_firmware is None:
+            return
+
+        # Get serial bytes
+        serial_obj = Serial.from_string(self.serial)
+        serial_bytes = bytearray(serial_obj.value)
+
+        # Check firmware major version
+        major_version = self._host_firmware.version_major
+
+        if major_version in (2, 4):
+            # MAC address matches serial
+            mac_bytes = bytes(serial_bytes)
+        elif major_version == 3:
+            # Add 1 to least significant byte (with wraparound)
+            serial_bytes[5] = (serial_bytes[5] + 1) % 256
+            mac_bytes = bytes(serial_bytes)
+        else:
+            # For unknown versions, default to serial
+            mac_bytes = bytes(serial_bytes)
+
+        # Convert to colon-separated hex string format (e.g., "d0:73:d5:01:02:03")
+        self._mac_address = ":".join(f"{b:02x}" for b in mac_bytes)
 
     async def _ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
@@ -673,6 +708,9 @@ class Device:
         )
 
         self._host_firmware = firmware
+
+        # Calculate MAC address now that we have firmware info
+        self._calculate_mac_address()
 
         _LOGGER.debug(
             {
@@ -1185,6 +1223,18 @@ class Device:
         """
         if self.capabilities is not None:
             return self.capabilities.name
+
+    @property
+    def mac_address(self) -> str | None:
+        """Get cached MAC address if available.
+
+        Use get_host_firmware() to calculate MAC address from device firmware.
+
+        Returns:
+            MAC address in colon-separated format (e.g., "d0:73:d5:01:02:03"),
+            or None if not yet calculated.
+        """
+        return self._mac_address
 
     def __repr__(self) -> str:
         """String representation of device."""
