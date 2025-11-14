@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -12,7 +13,14 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 if TYPE_CHECKING:
     from typing import Self
 
-from lifx.const import LIFX_UDP_PORT, MAX_CONNECTIONS
+from lifx.const import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_REQUEST_TIMEOUT,
+    LIFX_UDP_PORT,
+    MAX_CONNECTIONS,
+    MULTI_RESPONSE_COLLECTION_TIMEOUT,
+    RECEIVER_POLL_INTERVAL,
+)
 from lifx.exceptions import (
     LifxConnectionError,
     LifxProtocolError,
@@ -28,6 +36,11 @@ _LOGGER = logging.getLogger(__name__)
 
 # Type variable for packet types
 T = TypeVar("T")
+
+# Constants for retry logic
+_RETRY_SLEEP_BASE: float = 0.1  # Base sleep time between retries (seconds)
+_RETRY_JITTER_FACTOR: float = 0.3  # Jitter range: ±30% of sleep time
+_STATE_UNHANDLED_PKT_TYPE: int = 223  # Device.StateUnhandled packet type
 
 
 @dataclass
@@ -54,7 +67,7 @@ class PendingRequest:
     sequence: int
     event: asyncio.Event
     collect_multiple: bool = False
-    collection_timeout: float = 0.2
+    collection_timeout: float = MULTI_RESPONSE_COLLECTION_TIMEOUT
     results: list[tuple[LifxHeader, bytes]] = field(default_factory=list)
     error: Exception | None = None
     first_response_time: float | None = field(default=None)
@@ -130,8 +143,8 @@ class _ActualConnection:
         ip: str,
         port: int = LIFX_UDP_PORT,
         source: int | None = None,
-        max_retries: int = 3,
-        timeout: float = 1.0,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
         """Initialize device connection.
 
@@ -140,14 +153,16 @@ class _ActualConnection:
             ip: Device IP address
             port: Device UDP port (default LIFX_UDP_PORT)
             source: Client source identifier (random if None)
-            max_retries: Maximum number of retry attempts
-            timeout: Overall timeout for requests in seconds
+            max_retries: Maximum number of retry attempts (default: 8)
+            timeout: Default timeout for requests in seconds (default: 8.0)
+                    Used as fallback when timeout not specified in requests
         """
         self.serial = serial
         self.ip = ip
         self.port = port
         self.max_retries = max_retries
-        self.timeout = timeout
+        # Renamed to clarify it's a default, not override
+        self.default_timeout = timeout
 
         self._transport: UdpTransport | None = None
         self._builder = MessageBuilder(source=source)
@@ -361,7 +376,9 @@ class _ActualConnection:
                     # Receive next packet with short timeout to allow checking for
                     # expired collections
                     try:
-                        header, payload = await self.receive_packet(timeout=0.1)
+                        header, payload = await self.receive_packet(
+                            timeout=RECEIVER_POLL_INTERVAL
+                        )
                     except LifxTimeoutError:
                         # No packet received, loop back to check for expired timeouts
                         continue
@@ -372,7 +389,7 @@ class _ActualConnection:
                         pending = self._pending_requests[sequence]
 
                         # Check for StateUnhandled (unsupported command)
-                        if header.pkt_type == 223:  # Device.StateUnhandled
+                        if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
                             # Device doesn't support this command (e.g., Switch device
                             # received Light command)
                             pending.error = LifxUnsupportedCommandError(
@@ -434,6 +451,145 @@ class _ActualConnection:
             _LOGGER.debug(log_entry)
             raise  # Re-raise to complete cancellation/error propagation
 
+    @staticmethod
+    def _calculate_retry_sleep_with_jitter(attempt: int) -> float:
+        """Calculate retry sleep time with exponential backoff and jitter.
+
+        Uses full jitter strategy: random value between 0 and exponential delay.
+        This prevents thundering herd when multiple clients retry simultaneously.
+
+        Args:
+            attempt: Retry attempt number (0-based)
+
+        Returns:
+            Sleep time in seconds with jitter applied
+        """
+        # Exponential backoff: base * 2^attempt
+        exponential_delay = _RETRY_SLEEP_BASE * (2**attempt)
+
+        # Full jitter: random value between 0 and exponential_delay
+        # This spreads retries across time to avoid synchronized retries
+        return random.uniform(0, exponential_delay)  # nosec
+
+    async def _execute_request_with_retry(
+        self,
+        request: Any,
+        timeout: float | None,
+        max_retries: int | None,
+        ack_required: bool,
+        res_required: bool,
+        collect_multiple: bool = False,
+    ) -> tuple[LifxHeader, bytes] | list[tuple[LifxHeader, bytes]]:
+        """Execute request with retry logic, exponential backoff, and jitter.
+
+        Common implementation for both request_response() and request_ack().
+        Handles parameter validation, retry loop, timeout calculation,
+        pending request lifecycle, and error handling.
+
+        Uses full jitter strategy to prevent thundering herd when multiple
+        clients retry simultaneously.
+
+        Args:
+            request: Request packet to send
+            timeout: Overall timeout for all retry attempts
+            max_retries: Maximum retries (uses instance default if None)
+            ack_required: Request acknowledgement from device
+            res_required: Request response from device
+            collect_multiple: Whether to wait for multiple responses
+
+        Returns:
+            Single response tuple or list of response tuples
+
+        Raises:
+            ConnectionError: If connection is not open
+            TimeoutError: If no response after all retries
+            ProtocolError: If response is malformed
+        """
+        if not self._is_open or self._transport is None:
+            raise LifxConnectionError("Connection not open")
+
+        if timeout is None:
+            timeout = self.default_timeout
+
+        if max_retries is None:
+            max_retries = self.max_retries
+
+        # Calculate base timeout for exponential backoff
+        # Normalize so total time across all retries equals overall timeout
+        # Geometric series: 1 + 2 + 4 + ... + 2^n = 2^(n+1) - 1
+        total_weight = (2 ** (max_retries + 1)) - 1
+        base_timeout = timeout / total_weight
+
+        last_error: Exception | None = None
+
+        for attempt in range(max_retries + 1):
+            # Calculate timeout with exponential backoff (normalized)
+            current_timeout = base_timeout * (2**attempt)
+
+            try:
+                # Get sequence number BEFORE creating pending request
+                sequence = self._builder.next_sequence()
+
+                # Create pending request
+                pending = PendingRequest(
+                    sequence=sequence,
+                    event=asyncio.Event(),
+                    collect_multiple=collect_multiple,
+                )
+                self._pending_requests[sequence] = pending
+
+                try:
+                    # Send request with specified flags
+                    await self.send_packet(
+                        request,
+                        ack_required=ack_required,
+                        res_required=res_required,
+                    )
+
+                    # Wait for response(s) with timeout
+                    async with asyncio.timeout(current_timeout):
+                        await pending.event.wait()
+
+                    # Check if error occurred
+                    if pending.error is not None:
+                        raise pending.error
+
+                    # Return results
+                    if pending.results:
+                        if len(pending.results) == 1 and not collect_multiple:
+                            # Single response - return as tuple
+                            return pending.results[0]
+                        else:
+                            # Multiple responses or collect_multiple - return as list
+                            return pending.results
+                    else:
+                        raise LifxConnectionError("Request completed without result")
+
+                finally:
+                    # Cleanup pending request if still registered
+                    self._pending_requests.pop(sequence, None)
+
+            except TimeoutError:
+                last_error = LifxTimeoutError(
+                    f"No response within {current_timeout:.3f}s "
+                    f"(attempt {attempt + 1}/{max_retries + 1})"
+                )
+                if attempt < max_retries:
+                    # Sleep with jitter before retry
+                    sleep_time = self._calculate_retry_sleep_with_jitter(attempt)
+                    await asyncio.sleep(sleep_time)
+                    continue
+                else:
+                    break
+
+        # All retries exhausted
+        if last_error:
+            raise LifxTimeoutError(
+                f"No response from {self.ip} after {max_retries + 1} attempts"
+            ) from last_error
+        else:
+            raise LifxConnectionError("Request failed for unknown reason")
+
     async def request_response(
         self,
         request: Any,
@@ -443,8 +599,8 @@ class _ActualConnection:
     ) -> tuple[LifxHeader, bytes] | list[tuple[LifxHeader, bytes]]:
         """Send request and wait for response(s).
 
-        Implements retry logic with exponential backoff. Matches responses by
-        sequence number and supports concurrent requests on the same connection.
+        Implements retry logic with exponential backoff and jitter. Matches
+        responses by sequence number and supports concurrent requests.
 
         By default, returns immediately after the first response. Set
         collect_multiple=True to wait for additional responses (200ms timeout).
@@ -479,86 +635,14 @@ class _ActualConnection:
                 header, payload = response
             ```
         """
-        if not self._is_open or self._transport is None:
-            raise LifxConnectionError("Connection not open")
-
-        if timeout is None:
-            timeout = self.timeout
-
-        if max_retries is None:
-            max_retries = self.max_retries
-
-        # Calculate base timeout for exponential backoff
-        # Normalize so total time across all retries equals overall timeout
-        # Geometric series: 1 + 2 + 4 + ... + 2^n = 2^(n+1) - 1
-        total_weight = (2 ** (max_retries + 1)) - 1
-        base_timeout = timeout / total_weight
-
-        last_error: Exception | None = None
-
-        for attempt in range(max_retries + 1):
-            # Calculate timeout with exponential backoff (normalized to overall timeout)
-            current_timeout = base_timeout * (2**attempt)
-
-            try:
-                # Get sequence number BEFORE creating pending request
-                sequence = self._builder.next_sequence()
-
-                # Create pending request with optional multi-response collection
-                pending = PendingRequest(
-                    sequence=sequence,
-                    event=asyncio.Event(),
-                    collect_multiple=collect_multiple,
-                )
-                self._pending_requests[sequence] = pending
-
-                try:
-                    # Send request
-                    await self.send_packet(
-                        request, ack_required=False, res_required=True
-                    )
-
-                    # Wait for response(s) with internal collection timeout
-                    async with asyncio.timeout(current_timeout):
-                        await pending.event.wait()
-
-                    # Check if error occurred
-                    if pending.error is not None:
-                        raise pending.error
-
-                    # Return results - either single tuple or list of tuples
-                    if pending.results:
-                        if len(pending.results) == 1:
-                            # Single response - return as tuple
-                            return pending.results[0]
-                        else:
-                            # Multiple responses - return as list
-                            return pending.results
-                    else:
-                        raise LifxConnectionError("Request completed without result")
-
-                finally:
-                    # Cleanup pending request if still registered
-                    self._pending_requests.pop(sequence, None)
-
-            except TimeoutError:
-                last_error = LifxTimeoutError(
-                    f"No response within {current_timeout:.3f}s "
-                    f"(attempt {attempt + 1}/{max_retries + 1})"
-                )
-                if attempt < max_retries:
-                    await asyncio.sleep(0.1 * (2**attempt))
-                    continue
-                else:
-                    break
-
-        # All retries exhausted
-        if last_error:
-            raise LifxTimeoutError(
-                f"No response from {self.ip} after {max_retries + 1} attempts"
-            ) from last_error
-        else:
-            raise LifxConnectionError("Request failed for unknown reason")
+        return await self._execute_request_with_retry(
+            request=request,
+            timeout=timeout,
+            max_retries=max_retries,
+            ack_required=False,
+            res_required=True,
+            collect_multiple=collect_multiple,
+        )
 
     async def request_ack(
         self,
@@ -568,8 +652,8 @@ class _ActualConnection:
     ) -> None:
         """Send request and wait for acknowledgement packet.
 
-        Implements retry logic with exponential backoff. Matches acknowledgements
-        by sequence number and supports concurrent requests on the same connection.
+        Implements retry logic with exponential backoff and jitter. Matches
+        acknowledgements by sequence number and supports concurrent requests.
 
         Args:
             request: Request packet to send
@@ -589,74 +673,15 @@ class _ActualConnection:
             await conn.request_ack(LightSetPower(state=LightPowerLevel.ON), timeout=2.0)
             ```
         """
-        if not self._is_open or self._transport is None:
-            raise LifxConnectionError("Connection not open")
-
-        if timeout is None:
-            timeout = self.timeout
-
-        if max_retries is None:
-            max_retries = self.max_retries
-
-        # Calculate base timeout for exponential backoff
-        # Normalize so total time across all retries equals overall timeout
-        # Geometric series: 1 + 2 + 4 + ... + 2^n = 2^(n+1) - 1
-        total_weight = (2 ** (max_retries + 1)) - 1
-        base_timeout = timeout / total_weight
-
-        last_error: Exception | None = None
-
-        for attempt in range(max_retries + 1):
-            # Calculate timeout with exponential backoff (normalized to overall timeout)
-            current_timeout = base_timeout * (2**attempt)
-
-            try:
-                # Get sequence number BEFORE creating pending request
-                sequence = self._builder.next_sequence()
-
-                # Create pending request (matches by sequence number only)
-                pending = PendingRequest(sequence=sequence, event=asyncio.Event())
-                self._pending_requests[sequence] = pending
-
-                try:
-                    # Send request with acknowledgement required
-                    await self.send_packet(
-                        request, ack_required=True, res_required=False
-                    )
-
-                    # Wait for acknowledgement with current timeout
-                    async with asyncio.timeout(current_timeout):
-                        await pending.event.wait()
-
-                    # Check if error occurred
-                    if pending.error is not None:
-                        raise pending.error
-
-                    # Success (acknowledgement received)
-                    return
-
-                finally:
-                    # Cleanup pending request if still registered
-                    self._pending_requests.pop(sequence, None)
-
-            except TimeoutError:
-                last_error = LifxTimeoutError(
-                    f"No acknowledgement within {current_timeout:.3f}s "
-                    f"(attempt {attempt + 1}/{max_retries + 1})"
-                )
-                if attempt < max_retries:
-                    await asyncio.sleep(0.1 * (2**attempt))
-                    continue
-                else:
-                    break
-
-        # All retries exhausted
-        if last_error:
-            raise LifxTimeoutError(
-                f"Failed to receive acknowledgement after {max_retries + 1} attempts"
-            ) from last_error
-        else:
-            raise LifxConnectionError("Request failed for unknown reason")
+        # Execute with common retry logic (returns result, but we discard it)
+        await self._execute_request_with_retry(
+            request=request,
+            timeout=timeout,
+            max_retries=max_retries,
+            ack_required=True,
+            res_required=False,
+            collect_multiple=False,
+        )
 
     @property
     def is_open(self) -> bool:
@@ -707,8 +732,8 @@ class ConnectionPool:
         ip: str,
         port: int = LIFX_UDP_PORT,
         source: int | None = None,
-        max_retries: int = 3,
-        timeout: float = 1.0,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> _ActualConnection:
         """Get or create actual connection with parameters.
 
@@ -717,8 +742,8 @@ class ConnectionPool:
             ip: Device IP address
             port: Device UDP port
             source: Client source identifier (random if None)
-            max_retries: Maximum retry attempts
-            timeout: Overall timeout for requests (distributed across retries)
+            max_retries: Maximum retry attempts (default: 8)
+            timeout: Default timeout for requests in seconds (default: 8.0)
 
         Returns:
             _ActualConnection instance (opened and ready)
@@ -858,8 +883,8 @@ class DeviceConnection:
         ip: str,
         port: int = LIFX_UDP_PORT,
         source: int | None = None,
-        max_retries: int = 3,
-        timeout: float = 1.0,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
         """Initialize connection handle.
 
@@ -871,8 +896,8 @@ class DeviceConnection:
             ip: Device IP address
             port: Device UDP port (default LIFX_UDP_PORT)
             source: Client source identifier (random if None)
-            max_retries: Maximum retry attempts
-            timeout: Overall timeout for requests in seconds
+            max_retries: Maximum retry attempts (default: 8)
+            timeout: Default timeout for requests in seconds (default: 8.0)
         """
         self.serial = serial
         self.ip = ip
@@ -919,7 +944,10 @@ class DeviceConnection:
         return cls._pool.metrics if cls._pool is not None else None
 
     async def request(
-        self, packet: Any, timeout: float = 2.0, collect_multiple: bool = False
+        self,
+        packet: Any,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        collect_multiple: bool = False,
     ) -> Any:
         """Send request and return unpacked response(s).
 
