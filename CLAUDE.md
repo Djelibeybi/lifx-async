@@ -200,9 +200,34 @@ except LifxDeviceNotFoundError:
 - **Async Context Managers**: All devices and connections use `async with` for automatic cleanup
 - **Type Safety**: Full type hints with strict Pyright validation
 - **Auto-Generation**: Protocol structures generated from YAML specification
-- **State Storage**: Device state stored with TTL to minimize network requests
+- **State Caching**: Device properties cache values to reduce network requests
 - **Connection Pooling**: LRU cache for connection reuse across operations
 - **Background Response Dispatcher**: Concurrent request handling via asyncio tasks
+
+### State Caching
+
+**Current Behavior**:
+- Selected properties cache static/semi-static values to reduce network requests
+- Cached properties: `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
+- Volatile state (power, color, hev_cycle, zones, tile_colors) is **not** cached - always use `get_*()` methods to fetch fresh data
+- Use `get_*()` methods to fetch fresh data from devices for any property
+- No automatic expiration - application controls when to refresh
+- Use `get_color()` to retrieve color, power, and label values as two of the three are volatile and it returns all three in a single request/response pair.
+
+**Example**:
+```python
+async with device:
+    # get_color() is the most efficient way of getting color and power in a single request/response pair
+    color, power, label = device.get_color()
+
+    # Access cached label (semi-static)
+    cached_label = device.label  # Returns str | None
+
+    # For volatile state like power/color, always call get_*() methods
+    current_power = await device.get_power()  # Fresh data
+```
+
+**Note**: Volatile state properties (`power`, `color`, `hev_cycle`, `zones`, `tile_colors`) were removed as they change too frequently to benefit from caching. Always fetch these values using `get_*()` methods.
 
 ## Common Patterns
 
@@ -286,6 +311,36 @@ async with await InfraredLight.from_ip("192.168.1.100") as light:
     brightness = await light.get_infrared()
     print(f"IR brightness: {brightness * 100}%")
 ```
+
+### MultiZone Light Control (Strips and Beams)
+
+MultiZoneLight devices support zone-based color control:
+
+```python
+from lifx.devices import MultiZoneLight
+from lifx.color import HSBK
+
+async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+    # Get all zone colors using the convenience method
+    # Automatically uses the best method based on device capabilities
+    colors = await light.get_all_color_zones()
+    print(f"Device has {len(colors)} zones")
+
+    # Get specific zone range using extended method (requires extended capability)
+    first_ten = await light.get_extended_color_zones(start=0, end=9)
+
+    # Get specific zone range using standard method
+    first_ten = await light.get_color_zones(start=0, end=9)
+
+    # Set all zones to red
+    zone_count = await light.get_zone_count()
+    await light.set_color_zones(0, zone_count - 1, HSBK.from_rgb(255, 0, 0))
+```
+
+**Note on methods:**
+- `get_all_color_zones()`: Convenience method with no parameters that automatically uses the best method (extended or standard) based on device capabilities
+- `get_extended_color_zones(start, end)`: Direct access to extended multizone protocol (requires extended capability)
+- `get_color_zones(start, end)`: Direct access to standard multizone protocol (works on all multizone devices)
 
 ### Packet Flow
 
@@ -565,3 +620,4 @@ Critical constants are defined in `src/lifx/const.py`:
 
 - Button/Relay/Switch devices are explicitly out of scope (library focuses on lighting devices)
 - Not yet published to PyPI
+- Never update docs/changelog.md manually as it is auto-generated during the release process by the CI/CD workflow.

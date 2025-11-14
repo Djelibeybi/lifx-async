@@ -41,7 +41,7 @@ class InfraredLight(Light):
         """Initialize InfraredLight with additional state attributes."""
         super().__init__(*args, **kwargs)
         # Infrared-specific state storage
-        self._infrared: tuple[float, float] | None = None
+        self._infrared: float | None = None
 
     async def _setup(self) -> None:
         """Populate Infrared light capabilities, state and metadata."""
@@ -72,10 +72,8 @@ class InfraredLight(Light):
         # Convert from uint16 (0-65535) to float (0.0-1.0)
         brightness = state.brightness / 65535.0
 
-        # Store state with timestamp
-        import time
-
-        self._infrared = (brightness, time.time())
+        # Store cached state
+        self._infrared = brightness
 
         _LOGGER.debug(
             {
@@ -121,10 +119,8 @@ class InfraredLight(Light):
             packets.Light.SetInfrared(brightness=brightness_u16),
         )
 
-        # Update state with timestamp
-        import time
-
-        self._infrared = (brightness, time.time())
+        # Update cached state
+        self._infrared = brightness
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -135,11 +131,11 @@ class InfraredLight(Light):
         )
 
     @property
-    def infrared(self) -> tuple[float, float] | None:
-        """Get stored infrared brightness with timestamp if available.
+    def infrared(self) -> float | None:
+        """Get cached infrared brightness if available.
 
         Returns:
-            Tuple of (brightness, timestamp) or None if never fetched.
+            Brightness (0.0-1.0) or None if never fetched.
             Use get_infrared() to fetch from device.
         """
         return self._infrared
