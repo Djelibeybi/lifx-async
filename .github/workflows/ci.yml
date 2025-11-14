@@ -12,8 +12,14 @@ on:
     - tests/**
     - pyproject.toml
     - uv.lock
-    - .github/workflows/ci.yml
     - .pre-commit-config.yaml
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to deploy (e.g., v2.0.0). Leave empty to use the latest release.
+        required: false
+        type: string
+        default: ''
 
 
 env:
@@ -107,8 +113,8 @@ jobs:
     needs:
     - quality
     - test
-    # Always run release if quality passed, even if tests were skipped
-    if: always() && needs.quality.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    # Run release if not cancelled AND (manual dispatch OR quality passed with tests passed/skipped)
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (needs.quality.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped'))) }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -149,7 +155,7 @@ jobs:
 
     - name: Run Python Semantic Release (NOOP)
       id: psr-noop
-      if: github.ref_name != 'main'
+      if: github.event_name != 'workflow_dispatch' && github.ref_name != 'main'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -158,14 +164,24 @@ jobs:
 
     - name: Run Python Semantic Release
       id: release
-      if: github.ref_name == 'main'
+      if: github.event_name != 'workflow_dispatch' && github.ref_name == 'main'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        uv run --with python-semantic-release semantic-release version
+        # Capture output to detect if a release was made
+        output=$(uv run --with python-semantic-release semantic-release version 2>&1)
+        echo "$output"
+
+        # Check if a release was made (no "No release will be made" message)
+        if echo "$output" | grep -q "No release will be made"; then
+          echo "released=false" >> $GITHUB_OUTPUT
+        else
+          echo "released=true" >> $GITHUB_OUTPUT
+        fi
 
     - name: Upload Distribution Artifacts
+      if: github.event_name != 'workflow_dispatch'
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: distribution-artifacts
@@ -175,7 +191,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: release
-    if: ${{ needs.release.outputs.released == 'true' }}
+    # Run on manual trigger OR when release job created a new release
+    if: ${{ github.event_name == 'workflow_dispatch' || (!cancelled() && needs.release.outputs.released == 'true') }}
 
     permissions:
       contents: read
@@ -186,7 +203,33 @@ jobs:
       url: https://pypi.org/p/lifx-async
 
     steps:
-    - name: Download Build Artifacts
+    - name: Determine release tag for manual deployment
+      if: github.event_name == 'workflow_dispatch'
+      id: get-release-tag
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        if [ -n "${{ inputs.release_tag }}" ]; then
+          echo "tag=${{ inputs.release_tag }}" >> $GITHUB_OUTPUT
+        else
+          # Get latest release tag
+          latest_tag=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName --jq '.[0].tagName')
+          echo "tag=${latest_tag}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Download artifacts from GitHub Release
+      if: github.event_name == 'workflow_dispatch'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        mkdir -p dist
+        gh release download ${{ steps.get-release-tag.outputs.tag }} --repo ${{ github.repository }} --pattern '*.whl' --dir dist
+        gh release download ${{ steps.get-release-tag.outputs.tag }} --repo ${{ github.repository }} --pattern '*.tar.gz' --dir dist
+        echo "Downloaded artifacts for ${{ steps.get-release-tag.outputs.tag }}:"
+        ls -lh dist/
+
+    - name: Download Build Artifacts from workflow
+      if: github.event_name != 'workflow_dispatch'
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
       id: artifact-download
       with:
