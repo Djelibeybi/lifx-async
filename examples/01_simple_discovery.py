@@ -40,17 +40,17 @@ async def main():
 
             async with light:
                 print(f"  Product: {light.model}")
+                color, power, label = await light.get_color()
                 if light.label is not None:
-                    print(f"  Label: {light.label[0]}")
-                if light.power is not None:
-                    print(f"  Power: {'ON' if light.power[0] else 'OFF'}")
+                    print(f"  Label: {light.label}")
                 if light.host_firmware is not None:
-                    firmware = light.host_firmware[0]
+                    firmware = light.host_firmware
                     print(
                         f"  Firmware: {firmware.version_major}.{firmware.version_minor}"
                     )
-                if light.color is not None:
-                    print(f"  Color: {light.color[0].as_dict()}")
+
+                print(f"  Power: {'ON' if power else 'OFF'}")
+                print(f"  Color: {color.as_dict()}")
 
             print()
 

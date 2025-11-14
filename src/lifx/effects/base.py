@@ -220,11 +220,8 @@ class LIFXEffect(ABC):
             ```
         """
         try:
-            if light.color:
-                current_color, _ = light.color
-            else:
-                # Fetch current color from device
-                current_color, _, _ = await light.get_color()
+            # Fetch current color from device
+            current_color, _, _ = await light.get_color()
 
             # Safety check: boost brightness if too low
             if current_color.brightness < min_brightness:

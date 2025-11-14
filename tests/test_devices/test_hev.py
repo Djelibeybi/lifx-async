@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from lifx.devices.hev import HevLight
@@ -170,16 +168,9 @@ class TestHevLight:
         )
         hev_light.connection.request.return_value = mock_state
 
-        # First call should hit the device and store the value
-        state1 = await hev_light.get_hev_cycle()
+        # First call should hit the device
+        _ = await hev_light.get_hev_cycle()
         assert hev_light.connection.request.call_count == 1
-
-        # Check that value is stored as a tuple with timestamp
-        stored = hev_light.hev_cycle
-        assert stored is not None
-        stored_state, timestamp = stored
-        assert stored_state.duration_s == state1.duration_s
-        assert isinstance(timestamp, float)
 
     async def test_hev_config_caching(self, hev_light: HevLight) -> None:
         """Test HEV config caching."""
@@ -193,12 +184,10 @@ class TestHevLight:
         config1 = await hev_light.get_hev_config()
         assert hev_light.connection.request.call_count == 1
 
-        # Check that value is stored as a tuple with timestamp
+        # Check that value is stored in cache
         stored = hev_light.hev_config
         assert stored is not None
-        stored_config, timestamp = stored
-        assert stored_config.duration_s == config1.duration_s
-        assert isinstance(timestamp, float)
+        assert stored.duration_s == config1.duration_s
 
     async def test_hev_result_caching(self, hev_light: HevLight) -> None:
         """Test HEV result caching."""
@@ -211,64 +200,38 @@ class TestHevLight:
         result1 = await hev_light.get_last_hev_result()
         assert hev_light.connection.request.call_count == 1
 
-        # Check that value is stored as a tuple with timestamp
+        # Check that value is stored in cache
         stored = hev_light.hev_result
         assert stored is not None
-        stored_result, timestamp = stored
-        assert stored_result == result1
-        assert isinstance(timestamp, float)
-
-    async def test_hev_cycle_property(self, hev_light: HevLight) -> None:
-        """Test hev_cycle property returns stored value with timestamp."""
-        # Initially no stored value
-        assert hev_light.hev_cycle is None
-
-        # Set stored value with timestamp
-        state = HevCycleState(duration_s=3600, remaining_s=1800, last_power=True)
-        test_time = time.time()
-        hev_light._hev_cycle = (state, test_time)
-
-        # Property should return stored value as tuple
-        stored = hev_light.hev_cycle
-        assert stored is not None
-        stored_state, timestamp = stored
-        assert stored_state == state
-        assert stored_state.duration_s == 3600
-        assert timestamp == test_time
+        assert stored == result1
 
     async def test_hev_config_property(self, hev_light: HevLight) -> None:
-        """Test hev_config property returns stored value with timestamp."""
+        """Test hev_config property returns cached value."""
         # Initially no stored value
         assert hev_light.hev_config is None
 
-        # Set stored value with timestamp
+        # Set stored value
         config = HevConfig(indication=True, duration_s=7200)
-        test_time = time.time()
-        hev_light._hev_config = (config, test_time)
+        hev_light._hev_config = config
 
-        # Property should return stored value as tuple
+        # Property should return stored value
         stored = hev_light.hev_config
         assert stored is not None
-        stored_config, timestamp = stored
-        assert stored_config == config
-        assert stored_config.duration_s == 7200
-        assert timestamp == test_time
+        assert stored == config
+        assert stored.duration_s == 7200
 
     async def test_hev_result_property(self, hev_light: HevLight) -> None:
-        """Test hev_result property returns stored value with timestamp."""
+        """Test hev_result property returns cached value."""
         # Initially no stored value
         assert hev_light.hev_result is None
 
-        # Set stored value with timestamp
-        test_time = time.time()
-        hev_light._hev_result = (LightLastHevCycleResult.SUCCESS, test_time)
+        # Set stored value
+        hev_light._hev_result = LightLastHevCycleResult.SUCCESS
 
-        # Property should return stored value as tuple
+        # Property should return stored value
         stored = hev_light.hev_result
         assert stored is not None
-        stored_result, timestamp = stored
-        assert stored_result == LightLastHevCycleResult.SUCCESS
-        assert timestamp == test_time
+        assert stored == LightLastHevCycleResult.SUCCESS
 
     async def test_set_hev_config_updates_store(self, hev_light: HevLight) -> None:
         """Test that setting HEV config updates the store."""
@@ -276,25 +239,8 @@ class TestHevLight:
 
         await hev_light.set_hev_config(indication=False, duration_seconds=5400)
 
-        # Check store was updated as tuple with timestamp
+        # Check store was updated in cache
         stored = hev_light.hev_config
         assert stored is not None
-        config, timestamp = stored
-        assert config.indication is False
-        assert config.duration_s == 5400
-        assert isinstance(timestamp, float)
-
-    async def test_set_hev_cycle_invalidates_store(self, hev_light: HevLight) -> None:
-        """Test that setting HEV cycle invalidates the cycle state store."""
-        hev_light.connection.request.return_value = True
-
-        # Set initial store
-        state = HevCycleState(duration_s=3600, remaining_s=1800, last_power=True)
-        hev_light._hev_cycle = (state, time.time())
-        assert hev_light.hev_cycle is not None
-
-        # Set HEV cycle
-        await hev_light.set_hev_cycle(enable=True, duration_seconds=7200)
-
-        # Store should be invalidated
-        assert hev_light.hev_cycle is None
+        assert stored.indication is False
+        assert stored.duration_s == 5400

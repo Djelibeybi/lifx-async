@@ -503,7 +503,7 @@ async def discover_device_by_label(
             async with device:
                 # Match label (case-insensitive)
                 if device.label is not None:
-                    if device.label[0].lower() == label.lower():
+                    if device.label.lower() == label.lower():
                         return discovered_device
 
         except (LifxError, TimeoutError):

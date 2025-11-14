@@ -49,14 +49,6 @@ class TestLight:
         assert power is True
         assert label == "Test Light"
 
-        # Verify it was stored with timestamp
-        stored = light.color
-        assert stored is not None
-        stored_color, timestamp = stored
-        assert isinstance(stored_color, HSBK)
-        assert stored_color.hue == pytest.approx(180, abs=1)
-        assert isinstance(timestamp, float)
-
     async def test_set_color(self, light: Light) -> None:
         """Test setting light color."""
         # Mock SET operation returns True

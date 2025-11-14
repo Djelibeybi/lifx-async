@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from lifx.devices.infrared import InfraredLight
@@ -115,28 +113,23 @@ class TestInfraredLight:
         brightness1 = await infrared_light.get_infrared()
         assert infrared_light.connection.request.call_count == 1
 
-        # Check that value is stored as a tuple with timestamp
+        # Check that value is stored in cache
         stored = infrared_light.infrared
         assert stored is not None
-        stored_brightness, timestamp = stored
-        assert stored_brightness == pytest.approx(brightness1, abs=0.01)
-        assert isinstance(timestamp, float)
+        assert stored == pytest.approx(brightness1, abs=0.01)
 
     async def test_infrared_property(self, infrared_light: InfraredLight) -> None:
-        """Test infrared property returns stored value with timestamp."""
+        """Test infrared property returns cached value."""
         # Initially no stored value
         assert infrared_light.infrared is None
 
-        # Set stored value with timestamp
-        test_time = time.time()
-        infrared_light._infrared = (0.6, test_time)
+        # Set stored value
+        infrared_light._infrared = 0.6
 
-        # Property should return stored value as tuple
+        # Property should return stored value
         stored = infrared_light.infrared
         assert stored is not None
-        brightness, timestamp = stored
-        assert brightness == pytest.approx(0.6, abs=0.01)
-        assert timestamp == test_time
+        assert stored == pytest.approx(0.6, abs=0.01)
 
     async def test_set_infrared_updates_store(
         self, infrared_light: InfraredLight
@@ -146,9 +139,7 @@ class TestInfraredLight:
 
         await infrared_light.set_infrared(0.8)
 
-        # Check store was updated as tuple with timestamp
+        # Check store was updated in cache
         stored = infrared_light.infrared
         assert stored is not None
-        brightness, timestamp = stored
-        assert brightness == pytest.approx(0.8, abs=0.01)
-        assert isinstance(timestamp, float)
+        assert stored == pytest.approx(0.8, abs=0.01)

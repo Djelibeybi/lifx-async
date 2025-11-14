@@ -118,10 +118,10 @@ class Device:
     This class provides common functionality for all LIFX devices:
     - Connection management
     - Basic device queries (label, power, version, info)
-    - State storage with timestamps (no automatic expiration)
+    - State caching for reduced network traffic
 
-    All properties return a tuple of (value, timestamp) or None if never fetched.
-    Callers can use the timestamp to determine if data needs refreshing.
+    Properties return cached values or None if never fetched.
+    Use get_*() methods to fetch fresh data from the device.
 
     Example:
         ```python
@@ -132,19 +132,16 @@ class Device:
             label = await device.get_label()
             print(f"Device: {label}")
 
-            # Check label and its age
+            # Use cached label value
             if device.label is not None:
-                label_value, updated_at = device.label
-                age = time.time() - updated_at
-                print(f"Label '{label_value}' is {age:.1f}s old")
+                print(f"Cached label: {device.label}")
 
-            # Turn on device and auto-refresh power state
-            await device.set_power(True, refresh=True)
+            # Turn on device
+            await device.set_power(True)
 
-            # Get power state with timestamp
-            power_result = device.power
-            if power_result:
-                is_on, timestamp = power_result
+            # Get power state
+            is_on = await device.get_power()
+            if is_on is not None:
                 print(f"Power: {'ON' if is_on else 'OFF'}")
         ```
     """
@@ -251,15 +248,13 @@ class Device:
             max_retries=max_retries,
         )
 
-        # State storage: Each value stored as (value, timestamp) tuple
-        # Values never expire automatically - caller decides when to refresh
-        self._label: tuple[str, float] | None = None
-        self._power: tuple[bool, float] | None = None
-        self._version: tuple[DeviceVersion, float] | None = None
-        self._host_firmware: tuple[FirmwareInfo, float] | None = None
-        self._wifi_firmware: tuple[FirmwareInfo, float] | None = None
-        self._location: tuple[LocationInfo, float] | None = None
-        self._group: tuple[GroupInfo, float] | None = None
+        # State storage: Cached values from device
+        self._label: str | None = None
+        self._version: DeviceVersion | None = None
+        self._host_firmware: FirmwareInfo | None = None
+        self._wifi_firmware: FirmwareInfo | None = None
+        self._location: LocationInfo | None = None
+        self._group: GroupInfo | None = None
 
         # Product capabilities for device features (populated on first use)
         self._capabilities: ProductInfo | None = None
@@ -328,7 +323,6 @@ class Device:
             tg.create_task(self.get_host_firmware())
             tg.create_task(self.get_wifi_firmware())
             tg.create_task(self.get_label())
-            tg.create_task(self.get_power())
             tg.create_task(self.get_location())
             tg.create_task(self.get_group())
 
@@ -407,17 +401,16 @@ class Device:
             label = await device.get_label()
             print(f"Device name: {label}")
 
-            # Or use stored value
+            # Or use cached value
             if device.label:
-                label, timestamp = device.label
-                print(f"Stored label: {label}")
+                print(f"Cached label: {device.label}")
             ```
         """
         # Request automatically unpacks and decodes label
         state = await self.connection.request(packets.Device.GetLabel())
 
-        # Store label with timestamp
-        self._label = (state.label, time.time())
+        # Store label
+        self._label = state.label
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -458,8 +451,8 @@ class Device:
             packets.Device.SetLabel(label=label_bytes),
         )
 
-        # Update state with timestamp
-        self._label = (label, time.time())
+        # Update cached state
+        self._label = label
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -494,7 +487,6 @@ class Device:
         # Power level is uint16 (0 or 65535)
         is_on = state.level > 0
 
-        self._power = (is_on, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -529,8 +521,6 @@ class Device:
             packets.Device.SetPower(level=level),
         )
 
-        # Update state with timestamp
-        self._power = (on, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -567,7 +557,7 @@ class Device:
             product=state.product,
         )
 
-        self._version = (version, time.time())
+        self._version = version
 
         _LOGGER.debug(
             {
@@ -682,7 +672,7 @@ class Device:
             version_minor=state.version_minor,
         )
 
-        self._host_firmware = (firmware, time.time())
+        self._host_firmware = firmware
 
         _LOGGER.debug(
             {
@@ -726,7 +716,7 @@ class Device:
             version_minor=state.version_minor,
         )
 
-        self._wifi_firmware = (firmware, time.time())
+        self._wifi_firmware = firmware
 
         _LOGGER.debug(
             {
@@ -771,7 +761,7 @@ class Device:
             updated_at=state.updated_at,
         )
 
-        self._location = (location, time.time())
+        self._location = location
 
         _LOGGER.debug(
             {
@@ -894,11 +884,11 @@ class Device:
             ),
         )
 
-        # Update state with timestamp
+        # Update cached state
         location_info = LocationInfo(
             location=location_uuid_to_use, label=label, updated_at=updated_at
         )
-        self._location = (location_info, time.time())
+        self._location = location_info
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -941,7 +931,7 @@ class Device:
             updated_at=state.updated_at,
         )
 
-        self._group = (group, time.time())
+        self._group = group
 
         _LOGGER.debug(
             {
@@ -1064,11 +1054,11 @@ class Device:
             ),
         )
 
-        # Update state with timestamp
+        # Update cached state
         group_info = GroupInfo(
             group=group_uuid_to_use, label=label, updated_at=updated_at
         )
-        self._group = (group_info, time.time())
+        self._group = group_info
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -1117,83 +1107,74 @@ class Device:
         )
 
     @property
-    def label(self) -> tuple[str, float] | None:
-        """Get stored label with timestamp if available.
+    def label(self) -> str | None:
+        """Get cached label if available.
 
         Use get_label() to fetch from device.
 
         Returns:
-            Tuple of (label, timestamp) or None if never fetched.
+            Device label or None if never fetched.
         """
         return self._label
 
     @property
-    def power(self) -> tuple[bool, float] | None:
-        """Get stored power state with timestamp if available.
-
-        Use get_power() to fetch from device.
-
-        Returns:
-            Tuple of (is_on, timestamp) or None if never fetched.
-        """
-        return self._power
-
-    @property
-    def version(self) -> tuple[DeviceVersion, float] | None:
-        """Get stored version with timestamp if available.
+    def version(self) -> DeviceVersion | None:
+        """Get cached version if available.
 
         Use get_version() to fetch from device.
 
         Returns:
-            Tuple of (device_version, timestamp) or None if never fetched.
+            Device version or None if never fetched.
         """
         return self._version
 
     @property
-    def host_firmware(self) -> tuple[FirmwareInfo, float] | None:
-        """Get stored host firmware with timestamp if available.
+    def host_firmware(self) -> FirmwareInfo | None:
+        """Get cached host firmware if available.
 
         Use get_host_firmware() to fetch from device.
 
         Returns:
-            Tuple of (firmware_info, timestamp) or None if never fetched.
+            Firmware info or None if never fetched.
         """
         return self._host_firmware
 
     @property
-    def wifi_firmware(self) -> tuple[FirmwareInfo, float] | None:
-        """Get stored wifi firmware with timestamp if available.
+    def wifi_firmware(self) -> FirmwareInfo | None:
+        """Get cached wifi firmware if available.
 
         Use get_wifi_firmware() to fetch from device.
 
         Returns:
-            Tuple of (firmware_info, timestamp) or None if never fetched.
+            Firmware info or None if never fetched.
         """
         return self._wifi_firmware
 
     @property
-    def location(self) -> tuple[str, float] | None:
-        """Get stored location name with timestamp if available.
+    def location(self) -> str | None:
+        """Get cached location name if available.
 
         Use get_location() to fetch from device.
 
         Returns:
-            Tuple of (location_name, timestamp) or None if never fetched.
+            Location name or None if never fetched.
         """
         if self._location is not None:
-            return self._location[0].label, self._location[1]
+            return self._location.label
+        return None
 
     @property
-    def group(self) -> tuple[str, float] | None:
-        """Get stored group name with timestamp if available.
+    def group(self) -> str | None:
+        """Get cached group name if available.
 
         Use get_group() to fetch from device.
 
         Returns:
-            Tuple of (group_name, timestamp) or None if never fetched.
+            Group name or None if never fetched.
         """
         if self._group is not None:
-            return self._group[0].label, self._group[1]
+            return self._group.label
+        return None
 
     @property
     def model(self) -> str | None:

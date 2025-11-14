@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from lifx.color import HSBK
@@ -317,13 +315,14 @@ class TestTileDevice:
             firmware_version_minor=3,
             firmware_version_major=2,
         )
-        tile_device._tile_chain = ([tile_info], time.time())
+        tile_device._tile_chain = [tile_info]
 
-        # Mock power state (device is on)
-        tile_device._power = (True, time.time())
-
-        # Mock SET operation returns True
-        tile_device.connection.request.return_value = True
+        # Mock power state (device is on) and SET operation
+        # connection.request is called multiple times:
+        # 1. First for get_power() -> returns StatePower
+        # 2. Then for actual tile operations -> returns True
+        mock_power = packets.Device.StatePower(level=65535)  # Device is on
+        tile_device.connection.request.side_effect = [mock_power, True]
 
         # Create 8x8 grid of colors
         red = HSBK.from_rgb(255, 0, 0)
@@ -331,10 +330,12 @@ class TestTileDevice:
 
         await tile_device.set_tile_colors(0, colors, duration=1.0)
 
-        # Verify packet was sent
-        tile_device.connection.request.assert_called_once()
-        call_args = tile_device.connection.request.call_args
-        packet = call_args[0][0]
+        # Verify 2 calls were made: get_power + Set64
+        assert tile_device.connection.request.call_count == 2
+
+        # Check the second call (Set64 packet)
+        second_call = tile_device.connection.request.call_args_list[1]
+        packet = second_call[0][0]
 
         # Verify packet has correct values
         assert packet.tile_index == 0
@@ -362,13 +363,14 @@ class TestTileDevice:
             firmware_version_minor=3,
             firmware_version_major=2,
         )
-        tile_device._tile_chain = ([tile_info], time.time())
+        tile_device._tile_chain = [tile_info]
 
-        # Mock power state (device is on)
-        tile_device._power = (True, time.time())
-
-        # Mock SET operation returns True
-        tile_device.connection.request.return_value = True
+        # Mock power state (device is on) and SET operation
+        # connection.request is called multiple times:
+        # 1. First for get_power() -> returns StatePower
+        # 2. Then for actual tile operations -> returns True
+        mock_power = packets.Device.StatePower(level=65535)  # Device is on
+        tile_device.connection.request.side_effect = [mock_power, True]
 
         # Create 4x4 grid of colors
         blue = HSBK.from_rgb(0, 0, 255)
@@ -376,10 +378,12 @@ class TestTileDevice:
 
         await tile_device.set_tile_colors(0, colors, x=2, y=2)
 
-        # Verify packet was sent
-        tile_device.connection.request.assert_called_once()
-        call_args = tile_device.connection.request.call_args
-        packet = call_args[0][0]
+        # Verify 2 calls were made: get_power + Set64
+        assert tile_device.connection.request.call_count == 2
+
+        # Check the second call (Set64 packet)
+        second_call = tile_device.connection.request.call_args_list[1]
+        packet = second_call[0][0]
 
         # Verify packet has correct values
         assert packet.tile_index == 0
@@ -446,11 +450,8 @@ class TestTileDevice:
                 firmware_version_major=2,
             )
         ]
-        # Set tile_chain with timestamp
-        tile_device._tile_chain = (tile_info_list, time.time())
-
-        # Mock power state (device is on)
-        tile_device._power = (True, time.time())
+        # Set tile_chain
+        tile_device._tile_chain = tile_info_list
 
         # Create StateDeviceChain response for get_tile_chain()
         # call in copy_frame_buffer
@@ -488,10 +489,18 @@ class TestTileDevice:
         )
 
         # Mock request responses:
+        # - 1 GetPower returns StatePower (on)
         # - 2 Set64 packets return True
         # - 1 GetDeviceChain (in copy_frame_buffer) returns chain_response
         # - 1 CopyFrameBuffer packet returns True
-        tile_device.connection.request.side_effect = [True, True, chain_response, True]
+        mock_power = packets.Device.StatePower(level=65535)  # Device is on
+        tile_device.connection.request.side_effect = [
+            mock_power,
+            True,
+            True,
+            chain_response,
+            True,
+        ]
 
         # Create 16x8 grid of colors (128 pixels total, requires 2 Set64 packets)
         green = HSBK.from_rgb(0, 255, 0)
@@ -500,14 +509,15 @@ class TestTileDevice:
         await tile_device.set_tile_colors(0, colors, duration=1.0)
 
         # Verify multiple packets were sent:
+        # - 1 GetPower
         # - 2 Set64 packets to frame buffer 1 (top and bottom halves)
         # - 1 GetDeviceChain (for get_tile_chain in copy_frame_buffer)
         # - 1 CopyFrameBuffer packet to copy from fb 1 to fb 0
-        assert tile_device.connection.request.call_count == 4
+        assert tile_device.connection.request.call_count == 5
 
-        # Check first Set64 call (top half to frame buffer 1)
-        first_call = tile_device.connection.request.call_args_list[0]
-        packet1 = first_call[0][0]
+        # Check second call - first Set64 (top half to frame buffer 1)
+        second_call = tile_device.connection.request.call_args_list[1]
+        packet1 = second_call[0][0]
         assert packet1.tile_index == 0
         assert packet1.rect.fb_index == 1  # Write to invisible frame buffer
         assert packet1.rect.x == 0
@@ -515,23 +525,23 @@ class TestTileDevice:
         assert packet1.rect.width == 16
         assert packet1.duration == 0  # No duration when writing to fb 1
 
-        # Check second Set64 call (bottom half to frame buffer 1)
-        second_call = tile_device.connection.request.call_args_list[1]
-        packet2 = second_call[0][0]
+        # Check third call - second Set64 (bottom half to frame buffer 1)
+        third_call = tile_device.connection.request.call_args_list[2]
+        packet2 = third_call[0][0]
         assert packet2.tile_index == 0
         assert packet2.rect.fb_index == 1
         assert packet2.rect.x == 0
         assert packet2.rect.y == 4  # Second chunk starts at row 4
         assert packet2.rect.width == 16
 
-        # Check third call (GetDeviceChain - called by copy_frame_buffer)
-        third_call = tile_device.connection.request.call_args_list[2]
-        packet3 = third_call[0][0]
+        # Check fourth call (GetDeviceChain - called by copy_frame_buffer)
+        fourth_call = tile_device.connection.request.call_args_list[3]
+        packet3 = fourth_call[0][0]
         assert isinstance(packet3, packets.Tile.GetDeviceChain)
 
-        # Check fourth call (CopyFrameBuffer)
-        fourth_call = tile_device.connection.request.call_args_list[3]
-        packet4 = fourth_call[0][0]
+        # Check fifth call (CopyFrameBuffer)
+        fifth_call = tile_device.connection.request.call_args_list[4]
+        packet4 = fifth_call[0][0]
         assert packet4.tile_index == 0
         assert packet4.src_fb_index == 1  # Copy from invisible frame buffer
         assert packet4.dst_fb_index == 0  # To visible frame buffer
@@ -558,13 +568,14 @@ class TestTileDevice:
             firmware_version_minor=3,
             firmware_version_major=2,
         )
-        tile_device._tile_chain = ([tile_info], time.time())
+        tile_device._tile_chain = [tile_info]
 
-        # Mock power state (device is off)
-        tile_device._power = (False, time.time())
-
-        # Mock SET operation returns True
-        tile_device.connection.request.return_value = True
+        # Mock power state (device is off) and SET operations
+        # connection.request is called multiple times:
+        # 1. First for get_power() -> returns StatePower (off)
+        # 2. Then for tile set operations -> returns True (twice)
+        mock_power = packets.Device.StatePower(level=0)  # Device is off
+        tile_device.connection.request.side_effect = [mock_power, True, True]
 
         # Create 8x8 grid of colors
         red = HSBK.from_rgb(255, 0, 0)
@@ -572,18 +583,18 @@ class TestTileDevice:
 
         await tile_device.set_tile_colors(0, colors, duration=2.0)
 
-        # Verify two calls were made: Set64 and set_power
-        assert tile_device.connection.request.call_count == 2
+        # Verify three calls were made: GetPower, Set64, and SetPower
+        assert tile_device.connection.request.call_count == 3
 
-        # First call: Set64 with duration=0 (instant color change)
-        first_call = tile_device.connection.request.call_args_list[0]
-        packet1 = first_call[0][0]
+        # Second call: Set64 with duration=0 (instant color change)
+        second_call = tile_device.connection.request.call_args_list[1]
+        packet1 = second_call[0][0]
         assert packet1.tile_index == 0
         assert packet1.duration == 0  # Instant color change when off
 
-        # Second call: SetPower with duration=2000ms (power on with transition)
-        second_call = tile_device.connection.request.call_args_list[1]
-        packet2 = second_call[0][0]
+        # Third call: SetPower with duration=2000ms (power on with transition)
+        third_call = tile_device.connection.request.call_args_list[2]
+        packet2 = third_call[0][0]
         assert hasattr(packet2, "level")  # SetPower packet
         assert packet2.level == 65535  # Full power
         assert packet2.duration == 2000  # 2 seconds in ms

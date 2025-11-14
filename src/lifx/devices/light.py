@@ -50,8 +50,6 @@ class Light(Device):
     def __init__(self, *args, **kwargs) -> None:
         """Initialize Light with additional state attributes."""
         super().__init__(*args, **kwargs)
-        # Light-specific state storage
-        self._color: tuple[HSBK, float] | None = None
 
     async def _setup(self) -> None:
         """Populate light capabilities, state and metadata."""
@@ -90,13 +88,8 @@ class Light(Device):
         power = state.power > 0
         label = state.label
 
-        # Store color and other fields from StateColor response with timestamps
-        import time
-
-        timestamp = time.time()
-        self._color = (color, timestamp)
-        self._label = (label, timestamp)  # Already decoded to string
-        self._power = (power, timestamp)
+        # Store label from StateColor response
+        self._label = label  # Already decoded to string
 
         _LOGGER.debug(
             {
@@ -154,10 +147,6 @@ class Light(Device):
             ),
         )
 
-        # Update state with timestamp
-        import time
-
-        self._color = (color, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -367,10 +356,6 @@ class Light(Device):
         # Power level is uint16 (0 or 65535)
         is_on = state.level > 0
 
-        import time
-
-        self._power = (is_on, time.time())
-
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -416,10 +401,6 @@ class Light(Device):
             packets.Light.SetPower(level=level, duration=duration_ms),
         )
 
-        # Update state with timestamp
-        import time
-
-        self._power = (on, time.time())
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -706,17 +687,7 @@ class Light(Device):
             transient=True,
         )
 
-    # Stored value properties
-    @property
-    def color(self) -> tuple[HSBK, float] | None:
-        """Get stored light color with timestamp if available.
-
-        Returns:
-            Tuple of (color, timestamp) or None if never fetched.
-            Use get_color() to fetch from device.
-        """
-        return self._color
-
+    # Cached value properties
     @property
     def min_kelvin(self) -> int | None:
         """Get the minimum supported kelvin value if available.

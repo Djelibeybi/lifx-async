@@ -365,11 +365,8 @@ class TileDevice(Light):
         """Initialize TileDevice with additional state attributes."""
         super().__init__(*args, **kwargs)
         # Tile-specific state storage
-        self._tile_chain: tuple[list[TileInfo], float] | None = None
-        self._tile_effect: tuple[TileEffect | None, float] | None = None
-        # Tile colors: dict indexed by tile_index with TileColors for each tile
-        # Structure: dict[tile_index] -> TileColors(colors, width, height)
-        self._tile_colors: tuple[dict[int, TileColors], float] | None = None
+        self._tile_chain: list[TileInfo] | None = None
+        self._tile_effect: TileEffect | None | None = None
 
     async def _setup(self) -> None:
         """Populate Tile light capabilities, state and metadata."""
@@ -379,7 +376,7 @@ class TileDevice(Light):
             tg.create_task(self.get_tile_effect())
         async with asyncio.TaskGroup() as tg:
             if self.tile_count is not None:
-                tile_count, _ = self.tile_count
+                tile_count = self.tile_count
             else:
                 tile_count = await self.get_tile_count()
             [tg.create_task(self.get_tile_colors(i)) for i in range(tile_count)]
@@ -414,9 +411,7 @@ class TileDevice(Light):
             for tile_device in state.tile_devices[: state.tile_devices_count]
         ]
 
-        import time
-
-        self._tile_chain = (tiles, time.time())
+        self._tile_chain = tiles
 
         _LOGGER.debug(
             {
@@ -603,48 +598,6 @@ class TileDevice(Light):
                     row.append(HSBK(0, 0, 0, 3500))
             colors_2d.append(row)
 
-        # Update tile colors with fetched data
-        import time
-
-        timestamp = time.time()
-
-        # Get tile chain to know dimensions
-        if self._tile_chain is None:
-            chain = await self.get_tile_chain()
-        else:
-            chain, _ = self._tile_chain
-
-        # Get tile info for this specific tile
-        tile_info = chain[tile_index]
-
-        # Initialize or get existing colors dict
-        if self._tile_colors is None:
-            tiles_colors_dict = {}
-        else:
-            tiles_colors_dict, _ = self._tile_colors
-
-        # Get or create TileColors for this tile
-        if tile_index not in tiles_colors_dict:
-            # Create new TileColors with default black colors
-            num_zones = tile_info.width * tile_info.height
-            default_colors = [HSBK(0, 0, 0, 3500)] * num_zones
-            tiles_colors_dict[tile_index] = TileColors(
-                colors=default_colors, width=tile_info.width, height=tile_info.height
-            )
-
-        tile_colors = tiles_colors_dict[tile_index]
-
-        # Update the specific tile region with fetched colors
-        for row_idx in range(height):
-            for col_idx in range(width):
-                tile_x = x + col_idx
-                tile_y = y + row_idx
-                if tile_y < tile_colors.height and tile_x < tile_colors.width:
-                    tile_colors.set_color(tile_x, tile_y, colors_2d[row_idx][col_idx])
-
-        # Store updated colors with new timestamp
-        self._tile_colors = (tiles_colors_dict, timestamp)
-
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -733,12 +686,7 @@ class TileDevice(Light):
 
         # Check power state to optimize duration handling
         # If device is off, set colors instantly then power on with duration
-        # Use stored power state if available, otherwise fetch
-        power_tuple = self.power
-        if power_tuple is not None:
-            is_powered_on, _ = power_tuple
-        else:
-            is_powered_on = await self.get_power()
+        is_powered_on = await self.get_power()
 
         # Convert duration to milliseconds
         duration_ms = int(duration * 1000)
@@ -812,48 +760,6 @@ class TileDevice(Light):
                 duration=copy_duration,
             )
 
-        # Update tile colors with the values we just set
-        import time
-
-        timestamp = time.time()
-
-        # Get tile chain to know dimensions
-        if self._tile_chain is None:
-            chain = await self.get_tile_chain()
-        else:
-            chain, _ = self._tile_chain
-
-        # Get tile info for this specific tile
-        tile_info = chain[tile_index]
-
-        # Initialize or get existing colors dict
-        if self._tile_colors is None:
-            tiles_colors_dict = {}
-        else:
-            tiles_colors_dict, _ = self._tile_colors
-
-        # Get or create TileColors for this tile
-        if tile_index not in tiles_colors_dict:
-            # Create new TileColors with default black colors
-            num_zones = tile_info.width * tile_info.height
-            default_colors = [HSBK(0, 0, 0, 3500)] * num_zones
-            tiles_colors_dict[tile_index] = TileColors(
-                colors=default_colors, width=tile_info.width, height=tile_info.height
-            )
-
-        tile_colors = tiles_colors_dict[tile_index]
-
-        # Update the specific tile region with colors we just set
-        for row_idx in range(height):
-            for col_idx in range(width):
-                tile_x = x + col_idx
-                tile_y = y + row_idx
-                if tile_y < tile_colors.height and tile_x < tile_colors.width:
-                    tile_colors.set_color(tile_x, tile_y, colors[row_idx][col_idx])
-
-        # Store updated colors with new timestamp
-        self._tile_colors = (tiles_colors_dict, timestamp)
-
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -926,9 +832,7 @@ class TileDevice(Light):
                 parameters=parameters,
             )
 
-        import time
-
-        self._tile_effect = (result, time.time())
+        self._tile_effect = result
 
         _LOGGER.debug(
             {
@@ -1010,11 +914,9 @@ class TileDevice(Light):
             ),
         )
 
-        # Update state attribute
-        import time
-
+        # Update cached state
         result = effect if effect.effect_type != TileEffectType.OFF else None
-        self._tile_effect = (result, time.time())
+        self._tile_effect = result
 
         _LOGGER.debug(
             {
@@ -1309,60 +1211,36 @@ class TileDevice(Light):
             }
         )
 
-    # Stored value properties
+    # Cached value properties
     @property
-    def tile_chain(self) -> tuple[list[TileInfo], float] | None:
-        """Get stored tile chain if available.
+    def tile_chain(self) -> list[TileInfo] | None:
+        """Get cached tile chain if available.
 
         Returns:
-            Stored tile chain (use get_tile_chain() for fresh data)
+            Tile chain or None if never fetched (use get_tile_chain() for fresh data)
         """
         return self._tile_chain
 
     @property
-    def tile_count(self) -> tuple[int, float] | None:
-        """Get stored tile count with timestamp if available.
+    def tile_count(self) -> int | None:
+        """Get cached tile count if available.
 
         Returns:
-            Tuple of (tile_count, timestamp) or None if never fetched.
+            Tile count or None if never fetched.
             Derived from tile_chain property.
         """
         if self._tile_chain is not None:
-            chain, timestamp = self._tile_chain
-            return (len(chain), timestamp)
+            return len(self._tile_chain)
         return None
 
     @property
-    def tile_effect(self) -> tuple[TileEffect | None, float] | None:
-        """Get stored tile effect if available.
+    def tile_effect(self) -> TileEffect | None | None:
+        """Get cached tile effect if available.
 
         Returns:
-            Stored tile effect (use get_tile_effect() for fresh data)
+            Tile effect or None if never fetched (use get_tile_effect() for fresh data)
         """
         return self._tile_effect
-
-    @property
-    def tile_colors(self) -> tuple[dict[int, TileColors], float] | None:
-        """Get stored tile colors with timestamp if available.
-
-        Returns:
-            Tuple of (tile_colors_dict, timestamp) or None if never fetched.
-            The dict maps tile_index -> TileColors(colors, width, height).
-            Each TileColors contains a flat list of colors and dimensions.
-            Use get_tile_colors() to fetch from device.
-
-        Example:
-            ```python
-            if tile.tile_colors:
-                colors_dict, timestamp = tile.tile_colors
-                tile_0 = colors_dict[0]
-                # Access flat list: tile_0.colors
-                # Get dimensions: tile_0.width, tile_0.height
-                # Get 2D array: tile_0.to_2d()
-                # Get specific color: tile_0.get_color(x, y)
-            ```
-        """
-        return self._tile_colors
 
     async def apply_theme(
         self,

@@ -128,7 +128,7 @@ response = await conn.request_response(packet, response_type)
 **Purpose**: Device abstractions with high-level operations
 
 - **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, TileDevice
-- **State Storage**: Timestamped state properties with explicit freshness control
+- **State Caching**: Cached state properties for efficient access
 - **Type Detection**: Automatic capability detection
 - **Async Context Managers**: Automatic resource cleanup
 
@@ -249,26 +249,25 @@ async with await Light.from_ip("192.168.1.100") as light:
     await light.get_label()  # Reuses Connection 1
 ```
 
-### Storing State with Timestamps
+### State Caching
 
-**Why**: Reduces network traffic while keeping you in control of data freshness
+**Why**: Reduces network traffic and provides fast access to semi-static device state
 
 ```python
-import time
-
-# Properties return (value, timestamp) tuples when stored:
-stored_color = light.color
-if stored_state:
-    color, timestamp = stored_color
-    age = time.time() - timestamp
-    if age < 5.0:  # Still fresh
-        # Use stored color
-    else:
-        # Data is stale, fetch fresh from device
-        color, _, _ = await light.get_color()
+# Semi-static properties return cached values:
+label = light.label
+if label:
+    # Use cached label
+    print(f"Label: {label}")
 else:
-    # No stored data yet
-    color, _, _ = await light.get_color()
+    # No cached data yet, fetch from device
+    label = await light.get_label()
+    print(f"Fetched label: {label}")
+
+# Volatile state (power, color) always requires fresh fetch
+# get_color() will cache the label value only
+color, power, label = await light.get_color()
+print(f"Current state of {light.label} - Power: {power}, Color: {color}")
 ```
 
 ### Code Generation
@@ -288,11 +287,10 @@ uv run python -m lifx.protocol.generator
 - **Max Size**: Configurable (default: 128)
 - **Metrics**: Track hits, misses, evictions
 
-### Storing State as Properties
+### State Caching as Properties
 
-- **Format**: `(value, timestamp)` tuples for explicit freshness control
+- **Format**: Cached values or `None` if not yet fetched
 - **Properties**: All device state available as properties
-- **Freshness**: Application explicitly manages data age via timestamp
 - **Getting Fresh Data**: Use `get_*()` methods to always fetch from device
 
 ## Concurrency Model
