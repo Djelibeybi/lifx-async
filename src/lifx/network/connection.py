@@ -39,7 +39,6 @@ T = TypeVar("T")
 
 # Constants for retry logic
 _RETRY_SLEEP_BASE: float = 0.1  # Base sleep time between retries (seconds)
-_RETRY_JITTER_FACTOR: float = 0.3  # Jitter range: ±30% of sleep time
 _STATE_UNHANDLED_PKT_TYPE: int = 223  # Device.StateUnhandled packet type
 
 
