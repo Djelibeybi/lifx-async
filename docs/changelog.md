@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.2.2 (2025-11-14)
+
+### Bug Fixes
+
+- **devices**: Replace hardcoded timeout and retry values with constants
+  ([`989afe2`](https://github.com/Djelibeybi/lifx-async/commit/989afe20f116d287215ec7bf5e78baa766a5ac63))
+
+
 ## v2.2.1 (2025-11-14)
 
 ### Bug Fixes
