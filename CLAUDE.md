@@ -429,6 +429,77 @@ dispatcher:
 - Each request waits on an `asyncio.Event` that's signaled when response arrives
 - Sequence number ensures correct response routing even with concurrent requests
 
+**Sequence Number Allocation and Validation:**
+
+The library uses atomic sequence number allocation and optional packet type validation for robust concurrent request handling:
+
+1. **Atomic Sequence Allocation** (`message.py:next_sequence()`):
+   - Each request atomically allocates a unique sequence number (0-255)
+   - Sequence numbers are allocated **before** creating pending requests
+   - Prevents race conditions where concurrent requests could get the same sequence
+   - The sequence counter wraps around at 256 (uint8 protocol limit)
+
+   ```python
+   # In MessageBuilder
+   def next_sequence(self) -> int:
+       """Atomically allocate and return the next sequence number."""
+       seq = self._sequence
+       self._sequence = (self._sequence + 1) % 256
+       return seq
+   ```
+
+2. **Explicit Sequence Parameter** (`connection.py:_execute_request_with_retry()`):
+   - Sequence number is allocated early and passed through the call chain
+   - Eliminates timing windows where concurrent requests could conflict
+   - Ensures one-to-one mapping between sequence numbers and pending requests
+
+   ```python
+   # Atomically allocate sequence BEFORE creating pending request
+   sequence = self._builder.next_sequence()
+
+   # Create pending request with explicit sequence
+   pending = PendingRequest(sequence=sequence, event=asyncio.Event(), ...)
+   self._pending_requests[sequence] = pending
+
+   # Send with explicit sequence
+   message = self._builder.create_message(request, sequence=sequence, ...)
+   ```
+
+3. **Packet Type Validation** (Defense-in-Depth):
+   - Each Get*/Request packet auto-generates a `STATE_TYPE` class attribute
+   - `STATE_TYPE` defines the expected response packet type (e.g., `GetPower.STATE_TYPE = 22` for `StatePower`)
+   - Response validation checks both sequence number AND packet type match
+   - Catches protocol violations and misrouted responses early
+   - Negligible performance impact (~1ns integer comparison vs ~1-50ms network I/O)
+
+   ```python
+   # Auto-generated in packets.py
+   class GetPower(Packet):
+       PKT_TYPE: ClassVar[int] = 20
+       STATE_TYPE: ClassVar[int] = 22  # StatePower
+
+   # Validation in _response_receiver()
+   if pending.expected_pkt_type is not None and header.pkt_type != pending.expected_pkt_type:
+       pending.error = LifxProtocolError(
+           f"Received unexpected packet type {header.pkt_type}, "
+           f"expected {pending.expected_pkt_type}"
+       )
+   ```
+
+4. **Auto-Generation** (`protocol/generator.py`):
+   - `STATE_TYPE` attributes are automatically generated from `protocol.yml`
+   - Follows standard naming pattern: `GetXxx` → `StateXxx`, `XxxRequest` → `XxxResponse`
+   - Special case: `GetColorZones` → `StateMultiZone` (manually mapped)
+   - Generator builds packet lookup table and emits `STATE_TYPE` for each Get*/Request packet
+   - Never manually edit `packets.py` - regenerate from protocol specification
+
+**Why This Matters:**
+
+The atomic sequence allocation fixed a race condition that caused intermittent "mismatched packet" errors under high concurrency:
+- **Before**: Sequence read and increment were separate operations, allowing concurrent requests to get the same sequence
+- **After**: Sequence allocation is atomic, ensuring each request gets a unique sequence number
+- **Defense**: Packet type validation provides an additional safety layer to catch protocol errors early
+
 **Performance characteristics:**
 
 - Multiple concurrent requests on a single connection execute with maximum parallelism

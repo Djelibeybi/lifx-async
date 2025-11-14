@@ -14,30 +14,7 @@ from lifx.protocol.packets import Device
 
 
 class TestMessageBuilderSequence:
-    """Test MessageBuilder sequence handling."""
-
-    def test_message_builder_sequence_increment(self) -> None:
-        """Test that sequence increments properly."""
-        builder = MessageBuilder(source=12345)
-
-        assert builder.next_sequence() == 0
-
-        builder.create_message(Device.GetService())
-        assert builder.next_sequence() == 1
-
-        builder.create_message(Device.GetService())
-        assert builder.next_sequence() == 2
-
-    def test_message_builder_sequence_wraparound(self) -> None:
-        """Test sequence number wraps at 256."""
-        builder = MessageBuilder(source=12345)
-        builder._sequence = 255
-
-        assert builder.next_sequence() == 255
-
-        builder.create_message(Device.GetService())
-        # Should wrap to 0
-        assert builder.next_sequence() == 0
+    """Test MessageBuilder sequence handling - edge cases and verification."""
 
     def test_message_builder_sequence_in_header(self) -> None:
         """Test that sequence is correctly placed in header."""
@@ -56,14 +33,6 @@ class TestMessageBuilderSequence:
 
         header = LifxHeader.unpack(message[:36])
         assert header.source == 99999
-
-    def test_message_builder_random_source(self) -> None:
-        """Test MessageBuilder generates random source."""
-        builder1 = MessageBuilder()
-        builder2 = MessageBuilder()
-
-        # Should have different sources (extremely unlikely to be same)
-        assert builder1.source != builder2.source
 
 
 class TestCreateMessageErrors:

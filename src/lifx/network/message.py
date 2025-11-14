@@ -120,33 +120,43 @@ class MessageBuilder:
         target: bytes = b"\x00" * 8,
         ack_required: bool = False,
         res_required: bool = True,
+        sequence: int | None = None,
     ) -> bytes:
-        """Create a message with auto-incrementing sequence.
+        """Create a message with specified or auto-incrementing sequence.
 
         Args:
             packet: Packet dataclass instance
             target: Device serial number in bytes
             ack_required: Request acknowledgement
             res_required: Request response
+            sequence: Explicit sequence number (allocates new one if None)
 
         Returns:
             Complete message bytes
         """
+        # If sequence not provided, allocate atomically
+        if sequence is None:
+            sequence = self.next_sequence()
+
         msg = create_message(
             packet=packet,
             source=self.source,
             target=target,
-            sequence=self._sequence,
+            sequence=sequence,
             ack_required=ack_required,
             res_required=res_required,
         )
-        self._sequence = (self._sequence + 1) % 256
         return msg
 
     def next_sequence(self) -> int:
-        """Get the next sequence number without incrementing.
+        """Atomically allocate and return the next sequence number.
+
+        This method increments the internal counter immediately to prevent
+        race conditions in concurrent request handling.
 
         Returns:
-            Next sequence number
+            Allocated sequence number for this request
         """
-        return self._sequence
+        seq = self._sequence
+        self._sequence = (self._sequence + 1) % 256
+        return seq
