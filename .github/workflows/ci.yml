@@ -4,7 +4,16 @@ on:
   push:
     branches:
     - main
+    tags-ignore:
+    - '**'  # Don't run on tag pushes (semantic-release)
   pull_request:
+    paths:
+    - src/**
+    - tests/**
+    - pyproject.toml
+    - uv.lock
+    - .github/workflows/ci.yml
+    - .pre-commit-config.yaml
 
 
 env:
@@ -51,6 +60,8 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Only run tests on pull requests (skip on main branch pushes since tests already passed in PR)
+    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -96,6 +107,8 @@ jobs:
     needs:
     - quality
     - test
+    # Always run release if quality passed, even if tests were skipped
+    if: always() && needs.quality.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
 
     permissions:
