@@ -683,14 +683,33 @@ class_name = get_device_class_name(product_id=27)  # Returns "Light", "MultiZone
 
 **Automatic Device Type Detection:**
 
-The discovery system uses the products registry to automatically instantiate the correct device class:
+The discovery system uses device capabilities to automatically instantiate the correct device class.
+Device type detection is performed by `DiscoveredDevice.create_device()`, which is the single source
+of truth for device instantiation across the library.
+
+The detection uses capability-based logic in the following priority order:
+1. Matrix capability → `TileDevice`
+2. Multizone capability → `MultiZoneLight`
+3. Infrared capability → `InfraredLight`
+4. HEV capability → `HevLight`
+5. Color capability → `Light`
+6. Relay/Button-only devices → `None` (filtered out)
 
 ```python
-# Discovery automatically creates HevLight, InfraredLight, MultiZoneLight, etc.
+# High-level API - automatically creates appropriate device types
 async with discover() as group:
     for device in group:
-        # Each device is the correct type based on its product ID
+        # Each device is the correct type based on its capabilities
         print(f"{device.label}: {type(device).__name__}")
+
+# Low-level API - manual device type detection
+from lifx.network.discovery import discover_devices
+
+discovered = await discover_devices()
+for disc in discovered:
+    device = await disc.create_device()  # Returns appropriate device class or None
+    if device:
+        print(f"Created {type(device).__name__}")
 ```
 
 ## Constants Module
