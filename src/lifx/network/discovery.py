@@ -48,16 +48,21 @@ class DiscoveredDevice:
     async def create_device(self) -> Device:
         """Create appropriate device instance based on product capabilities.
 
-        Queries the device for its product ID and firmware version, then
-        instantiates the appropriate device class (Device, Light, MultiZoneLight,
-        or TileDevice) based on the product capabilities.
+        Queries the device for its product ID and uses the product registry
+        to instantiate the appropriate device class (Device, Light, HevLight,
+        InfraredLight, MultiZoneLight, or TileDevice) based on the product
+        capabilities.
+
+        This is the single source of truth for device type detection and
+        instantiation across the library.
 
         Returns:
             Device instance of the appropriate type
 
         Raises:
-            DeviceNotFoundError: If device doesn't respond
-            TimeoutError: If device query times out
+            LifxDeviceNotFoundError: If device doesn't respond
+            LifxTimeoutError: If device query times out
+            LifxProtocolError: If device returns invalid data
 
         Example:
             ```python
@@ -73,38 +78,37 @@ class DiscoveredDevice:
         from lifx.devices.light import Light
         from lifx.devices.multizone import MultiZoneLight
         from lifx.devices.tile import TileDevice
-        from lifx.products import get_device_class_name
 
-        # Create temporary device to query version (registry is always pre-loaded)
+        # Create temporary device to query version
         temp_device = Device(serial=self.serial, ip=self.ip, port=self.port)
 
         try:
-            version = await temp_device.get_version()
-            pid = version.product
+            async with temp_device:
+                if temp_device.capabilities:
+                    if temp_device.capabilities.has_matrix:
+                        return TileDevice(
+                            serial=self.serial, ip=self.ip, port=self.port
+                        )
+                    if temp_device.capabilities.has_multizone:
+                        return MultiZoneLight(
+                            serial=self.serial, ip=self.ip, port=self.port
+                        )
+                    if temp_device.capabilities.has_infrared:
+                        return InfraredLight(
+                            serial=self.serial, ip=self.ip, port=self.port
+                        )
+                    if temp_device.capabilities.has_hev:
+                        return HevLight(serial=self.serial, ip=self.ip, port=self.port)
+                    if temp_device.capabilities.has_relays or (
+                        temp_device.capabilities.has_buttons
+                        and not temp_device.capabilities.has_color
+                    ):
+                        return None
 
-            # Get appropriate class name
-            class_name = get_device_class_name(pid)
-
-            # Instantiate the correct class
-            if class_name == "TileDevice":
-                device = TileDevice(serial=self.serial, ip=self.ip, port=self.port)
-            elif class_name == "MultiZoneLight":
-                device = MultiZoneLight(serial=self.serial, ip=self.ip, port=self.port)
-            elif class_name == "HevLight":
-                device = HevLight(serial=self.serial, ip=self.ip, port=self.port)
-            elif class_name == "InfraredLight":
-                device = InfraredLight(serial=self.serial, ip=self.ip, port=self.port)
-            elif class_name == "Light":
-                device = Light(serial=self.serial, ip=self.ip, port=self.port)
-            else:
-                device = temp_device
-
-            return device
+                    return Light(serial=self.serial, ip=self.ip, port=self.port)
 
         except Exception:
-            # If version query fails, default to Light
-            device = Light(serial=self.serial, ip=self.ip, port=self.port)
-            return device
+            return None
 
     def __hash__(self) -> int:
         """Hash based on serial number for deduplication."""

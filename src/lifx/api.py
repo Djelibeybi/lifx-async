@@ -34,10 +34,7 @@ from lifx.devices import (
     TileDevice,
 )
 from lifx.exceptions import LifxTimeoutError
-from lifx.network.connection import DeviceConnection
 from lifx.network.discovery import DiscoveredDevice, discover_devices
-from lifx.products import get_device_class_name
-from lifx.protocol import packets
 from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,68 +66,6 @@ class GroupGrouping:
     def to_device_group(self) -> DeviceGroup:
         """Convert to DeviceGroup for batch operations."""
         return DeviceGroup(self.devices)
-
-
-async def _detect_device_type(
-    discovered: DiscoveredDevice,
-) -> Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice | None:
-    """Detect device type and instantiate appropriate class.
-
-    Queries the device for its version information and uses the products
-    database to determine the most appropriate device class.
-
-    Args:
-        discovered: DiscoveredDevice with serial, ip, and port
-
-    Returns:
-        Device instance of the appropriate type
-        or None if unresponsive
-    """
-
-    conn = DeviceConnection(
-        serial=discovered.serial,
-        ip=discovered.ip,
-        port=discovered.port,
-    )
-
-    try:
-        state_version = await conn.request(
-            packets.Device.GetVersion(),
-            timeout=2.0,
-        )
-        product_id = state_version.product
-
-        # Determine appropriate device class based on product capabilities
-        class_name = get_device_class_name(product_id)
-
-    except Exception as e:
-        _LOGGER.warning(
-            {
-                "class": "_detect_device_type",
-                "method": "detect",
-                "action": "query_failed",
-                "serial": discovered.serial,
-                "reason": str(e),
-            }
-        )
-        return None
-
-    # Instantiate the appropriate class
-    device_class_map = {
-        "Device": Device,
-        "Light": Light,
-        "HevLight": HevLight,
-        "InfraredLight": InfraredLight,
-        "MultiZoneLight": MultiZoneLight,
-        "TileDevice": TileDevice,
-    }
-
-    device_class = device_class_map.get(class_name, Light)
-    device = device_class(
-        serial=discovered.serial, ip=discovered.ip, port=discovered.port
-    )
-
-    return device
 
 
 class DiscoveryContext:
@@ -189,7 +124,7 @@ class DiscoveryContext:
         results: list[Device | None] = [None] * len(discovered)
 
         async def detect_and_store(index: int, disc: DiscoveredDevice) -> None:
-            results[index] = await _detect_device_type(disc)
+            results[index] = await disc.create_device()
 
         async with asyncio.TaskGroup() as tg:
             for i, disc in enumerate(discovered):
@@ -926,7 +861,7 @@ async def find_lights(
     results: list[Device | None] = [None] * len(discovered)
 
     async def detect_and_store(index: int, disc: DiscoveredDevice) -> None:
-        results[index] = await _detect_device_type(disc)
+        results[index] = await disc.create_device()
 
     async with asyncio.TaskGroup() as tg:
         for i, disc in enumerate(discovered):
@@ -1009,7 +944,7 @@ async def find_by_serial(
     for d in discovered:
         if d.serial.lower() == serial_str:
             # Detect device type and return appropriate class
-            return await _detect_device_type(d)
+            return await d.create_device()
 
     return None
 
