@@ -10,22 +10,27 @@ managing visual effects on LIFX devices. It includes:
 
 Example:
     ```python
-    from lifx import discover
+    from lifx import discover, DeviceGroup
     from lifx.effects import Conductor, EffectPulse, EffectColorloop
 
-    async with discover() as group:
-        conductor = Conductor()
+    # Discover devices
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        # Pulse effect
-        effect = EffectPulse(mode="blink", cycles=5)
-        await conductor.start(effect, group.lights)
+    conductor = Conductor()
 
-        # ColorLoop effect
-        effect = EffectColorloop(period=30, change=20)
-        await conductor.start(effect, group.lights)
+    # Pulse effect
+    effect = EffectPulse(mode="blink", cycles=5)
+    await conductor.start(effect, group.lights)
 
-        # Stop when done
-        await conductor.stop(group.lights)
+    # ColorLoop effect
+    effect = EffectColorloop(period=30, change=20)
+    await conductor.start(effect, group.lights)
+
+    # Stop when done
+    await conductor.stop(group.lights)
     ```
 """
 

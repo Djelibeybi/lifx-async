@@ -188,10 +188,6 @@ class Device:
                 "Broadcast serial number not allowed for device connection"
             )
 
-        # Check multicast bit (first byte, LSB should be 0 for unicast)
-        if serial_bytes[0] & 0x01:
-            raise ValueError("Multicast serial number not allowed")
-
         # Validate IP address
         try:
             addr = ipaddress.ip_address(ip)
@@ -862,10 +858,8 @@ class Device:
         location_uuid_to_use: bytes | None = None
 
         try:
-            discovered = await discover_devices(timeout=discover_timeout)
-
             # Check each device for the target label
-            for disc in discovered:
+            async for disc in discover_devices(timeout=discover_timeout):
                 try:
                     # Create connection handle - no explicit open/close needed
                     temp_conn = DeviceConnection(
@@ -1034,10 +1028,8 @@ class Device:
         group_uuid_to_use: bytes | None = None
 
         try:
-            discovered = await discover_devices(timeout=discover_timeout)
-
             # Check each device for the target label
-            for disc in discovered:
+            async for disc in discover_devices(timeout=discover_timeout):
                 try:
                     # Create connection handle - no explicit open/close needed
                     temp_conn = DeviceConnection(

@@ -19,8 +19,8 @@ async def main():
     print("This will broadcast on your network and wait for responses.")
     print()
 
-    # Discover lights with 5 second timeout
-    async for light in discover(timeout=5.0, broadcast_address="255.255.255.255"):
+    # Discover lights
+    async for light in discover():
         # Display information about each device
         print("Light:")
         print(f"  Serial: {light.serial}")

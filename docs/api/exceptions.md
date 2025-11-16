@@ -228,15 +228,18 @@ finally:
 
 ```python
 import logging
-from lifx import discover, LifxError
+from lifx import discover, DeviceGroup, LifxError
 
 logger = logging.getLogger(__name__)
 
 
 async def main():
     try:
-        async with discover() as group:
-            await group.set_color(Colors.BLUE)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        await group.set_color(Colors.BLUE)
     except LifxError as e:
         logger.exception("Failed to control lights")
         # Logs full traceback for debugging

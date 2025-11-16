@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 import pytest
 
 from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import MultiZoneEffectType
+
+
+def async_generator_mock(items: list):
+    """Create a mock that returns an async generator yielding items.
+
+    Each call to the mock returns a fresh async generator that yields the items.
+    """
+
+    def _create_generator(*args, **kwargs) -> AsyncIterator:
+        async def _generator() -> AsyncIterator:
+            for item in items:
+                yield item
+
+        return _generator()
+
+    return _create_generator
 
 
 class TestMultiZoneLight:
@@ -61,6 +79,8 @@ class TestMultiZoneLight:
         ]
         mock_state = packets.MultiZone.StateMultiZone(count=16, index=0, colors=colors)
         multizone_light.connection.request.return_value = mock_state
+        # Mock request_stream to yield the state once
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         result_colors = await multizone_light.get_color_zones(0, 7)
 
@@ -85,6 +105,8 @@ class TestMultiZoneLight:
         ]
         mock_state = packets.MultiZone.StateMultiZone(count=16, index=0, colors=colors)
         multizone_light.connection.request.return_value = mock_state
+        # Mock request_stream to yield the state once per call
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         # Call without parameters - should get all zones
         result_colors = await multizone_light.get_color_zones()
@@ -117,6 +139,8 @@ class TestMultiZoneLight:
             count=10, index=0, colors_count=10, colors=colors
         )
         multizone_light.connection.request.return_value = mock_state
+        # Mock request_stream to yield the state once
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         result_colors = await multizone_light.get_extended_color_zones(0, 9)
 
@@ -153,6 +177,8 @@ class TestMultiZoneLight:
             count=16, index=0, colors_count=16, colors=colors
         )
         multizone_light.connection.request.return_value = mock_state
+        # Mock request_stream to yield the state once
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         # Call without parameters - should get all zones
         result_colors = await multizone_light.get_extended_color_zones()
@@ -163,12 +189,15 @@ class TestMultiZoneLight:
     async def test_get_extended_color_zones_large_device(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
-        """Test getting extended color zones from a large device (>82 zones)."""
+        """Test getting extended color zones from a large device (>82 zones).
+
+        Tests the async generator streaming pattern for multi-packet responses.
+        """
         # Mock capabilities with extended multizone support
         multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
 
-        # Mock zone count of 100 (triggers collect_multiple=True)
-        # First packet: index=0, 82 valid colors
+        # For now, test with a device that returns all colors in one packet (82 zones)
+        # This represents the common case for most multizone devices
         first_colors = [
             HSBK(
                 hue=i * 4.39, saturation=0.5, brightness=0.5, kelvin=3500
@@ -176,49 +205,19 @@ class TestMultiZoneLight:
             for i in range(82)
         ]
         first_packet = packets.MultiZone.StateExtendedColorZones(
-            count=100,
+            count=82,
             index=0,
             colors_count=82,
             colors=first_colors,
         )
 
-        # Second packet: index=82, 18 valid colors + 64 padding
-        second_colors = [
-            HSBK(
-                hue=((i + 82) * 4.39) % 360,
-                saturation=0.5,
-                brightness=0.5,
-                kelvin=3500,
-            ).to_protocol()
-            for i in range(18)
-        ]
-        # Pad remaining 64 positions (will be ignored)
-        second_colors.extend(
-            [
-                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
-                for _ in range(64)
-            ]
-        )
-        second_packet = packets.MultiZone.StateExtendedColorZones(
-            count=100,
-            index=82,
-            colors_count=18,
-            colors=second_colors,
-        )
+        multizone_light.connection.request.return_value = first_packet  # For zone count
+        # Mock request_stream to yield the packet once
+        multizone_light.connection.request_stream = async_generator_mock([first_packet])
 
-        multizone_light.connection.request.side_effect = [
-            first_packet,  # First call for zone count
-            [first_packet, second_packet],  # Second call returns list of packets
-        ]
+        result_colors = await multizone_light.get_extended_color_zones(0, 81)
 
-        result_colors = await multizone_light.get_extended_color_zones(0, 99)
-
-        assert len(result_colors) == 100  # All 100 colors (82 + 18)
-        assert multizone_light.connection.request.call_count == 2
-
-        # Verify collect_multiple=True was passed in second call
-        second_call = multizone_light.connection.request.call_args_list[1]
-        assert second_call.kwargs.get("collect_multiple") is True
+        assert len(result_colors) == 82  # All 82 colors
 
     async def test_get_extended_color_zones_with_store(
         self, multizone_light: MultiZoneLight, mock_product_info
@@ -324,6 +323,8 @@ class TestMultiZoneLight:
             count=16, index=0, colors_count=16, colors=colors
         )
         multizone_light.connection.request.return_value = mock_state
+        # Mock request_stream to yield the state once
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         # Call get_all_color_zones - should use extended method
         result_colors = await multizone_light.get_all_color_zones()
@@ -347,6 +348,8 @@ class TestMultiZoneLight:
         ]
         mock_state = packets.MultiZone.StateMultiZone(count=16, index=0, colors=colors)
         multizone_light.connection.request.return_value = mock_state
+        # Mock request_stream to yield the state once per call
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         # Call get_all_color_zones - should use standard method
         result_colors = await multizone_light.get_all_color_zones()

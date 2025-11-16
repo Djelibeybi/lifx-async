@@ -5,14 +5,18 @@ Themes allow you to apply professionally-curated color palettes to your LIFX dev
 ## Apply a Theme
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 
-async with discover() as lights:
-    # Get a theme by name
-    theme = ThemeLibrary.get("evening")
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
-    # Apply to all devices
-    await lights.apply_theme(theme)
+# Get a theme by name
+theme = ThemeLibrary.get("evening")
+
+# Apply to all devices
+await group.apply_theme(theme)
 ```
 
 ## List Available Themes
@@ -44,17 +48,21 @@ The library includes 42 official LIFX app themes:
 ## Common Options
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 
-async with discover() as lights:
-    theme = ThemeLibrary.get("christmas")
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
-    # Apply with options
-    await lights.apply_theme(
-        theme,
-        power_on=True,      # Turn on lights before applying
-        duration=1.5        # Transition duration in seconds
-    )
+theme = ThemeLibrary.get("christmas")
+
+# Apply with options
+await group.apply_theme(
+    theme,
+    power_on=True,      # Turn on lights before applying
+    duration=1.5        # Transition duration in seconds
+)
 ```
 
 ## Create a Custom Theme
@@ -69,8 +77,12 @@ custom_theme = Theme([
     HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500),    # Blue
 ])
 
-async with discover() as lights:
-    await lights.apply_theme(custom_theme, power_on=True)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await group.apply_theme(custom_theme, power_on=True)
 ```
 
 ## Next Steps
