@@ -28,12 +28,9 @@ class TestDeviceGroupApplyTheme:
             # Verify theme was applied (check one device)
             await asyncio.sleep(0.1)  # Give time for updates
             device = group.lights[0]
-            async with device:
-                color, _, _ = await device.get_color()
-                # Evening theme colors are warm (hue 30-40)
-                assert 25 <= color.hue <= 45, (
-                    f"Hue {color.hue} not in evening theme range"
-                )
+            color, _, _ = await device.get_color()
+            # Evening theme colors are warm (hue 30-40)
+            assert 25 <= color.hue <= 45, f"Hue {color.hue} not in evening theme range"
 
     async def test_apply_theme_with_power_on(
         self, emulator_devices: DeviceGroup
@@ -48,9 +45,8 @@ class TestDeviceGroupApplyTheme:
             # Verify power is on and theme was applied
             await asyncio.sleep(0.1)
             device = group.lights[0]
-            async with device:
-                is_on = await device.get_power()
-                assert is_on is True
+            is_on = await device.get_power()
+            assert is_on is True
 
     async def test_apply_theme_with_duration(
         self, emulator_devices: DeviceGroup
@@ -66,9 +62,8 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)
             # Verify devices received the command
             device = group.lights[0]
-            async with device:
-                color, _, _ = await device.get_color()
-                assert color is not None
+            color, _, _ = await device.get_color()
+            assert color is not None
 
     async def test_apply_theme_to_multizone(
         self, emulator_devices: DeviceGroup
@@ -87,10 +82,9 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)
             # Verify multizone light was updated
             multizone = group.multizone_lights[0]
-            async with multizone:
-                # Get zone count to verify device is responsive
-                zone_count = await multizone.get_zone_count()
-                assert zone_count > 0
+            # Get zone count to verify device is responsive
+            zone_count = await multizone.get_zone_count()
+            assert zone_count > 0
 
     async def test_apply_theme_to_tiles(self, emulator_devices: DeviceGroup) -> None:
         """Test that theme is applied to tile devices."""
@@ -107,10 +101,9 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)
             # Verify tile device was updated
             tile = group.tiles[0]
-            async with tile:
-                # Get tile chain to verify device is responsive
-                tiles_info = await tile.get_tile_chain()
-                assert len(tiles_info) > 0
+            # Get tile chain to verify device is responsive
+            tiles_info = await tile.get_tile_chain()
+            assert len(tiles_info) > 0
 
     async def test_apply_different_themes(self, emulator_devices: DeviceGroup) -> None:
         """Test applying different themes to the group."""
@@ -126,9 +119,8 @@ class TestDeviceGroupApplyTheme:
 
                 # Verify at least one device is updated
                 device = group.lights[0]
-                async with device:
-                    color, _, _ = await device.get_color()
-                    assert color is not None
+                color, _, _ = await device.get_color()
+                assert color is not None
 
     async def test_apply_theme_empty_group(self) -> None:
         """Test apply_theme on empty device group."""
@@ -162,15 +154,13 @@ class TestDeviceGroupApplyTheme:
 
             # Verify at least one light was updated
             light = group.lights[0]
-            async with light:
-                is_on = await light.get_power()
-                assert is_on is True
+            is_on = await light.get_power()
+            assert is_on is True
 
             # Verify at least one multizone was updated
             multizone = group.multizone_lights[0]
-            async with multizone:
-                zone_count = await multizone.get_zone_count()
-                assert zone_count > 0
+            zone_count = await multizone.get_zone_count()
+            assert zone_count > 0
 
     async def test_apply_theme_all_library_themes(
         self, emulator_devices: DeviceGroup
@@ -216,9 +206,8 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)
             # Verify operation completed successfully
             device = group.lights[0]
-            async with device:
-                is_on = await device.get_power()
-                assert is_on is True
+            is_on = await device.get_power()
+            assert is_on is True
 
     async def test_apply_theme_sequential_calls(
         self, emulator_devices: DeviceGroup
@@ -236,10 +225,9 @@ class TestDeviceGroupApplyTheme:
 
             # Verify last theme was applied
             device = group.lights[0]
-            async with device:
-                color, _, _ = await device.get_color()
-                # Halloween theme has orange colors (hue ~30-35)
-                assert 25 <= color.hue <= 40
+            color, _, _ = await device.get_color()
+            # Halloween theme has orange colors (hue ~30-35)
+            assert 25 <= color.hue <= 40
 
     async def test_apply_theme_only_lights(self) -> None:
         """Test apply_theme on group with only lights."""
@@ -278,9 +266,8 @@ class TestDeviceGroupApplyTheme:
             # Verify change was instant
             await asyncio.sleep(0.05)
             device = group.lights[0]
-            async with device:
-                color, _, _ = await device.get_color()
-                assert color is not None
+            color, _, _ = await device.get_color()
+            assert color is not None
 
     async def test_apply_theme_large_duration(
         self, emulator_devices: DeviceGroup
@@ -296,6 +283,5 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)
             # Verify command was sent
             device = group.lights[0]
-            async with device:
-                color, _, _ = await device.get_color()
-                assert color is not None
+            color, _, _ = await device.get_color()
+            assert color is not None

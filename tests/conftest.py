@@ -105,6 +105,8 @@ def emulator_server(emulator_available: bool, xprocess) -> Generator[int]:
             "2",  # 2 multizone devices
             "--tile",
             "1",  # 1 tile device
+            "--tile-count",
+            "1",  # 1 tile on the chain
             "--hev",
             "1",  # 1 HEV light
             "--infrared",
@@ -155,13 +157,55 @@ def emulator_devices(emulator_server: int) -> DeviceGroup:
 
     try:
         devices = [
-            Light(serial="d073d5000001", ip="127.0.0.1", port=emulator_server),
-            Light(serial="d073d5000002", ip="127.0.0.1", port=emulator_server),
-            InfraredLight(serial="d073d5000003", ip="127.0.0.1", port=emulator_server),
-            HevLight(serial="d073d5000004", ip="127.0.0.1", port=emulator_server),
-            MultiZoneLight(serial="d073d5000005", ip="127.0.0.1", port=emulator_server),
-            MultiZoneLight(serial="d073d5000006", ip="127.0.0.1", port=emulator_server),
-            TileDevice(serial="d073d5000007", ip="127.0.0.1", port=emulator_server),
+            Light(
+                serial="d073d5000001",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
+            Light(
+                serial="d073d5000002",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
+            InfraredLight(
+                serial="d073d5000003",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
+            HevLight(
+                serial="d073d5000004",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
+            MultiZoneLight(
+                serial="d073d5000005",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
+            MultiZoneLight(
+                serial="d073d5000006",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
+            TileDevice(
+                serial="d073d5000007",
+                ip="127.0.0.1",
+                port=emulator_server,
+                timeout=1.0,
+                max_retries=1,
+            ),
         ]
         return DeviceGroup(devices)
     finally:

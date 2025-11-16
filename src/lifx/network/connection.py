@@ -292,7 +292,7 @@ class _ActualConnection:
         # Send to device
         await self._transport.send(message, (self.ip, self.port))
 
-    async def receive_packet(self, timeout: float = 2.0) -> tuple[LifxHeader, bytes]:
+    async def receive_packet(self, timeout: float = 0.5) -> tuple[LifxHeader, bytes]:
         """Receive a packet from the device.
 
         Note:
