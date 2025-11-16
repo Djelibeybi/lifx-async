@@ -177,19 +177,23 @@ Control multiple devices in parallel:
 
 ```python
 import asyncio
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
 async def multi_device_control():
-    async with discover() as group:
-        # Create different tasks for different devices
-        tasks = [
-            group.devices[0].set_color(Colors.RED),
-            group.devices[1].set_color(Colors.GREEN),
-            group.devices[2].set_color(Colors.BLUE),
-        ]
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        # Execute all at once
-        await asyncio.gather(*tasks)
+    # Create different tasks for different devices
+    tasks = [
+        group.devices[0].set_color(Colors.RED),
+        group.devices[1].set_color(Colors.GREEN),
+        group.devices[2].set_color(Colors.BLUE),
+    ]
+
+    # Execute all at once
+    await asyncio.gather(*tasks)
 ```
 
 ### Batched Discovery
@@ -264,24 +268,28 @@ async def resilient_control():
 ### Graceful Degradation
 
 ```python
-from lifx import discover, LifxError
+from lifx import discover, DeviceGroup, LifxError
 
 async def best_effort_control():
-    async with discover() as group:
-        results = []
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        # Try to control all lights, continue on errors
-        for light in group.lights:
-            try:
-                await light.set_color(Colors.GREEN)
-                results.append((light, "success"))
-            except LifxError as e:
-                results.append((light, f"failed: {e}"))
+    results = []
 
-        # Report results
-        for light, status in results:
-            label = await light.get_label() if status == "success" else "Unknown"
-            print(f"{label}: {status}")
+    # Try to control all lights, continue on errors
+    for light in group.lights:
+        try:
+            await light.set_color(Colors.GREEN)
+            results.append((light, "success"))
+        except LifxError as e:
+            results.append((light, f"failed: {e}"))
+
+    # Report results
+    for light, status in results:
+        label = await light.get_label() if status == "success" else "Unknown"
+        print(f"{label}: {status}")
 ```
 
 ## Device Capabilities
@@ -314,21 +322,24 @@ async def check_capabilities():
 ### Capability-Based Logic
 
 ```python
-from lifx import discover
+from lifx import discover, DeviceGroup
 from lifx.products.registry import ProductCapability
 
 async def capability_aware_control():
-    async with discover() as group:
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        for device in group.devices:
+    for device in group.devices:
 
-            # Color devices
-            if ProductCapability.COLOR in device.capabilities:
-                await device.set_color(Colors.PURPLE)
+        # Color devices
+        if ProductCapability.COLOR in device.capabilities:
+            await device.set_color(Colors.PURPLE)
 
-            # Multizone devices
-            if ProductCapability.MULTIZONE in device.capabilities:
-                await device.set_color_zones(0, 8, Colors.RED)
+        # Multizone devices
+        if ProductCapability.MULTIZONE in device.capabilities:
+            await device.set_color_zones(0, 8, Colors.RED)
 ```
 
 ## Custom Effects
@@ -353,31 +364,39 @@ async def smooth_color_cycle():
 
 ```python
 import asyncio
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
 async def synchronized_flash():
-    async with discover() as group:
-        # Flash all devices simultaneously
-        for _ in range(5):
-            await group.set_color(Colors.RED, duration=0.0)
-            await asyncio.sleep(0.2)
-            await group.set_color(Colors.OFF, duration=0.0)
-            await asyncio.sleep(0.2)
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    # Flash all devices simultaneously
+    for _ in range(5):
+        await group.set_color(Colors.RED, duration=0.0)
+        await asyncio.sleep(0.2)
+        await group.set_color(Colors.OFF, duration=0.0)
+        await asyncio.sleep(0.2)
 ```
 
 ### Wave Effect Across Devices
 
 ```python
 import asyncio
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
 async def wave_effect():
-    async with discover() as group:
-        for i, device in enumerate(group.devices):
-            # Each device changes color with a delay
-            asyncio.create_task(
-                delayed_color_change(device, Colors.BLUE, delay=i * 0.3)
-            )
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    for i, device in enumerate(group.devices):
+        # Each device changes color with a delay
+        asyncio.create_task(
+            delayed_color_change(device, Colors.BLUE, delay=i * 0.3)
+        )
 
 async def delayed_color_change(device, color, delay):
     await asyncio.sleep(delay)
@@ -410,16 +429,26 @@ async def efficient():
 ### Batch Operations
 
 ```python
+from lifx import discover, DeviceGroup, Colors
+
 # ❌ Sequential: Takes N * latency
 async def sequential():
-    async with discover() as group:
-        for device in group.devices:
-            await device.set_color(Colors.GREEN)
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    for device in group.devices:
+        await device.set_color(Colors.GREEN)
 
 # ✅ Parallel: Takes ~latency
 async def parallel():
-    async with discover() as group:
-        await group.set_color(Colors.GREEN)
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    await group.set_color(Colors.GREEN)
 ```
 
 ### Connection Reuse

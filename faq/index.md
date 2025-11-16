@@ -61,9 +61,15 @@ async with await Light.from_ip("192.168.1.100") as light:
 No! Discovery finds devices automatically:
 
 ```python
-async with discover() as group:
-    # All devices found automatically
-    await group.set_color(Colors.BLUE)
+from lifx import discover, DeviceGroup
+
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+# All devices found automatically
+await group.set_color(Colors.BLUE)
 ```
 
 If you do know the IP, you can connect directly for faster connection.
@@ -72,16 +78,20 @@ If you do know the IP, you can connect directly for faster connection.
 
 ### How do I control multiple lights at once?
 
-Use the `DeviceGroup` returned by `discover()` for batch operations:
+Use `DeviceGroup` for batch operations:
 
 ```python
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
-async with discover() as group:
-    # All lights at once
-    await group.set_power(True)
-    await group.set_color(Colors.BLUE)
-    await group.set_brightness(0.5)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+# All lights at once
+await group.set_power(True)
+await group.set_color(Colors.BLUE)
+await group.set_brightness(0.5)
 ```
 
 ### How do I set a specific RGB color?

@@ -44,15 +44,19 @@ Common issues and solutions when working with lifx.
 Try different broadcast addresses:
 
 ```python
-from lifx import discover
+from lifx import discover, DeviceGroup
 
 # Default (255.255.255.255)
-async with discover() as group:
-    pass
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
 # Network-specific (e.g., 192.168.1.255)
-async with discover(broadcast_address="192.168.1.255") as group:
-    pass
+devices = []
+async for device in discover(broadcast_address="192.168.1.255"):
+    devices.append(device)
+group = DeviceGroup(devices)
 ```
 
 **Solution:**

@@ -8,53 +8,54 @@ The high-level API provides simplified functions for common LIFX operations. The
 
 ```python
 discover(
-    timeout: float = 3.0,
+    timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> DiscoveryContext
+) -> AsyncGenerator[Device, None]
 ```
 
-Discover LIFX devices and return a discovery context manager.
-
-This function returns an async context manager that performs device discovery and automatically handles connection/disconnection.
+Discover LIFX devices and yield them as they are found.
 
 | PARAMETER                 | DESCRIPTION                                                                                           |
 | ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `timeout`                 | Discovery timeout in seconds (default 3.0) **TYPE:** `float` **DEFAULT:** `3.0`                       |
+| `timeout`                 | Discovery timeout in seconds (default 3.0) **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT`         |
 | `broadcast_address`       | Broadcast address to use (default "255.255.255.255") **TYPE:** `str` **DEFAULT:** `'255.255.255.255'` |
 | `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                      |
 | `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                     |
 | `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                      |
 
-| RETURNS            | DESCRIPTION                            |
-| ------------------ | -------------------------------------- |
-| `DiscoveryContext` | DiscoveryContext async context manager |
+| YIELDS                         | DESCRIPTION                             |
+| ------------------------------ | --------------------------------------- |
+| `AsyncGenerator[Device, None]` | Device instances as they are discovered |
 
 Example
 
 ```python
-# Discover and control all devices using context manager
-async with discover() as group:
-    await group.set_power(True)
-    await group.set_color(Colors.BLUE)
+# Process devices as they're discovered
+async for device in discover():
+    print(f"Found: {device.serial}")
+    async with device:
+        await device.set_power(True)
+
+# Or collect all devices first
+devices = []
+async for device in discover():
+    devices.append(device)
 ```
 
 Source code in `src/lifx/api.py`
 
 ````python
-def discover(
-    timeout: float = 3.0,
+async def discover(
+    timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> DiscoveryContext:
-    """Discover LIFX devices and return a discovery context manager.
-
-    This function returns an async context manager that performs device
-    discovery and automatically handles connection/disconnection.
+) -> AsyncGenerator[Device, None]:
+    """Discover LIFX devices and yield them as they are found.
 
     Args:
         timeout: Discovery timeout in seconds (default 3.0)
@@ -63,151 +64,41 @@ def discover(
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
 
-    Returns:
-        DiscoveryContext async context manager
+    Yields:
+        Device instances as they are discovered
 
     Example:
         ```python
-        # Discover and control all devices using context manager
-        async with discover() as group:
-            await group.set_power(True)
-            await group.set_color(Colors.BLUE)
+        # Process devices as they're discovered
+        async for device in discover():
+            print(f"Found: {device.serial}")
+            async with device:
+                await device.set_power(True)
+
+        # Or collect all devices first
+        devices = []
+        async for device in discover():
+            devices.append(device)
         ```
     """
-    return DiscoveryContext(
+    async for discovered in discover_devices(
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
-    )
-````
-
-### find_lights
-
-```python
-find_lights(
-    label_contains: str | None = None,
-    timeout: float = 3.0,
-    broadcast_address: str = "255.255.255.255",
-    port: int = LIFX_UDP_PORT,
-    max_response_time: float = MAX_RESPONSE_TIME,
-    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> list[Light]
-```
-
-Find Light devices with optional label filtering.
-
-| PARAMETER                 | DESCRIPTION                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `label_contains`          | Filter by label substring (case-insensitive) **TYPE:** \`str                                          |
-| `timeout`                 | Discovery timeout in seconds (default 3.0) **TYPE:** `float` **DEFAULT:** `3.0`                       |
-| `broadcast_address`       | Broadcast address to use (default "255.255.255.255") **TYPE:** `str` **DEFAULT:** `'255.255.255.255'` |
-| `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                      |
-| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                     |
-| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                      |
-
-| RETURNS       | DESCRIPTION                                   |
-| ------------- | --------------------------------------------- |
-| `list[Light]` | List of Light instances matching the criteria |
-
-Example
-
-```python
-# Find all lights with "bedroom" in the label
-lights = await find_lights(label_contains="bedroom")
-for light in lights:
-    async with light:
-        await light.set_color(Colors.WARM_WHITE)
-```
-
-Source code in `src/lifx/api.py`
-
-````python
-async def find_lights(
-    label_contains: str | None = None,
-    timeout: float = 3.0,
-    broadcast_address: str = "255.255.255.255",
-    port: int = LIFX_UDP_PORT,
-    max_response_time: float = MAX_RESPONSE_TIME,
-    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> list[Light]:
-    """Find Light devices with optional label filtering.
-
-    Args:
-        label_contains: Filter by label substring (case-insensitive)
-        timeout: Discovery timeout in seconds (default 3.0)
-        broadcast_address: Broadcast address to use (default "255.255.255.255")
-        port: Port to use (default LIFX_UDP_PORT)
-        max_response_time: Max time to wait for responses
-        idle_timeout_multiplier: Idle timeout multiplier
-
-    Returns:
-        List of Light instances matching the criteria
-
-    Example:
-        ```python
-        # Find all lights with "bedroom" in the label
-        lights = await find_lights(label_contains="bedroom")
-        for light in lights:
-            async with light:
-                await light.set_color(Colors.WARM_WHITE)
-        ```
-    """
-    discovered = await discover_devices(
-        timeout=timeout,
-        broadcast_address=broadcast_address,
-        port=port,
-        max_response_time=max_response_time,
-        idle_timeout_multiplier=idle_timeout_multiplier,
-    )
-
-    # Detect device types in parallel
-    results: list[Device | None] = [None] * len(discovered)
-
-    async def detect_and_store(index: int, disc: DiscoveredDevice) -> None:
-        results[index] = await _detect_device_type(disc)
-
-    async with asyncio.TaskGroup() as tg:
-        for i, disc in enumerate(discovered):
-            tg.create_task(detect_and_store(i, disc))
-
-    devices = [d for d in results if d is not None]
-
-    # Filter to only Light devices (and subclasses like MultiZoneLight, TileDevice)
-    lights: list[Light] = [d for d in devices if isinstance(d, Light)]
-
-    # If label filtering is requested, connect and check label
-    if label_contains is not None:
-        filtered_lights: list[Light] = []
-        for light in lights:
-            async with light:
-                try:
-                    label = await light.get_label()
-                    if label_contains.lower() in label.lower():
-                        filtered_lights.append(light)
-                except LifxTimeoutError:
-                    # Skip devices that fail to respond
-                    _LOGGER.warning(
-                        {
-                            "class": "find_lights",
-                            "method": "filter_devices",
-                            "action": "no_response",
-                            "serial": light.serial,
-                            "ip": light.ip,
-                        }
-                    )
-        return filtered_lights
-
-    return lights
+    ):
+        device = await discovered.create_device()
+        if device is not None:
+            yield device
 ````
 
 ### find_by_serial
 
 ```python
 find_by_serial(
-    serial: bytes | str,
-    timeout: float = 3.0,
+    serial: str,
+    timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
@@ -217,14 +108,14 @@ find_by_serial(
 
 Find a specific device by serial number.
 
-| PARAMETER                 | DESCRIPTION                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `serial`                  | Serial number as bytes or hex string (with or without separators) **TYPE:** \`bytes                   |
-| `timeout`                 | Discovery timeout in seconds (default 3.0) **TYPE:** `float` **DEFAULT:** `3.0`                       |
-| `broadcast_address`       | Broadcast address to use (default "255.255.255.255") **TYPE:** `str` **DEFAULT:** `'255.255.255.255'` |
-| `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                      |
-| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                     |
-| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                      |
+| PARAMETER                 | DESCRIPTION                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `serial`                  | Serial number as hex string (with or without separators) **TYPE:** `str`                                    |
+| `timeout`                 | Discovery timeout in seconds (default DISCOVERY_TIMEOUT) **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT` |
+| `broadcast_address`       | Broadcast address to use (default "255.255.255.255") **TYPE:** `str` **DEFAULT:** `'255.255.255.255'`       |
+| `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
+| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                           |
+| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                            |
 
 | RETURNS  | DESCRIPTION |
 | -------- | ----------- |
@@ -244,8 +135,8 @@ Source code in `src/lifx/api.py`
 
 ````python
 async def find_by_serial(
-    serial: bytes | str,
-    timeout: float = 3.0,
+    serial: str,
+    timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
@@ -254,8 +145,8 @@ async def find_by_serial(
     """Find a specific device by serial number.
 
     Args:
-        serial: Serial number as bytes or hex string (with or without separators)
-        timeout: Discovery timeout in seconds (default 3.0)
+        serial: Serial number as hex string (with or without separators)
+        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)
         broadcast_address: Broadcast address to use (default "255.255.255.255")
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
@@ -274,170 +165,236 @@ async def find_by_serial(
         ```
     """
     # Normalize serial to string format (12-digit hex, no separators)
-    if isinstance(serial, bytes):
-        serial_str = serial.hex()
-    else:
-        serial_str = serial.replace(":", "").replace("-", "").lower()
+    serial_str = serial.replace(":", "").replace("-", "").lower()
 
-    discovered = await discover_devices(
+    async for disc in discover_devices(
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
-    )
-
-    for d in discovered:
-        if d.serial.lower() == serial_str:
+    ):
+        if disc.serial.lower() == serial_str:
             # Detect device type and return appropriate class
-            return await _detect_device_type(d)
+            return await disc.create_device()
 
     return None
 ````
 
-## Discovery Context
-
-### DiscoveryContext
+### find_by_label
 
 ```python
-DiscoveryContext(
-    timeout: float,
-    broadcast_address: str,
-    port: int,
+find_by_label(
+    label: str,
+    exact_match: bool = False,
+    timeout: float = DISCOVERY_TIMEOUT,
+    broadcast_address: str = "255.255.255.255",
+    port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-)
+) -> AsyncGenerator[Device]
 ```
 
-Async context manager for device discovery.
+Find LIFX devices by label (name).
 
-Handles device discovery and automatic connection/disconnection. Use with the `discover()` function for convenient device discovery.
+Uses a protocol trick by broadcasting GetLabel instead of GetService, which returns all device labels in StateLabel responses. This is more efficient than querying each device individually.
+
+| PARAMETER                 | DESCRIPTION                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`                   | Device label to search for (case-insensitive) **TYPE:** `str`                                                                                                             |
+| `exact_match`             | If True, match label exactly and yield at most one device; if False, match substring and yield all matching devices (default False) **TYPE:** `bool` **DEFAULT:** `False` |
+| `timeout`                 | Discovery timeout in seconds (default DISCOVERY_TIMEOUT) **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT`                                                               |
+| `broadcast_address`       | Broadcast address to use (default "255.255.255.255") **TYPE:** `str` **DEFAULT:** `'255.255.255.255'`                                                                     |
+| `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                                                                                          |
+| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                                                                                         |
+| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                                                                                          |
+
+| YIELDS                   | DESCRIPTION               |
+| ------------------------ | ------------------------- |
+| `AsyncGenerator[Device]` | Matching Device instances |
 
 Example
 
 ```python
-async with discover(timeout=5.0) as group:
-    await group.set_power(True)
+# Find all devices with "Living" in the label
+async for device in find_by_label("Living"):
+    async with device:
+        await device.set_power(True)
+
+# Find device by exact label match (yields at most one)
+async for device in find_by_label("Living Room", exact_match=True):
+    async with device:
+        await device.set_power(True)
+    break  # exact_match yields at most one device
 ```
-
-| PARAMETER                 | DESCRIPTION                                                                       |
-| ------------------------- | --------------------------------------------------------------------------------- |
-| `timeout`                 | Discovery timeout in seconds **TYPE:** `float`                                    |
-| `broadcast_address`       | Broadcast address to use **TYPE:** `str`                                          |
-| `port`                    | Port to use **TYPE:** `int`                                                       |
-| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME` |
-| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`  |
-
-| METHOD       | DESCRIPTION                           |
-| ------------ | ------------------------------------- |
-| `__aenter__` | Discover devices and connect to them. |
-| `__aexit__`  | Disconnect from all devices.          |
 
 Source code in `src/lifx/api.py`
 
-```python
-def __init__(
-    self,
-    timeout: float,
-    broadcast_address: str,
-    port: int,
+````python
+async def find_by_label(
+    label: str,
+    exact_match: bool = False,
+    timeout: float = DISCOVERY_TIMEOUT,
+    broadcast_address: str = "255.255.255.255",
+    port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> None:
-    """Initialize discovery context.
+) -> AsyncGenerator[Device]:
+    """Find LIFX devices by label (name).
+
+    Uses a protocol trick by broadcasting GetLabel instead of GetService,
+    which returns all device labels in StateLabel responses. This is more
+    efficient than querying each device individually.
 
     Args:
-        timeout: Discovery timeout in seconds
-        broadcast_address: Broadcast address to use
-        port: Port to use
+        label: Device label to search for (case-insensitive)
+        exact_match: If True, match label exactly and yield at most one device;
+                     if False, match substring and yield all matching devices
+                     (default False)
+        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)
+        broadcast_address: Broadcast address to use (default "255.255.255.255")
+        port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
+
+    Yields:
+        Matching Device instances
+
+    Example:
+        ```python
+        # Find all devices with "Living" in the label
+        async for device in find_by_label("Living"):
+            async with device:
+                await device.set_power(True)
+
+        # Find device by exact label match (yields at most one)
+        async for device in find_by_label("Living Room", exact_match=True):
+            async with device:
+                await device.set_power(True)
+            break  # exact_match yields at most one device
+        ```
     """
-    self.timeout = timeout
-    self.broadcast_address = broadcast_address
-    self.port = port
-    self._group: DeviceGroup | None = None
-    self._max_response_time = max_response_time
-    self._idle_timeout_multiplier = idle_timeout_multiplier
-```
+    async for resp in _discover_with_packet(
+        packets.Device.GetLabel(),
+        timeout=timeout,
+        broadcast_address=broadcast_address,
+        port=port,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+    ):
+        device_label = resp.response_payload.get("label", "")
+        matched = False
 
-#### Functions
+        if exact_match:
+            # Exact match - return first match only
+            if device_label.lower() == label.lower():
+                matched = True
+        else:
+            # Substring match - return all matches
+            if label.lower() in device_label.lower():
+                matched = True
 
-##### __aenter__
+        if matched:
+            # Create DiscoveredDevice from response
+            disc = DiscoveredDevice(
+                serial=resp.serial,
+                ip=resp.ip,
+                port=resp.port,
+                service=1,  # UDP
+                response_time=resp.response_time,
+            )
+
+            device = await disc.create_device()
+            if device is not None:
+                yield device
+````
+
+### find_by_ip
 
 ```python
-__aenter__() -> DeviceGroup
+find_by_ip(
+    ip: str,
+    timeout: float = DISCOVERY_TIMEOUT,
+    port: int = LIFX_UDP_PORT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+) -> Device | None
 ```
 
-Discover devices and connect to them.
+Find a LIFX device by IP address.
 
-| RETURNS       | DESCRIPTION                                   |
-| ------------- | --------------------------------------------- |
-| `DeviceGroup` | DeviceGroup containing all discovered devices |
+Uses a targeted discovery by sending the broadcast to the specific IP address, which means only that device will respond (if it exists). This is more efficient than broadcasting to all devices and filtering.
+
+| PARAMETER                 | DESCRIPTION                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ip`                      | Target device IP address **TYPE:** `str`                                                                    |
+| `timeout`                 | Discovery timeout in seconds (default DISCOVERY_TIMEOUT) **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT` |
+| `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
+| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                           |
+| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                            |
+
+| RETURNS  | DESCRIPTION |
+| -------- | ----------- |
+| \`Device | None\`      |
+
+Example
+
+```python
+# Find device at specific IP
+device = await find_by_ip("192.168.1.100")
+if device:
+    async with device:
+        print(f"Found: {device.label}")
+```
 
 Source code in `src/lifx/api.py`
 
-```python
-async def __aenter__(self) -> DeviceGroup:
-    """Discover devices and connect to them.
+````python
+async def find_by_ip(
+    ip: str,
+    timeout: float = DISCOVERY_TIMEOUT,
+    port: int = LIFX_UDP_PORT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+) -> Device | None:
+    """Find a LIFX device by IP address.
+
+    Uses a targeted discovery by sending the broadcast to the specific IP address,
+    which means only that device will respond (if it exists). This is more efficient
+    than broadcasting to all devices and filtering.
+
+    Args:
+        ip: Target device IP address
+        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)
+        port: Port to use (default LIFX_UDP_PORT)
+        max_response_time: Max time to wait for responses
+        idle_timeout_multiplier: Idle timeout multiplier
 
     Returns:
-        DeviceGroup containing all discovered devices
+        Device instance if found, None otherwise
+
+    Example:
+        ```python
+        # Find device at specific IP
+        device = await find_by_ip("192.168.1.100")
+        if device:
+            async with device:
+                print(f"Found: {device.label}")
+        ```
     """
-    # Perform discovery
-    discovered = await discover_devices(
-        timeout=self.timeout,
-        broadcast_address=self.broadcast_address,
-        port=self.port,
-        max_response_time=self._max_response_time,
-        idle_timeout_multiplier=self._idle_timeout_multiplier,
-    )
+    # Use the target IP as the "broadcast" address - only that device will respond
+    async for discovered in discover_devices(
+        timeout=timeout,
+        broadcast_address=ip,  # Protocol trick: send directly to target IP
+        port=port,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+    ):
+        # Should only get one response (or none)
+        return await discovered.create_device()
 
-    # Detect device types and instantiate appropriate classes
-    results: list[Device | None] = [None] * len(discovered)
-
-    async def detect_and_store(index: int, disc: DiscoveredDevice) -> None:
-        results[index] = await _detect_device_type(disc)
-
-    async with asyncio.TaskGroup() as tg:
-        for i, disc in enumerate(discovered):
-            tg.create_task(detect_and_store(i, disc))
-
-    # Filter out None values (unresponsive devices)
-    devices = [d for d in results if d is not None]
-
-    # Create group and connect all devices
-    self._group = DeviceGroup(devices)
-    await self._group.__aenter__()
-
-    return self._group
-```
-
-##### __aexit__
-
-```python
-__aexit__(
-    exc_type: type[BaseException] | None,
-    exc_val: BaseException | None,
-    exc_tb: TracebackType | None,
-) -> None
-```
-
-Disconnect from all devices.
-
-Source code in `src/lifx/api.py`
-
-```python
-async def __aexit__(
-    self,
-    exc_type: type[BaseException] | None,
-    exc_val: BaseException | None,
-    exc_tb: TracebackType | None,
-) -> None:
-    """Disconnect from all devices."""
-    if self._group:
-        await self._group.__aexit__(exc_type, exc_val, exc_tb)
-```
+    return None
+````
 
 ## Device Group
 
@@ -458,9 +415,15 @@ Provides convenient methods to control multiple devices simultaneously.
 Example
 
 ```python
-async with discover() as group:
-    await group.set_power(True)
-    await group.set_color(Colors.BLUE)
+# Collect devices from discovery
+devices = []
+async for device in discover():
+    devices.append(device)
+
+# Create group and perform batch operations
+group = DeviceGroup(devices)
+await group.set_power(True)
+await group.set_color(Colors.BLUE)
 ```
 
 | PARAMETER | DESCRIPTION                                       |
@@ -509,6 +472,15 @@ def __init__(
         devices: List of Device instances
     """
     self._devices = devices
+    self._lights = [light for light in devices if isinstance(light, Light)]
+    self._hev_lights = [light for light in devices if type(light) is HevLight]
+    self._infrared_lights = [
+        light for light in devices if type(light) is InfraredLight
+    ]
+    self._multizone_lights = [
+        light for light in devices if type(light) is MultiZoneLight
+    ]
+    self._tile_devices = [light for light in devices if type(light) is TileDevice]
     self._locations_cache: dict[str, DeviceGroup] | None = None
     self._groups_cache: dict[str, DeviceGroup] | None = None
     self._location_metadata: dict[bytes, LocationGrouping] | None = None
@@ -575,18 +547,11 @@ __aenter__() -> DeviceGroup
 
 Enter async context manager.
 
-Note: With the new connection architecture, explicit connect/disconnect is not needed. Connections are managed automatically by the connection pool when requests are made.
-
 Source code in `src/lifx/api.py`
 
 ```python
 async def __aenter__(self) -> DeviceGroup:
-    """Enter async context manager.
-
-    Note: With the new connection architecture, explicit connect/disconnect
-    is not needed. Connections are managed automatically by the connection
-    pool when requests are made.
-    """
+    """Enter async context manager."""
     return self
 ```
 
@@ -602,8 +567,6 @@ __aexit__(
 
 Exit async context manager.
 
-Note: Cleanup is handled automatically by the connection pool.
-
 Source code in `src/lifx/api.py`
 
 ```python
@@ -613,10 +576,7 @@ async def __aexit__(
     exc_val: BaseException | None,
     exc_tb: TracebackType | None,
 ) -> None:
-    """Exit async context manager.
-
-    Note: Cleanup is handled automatically by the connection pool.
-    """
+    """Exit async context manager."""
     pass
 ```
 
@@ -674,8 +634,11 @@ Set power state for all devices in the group.
 Example
 
 ```python
-async with discover() as group:
-    await group.set_power(True, duration=1.0)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+await group.set_power(True, duration=1.0)
 ```
 
 Source code in `src/lifx/api.py`
@@ -690,8 +653,11 @@ async def set_power(self, on: bool, duration: float = 0.0) -> None:
 
     Example:
         ```python
-        async with discover() as group:
-            await group.set_power(True, duration=1.0)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        await group.set_power(True, duration=1.0)
         ```
     """
     async with asyncio.TaskGroup() as tg:
@@ -715,8 +681,11 @@ Set color for all Light devices in the group.
 Example
 
 ```python
-async with discover() as group:
-    await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
 ```
 
 Source code in `src/lifx/api.py`
@@ -731,8 +700,11 @@ async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
 
     Example:
         ```python
-        async with discover() as group:
-            await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
         ```
     """
     async with asyncio.TaskGroup() as tg:
@@ -756,8 +728,11 @@ Set brightness for all Light devices in the group.
 Example
 
 ```python
-async with discover() as group:
-    await group.set_brightness(0.5, duration=1.0)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+await group.set_brightness(0.5, duration=1.0)
 ```
 
 Source code in `src/lifx/api.py`
@@ -772,8 +747,11 @@ async def set_brightness(self, brightness: float, duration: float = 0.0) -> None
 
     Example:
         ```python
-        async with discover() as group:
-            await group.set_brightness(0.5, duration=1.0)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        await group.set_brightness(0.5, duration=1.0)
         ```
     """
     async with asyncio.TaskGroup() as tg:
@@ -798,8 +776,11 @@ Pulse effect for all Light devices.
 Example
 
 ```python
-async with discover() as group:
-    await group.pulse(Colors.RED, period=1.0, cycles=1.0)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+await group.pulse(Colors.RED, period=1.0, cycles=1.0)
 ```
 
 Source code in `src/lifx/api.py`
@@ -817,8 +798,11 @@ async def pulse(
 
     Example:
         ```python
-        async with discover() as group:
-            await group.pulse(Colors.RED, period=1.0, cycles=1.0)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        await group.pulse(Colors.RED, period=1.0, cycles=1.0)
         ```
     """
     async with asyncio.TaskGroup() as tg:
@@ -849,10 +833,13 @@ Fetches location metadata if not cached and groups devices by location label.
 Example
 
 ```python
-async with discover() as group:
-    by_location = await group.organize_by_location()
-    kitchen = by_location["Kitchen"]
-    await kitchen.set_color(Colors.BLUE)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+by_location = await group.organize_by_location()
+kitchen = by_location["Kitchen"]
+await kitchen.set_color(Colors.BLUE)
 ```
 
 Source code in `src/lifx/api.py`
@@ -873,10 +860,13 @@ async def organize_by_location(
 
     Example:
         ```python
-        async with discover() as group:
-            by_location = await group.organize_by_location()
-            kitchen = by_location["Kitchen"]
-            await kitchen.set_color(Colors.BLUE)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        by_location = await group.organize_by_location()
+        kitchen = by_location["Kitchen"]
+        await kitchen.set_color(Colors.BLUE)
         ```
     """
     # Fetch metadata if not cached
@@ -911,10 +901,13 @@ Fetches group metadata if not cached and groups devices by group label.
 Example
 
 ```python
-async with discover() as group:
-    by_group = await group.organize_by_group()
-    bedroom = by_group["Bedroom Lights"]
-    await bedroom.set_power(False)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+by_group = await group.organize_by_group()
+bedroom = by_group["Bedroom Lights"]
+await bedroom.set_power(False)
 ```
 
 Source code in `src/lifx/api.py`
@@ -935,10 +928,13 @@ async def organize_by_group(
 
     Example:
         ```python
-        async with discover() as group:
-            by_group = await group.organize_by_group()
-            bedroom = by_group["Bedroom Lights"]
-            await bedroom.set_power(False)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        by_group = await group.organize_by_group()
+        bedroom = by_group["Bedroom Lights"]
+        await bedroom.set_power(False)
         ```
     """
     # Fetch metadata if not cached
@@ -976,9 +972,12 @@ Filter devices to a specific location.
 Example
 
 ```python
-async with discover() as group:
-    living_room = await group.filter_by_location("Living Room")
-    await living_room.set_brightness(0.7)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+living_room = await group.filter_by_location("Living Room")
+await living_room.set_brightness(0.7)
 ```
 
 Source code in `src/lifx/api.py`
@@ -1001,9 +1000,12 @@ async def filter_by_location(
 
     Example:
         ```python
-        async with discover() as group:
-            living_room = await group.filter_by_location("Living Room")
-            await living_room.set_brightness(0.7)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        living_room = await group.filter_by_location("Living Room")
+        await living_room.set_brightness(0.7)
         ```
     """
     locations = await self.organize_by_location(include_unassigned=False)
@@ -1045,9 +1047,12 @@ Filter devices to a specific group.
 Example
 
 ```python
-async with discover() as group:
-    bedroom = await group.filter_by_group("Bedroom Lights")
-    await bedroom.set_color(Colors.WARM_WHITE)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+bedroom = await group.filter_by_group("Bedroom Lights")
+await bedroom.set_color(Colors.WARM_WHITE)
 ```
 
 Source code in `src/lifx/api.py`
@@ -1070,9 +1075,12 @@ async def filter_by_group(
 
     Example:
         ```python
-        async with discover() as group:
-            bedroom = await group.filter_by_group("Bedroom Lights")
-            await bedroom.set_color(Colors.WARM_WHITE)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        bedroom = await group.filter_by_group("Bedroom Lights")
+        await bedroom.set_color(Colors.WARM_WHITE)
         ```
     """
     groups = await self.organize_by_group(include_unassigned=False)
@@ -1115,10 +1123,13 @@ Get devices without location or group assigned.
 Example
 
 ```python
-async with discover() as group:
-    await group.organize_by_location()
-    unassigned = group.get_unassigned_devices(metadata_type="location")
-    print(f"Found {len(unassigned)} devices without location")
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+await group.organize_by_location()
+unassigned = group.get_unassigned_devices(metadata_type="location")
+print(f"Found {len(unassigned)} devices without location")
 ```
 
 Source code in `src/lifx/api.py`
@@ -1140,10 +1151,13 @@ def get_unassigned_devices(
 
     Example:
         ```python
-        async with discover() as group:
-            await group.organize_by_location()
-            unassigned = group.get_unassigned_devices(metadata_type="location")
-            print(f"Found {len(unassigned)} devices without location")
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        await group.organize_by_location()
+        unassigned = group.get_unassigned_devices(metadata_type="location")
+        print(f"Found {len(unassigned)} devices without location")
         ```
     """
     if metadata_type == "location":
@@ -1188,9 +1202,12 @@ Example
 ```python
 from lifx.theme import get_theme
 
-async with discover() as group:
-    evening = get_theme("evening")
-    await group.apply_theme(evening, power_on=True, duration=1.0)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+evening = get_theme("evening")
+await group.apply_theme(evening, power_on=True, duration=1.0)
 ```
 
 Source code in `src/lifx/api.py`
@@ -1216,9 +1233,12 @@ async def apply_theme(
         ```python
         from lifx.theme import get_theme
 
-        async with discover() as group:
-            evening = get_theme("evening")
-            await group.apply_theme(evening, power_on=True, duration=1.0)
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
+        evening = get_theme("evening")
+        await group.apply_theme(evening, power_on=True, duration=1.0)
         ```
     """
     async with asyncio.TaskGroup() as tg:
@@ -1248,15 +1268,19 @@ Use this if you've changed device locations/groups and want to re-fetch.
 Example
 
 ```python
-async with discover() as group:
-    # First organization
-    by_location = await group.organize_by_location()
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
-    # ... change device locations ...
+# First organization
+by_location = await group.organize_by_location()
 
-    # Clear cache and re-organize
-    group.invalidate_metadata_cache()
-    by_location = await group.organize_by_location()
+# ... change device locations ...
+
+# Clear cache and re-organize
+group.invalidate_metadata_cache()
+by_location = await group.organize_by_location()
 ```
 
 Source code in `src/lifx/api.py`
@@ -1269,15 +1293,19 @@ def invalidate_metadata_cache(self) -> None:
 
     Example:
         ```python
-        async with discover() as group:
-            # First organization
-            by_location = await group.organize_by_location()
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
 
-            # ... change device locations ...
+        # First organization
+        by_location = await group.organize_by_location()
 
-            # Clear cache and re-organize
-            group.invalidate_metadata_cache()
-            by_location = await group.organize_by_location()
+        # ... change device locations ...
+
+        # Clear cache and re-organize
+        group.invalidate_metadata_cache()
+        by_location = await group.organize_by_location()
         ```
     """
     self._locations_cache = None
@@ -1291,27 +1319,17 @@ def invalidate_metadata_cache(self) -> None:
 ### Simple Discovery
 
 ```python
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
 
 async def main():
-    async with discover() as group:
-        print(f"Found {len(group.devices)} devices")
-        await group.set_power(True)
-        await group.set_color(Colors.BLUE)
-```
+    count: int = 0
+    async for device in discover():
+        count += 1
+        await device.set_power(True)
+        await device.set_color(Colors.BLUE)
 
-### Find Specific Lights
-
-```python
-from lifx import find_lights
-
-
-async def main():
-    # Find all lights with "Kitchen" in the label
-    async with find_lights(label_filter="Kitchen") as lights:
-        for light in lights:
-            await light.set_brightness(0.8)
+    print(f"Found {count} devices")
 ```
 
 ### Find by Serial Number
@@ -1323,6 +1341,38 @@ from lifx import find_by_serial
 async def main():
     # Find specific device by serial number
     device = await find_by_serial("d073d5123456")
+    if device:
+        async with device:
+            await device.set_power(True)
+```
+
+### Find by Label
+
+```python
+from lifx import find_by_label, Colors
+
+
+async def main():
+    # Find all devices with "Living" in the label (substring match)
+    async for device in find_by_label("Living"):  # May match "Living Room", "Living Area", etc.
+
+        await device.set_power(True)
+
+    # Find device with exact label match
+    async for device in find_by_label("Living Room", exact_match=True):
+        await device.set_color(Colors.WARM_WHITE)
+        break  # exact_match returns at most one device
+```
+
+### Find by IP Address
+
+```python
+from lifx import find_by_ip
+
+
+async def main():
+    # Find device at specific IP address
+    device = await find_by_ip("192.168.1.100")
     if device:
         async with device:
             await device.set_power(True)

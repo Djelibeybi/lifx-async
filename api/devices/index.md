@@ -135,10 +135,6 @@ def __init__(
             "Broadcast serial number not allowed for device connection"
         )
 
-    # Check multicast bit (first byte, LSB should be 0 for unicast)
-    if serial_bytes[0] & 0x01:
-        raise ValueError("Multicast serial number not allowed")
-
     # Validate IP address
     try:
         addr = ipaddress.ip_address(ip)
@@ -1224,10 +1220,8 @@ async def set_location(
     location_uuid_to_use: bytes | None = None
 
     try:
-        discovered = await discover_devices(timeout=discover_timeout)
-
         # Check each device for the target label
-        for disc in discovered:
+        async for disc in discover_devices(timeout=discover_timeout):
             try:
                 # Create connection handle - no explicit open/close needed
                 temp_conn = DeviceConnection(
@@ -1464,10 +1458,8 @@ async def set_group(
     group_uuid_to_use: bytes | None = None
 
     try:
-        discovered = await discover_devices(timeout=discover_timeout)
-
         # Check each device for the target label
-        for disc in discovered:
+        async for disc in discover_devices(timeout=discover_timeout):
             try:
                 # Create connection handle - no explicit open/close needed
                 temp_conn = DeviceConnection(
@@ -3846,19 +3838,21 @@ async def get_color_zones(
 
     while current_start <= end:
         current_end = min(current_start + 7, end)  # Max 8 zones per request
-        state = await self.connection.request(
+
+        # Stream responses - break after first (single response per request)
+        async for state in self.connection.request_stream(
             packets.MultiZone.GetColorZones(
                 start_index=current_start, end_index=current_end
             )
-        )
-
-        # Extract colors from response (up to 8 colors)
-        zones_in_response = min(8, current_end - current_start + 1)
-        for i in range(zones_in_response):
-            if i >= len(state.colors):
-                break
-            protocol_hsbk = state.colors[i]
-            colors.append(HSBK.from_protocol(protocol_hsbk))
+        ):
+            # Extract colors from response (up to 8 colors)
+            zones_in_response = min(8, current_end - current_start + 1)
+            for i in range(zones_in_response):
+                if i >= len(state.colors):
+                    break
+                protocol_hsbk = state.colors[i]
+                colors.append(HSBK.from_protocol(protocol_hsbk))
+            break  # Single response per request
 
         current_start += 8
 
@@ -3968,23 +3962,23 @@ async def get_extended_color_zones(
     zone_count = await self.get_zone_count()
     end = min(zone_count - 1, end)
 
-    colors = []
+    colors: list[HSBK] = []
 
-    state = await self.connection.request(
+    # Stream all responses until timeout
+    async for packet in self.connection.request_stream(
         packets.MultiZone.GetExtendedColorZones(),
-        collect_multiple=bool(zone_count > 82),
-    )
-
-    # Handle both single packet and list of packets (when collect_multiple=True)
-    packets_list = state if isinstance(state, list) else [state]
-
-    for packet in packets_list:
+        timeout=2.0,  # Allow time for multiple responses
+    ):
         # Only process valid colors based on colors_count
         for i in range(packet.colors_count):
             if i >= len(packet.colors):
                 break
             protocol_hsbk = packet.colors[i]
             colors.append(HSBK.from_protocol(protocol_hsbk))
+
+        # Early exit if we have all zones
+        if len(colors) >= zone_count:
+            break
 
     # Return only the requested range to caller
     result = colors[start : end + 1]
@@ -6150,7 +6144,9 @@ async def apply_theme(
     from lifx.theme.generators import MatrixGenerator
 
     # Get tile dimensions
-    tiles = await self.get_tile_chain()
+    tiles = (
+        await self.get_tile_chain() if self.tile_chain is None else self.tile_chain
+    )
     if not tiles:
         _LOGGER.warning("No tiles available, skipping theme application")
         return

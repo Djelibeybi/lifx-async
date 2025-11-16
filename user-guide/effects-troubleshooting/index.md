@@ -33,14 +33,20 @@ await conductor.start(effect, lights)
 
 ```python
 # Check device connectivity first
-async with discover() as group:
-    if not group.lights:
-        print("No devices found!")
-        return
+from lifx import discover, DeviceGroup
 
-    # Now safe to use effects
-    conductor = Conductor()
-    await conductor.start(effect, group.lights)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+if not group.lights:
+    print("No devices found!")
+    return
+
+# Now safe to use effects
+conductor = Conductor()
+await conductor.start(effect, group.lights)
 ```
 
 1. **Empty participants list**
@@ -603,8 +609,14 @@ async def check_connectivity(lights):
             print(f"✗ {light.serial} unreachable: {e}")
 
 # Use before effects
-async with discover() as group:
-    await check_connectivity(group.lights)
+from lifx import discover, DeviceGroup
+
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await check_connectivity(group.lights)
 ```
 
 ______________________________________________________________________
@@ -615,18 +627,24 @@ Isolate issues by testing with one device:
 
 ```python
 # Test with single device first
-async with discover() as group:
-    if group.lights:
-        test_light = group.lights[0]
+from lifx import discover, DeviceGroup
 
-        conductor = Conductor()
-        effect = EffectPulse(mode='blink', cycles=3)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
-        print(f"Testing with {await test_light.get_label()}")
-        await conductor.start(effect, [test_light])
-        await asyncio.sleep(4)
+if group.lights:
+    test_light = group.lights[0]
 
-        print("Test complete - check if light restored correctly")
+    conductor = Conductor()
+    effect = EffectPulse(mode='blink', cycles=3)
+
+    print(f"Testing with {await test_light.get_label()}")
+    await conductor.start(effect, [test_light])
+    await asyncio.sleep(4)
+
+    print("Test complete - check if light restored correctly")
 ```
 
 ______________________________________________________________________

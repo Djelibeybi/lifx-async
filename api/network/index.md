@@ -15,29 +15,37 @@ discover_devices(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> list[DiscoveredDevice]
+) -> AsyncGenerator[DiscoveredDevice, None]
 ```
 
 Discover LIFX devices on the local network.
 
-Sends a broadcast DeviceGetService packet and collects responses. Implements DoS protection via timeout, source validation, and serial validation.
+Sends a broadcast DeviceGetService packet and yields devices as they respond. Implements DoS protection via timeout, source validation, and serial validation.
 
-| PARAMETER           | DESCRIPTION                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `timeout`           | Discovery timeout in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT`      |
-| `broadcast_address` | Broadcast address to use **TYPE:** `str` **DEFAULT:** `'255.255.255.255'`            |
-| `port`              | UDP port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT` |
+| PARAMETER                 | DESCRIPTION                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| `timeout`                 | Discovery timeout in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT`      |
+| `broadcast_address`       | Broadcast address to use **TYPE:** `str` **DEFAULT:** `'255.255.255.255'`            |
+| `port`                    | UDP port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT` |
+| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`    |
+| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`     |
 
-| RETURNS                  | DESCRIPTION                                                |
-| ------------------------ | ---------------------------------------------------------- |
-| `list[DiscoveredDevice]` | List of discovered devices (deduplicated by serial number) |
+| YIELDS                                   | DESCRIPTION                                       |
+| ---------------------------------------- | ------------------------------------------------- |
+| `AsyncGenerator[DiscoveredDevice, None]` | DiscoveredDevice instances as they are discovered |
+| `AsyncGenerator[DiscoveredDevice, None]` | (deduplicated by serial number)                   |
 
 Example
 
 ```python
-devices = await discover_devices(timeout=5.0)
-for device in devices:
+# Process devices as they're discovered
+async for device in discover_devices(timeout=5.0):
     print(f"Found device: {device.serial} at {device.ip}:{device.port}")
+
+# Or collect all devices first
+devices = []
+async for device in discover_devices():
+    devices.append(device)
 ```
 
 Source code in `src/lifx/network/discovery.py`
@@ -49,28 +57,36 @@ async def discover_devices(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> list[DiscoveredDevice]:
+) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
-    Sends a broadcast DeviceGetService packet and collects responses.
+    Sends a broadcast DeviceGetService packet and yields devices as they respond.
     Implements DoS protection via timeout, source validation, and serial validation.
 
     Args:
         timeout: Discovery timeout in seconds
         broadcast_address: Broadcast address to use
         port: UDP port to use (default LIFX_UDP_PORT)
+        max_response_time: Max time to wait for responses
+        idle_timeout_multiplier: Idle timeout multiplier
 
-    Returns:
-        List of discovered devices (deduplicated by serial number)
+    Yields:
+        DiscoveredDevice instances as they are discovered
+        (deduplicated by serial number)
 
     Example:
         ```python
-        devices = await discover_devices(timeout=5.0)
-        for device in devices:
+        # Process devices as they're discovered
+        async for device in discover_devices(timeout=5.0):
             print(f"Found device: {device.serial} at {device.ip}:{device.port}")
+
+        # Or collect all devices first
+        devices = []
+        async for device in discover_devices():
+            devices.append(device)
         ```
     """
-    devices: dict[str, DiscoveredDevice] = {}
+    seen_serials: set[str] = set()
     packet_count = 0
     start_time = time.time()
 
@@ -212,32 +228,35 @@ async def discover_devices(
                 # Convert 8-byte protocol serial to string
                 device_serial = Serial.from_protocol(header.target).to_string()
 
-                # Create device info
-                device = DiscoveredDevice(
-                    serial=device_serial,
-                    ip=addr[0],
-                    port=device_port,
-                    service=service,
-                    response_time=response_time,
-                )
+                # Deduplicate by serial number and yield new devices immediately
+                if device_serial not in seen_serials:
+                    seen_serials.add(device_serial)
 
-                # Deduplicate by serial number
-                devices[device.serial] = device
+                    # Create device info
+                    device = DiscoveredDevice(
+                        serial=device_serial,
+                        ip=addr[0],
+                        port=device_port,
+                        service=service,
+                        response_time=response_time,
+                    )
+
+                    _LOGGER.debug(
+                        {
+                            "class": "discover_devices",
+                            "method": "discover",
+                            "action": "device_found",
+                            "serial": device.serial,
+                            "ip": device.ip,
+                            "port": device.port,
+                            "response_time": response_time,
+                        }
+                    )
+
+                    yield device
 
                 # Update last response time for idle timeout calculation
                 last_response_time = response_timestamp
-
-                _LOGGER.debug(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "device_found",
-                        "serial": device.serial,
-                        "ip": device.ip,
-                        "port": device.port,
-                        "response_time": response_time,
-                    }
-                )
 
             except LifxProtocolError as e:
                 # Log malformed responses
@@ -272,13 +291,11 @@ async def discover_devices(
                 "class": "discover_devices",
                 "method": "discover",
                 "action": "complete",
-                "devices_found": len(devices),
+                "devices_found": len(seen_serials),
                 "packets_processed": packet_count,
                 "elapsed": time.time() - start_time,
             }
         )
-
-    return list(devices.values())
 ````
 
 ### DiscoveredDevice
@@ -316,21 +333,24 @@ Information about a discovered LIFX device.
 ##### create_device
 
 ```python
-create_device() -> Device
+create_device() -> Device | None
 ```
 
 Create appropriate device instance based on product capabilities.
 
-Queries the device for its product ID and firmware version, then instantiates the appropriate device class (Device, Light, MultiZoneLight, or TileDevice) based on the product capabilities.
+Queries the device for its product ID and uses the product registry to instantiate the appropriate device class (Device, Light, HevLight, InfraredLight, MultiZoneLight, or TileDevice) based on the product capabilities.
 
-| RETURNS  | DESCRIPTION                             |
-| -------- | --------------------------------------- |
-| `Device` | Device instance of the appropriate type |
+This is the single source of truth for device type detection and instantiation across the library.
 
-| RAISES                | DESCRIPTION               |
-| --------------------- | ------------------------- |
-| `DeviceNotFoundError` | If device doesn't respond |
-| `TimeoutError`        | If device query times out |
+| RETURNS  | DESCRIPTION |
+| -------- | ----------- |
+| \`Device | None\`      |
+
+| RAISES                    | DESCRIPTION                    |
+| ------------------------- | ------------------------------ |
+| `LifxDeviceNotFoundError` | If device doesn't respond      |
+| `LifxTimeoutError`        | If device query times out      |
+| `LifxProtocolError`       | If device returns invalid data |
 
 Example
 
@@ -344,19 +364,24 @@ for discovered in devices:
 Source code in `src/lifx/network/discovery.py`
 
 ````python
-async def create_device(self) -> Device:
+async def create_device(self) -> Device | None:
     """Create appropriate device instance based on product capabilities.
 
-    Queries the device for its product ID and firmware version, then
-    instantiates the appropriate device class (Device, Light, MultiZoneLight,
-    or TileDevice) based on the product capabilities.
+    Queries the device for its product ID and uses the product registry
+    to instantiate the appropriate device class (Device, Light, HevLight,
+    InfraredLight, MultiZoneLight, or TileDevice) based on the product
+    capabilities.
+
+    This is the single source of truth for device type detection and
+    instantiation across the library.
 
     Returns:
         Device instance of the appropriate type
 
     Raises:
-        DeviceNotFoundError: If device doesn't respond
-        TimeoutError: If device query times out
+        LifxDeviceNotFoundError: If device doesn't respond
+        LifxTimeoutError: If device query times out
+        LifxProtocolError: If device returns invalid data
 
     Example:
         ```python
@@ -372,38 +397,39 @@ async def create_device(self) -> Device:
     from lifx.devices.light import Light
     from lifx.devices.multizone import MultiZoneLight
     from lifx.devices.tile import TileDevice
-    from lifx.products import get_device_class_name
 
-    # Create temporary device to query version (registry is always pre-loaded)
+    # Create temporary device to query version
     temp_device = Device(serial=self.serial, ip=self.ip, port=self.port)
 
     try:
-        version = await temp_device.get_version()
-        pid = version.product
+        async with temp_device:
+            if temp_device.capabilities:
+                if temp_device.capabilities.has_matrix:
+                    return TileDevice(
+                        serial=self.serial, ip=self.ip, port=self.port
+                    )
+                if temp_device.capabilities.has_multizone:
+                    return MultiZoneLight(
+                        serial=self.serial, ip=self.ip, port=self.port
+                    )
+                if temp_device.capabilities.has_infrared:
+                    return InfraredLight(
+                        serial=self.serial, ip=self.ip, port=self.port
+                    )
+                if temp_device.capabilities.has_hev:
+                    return HevLight(serial=self.serial, ip=self.ip, port=self.port)
+                if temp_device.capabilities.has_relays or (
+                    temp_device.capabilities.has_buttons
+                    and not temp_device.capabilities.has_color
+                ):
+                    return None
 
-        # Get appropriate class name
-        class_name = get_device_class_name(pid)
-
-        # Instantiate the correct class
-        if class_name == "TileDevice":
-            device = TileDevice(serial=self.serial, ip=self.ip, port=self.port)
-        elif class_name == "MultiZoneLight":
-            device = MultiZoneLight(serial=self.serial, ip=self.ip, port=self.port)
-        elif class_name == "HevLight":
-            device = HevLight(serial=self.serial, ip=self.ip, port=self.port)
-        elif class_name == "InfraredLight":
-            device = InfraredLight(serial=self.serial, ip=self.ip, port=self.port)
-        elif class_name == "Light":
-            device = Light(serial=self.serial, ip=self.ip, port=self.port)
-        else:
-            device = temp_device
-
-        return device
+                return Light(serial=self.serial, ip=self.ip, port=self.port)
 
     except Exception:
-        # If version query fails, default to Light
-        device = Light(serial=self.serial, ip=self.ip, port=self.port)
-        return device
+        return None
+
+    return None
 ````
 
 ##### __hash__
@@ -1092,11 +1118,12 @@ This is lightweight - doesn't actually create a connection. Connection is create
 | `max_retries` | Maximum retry attempts (default: 8) **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                          |
 | `timeout`     | Default timeout for requests in seconds (default: 8.0) **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
-| METHOD                  | DESCRIPTION                                   |
-| ----------------------- | --------------------------------------------- |
-| `close_all_connections` | Close all connections in the shared pool.     |
-| `get_pool_metrics`      | Get connection pool metrics.                  |
-| `request`               | Send request and return unpacked response(s). |
+| METHOD                  | DESCRIPTION                                                 |
+| ----------------------- | ----------------------------------------------------------- |
+| `close_all_connections` | Close all connections in the shared pool.                   |
+| `get_pool_metrics`      | Get connection pool metrics.                                |
+| `request_stream`        | Send request and yield unpacked responses.                  |
+| `request`               | Send request and get single response (convenience wrapper). |
 
 Source code in `src/lifx/network/connection.py`
 
@@ -1183,140 +1210,128 @@ def get_pool_metrics(cls) -> ConnectionPoolMetrics | None:
     return cls._pool.metrics if cls._pool is not None else None
 ```
 
-##### request
+##### request_stream
 
 ```python
-request(
-    packet: Any,
-    timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    collect_multiple: bool = False,
-) -> Any
+request_stream(
+    packet: Any, timeout: float = DEFAULT_REQUEST_TIMEOUT
+) -> AsyncGenerator[Any, None]
 ```
 
-Send request and return unpacked response(s).
+Send request and yield unpacked responses.
 
-This method handles everything internally:
+This is an async generator that handles the complete request/response cycle including packet type detection, response unpacking, and label decoding.
 
-- Getting connection from pool (creates if needed)
-- Opening connection if needed
-- Sending request with proper ack/response flags
-- Optionally collecting multiple responses if requested
-- Unpacking response(s)
-- Decoding label fields
+Single response (most common): async for response in conn.request_stream(GetLabel()): process(response) break # Exit immediately
 
-Device classes just call this and get back the result.
+Multiple responses
 
-By default, GET requests return immediately after the first response. Set collect_multiple=True for multi-response commands to wait 200ms.
+async for state in conn.request_stream(GetColorZones()): process(state)
 
-| PARAMETER          | DESCRIPTION                                                                                   |
-| ------------------ | --------------------------------------------------------------------------------------------- |
-| `packet`           | Packet instance to send **TYPE:** `Any`                                                       |
-| `timeout`          | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`           |
-| `collect_multiple` | Whether to wait for multiple responses (default: False) **TYPE:** `bool` **DEFAULT:** `False` |
+# Continues until timeout
 
-| RETURNS | DESCRIPTION                                                         |
-| ------- | ------------------------------------------------------------------- |
-| `Any`   | Single or multiple response packets (list if collect_multiple=True) |
-| `Any`   | True for SET acknowledgement                                        |
+| PARAMETER | DESCRIPTION                                                                         |
+| --------- | ----------------------------------------------------------------------------------- |
+| `packet`  | Packet instance to send **TYPE:** `Any`                                             |
+| `timeout` | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
-| RAISES                        | DESCRIPTION                   |
-| ----------------------------- | ----------------------------- |
-| `LifxTimeoutError`            | If request times out          |
-| `LifxProtocolError`           | If response invalid           |
-| `LifxConnectionError`         | If connection fails           |
-| `LifxUnsupportedCommandError` | If packet kind is unsupported |
+| YIELDS                      | DESCRIPTION                                         |
+| --------------------------- | --------------------------------------------------- |
+| `AsyncGenerator[Any, None]` | Unpacked response packet instances                  |
+| `AsyncGenerator[Any, None]` | For SET packets: yields True once (acknowledgement) |
+
+| RAISES                        | DESCRIPTION              |
+| ----------------------------- | ------------------------ |
+| `LifxTimeoutError`            | If request times out     |
+| `LifxProtocolError`           | If response invalid      |
+| `LifxConnectionError`         | If connection fails      |
+| `LifxUnsupportedCommandError` | If command not supported |
 
 Example
 
 ```python
-# GET request returns unpacked packet
-state = await conn.request(packets.Light.GetColor())
-color = HSBK.from_protocol(state.color)
-label = state.label  # Already decoded to string
+# GET request yields unpacked packets
+async for state in conn.request_stream(packets.Light.GetColor()):
+    color = HSBK.from_protocol(state.color)
+    label = state.label  # Already decoded to string
+    break
 
-# SET request returns True
-success = await conn.request(
+# SET request yields True (acknowledgement)
+async for _ in conn.request_stream(
     packets.Light.SetColor(color=hsbk, duration=1000)
-)
+):
+    # Acknowledgement received
+    break
 
-# Multi-response GET - collect multiple responses
-states = await conn.request(
-    packets.MultiZone.GetColorZones(...), collect_multiple=True
-)
-if isinstance(states, list):
-    for state in states:
-        # process each zone state
-        pass
-else:
-    # single response
+# Multi-response GET - stream all responses
+async for state in conn.request_stream(
+    packets.MultiZone.GetExtendedColorZones()
+):
+    # Process each zone state
     pass
 ```
 
 Source code in `src/lifx/network/connection.py`
 
 ````python
-async def request(
+async def request_stream(
     self,
     packet: Any,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    collect_multiple: bool = False,
-) -> Any:
-    """Send request and return unpacked response(s).
+) -> AsyncGenerator[Any, None]:
+    """Send request and yield unpacked responses.
 
-    This method handles everything internally:
-    - Getting connection from pool (creates if needed)
-    - Opening connection if needed
-    - Sending request with proper ack/response flags
-    - Optionally collecting multiple responses if requested
-    - Unpacking response(s)
-    - Decoding label fields
+    This is an async generator that handles the complete request/response
+    cycle including packet type detection, response unpacking, and label
+    decoding.
 
-    Device classes just call this and get back the result.
+    Single response (most common):
+        async for response in conn.request_stream(GetLabel()):
+            process(response)
+            break  # Exit immediately
 
-    By default, GET requests return immediately after the first response.
-    Set collect_multiple=True for multi-response commands to wait 200ms.
+    Multiple responses:
+        async for state in conn.request_stream(GetColorZones()):
+            process(state)
+            # Continues until timeout
 
     Args:
         packet: Packet instance to send
         timeout: Request timeout in seconds
-        collect_multiple: Whether to wait for multiple responses (default: False)
 
-    Returns:
-        Single or multiple response packets (list if collect_multiple=True)
-        True for SET acknowledgement
+    Yields:
+        Unpacked response packet instances
+        For SET packets: yields True once (acknowledgement)
 
     Raises:
         LifxTimeoutError: If request times out
         LifxProtocolError: If response invalid
         LifxConnectionError: If connection fails
-        LifxUnsupportedCommandError: If packet kind is unsupported
+        LifxUnsupportedCommandError: If command not supported
 
     Example:
         ```python
-        # GET request returns unpacked packet
-        state = await conn.request(packets.Light.GetColor())
-        color = HSBK.from_protocol(state.color)
-        label = state.label  # Already decoded to string
+        # GET request yields unpacked packets
+        async for state in conn.request_stream(packets.Light.GetColor()):
+            color = HSBK.from_protocol(state.color)
+            label = state.label  # Already decoded to string
+            break
 
-        # SET request returns True
-        success = await conn.request(
+        # SET request yields True (acknowledgement)
+        async for _ in conn.request_stream(
             packets.Light.SetColor(color=hsbk, duration=1000)
-        )
+        ):
+            # Acknowledgement received
+            break
 
-        # Multi-response GET - collect multiple responses
-        states = await conn.request(
-            packets.MultiZone.GetColorZones(...), collect_multiple=True
-        )
-        if isinstance(states, list):
-            for state in states:
-                # process each zone state
-                pass
-        else:
-            # single response
+        # Multi-response GET - stream all responses
+        async for state in conn.request_stream(
+            packets.MultiZone.GetExtendedColorZones()
+        ):
+            # Process each zone state
             pass
         ```
     """
-
     # Get pool and retrieve actual connection
     pool = await self._get_pool()
     actual_conn = await pool.get_connection(
@@ -1332,61 +1347,13 @@ async def request(
     packet_kind = getattr(packet, "_packet_kind", "OTHER")
 
     if packet_kind == "GET":
-        # Request response(s) - with optional multi-response collection
-        response = await actual_conn.request_response(
-            packet, timeout=timeout, collect_multiple=collect_multiple
-        )
-
         # Use PACKET_REGISTRY to find the appropriate packet class
         from lifx.protocol.packets import get_packet_class
 
-        # Check if we got multiple responses or a single response
-        if isinstance(response, list):
-            # Multiple responses - unpack each one
-            unpacked_responses = []
-            for header, payload in response:
-                packet_class = get_packet_class(header.pkt_type)
-                if packet_class is None:
-                    raise LifxProtocolError(
-                        f"Unknown packet type {header.pkt_type} in response"
-                    )
-
-                # Unpack (labels are automatically decoded by Packet.unpack())
-                response_packet = packet_class.unpack(payload)
-                unpacked_responses.append(response_packet)
-
-            # Log the full request/reply cycle (multiple responses)
-            request_values = packet.as_dict
-            reply_values_by_seq: dict[int, dict[str, Any]] = {}
-            for i, (header, _) in enumerate(response, 1):
-                resp_pkt = unpacked_responses[i - 1]
-                reply_values_by_seq[header.sequence] = resp_pkt.as_dict
-
-            _LOGGER.debug(
-                {
-                    "class": "DeviceConnection",
-                    "method": "request",
-                    "request": {
-                        "packet": type(packet).__name__,
-                        "values": request_values,
-                    },
-                    "reply": {
-                        "packet": type(unpacked_responses[0]).__name__
-                        if unpacked_responses
-                        else "Unknown",
-                        "expected": len(response),
-                        "received": len(unpacked_responses),
-                        "values": reply_values_by_seq,
-                    },
-                    "serial": self.serial,
-                    "ip": self.ip,
-                }
-            )
-
-            return unpacked_responses
-        else:
-            # Single response - response is tuple[LifxHeader, bytes]
-            header, payload = response
+        # Stream responses and unpack each
+        async for header, payload in actual_conn.request_stream(
+            packet, timeout=timeout
+        ):
             packet_class = get_packet_class(header.pkt_type)
             if packet_class is None:
                 raise LifxProtocolError(
@@ -1401,13 +1368,13 @@ async def request(
             # Unpack (labels are automatically decoded by Packet.unpack())
             response_packet = packet_class.unpack(payload)
 
-            # Log the full request/reply cycle (single response)
+            # Log the request/reply cycle
             request_values = packet.as_dict
             reply_values = response_packet.as_dict
             _LOGGER.debug(
                 {
                     "class": "DeviceConnection",
-                    "method": "request",
+                    "method": "request_stream",
                     "request": {
                         "packet": type(packet).__name__,
                         "values": request_values,
@@ -1421,32 +1388,32 @@ async def request(
                 }
             )
 
-            return response_packet
+            yield response_packet
 
     elif packet_kind == "SET":
         # Request acknowledgement
-        await actual_conn.request_ack(packet, timeout=timeout)
+        async for _ in actual_conn.request_ack_stream(packet, timeout=timeout):
+            # Log the request/ack cycle
+            request_values = packet.as_dict
+            _LOGGER.debug(
+                {
+                    "class": "DeviceConnection",
+                    "method": "request_stream",
+                    "request": {
+                        "packet": type(packet).__name__,
+                        "values": request_values,
+                    },
+                    "reply": {
+                        "packet": "Acknowledgement",
+                        "values": {},
+                    },
+                    "serial": self.serial,
+                    "ip": self.ip,
+                }
+            )
 
-        # Log the full request/ack cycle
-        request_values = packet.as_dict
-        _LOGGER.debug(
-            {
-                "class": "DeviceConnection",
-                "method": "request",
-                "request": {
-                    "packet": type(packet).__name__,
-                    "values": request_values,
-                },
-                "reply": {
-                    "packet": "Acknowledgement",
-                    "values": {},
-                },
-                "serial": self.serial,
-                "ip": self.ip,
-            }
-        )
-
-        return True
+            yield True
+            return
 
     else:
         # Handle special cases
@@ -1456,38 +1423,33 @@ async def request(
             if pkt_type == 58:  # EchoRequest
                 from lifx.protocol.packets import Device
 
-                response = await actual_conn.request_response(
-                    packet, timeout=timeout, collect_multiple=False
-                )
-                if not isinstance(response, tuple):
-                    raise LifxProtocolError(
-                        "Expected single response tuple for EchoRequest"
+                async for header, payload in actual_conn.request_stream(
+                    packet, timeout=timeout
+                ):
+                    response_packet = Device.EchoResponse.unpack(payload)
+
+                    # Log the request/reply cycle
+                    request_values = packet.as_dict
+                    reply_values = response_packet.as_dict
+                    _LOGGER.debug(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "request_stream",
+                            "request": {
+                                "packet": type(packet).__name__,
+                                "values": request_values,
+                            },
+                            "reply": {
+                                "packet": type(response_packet).__name__,
+                                "values": reply_values,
+                            },
+                            "serial": self.serial,
+                            "ip": self.ip,
+                        }
                     )
 
-                header, payload = response
-                response_packet = Device.EchoResponse.unpack(payload)
-
-                # Log the full request/reply cycle
-                request_values = packet.as_dict
-                reply_values = response_packet.as_dict
-                _LOGGER.debug(
-                    {
-                        "class": "DeviceConnection",
-                        "method": "request",
-                        "request": {
-                            "packet": type(packet).__name__,
-                            "values": request_values,
-                        },
-                        "reply": {
-                            "packet": type(response_packet).__name__,
-                            "values": reply_values,
-                        },
-                        "serial": self.serial,
-                        "ip": self.ip,
-                    }
-                )
-
-                return response_packet
+                    yield response_packet
+                    return
             else:
                 raise LifxUnsupportedCommandError(
                     f"Cannot auto-handle packet kind: {packet_kind}"
@@ -1496,6 +1458,97 @@ async def request(
             raise LifxProtocolError(
                 f"Packet missing PKT_TYPE: {type(packet).__name__}"
             )
+````
+
+##### request
+
+```python
+request(packet: Any, timeout: float = DEFAULT_REQUEST_TIMEOUT) -> Any
+```
+
+Send request and get single response (convenience wrapper).
+
+This is a convenience method that returns the first response from request_stream(). It's equivalent to: await anext(conn.request_stream(packet))
+
+Most device operations use this method since they expect a single response.
+
+| PARAMETER | DESCRIPTION                                                                         |
+| --------- | ----------------------------------------------------------------------------------- |
+| `packet`  | Packet instance to send **TYPE:** `Any`                                             |
+| `timeout` | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+
+| RETURNS | DESCRIPTION                     |
+| ------- | ------------------------------- |
+| `Any`   | Single unpacked response packet |
+| `Any`   | True for SET acknowledgement    |
+
+| RAISES                        | DESCRIPTION                   |
+| ----------------------------- | ----------------------------- |
+| `LifxTimeoutError`            | If no response within timeout |
+| `LifxProtocolError`           | If response invalid           |
+| `LifxConnectionError`         | If connection fails           |
+| `LifxUnsupportedCommandError` | If command not supported      |
+
+Example
+
+```python
+# GET request returns unpacked packet
+state = await conn.request(packets.Light.GetColor())
+color = HSBK.from_protocol(state.color)
+label = state.label  # Already decoded to string
+
+# SET request returns True
+success = await conn.request(
+    packets.Light.SetColor(color=hsbk, duration=1000)
+)
+```
+
+Source code in `src/lifx/network/connection.py`
+
+````python
+async def request(
+    self,
+    packet: Any,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+) -> Any:
+    """Send request and get single response (convenience wrapper).
+
+    This is a convenience method that returns the first response from
+    request_stream(). It's equivalent to:
+        await anext(conn.request_stream(packet))
+
+    Most device operations use this method since they expect a single response.
+
+    Args:
+        packet: Packet instance to send
+        timeout: Request timeout in seconds
+
+    Returns:
+        Single unpacked response packet
+        True for SET acknowledgement
+
+    Raises:
+        LifxTimeoutError: If no response within timeout
+        LifxProtocolError: If response invalid
+        LifxConnectionError: If connection fails
+        LifxUnsupportedCommandError: If command not supported
+
+    Example:
+        ```python
+        # GET request returns unpacked packet
+        state = await conn.request(packets.Light.GetColor())
+        color = HSBK.from_protocol(state.color)
+        label = state.label  # Already decoded to string
+
+        # SET request returns True
+        success = await conn.request(
+            packets.Light.SetColor(color=hsbk, duration=1000)
+        )
+        ```
+    """
+    async for response in self.request_stream(packet, timeout):
+        return response
+    raise LifxTimeoutError(f"No response from {self.ip}")
 ````
 
 ## Performance Considerations

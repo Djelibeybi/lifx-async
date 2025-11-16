@@ -169,10 +169,14 @@ async with Light(serial, ip) as light:
 **Example**:
 
 ```python
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
-async with discover() as group:
-    await group.set_color(Colors.BLUE)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await group.set_color(Colors.BLUE)
 ```
 
 ## Data Flow
