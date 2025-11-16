@@ -20,6 +20,7 @@ class TestHevLight:
             ip="192.168.1.100",
             port=56700,
         )
+
         assert light.serial == "d073d5010203"
         assert light.ip == "192.168.1.100"
         assert light.port == 56700

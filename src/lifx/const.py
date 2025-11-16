@@ -40,14 +40,6 @@ DEFAULT_REQUEST_TIMEOUT: Final[float] = 8.0
 # Default maximum number of retry attempts for failed requests
 DEFAULT_MAX_RETRIES: Final[int] = 8
 
-# Background receiver polling interval in seconds
-# This is the timeout used when checking for new responses in the background task
-RECEIVER_POLL_INTERVAL: Final[float] = 0.5
-
-# Multi-response collection timeout in seconds
-# After receiving the first response, wait this long for additional responses
-MULTI_RESPONSE_COLLECTION_TIMEOUT: Final[float] = 0.5
-
 # ============================================================================
 # UUID Namespaces
 # ============================================================================

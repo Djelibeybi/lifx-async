@@ -80,9 +80,15 @@ class DeviceGroup:
 
     Example:
         ```python
-        async with discover() as group:
-            await group.set_power(True)
-            await group.set_color(Colors.BLUE)
+        # Collect devices from discovery
+        devices = []
+        async for device in discover():
+            devices.append(device)
+
+        # Create group and perform batch operations
+        group = DeviceGroup(devices)
+        await group.set_power(True)
+        await group.set_color(Colors.BLUE)
         ```
     """
 
@@ -113,12 +119,7 @@ class DeviceGroup:
         self._group_metadata: dict[bytes, GroupGrouping] | None = None
 
     async def __aenter__(self) -> DeviceGroup:
-        """Enter async context manager.
-
-        Note: With the new connection architecture, explicit connect/disconnect
-        is not needed. Connections are managed automatically by the connection
-        pool when requests are made.
-        """
+        """Enter async context manager."""
         return self
 
     async def __aexit__(
@@ -127,10 +128,7 @@ class DeviceGroup:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Exit async context manager.
-
-        Note: Cleanup is handled automatically by the connection pool.
-        """
+        """Exit async context manager."""
         pass
 
     def __iter__(
@@ -184,8 +182,11 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                await group.set_power(True, duration=1.0)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            await group.set_power(True, duration=1.0)
             ```
         """
         async with asyncio.TaskGroup() as tg:
@@ -201,8 +202,11 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
             ```
         """
         async with asyncio.TaskGroup() as tg:
@@ -218,8 +222,11 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                await group.set_brightness(0.5, duration=1.0)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            await group.set_brightness(0.5, duration=1.0)
             ```
         """
         async with asyncio.TaskGroup() as tg:
@@ -238,8 +245,11 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                await group.pulse(Colors.RED, period=1.0, cycles=1.0)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            await group.pulse(Colors.RED, period=1.0, cycles=1.0)
             ```
         """
         async with asyncio.TaskGroup() as tg:
@@ -496,10 +506,13 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                by_location = await group.organize_by_location()
-                kitchen = by_location["Kitchen"]
-                await kitchen.set_color(Colors.BLUE)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            by_location = await group.organize_by_location()
+            kitchen = by_location["Kitchen"]
+            await kitchen.set_color(Colors.BLUE)
             ```
         """
         # Fetch metadata if not cached
@@ -527,10 +540,13 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                by_group = await group.organize_by_group()
-                bedroom = by_group["Bedroom Lights"]
-                await bedroom.set_power(False)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            by_group = await group.organize_by_group()
+            bedroom = by_group["Bedroom Lights"]
+            await bedroom.set_power(False)
             ```
         """
         # Fetch metadata if not cached
@@ -560,9 +576,12 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                living_room = await group.filter_by_location("Living Room")
-                await living_room.set_brightness(0.7)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            living_room = await group.filter_by_location("Living Room")
+            await living_room.set_brightness(0.7)
             ```
         """
         locations = await self.organize_by_location(include_unassigned=False)
@@ -596,9 +615,12 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                bedroom = await group.filter_by_group("Bedroom Lights")
-                await bedroom.set_color(Colors.WARM_WHITE)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            bedroom = await group.filter_by_group("Bedroom Lights")
+            await bedroom.set_color(Colors.WARM_WHITE)
             ```
         """
         groups = await self.organize_by_group(include_unassigned=False)
@@ -631,10 +653,13 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                await group.organize_by_location()
-                unassigned = group.get_unassigned_devices(metadata_type="location")
-                print(f"Found {len(unassigned)} devices without location")
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            await group.organize_by_location()
+            unassigned = group.get_unassigned_devices(metadata_type="location")
+            print(f"Found {len(unassigned)} devices without location")
             ```
         """
         if metadata_type == "location":
@@ -670,9 +695,12 @@ class DeviceGroup:
             ```python
             from lifx.theme import get_theme
 
-            async with discover() as group:
-                evening = get_theme("evening")
-                await group.apply_theme(evening, power_on=True, duration=1.0)
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
+            evening = get_theme("evening")
+            await group.apply_theme(evening, power_on=True, duration=1.0)
             ```
         """
         async with asyncio.TaskGroup() as tg:
@@ -695,15 +723,19 @@ class DeviceGroup:
 
         Example:
             ```python
-            async with discover() as group:
-                # First organization
-                by_location = await group.organize_by_location()
+            devices = []
+            async for device in discover():
+                devices.append(device)
+            group = DeviceGroup(devices)
 
-                # ... change device locations ...
+            # First organization
+            by_location = await group.organize_by_location()
 
-                # Clear cache and re-organize
-                group.invalidate_metadata_cache()
-                by_location = await group.organize_by_location()
+            # ... change device locations ...
+
+            # Clear cache and re-organize
+            group.invalidate_metadata_cache()
+            by_location = await group.organize_by_location()
             ```
         """
         self._locations_cache = None
@@ -713,7 +745,7 @@ class DeviceGroup:
 
 
 async def discover(
-    timeout: float = 3.0,
+    timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
@@ -867,8 +899,8 @@ async def find_by_label(
 
     Args:
         label: Device label to search for (case-insensitive)
-        exact_match: If True, match label exactly and return at most one device;
-                     if False, match substring and return all matching devices
+        exact_match: If True, match label exactly and yield at most one device;
+                     if False, match substring and yield all matching devices
                      (default False)
         timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)
         broadcast_address: Broadcast address to use (default "255.255.255.255")
@@ -876,22 +908,21 @@ async def find_by_label(
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
 
-    Returns:
-        List of matching Device instances (empty list if none found)
+    Yields:
+        Matching Device instances
 
     Example:
         ```python
         # Find all devices with "Living" in the label
-        devices = await find_by_label("Living")  # May match multiple devices
-        for device in devices:
+        async for device in find_by_label("Living"):
             async with device:
                 await device.set_power(True)
 
-        # Find device by exact label match (returns at most one)
-        devices = await find_by_label("Living Room", exact_match=True)
-        if devices:
-            async with devices[0]:
-                await devices[0].set_power(True)
+        # Find device by exact label match (yields at most one)
+        async for device in find_by_label("Living Room", exact_match=True):
+            async with device:
+                await device.set_power(True)
+            break  # exact_match yields at most one device
         ```
     """
     async for resp in _discover_with_packet(
