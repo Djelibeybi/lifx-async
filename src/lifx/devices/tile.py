@@ -1269,7 +1269,9 @@ class TileDevice(Light):
         from lifx.theme.generators import MatrixGenerator
 
         # Get tile dimensions
-        tiles = await self.get_tile_chain()
+        tiles = (
+            await self.get_tile_chain() if self.tile_chain is None else self.tile_chain
+        )
         if not tiles:
             _LOGGER.warning("No tiles available, skipping theme application")
             return

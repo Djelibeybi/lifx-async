@@ -44,8 +44,9 @@ lifx/
 Main entry points for most users:
 
 - [`discover()`](high-level.md#lifx.api.discover) - Simple device discovery
-- [`find_lights()`](high-level.md#lifx.api.find_lights) - Find Light devices
-- [`find_by_serial()`](high-level.md#lifx.api.find_by_serial) - Find specific device
+- [`find_by_serial()`](high-level.md#lifx.api.find_by_serial) - Find device by serial number
+- [`find_by_label()`](high-level.md#lifx.api.find_by_label) - Find devices by label (exact or substring)
+- [`find_by_ip()`](high-level.md#lifx.api.find_by_ip) - Find device by IP address
 - [`DeviceGroup`](high-level.md#lifx.api.DeviceGroup) - Batch operations
 
 ### Device Classes
@@ -105,9 +106,15 @@ async with await Light.from_ip("192.168.1.100") as light:
 Use `DeviceGroup` for efficient batch operations:
 
 ```python
-async with discover() as group:
-    await group.set_power(True)
-    await group.set_color(Colors.BLUE)
+from lifx import discover, DeviceGroup, Colors
+
+devices = []
+async for device in discover():
+    devices.append(device)
+
+group = DeviceGroup(devices)
+await group.set_power(True)
+await group.set_color(Colors.BLUE)
 ```
 
 ### Connection Pooling
@@ -224,11 +231,11 @@ await light.disconnect()
 ### Handle Exceptions
 
 ```python
-from lifx import discover, LifxError
+from lifx import discover, Colors, LifxError
 
 try:
-    async with discover() as group:
-        await group.set_color(Colors.GREEN)
+    async for device in discover():
+        await device.set_color(Colors.GREEN)
 except LifxError as e:
     print(f"LIFX error: {e}")
 ```

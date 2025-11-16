@@ -14,8 +14,11 @@ from lifx import discover
 
 
 async def main():
-    async with discover(timeout=3.0) as group:
-        print(f"Found {len(group)} lights")
+    count = 0
+    async for device in discover():
+        count += 1
+        print(f"Found: {device.serial}")
+    print(f"Total: {count} lights")
 
 
 asyncio.run(main())
@@ -23,7 +26,7 @@ asyncio.run(main())
 
 ### 2. Control a Light
 
-Turn on a light and change its color:
+Turn on the first discovered light, then change its color:
 
 ```python
 import asyncio
@@ -31,11 +34,10 @@ from lifx import discover, Colors
 
 
 async def main():
-    async with discover() as group:
-        if group.lights:
-            light = group.lights[0]
-            await light.set_power(True)
-            await light.set_color(Colors.BLUE, duration=1.0)
+    async for light in discover():
+        await light.set_power(True)
+        await light.set_color(Colors.BLUE, duration=1.0)
+        break
 
 
 asyncio.run(main())
@@ -43,21 +45,25 @@ asyncio.run(main())
 
 ### 3. Batch Operations
 
-Control multiple lights at once:
+Control multiple lights as a group:
 
 ```python
 import asyncio
-from lifx import discover, Colors
+from lifx import discover, DeviceGroup, Colors
 
 
 async def main():
-    async with discover() as group:
-        # Turn all lights on and blue
-        await group.set_power(True)
-        await group.set_color(Colors.BLUE, duration=1.0)
+    devices = []
+    async for device in discover():
+        devices.append(device)
 
-        # Set brightness
-        await group.set_brightness(0.5)
+    # Create DeviceGroup for batch operations
+    group = DeviceGroup(devices)
+    await group.set_power(True)
+    await group.set_color(Colors.BLUE, duration=1.0)
+    await group.set_brightness(0.5)
+
+
 
 
 asyncio.run(main())
@@ -82,20 +88,34 @@ async def main():
 asyncio.run(main())
 ```
 
-### Find Specific Device
+### Find Specific Devices
 
-Find a device by label:
+Find devices by label, IP, or serial:
 
 ```python
 import asyncio
-from lifx import find_lights
+from lifx import find_by_label, find_by_ip, find_by_serial, Colors
 
 
 async def main():
-    lights = await find_lights(label_contains="Bedroom")
-    if lights:
-        async with lights[0] as light:
-            await light.set_color(Colors.WARM_WHITE)
+    # Find by label (substring match)
+    async for device in find_by_label("Bedroom"):  # Matches "Bedroom", "Master Bedroom", etc.
+        await device.set_color(Colors.WARM_WHITE)
+
+    # Find by exact label
+    async for device in find_by_label("Master Bedroom", exact_match=True):
+        await device.set_brightness(0.8)
+        break  # exact_match returns at most one device
+
+    # Find by IP address (fastest if you only know the IP)
+    device = await find_by_ip("192.168.1.100")
+    if device:
+        await device.set_power(True)
+
+    # Find by serial number
+    device = await find_by_serial("d073d5123456")
+    if device:
+        await device.set_color(Colors.BLUE)
 
 
 asyncio.run(main())
@@ -162,17 +182,13 @@ Always use proper error handling:
 
 ```python
 import asyncio
-from lifx import discover, LifxError
+from lifx import discover, Colors, LifxError
 
 
 async def main():
     try:
-        async with discover(timeout=3.0) as group:
-            if not group:
-                print("No devices found")
-                return
-
-            await group.set_color(Colors.GREEN)
+        async for device in discover():
+            await device.set_color(Colors.GREEN)
     except LifxError as e:
         print(f"LIFX error: {e}")
     except Exception as e:

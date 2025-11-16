@@ -7,7 +7,7 @@ and display information about each device found.
 import asyncio
 import logging
 
-from lifx import discover
+from lifx import Light, discover
 
 # Enable logging to see what's happening
 logging.basicConfig(level=logging.INFO)
@@ -20,39 +20,20 @@ async def main():
     print()
 
     # Discover lights with 5 second timeout
-    async with discover(timeout=5.0, broadcast_address="192.168.19.255") as group:
-        if not group.lights:
-            print("No lights found!")
-            print("\nTroubleshooting:")
-            print("1. Ensure lights are powered on")
-            print("2. Check that lights are on the same network")
-            print("3. Verify firewall allows UDP port 56700")
-            return
-
-        print(f"Found {len(group.lights)} lights(s):\n")
-
+    async for light in discover(timeout=5.0, broadcast_address="255.255.255.255"):
         # Display information about each device
-        for i, light in enumerate(group.lights, 1):
-            print(f"Light {i}:")
-            print(f"  Serial: {light.serial}")
-            print(f"  IP: {light.ip}")
-            print(f"  Port: {light.port}")
+        print("Light:")
+        print(f"  Serial: {light.serial}")
+        print(f"  IP: {light.ip}")
+        print(f"  Port: {light.port}")
 
-            async with light:
-                print(f"  Product: {light.model}")
-                color, power, label = await light.get_color()
-                if light.label is not None:
-                    print(f"  Label: {light.label}")
-                if light.host_firmware is not None:
-                    firmware = light.host_firmware
-                    print(
-                        f"  Firmware: {firmware.version_major}.{firmware.version_minor}"
-                    )
+        if isinstance(light, Light):
+            color, power, label = await light.get_color()
+            print(f"  Label: {label}")
+            print(f"  Power: {'ON' if power else 'OFF'}")
+            print(f"  Color: {color.as_dict()}")
 
-                print(f"  Power: {'ON' if power else 'OFF'}")
-                print(f"  Color: {color.as_dict()}")
-
-            print()
+        print()
 
 
 if __name__ == "__main__":

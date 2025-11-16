@@ -136,11 +136,11 @@ uv run mkdocs gh-deploy
 
 4. **High-Level API** (`src/lifx/api.py`)
 
-   - `discover()`: Simplified discovery returning `DeviceGroup` with context manager
-   - `find_lights()`: Find Light devices with optional label filtering
+   - `discover()`: Async generator yielding devices as they're discovered
    - `find_by_serial()`: Find specific device by serial number
+   - `find_by_label()`: Async generator yielding devices matching label (exact or substring)
+   - `find_by_ip()`: Find device by IP address using targeted broadcast
    - `DeviceGroup`: Batch operations (set_power, set_color, etc.)
-   - `DiscoveryContext`: Async context manager for device discovery
    - `LocationGrouping` / `GroupGrouping`: Organizational structures for location/group-based grouping
 
 5. **Utilities**
@@ -230,6 +230,71 @@ async with device:
 **Note**: Volatile state properties (`power`, `color`, `hev_cycle`, `zones`, `tile_colors`) were removed as they change too frequently to benefit from caching. Always fetch these values using `get_*()` methods.
 
 ## Common Patterns
+
+### Targeted Device Discovery
+
+The high-level API provides efficient methods to find specific devices without discovering all devices on the network:
+
+#### Find by Label
+
+`find_by_label()` uses a protocol trick by broadcasting `GetLabel` instead of `GetService`, returning all device labels in one pass. This is more efficient than querying each device individually.
+
+```python
+from lifx import find_by_label
+
+# Find all devices with "Living" in the label (substring match, default)
+async for device in find_by_label("Living"):  # May match "Living Room", "Living Area", etc.
+    await device.set_power(True)
+
+# Find device by exact label match (returns at most one device)
+async for device in find_by_label("Living Room", exact_match=True):
+    await device.set_power(True)
+    break  # exact_match returns at most one device
+```
+
+**Parameters:**
+- `label`: Device label to search for (case-insensitive)
+- `exact_match`: If `True`, match label exactly and yield at most one device; if `False` (default), match substring and yield all matching devices
+- Returns: `AsyncGenerator[Device, None]`
+
+#### Find by IP Address
+
+`find_by_ip()` uses a protocol trick by sending `GetService` directly to a specific IP address instead of broadcasting, making it faster and more targeted.
+
+```python
+from lifx import find_by_ip
+
+# Find device at specific IP address
+device = await find_by_ip("192.168.1.100")
+if device:
+    async with device:
+        await device.set_power(True)
+```
+
+**Parameters:**
+- `ip`: IP address to search
+- Returns: `Device | None`
+
+#### Find by Serial Number
+
+`find_by_serial()` discovers devices and filters by serial number.
+
+```python
+from lifx import find_by_serial
+
+# Find device by serial (accepts with or without colons)
+device = await find_by_serial("d073d5123456")
+# or
+device = await find_by_serial("d0:73:d5:12:34:56")
+
+if device:
+    async with device:
+        await device.set_power(True)
+```
+
+**Parameters:**
+- `serial`: 12-digit hex serial number (with or without colons, case-insensitive)
+- Returns: `Device | None`
 
 ### Device Serial Number Handling
 
@@ -605,7 +670,8 @@ tests/
 │   └── test_generator.py        # Generator validation tests
 ├── test_network/
 │   ├── test_transport.py        # UDP transport tests
-│   ├── test_discovery.py        # Device discovery tests
+│   ├── test_discovery_devices.py    # Device discovery tests
+│   ├── test_discovery_errors.py     # Discovery error handling tests
 │   ├── test_connection.py       # Connection management tests
 │   ├── test_message.py          # Message building/parsing tests
 │   └── test_concurrent_requests.py  # Concurrent request tests
@@ -618,7 +684,6 @@ tests/
 │   └── test_tile.py             # Tile device tests
 ├── test_api/
 │   ├── test_api_discovery.py    # High-level discovery tests
-│   ├── test_api_context.py      # Context manager tests
 │   ├── test_api_batch_operations.py  # Batch operation tests
 │   ├── test_api_batch_errors.py      # Error handling tests
 │   └── test_api_organization.py      # Location/group organization tests
@@ -697,16 +762,14 @@ The detection uses capability-based logic in the following priority order:
 
 ```python
 # High-level API - automatically creates appropriate device types
-async with discover() as group:
-    for device in group:
-        # Each device is the correct type based on its capabilities
-        print(f"{device.label}: {type(device).__name__}")
+async for device in discover():
+    # Each device is the correct type based on its capabilities
+    print(f"{device.label}: {type(device).__name__}")
 
 # Low-level API - manual device type detection
 from lifx.network.discovery import discover_devices
 
-discovered = await discover_devices()
-for disc in discovered:
+async for disc in discover_devices():
     device = await disc.create_device()  # Returns appropriate device class or None
     if device:
         print(f"Created {type(device).__name__}")

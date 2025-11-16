@@ -132,7 +132,13 @@ class TestErrorHandling:
 
         from lifx.network.connection import DeviceConnection
 
-        conn = DeviceConnection(serial="d073d5000001", ip="127.0.0.1", port=server.port)
+        conn = DeviceConnection(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=server.port,
+            timeout=1.0,
+            max_retries=2,
+        )
 
         # Create multiple concurrent requests where one will timeout
         async def get_power():

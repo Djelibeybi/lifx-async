@@ -9,8 +9,6 @@ import pytest
 from lifx.exceptions import LifxProtocolError
 from lifx.network.discovery import (
     _parse_device_state_service,
-    discover_device_by_ip,
-    discover_device_by_serial,
     discover_devices,
 )
 
@@ -60,15 +58,17 @@ class TestDiscoveryMalformedPackets:
         """
         # Test that discovery handles malformed packets gracefully
         # The emulator provides valid packets on the port
-        devices = await discover_devices(
+        found_device = False
+        async for disc in discover_devices(
             timeout=2.0,
             broadcast_address="127.0.0.1",
             port=emulator_server,
-        )
+        ):
+            found_device = True
+            break
 
-        # Should have discovered devices despite being ready to handle malformed packets
-        assert isinstance(devices, list)
-        assert len(devices) > 0
+        # Should have discovered at least one device
+        assert found_device
 
 
 class TestDiscoveryWithEmulatorErrors:
@@ -77,83 +77,17 @@ class TestDiscoveryWithEmulatorErrors:
     @pytest.mark.asyncio
     async def test_discovery_timeout_scenario(self) -> None:
         """Test discovery with no responding devices."""
-        # Use non-existent port
-        devices = await discover_devices(
+        # Use non-existent port - generator should yield nothing
+        count = 0
+        async for disc in discover_devices(
             timeout=0.1,
             broadcast_address="255.255.255.255",
             port=65432,
-        )
+        ):
+            count += 1
 
-        # Should return empty list, not raise exception
-        assert devices == []
-
-    @pytest.mark.asyncio
-    async def test_discovery_device_by_ip_not_found(self) -> None:
-        """Test discover_device_by_ip returns None when not found."""
-        device = await discover_device_by_ip(
-            "192.168.1.254",
-            timeout=0.1,
-            broadcast_address="255.255.255.255",
-            port=65432,
-        )
-
-        assert device is None
-
-    @pytest.mark.asyncio
-    async def test_discovery_device_by_serial_not_found(self) -> None:
-        """Test discover_device_by_serial returns None when not found."""
-        device = await discover_device_by_serial(
-            "d073d5999999",
-            timeout=0.1,
-            broadcast_address="255.255.255.255",
-            port=65432,
-        )
-
-        assert device is None
-
-    @pytest.mark.asyncio
-    async def test_discovery_device_by_ip_found(self, emulator_server: int) -> None:
-        """Test discover_device_by_ip successfully finds a device."""
-        # First get a device IP from actual discovery
-        all_devices = await discover_devices(
-            timeout=2.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-        )
-
-        if all_devices:
-            target_ip = all_devices[0].ip
-            device = await discover_device_by_ip(
-                target_ip,
-                timeout=2.0,
-                broadcast_address="127.0.0.1",
-                port=emulator_server,
-            )
-
-            assert device is not None
-            assert device.ip == target_ip
-
-    @pytest.mark.asyncio
-    async def test_discovery_device_by_serial_found(self, emulator_server: int) -> None:
-        """Test discover_device_by_serial successfully finds a device."""
-        # First get a device serial from actual discovery
-        all_devices = await discover_devices(
-            timeout=2.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-        )
-
-        if all_devices:
-            target_serial = all_devices[0].serial
-            device = await discover_device_by_serial(
-                target_serial,
-                timeout=2.0,
-                broadcast_address="127.0.0.1",
-                port=emulator_server,
-            )
-
-            assert device is not None
-            assert device.serial == target_serial
+        # Should not yield any devices
+        assert count == 0
 
 
 class TestDiscoveryDeduplication:
@@ -162,14 +96,12 @@ class TestDiscoveryDeduplication:
     @pytest.mark.asyncio
     async def test_devices_deduplicated_by_serial(self, emulator_server: int) -> None:
         """Test that duplicate responses are deduplicated by serial."""
-        devices = await discover_devices(
+        seen_serials: set[str] = set()
+        async for disc in discover_devices(
             timeout=1.5,
             broadcast_address="127.0.0.1",
             port=emulator_server,
-        )
-
-        # Extract serials
-        serials = [d.serial for d in devices]
-
-        # All serials should be unique
-        assert len(serials) == len(set(serials))
+        ):
+            # Each yielded device should have a unique serial
+            assert disc.serial not in seen_serials, f"Duplicate serial: {disc.serial}"
+            seen_serials.add(disc.serial)

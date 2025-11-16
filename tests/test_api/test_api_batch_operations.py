@@ -28,9 +28,8 @@ class TestDeviceGroupBatchOperations:
             # Verify power is on (spot check one device)
             await asyncio.sleep(0.1)  # Give time for updates
             device = group.devices[0]
-            async with device:
-                power = await device.get_power()
-                assert power is True
+            power = await device.get_power()
+            assert power is True
 
     async def test_batch_set_color(self, emulator_devices: DeviceGroup):
         """Test setting color on all devices."""
@@ -43,10 +42,9 @@ class TestDeviceGroupBatchOperations:
             # Verify color was set (check one device)
             await asyncio.sleep(0.1)
             device = group.devices[0]
-            async with device:
-                light_color, _, _ = await device.get_color()
-                # Color should be approximately what we set
-                assert abs(light_color.hue - 180) < 5
+            light_color, _, _ = await device.get_color()
+            # Color should be approximately what we set
+            assert abs(light_color.hue - 180) < 5
 
     async def test_batch_set_brightness(self, emulator_devices: DeviceGroup):
         """Test setting brightness on all devices."""
@@ -58,10 +56,9 @@ class TestDeviceGroupBatchOperations:
             # Verify brightness was set
             await asyncio.sleep(0.1)
             device = group.devices[0]
-            async with device:
-                color, _, _ = await device.get_color()
-                # Brightness should be approximately 0.25
-                assert abs(color.brightness - 0.25) < 0.05
+            color, _, _ = await device.get_color()
+            # Brightness should be approximately 0.25
+            assert abs(color.brightness - 0.25) < 0.05
 
     async def test_batch_pulse(self, emulator_devices: DeviceGroup):
         """Test pulse effect on all devices."""
@@ -102,6 +99,5 @@ class TestDeviceGroupBatchOperations:
 
         # Verify operation succeeded on at least one device
         device = group.lights[0]
-        async with device:
-            is_on = await device.get_power()
-            assert is_on
+        is_on = await device.get_power()
+        assert is_on

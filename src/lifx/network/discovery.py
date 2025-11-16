@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lifx.const import (
     DISCOVERY_TIMEOUT,
@@ -16,6 +17,7 @@ from lifx.const import (
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.network.message import MessageBuilder, parse_message
 from lifx.network.transport import UdpTransport
+from lifx.protocol.base import Packet
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device as DevicePackets
 
@@ -45,7 +47,7 @@ class DiscoveredDevice:
     first_seen: float = field(default_factory=time.time)
     response_time: float = 0.0
 
-    async def create_device(self) -> Device:
+    async def create_device(self) -> Device | None:
         """Create appropriate device instance based on product capabilities.
 
         Queries the device for its product ID and uses the product registry
@@ -121,6 +123,257 @@ class DiscoveredDevice:
         return self.serial == other.serial
 
 
+@dataclass
+class DiscoveryResponse:
+    """Response from a discovery broadcast using a custom packet.
+
+    Attributes:
+        serial: Device serial number
+        ip: Device IP address
+        port: Device UDP port
+        response_time: Response time in seconds
+        response_payload: Unpacked State packet fields as key/value dict
+    """
+
+    serial: str
+    ip: str
+    port: int
+    response_time: float
+    response_payload: dict[str, Any]
+
+
+async def _discover_with_packet(
+    packet: Packet,
+    timeout: float = DISCOVERY_TIMEOUT,
+    broadcast_address: str = "255.255.255.255",
+    port: int = LIFX_UDP_PORT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+) -> AsyncGenerator[DiscoveryResponse]:
+    """Generic discovery using any Get* packet.
+
+    Broadcasts the specified packet and collects all State* responses.
+    Uses the packet's STATE_TYPE attribute to validate expected responses.
+
+    This is a powerful protocol trick that allows targeted discovery:
+    - GetLabel: Find devices by label
+    - GetColor: Find only lights (non-lights return StateUnhandled)
+    - GetGroup/GetLocation: Find devices by group/location
+
+    Args:
+        packet: Any Get* packet to broadcast (must have STATE_TYPE attribute)
+        timeout: Discovery timeout in seconds
+        broadcast_address: Broadcast address or specific IP
+        port: UDP port
+        max_response_time: Max response time
+        idle_timeout_multiplier: Idle timeout multiplier
+
+    Returns:
+        List of DiscoveryResponse objects with unpacked response payloads
+
+    Example:
+        ```python
+        # Find all devices and their labels
+        responses = await _discover_with_packet(DevicePackets.GetLabel())
+        for resp in responses:
+            print(f"{resp.serial}: {resp.response_payload['Label']}")
+
+        # Find only lights (filter out StateUnhandled)
+        responses = await _discover_with_packet(LightPackets.Get())
+        lights = [
+            r
+            for r in responses
+            if r.response_payload.get("pkt_type") != StateUnhandled.PKT_TYPE
+        ]
+        ```
+    """
+    if not hasattr(packet, "STATE_TYPE"):
+        raise ValueError(
+            f"Packet {type(packet).__name__} must have STATE_TYPE attribute"
+        )
+
+    expected_response_type: int = getattr(packet, "STATE_TYPE")
+    responses: dict[str, DiscoveryResponse] = {}
+    start_time = time.time()
+
+    async with UdpTransport(port=0, broadcast=True) as transport:
+        builder = MessageBuilder()
+        message = builder.create_message(
+            packet=packet,
+            target=b"\x00" * 8,  # Broadcast
+            res_required=True,
+            ack_required=False,
+        )
+
+        request_time = time.time()
+        _LOGGER.debug(
+            {
+                "class": "_discover_with_packet",
+                "method": "discover",
+                "action": "broadcast_sent",
+                "broadcast_address": broadcast_address,
+                "port": port,
+                "packet_type": type(packet).__name__,
+                "expected_response": expected_response_type,
+            }
+        )
+        await transport.send(message, (broadcast_address, port))
+
+        idle_timeout = max_response_time * idle_timeout_multiplier
+        last_response_time = request_time
+
+        while True:
+            elapsed_since_last = time.time() - last_response_time
+
+            if elapsed_since_last >= idle_timeout:
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_with_packet",
+                        "action": "idle_timeout",
+                        "elapsed": elapsed_since_last,
+                    }
+                )
+                break
+
+            if time.time() - request_time >= timeout:
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_with_packet",
+                        "action": "overall_timeout",
+                        "elapsed": time.time() - request_time,
+                    }
+                )
+                break
+
+            remaining_idle = idle_timeout - elapsed_since_last
+            remaining_overall = timeout - (time.time() - request_time)
+            remaining = min(remaining_idle, remaining_overall)
+
+            try:
+                data, addr = await transport.receive(timeout=remaining)
+                response_timestamp = time.time()
+            except LifxTimeoutError:
+                break
+
+            try:
+                header, payload = parse_message(data)
+
+                # Validate source
+                if header.source != builder.source:
+                    continue
+
+                # Check for expected response type
+                if header.pkt_type != expected_response_type:
+                    _LOGGER.debug(
+                        {
+                            "class": "_discover_with_packet",
+                            "action": "unexpected_packet_type",
+                            "expected": expected_response_type,
+                            "received": header.pkt_type,
+                        }
+                    )
+                    continue
+
+                # Extract serial from header
+                device_serial = Serial.from_protocol(header.target).to_string()
+
+                # Dynamically get the response packet class and unpack
+                # We need to find the packet class that matches this pkt_type
+                from lifx.protocol import packets as all_packets
+
+                response_packet_class = None
+                for category_name in dir(all_packets):
+                    category = getattr(all_packets, category_name)
+                    if not hasattr(category, "__dict__"):
+                        continue
+                    for packet_name in dir(category):
+                        pkt_class = getattr(category, packet_name)
+                        if (
+                            hasattr(pkt_class, "PKT_TYPE")
+                            and pkt_class.PKT_TYPE == header.pkt_type
+                        ):
+                            response_packet_class = pkt_class
+                            break
+                    if response_packet_class:
+                        break
+
+                if not response_packet_class:
+                    _LOGGER.warning(
+                        {
+                            "class": "_discover_with_packet",
+                            "action": "unknown_packet_type",
+                            "pkt_type": header.pkt_type,
+                        }
+                    )
+                    continue
+
+                # Unpack the response packet
+                response_packet = response_packet_class.unpack(payload)
+
+                # Extract all fields into a dict
+                response_payload = response_packet.as_dict
+
+                # Calculate response time
+                response_time = response_timestamp - request_time
+
+                # Create discovery response
+                discovery_resp = DiscoveryResponse(
+                    serial=device_serial,
+                    ip=addr[0],
+                    port=port,
+                    response_time=response_time,
+                    response_payload=response_payload,
+                )
+
+                yield discovery_resp
+
+                responses[device_serial] = discovery_resp
+                last_response_time = response_timestamp
+
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_with_packet",
+                        "action": "device_found",
+                        "serial": device_serial,
+                        "ip": addr[0],
+                        "payload_keys": list(response_payload.keys()),
+                    }
+                )
+
+            except LifxProtocolError as e:
+                _LOGGER.warning(
+                    {
+                        "class": "_discover_with_packet",
+                        "action": "malformed_response",
+                        "reason": str(e),
+                        "source_ip": addr[0],
+                    }
+                )
+                continue
+            except Exception as e:
+                _LOGGER.error(
+                    {
+                        "class": "_discover_with_packet",
+                        "action": "unexpected_error",
+                        "error": str(e),
+                        "source_ip": addr[0],
+                    },
+                    exc_info=True,
+                )
+                continue
+
+        _LOGGER.debug(
+            {
+                "class": "_discover_with_packet",
+                "action": "complete",
+                "devices_found": len(responses),
+                "elapsed": time.time() - start_time,
+            }
+        )
+
+    # return list(responses.values())
+
+
 def _parse_device_state_service(payload: bytes) -> tuple[int, int]:
     """Parse DeviceStateService payload.
 
@@ -154,28 +407,36 @@ async def discover_devices(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> list[DiscoveredDevice]:
+) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
-    Sends a broadcast DeviceGetService packet and collects responses.
+    Sends a broadcast DeviceGetService packet and yields devices as they respond.
     Implements DoS protection via timeout, source validation, and serial validation.
 
     Args:
         timeout: Discovery timeout in seconds
         broadcast_address: Broadcast address to use
         port: UDP port to use (default LIFX_UDP_PORT)
+        max_response_time: Max time to wait for responses
+        idle_timeout_multiplier: Idle timeout multiplier
 
-    Returns:
-        List of discovered devices (deduplicated by serial number)
+    Yields:
+        DiscoveredDevice instances as they are discovered
+        (deduplicated by serial number)
 
     Example:
         ```python
-        devices = await discover_devices(timeout=5.0)
-        for device in devices:
+        # Process devices as they're discovered
+        async for device in discover_devices(timeout=5.0):
             print(f"Found device: {device.serial} at {device.ip}:{device.port}")
+
+        # Or collect all devices first
+        devices = []
+        async for device in discover_devices():
+            devices.append(device)
         ```
     """
-    devices: dict[str, DiscoveredDevice] = {}
+    seen_serials: set[str] = set()
     packet_count = 0
     start_time = time.time()
 
@@ -317,32 +578,35 @@ async def discover_devices(
                 # Convert 8-byte protocol serial to string
                 device_serial = Serial.from_protocol(header.target).to_string()
 
-                # Create device info
-                device = DiscoveredDevice(
-                    serial=device_serial,
-                    ip=addr[0],
-                    port=device_port,
-                    service=service,
-                    response_time=response_time,
-                )
+                # Deduplicate by serial number and yield new devices immediately
+                if device_serial not in seen_serials:
+                    seen_serials.add(device_serial)
 
-                # Deduplicate by serial number
-                devices[device.serial] = device
+                    # Create device info
+                    device = DiscoveredDevice(
+                        serial=device_serial,
+                        ip=addr[0],
+                        port=device_port,
+                        service=service,
+                        response_time=response_time,
+                    )
+
+                    _LOGGER.debug(
+                        {
+                            "class": "discover_devices",
+                            "method": "discover",
+                            "action": "device_found",
+                            "serial": device.serial,
+                            "ip": device.ip,
+                            "port": device.port,
+                            "response_time": response_time,
+                        }
+                    )
+
+                    yield device
 
                 # Update last response time for idle timeout calculation
                 last_response_time = response_timestamp
-
-                _LOGGER.debug(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "device_found",
-                        "serial": device.serial,
-                        "ip": device.ip,
-                        "port": device.port,
-                        "response_time": response_time,
-                    }
-                )
 
             except LifxProtocolError as e:
                 # Log malformed responses
@@ -377,141 +641,8 @@ async def discover_devices(
                 "class": "discover_devices",
                 "method": "discover",
                 "action": "complete",
-                "devices_found": len(devices),
+                "devices_found": len(seen_serials),
                 "packets_processed": packet_count,
                 "elapsed": time.time() - start_time,
             }
         )
-
-    return list(devices.values())
-
-
-async def discover_device_by_ip(
-    target_ip: str,
-    timeout: float = 5.0,
-    broadcast_address: str = "255.255.255.255",
-    port: int = LIFX_UDP_PORT,
-) -> DiscoveredDevice | None:
-    """Discover a specific LIFX device by IP address.
-
-    Args:
-        target_ip: Target device IP address (IPv4 only)
-        timeout: Discovery timeout in seconds
-        broadcast_address: Broadcast address to use
-        port: UDP port to use (default LIFX_UDP_PORT)
-
-    Returns:
-        DiscoveredDevice if found, None otherwise
-
-    Example:
-        ```python
-        ip = "192.168.1.100"
-        device = await discover_device_by_ip(ip, timeout=5.0)
-        if device:
-            print(f"Found device at {device.ip}:{device.port})
-        ```
-    """
-    devices = await discover_devices(
-        timeout=timeout, broadcast_address=broadcast_address, port=port
-    )
-
-    for device in devices:
-        if device.ip == target_ip:
-            return device
-
-    return None
-
-
-async def discover_device_by_serial(
-    target_serial: str,
-    timeout: float = 5.0,
-    broadcast_address: str = "255.255.255.255",
-    port: int = LIFX_UDP_PORT,
-) -> DiscoveredDevice | None:
-    """Discover a specific LIFX device by serial number.
-
-    Args:
-        target_serial: Target device serial number (string)
-        timeout: Discovery timeout in seconds
-        broadcast_address: Broadcast address to use
-        port: UDP port to use (default LIFX_UDP_PORT)
-
-    Returns:
-        DiscoveredDevice if found, None otherwise
-
-    Example:
-        ```python
-        serial = "d073d5123456"
-        device = await discover_device_by_serial(serial, timeout=5.0)
-        if device:
-            print(f"Found device at {device.ip}:{device.port}")
-        ```
-    """
-    devices = await discover_devices(
-        timeout=timeout, broadcast_address=broadcast_address, port=port
-    )
-
-    for device in devices:
-        if device.serial == target_serial:
-            return device
-
-    return None
-
-
-# Deprecated alias for backward compatibility
-async def discover_device_by_label(
-    label: str,
-    timeout: float = 5.0,
-    broadcast_address: str = "255.255.255.255",
-    port: int = LIFX_UDP_PORT,
-) -> DiscoveredDevice | None:
-    """Discover a LIFX device by label (name).
-
-    Note: This requires querying all devices for their labels,
-    so it may take longer than serial-based discovery.
-
-    Args:
-        label: Device label to search for
-        timeout: Discovery timeout in seconds
-        broadcast_address: Broadcast address to use
-        port: UDP port to use (default LIFX_UDP_PORT)
-
-    Returns:
-        DiscoveredDevice if found, None otherwise
-
-    Example:
-        ```python
-        device = await discover_device_by_label("Living Room", timeout=5.0)
-        if device:
-            print(f"Found device at {device.ip}:{device.port}")
-        ```
-    """
-    from lifx.devices.base import Device
-    from lifx.exceptions import LifxError
-
-    # First discover all devices
-    devices = await discover_devices(
-        timeout=timeout, broadcast_address=broadcast_address, port=port
-    )
-
-    # Query each device for its label
-    for discovered_device in devices:
-        try:
-            # Create a temporary device connection to query the label
-            device = Device(
-                serial=discovered_device.serial,
-                ip=discovered_device.ip,
-                port=discovered_device.port,
-            )
-
-            async with device:
-                # Match label (case-insensitive)
-                if device.label is not None:
-                    if device.label.lower() == label.lower():
-                        return discovered_device
-
-        except (LifxError, TimeoutError):
-            # Skip devices that don't respond or error out
-            continue
-
-    return None
