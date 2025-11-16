@@ -96,13 +96,14 @@ class TestDiscoveredDeviceCreateDevice:
         ):
             device = await disc.create_device()
             if device is not None:
-                device_type = type(device).__name__
-                device_types[device_type] = device_types.get(device_type, 0) + 1
+                async with device:
+                    device_type = type(device).__name__
+                    device_types[device_type] = device_types.get(device_type, 0) + 1
 
-                # Each created device should have valid connection info
-                assert device.serial == disc.serial
-                assert device.ip == disc.ip
-                assert device.port == disc.port
+                    # Each created device should have valid connection info
+                    assert device.serial == disc.serial
+                    assert device.ip == disc.ip
+                    assert device.port == disc.port
 
         # Verify we have expected device types
         assert "Light" in device_types and "InfraredLight" in device_types

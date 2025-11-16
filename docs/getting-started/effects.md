@@ -30,29 +30,33 @@ The simplest way to use the effects framework is with the `EffectPulse` class:
 
 ```python
 import asyncio
-from lifx import discover
+from lifx import discover, DeviceGroup
 from lifx.effects import Conductor, EffectPulse
 
 async def main():
     # Discover lights on your network
-    async with discover() as group:
-        if not group.lights:
-            print("No lights found")
-            return
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        # Create a conductor to manage effects
-        conductor = Conductor()
+    if not group.lights:
+        print("No lights found")
+        return
 
-        # Create a blink effect
-        effect = EffectPulse(mode='blink', cycles=5)
+    # Create a conductor to manage effects
+    conductor = Conductor()
 
-        # Start the effect on all lights
-        await conductor.start(effect, group.lights)
+    # Create a blink effect
+    effect = EffectPulse(mode='blink', cycles=5)
 
-        # Wait for effect to complete (5 cycles * 1 second)
-        await asyncio.sleep(6)
+    # Start the effect on all lights
+    await conductor.start(effect, group.lights)
 
-        print("Effect complete - lights restored to original state")
+    # Wait for effect to complete (5 cycles * 1 second)
+    await asyncio.sleep(6)
+
+    print("Effect complete - lights restored to original state")
 
 asyncio.run(main())
 ```
@@ -63,16 +67,20 @@ The `EffectColorloop` creates a continuous rainbow effect:
 
 ```python
 import asyncio
-from lifx import discover
+from lifx import discover, DeviceGroup
 from lifx.effects import Conductor, EffectColorloop
 
 async def main():
-    async with discover() as group:
-        if not group.lights:
-            print("No lights found")
-            return
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        conductor = Conductor()
+    if not group.lights:
+        print("No lights found")
+        return
+
+    conductor = Conductor()
 
         # Create a rainbow effect
         effect = EffectColorloop(
@@ -131,19 +139,25 @@ There are two ways effects complete:
 You can apply effects to specific lights instead of all discovered devices:
 
 ```python
-async with discover() as group:
-    conductor = Conductor()
+from lifx import discover, DeviceGroup
 
-    # Get lights by label
-    bedroom_lights = [
-        light for light in group.lights
-        if "Bedroom" in await light.get_label()
-    ]
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
-    # Apply effect only to bedroom lights
-    effect = EffectPulse(mode='breathe', cycles=3)
-    await conductor.start(effect, bedroom_lights)
-    await asyncio.sleep(4)
+conductor = Conductor()
+
+# Get lights by label
+bedroom_lights = [
+    light for light in group.lights
+    if "Bedroom" in await light.get_label()
+]
+
+# Apply effect only to bedroom lights
+effect = EffectPulse(mode='breathe', cycles=3)
+await conductor.start(effect, bedroom_lights)
+await asyncio.sleep(4)
 ```
 
 ### Sequential Effects
@@ -273,27 +287,37 @@ await conductor.stop(lights)
 Always check if lights were found before attempting effects:
 
 ```python
-async with discover() as group:
-    if not group.lights:
-        print("No lights found on network")
-        return
+from lifx import discover, DeviceGroup
 
-    # Safe to use effects
-    conductor = Conductor()
-    # ...
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+if not group.lights:
+    print("No lights found on network")
+    return
+
+# Safe to use effects
+conductor = Conductor()
+# ...
 ```
 
-### 5. Use Context Managers
+### 5. Use DeviceGroup for Organization
 
-The discovery context manager ensures proper cleanup:
+The DeviceGroup provides convenient access to device collections:
 
 ```python
-# Good - automatic cleanup
-async with discover() as group:
-    conductor = Conductor()
-    await conductor.start(effect, group.lights)
+from lifx import discover, DeviceGroup
 
-# The context manager handles cleanup automatically
+# Discover devices
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+conductor = Conductor()
+await conductor.start(effect, group.lights)
 ```
 
 ## Complete Examples
@@ -324,8 +348,14 @@ async def notify(lights: list, level: str = 'info'):
     await asyncio.sleep(4)  # Wait for completion
 
 # Usage
-async with discover() as group:
-    await notify(group.lights, level='warning')
+from lifx import discover, DeviceGroup
+
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await notify(group.lights, level='warning')
 ```
 
 ### Party Mode
@@ -362,8 +392,14 @@ async def party_mode(lights: list, duration: int = 60):
     await conductor.stop(lights)
 
 # Usage
-async with discover() as group:
-    await party_mode(group.lights, duration=120)
+from lifx import discover, DeviceGroup
+
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await party_mode(group.lights, duration=120)
 ```
 
 ## Next Steps

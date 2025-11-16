@@ -202,7 +202,7 @@ except LifxDeviceNotFoundError:
 - **Auto-Generation**: Protocol structures generated from YAML specification
 - **State Caching**: Device properties cache values to reduce network requests
 - **Connection Pooling**: LRU cache for connection reuse across operations
-- **Background Response Dispatcher**: Concurrent request handling via asyncio tasks
+- **Async Generator Streaming**: Request/response communication via async generators
 
 ### State Caching
 
@@ -441,136 +441,107 @@ async with await MultiZoneLight.from_ip("192.168.1.100") as light:
 
 ### Concurrency Considerations
 
-**Device Connection Concurrency (Implemented):**
+**Request/Response Pattern:**
 
-Each `DeviceConnection` supports **true concurrent requests** using a background response
-dispatcher:
+The library uses async generators for all request/response communication:
 
-- Background receiver task runs continuously while connection is open
-- Responses are routed to waiting coroutines by sequence number
-- Multiple concurrent requests on the same connection are fully supported
-- Backward compatible with existing sequential code
+**Single Response (Most Common):**
+```python
+# Get single response with convenience wrapper
+label_state = await device.connection.request(GetLabel())
+
+# Or explicitly with generator
+async for state in device.connection.request_stream(GetLabel()):
+    process(state)
+    break  # Exit after first response
+```
+
+**Multiple Responses:**
+```python
+# Stream responses until timeout
+async for zone_state in device.connection.request_stream(
+    GetExtendedColorZones(), timeout=2.0
+):
+    colors.extend(zone_state.colors)
+    if len(colors) >= expected:
+        break  # Early exit when done
+```
+
+**Benefits:**
+- Immediate exit for single-response requests (no wasted timeout)
+- Natural streaming for multi-response protocols
+- Memory efficient (no buffering all responses)
+- Consistent with discovery pattern
 
 **Concurrent request patterns:**
 
-1. **Concurrent requests on a single connection** (optimal):
+1. **Sequential operations on a single connection** (default):
 
    ```python
    async with DeviceConnection(serial, ip) as conn:
-       # Multiple requests execute concurrently
-       result1, result2, result3 = await asyncio.gather(
-           conn.request_response(packet1, type1),
-           conn.request_response(packet2, type2),
-           conn.request_response(packet3, type3),
-       )
+       # Requests are serialized via _request_lock to prevent response mixing
+       await conn.request(packet1)
+       await conn.request(packet2)
    ```
 
-2. **Sequential operations on a single connection** (still works):
-
-   ```python
-   async with DeviceConnection(serial, ip) as conn:
-       # These execute sequentially (no gather)
-       await conn.request_response(packet1, type1)
-       await conn.request_response(packet2, type2)
-   ```
-
-3. **Concurrent operations on different devices** (fully parallel):
+2. **Concurrent operations on different devices** (fully parallel):
 
    ```python
    # Different devices = different connections = maximum parallelism
-   async with DeviceConnection(serial1, ip1) as conn1, DeviceConnection(
-       serial2, ip2
-   ) as conn2:
-       result1, result2 = await asyncio.gather(
-           conn1.request_response(...), conn2.request_response(...)
-       )
+   async with asyncio.TaskGroup() as tg:
+       tg.create_task(device1.set_power(True))
+       tg.create_task(device2.set_power(True))
    ```
 
 **How it works:**
 
 - Each connection has one UDP socket with a unique local port
-- Background task (`_response_receiver()`) continuously receives UDP packets
-- Incoming packets are matched to pending requests by sequence number
-- Each request waits on an `asyncio.Event` that's signaled when response arrives
-- Sequence number ensures correct response routing even with concurrent requests
+- Requests are serialized via `_request_lock` to prevent response mixing on the same connection
+- Each request uses `request_stream()` async generator to yield responses as they arrive
+- Single-response requests break immediately after first response
+- Multi-response requests stream until timeout or early exit condition
 
-**Sequence Number Allocation and Validation:**
+**Request Serialization:**
 
-The library uses atomic sequence number allocation and optional packet type validation for robust concurrent request handling:
+The library uses an asyncio.Lock (`_request_lock`) to serialize requests on the same connection:
 
-1. **Atomic Sequence Allocation** (`message.py:next_sequence()`):
-   - Each request atomically allocates a unique sequence number (0-255)
-   - Sequence numbers are allocated **before** creating pending requests
-   - Prevents race conditions where concurrent requests could get the same sequence
-   - The sequence counter wraps around at 256 (uint8 protocol limit)
+1. **Why serialization?** Without a background receiver task, concurrent requests on the same UDP socket could receive each other's responses. The lock ensures only one request is active per connection.
 
+2. **How it works:**
    ```python
-   # In MessageBuilder
-   def next_sequence(self) -> int:
-       """Atomically allocate and return the next sequence number."""
-       seq = self._sequence
-       self._sequence = (self._sequence + 1) % 256
-       return seq
+   async with self._request_lock:
+       # Send request
+       await self.send_packet(request)
+       # Receive and yield responses
+       async for header, payload in self._receive_responses(timeout):
+           yield header, payload
    ```
 
-2. **Explicit Sequence Parameter** (`connection.py:_execute_request_with_retry()`):
-   - Sequence number is allocated early and passed through the call chain
-   - Eliminates timing windows where concurrent requests could conflict
-   - Ensures one-to-one mapping between sequence numbers and pending requests
+3. **Concurrent device operations:** Different devices have different connections with their own locks, so operations on multiple devices execute in parallel.
 
-   ```python
-   # Atomically allocate sequence BEFORE creating pending request
-   sequence = self._builder.next_sequence()
+**Sequence Number Allocation:**
 
-   # Create pending request with explicit sequence
-   pending = PendingRequest(sequence=sequence, event=asyncio.Event(), ...)
-   self._pending_requests[sequence] = pending
+The library uses atomic sequence number allocation for robust request handling:
 
-   # Send with explicit sequence
-   message = self._builder.create_message(request, sequence=sequence, ...)
-   ```
+- Each request atomically allocates a unique sequence number (0-255)
+- The sequence counter wraps around at 256 (uint8 protocol limit)
+- Ensures response correlation with the request
 
-3. **Packet Type Validation** (Defense-in-Depth):
-   - Each Get*/Request packet auto-generates a `STATE_TYPE` class attribute
-   - `STATE_TYPE` defines the expected response packet type (e.g., `GetPower.STATE_TYPE = 22` for `StatePower`)
-   - Response validation checks both sequence number AND packet type match
-   - Catches protocol violations and misrouted responses early
-   - Negligible performance impact (~1ns integer comparison vs ~1-50ms network I/O)
-
-   ```python
-   # Auto-generated in packets.py
-   class GetPower(Packet):
-       PKT_TYPE: ClassVar[int] = 20
-       STATE_TYPE: ClassVar[int] = 22  # StatePower
-
-   # Validation in _response_receiver()
-   if pending.expected_pkt_type is not None and header.pkt_type != pending.expected_pkt_type:
-       pending.error = LifxProtocolError(
-           f"Received unexpected packet type {header.pkt_type}, "
-           f"expected {pending.expected_pkt_type}"
-       )
-   ```
-
-4. **Auto-Generation** (`protocol/generator.py`):
-   - `STATE_TYPE` attributes are automatically generated from `protocol.yml`
-   - Follows standard naming pattern: `GetXxx` → `StateXxx`, `XxxRequest` → `XxxResponse`
-   - Special case: `GetColorZones` → `StateMultiZone` (manually mapped)
-   - Generator builds packet lookup table and emits `STATE_TYPE` for each Get*/Request packet
-   - Never manually edit `packets.py` - regenerate from protocol specification
-
-**Why This Matters:**
-
-The atomic sequence allocation fixed a race condition that caused intermittent "mismatched packet" errors under high concurrency:
-- **Before**: Sequence read and increment were separate operations, allowing concurrent requests to get the same sequence
-- **After**: Sequence allocation is atomic, ensuring each request gets a unique sequence number
-- **Defense**: Packet type validation provides an additional safety layer to catch protocol errors early
+```python
+# In MessageBuilder
+def next_sequence(self) -> int:
+    """Atomically allocate and return the next sequence number."""
+    seq = self._sequence
+    self._sequence = (self._sequence + 1) % 256
+    return seq
+```
 
 **Performance characteristics:**
 
-- Multiple concurrent requests on a single connection execute with maximum parallelism
+- Single-response requests exit immediately (no wasted timeout)
+- Multi-response requests stream efficiently with early exit
 - Concurrent requests to different devices benefit from full parallelism
-- No additional UDP sockets needed for concurrency
-- Minimal memory overhead (~100 bytes per pending request)
+- Minimal memory overhead (no buffering responses)
 
 **Rate Limiting:**
 
@@ -603,12 +574,12 @@ The `discover_devices()` function implements DoS protection through:
 
 ## Testing Strategy
 
-- **561 tests total** (comprehensive coverage across all layers)
+- **768 tests total** (comprehensive coverage across all layers)
 - **Protocol Layer**: 136 tests (serialization, header, packets, generator validation)
-- **Network Layer**: 76 tests (transport, discovery, connection, message, concurrent requests)
-- **Device Layer**: 145 tests (base, light, hev, infrared, multizone, tile)
-- **API Layer**: 88 tests (discovery, context management, batch operations, organization, error handling)
-- **Utilities**: 74 tests (color conversion, product registry, RGB roundtrip)
+- **Network Layer**: 86 tests (transport, discovery, connection, message, async generator requests)
+- **Device Layer**: 157 tests (base, light, hev, infrared, multizone, tile)
+- **API Layer**: 60 tests (discovery, batch operations, organization, themes, error handling)
+- **Utilities**: 329 tests (color conversion, product registry, RGB roundtrip, effects, themes)
 
 Test files mirror source structure: `tests/test_devices/test_light.py` tests
 `src/lifx/devices/light.py`

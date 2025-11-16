@@ -7,34 +7,42 @@ Themes enable coordinated color schemes across your LIFX devices. This guide cov
 ### Apply Theme to All Devices
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 
 async def apply_evening_mode():
-    async with discover() as lights:
-        theme = ThemeLibrary.get("evening")
-        await lights.apply_theme(theme, power_on=True, duration=2.0)
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    theme = ThemeLibrary.get("evening")
+    await group.apply_theme(theme, power_on=True, duration=2.0)
 ```
 
 ### Apply Different Themes to Different Device Types
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 
 async def themed_lighting():
-    async with discover() as lights:
-        theme = ThemeLibrary.get("christmas")
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        # Single-zone lights get a random color
-        for light in lights.lights:
-            await light.apply_theme(theme)
+    theme = ThemeLibrary.get("christmas")
 
-        # Multi-zone lights get distributed colors
-        for strip in lights.multizone_lights:
-            await strip.apply_theme(theme)
+    # Single-zone lights get a random color
+    for light in group.lights:
+        await light.apply_theme(theme)
 
-        # Tile devices get smooth interpolation
-        for tile in lights.tiles:
-            await tile.apply_theme(theme)
+    # Multi-zone lights get distributed colors
+    for strip in group.multizone_lights:
+        await strip.apply_theme(theme)
+
+    # Tile devices get smooth interpolation
+    for tile in group.tiles:
+        await tile.apply_theme(theme)
 ```
 
 ## Time-Based Lighting
@@ -42,24 +50,28 @@ async def themed_lighting():
 ### Morning to Night Transition
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 import asyncio
 
 async def daily_lighting_schedule():
-    async with discover() as lights:
-        schedule = [
-            ("06:00", "energizing"),   # Morning
-            ("12:00", "focusing"),     # Afternoon
-            ("18:00", "evening"),      # Early evening
-            ("21:00", "relaxing"),     # Night
-            ("23:00", "peaceful"),     # Bedtime
-        ]
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        for time_str, theme_name in schedule:
-            theme = ThemeLibrary.get(theme_name)
-            await lights.apply_theme(theme, duration=2.0)
-            # In production, schedule this with APScheduler or similar
-            await asyncio.sleep(2.0)  # Demo delay
+    schedule = [
+        ("06:00", "energizing"),   # Morning
+        ("12:00", "focusing"),     # Afternoon
+        ("18:00", "evening"),      # Early evening
+        ("21:00", "relaxing"),     # Night
+        ("23:00", "peaceful"),     # Bedtime
+    ]
+
+    for time_str, theme_name in schedule:
+        theme = ThemeLibrary.get(theme_name)
+        await group.apply_theme(theme, duration=2.0)
+        # In production, schedule this with APScheduler or similar
+        await asyncio.sleep(2.0)  # Demo delay
 ```
 
 ## Holiday Decorations
@@ -67,7 +79,7 @@ async def daily_lighting_schedule():
 ### Holiday Mode Manager
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 from datetime import datetime
 
 async def activate_holiday_theme():
@@ -85,38 +97,46 @@ async def activate_holiday_theme():
     if not theme_name:
         return
 
-    async with discover() as lights:
-        theme = ThemeLibrary.get(theme_name)
-        await lights.apply_theme(theme, power_on=True)
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    theme = ThemeLibrary.get(theme_name)
+    await group.apply_theme(theme, power_on=True)
 ```
 
 ### Multi-Room Holiday Setup
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 
 async def decorate_house_for_christmas():
     """Apply Christmas theme throughout the house."""
-    async with discover() as lights:
-        theme = ThemeLibrary.get("christmas")
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        # Living room: full brightness
-        for light in lights.lights:
-            if "living" in light.label.lower():
-                await light.apply_theme(theme, power_on=True, duration=1.0)
+    theme = ThemeLibrary.get("christmas")
 
-        # Bedroom: dimmer
-        for light in lights.lights:
-            if "bedroom" in light.label.lower():
-                dim_theme = ThemeLibrary.get("peaceful")
-                await light.apply_theme(dim_theme, power_on=True, duration=1.0)
+    # Living room: full brightness
+    for light in group.lights:
+        if "living" in light.label.lower():
+            await light.apply_theme(theme, power_on=True, duration=1.0)
 
-        # Strips and tiles throughout
-        for strip in lights.multizone_lights:
-            await strip.apply_theme(theme, power_on=True, duration=1.5)
+    # Bedroom: dimmer
+    for light in group.lights:
+        if "bedroom" in light.label.lower():
+            dim_theme = ThemeLibrary.get("peaceful")
+            await light.apply_theme(dim_theme, power_on=True, duration=1.0)
 
-        for tile in lights.tiles:
-            await tile.apply_theme(theme, power_on=True, duration=1.5)
+    # Strips and tiles throughout
+    for strip in group.multizone_lights:
+        await strip.apply_theme(theme, power_on=True, duration=1.5)
+
+    for tile in group.tiles:
+        await tile.apply_theme(theme, power_on=True, duration=1.5)
 ```
 
 ## Dynamic Theme Transitions
@@ -124,7 +144,7 @@ async def decorate_house_for_christmas():
 ### Smooth Theme Cycling
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 import asyncio
 
 async def cycle_moods():
@@ -137,29 +157,37 @@ async def cycle_moods():
         "energizing",
     ]
 
-    async with discover() as lights:
-        for theme_name in mood_themes:
-            theme = ThemeLibrary.get(theme_name)
-            await lights.apply_theme(theme, duration=2.0)
-            await asyncio.sleep(2.5)  # Wait for transition + 0.5s delay
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    for theme_name in mood_themes:
+        theme = ThemeLibrary.get(theme_name)
+        await group.apply_theme(theme, duration=2.0)
+        await asyncio.sleep(2.5)  # Wait for transition + 0.5s delay
 ```
 
 ### Theme Playlist
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 import asyncio
 
 async def theme_playlist(themes: list[str], duration: float = 5.0):
     """Apply a sequence of themes with configurable timing."""
-    async with discover() as lights:
-        for theme_name in themes:
-            try:
-                theme = ThemeLibrary.get(theme_name)
-                await lights.apply_theme(theme, duration=1.0)
-                await asyncio.sleep(duration)
-            except KeyError:
-                print(f"Theme '{theme_name}' not found, skipping")
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    for theme_name in themes:
+        try:
+            theme = ThemeLibrary.get(theme_name)
+            await group.apply_theme(theme, duration=1.0)
+            await asyncio.sleep(duration)
+        except KeyError:
+            print(f"Theme '{theme_name}' not found, skipping")
 
 # Usage:
 # await theme_playlist(["evening", "relaxing", "peaceful"], duration=10.0)
@@ -170,23 +198,27 @@ async def theme_playlist(themes: list[str], duration: float = 5.0):
 ### Multi-Room Coordination
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 import asyncio
 
 async def set_room_theme(room_name: str, theme_name: str):
     """Apply theme to all lights in a specific room (group)."""
-    async with discover() as lights:
-        theme = ThemeLibrary.get(theme_name)
-        groups = await lights.organize_by_group()
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        if room_name in groups:
-            room_lights = groups["room_name"]
+    theme = ThemeLibrary.get(theme_name)
+    groups = await group.organize_by_group()
 
-        for light in room_lights.lights:
-            await light.apply_theme(theme, power_on=True)
+    if room_name in groups:
+        room_lights = groups["room_name"]
 
-        for strip in room_lights.multizone_lights:
-            await strip.apply_theme(theme, power_on=True)
+    for light in room_lights.lights:
+        await light.apply_theme(theme, power_on=True)
+
+    for strip in room_lights.multizone_lights:
+        await strip.apply_theme(theme, power_on=True)
 
 # Usage:
 # await set_room_theme("bedroom", "peaceful")
@@ -224,22 +256,25 @@ async def activate_scene(scene: str):
         print(f"Scene '{scene}' not found")
         return
 
-    async with discover() as lights:
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
 
-        groups = lights.organize_by_group()
+    groups = group.organize_by_group()
 
-        for room, theme_name in scenes[scene].items():
-            if room not in groups:
-                continue
+    for room, theme_name in scenes[scene].items():
+        if room not in groups:
+            continue
 
-            room_lights = groups["room"]
-            theme = ThemeLibrary.get(theme_name)
+        room_lights = groups["room"]
+        theme = ThemeLibrary.get(theme_name)
 
-            for light in room_lights.lights:
-                await light.apply_theme(theme, power_on=True, duration=1.5)
+        for light in room_lights.lights:
+            await light.apply_theme(theme, power_on=True, duration=1.5)
 
-            for strip in room_lights.multizone_lights:
-                await strip.apply_theme(theme, power_on=True, duration=1.5)
+        for strip in room_lights.multizone_lights:
+            await strip.apply_theme(theme, power_on=True, duration=1.5)
 
 # Usage:
 # await activate_scene("movie_night")
@@ -251,7 +286,7 @@ async def activate_scene(scene: str):
 ### Create Branded Theme
 
 ```python
-from lifx import HSBK, Theme, discover
+from lifx import HSBK, Theme, discover, DeviceGroup
 
 # Create corporate branding theme
 corporate_theme = Theme([
@@ -260,14 +295,18 @@ corporate_theme = Theme([
     HSBK(hue=200, saturation=0.5, brightness=0.7, kelvin=4000),   # Light blue
 ])
 
-async with discover() as lights:
-    await lights.apply_theme(corporate_theme)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await group.apply_theme(corporate_theme)
 ```
 
 ### Sunset Gradient
 
 ```python
-from lifx import HSBK, Theme, discover
+from lifx import HSBK, Theme, discover, DeviceGroup
 
 # Create sunset-inspired gradient
 sunset_theme = Theme([
@@ -277,8 +316,12 @@ sunset_theme = Theme([
     HSBK(hue=320, saturation=0.7, brightness=0.7, kelvin=2400),  # Deep red
 ])
 
-async with discover() as lights:
-    await lights.apply_theme(sunset_theme, duration=3.0)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+await group.apply_theme(sunset_theme, duration=3.0)
 ```
 
 ## Error Handling
@@ -286,7 +329,7 @@ async with discover() as lights:
 ### Robust Theme Application
 
 ```python
-from lifx import discover, ThemeLibrary, LifxTimeoutError, LifxDeviceNotFoundError
+from lifx import discover, DeviceGroup, ThemeLibrary, LifxTimeoutError, LifxDeviceNotFoundError
 
 async def safe_apply_theme(theme_name: str):
     """Apply theme with comprehensive error handling."""
@@ -298,14 +341,18 @@ async def safe_apply_theme(theme_name: str):
         return False
 
     try:
-        async with discover() as lights:
-            if not lights:
-                print("No lights found")
-                return False
+        devices = []
+        async for device in discover():
+            devices.append(device)
+        group = DeviceGroup(devices)
 
-            await lights.apply_theme(theme, power_on=True, duration=1.5)
-            print(f"Successfully applied '{theme_name}' theme")
-            return True
+        if not group.devices:
+            print("No lights found")
+            return False
+
+        await group.apply_theme(theme, power_on=True, duration=1.5)
+        print(f"Successfully applied '{theme_name}' theme")
+        return True
 
     except LifxTimeoutError:
         print("Timeout: Devices did not respond in time")
@@ -325,28 +372,36 @@ async def safe_apply_theme(theme_name: str):
 When applying themes to many devices, use `DeviceGroup.apply_theme()` for concurrent execution:
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 
-async with discover() as lights:
-    theme = ThemeLibrary.get("evening")
-    # All devices updated concurrently
-    await lights.apply_theme(theme)
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
+
+theme = ThemeLibrary.get("evening")
+# All devices updated concurrently
+await group.apply_theme(theme)
 ```
 
 ### Avoid Rapid Transitions
 
 ```python
-from lifx import discover, ThemeLibrary
+from lifx import discover, DeviceGroup, ThemeLibrary
 import asyncio
 
-async with discover() as lights:
-    themes = ["evening", "relaxing", "peaceful"]
+devices = []
+async for device in discover():
+    devices.append(device)
+group = DeviceGroup(devices)
 
-    for theme_name in themes:
-        theme = ThemeLibrary.get(theme_name)
-        await lights.apply_theme(theme, duration=2.0)
-        # Wait for transition to complete
-        await asyncio.sleep(2.5)
+themes = ["evening", "relaxing", "peaceful"]
+
+for theme_name in themes:
+    theme = ThemeLibrary.get(theme_name)
+    await group.apply_theme(theme, duration=2.0)
+    # Wait for transition to complete
+    await asyncio.sleep(2.5)
 ```
 
 ## See Also

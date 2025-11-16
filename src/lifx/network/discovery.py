@@ -112,6 +112,8 @@ class DiscoveredDevice:
         except Exception:
             return None
 
+        return None
+
     def __hash__(self) -> int:
         """Hash based on serial number for deduplication."""
         return hash(self.serial)

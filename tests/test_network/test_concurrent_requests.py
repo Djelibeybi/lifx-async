@@ -10,61 +10,8 @@ import asyncio
 
 import pytest
 
-from lifx.const import MULTI_RESPONSE_COLLECTION_TIMEOUT
-from lifx.exceptions import LifxProtocolError, LifxTimeoutError
-from lifx.network.connection import PendingRequest
-from lifx.protocol.header import LifxHeader
+from lifx.exceptions import LifxTimeoutError
 from lifx.protocol.packets import Device
-
-
-class TestPendingRequest:
-    """Test PendingRequest dataclass."""
-
-    def test_pending_request_initialization(self):
-        """Test creating a PendingRequest."""
-        event = asyncio.Event()
-        pending = PendingRequest(sequence=42, event=event)
-
-        assert pending.sequence == 42
-        assert pending.event is event
-        assert pending.results == []  # Empty list for collecting responses
-        assert pending.error is None
-        # Default uses MULTI_RESPONSE_COLLECTION_TIMEOUT from const.py
-        assert pending.collection_timeout == MULTI_RESPONSE_COLLECTION_TIMEOUT
-        assert (
-            pending.first_response_time is None
-        )  # No response time until first response
-
-    def test_pending_request_with_result(self):
-        """Test PendingRequest with result."""
-        event = asyncio.Event()
-        pending = PendingRequest(sequence=42, event=event)
-
-        # Simulate receiving response
-        header = LifxHeader.create(
-            pkt_type=Device.StatePower.PKT_TYPE,
-            sequence=42,
-            target=b"\x00" * 6,
-            source=12345,
-        )
-        payload = b"\x00\x01"  # Sample payload
-        pending.results = [(header, payload)]
-        pending.event.set()
-
-        assert pending.results[0] == (header, payload)
-        assert pending.error is None
-
-    def test_pending_request_with_error(self):
-        """Test PendingRequest with error."""
-        event = asyncio.Event()
-        pending = PendingRequest(sequence=42, event=event)
-
-        # Simulate error
-        pending.error = LifxProtocolError("Type mismatch")
-        pending.event.set()
-
-        assert len(pending.results) == 0
-        assert isinstance(pending.error, LifxProtocolError)
 
 
 class TestConcurrentRequests:
@@ -165,11 +112,11 @@ class TestErrorHandling:
         assert results[1] == "label_success"
 
 
-class TestConnectionPoolWithPhase2:
-    """Test that ConnectionPool works with Phase 2 changes."""
+class TestConnectionPoolWithAsyncGenerators:
+    """Test that ConnectionPool works with async generator-based requests."""
 
     async def test_connection_pool_basic_operation(self):
-        """Test that connection pool still works with Phase 2."""
+        """Test that connection pool still works with async generators."""
         from lifx.network.connection import ConnectionPool
 
         pool = ConnectionPool(max_connections=2)
@@ -186,3 +133,96 @@ class TestConnectionPoolWithPhase2:
                 serial="d073d5000001", ip="192.168.1.100"
             )
             assert conn1_again is conn1
+
+
+class TestAsyncGeneratorRequests:
+    """Test async generator-based request streaming."""
+
+    async def test_request_stream_single_response(self, emulator_server_with_scenarios):
+        """Test request_stream with single response exits immediately after break."""
+        server, _device = await emulator_server_with_scenarios(
+            device_type="color",
+            serial="d073d5000001",
+            scenarios={},
+        )
+
+        from lifx.network.connection import DeviceConnection
+
+        conn = DeviceConnection(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=server.port,
+            timeout=2.0,
+            max_retries=2,
+        )
+
+        # Stream should yield single response
+        received = []
+        async for response in conn.request_stream(Device.GetLabel()):
+            received.append(response)
+            break  # Exit immediately after first response
+
+        assert len(received) == 1
+        assert hasattr(received[0], "label")
+
+    async def test_request_stream_convenience_wrapper(
+        self, emulator_server_with_scenarios
+    ):
+        """Test that request() convenience wrapper works correctly."""
+        server, _device = await emulator_server_with_scenarios(
+            device_type="color",
+            serial="d073d5000001",
+            scenarios={},
+        )
+
+        from lifx.network.connection import DeviceConnection
+
+        conn = DeviceConnection(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=server.port,
+            timeout=2.0,
+            max_retries=2,
+        )
+
+        # request() should return single response directly
+        response = await conn.request(Device.GetLabel())
+        assert hasattr(response, "label")
+
+    async def test_early_exit_no_resource_leak(self, emulator_server_with_scenarios):
+        """Test that breaking early doesn't leak resources."""
+        server, _device = await emulator_server_with_scenarios(
+            device_type="color",
+            serial="d073d5000001",
+            scenarios={},
+        )
+
+        from lifx.network.connection import ConnectionPool, DeviceConnection
+
+        # Use fresh pool for this test
+        pool = ConnectionPool(max_connections=10)
+        DeviceConnection._pool = pool
+
+        try:
+            conn = DeviceConnection(
+                serial="d073d5000001",
+                ip="127.0.0.1",
+                port=server.port,
+                timeout=2.0,
+                max_retries=2,
+            )
+
+            # Stream and break early
+            async for _response in conn.request_stream(Device.GetLabel()):
+                break
+
+            # Verify connection is still functional
+            actual_conn = await pool.get_connection(
+                serial="d073d5000001",
+                ip="127.0.0.1",
+                port=server.port,
+            )
+            assert actual_conn.is_open
+        finally:
+            await pool.close_all()
+            DeviceConnection._pool = None
