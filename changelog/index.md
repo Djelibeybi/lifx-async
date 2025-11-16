@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v3.0.0 (2025-11-16)
+
+### Features
+
+- Convert discovery methods to async generators ([`0d41880`](https://github.com/Djelibeybi/lifx-async/commit/0d418800729b45869057b1f4dd86b4ceb7ef2fbe))
+- Replace event-based request/response with async generators ([`fa50734`](https://github.com/Djelibeybi/lifx-async/commit/fa50734057d40ac968f2edb4ff7d6634fe5be798))
+
+### Breaking Changes
+
+- Internal connection architecture completely refactored
+
 ## v2.2.2 (2025-11-14)
 
 ### Bug Fixes
