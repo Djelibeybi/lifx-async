@@ -30,7 +30,13 @@ class TestBatchOperationPartialFailures:
         real_devices = list(emulator_devices.devices[:2])
 
         # Add a device that doesn't exist (will timeout)
-        fake_device = Light(serial="d073d5999999", ip="127.0.0.1", port=get_free_port())
+        fake_device = Light(
+            serial="d073d5999999",
+            ip="127.0.0.1",
+            port=get_free_port(),
+            timeout=0.5,
+            max_retries=0,
+        )
         real_devices.append(fake_device)
 
         group = DeviceGroup(real_devices)
@@ -61,9 +67,8 @@ class TestBatchOperationScalability:
 
         # Verify devices are on (spot check a few)
         device = group.devices[0]
-        async with device:
-            is_on = await device.get_power()
-            assert is_on
+        is_on = await device.get_power()
+        assert is_on
 
 
 class TestBatchOperationConcurrency:
@@ -84,9 +89,8 @@ class TestBatchOperationConcurrency:
 
         # Verify all devices received the command
         for i, light in enumerate(group.devices):
-            async with light:
-                is_on = await light.get_power()
-                assert is_on, f"Device {i} should be on"
+            is_on = await light.get_power()
+            assert is_on, f"Device {i} should be on"
 
 
 class TestBatchOperationEdgeCases:
@@ -109,7 +113,13 @@ class TestBatchOperationEdgeCases:
         """Test batch operation when all devices fail (non-existent devices)."""
         # Create 3 devices that don't exist (will all timeout)
         light_devices = [
-            Light(serial=f"d073d500{i:04x}", ip="127.0.0.1", port=get_free_port())
+            Light(
+                serial=f"d073d500{i:04x}",
+                ip="127.0.0.1",
+                port=get_free_port(),
+                timeout=0.1,
+                max_retries=0,
+            )
             for i in range(3)
         ]
         group = DeviceGroup(light_devices)
@@ -136,10 +146,18 @@ class TestBatchOperationEdgeCases:
         light_devices = [
             real_device,  # Real
             Light(
-                serial="d073d5999998", ip="127.0.0.1", port=get_free_port()
+                serial="d073d5999998",
+                ip="127.0.0.1",
+                port=get_free_port(),
+                timeout=0.1,
+                max_retries=0,
             ),  # Fake (will fail)
             Light(
-                serial="d073d5999999", ip="127.0.0.1", port=get_free_port()
+                serial="d073d5999999",
+                ip="127.0.0.1",
+                port=get_free_port(),
+                timeout=0.1,
+                max_retries=0,
             ),  # Fake (will fail)
         ]
         group = DeviceGroup(light_devices)
@@ -149,9 +167,8 @@ class TestBatchOperationEdgeCases:
             await group.set_power(True, duration=0.0)
 
         # Verify that the real device actually changed state
-        async with real_device:
-            is_on = await real_device.get_power()
-            assert is_on  # Real device should be on
+        is_on = await real_device.get_power()
+        assert is_on  # Real device should be on
 
 
 class TestBatchOperationErrorDetails:
@@ -167,7 +184,13 @@ class TestBatchOperationErrorDetails:
         # Create group with real and fake devices
         light_devices = [
             real_device,
-            Light(serial="d073d5999999", ip="127.0.0.1", port=get_free_port()),
+            Light(
+                serial="d073d5999999",
+                ip="127.0.0.1",
+                port=get_free_port(),
+                timeout=0.5,
+                max_retries=0,
+            ),
         ]
         group = DeviceGroup(light_devices)
 

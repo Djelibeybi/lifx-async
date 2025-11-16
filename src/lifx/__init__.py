@@ -9,10 +9,10 @@ from importlib.metadata import version as get_version
 
 from lifx.api import (
     DeviceGroup,
-    DiscoveryContext,
     discover,
+    find_by_ip,
+    find_by_label,
     find_by_serial,
-    find_lights,
 )
 from lifx.color import HSBK, Colors
 from lifx.devices import (
@@ -86,11 +86,11 @@ __all__ = [
     "ThemeLibrary",
     "get_theme",
     # High-level API
-    "DiscoveryContext",
     "DeviceGroup",
     "discover",
-    "find_lights",
     "find_by_serial",
+    "find_by_label",
+    "find_by_ip",
     # Discovery (low-level)
     "discover_devices",
     "DiscoveredDevice",

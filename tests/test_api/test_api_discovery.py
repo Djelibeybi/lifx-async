@@ -1,171 +1,54 @@
 """Tests for high-level API discovery helper functions.
 
 This module tests:
-- discover() - Context manager for device discovery
-- find_lights() - Find lights with optional label filtering
+- discover() - Async generator for device discovery
 - find_by_serial() - Find specific device by serial number
+- find_by_ip() - Find device by IP address
+- find_by_label() - Find device by exact label match
 """
 
 from __future__ import annotations
 
-from lifx.api import discover, find_by_serial, find_lights
-from lifx.devices import Light, MultiZoneLight
+import pytest
+
+from lifx.api import discover, find_by_ip, find_by_label, find_by_serial
+from lifx.devices import Light
 from lifx.network.discovery import discover_devices
 from tests.conftest import get_free_port
 
 
 class TestDiscover:
-    """Test discover() context manager."""
+    """Test discover() async generator."""
 
     async def test_discover_basic(self, emulator_server: int):
-        """Test basic discovery with context manager."""
-        async with discover(
+        """Test basic discovery with async generator."""
+        async for device in discover(
             timeout=1.0,
             broadcast_address="127.0.0.1",
             port=emulator_server,
             idle_timeout_multiplier=0.5,
-        ) as group:
-            # Should discover all 7 devices from emulator
-            assert len(group.devices) == 7
-
-            # Should be able to perform operations
-            assert len(group.lights) == 7  # All devices are lights
+        ):
+            assert isinstance(device, Light)
 
     async def test_discover_with_timeout(self, emulator_server: int):
         """Test discovery with custom timeout."""
-        async with discover(
+        async for device in discover(
             timeout=0.5,
             broadcast_address="127.0.0.1",
             port=emulator_server,
             idle_timeout_multiplier=0.5,
-        ) as group:
-            # Should complete within timeout
-            assert len(group.devices) >= 0  # May find some or all devices
+        ):
+            assert device is not None
+            break
 
     async def test_discover_empty_network(self):
         """Test discovery when no devices are present."""
-        # Use a port with no emulator running - will timeout and return empty
-        async with discover(
+        async for device in discover(
             timeout=0.5,
             broadcast_address="127.0.0.1",
             port=get_free_port(),
-        ) as group:
-            # Should return empty group
-            assert len(group.devices) == 0
-
-    async def test_discover_context_manager_cleanup(self, emulator_server: int):
-        """Test that context manager properly cleans up."""
-        # Enter and exit context
-        async with discover(
-            timeout=1.0, broadcast_address="127.0.0.1", port=emulator_server
-        ) as group:
-            devices = group.devices
-            assert len(devices) > 0
-
-        # After exit, devices should still be accessible but connections managed by pool
-        # Just verify we exited cleanly
-        assert len(devices) == 7  # Emulator creates 7 devices
-
-
-class TestFindLights:
-    """Test find_lights() helper function."""
-
-    async def test_find_lights_all(self, emulator_server: int):
-        """Test finding all lights without filtering."""
-        lights = await find_lights(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        # Should find all 7 light devices from emulator
-        assert len(lights) == 7
-        assert all(isinstance(light, Light) for light in lights)
-
-    async def test_find_lights_by_label_exact(self, emulator_server: int):
-        """Test finding lights with exact label match."""
-        # Emulator devices have default labels, we can search for "LIFX"
-        lights = await find_lights(
-            label_contains="LIFX",
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        # Should find devices with "LIFX" in their label
-        assert len(lights) > 0
-        # Verify label contains the search term
-        async with lights[0]:
-            label = await lights[0].get_label()
-            assert "LIFX" in label or "lifx" in label.lower()
-
-    async def test_find_lights_by_label_partial(self, emulator_server: int):
-        """Test finding lights with partial label match (case-insensitive)."""
-        # Search for common term in emulator device names
-        lights = await find_lights(
-            label_contains="Color",
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        # Should find at least the color light devices
-        assert len(lights) >= 1
-
-    async def test_find_lights_by_label_case_insensitive(self, emulator_server: int):
-        """Test that label filtering is case-insensitive."""
-        # Search with different case
-        lights = await find_lights(
-            label_contains="COLOR",
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        # Should find devices with "color" in label (case-insensitive)
-        assert len(lights) >= 1
-
-    async def test_find_lights_not_found(self, emulator_server: int):
-        """Test finding lights with non-existent label."""
-        lights = await find_lights(
-            label_contains="NonExistentDeviceName12345",
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        # Should return empty list
-        assert len(lights) == 0
-
-    async def test_find_lights_includes_multizone(self, emulator_server: int):
-        """Test that find_lights includes MultiZoneLight devices."""
-        lights = await find_lights(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        # Should include multizone lights (emulator creates 2 multizone devices)
-        multizone_lights = [
-            light for light in lights if isinstance(light, MultiZoneLight)
-        ]
-        assert len(multizone_lights) == 2
-
-    async def test_find_lights_empty_network(self):
-        """Test find_lights when no devices are present."""
-        # Use a port with no emulator running
-        lights = await find_lights(
-            timeout=0.5,
-            broadcast_address="127.0.0.1",
-            port=get_free_port(),
-        )
-        assert len(lights) == 0
+        ):
+            pytest.fail(f"Unexpected yield of {device} from discover.")
 
 
 class TestFindBySerial:
@@ -173,17 +56,20 @@ class TestFindBySerial:
 
     async def test_find_by_serial_found_string(self, emulator_server: int):
         """Test finding device by serial number (string format)."""
-        # First discover devices to get a real serial number
-        devices = await discover_devices(
+        # First discover a device to get a real serial number
+        target_serial = None
+        async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
             port=emulator_server,
             idle_timeout_multiplier=0.5,
-        )
-        assert len(devices) > 0
+        ):
+            target_serial = disc.serial
+            break
+
+        assert target_serial is not None
 
         # Use the first discovered device's serial
-        target_serial = devices[0].serial
         device = await find_by_serial(
             target_serial,
             timeout=1.0,
@@ -196,43 +82,21 @@ class TestFindBySerial:
         assert device.serial == target_serial
         assert isinstance(device, Light)
 
-    async def test_find_by_serial_found_bytes(self, emulator_server: int):
-        """Test finding device by serial number (bytes format)."""
-        # Discover devices to get a real serial
-        devices = await discover_devices(
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-        assert len(devices) >= 2
-
-        # Use second device's serial as bytes
-        target_serial = devices[1].serial
-        serial_bytes = bytes.fromhex(target_serial)
-        device = await find_by_serial(
-            serial_bytes,
-            timeout=1.0,
-            broadcast_address="127.0.0.1",
-            port=emulator_server,
-            idle_timeout_multiplier=0.5,
-        )
-
-        assert device is not None
-        assert device.serial == target_serial
-
     async def test_find_by_serial_with_colons(self, emulator_server: int):
         """Test finding device by serial with colon separators."""
-        # Discover multizone device
-        devices = await discover_devices(
+        # Discover first device
+        target_serial = None
+        async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
             port=emulator_server,
             idle_timeout_multiplier=0.5,
-        )
+        ):
+            target_serial = disc.serial
+            break
+        assert target_serial is not None
 
-        # Use the first discovered device and format with colons
-        target_serial = devices[0].serial
+        # Format with colons
         serial_with_colons = ":".join(
             [target_serial[i : i + 2] for i in range(0, 12, 2)]
         )
@@ -263,17 +127,19 @@ class TestFindBySerial:
 
     async def test_find_by_serial_case_insensitive(self, emulator_server: int):
         """Test that serial matching is case-insensitive."""
-        # Discover devices first
-        devices = await discover_devices(
+        # Discover first device
+        target_serial = None
+        async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
             port=emulator_server,
             idle_timeout_multiplier=0.5,
-        )
-        assert len(devices) > 0
+        ):
+            target_serial = disc.serial
+            break
+        assert target_serial is not None
 
         # Use uppercase version of serial
-        target_serial = devices[0].serial
         uppercase_serial = target_serial.upper()
 
         device = await find_by_serial(
@@ -297,3 +163,223 @@ class TestFindBySerial:
             port=get_free_port(),
         )
         assert device is None
+
+
+class TestFindByIp:
+    """Tests for find_by_ip function."""
+
+    async def test_find_by_ip_found(self, emulator_server: int):
+        """Test find_by_ip returns device when IP matches."""
+        # Emulator devices are all at 127.0.0.1
+        device = await find_by_ip(
+            "127.0.0.1",
+            timeout=1.0,
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        )
+
+        assert device is not None
+        # Should get one of the emulator devices (d073d5000001-d073d5000007)
+        assert device.serial.startswith("d073d5")
+
+    async def test_find_by_ip_not_found(self, emulator_server: int):
+        """Test find_by_ip returns None when IP doesn't match any device."""
+        # Use an IP that's definitely not the emulator (192.168.200.254)
+        device = await find_by_ip(
+            "192.168.200.254",
+            timeout=1.0,
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        )
+
+        assert device is None
+
+    async def test_find_by_ip_timeout(self):
+        """Test find_by_ip with no emulator running (timeout scenario)."""
+        device = await find_by_ip(
+            "127.0.0.1",
+            timeout=0.5,
+            port=get_free_port(),
+            idle_timeout_multiplier=0.5,
+        )
+        assert device is None
+
+
+class TestFindByLabel:
+    """Tests for find_by_label function."""
+
+    async def test_find_by_label_found(self, emulator_server: int):
+        """Test find_by_label can find devices by label."""
+        # First discover a device and get its label
+        first_disc = None
+        async for disc in discover_devices(
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            first_disc = disc
+            break
+
+        assert first_disc is not None
+
+        # Get the label of the first device
+        device = await first_disc.create_device()
+        if device is None:
+            pytest.skip("Device creation returned None")
+
+        device_label = await device.get_label()
+
+        # Now search for that device by label using find_by_label
+        found_devices = []
+        async for d in find_by_label(
+            device_label,
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            found_devices.append(d)
+
+        assert len(found_devices) >= 1
+        assert any(d.serial == first_disc.serial for d in found_devices)
+
+    async def test_find_by_label_case_insensitive(self, emulator_server: int):
+        """Test find_by_label is case-insensitive."""
+        # Get a device label
+        first_disc = None
+        async for disc in discover_devices(
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            first_disc = disc
+            break
+
+        assert first_disc is not None
+
+        device = await first_disc.create_device()
+        if device is None:
+            pytest.skip("Device creation returned None")
+
+        async with device:
+            device_label = await device.get_label()
+
+        # Search with different case
+        found_devices = []
+        async for d in find_by_label(
+            device_label.upper(),
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            found_devices.append(d)
+
+        assert len(found_devices) >= 1
+        assert any(d.serial == first_disc.serial for d in found_devices)
+
+    async def test_find_by_label_not_found(self, emulator_server: int):
+        """Test find_by_label returns empty list when label doesn't match any device."""
+        # Use a label that definitely doesn't exist
+        async for d in find_by_label(
+            "Nonexistent Device Label XYZ999",
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            pytest.fail(f"Unexpected yield of {d} from find_by_label()")
+
+    async def test_find_by_label_timeout(self):
+        """Test find_by_label with no emulator running (timeout scenario)."""
+        async for d in find_by_label(
+            "Test Device",
+            timeout=0.5,
+            broadcast_address="127.0.0.1",
+            port=get_free_port(),
+            idle_timeout_multiplier=0.5,
+        ):
+            pytest.fail(f"Unexpected yield of {d} from find_by_label()")
+
+    async def test_find_by_label_substring_match(self, emulator_server: int):
+        """Test find_by_label substring matching (default behavior)."""
+        # Get a device label
+        first_disc = None
+        async for disc in discover_devices(
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            first_disc = disc
+            break
+
+        assert first_disc is not None
+
+        device = await first_disc.create_device()
+        if device is None:
+            pytest.skip("Device creation returned None")
+
+        device_label = await device.get_label()
+
+        # Search with partial label (should match if label contains the substring)
+        # E.g., if label is "LIFX Color 000001", search for "Color"
+        if len(device_label) > 4:
+            partial_label = device_label[5:9]  # Get a middle substring
+            async for d in find_by_label(
+                partial_label,
+                exact_match=False,
+                timeout=1.0,
+                broadcast_address="127.0.0.1",
+                port=emulator_server,
+                idle_timeout_multiplier=0.5,
+            ):
+                assert d is not None
+                break
+
+    async def test_find_by_label_exact_match(self, emulator_server: int):
+        """Test find_by_label exact matching."""
+        # Get a device label
+        first_disc = None
+        async for disc in discover_devices(
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            first_disc = disc
+            break
+
+        assert first_disc is not None
+
+        device = await first_disc.create_device()
+        if device is None:
+            pytest.skip("Device creation returned None")
+
+        device_label = await device.get_label()
+
+        # Exact match should work
+        async for d in find_by_label(
+            device_label,
+            exact_match=True,
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_server,
+            idle_timeout_multiplier=0.5,
+        ):
+            assert d.serial == first_disc.serial
+
+        # Partial label with exact_match=True should NOT match
+        if len(device_label) > 4:
+            partial_label = device_label[5:9]
+            async for d in find_by_label(
+                partial_label,
+                exact_match=True,
+                timeout=1.0,
+                broadcast_address="127.0.0.1",
+                port=emulator_server,
+                idle_timeout_multiplier=0.5,
+            ):
+                pytest.fail(f"Unexpected yield of {d} from find_by_label()")

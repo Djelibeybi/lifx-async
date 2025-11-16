@@ -8,7 +8,7 @@ Requirements:
 
 import asyncio
 
-from lifx import HSBK, discover
+from lifx import HSBK, Light, discover
 from lifx.effects import Conductor, LIFXEffect
 
 
@@ -104,32 +104,36 @@ async def main() -> None:
     """Run custom effect examples."""
     print("Discovering LIFX devices...")
 
-    async with discover() as group:
-        if not group.lights:
-            print("No lights found")
-            return
+    lights: list[Light] = []
+    async for device in discover():
+        if isinstance(device, Light):
+            lights.append(device)
 
-        print(f"Found {len(group.lights)} light(s)")
-        conductor = Conductor()
+    if not lights:
+        print("No lights found")
+        return
 
-        # Example 1: Flash effect
-        print("\n1. Flash effect (10 flashes)")
-        effect = FlashEffect(flash_count=10, duration=0.3)
-        await conductor.start(effect, group.lights)
-        await asyncio.sleep(4)  # Wait for effect to complete
+    print(f"Found {len(lights)} light(s)")
+    conductor = Conductor()
 
-        await asyncio.sleep(2)  # Brief pause
+    # Example 1: Flash effect
+    print("\n1. Flash effect (10 flashes)")
+    flash_effect = FlashEffect(flash_count=10, duration=0.3)
+    await conductor.start(flash_effect, lights)
+    await asyncio.sleep(4)  # Wait for effect to complete
 
-        # Example 2: Wave effect
-        print("\n2. Wave effect (3 waves)")
-        effect = WaveEffect(wave_count=3, wave_speed=0.4)
-        await conductor.start(effect, group.lights)
-        # Calculate total time: waves * (lights * speed + pause)
-        total_time = 3 * (len(group.lights) * 0.4 + 0.5)
-        await asyncio.sleep(total_time + 1)
+    await asyncio.sleep(2)  # Brief pause
 
-        print("\nAll effects completed!")
-        print("Lights have been restored to their original state")
+    # Example 2: Wave effect
+    print("\n2. Wave effect (3 waves)")
+    wave_effect = WaveEffect(wave_count=3, wave_speed=0.4)
+    await conductor.start(wave_effect, lights)
+    # Calculate total time: waves * (lights * speed + pause)
+    total_time = 3 * (len(lights) * 0.4 + 0.5)
+    await asyncio.sleep(total_time + 1)
+
+    print("\nAll effects completed!")
+    print("Lights have been restored to their original state")
 
 
 if __name__ == "__main__":
