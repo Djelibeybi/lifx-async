@@ -29,7 +29,7 @@ class TestDeviceGroupBatchOperations:
             await asyncio.sleep(0.1)  # Give time for updates
             device = group.devices[0]
             power = await device.get_power()
-            assert power is True
+            assert power == 65535
 
     async def test_batch_set_color(self, emulator_devices: DeviceGroup):
         """Test setting color on all devices."""

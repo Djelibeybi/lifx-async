@@ -46,7 +46,7 @@ class TestLight:
         assert color.saturation == pytest.approx(0.5, abs=0.01)
         assert color.brightness == pytest.approx(0.75, abs=0.01)
         assert color.kelvin == 3500
-        assert power is True
+        assert power == 65535
         assert label == "Test Light"
 
     async def test_set_color(self, light: Light) -> None:
@@ -200,7 +200,7 @@ class TestLight:
 
         power = await light.get_power()
 
-        assert power is True
+        assert power == 65535
 
     async def test_set_power(self, light: Light) -> None:
         """Test setting light power."""

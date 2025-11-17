@@ -56,14 +56,14 @@ class Light(Device):
         await super()._setup()
         await self.get_color()
 
-    async def get_color(self) -> tuple[HSBK, bool, str]:
+    async def get_color(self) -> tuple[HSBK, int, str]:
         """Get current light color, power, and label.
 
         Always fetches from device. Use the `color` property to access stored value.
 
         Returns a tuple containing:
         - color: HSBK color
-        - power: Power state (True=on, False=off)
+        - power: Power level as integer (0 for off, 65535 for on)
         - label: Device label/name
 
         Returns:
@@ -77,7 +77,7 @@ class Light(Device):
         Example:
             ```python
             color, power, label = await light.get_color()
-            print(f"{label}: Hue: {color.hue}°, Power: {power}")
+            print(f"{label}: Hue: {color.hue}°, Power: {'ON' if power > 0 else 'OFF'}")
             ```
         """
         # Request automatically unpacks response and decodes labels
@@ -85,7 +85,7 @@ class Light(Device):
 
         # Convert from protocol HSBK to user-friendly HSBK
         color = HSBK.from_protocol(state.color)
-        power = state.power > 0
+        power = state.power
         label = state.label
 
         # Store label from StateColor response
@@ -328,16 +328,16 @@ class Light(Device):
             set_kelvin=False,
         )
 
-    async def get_power(self) -> bool:
+    async def get_power(self) -> int:
         """Get light power state (specific to light, not device).
 
-        Always fetches from device. Use the `power` property to access stored value.
+        Always fetches from device.
 
         This overrides Device.get_power() as it queries the light-specific
         power state (packet type 116/118) instead of device power (packet type 20/22).
 
         Returns:
-            True if light is powered on, False otherwise
+            Power level as integer (0 for off, 65535 for on)
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -346,16 +346,14 @@ class Light(Device):
 
         Example:
             ```python
-            is_on = await light.get_power()
-            print(f"Light power: {'ON' if is_on else 'OFF'}")
+            level = await light.get_power()
+            print(f"Light power: {'ON' if level > 0 else 'OFF'}")
             ```
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Light.GetPower())
 
         # Power level is uint16 (0 or 65535)
-        is_on = state.level > 0
-
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -365,40 +363,52 @@ class Light(Device):
             }
         )
 
-        return is_on
+        return state.level
 
-    async def set_power(self, on: bool, duration: float = 0.0) -> None:
+    async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
         """Set light power state (specific to light, not device).
 
         This overrides Device.set_power() as it uses the light-specific
         power packet (type 117) which supports transition duration.
 
         Args:
-            on: True to turn on, False to turn off
+            level: True/65535 to turn on, False/0 to turn off
             duration: Transition duration in seconds (default 0.0)
 
         Raises:
+            ValueError: If integer value is not 0 or 65535
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
 
         Example:
             ```python
-            # Turn on instantly
+            # Turn on instantly with boolean
             await light.set_power(True)
+
+            # Turn on with integer
+            await light.set_power(65535)
 
             # Fade off over 3 seconds
             await light.set_power(False, duration=3.0)
+            await light.set_power(0, duration=3.0)
             ```
         """
         # Power level: 0 for off, 65535 for on
-        level = 65535 if on else 0
+        if isinstance(level, bool):
+            power_level = 65535 if level else 0
+        elif isinstance(level, int):
+            if level not in (0, 65535):
+                raise ValueError(f"Power level must be 0 or 65535, got {level}")
+            power_level = level
+        else:
+            raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
         # Convert duration to milliseconds
         duration_ms = int(duration * 1000)
 
         # Request automatically handles acknowledgement
         await self.connection.request(
-            packets.Light.SetPower(level=level, duration=duration_ms),
+            packets.Light.SetPower(level=power_level, duration=duration_ms),
         )
 
         _LOGGER.debug(
@@ -406,7 +416,7 @@ class Light(Device):
                 "class": "Device",
                 "method": "set_power",
                 "action": "change",
-                "values": {"level": level, "duration": duration_ms},
+                "values": {"level": power_level, "duration": duration_ms},
             }
         )
 

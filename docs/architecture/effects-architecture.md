@@ -220,8 +220,8 @@ If `effect.power_on == True`, devices are powered on:
 async def async_perform(self, participants):
     if self.power_on:
         for light in self.participants:
-            is_on = await light.get_power()
-            if not is_on:
+            power_level = await light.get_power()
+            if power_level == 0:
                 startup_color = await self.from_poweroff_hsbk(light)
                 await light.set_color(startup_color, duration=0)
                 await light.set_power(True, duration=0.3)
@@ -307,10 +307,11 @@ _running: dict[str, RunningEffect]
 
 #### Power State
 
-Simple boolean captured via `get_power()`:
+Integer power level captured via `get_power()`:
 
 ```python
-power = await light.get_power()
+power_level = await light.get_power()  # Returns int (0 or 65535)
+is_on = power_level > 0
 ```
 
 #### Color State
@@ -318,14 +319,14 @@ power = await light.get_power()
 HSBK color captured via `get_color()`:
 
 ```python
-color, _, _ = await light.get_color()
+color, power, _ = await light.get_color()  # power is int (0 or 65535)
 ```
 
 Returns:
 
 - `color`: HSBK (hue, saturation, brightness, kelvin)
-- `power`: Power level (unused - we use get_power())
-- `label`: Device label (unused)
+- `power`: Power level as integer (0 for off, 65535 for on)
+- `label`: Device label
 
 #### Multizone State
 

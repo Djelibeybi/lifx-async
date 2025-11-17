@@ -67,15 +67,14 @@ class DeviceStateManager:
             ```
         """
         # Get power and color states
-        power = await light.get_power()
-        color, _, _ = await light.get_color()
+        color, power, _ = await light.get_color()
 
         # Get zone colors for multizone devices
         zone_colors = None
         if isinstance(light, MultiZoneLight):
             zone_colors = await self._capture_zones(light)
 
-        return PreState(power=power, color=color, zone_colors=zone_colors)
+        return PreState(power=bool(power > 0), color=color, zone_colors=zone_colors)
 
     async def restore_state(self, light: Light, prestate: PreState) -> None:
         """Restore device to pre-effect state.

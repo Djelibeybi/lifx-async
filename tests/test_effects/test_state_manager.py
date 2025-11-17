@@ -65,9 +65,9 @@ async def test_capture_state_regular_light(state_manager, mock_light):
 async def test_capture_state_powered_off_light(state_manager, mock_light):
     """Test capturing state from a powered off light."""
     # Setup mock responses for powered off light
-    mock_light.get_power = AsyncMock(return_value=False)
+    mock_light.get_power = AsyncMock(return_value=0)
     color = HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)
-    mock_light.get_color = AsyncMock(return_value=(color, 100, 200))
+    mock_light.get_color = AsyncMock(return_value=(color, 0, 200))
 
     # Capture state
     prestate = await state_manager.capture_state(mock_light)
