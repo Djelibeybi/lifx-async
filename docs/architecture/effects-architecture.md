@@ -716,10 +716,10 @@ No special device modifications needed.
 
 ### With Network Layer
 
-Effects rely on existing connection pooling and concurrent request support:
+Effects rely on existing lazy connection and concurrent request support:
 
-- Connection pooling (LRU cache) reuses connections
-- Background response dispatcher handles concurrent requests
+- Lazy connections open on first request and are reused
+- Requests are serialized via lock to prevent response mixing
 - No effect-specific network code needed
 
 ### With Protocol Layer
@@ -743,7 +743,7 @@ Effects use existing protocol structures:
 
 - **Minimal:** Async I/O bound, not CPU bound
 - **Concurrency:** Multiple devices don't increase CPU significantly
-- **Background Tasks:** One receiver task per connection (managed by connection pool)
+- **Background Tasks:** Requests serialized per connection, concurrent across devices
 
 ### Network Traffic
 

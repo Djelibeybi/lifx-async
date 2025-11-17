@@ -22,7 +22,7 @@ graph TB
 
     subgraph "Layer 2: Network Layer"
         Discovery[Discovery<br/>UDP broadcast]
-        Connection[Connection<br/>Connection pooling]
+        Connection[Connection<br/>Lazy opening]
         Transport[Transport<br/>UDP sockets]
     end
 
@@ -103,7 +103,7 @@ data = packet.pack()
 
 - **UDP Transport**: Async socket operations
 - **Discovery**: Broadcast-based device discovery
-- **Connection Pooling**: Efficient connection reuse (LRU cache)
+- **Lazy Connections**: Auto-open on first request
 - **Retry Logic**: Automatic retry with exponential backoff
 
 **Key Files**:
@@ -119,8 +119,8 @@ data = packet.pack()
 from lifx.network.connection import DeviceConnection
 
 conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
-# Connection automatically pooled
-response = await conn.request_response(packet, response_type)
+# Connection opens lazily on first request
+response = await conn.request(packet)
 ```
 
 ### Layer 3: Device Layer
@@ -241,16 +241,17 @@ await asyncio.gather(
 )
 ```
 
-### Connection Pooling
+### Lazy Connections
 
-**Why**: Reduces overhead and improves performance
+**Why**: Simple lifecycle management with automatic cleanup
 
 ```python
-# Same connection reused automatically
+# Connection opens lazily on first request
 async with await Light.from_ip("192.168.1.100") as light:
-    await light.set_color(Colors.RED)  # Connection 1
-    await light.set_brightness(0.5)  # Reuses Connection 1
-    await light.get_label()  # Reuses Connection 1
+    await light.set_color(Colors.RED)  # Opens connection here
+    await light.set_brightness(0.5)  # Reuses same connection
+    await light.get_label()  # Reuses same connection
+# Connection automatically closed on exit
 ```
 
 ### State Caching
@@ -285,11 +286,11 @@ uv run python -m lifx.protocol.generator
 
 ## Performance Characteristics
 
-### Connection Pool
+### Connection Lifecycle
 
-- **LRU Cache**: Least Recently Used eviction
-- **Max Size**: Configurable (default: 128)
-- **Metrics**: Track hits, misses, evictions
+- **Lazy Opening**: Opens on first request, not on creation
+- **Explicit Cleanup**: Closes via `close()` or context manager exit
+- **Low Overhead**: One UDP socket per device
 
 ### State Caching as Properties
 
@@ -299,23 +300,21 @@ uv run python -m lifx.protocol.generator
 
 ## Concurrency Model
 
-Each connection supports concurrent requests:
+Each connection serializes requests to prevent response mixing:
 
 ```python
-async with DeviceConnection(serial, ip) as conn:
-    # All three execute concurrently
-    results = await asyncio.gather(
-        conn.request_response(packet1, type1),
-        conn.request_response(packet2, type2),
-        conn.request_response(packet3, type3),
-    )
+conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+# Requests are serialized on the same connection
+result1 = await conn.request(packet1)
+result2 = await conn.request(packet2)
+await conn.close()
 ```
 
 **How it works**:
 
-- Background receiver task continuously reads UDP packets
+- Requests are serialized via `_request_lock` on same connection
 - Responses matched to requests by sequence number
-- Each request waits on an `asyncio.Event`
+- Async generator streaming for efficient multi-response protocols
 - Single UDP socket per connection
 
 ## Next Steps

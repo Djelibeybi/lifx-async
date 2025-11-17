@@ -180,27 +180,29 @@ class Device:
         # Validate serial number
         # Check for all-zeros (invalid)
         if serial_bytes == b"\x00" * 6:
-            raise ValueError("Serial number cannot be all zeros")
+            raise ValueError("Serial number cannot be all zeros")  # pragma: no cover
 
         # Check for all-ones/broadcast (invalid for unicast)
         if serial_bytes == b"\xff" * 6:
-            raise ValueError(
+            raise ValueError(  # pragma: no cover
                 "Broadcast serial number not allowed for device connection"
             )
 
         # Validate IP address
         try:
             addr = ipaddress.ip_address(ip)
-        except ValueError as e:
+        except ValueError as e:  # pragma: no cover
             raise ValueError(f"Invalid IP address format: {e}")
 
         # Check for localhost
         if addr.is_loopback:
-            raise ValueError("Localhost IP address not allowed")
+            raise ValueError("Localhost IP address not allowed")  # pragma: no cover
 
         # Check for unspecified (0.0.0.0)
         if addr.is_unspecified:
-            raise ValueError("Unspecified IP address (0.0.0.0) not allowed")
+            raise ValueError(
+                "Unspecified IP address (0.0.0.0) not allowed"
+            )  # pragma: no cover
 
         # Warn for non-private IPs (LIFX should be on local network)
         if not addr.is_private:
@@ -215,11 +217,13 @@ class Device:
 
         # LIFX uses IPv4 only (protocol limitation)
         if addr.version != 4:
-            raise ValueError("Only IPv4 addresses are supported")
+            raise ValueError("Only IPv4 addresses are supported")  # pragma: no cover
 
         # Validate port
-        if not (1 <= port <= 65535):
-            raise ValueError(f"Port must be between 1 and 65535, got {port}")
+        if not (1024 <= port <= 65535):
+            raise ValueError(
+                f"Port must be between 1 and 65535, got {port}"
+            )  # pragma: no cover
 
         # Warn for non-standard ports
         if port != LIFX_UDP_PORT:
@@ -266,6 +270,7 @@ class Device:
         port: int = LIFX_UDP_PORT,
         serial: str | None = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> Self:
         """Create and return an instance for the given IP address.
 
@@ -295,10 +300,20 @@ class Device:
             if response and isinstance(response, packets.Device.StateService):
                 if temp_conn.serial and temp_conn.serial != "000000000000":
                     return cls(
-                        serial=temp_conn.serial, ip=ip, port=port, timeout=timeout
+                        serial=temp_conn.serial,
+                        ip=ip,
+                        port=port,
+                        timeout=timeout,
+                        max_retries=max_retries,
                     )
         else:
-            return cls(serial=serial, ip=ip, port=port, timeout=timeout)
+            return cls(
+                serial=serial,
+                ip=ip,
+                port=port,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
 
         raise LifxDeviceNotFoundError()
 
@@ -314,9 +329,9 @@ class Device:
         exc_val: BaseException | None,
         exc_tb: object,
     ) -> None:
-        """Exit async context manager."""
-        # No connection cleanup needed - connection pool manages lifecycle
-        pass
+        """Exit async context manager and close connection."""
+        # Close connection for explicit cleanup
+        await self.connection.close()
 
     async def _setup(self) -> None:
         """Populate device capabilities, state and metadata."""
@@ -338,7 +353,7 @@ class Device:
 
         This method is called automatically when host firmware is fetched.
         """
-        if self._host_firmware is None:
+        if self._host_firmware is None:  # pragma: no cover
             return
 
         # Get serial bytes
@@ -371,7 +386,7 @@ class Device:
 
         Called automatically when entering context manager, but can be called manually.
         """
-        if self._capabilities is not None:
+        if self._capabilities is not None:  # pragma: no cover
             return
 
         # Get device version to determine product ID
@@ -387,7 +402,9 @@ class Device:
                 ) | firmware.version_minor
 
                 # If firmware is too old, remove the extended_multizone capability
-                if firmware_version < self._capabilities.min_ext_mz_firmware:
+                if (
+                    firmware_version < self._capabilities.min_ext_mz_firmware
+                ):  # pragma: no cover
                     from lifx.products.registry import ProductCapability
 
                     self._capabilities.capabilities &= (

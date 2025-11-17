@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from lifx.const import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_REQUEST_TIMEOUT,
     DISCOVERY_TIMEOUT,
     IDLE_TIMEOUT_MULTIPLIER,
     LIFX_UDP_PORT,
@@ -35,7 +37,6 @@ class DiscoveredDevice:
         serial: Device serial number as 12-digit hex string (e.g., "d073d5123456")
         ip: Device IP address
         port: Device UDP port
-        service: Service type (typically UDP=1)
         first_seen: Timestamp when device was first discovered
         response_time: Response time in seconds
     """
@@ -43,6 +44,8 @@ class DiscoveredDevice:
     serial: str
     ip: str
     port: int = LIFX_UDP_PORT
+    timeout: float = DEFAULT_REQUEST_TIMEOUT
+    max_retries: int = DEFAULT_MAX_RETRIES
     first_seen: float = field(default_factory=time.time)
     response_time: float = 0.0
 
@@ -80,29 +83,35 @@ class DiscoveredDevice:
         from lifx.devices.multizone import MultiZoneLight
         from lifx.devices.tile import TileDevice
 
+        kwargs = {
+            "serial": self.serial,
+            "ip": self.ip,
+            "port": self.port,
+            "timeout": self.timeout,
+            "max_retries": self.max_retries,
+        }
+
         # Create temporary device to query version
-        temp_device = Device(serial=self.serial, ip=self.ip, port=self.port)
+        temp_device = Device(**kwargs)
         await temp_device._ensure_capabilities()
 
         try:
             if temp_device.capabilities:
                 if temp_device.capabilities.has_matrix:
-                    return TileDevice(serial=self.serial, ip=self.ip, port=self.port)
+                    return TileDevice(**kwargs)
                 if temp_device.capabilities.has_multizone:
-                    return MultiZoneLight(
-                        serial=self.serial, ip=self.ip, port=self.port
-                    )
+                    return MultiZoneLight(**kwargs)
                 if temp_device.capabilities.has_infrared:
-                    return InfraredLight(serial=self.serial, ip=self.ip, port=self.port)
+                    return InfraredLight(**kwargs)
                 if temp_device.capabilities.has_hev:
-                    return HevLight(serial=self.serial, ip=self.ip, port=self.port)
+                    return HevLight(**kwargs)
                 if temp_device.capabilities.has_relays or (
                     temp_device.capabilities.has_buttons
                     and not temp_device.capabilities.has_color
                 ):
                     return None
 
-                return Light(serial=self.serial, ip=self.ip, port=self.port)
+                return Light(**kwargs)
 
         except Exception:
             return None
@@ -368,8 +377,6 @@ async def _discover_with_packet(
             }
         )
 
-    # return list(responses.values())
-
 
 def _parse_device_state_service(payload: bytes) -> tuple[int, int]:
     """Parse DeviceStateService payload.
@@ -404,6 +411,8 @@ async def discover_devices(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
@@ -416,6 +425,8 @@ async def discover_devices(
         port: UDP port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered devices
+        max_retries: max retries per request set on discovered devices
 
     Yields:
         DiscoveredDevice instances as they are discovered
@@ -585,6 +596,8 @@ async def discover_devices(
                         ip=addr[0],
                         port=device_port,
                         response_time=response_time,
+                        timeout=device_timeout,
+                        max_retries=max_retries,
                     )
 
                     _LOGGER.debug(

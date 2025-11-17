@@ -31,9 +31,6 @@ MAX_RESPONSE_TIME: Final[float] = 1.0  # 1 second
 # Idle timeout multiplier - wait this many times MAX_RESPONSE_TIME after last response
 IDLE_TIMEOUT_MULTIPLIER: Final[float] = 4.0  # 4 seconds (1.0 x 4.0)
 
-# Maximum number of connections in a ConnectionPool
-MAX_CONNECTIONS: Final[int] = 100
-
 # Default timeout for device requests in seconds
 DEFAULT_REQUEST_TIMEOUT: Final[float] = 8.0
 

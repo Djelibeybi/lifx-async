@@ -19,7 +19,7 @@ lifx/
 │   ├── multizone.py         # MultiZoneLight (strips/beams)
 │   └── tile.py              # TileDevice (2D pixel grids)
 ├── network/                  # Network layer
-│   ├── connection.py        # Device connections with pooling
+│   ├── connection.py        # Device connections with lazy opening
 │   ├── discovery.py         # Network device discovery
 │   ├── message.py           # Message building and parsing
 │   └── transport.py         # UDP transport
@@ -117,9 +117,9 @@ await group.set_power(True)
 await group.set_color(Colors.BLUE)
 ```
 
-### Connection Pooling
+### Connection Lifecycle
 
-Connections are automatically pooled and reused:
+Connections open lazily on first request and reuse the same socket:
 
 ```python
 # Multiple operations reuse the same connection
@@ -127,6 +127,7 @@ async with await Light.from_ip("192.168.1.100") as light:
     await light.set_color(Colors.RED)
     await light.set_brightness(0.5)
     await light.get_label()
+# Connection automatically closed on exit
 ```
 
 ### Concurrent Requests

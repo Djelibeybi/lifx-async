@@ -1,6 +1,6 @@
 """Network layer for LIFX device communication."""
 
-from lifx.network.connection import ConnectionPool, DeviceConnection
+from lifx.network.connection import DeviceConnection
 from lifx.network.discovery import DiscoveredDevice, discover_devices
 from lifx.network.message import MessageBuilder, create_message, parse_message
 from lifx.network.transport import UdpTransport
@@ -17,5 +17,4 @@ __all__ = [
     "discover_devices",
     # Connection
     "DeviceConnection",
-    "ConnectionPool",
 ]

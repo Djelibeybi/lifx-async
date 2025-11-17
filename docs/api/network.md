@@ -62,24 +62,26 @@ async def main():
 
 ## Concurrency
 
-### Concurrent Requests on Single Connection
+### Request Serialization on Single Connection
 
-Each `DeviceConnection` supports true concurrent requests using a background response dispatcher:
+Each `DeviceConnection` serializes requests using a lock to prevent response mixing:
 
 ```python
 import asyncio
 from lifx.network.connection import DeviceConnection
-from lifx.protocol.packets import LightGet, LightGetPower, DeviceGetLabel
+from lifx.protocol.packets import Light, Device
 
 
 async def main():
-    async with DeviceConnection(serial, ip) as conn:
-        # Multiple requests execute concurrently
-        state, power, label = await asyncio.gather(
-            conn.request_response(LightGet(), LightState),
-            conn.request_response(LightGetPower(), LightStatePower),
-            conn.request_response(DeviceGetLabel(), DeviceStateLabel),
-        )
+    conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+
+    # Sequential requests (serialized by internal lock)
+    state = await conn.request(Light.GetColor())
+    power = await conn.request(Light.GetPower())
+    label = await conn.request(Device.GetLabel())
+
+    # Connection automatically closes when done
+    await conn.close()
 ```
 
 ### Concurrent Requests on Different Devices
@@ -90,13 +92,18 @@ from lifx.network.connection import DeviceConnection
 
 
 async def main():
-    async with DeviceConnection(serial1, ip1) as conn1, DeviceConnection(
-        serial2, ip2
-    ) as conn2:
-        # Fully parallel - different UDP sockets
-        result1, result2 = await asyncio.gather(
-            conn1.request_response(...), conn2.request_response(...)
-        )
+    conn1 = DeviceConnection(serial="d073d5000001", ip="192.168.1.100")
+    conn2 = DeviceConnection(serial="d073d5000002", ip="192.168.1.101")
+
+    # Fully parallel - different UDP sockets
+    result1, result2 = await asyncio.gather(
+        conn1.request(Light.GetColor()),
+        conn2.request(Light.GetColor())
+    )
+
+    # Clean up connections
+    await conn1.close()
+    await conn2.close()
 ```
 
 ## Connection Management
@@ -110,19 +117,19 @@ async def main():
 
 ## Performance Considerations
 
-### Connection Pooling
+### Connection Lifecycle
 
-- Connections are cached with LRU eviction
-- Default pool size: 100 connections
-- Idle connections are automatically closed after timeout
-- Pool metrics available via `get_pool_metrics()`
+- Connections open lazily on first request
+- Each device owns its own connection (no shared pool)
+- Connections close explicitly via `close()` or context manager exit
+- Low memory overhead (one UDP socket per device)
 
 ### Response Handling
 
-- Background receiver task runs continuously
 - Responses matched by sequence number
-- Minimal overhead per concurrent request (~100 bytes)
-- Clean shutdown on connection close
+- Async generator-based streaming for efficient multi-response protocols
+- Immediate exit for single-response requests (no wasted timeout)
+- Retry logic with exponential backoff and jitter
 
 ### Rate Limiting
 

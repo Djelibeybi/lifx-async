@@ -11,23 +11,18 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.network.connection import (
-    ConnectionPool,
-    ConnectionPoolMetrics,
-    DeviceConnection,
-    _ActualConnection,
-)
+from lifx.network.connection import DeviceConnection
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
 
 
-class TestActualConnection:
-    """Test _ActualConnection class (internal implementation)."""
+class TestDeviceConnection:
+    """Test DeviceConnection class."""
 
     async def test_connection_creation(self) -> None:
-        """Test creating an actual device connection."""
+        """Test creating a device connection."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100", port=56700)
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100", port=56700)
 
         assert conn.serial == serial
         assert conn.ip == "192.168.1.100"
@@ -37,15 +32,14 @@ class TestActualConnection:
     async def test_connection_context_manager(self) -> None:
         """Test connection context manager."""
         serial = "d073d5001234"
-        async with _ActualConnection(serial=serial, ip="192.168.1.100") as conn:
-            assert conn.is_open
+        async with DeviceConnection(serial=serial, ip="192.168.1.100") as conn:
+            # Connection is lazy - not open until first request
+            assert not conn.is_open
 
-        assert not conn.is_open
-
-    async def test_connection_open_close(self) -> None:
-        """Test manual open/close."""
+    async def test_connection_explicit_open_close(self) -> None:
+        """Test explicit open/close."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100")
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100")
 
         await conn.open()
         assert conn.is_open
@@ -53,10 +47,24 @@ class TestActualConnection:
         await conn.close()
         assert not conn.is_open
 
+    async def test_connection_lazy_opening(self) -> None:
+        """Test connection opens lazily on first request."""
+        serial = "d073d5001234"
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100")
+
+        # Not open initially
+        assert not conn.is_open
+
+        # _ensure_open should open it
+        await conn._ensure_open()
+        assert conn.is_open
+
+        await conn.close()
+
     async def test_connection_double_open(self) -> None:
         """Test opening connection twice is safe."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100")
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100")
 
         await conn.open()
         await conn.open()  # Should not raise
@@ -67,7 +75,7 @@ class TestActualConnection:
     async def test_send_without_open(self) -> None:
         """Test sending without opening raises error."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100")
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100")
         packet = Device.GetLabel()
 
         with pytest.raises(ConnectionError):
@@ -76,7 +84,7 @@ class TestActualConnection:
     async def test_receive_without_open(self) -> None:
         """Test receiving without opening raises error."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100")
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100")
 
         with pytest.raises(ConnectionError):
             await conn.receive_packet(timeout=1.0)
@@ -84,23 +92,23 @@ class TestActualConnection:
     async def test_connection_source(self) -> None:
         """Test connection maintains consistent source ID."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100", source=12345)
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100", source=12345)
 
         assert conn.source == 12345
 
     async def test_connection_random_source(self) -> None:
         """Test connection with random source."""
         serial = "d073d5001234"
-        conn = _ActualConnection(serial=serial, ip="192.168.1.100")
+        conn = DeviceConnection(serial=serial, ip="192.168.1.100")
 
         assert conn.source > 0  # Should have random source
 
     async def test_concurrent_requests_supported(self) -> None:
-        """Test concurrent requests to same connection are supported (Phase 2)."""
+        """Test concurrent requests to same connection are supported."""
         import asyncio
 
         serial = "d073d5001234"
-        _conn = _ActualConnection(serial=serial, ip="192.168.1.100")
+        _conn = DeviceConnection(serial=serial, ip="192.168.1.100")
 
         # Track execution order
         execution_order = []
@@ -137,15 +145,15 @@ class TestActualConnection:
         serial1 = "d073d5001111"
         serial2 = "d073d5002222"
 
-        conn1 = _ActualConnection(serial=serial1, ip="192.168.1.100")
-        conn2 = _ActualConnection(serial=serial2, ip="192.168.1.101")
+        conn1 = DeviceConnection(serial=serial1, ip="192.168.1.100")
+        conn2 = DeviceConnection(serial=serial2, ip="192.168.1.101")
 
         await conn1.open()
         await conn2.open()
 
         execution_times = {}
 
-        async def mock_request(conn: _ActualConnection, request_id: str) -> None:
+        async def mock_request(conn: DeviceConnection, request_id: str) -> None:
             """Mock a request that records timing."""
             start = time.monotonic()
             await asyncio.sleep(0.1)  # Simulate work
@@ -174,26 +182,6 @@ class TestActualConnection:
             await conn1.close()
             await conn2.close()
 
-
-class TestDeviceConnection:
-    """Test DeviceConnection handle class (user-facing lightweight handle)."""
-
-    def test_connection_creation(self) -> None:
-        """Test creating a DeviceConnection handle."""
-        serial = "d073d5001234"
-        conn = DeviceConnection(serial=serial, ip="192.168.1.100", port=56700)
-
-        assert conn.serial == serial
-        assert conn.ip == "192.168.1.100"
-        assert conn.port == 56700
-
-    def test_connection_with_source(self) -> None:
-        """Test DeviceConnection handle with explicit source."""
-        serial = "d073d5001234"
-        conn = DeviceConnection(serial=serial, ip="192.168.1.100", source=12345)
-
-        assert conn.source == 12345
-
     def test_unsupported_command_error_exists(self) -> None:
         """Test that LifxUnsupportedCommandError exception exists.
 
@@ -217,189 +205,26 @@ class TestDeviceConnection:
 
         assert "test error" in str(exc_info.value).lower()
 
+    async def test_close_already_closed_connection(self) -> None:
+        """Test closing an already-closed connection is a no-op."""
+        conn = DeviceConnection(
+            serial="d073d5001234",
+            ip="192.168.1.100",
+        )
 
-class TestConnectionPool:
-    """Test ConnectionPool class."""
+        # Close without opening - should not raise
+        await conn.close()
+        assert not conn.is_open
 
-    async def test_pool_creation(self) -> None:
-        """Test creating a connection pool."""
-        pool = ConnectionPool(max_connections=5)
-        assert pool.max_connections == 5
+        # Open and close
+        await conn.open()
+        assert conn.is_open
+        await conn.close()
+        assert not conn.is_open
 
-    async def test_pool_context_manager(self) -> None:
-        """Test pool context manager."""
-        async with ConnectionPool() as pool:
-            assert pool is not None
-
-    async def test_pool_get_connection(self) -> None:
-        """Test getting connection from pool."""
-        serial = "d073d5001234"
-
-        async with ConnectionPool() as pool:
-            conn = await pool.get_connection(serial=serial, ip="192.168.1.100")
-            assert conn.is_open
-            assert conn.serial == serial
-
-    async def test_pool_reuses_connection(self) -> None:
-        """Test pool reuses existing connections."""
-        serial = "d073d5001234"
-
-        async with ConnectionPool() as pool:
-            conn1 = await pool.get_connection(serial=serial, ip="192.168.1.100")
-            conn2 = await pool.get_connection(serial=serial, ip="192.168.1.100")
-
-            assert conn1 is conn2  # Same connection instance
-
-    async def test_pool_different_devices(self) -> None:
-        """Test pool manages connections to different devices."""
-        serial1 = "d073d5001234"
-        serial2 = "d073d5005678"
-
-        async with ConnectionPool() as pool:
-            conn1 = await pool.get_connection(serial=serial1, ip="192.168.1.100")
-            conn2 = await pool.get_connection(serial=serial2, ip="192.168.1.101")
-
-            assert conn1 is not conn2
-            assert conn1.serial == serial1
-            assert conn2.serial == serial2
-
-    async def test_pool_eviction(self) -> None:
-        """Test pool evicts oldest connection when full."""
-        async with ConnectionPool(max_connections=2) as pool:
-            serial1 = "d073d5001111"
-            serial2 = "d073d5002222"
-            serial3 = "d073d5003333"
-
-            conn1 = await pool.get_connection(serial=serial1, ip="192.168.1.100")
-            conn2 = await pool.get_connection(serial=serial2, ip="192.168.1.101")
-
-            # Adding third should evict first
-            conn3 = await pool.get_connection(serial=serial3, ip="192.168.1.102")
-
-            # First connection should be closed
-            assert not conn1.is_open
-            assert conn2.is_open
-            assert conn3.is_open
-
-    async def test_pool_close_all(self) -> None:
-        """Test closing all connections in pool."""
-        serial1 = "d073d5001234"
-        serial2 = "d073d5005678"
-
-        pool = ConnectionPool()
-        conn1 = await pool.get_connection(serial=serial1, ip="192.168.1.100")
-        conn2 = await pool.get_connection(serial=serial2, ip="192.168.1.101")
-
-        assert conn1.is_open
-        assert conn2.is_open
-
-        await pool.close_all()
-
-        assert not conn1.is_open
-        assert not conn2.is_open
-
-
-class TestConnectionPoolMetrics:
-    """Test ConnectionPoolMetrics class."""
-
-    def test_metrics_initialization(self) -> None:
-        """Test metrics are initialized to zero."""
-        metrics = ConnectionPoolMetrics()
-
-        assert metrics.hits == 0
-        assert metrics.misses == 0
-        assert metrics.evictions == 0
-        assert metrics.total_requests == 0
-        assert metrics.eviction_times_ms == []
-
-    def test_hit_rate_with_no_requests(self) -> None:
-        """Test hit rate calculation with no requests."""
-        metrics = ConnectionPoolMetrics()
-
-        assert metrics.hit_rate == 0.0
-
-    def test_hit_rate_calculation(self) -> None:
-        """Test hit rate calculation."""
-        metrics = ConnectionPoolMetrics()
-        metrics.hits = 8
-        metrics.misses = 2
-        metrics.total_requests = 10
-
-        assert metrics.hit_rate == 0.8
-
-    def test_hit_rate_all_hits(self) -> None:
-        """Test hit rate with all hits."""
-        metrics = ConnectionPoolMetrics()
-        metrics.hits = 10
-        metrics.total_requests = 10
-
-        assert metrics.hit_rate == 1.0
-
-    def test_hit_rate_all_misses(self) -> None:
-        """Test hit rate with all misses."""
-        metrics = ConnectionPoolMetrics()
-        metrics.misses = 10
-        metrics.total_requests = 10
-
-        assert metrics.hit_rate == 0.0
-
-    def test_avg_eviction_time_with_no_evictions(self) -> None:
-        """Test average eviction time with no evictions."""
-        metrics = ConnectionPoolMetrics()
-
-        assert metrics.avg_eviction_time_ms == 0.0
-
-    def test_avg_eviction_time_calculation(self) -> None:
-        """Test average eviction time tracking."""
-        metrics = ConnectionPoolMetrics()
-        metrics.eviction_times_ms.extend([1.5, 2.0, 1.8])
-
-        assert metrics.avg_eviction_time_ms == pytest.approx(1.77, 0.01)
-
-    def test_avg_eviction_time_single_eviction(self) -> None:
-        """Test average eviction time with single eviction."""
-        metrics = ConnectionPoolMetrics()
-        metrics.eviction_times_ms.append(2.5)
-
-        assert metrics.avg_eviction_time_ms == 2.5
-
-    def test_metrics_reset(self) -> None:
-        """Test metrics reset functionality."""
-        metrics = ConnectionPoolMetrics()
-        metrics.hits = 10
-        metrics.misses = 5
-        metrics.evictions = 2
-        metrics.total_requests = 15
-        metrics.eviction_times_ms.extend([1.5, 2.0])
-
-        metrics.reset()
-
-        assert metrics.hits == 0
-        assert metrics.misses == 0
-        assert metrics.evictions == 0
-        assert metrics.total_requests == 0
-        assert metrics.eviction_times_ms == []
-        assert metrics.hit_rate == 0.0
-        assert metrics.avg_eviction_time_ms == 0.0
-
-    def test_metrics_accumulation(self) -> None:
-        """Test metrics can be accumulated over time."""
-        metrics = ConnectionPoolMetrics()
-
-        # Simulate some activity
-        metrics.total_requests = 5
-        metrics.hits = 3
-        metrics.misses = 2
-
-        # More activity
-        metrics.total_requests += 5
-        metrics.hits += 4
-        metrics.misses += 1
-
-        assert metrics.total_requests == 10
-        assert metrics.hits == 7
-        assert metrics.misses == 3
-        assert metrics.hit_rate == 0.7
+        # Close again - should be no-op
+        await conn.close()
+        assert not conn.is_open
 
 
 class TestAsyncGeneratorStreaming:
@@ -460,18 +285,18 @@ class TestAsyncGeneratorStreaming:
 class TestRequestStreamErrorPaths:
     """Test error handling in request_stream() async generator."""
 
-    async def test_request_stream_connection_not_open(self) -> None:
-        """Test request_stream raises error when connection not open."""
-        conn = _ActualConnection(serial="d073d5001234", ip="192.168.1.100")
+    async def test_request_stream_impl_connection_not_open(self) -> None:
+        """Test _request_stream_impl raises error when connection not open."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
         # Connection not opened
 
         with pytest.raises(ConnectionError, match="Connection not open"):
-            async for _ in conn.request_stream(Device.GetLabel()):
+            async for _ in conn._request_stream_impl(Device.GetLabel()):
                 pass
 
     async def test_request_stream_timeout_no_response(self) -> None:
         """Test request_stream raises timeout when no response received."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.1,
@@ -481,14 +306,14 @@ class TestRequestStreamErrorPaths:
         try:
             # Send to non-existent device - should timeout
             with pytest.raises(LifxTimeoutError, match="No response"):
-                async for _ in conn.request_stream(Device.GetLabel()):
+                async for _ in conn._request_stream_impl(Device.GetLabel()):
                     pass
         finally:
             await conn.close()
 
     async def test_request_stream_uses_default_timeout(self) -> None:
         """Test request_stream uses instance default timeout when not specified."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.05,  # Very short timeout
@@ -498,23 +323,25 @@ class TestRequestStreamErrorPaths:
         try:
             # Should use default timeout (0.05s) and timeout quickly
             with pytest.raises(LifxTimeoutError):
-                async for _ in conn.request_stream(Device.GetLabel()):
+                async for _ in conn._request_stream_impl(Device.GetLabel()):
                     pass
         finally:
             await conn.close()
 
-    async def test_request_ack_stream_connection_not_open(self) -> None:
-        """Test request_ack_stream raises error when connection not open."""
-        conn = _ActualConnection(serial="d073d5001234", ip="192.168.1.100")
+    async def test_request_ack_stream_impl_connection_not_open(self) -> None:
+        """Test _request_ack_stream_impl raises error when connection not open."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
         # Connection not opened
 
         with pytest.raises(ConnectionError, match="Connection not open"):
-            async for _ in conn.request_ack_stream(Device.SetLabel(label=b"Test")):
+            async for _ in conn._request_ack_stream_impl(
+                Device.SetLabel(label=b"Test")
+            ):
                 pass
 
     async def test_request_ack_stream_timeout(self) -> None:
         """Test request_ack_stream raises timeout when no ack received."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.1,
@@ -524,14 +351,16 @@ class TestRequestStreamErrorPaths:
         try:
             # Send to non-existent device - should timeout
             with pytest.raises(LifxTimeoutError, match="No acknowledgement"):
-                async for _ in conn.request_ack_stream(Device.SetLabel(label=b"Test")):
+                async for _ in conn._request_ack_stream_impl(
+                    Device.SetLabel(label=b"Test")
+                ):
                     pass
         finally:
             await conn.close()
 
     async def test_request_stream_state_unhandled_error(self) -> None:
         """Test request_stream raises LifxUnsupportedCommandError on StateUnhandled."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=1.0,
@@ -560,14 +389,14 @@ class TestRequestStreamErrorPaths:
                 with pytest.raises(
                     LifxUnsupportedCommandError, match="does not support"
                 ):
-                    async for _ in conn.request_stream(Device.GetLabel()):
+                    async for _ in conn._request_stream_impl(Device.GetLabel()):
                         pass
         finally:
             await conn.close()
 
     async def test_request_stream_wrong_packet_type_error(self) -> None:
         """Test request_stream raises LifxProtocolError on wrong packet type."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=1.0,
@@ -593,14 +422,14 @@ class TestRequestStreamErrorPaths:
 
             with patch.object(conn, "receive_packet", side_effect=mock_receive):
                 with pytest.raises(LifxProtocolError, match="unexpected packet type"):
-                    async for _ in conn.request_stream(Device.GetLabel()):
+                    async for _ in conn._request_stream_impl(Device.GetLabel()):
                         pass
         finally:
             await conn.close()
 
     async def test_request_stream_sequence_mismatch_ignored(self) -> None:
         """Test request_stream ignores responses with wrong sequence number."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.3,
@@ -633,7 +462,7 @@ class TestRequestStreamErrorPaths:
 
             with patch.object(conn, "receive_packet", side_effect=mock_receive):
                 with pytest.raises(LifxTimeoutError):
-                    async for _ in conn.request_stream(Device.GetLabel()):
+                    async for _ in conn._request_stream_impl(Device.GetLabel()):
                         pass
 
             # Should have called receive at least twice (ignoring wrong sequences)
@@ -643,7 +472,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_stream_retry_with_backoff(self) -> None:
         """Test request_stream retries with exponential backoff."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.5,
@@ -667,7 +496,7 @@ class TestRequestStreamErrorPaths:
                 patch("asyncio.sleep", side_effect=tracked_sleep),
             ):
                 with pytest.raises(LifxTimeoutError, match="No response"):
-                    async for _ in conn.request_stream(Device.GetLabel()):
+                    async for _ in conn._request_stream_impl(Device.GetLabel()):
                         pass
 
             # Should have slept between retries (jitter applied)
@@ -679,7 +508,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_ack_stream_sequence_mismatch_ignored(self) -> None:
         """Test request_ack_stream ignores ACKs with wrong sequence number."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.3,
@@ -711,7 +540,7 @@ class TestRequestStreamErrorPaths:
 
             with patch.object(conn, "receive_packet", side_effect=mock_receive):
                 with pytest.raises(LifxTimeoutError):
-                    async for _ in conn.request_ack_stream(
+                    async for _ in conn._request_ack_stream_impl(
                         Device.SetLabel(label=b"Test")
                     ):
                         pass
@@ -722,7 +551,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_ack_stream_state_unhandled_error(self) -> None:
         """Test request_ack_stream raises error on StateUnhandled."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=1.0,
@@ -749,7 +578,7 @@ class TestRequestStreamErrorPaths:
                 with pytest.raises(
                     LifxUnsupportedCommandError, match="does not support"
                 ):
-                    async for _ in conn.request_ack_stream(
+                    async for _ in conn._request_ack_stream_impl(
                         Device.SetLabel(label=b"Test")
                     ):
                         pass
@@ -758,7 +587,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_ack_stream_successful_ack(self) -> None:
         """Test request_ack_stream yields on successful ACK receipt."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=1.0,
@@ -785,7 +614,9 @@ class TestRequestStreamErrorPaths:
             with patch.object(conn, "receive_packet", side_effect=mock_receive):
                 # Should yield once then return
                 ack_received = False
-                async for _ in conn.request_ack_stream(Device.SetLabel(label=b"Test")):
+                async for _ in conn._request_ack_stream_impl(
+                    Device.SetLabel(label=b"Test")
+                ):
                     ack_received = True
 
                 assert ack_received
@@ -794,7 +625,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_stream_multiple_responses_with_polling(self) -> None:
         """Test request_stream continues polling after yielding responses."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.3,
@@ -827,7 +658,9 @@ class TestRequestStreamErrorPaths:
 
             responses = []
             with patch.object(conn, "receive_packet", side_effect=mock_receive):
-                async for header, payload in conn.request_stream(Device.GetLabel()):
+                async for header, payload in conn._request_stream_impl(
+                    Device.GetLabel()
+                ):
                     responses.append((header, payload))
                     # Don't break - let it continue polling for more responses
 
@@ -842,7 +675,7 @@ class TestRequestStreamErrorPaths:
         """Test request_stream returns normally after timeout with responses."""
         import time
 
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.2,
@@ -898,7 +731,9 @@ class TestRequestStreamErrorPaths:
                 patch.object(conn, "receive_packet", side_effect=mock_receive),
                 patch("time.monotonic", side_effect=mock_monotonic),
             ):
-                async for header, payload in conn.request_stream(Device.GetLabel()):
+                async for header, payload in conn._request_stream_impl(
+                    Device.GetLabel()
+                ):
                     responses.append((header, payload))
 
             # Got one response before timeout - no error should be raised
@@ -908,7 +743,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_stream_default_max_retries(self) -> None:
         """Test request_stream uses instance default max_retries when not specified."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.3,
@@ -933,7 +768,7 @@ class TestRequestStreamErrorPaths:
                 patch("asyncio.sleep", side_effect=track_sleep),
             ):
                 with pytest.raises(LifxTimeoutError, match="No response"):
-                    async for _ in conn.request_stream(Device.GetLabel()):
+                    async for _ in conn._request_stream_impl(Device.GetLabel()):
                         pass
 
             # Should have slept between retries (2 retries = 2 sleeps)
@@ -943,7 +778,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_ack_stream_retry_with_backoff(self) -> None:
         """Test request_ack_stream retries with exponential backoff."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.5,
@@ -966,7 +801,7 @@ class TestRequestStreamErrorPaths:
                 patch("asyncio.sleep", side_effect=tracked_sleep),
             ):
                 with pytest.raises(LifxTimeoutError, match="No acknowledgement"):
-                    async for _ in conn.request_ack_stream(
+                    async for _ in conn._request_ack_stream_impl(
                         Device.SetLabel(label=b"Test")
                     ):
                         pass
@@ -979,7 +814,7 @@ class TestRequestStreamErrorPaths:
 
     async def test_request_ack_stream_default_max_retries(self) -> None:
         """Test request_ack_stream uses instance default max_retries."""
-        conn = _ActualConnection(
+        conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
             timeout=0.3,
@@ -1003,7 +838,7 @@ class TestRequestStreamErrorPaths:
                 patch("asyncio.sleep", side_effect=track_sleep),
             ):
                 with pytest.raises(LifxTimeoutError, match="No acknowledgement"):
-                    async for _ in conn.request_ack_stream(
+                    async for _ in conn._request_ack_stream_impl(
                         Device.SetLabel(label=b"Test")
                     ):
                         pass
@@ -1019,22 +854,14 @@ class TestDeviceConnectionRequestStream:
 
     async def test_echo_request_handling(self) -> None:
         """Test EchoRequest special case in request_stream()."""
-        # Create mock response for EchoRequest
         from lifx.protocol.packets import Device as DevicePackets
 
-        # Create a mock DeviceConnection
         conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
         )
 
-        # Mock the pool and actual connection
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_request_stream(packet, timeout):
+        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
             # Return EchoResponse with same echoing payload
             header = LifxHeader(
                 size=36 + 64,
@@ -1051,38 +878,25 @@ class TestDeviceConnectionRequestStream:
             payload = b"\x01\x02\x03\x04" + (b"\x00" * 60)
             yield header, payload
 
-        with patch.object(
-            mock_actual_conn, "request_stream", side_effect=mock_request_stream
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
+            ),
         ):
-            # Mock the pool to return our mocked connection
-            async def mock_get_pool():
-                pool = ConnectionPool()
-                return pool
+            # Create EchoRequest packet
+            echo_request = DevicePackets.EchoRequest(
+                payload=b"\x01\x02\x03\x04" + (b"\x00" * 60)
+            )
 
-            async def mock_get_connection(*args, **kwargs):
-                await mock_actual_conn.open()
-                return mock_actual_conn
+            # Test that request_stream handles EchoRequest
+            responses = []
+            async for response in conn.request_stream(echo_request):
+                responses.append(response)
+                # Don't break - let generator return naturally
 
-            with (
-                patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-                patch.object(
-                    ConnectionPool, "get_connection", side_effect=mock_get_connection
-                ),
-            ):
-                # Create EchoRequest packet
-                echo_request = DevicePackets.EchoRequest(
-                    payload=b"\x01\x02\x03\x04" + (b"\x00" * 60)
-                )
-
-                # Test that request_stream handles EchoRequest
-                responses = []
-                async for response in conn.request_stream(echo_request):
-                    responses.append(response)
-                    # Don't break - let generator return naturally to cover line 1017
-
-                assert len(responses) == 1
-                assert isinstance(responses[0], DevicePackets.EchoResponse)
-                await mock_actual_conn.close()
+            assert len(responses) == 1
+            assert isinstance(responses[0], DevicePackets.EchoResponse)
 
     async def test_unsupported_packet_kind_error(self) -> None:
         """Test error when packet kind is not GET or SET."""
@@ -1097,29 +911,10 @@ class TestDeviceConnectionRequestStream:
             PKT_TYPE = 999
             as_dict: dict[str, object] = {}
 
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_get_pool():
-            return ConnectionPool()
-
-        async def mock_get_connection(*args, **kwargs):
-            await mock_actual_conn.open()
-            return mock_actual_conn
-
-        with (
-            patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-            patch.object(
-                ConnectionPool, "get_connection", side_effect=mock_get_connection
-            ),
-        ):
+        with patch.object(conn, "_ensure_open", return_value=None):
             with pytest.raises(LifxUnsupportedCommandError, match="auto-handle"):
                 async for _ in conn.request_stream(UnknownPacket()):
                     pass
-
-            await mock_actual_conn.close()
 
     async def test_packet_missing_pkt_type_error(self) -> None:
         """Test error when packet is missing PKT_TYPE."""
@@ -1134,29 +929,10 @@ class TestDeviceConnectionRequestStream:
             as_dict: dict[str, object] = {}
             # No PKT_TYPE attribute
 
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_get_pool():
-            return ConnectionPool()
-
-        async def mock_get_connection(*args, **kwargs):
-            await mock_actual_conn.open()
-            return mock_actual_conn
-
-        with (
-            patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-            patch.object(
-                ConnectionPool, "get_connection", side_effect=mock_get_connection
-            ),
-        ):
+        with patch.object(conn, "_ensure_open", return_value=None):
             with pytest.raises(LifxProtocolError, match="missing PKT_TYPE"):
                 async for _ in conn.request_stream(BadPacket()):
                     pass
-
-            await mock_actual_conn.close()
 
     async def test_set_packet_acknowledgement(self) -> None:
         """Test SET packet handling yields True on acknowledgement."""
@@ -1165,43 +941,26 @@ class TestDeviceConnectionRequestStream:
             ip="192.168.1.100",
         )
 
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_ack_stream(packet, timeout):
+        async def mock_ack_stream_impl(packet, timeout=None, max_retries=None):
             # Yield once to indicate ACK received
             yield
 
-        with patch.object(
-            mock_actual_conn, "request_ack_stream", side_effect=mock_ack_stream
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_ack_stream_impl", side_effect=mock_ack_stream_impl
+            ),
         ):
+            # Create SET packet (SetLabel is a SET packet)
+            set_packet = Device.SetLabel(label=b"TestLight")
 
-            async def mock_get_pool():
-                return ConnectionPool()
+            # Test that request_stream yields True for SET
+            responses = []
+            async for response in conn.request_stream(set_packet):
+                responses.append(response)
 
-            async def mock_get_connection(*args, **kwargs):
-                await mock_actual_conn.open()
-                return mock_actual_conn
-
-            with (
-                patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-                patch.object(
-                    ConnectionPool, "get_connection", side_effect=mock_get_connection
-                ),
-            ):
-                # Create SET packet (SetLabel is a SET packet)
-                set_packet = Device.SetLabel(label=b"TestLight")
-
-                # Test that request_stream yields True for SET
-                responses = []
-                async for response in conn.request_stream(set_packet):
-                    responses.append(response)
-
-                assert len(responses) == 1
-                assert responses[0] is True
-                await mock_actual_conn.close()
+            assert len(responses) == 1
+            assert responses[0] is True
 
     async def test_get_packet_response_handling(self) -> None:
         """Test GET packet handling yields unpacked response."""
@@ -1212,12 +971,7 @@ class TestDeviceConnectionRequestStream:
             ip="192.168.1.100",
         )
 
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_request_stream(packet, timeout):
+        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
             # Return StateLabel response
             header = LifxHeader(
                 size=36 + 32,
@@ -1234,36 +988,24 @@ class TestDeviceConnectionRequestStream:
             payload = b"TestLight\x00" + (b"\x00" * 23)
             yield header, payload
 
-        with patch.object(
-            mock_actual_conn, "request_stream", side_effect=mock_request_stream
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
+            ),
         ):
+            # Create GET packet
+            get_packet = DevicePackets.GetLabel()
 
-            async def mock_get_pool():
-                return ConnectionPool()
+            # Test that request_stream yields unpacked response
+            responses = []
+            async for response in conn.request_stream(get_packet):
+                responses.append(response)
+                break
 
-            async def mock_get_connection(*args, **kwargs):
-                await mock_actual_conn.open()
-                return mock_actual_conn
-
-            with (
-                patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-                patch.object(
-                    ConnectionPool, "get_connection", side_effect=mock_get_connection
-                ),
-            ):
-                # Create GET packet
-                get_packet = DevicePackets.GetLabel()
-
-                # Test that request_stream yields unpacked response
-                responses = []
-                async for response in conn.request_stream(get_packet):
-                    responses.append(response)
-                    break
-
-                assert len(responses) == 1
-                assert isinstance(responses[0], DevicePackets.StateLabel)
-                assert responses[0].label == "TestLight"
-                await mock_actual_conn.close()
+            assert len(responses) == 1
+            assert isinstance(responses[0], DevicePackets.StateLabel)
+            assert responses[0].label == "TestLight"
 
     async def test_unknown_packet_type_in_response(self) -> None:
         """Test error when response contains unknown packet type."""
@@ -1274,12 +1016,7 @@ class TestDeviceConnectionRequestStream:
             ip="192.168.1.100",
         )
 
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_request_stream(packet, timeout):
+        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
             # Return unknown packet type
             header = LifxHeader(
                 size=36,
@@ -1294,31 +1031,18 @@ class TestDeviceConnectionRequestStream:
             )
             yield header, b""
 
-        with patch.object(
-            mock_actual_conn, "request_stream", side_effect=mock_request_stream
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
+            ),
         ):
+            # Create GET packet
+            get_packet = DevicePackets.GetLabel()
 
-            async def mock_get_pool():
-                return ConnectionPool()
-
-            async def mock_get_connection(*args, **kwargs):
-                await mock_actual_conn.open()
-                return mock_actual_conn
-
-            with (
-                patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-                patch.object(
-                    ConnectionPool, "get_connection", side_effect=mock_get_connection
-                ),
-            ):
-                # Create GET packet
-                get_packet = DevicePackets.GetLabel()
-
-                with pytest.raises(LifxProtocolError, match="Unknown packet type"):
-                    async for _ in conn.request_stream(get_packet):
-                        pass
-
-                await mock_actual_conn.close()
+            with pytest.raises(LifxProtocolError, match="Unknown packet type"):
+                async for _ in conn.request_stream(get_packet):
+                    pass
 
     async def test_serial_update_from_response(self) -> None:
         """Test serial is updated from response when unknown."""
@@ -1329,12 +1053,7 @@ class TestDeviceConnectionRequestStream:
             ip="192.168.1.100",
         )
 
-        mock_actual_conn = _ActualConnection(
-            serial="000000000000",
-            ip="192.168.1.100",
-        )
-
-        async def mock_request_stream(packet, timeout):
+        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
             # Return response with device's actual serial
             header = LifxHeader(
                 size=36 + 32,
@@ -1350,31 +1069,19 @@ class TestDeviceConnectionRequestStream:
             payload = b"TestLight\x00" + (b"\x00" * 23)
             yield header, payload
 
-        with patch.object(
-            mock_actual_conn, "request_stream", side_effect=mock_request_stream
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
+            ),
         ):
+            get_packet = DevicePackets.GetLabel()
 
-            async def mock_get_pool():
-                return ConnectionPool()
+            async for _ in conn.request_stream(get_packet):
+                break
 
-            async def mock_get_connection(*args, **kwargs):
-                await mock_actual_conn.open()
-                return mock_actual_conn
-
-            with (
-                patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-                patch.object(
-                    ConnectionPool, "get_connection", side_effect=mock_get_connection
-                ),
-            ):
-                get_packet = DevicePackets.GetLabel()
-
-                async for _ in conn.request_stream(get_packet):
-                    break
-
-                # Serial should be updated from response
-                assert conn.serial == "d073d5001234"
-                await mock_actual_conn.close()
+            # Serial should be updated from response
+            assert conn.serial == "d073d5001234"
 
     async def test_request_no_response_error(self) -> None:
         """Test request() raises error when no response received."""
@@ -1385,72 +1092,18 @@ class TestDeviceConnectionRequestStream:
             ip="192.168.1.100",
         )
 
-        mock_actual_conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        async def mock_request_stream(packet, timeout):
+        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
             # Empty generator - no responses
             return
             yield  # noqa: B901 - Makes this an async generator
 
-        with patch.object(
-            mock_actual_conn, "request_stream", side_effect=mock_request_stream
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
+            ),
         ):
+            get_packet = DevicePackets.GetLabel()
 
-            async def mock_get_pool():
-                return ConnectionPool()
-
-            async def mock_get_connection(*args, **kwargs):
-                await mock_actual_conn.open()
-                return mock_actual_conn
-
-            with (
-                patch.object(conn, "_get_pool", side_effect=mock_get_pool),
-                patch.object(
-                    ConnectionPool, "get_connection", side_effect=mock_get_connection
-                ),
-            ):
-                get_packet = DevicePackets.GetLabel()
-
-                with pytest.raises(LifxTimeoutError, match="No response from"):
-                    await conn.request(get_packet)
-
-                await mock_actual_conn.close()
-
-
-class TestActualConnectionEdgeCases:
-    """Test edge cases in _ActualConnection."""
-
-    async def test_close_already_closed_connection(self) -> None:
-        """Test closing an already-closed connection is a no-op."""
-        conn = _ActualConnection(
-            serial="d073d5001234",
-            ip="192.168.1.100",
-        )
-
-        # Close without opening - should not raise
-        await conn.close()
-        assert not conn.is_open
-
-        # Open and close
-        await conn.open()
-        assert conn.is_open
-        await conn.close()
-        assert not conn.is_open
-
-        # Close again - should be no-op
-        await conn.close()
-        assert not conn.is_open
-
-    async def test_get_pool_metrics_when_pool_exists(self) -> None:
-        """Test get_pool_metrics returns metrics when pool exists."""
-        # First, ensure pool exists by getting it
-        pool = await DeviceConnection._get_pool()
-        assert pool is not None
-
-        # Now get metrics
-        metrics = DeviceConnection.get_pool_metrics()
-        assert metrics is not None
-        assert isinstance(metrics, ConnectionPoolMetrics)
+            with pytest.raises(LifxTimeoutError, match="No response from"):
+                await conn.request(get_packet)
