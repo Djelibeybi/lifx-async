@@ -220,7 +220,7 @@ async def discover_devices(
                     continue
 
                 # Parse service info
-                service, device_port = _parse_device_state_service(payload)
+                _service, device_port = _parse_device_state_service(payload)
 
                 # Calculate accurate response time from this specific response
                 response_time = response_timestamp - request_time
@@ -237,7 +237,6 @@ async def discover_devices(
                         serial=device_serial,
                         ip=addr[0],
                         port=device_port,
-                        service=service,
                         response_time=response_time,
                     )
 
@@ -304,8 +303,7 @@ async def discover_devices(
 DiscoveredDevice(
     serial: str,
     ip: str,
-    port: int,
-    service: int,
+    port: int = LIFX_UDP_PORT,
     first_seen: float = time(),
     response_time: float = 0.0,
 )
@@ -400,31 +398,27 @@ async def create_device(self) -> Device | None:
 
     # Create temporary device to query version
     temp_device = Device(serial=self.serial, ip=self.ip, port=self.port)
+    await temp_device._ensure_capabilities()
 
     try:
-        async with temp_device:
-            if temp_device.capabilities:
-                if temp_device.capabilities.has_matrix:
-                    return TileDevice(
-                        serial=self.serial, ip=self.ip, port=self.port
-                    )
-                if temp_device.capabilities.has_multizone:
-                    return MultiZoneLight(
-                        serial=self.serial, ip=self.ip, port=self.port
-                    )
-                if temp_device.capabilities.has_infrared:
-                    return InfraredLight(
-                        serial=self.serial, ip=self.ip, port=self.port
-                    )
-                if temp_device.capabilities.has_hev:
-                    return HevLight(serial=self.serial, ip=self.ip, port=self.port)
-                if temp_device.capabilities.has_relays or (
-                    temp_device.capabilities.has_buttons
-                    and not temp_device.capabilities.has_color
-                ):
-                    return None
+        if temp_device.capabilities:
+            if temp_device.capabilities.has_matrix:
+                return TileDevice(serial=self.serial, ip=self.ip, port=self.port)
+            if temp_device.capabilities.has_multizone:
+                return MultiZoneLight(
+                    serial=self.serial, ip=self.ip, port=self.port
+                )
+            if temp_device.capabilities.has_infrared:
+                return InfraredLight(serial=self.serial, ip=self.ip, port=self.port)
+            if temp_device.capabilities.has_hev:
+                return HevLight(serial=self.serial, ip=self.ip, port=self.port)
+            if temp_device.capabilities.has_relays or (
+                temp_device.capabilities.has_buttons
+                and not temp_device.capabilities.has_color
+            ):
+                return None
 
-                return Light(serial=self.serial, ip=self.ip, port=self.port)
+            return Light(serial=self.serial, ip=self.ip, port=self.port)
 
     except Exception:
         return None
@@ -1031,7 +1025,6 @@ async def main():
     for device in devices:
         print(f"Found: {device.label} at {device.ip}")
         print(f"  Serial: {device.serial}")
-        print(f"  Service: {device.service}")
 ```
 
 ## Concurrency

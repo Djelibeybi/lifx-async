@@ -300,7 +300,6 @@ async def find_by_label(
                 serial=resp.serial,
                 ip=resp.ip,
                 port=resp.port,
-                service=1,  # UDP
                 response_time=resp.response_time,
             )
 

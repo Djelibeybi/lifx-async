@@ -2271,8 +2271,7 @@ efficient than querying each device individually.</p>
 <span class="normal"><a href="#__codelineno-0-956">956</a></span>
 <span class="normal"><a href="#__codelineno-0-957">957</a></span>
 <span class="normal"><a href="#__codelineno-0-958">958</a></span>
-<span class="normal"><a href="#__codelineno-0-959">959</a></span>
-<span class="normal"><a href="#__codelineno-0-960">960</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-885"><a id="__codelineno-0-885" name="__codelineno-0-885"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_label</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-959">959</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-885"><a id="__codelineno-0-885" name="__codelineno-0-885"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_label</span><span class="p">(</span>
 </span><span id="__span-0-886"><a id="__codelineno-0-886" name="__codelineno-0-886"></a>    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 </span><span id="__span-0-887"><a id="__codelineno-0-887" name="__codelineno-0-887"></a>    <span class="n">exact_match</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-0-888"><a id="__codelineno-0-888" name="__codelineno-0-888"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
@@ -2341,13 +2340,12 @@ efficient than querying each device individually.</p>
 </span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a>                <span class="n">serial</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
 </span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a>                <span class="n">ip</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span>
 </span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a>                <span class="n">port</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
-</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a>                <span class="n">service</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># UDP</span>
-</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a>                <span class="n">response_time</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">response_time</span><span class="p">,</span>
-</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a>            <span class="p">)</span>
-</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>
-</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>            <span class="n">device</span> <span class="o">=</span> <span class="k">await</span> <span class="n">disc</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
-</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>            <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>                <span class="k">yield</span> <span class="n">device</span>
+</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a>                <span class="n">response_time</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">response_time</span><span class="p">,</span>
+</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a>            <span class="p">)</span>
+</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a>
+</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>            <span class="n">device</span> <span class="o">=</span> <span class="k">await</span> <span class="n">disc</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
+</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>            <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>                <span class="k">yield</span> <span class="n">device</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
