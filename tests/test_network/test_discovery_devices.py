@@ -186,5 +186,3 @@ class TestDiscoveryEdgeCasesWithEmulator:
         for device in devices:
             # Port should be valid
             assert 1024 <= device.port <= 65535
-            # Service should be UDP (1)
-            assert device.service == 1

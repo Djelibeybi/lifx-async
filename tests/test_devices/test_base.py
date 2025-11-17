@@ -511,9 +511,7 @@ class TestLocationAndGroupManagement:
         from lifx.network.discovery import DiscoveredDevice
 
         discovered_devices = [
-            DiscoveredDevice(
-                serial="d073d5aabbcc", ip="192.168.1.50", port=56700, service=1
-            )
+            DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
 
         # Create mock response for the discovered device
@@ -567,9 +565,7 @@ class TestLocationAndGroupManagement:
         from lifx.network.discovery import DiscoveredDevice
 
         discovered_devices = [
-            DiscoveredDevice(
-                serial="d073d5aabbcc", ip="192.168.1.50", port=56700, service=1
-            )
+            DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
 
         # Create mock response with different label
@@ -617,9 +613,7 @@ class TestLocationAndGroupManagement:
         from lifx.network.discovery import DiscoveredDevice
 
         discovered_devices = [
-            DiscoveredDevice(
-                serial="d073d5aabbcc", ip="192.168.1.50", port=56700, service=1
-            )
+            DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
 
         # Create mock response for the discovered device
@@ -672,9 +666,7 @@ class TestLocationAndGroupManagement:
         from lifx.network.discovery import DiscoveredDevice
 
         discovered_devices = [
-            DiscoveredDevice(
-                serial="d073d5aabbcc", ip="192.168.1.50", port=56700, service=1
-            )
+            DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
 
         # Create mock response with different label
