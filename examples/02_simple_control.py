@@ -18,7 +18,7 @@ async def main(ip: str):
         color, power, label = await light.get_color()
         print(f"Connected to: {label}\n")
 
-        if power is False:
+        if power == 0:
             # Turn on the light
             print("Turning light ON...")
             await light.set_power(True)
@@ -54,7 +54,7 @@ async def main(ip: str):
         await light.set_color(color, duration=1.0)
         await asyncio.sleep(2)
 
-        if power is False:
+        if power == 0:
             # Turn off
             print("Turning light back OFF...")
             await light.set_power(False, duration=1.0)

@@ -45,8 +45,8 @@ class TestDeviceGroupApplyTheme:
             # Verify power is on and theme was applied
             await asyncio.sleep(0.1)
             device = group.lights[0]
-            is_on = await device.get_power()
-            assert is_on is True
+            power_level = await device.get_power()
+            assert power_level == 65535
 
     async def test_apply_theme_with_duration(
         self, emulator_devices: DeviceGroup
@@ -154,8 +154,8 @@ class TestDeviceGroupApplyTheme:
 
             # Verify at least one light was updated
             light = group.lights[0]
-            is_on = await light.get_power()
-            assert is_on is True
+            power_level = await light.get_power()
+            assert power_level == 65535
 
             # Verify at least one multizone was updated
             multizone = group.multizone_lights[0]
@@ -206,8 +206,8 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)
             # Verify operation completed successfully
             device = group.lights[0]
-            is_on = await device.get_power()
-            assert is_on is True
+            power_level = await device.get_power()
+            assert power_level == 65535
 
     async def test_apply_theme_sequential_calls(
         self, emulator_devices: DeviceGroup

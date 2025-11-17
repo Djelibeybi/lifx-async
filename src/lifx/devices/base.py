@@ -498,13 +498,13 @@ class Device:
             }
         )
 
-    async def get_power(self) -> bool:
+    async def get_power(self) -> int:
         """Get device power state.
 
-        Always fetches from device. Use the `power` property to access stored value.
+        Always fetches from device.
 
         Returns:
-            True if device is powered on, False otherwise
+            Power level as integer (0 for off, 65535 for on)
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -513,16 +513,14 @@ class Device:
 
         Example:
             ```python
-            is_on = await device.get_power()
-            print(f"Power: {'ON' if is_on else 'OFF'}")
+            level = await device.get_power()
+            print(f"Power: {'ON' if level > 0 else 'OFF'}")
             ```
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetPower())
 
         # Power level is uint16 (0 or 65535)
-        is_on = state.level > 0
-
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -531,30 +529,45 @@ class Device:
                 "reply": {"level": state.level},
             }
         )
-        return is_on
+        return state.level
 
-    async def set_power(self, on: bool) -> None:
+    async def set_power(self, level: bool | int) -> None:
         """Set device power state.
 
         Args:
-            on: True to turn on, False to turn off
+            level: True/65535 to turn on, False/0 to turn off
 
         Raises:
+            ValueError: If integer value is not 0 or 65535
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
 
         Example:
             ```python
-            # Turn on device
+            # Turn on device with boolean
             await device.set_power(True)
+
+            # Turn on device with integer
+            await device.set_power(65535)
+
+            # Turn off device
+            await device.set_power(False)
+            await device.set_power(0)
             ```
         """
         # Power level: 0 for off, 65535 for on
-        level = 65535 if on else 0
+        if isinstance(level, bool):
+            power_level = 65535 if level else 0
+        elif isinstance(level, int):
+            if level not in (0, 65535):
+                raise ValueError(f"Power level must be 0 or 65535, got {level}")
+            power_level = level
+        else:
+            raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
         # Request automatically handles acknowledgement
         await self.connection.request(
-            packets.Device.SetPower(level=level),
+            packets.Device.SetPower(level=power_level),
         )
 
         _LOGGER.debug(
@@ -562,7 +575,7 @@ class Device:
                 "class": "Device",
                 "method": "set_power",
                 "action": "change",
-                "values": {"level": level},
+                "values": {"level": power_level},
             }
         )
 

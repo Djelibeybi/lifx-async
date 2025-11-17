@@ -218,13 +218,14 @@ except LifxDeviceNotFoundError:
 ```python
 async with device:
     # get_color() is the most efficient way of getting color and power in a single request/response pair
-    color, power, label = device.get_color()
+    color, power, label = await device.get_color()
 
     # Access cached label (semi-static)
     cached_label = device.label  # Returns str | None
 
     # For volatile state like power/color, always call get_*() methods
-    current_power = await device.get_power()  # Fresh data
+    power_level = await device.get_power()  # Returns int (0 or 65535)
+    is_on = power_level > 0
 ```
 
 **Note**: Volatile state properties (`power`, `color`, `hev_cycle`, `zones`, `tile_colors`) were removed as they change too frequently to benefit from caching. Always fetch these values using `get_*()` methods.
