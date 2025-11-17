@@ -8,7 +8,7 @@ lifx-async is a modern, async Python library for controlling LIFX smart lighting
 
 ### Which devices are supported?
 
-lifx-async supports all LIFX lighting products:
+lifx-async supports all LIFX lighting products, including:
 
 - **Light**: A19, BR30, Downlight, etc.
 - **HEV**: Clean
@@ -16,7 +16,7 @@ lifx-async supports all LIFX lighting products:
 - **Multizone**: LIFX Z, Beam, Neon, String
 - **Matrix**: LIFX Tile, Candle, Ceiling, Path, Spot
 
-Button and Relay devices are not currently supported (they are out of scope for this lighting-focused library).
+LIFX Switches are out of scope for this lighting-focused library and are therefore not supported.
 
 ### Do I need cloud access?
 
@@ -49,10 +49,10 @@ Common issues:
 1. **Timeout**: Try increasing timeout: `discover(timeout=10.0)`
 1. **Router**: Some routers block broadcast packets - try direct connection
 
-**Workaround** - Connect directly by IP:
+**Workaround** - Connect directly using IP and serial:
 
 ```python
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Light(serial="d073d5000000",  ip="192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 ```
 
@@ -61,15 +61,10 @@ async with await Light.from_ip("192.168.1.100") as light:
 No! Discovery finds devices automatically:
 
 ```python
-from lifx import discover, DeviceGroup
+from lifx import discover
 
-devices = []
 async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-# All devices found automatically
-await group.set_color(Colors.BLUE)
+    print(f"Found {device.serial} at {device.ip}")
 ```
 
 If you do know the IP, you can connect directly for faster connection.
@@ -186,14 +181,14 @@ await light.breathe(Colors.BLUE, period=2.0, cycles=0)
 Yes! Key performance features:
 
 - **Async I/O**: Non-blocking operations
-- **Connection Pooling**: Reuses connections (LRU cache)
-- **Rate Limiting**: Prevents overwhelming devices (20 msg/sec)
-- **State Caching**: Reduces redundant network requests
-- **Concurrent Requests**: Multiple requests per connection
+- **Lazy Connections**: Auto-open on first request, reuse for all operations
+- **Non-volatile State Caching**: Reduces redundant network requests
+- **Concurrent Devices**: Operations on different devices run in parallel
+- **Request Serialization**: Prevents response mixing on same connection
 
 ### How is state stored?
 
-Selected device properties cache semi-static values that were last retrieved from the device. Properties return `None` if no value has been fetched yet:
+Selected device properties that are considered non-volatile, including product ID and firmware version are cached after they are fetched for the first time. Properties return `None` if no value has been fetched yet:
 
 ```python
 # Check cached semi-static state (label, version, firmware, etc.)
@@ -217,6 +212,13 @@ color, power, label = await light.get_color()  # Returns (color, power, label)
 
 # Or fetch specific info separately
 version = await light.get_version()  # Get firmware and hardware version
+```
+
+If you use a light as an async context manager, it will automatically populate all of the non-volatile properties:
+
+```python
+async with Light(serial="d073d5000000",  ip="192.168.1.100") as light:
+    print(f"{light.label} is a {light.model} and is in the {light.group} group.")
 ```
 
 ### Can I control devices from multiple computers?
@@ -316,9 +318,9 @@ async with DeviceConnection(serial, ip) as conn:
     reply = await conn.request(packet)
 ```
 
-### How does connection pooling work?
+### How does connection management work?
 
-lifx-async maintains an LRU cache of connections. When you open a connection to a device, it's automatically pooled and reused for subsequent operations. Connections are evicted when the cache is full (default maximum: 100 connections).
+Each device owns its own connection that opens lazily on first request. The connection is reused for all subsequent operations on that device. Connections are automatically closed when you exit the device's context manager, or you can manually call `await device.connection.close()`.
 
 ## Still have questions?
 

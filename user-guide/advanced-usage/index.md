@@ -125,17 +125,18 @@ All cached properties return `None` if no data has been cached yet, or the cache
 
 ## Connection Management
 
-### Understanding Connection Pooling
+### Understanding Lazy Connections
 
-lifx-async automatically pools connections for efficient reuse:
+Each device owns its own connection that opens lazily on first request:
 
 ```python
 from lifx import Light
 
 async def main():
     async with await Light.from_ip("192.168.1.100") as light:
-        # All these operations reuse the same connection
+        # Connection opens automatically on first request
         await light.set_power(True)
+        # All subsequent operations reuse the same connection
         await light.set_color(Colors.BLUE)
         await light.get_label()
         # Connection automatically closed when exiting context
@@ -143,9 +144,10 @@ async def main():
 
 **Benefits:**
 
-- Reduced overhead from socket creation/teardown
-- Lower latency for repeated operations
+- Simple lifecycle: one connection per device
+- Lazy opening: connection opens only when needed
 - Automatic cleanup on context exit
+- Requests are serialized to prevent response mixing
 
 ## Concurrency Patterns
 

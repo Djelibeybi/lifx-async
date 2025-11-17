@@ -276,7 +276,7 @@ await asyncio.gather(
 )
 ```
 
-1. **Not using connection pooling**
+1. **Not reusing connections**
 
 Inefficient (creates new connection each time):
 

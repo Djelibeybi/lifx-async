@@ -13,6 +13,8 @@ discover(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device, None]
 ```
 
@@ -25,10 +27,10 @@ Discover LIFX devices and yield them as they are found.
 | `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                      |
 | `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                     |
 | `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                      |
+| `device_timeout`          | request timeout set on discovered devices **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`    |
+| `max_retries`             | max retries per request set on discovered devices **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`  |
 
-| YIELDS                         | DESCRIPTION                             |
-| ------------------------------ | --------------------------------------- |
-| `AsyncGenerator[Device, None]` | Device instances as they are discovered |
+Yields: Device instances as they are discovered
 
 Example
 
@@ -54,6 +56,8 @@ async def discover(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices and yield them as they are found.
 
@@ -63,7 +67,8 @@ async def discover(
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
-
+        device_timeout: request timeout set on discovered devices
+        max_retries: max retries per request set on discovered devices
     Yields:
         Device instances as they are discovered
 
@@ -87,6 +92,8 @@ async def discover(
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
+        device_timeout=device_timeout,
+        max_retries=max_retries,
     ):
         device = await discovered.create_device()
         if device is not None:
@@ -103,6 +110,8 @@ find_by_serial(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Device | None
 ```
 
@@ -116,6 +125,8 @@ Find a specific device by serial number.
 | `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
 | `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                           |
 | `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                            |
+| `device_timeout`          | request timeout set on discovered device **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`           |
+| `max_retries`             | max retries per request set on discovered device **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`         |
 
 | RETURNS  | DESCRIPTION |
 | -------- | ----------- |
@@ -141,6 +152,8 @@ async def find_by_serial(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Device | None:
     """Find a specific device by serial number.
 
@@ -151,6 +164,8 @@ async def find_by_serial(
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered device
+        max_retries: max retries per request set on discovered device
 
     Returns:
         Device instance if found, None otherwise
@@ -173,6 +188,8 @@ async def find_by_serial(
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
+        device_timeout=device_timeout,
+        max_retries=max_retries,
     ):
         if disc.serial.lower() == serial_str:
             # Detect device type and return appropriate class
@@ -192,6 +209,8 @@ find_by_label(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device]
 ```
 
@@ -208,10 +227,12 @@ Uses a protocol trick by broadcasting GetLabel instead of GetService, which retu
 | `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                                                                                          |
 | `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                                                                                         |
 | `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                                                                                          |
+| `device_timeout`          | request timeout set on discovered device(s) **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`                                                                      |
+| `max_retries`             | max retries per request set on discovered device(s) **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                                                                    |
 
-| YIELDS                   | DESCRIPTION               |
-| ------------------------ | ------------------------- |
-| `AsyncGenerator[Device]` | Matching Device instances |
+| YIELDS                   | DESCRIPTION                 |
+| ------------------------ | --------------------------- |
+| `AsyncGenerator[Device]` | Matching Device instance(s) |
 
 Example
 
@@ -239,6 +260,8 @@ async def find_by_label(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device]:
     """Find LIFX devices by label (name).
 
@@ -256,9 +279,11 @@ async def find_by_label(
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered device(s)
+        max_retries: max retries per request set on discovered device(s)
 
     Yields:
-        Matching Device instances
+        Matching Device instance(s)
 
     Example:
         ```python
@@ -301,6 +326,8 @@ async def find_by_label(
                 ip=resp.ip,
                 port=resp.port,
                 response_time=resp.response_time,
+                timeout=device_timeout,
+                max_retries=max_retries,
             )
 
             device = await disc.create_device()
@@ -317,6 +344,8 @@ find_by_ip(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Device | None
 ```
 
@@ -331,6 +360,8 @@ Uses a targeted discovery by sending the broadcast to the specific IP address, w
 | `port`                    | Port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
 | `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                           |
 | `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                            |
+| `device_timeout`          | request timeout set on discovered device **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`           |
+| `max_retries`             | max retries per request set on discovered device **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`         |
 
 | RETURNS  | DESCRIPTION |
 | -------- | ----------- |
@@ -355,6 +386,8 @@ async def find_by_ip(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Device | None:
     """Find a LIFX device by IP address.
 
@@ -368,6 +401,8 @@ async def find_by_ip(
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered device
+        max_retries: max retries per request set on discovered device
 
     Returns:
         Device instance if found, None otherwise
@@ -388,6 +423,8 @@ async def find_by_ip(
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
+        device_timeout=device_timeout,
+        max_retries=max_retries,
     ):
         # Should only get one response (or none)
         return await discovered.create_device()
@@ -401,7 +438,7 @@ async def find_by_ip(
 
 ```python
 DeviceGroup(
-    devices: list[
+    devices: Sequence[
         Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
     ],
 )
@@ -425,9 +462,9 @@ await group.set_power(True)
 await group.set_color(Colors.BLUE)
 ```
 
-| PARAMETER | DESCRIPTION                                       |
-| --------- | ------------------------------------------------- |
-| `devices` | List of Device instances **TYPE:** \`list\[Device |
+| PARAMETER | DESCRIPTION                                           |
+| --------- | ----------------------------------------------------- |
+| `devices` | List of Device instances **TYPE:** \`Sequence\[Device |
 
 | METHOD                      | DESCRIPTION                                        |
 | --------------------------- | -------------------------------------------------- |
@@ -449,7 +486,7 @@ await group.set_color(Colors.BLUE)
 
 | ATTRIBUTE          | DESCRIPTION                                                                    |
 | ------------------ | ------------------------------------------------------------------------------ |
-| `devices`          | Get all the devices in the group. **TYPE:** `list[Device]`                     |
+| `devices`          | Get all the devices in the group. **TYPE:** \`Sequence\[Device                 |
 | `lights`           | Get all Light devices in the group. **TYPE:** `list[Light]`                    |
 | `hev_lights`       | Get the HEV lights in the group. **TYPE:** `list[HevLight]`                    |
 | `infrared_lights`  | Get the Infrared lights in the group. **TYPE:** `list[InfraredLight]`          |
@@ -461,7 +498,7 @@ Source code in `src/lifx/api.py`
 ```python
 def __init__(
     self,
-    devices: list[
+    devices: Sequence[
         Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
     ],
 ) -> None:
@@ -491,7 +528,9 @@ def __init__(
 ##### devices
 
 ```python
-devices: list[Device]
+devices: Sequence[
+    Device | HevLight | InfraredLight | Light | MultiZoneLight | TileDevice
+]
 ```
 
 Get all the devices in the group.

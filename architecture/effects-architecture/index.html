@@ -2282,10 +2282,10 @@
 </ul>
 <p>No special device modifications needed.</p>
 <h3 id="with-network-layer">With Network Layer<a class="headerlink" href="#with-network-layer" title="Permanent link">&para;</a></h3>
-<p>Effects rely on existing connection pooling and concurrent request support:</p>
+<p>Effects rely on existing lazy connection and concurrent request support:</p>
 <ul>
-<li>Connection pooling (LRU cache) reuses connections</li>
-<li>Background response dispatcher handles concurrent requests</li>
+<li>Lazy connections open on first request and are reused</li>
+<li>Requests are serialized via lock to prevent response mixing</li>
 <li>No effect-specific network code needed</li>
 </ul>
 <h3 id="with-protocol-layer">With Protocol Layer<a class="headerlink" href="#with-protocol-layer" title="Permanent link">&para;</a></h3>
@@ -2307,7 +2307,7 @@
 <ul>
 <li><strong>Minimal:</strong> Async I/O bound, not CPU bound</li>
 <li><strong>Concurrency:</strong> Multiple devices don't increase CPU significantly</li>
-<li><strong>Background Tasks:</strong> One receiver task per connection (managed by connection pool)</li>
+<li><strong>Background Tasks:</strong> Requests serialized per connection, concurrent across devices</li>
 </ul>
 <h3 id="network-traffic">Network Traffic<a class="headerlink" href="#network-traffic" title="Permanent link">&para;</a></h3>
 <h4 id="state-capture">State Capture<a class="headerlink" href="#state-capture" title="Permanent link">&para;</a></h4>
@@ -2365,7 +2365,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 17, 2025 03:25:48 UTC">November 17, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 17, 2025 12:51:18 UTC">November 17, 2025</span>
   </span>
 
     

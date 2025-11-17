@@ -15,6 +15,8 @@ discover_devices(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[DiscoveredDevice, None]
 ```
 
@@ -22,13 +24,15 @@ Discover LIFX devices on the local network.
 
 Sends a broadcast DeviceGetService packet and yields devices as they respond. Implements DoS protection via timeout, source validation, and serial validation.
 
-| PARAMETER                 | DESCRIPTION                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------ |
-| `timeout`                 | Discovery timeout in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT`      |
-| `broadcast_address`       | Broadcast address to use **TYPE:** `str` **DEFAULT:** `'255.255.255.255'`            |
-| `port`                    | UDP port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT` |
-| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`    |
-| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`     |
+| PARAMETER                 | DESCRIPTION                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `timeout`                 | Discovery timeout in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT`                      |
+| `broadcast_address`       | Broadcast address to use **TYPE:** `str` **DEFAULT:** `'255.255.255.255'`                            |
+| `port`                    | UDP port to use (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                 |
+| `max_response_time`       | Max time to wait for responses **TYPE:** `float` **DEFAULT:** `MAX_RESPONSE_TIME`                    |
+| `idle_timeout_multiplier` | Idle timeout multiplier **TYPE:** `float` **DEFAULT:** `IDLE_TIMEOUT_MULTIPLIER`                     |
+| `device_timeout`          | request timeout set on discovered devices **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`   |
+| `max_retries`             | max retries per request set on discovered devices **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES` |
 
 | YIELDS                                   | DESCRIPTION                                       |
 | ---------------------------------------- | ------------------------------------------------- |
@@ -57,6 +61,8 @@ async def discover_devices(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
@@ -69,6 +75,8 @@ async def discover_devices(
         port: UDP port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered devices
+        max_retries: max retries per request set on discovered devices
 
     Yields:
         DiscoveredDevice instances as they are discovered
@@ -238,6 +246,8 @@ async def discover_devices(
                         ip=addr[0],
                         port=device_port,
                         response_time=response_time,
+                        timeout=device_timeout,
+                        max_retries=max_retries,
                     )
 
                     _LOGGER.debug(
@@ -304,6 +314,8 @@ DiscoveredDevice(
     serial: str,
     ip: str,
     port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     first_seen: float = time(),
     response_time: float = 0.0,
 )
@@ -316,7 +328,6 @@ Information about a discovered LIFX device.
 | `serial`        | Device serial number as 12-digit hex string (e.g., "d073d5123456") **TYPE:** `str` |
 | `ip`            | Device IP address **TYPE:** `str`                                                  |
 | `port`          | Device UDP port **TYPE:** `int`                                                    |
-| `service`       | Service type (typically UDP=1) **TYPE:** `int`                                     |
 | `first_seen`    | Timestamp when device was first discovered **TYPE:** `float`                       |
 | `response_time` | Response time in seconds **TYPE:** `float`                                         |
 
@@ -396,29 +407,35 @@ async def create_device(self) -> Device | None:
     from lifx.devices.multizone import MultiZoneLight
     from lifx.devices.tile import TileDevice
 
+    kwargs = {
+        "serial": self.serial,
+        "ip": self.ip,
+        "port": self.port,
+        "timeout": self.timeout,
+        "max_retries": self.max_retries,
+    }
+
     # Create temporary device to query version
-    temp_device = Device(serial=self.serial, ip=self.ip, port=self.port)
+    temp_device = Device(**kwargs)
     await temp_device._ensure_capabilities()
 
     try:
         if temp_device.capabilities:
             if temp_device.capabilities.has_matrix:
-                return TileDevice(serial=self.serial, ip=self.ip, port=self.port)
+                return TileDevice(**kwargs)
             if temp_device.capabilities.has_multizone:
-                return MultiZoneLight(
-                    serial=self.serial, ip=self.ip, port=self.port
-                )
+                return MultiZoneLight(**kwargs)
             if temp_device.capabilities.has_infrared:
-                return InfraredLight(serial=self.serial, ip=self.ip, port=self.port)
+                return InfraredLight(**kwargs)
             if temp_device.capabilities.has_hev:
-                return HevLight(serial=self.serial, ip=self.ip, port=self.port)
+                return HevLight(**kwargs)
             if temp_device.capabilities.has_relays or (
                 temp_device.capabilities.has_buttons
                 and not temp_device.capabilities.has_color
             ):
                 return None
 
-            return Light(serial=self.serial, ip=self.ip, port=self.port)
+            return Light(**kwargs)
 
     except Exception:
         return None
@@ -1029,24 +1046,26 @@ async def main():
 
 ## Concurrency
 
-### Concurrent Requests on Single Connection
+### Request Serialization on Single Connection
 
-Each `DeviceConnection` supports true concurrent requests using a background response dispatcher:
+Each `DeviceConnection` serializes requests using a lock to prevent response mixing:
 
 ```python
 import asyncio
 from lifx.network.connection import DeviceConnection
-from lifx.protocol.packets import LightGet, LightGetPower, DeviceGetLabel
+from lifx.protocol.packets import Light, Device
 
 
 async def main():
-    async with DeviceConnection(serial, ip) as conn:
-        # Multiple requests execute concurrently
-        state, power, label = await asyncio.gather(
-            conn.request_response(LightGet(), LightState),
-            conn.request_response(LightGetPower(), LightStatePower),
-            conn.request_response(DeviceGetLabel(), DeviceStateLabel),
-        )
+    conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+
+    # Sequential requests (serialized by internal lock)
+    state = await conn.request(Light.GetColor())
+    power = await conn.request(Light.GetPower())
+    label = await conn.request(Device.GetLabel())
+
+    # Connection automatically closes when done
+    await conn.close()
 ```
 
 ### Concurrent Requests on Different Devices
@@ -1057,13 +1076,18 @@ from lifx.network.connection import DeviceConnection
 
 
 async def main():
-    async with DeviceConnection(serial1, ip1) as conn1, DeviceConnection(
-        serial2, ip2
-    ) as conn2:
-        # Fully parallel - different UDP sockets
-        result1, result2 = await asyncio.gather(
-            conn1.request_response(...), conn2.request_response(...)
-        )
+    conn1 = DeviceConnection(serial="d073d5000001", ip="192.168.1.100")
+    conn2 = DeviceConnection(serial="d073d5000002", ip="192.168.1.101")
+
+    # Fully parallel - different UDP sockets
+    result1, result2 = await asyncio.gather(
+        conn1.request(Light.GetColor()),
+        conn2.request(Light.GetColor())
+    )
+
+    # Clean up connections
+    await conn1.close()
+    await conn2.close()
 ```
 
 ## Connection Management
@@ -1081,42 +1105,66 @@ DeviceConnection(
 )
 ```
 
-Handle to a device connection (lightweight, user-facing).
+Connection to a LIFX device.
 
-This is a lightweight handle that internally uses a class-level connection pool. Multiple DeviceConnection instances with the same serial/ip/port will share the same underlying connection.
+This class manages the UDP transport and request/response lifecycle for a single device. Connections are opened lazily on first request and remain open until explicitly closed.
 
-All connection management (pooling, opening, closing) is internal and completely hidden from Device classes.
+Features:
 
-Device classes just call
-
-await self.connection.request(packet)
+- Lazy connection opening (no context manager required)
+- Async generator-based request/response streaming
+- Retry logic with exponential backoff and jitter
+- Request serialization to prevent response mixing
+- Automatic sequence number management
 
 Example
 
 ```python
 conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+
+# Connection opens automatically on first request
 state = await conn.request(packets.Light.GetColor())
 # state.label is already decoded to string
 # state.color is LightHsbk instance
+
+# Optionally close when done
+await conn.close()
 ```
 
-This is lightweight - doesn't actually create a connection. Connection is created/retrieved from pool on first request().
+With context manager (recommended for cleanup):
+
+```python
+async with DeviceConnection(...) as conn:
+    state = await conn.request(packets.Light.GetColor())
+# Connection automatically closed on exit
+```
+
+This is lightweight - doesn't actually create a connection. Connection is opened lazily on first request.
 
 | PARAMETER     | DESCRIPTION                                                                                                     |
 | ------------- | --------------------------------------------------------------------------------------------------------------- |
-| `serial`      | Device serial number as 12-digit hex string **TYPE:** `str`                                                     |
+| `serial`      | Device serial number as 12-digit hex string (e.g., 'd073d5123456') **TYPE:** `str`                              |
 | `ip`          | Device IP address **TYPE:** `str`                                                                               |
 | `port`        | Device UDP port (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
 | `source`      | Client source identifier (random if None) **TYPE:** \`int                                                       |
-| `max_retries` | Maximum retry attempts (default: 8) **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                          |
+| `max_retries` | Maximum number of retry attempts (default: 8) **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                |
 | `timeout`     | Default timeout for requests in seconds (default: 8.0) **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
-| METHOD                  | DESCRIPTION                                                 |
-| ----------------------- | ----------------------------------------------------------- |
-| `close_all_connections` | Close all connections in the shared pool.                   |
-| `get_pool_metrics`      | Get connection pool metrics.                                |
-| `request_stream`        | Send request and yield unpacked responses.                  |
-| `request`               | Send request and get single response (convenience wrapper). |
+| METHOD           | DESCRIPTION                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| `__aenter__`     | Enter async context manager.                                |
+| `__aexit__`      | Exit async context manager and close connection.            |
+| `open`           | Open connection to device.                                  |
+| `close`          | Close connection to device.                                 |
+| `send_packet`    | Send a packet to the device.                                |
+| `receive_packet` | Receive a packet from the device.                           |
+| `request_stream` | Send request and yield unpacked responses.                  |
+| `request`        | Send request and get single response (convenience wrapper). |
+
+| ATTRIBUTE | DESCRIPTION                                                    |
+| --------- | -------------------------------------------------------------- |
+| `is_open` | Check if connection is open. **TYPE:** `bool`                  |
+| `source`  | Get the source identifier for this connection. **TYPE:** `int` |
 
 Source code in `src/lifx/network/connection.py`
 
@@ -1130,77 +1178,304 @@ def __init__(
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> None:
-    """Initialize connection handle.
+    """Initialize device connection.
 
     This is lightweight - doesn't actually create a connection.
-    Connection is created/retrieved from pool on first request().
+    Connection is opened lazily on first request.
 
     Args:
-        serial: Device serial number as 12-digit hex string
+        serial: Device serial number as 12-digit hex string (e.g., 'd073d5123456')
         ip: Device IP address
         port: Device UDP port (default LIFX_UDP_PORT)
         source: Client source identifier (random if None)
-        max_retries: Maximum retry attempts (default: 8)
+        max_retries: Maximum number of retry attempts (default: 8)
         timeout: Default timeout for requests in seconds (default: 8.0)
     """
     self.serial = serial
     self.ip = ip
     self.port = port
-    self.source = source
     self.max_retries = max_retries
     self.timeout = timeout
+
+    self._transport: UdpTransport | None = None
+    self._builder = MessageBuilder(source=source)
+    self._is_open = False
+    self._is_opening = False  # Flag to prevent concurrent open() calls
+    # Lock is created lazily in open() to bind to the current event loop
+    self._request_lock: asyncio.Lock | None = None
 ```
+
+#### Attributes
+
+##### is_open
+
+```python
+is_open: bool
+```
+
+Check if connection is open.
+
+##### source
+
+```python
+source: int
+```
+
+Get the source identifier for this connection.
 
 #### Functions
 
-##### close_all_connections
+##### __aenter__
 
 ```python
-close_all_connections() -> None
+__aenter__() -> Self
 ```
 
-Close all connections in the shared pool.
-
-Call this at application shutdown for clean teardown.
+Enter async context manager.
 
 Source code in `src/lifx/network/connection.py`
 
 ```python
-@classmethod
-async def close_all_connections(cls) -> None:
-    """Close all connections in the shared pool.
+async def __aenter__(self) -> Self:
+    """Enter async context manager."""
+    # Don't open connection here - it will open lazily on first request
+    return self
+```
 
-    Call this at application shutdown for clean teardown.
+##### __aexit__
+
+```python
+__aexit__(
+    exc_type: type[BaseException] | None,
+    exc_val: BaseException | None,
+    exc_tb: object,
+) -> None
+```
+
+Exit async context manager and close connection.
+
+Source code in `src/lifx/network/connection.py`
+
+```python
+async def __aexit__(
+    self,
+    exc_type: type[BaseException] | None,
+    exc_val: BaseException | None,
+    exc_tb: object,
+) -> None:
+    """Exit async context manager and close connection."""
+    await self.close()
+```
+
+##### open
+
+```python
+open() -> None
+```
+
+Open connection to device.
+
+Opens the UDP transport for sending and receiving packets. Called automatically on first request if not already open.
+
+Source code in `src/lifx/network/connection.py`
+
+```python
+async def open(self) -> None:
+    """Open connection to device.
+
+    Opens the UDP transport for sending and receiving packets.
+    Called automatically on first request if not already open.
     """
-    async with cls._pool_lock:
-        if cls._pool is not None:
-            await cls._pool.close_all()
-            cls._pool = None
+    if self._is_open:
+        return
+
+    # Prevent concurrent open() calls
+    if self._is_opening:
+        # Another task is already opening, wait for it
+        while self._is_opening:
+            await asyncio.sleep(0.001)
+        return
+
+    self._is_opening = True
+    try:
+        # Double-check after setting flag
+        if self._is_open:  # pragma: no cover
+            return
+
+        # Create lock bound to the current event loop
+        # This is necessary because locks created in a different event loop
+        # (e.g., during __init__ in a session fixture) cannot be used
+        self._request_lock = asyncio.Lock()
+
+        # Open transport
+        self._transport = UdpTransport(port=0, broadcast=False)
+        await self._transport.open()
+        self._is_open = True
+
+        _LOGGER.debug(
+            {
+                "class": "DeviceConnection",
+                "method": "open",
+                "serial": self.serial,
+                "ip": self.ip,
+                "port": self.port,
+            }
+        )
+    finally:
+        self._is_opening = False
 ```
 
-##### get_pool_metrics
+##### close
 
 ```python
-get_pool_metrics() -> ConnectionPoolMetrics | None
+close() -> None
 ```
 
-Get connection pool metrics.
-
-| RETURNS                 | DESCRIPTION |
-| ----------------------- | ----------- |
-| \`ConnectionPoolMetrics | None\`      |
+Close connection to device.
 
 Source code in `src/lifx/network/connection.py`
 
 ```python
-@classmethod
-def get_pool_metrics(cls) -> ConnectionPoolMetrics | None:
-    """Get connection pool metrics.
+async def close(self) -> None:
+    """Close connection to device."""
+    if not self._is_open:
+        return
+
+    self._is_open = False
+
+    # Close transport
+    if self._transport is not None:
+        await self._transport.close()
+
+    _LOGGER.debug(
+        {
+            "class": "DeviceConnection",
+            "method": "close",
+            "serial": self.serial,
+            "ip": self.ip,
+        }
+    )
+    self._transport = None
+```
+
+##### send_packet
+
+```python
+send_packet(
+    packet: Any,
+    ack_required: bool = False,
+    res_required: bool = False,
+    sequence: int | None = None,
+) -> None
+```
+
+Send a packet to the device.
+
+| PARAMETER      | DESCRIPTION                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| `packet`       | Packet dataclass instance **TYPE:** `Any`                            |
+| `ack_required` | Request acknowledgement **TYPE:** `bool` **DEFAULT:** `False`        |
+| `res_required` | Request response **TYPE:** `bool` **DEFAULT:** `False`               |
+| `sequence`     | Explicit sequence number (allocates new one if None) **TYPE:** \`int |
+
+| RAISES            | DESCRIPTION                             |
+| ----------------- | --------------------------------------- |
+| `ConnectionError` | If connection is not open or send fails |
+
+Source code in `src/lifx/network/connection.py`
+
+```python
+async def send_packet(
+    self,
+    packet: Any,
+    ack_required: bool = False,
+    res_required: bool = False,
+    sequence: int | None = None,
+) -> None:
+    """Send a packet to the device.
+
+    Args:
+        packet: Packet dataclass instance
+        ack_required: Request acknowledgement
+        res_required: Request response
+        sequence: Explicit sequence number (allocates new one if None)
+
+    Raises:
+        ConnectionError: If connection is not open or send fails
+    """
+    if not self._is_open or self._transport is None:
+        raise LifxConnectionError("Connection not open")
+
+    message = self._builder.create_message(
+        packet=packet,
+        target=Serial.from_string(self.serial).to_protocol(),
+        ack_required=ack_required,
+        res_required=res_required,
+        sequence=sequence,
+    )
+
+    # Send to device
+    await self._transport.send(message, (self.ip, self.port))
+```
+
+##### receive_packet
+
+```python
+receive_packet(timeout: float = 0.5) -> tuple[LifxHeader, bytes]
+```
+
+Receive a packet from the device.
+
+Note
+
+This method does not validate the source IP address. Validation is instead performed using the LIFX protocol's built-in target field (serial number) and sequence number matching in request_stream() and request_ack_stream(). This approach is more reliable in complex network configurations (NAT, multiple interfaces, bridges, etc.) while maintaining security through proper protocol-level validation.
+
+| PARAMETER | DESCRIPTION                                             |
+| --------- | ------------------------------------------------------- |
+| `timeout` | Timeout in seconds **TYPE:** `float` **DEFAULT:** `0.5` |
+
+| RETURNS                    | DESCRIPTION                |
+| -------------------------- | -------------------------- |
+| `tuple[LifxHeader, bytes]` | Tuple of (header, payload) |
+
+| RAISES            | DESCRIPTION                   |
+| ----------------- | ----------------------------- |
+| `ConnectionError` | If connection is not open     |
+| `TimeoutError`    | If no response within timeout |
+
+Source code in `src/lifx/network/connection.py`
+
+```python
+async def receive_packet(self, timeout: float = 0.5) -> tuple[LifxHeader, bytes]:
+    """Receive a packet from the device.
+
+    Note:
+        This method does not validate the source IP address. Validation is instead
+        performed using the LIFX protocol's built-in target field (serial number)
+        and sequence number matching in request_stream() and request_ack_stream().
+        This approach is more reliable in complex network configurations (NAT,
+        multiple interfaces, bridges, etc.) while maintaining security through
+        proper protocol-level validation.
+
+    Args:
+        timeout: Timeout in seconds
 
     Returns:
-        ConnectionPoolMetrics if pool exists, None otherwise
+        Tuple of (header, payload)
+
+    Raises:
+        ConnectionError: If connection is not open
+        TimeoutError: If no response within timeout
     """
-    return cls._pool.metrics if cls._pool is not None else None
+    if not self._is_open or self._transport is None:
+        raise LifxConnectionError("Connection not open")
+
+    # Receive message - source address not validated here
+    # Validation occurs via target field and sequence number matching
+    data, _addr = await self._transport.receive(timeout=timeout)
+
+    # Parse and return message
+    return parse_message(data)
 ```
 
 ##### request_stream
@@ -1213,7 +1488,7 @@ request_stream(
 
 Send request and yield unpacked responses.
 
-This is an async generator that handles the complete request/response cycle including packet type detection, response unpacking, and label decoding.
+This is an async generator that handles the complete request/response cycle including packet type detection, response unpacking, and label decoding. Connection is opened automatically if not already open.
 
 Single response (most common): async for response in conn.request_stream(GetLabel()): process(response) break # Exit immediately
 
@@ -1276,7 +1551,7 @@ async def request_stream(
 
     This is an async generator that handles the complete request/response
     cycle including packet type detection, response unpacking, and label
-    decoding.
+    decoding. Connection is opened automatically if not already open.
 
     Single response (most common):
         async for response in conn.request_stream(GetLabel()):
@@ -1325,16 +1600,8 @@ async def request_stream(
             pass
         ```
     """
-    # Get pool and retrieve actual connection
-    pool = await self._get_pool()
-    actual_conn = await pool.get_connection(
-        serial=self.serial,
-        ip=self.ip,
-        port=self.port,
-        source=self.source,
-        max_retries=self.max_retries,
-        timeout=self.timeout,
-    )
+    # Ensure connection is open (lazy opening)
+    await self._ensure_open()
 
     # Get packet metadata
     packet_kind = getattr(packet, "_packet_kind", "OTHER")
@@ -1344,7 +1611,7 @@ async def request_stream(
         from lifx.protocol.packets import get_packet_class
 
         # Stream responses and unpack each
-        async for header, payload in actual_conn.request_stream(
+        async for header, payload in self._request_stream_impl(
             packet, timeout=timeout
         ):
             packet_class = get_packet_class(header.pkt_type)
@@ -1385,7 +1652,7 @@ async def request_stream(
 
     elif packet_kind == "SET":
         # Request acknowledgement
-        async for _ in actual_conn.request_ack_stream(packet, timeout=timeout):
+        async for _ in self._request_ack_stream_impl(packet, timeout=timeout):
             # Log the request/ack cycle
             request_values = packet.as_dict
             _LOGGER.debug(
@@ -1416,7 +1683,7 @@ async def request_stream(
             if pkt_type == 58:  # EchoRequest
                 from lifx.protocol.packets import Device
 
-                async for header, payload in actual_conn.request_stream(
+                async for header, payload in self._request_stream_impl(
                     packet, timeout=timeout
                 ):
                     response_packet = Device.EchoResponse.unpack(payload)
@@ -1463,7 +1730,7 @@ Send request and get single response (convenience wrapper).
 
 This is a convenience method that returns the first response from request_stream(). It's equivalent to: await anext(conn.request_stream(packet))
 
-Most device operations use this method since they expect a single response.
+Most device operations use this method since they expect a single response. Connection is opened automatically if not already open.
 
 | PARAMETER | DESCRIPTION                                                                         |
 | --------- | ----------------------------------------------------------------------------------- |
@@ -1511,6 +1778,7 @@ async def request(
         await anext(conn.request_stream(packet))
 
     Most device operations use this method since they expect a single response.
+    Connection is opened automatically if not already open.
 
     Args:
         packet: Packet instance to send
@@ -1546,19 +1814,19 @@ async def request(
 
 ## Performance Considerations
 
-### Connection Pooling
+### Connection Lifecycle
 
-- Connections are cached with LRU eviction
-- Default pool size: 100 connections
-- Idle connections are automatically closed after timeout
-- Pool metrics available via `get_pool_metrics()`
+- Connections open lazily on first request
+- Each device owns its own connection (no shared pool)
+- Connections close explicitly via `close()` or context manager exit
+- Low memory overhead (one UDP socket per device)
 
 ### Response Handling
 
-- Background receiver task runs continuously
 - Responses matched by sequence number
-- Minimal overhead per concurrent request (~100 bytes)
-- Clean shutdown on connection close
+- Async generator-based streaming for efficient multi-response protocols
+- Immediate exit for single-response requests (no wasted timeout)
+- Retry logic with exponential backoff and jitter
 
 ### Rate Limiting
 
