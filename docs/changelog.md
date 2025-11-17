@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.1.0 (2025-11-17)
+
+### Features
+
+- Remove connection pool in favor of lazy device-owned connections
+  ([`11b3cb2`](https://github.com/Djelibeybi/lifx-async/commit/11b3cb24f51f3066cacc94d5ec2b2adb1bdf5ce1))
+
+
 ## v3.0.1 (2025-11-17)
 
 ### Bug Fixes
