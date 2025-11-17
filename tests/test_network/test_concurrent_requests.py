@@ -112,29 +112,6 @@ class TestErrorHandling:
         assert results[1] == "label_success"
 
 
-class TestConnectionPoolWithAsyncGenerators:
-    """Test that ConnectionPool works with async generator-based requests."""
-
-    async def test_connection_pool_basic_operation(self):
-        """Test that connection pool still works with async generators."""
-        from lifx.network.connection import ConnectionPool
-
-        pool = ConnectionPool(max_connections=2)
-
-        async with pool:
-            conn1 = await pool.get_connection(serial="d073d5000001", ip="192.168.1.100")
-            assert conn1.is_open
-
-            conn2 = await pool.get_connection(serial="d073d5000002", ip="192.168.1.101")
-            assert conn2.is_open
-
-            # Getting same connection should return cached instance
-            conn1_again = await pool.get_connection(
-                serial="d073d5000001", ip="192.168.1.100"
-            )
-            assert conn1_again is conn1
-
-
 class TestAsyncGeneratorRequests:
     """Test async generator-based request streaming."""
 
@@ -197,32 +174,26 @@ class TestAsyncGeneratorRequests:
             scenarios={},
         )
 
-        from lifx.network.connection import ConnectionPool, DeviceConnection
+        from lifx.network.connection import DeviceConnection
 
-        # Use fresh pool for this test
-        pool = ConnectionPool(max_connections=10)
-        DeviceConnection._pool = pool
+        conn = DeviceConnection(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=server.port,
+            timeout=2.0,
+            max_retries=2,
+        )
 
         try:
-            conn = DeviceConnection(
-                serial="d073d5000001",
-                ip="127.0.0.1",
-                port=server.port,
-                timeout=2.0,
-                max_retries=2,
-            )
-
             # Stream and break early
             async for _response in conn.request_stream(Device.GetLabel()):
                 break
 
             # Verify connection is still functional
-            actual_conn = await pool.get_connection(
-                serial="d073d5000001",
-                ip="127.0.0.1",
-                port=server.port,
-            )
-            assert actual_conn.is_open
+            assert conn.is_open
+
+            # Make another request to verify no leak
+            response = await conn.request(Device.GetPower())
+            assert hasattr(response, "level")
         finally:
-            await pool.close_all()
-            DeviceConnection._pool = None
+            await conn.close()

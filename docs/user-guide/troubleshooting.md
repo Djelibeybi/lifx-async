@@ -272,7 +272,7 @@ async def measure_latency():
    )
    ```
 
-2. **Not using connection pooling**
+2. **Not reusing connections**
 
    Inefficient (creates new connection each time):
    ```python

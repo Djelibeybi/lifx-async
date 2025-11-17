@@ -6,10 +6,8 @@ import asyncio
 import logging
 import random
 import time
-from collections import OrderedDict
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from typing import Self
@@ -18,7 +16,6 @@ from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
-    MAX_CONNECTIONS,
 )
 from lifx.exceptions import (
     LifxConnectionError,
@@ -42,68 +39,39 @@ _STATE_UNHANDLED_PKT_TYPE: int = 223  # Device.StateUnhandled packet type
 _DEFAULT_IDLE_TIMEOUT: float = 0.1  # Idle timeout for response polling within generator
 
 
-@dataclass
-class ConnectionPoolMetrics:
-    """Performance metrics for connection pool.
+class DeviceConnection:
+    """Connection to a LIFX device.
 
-    Tracks cache hits, misses, evictions, and eviction times to help
-    identify performance bottlenecks.
+    This class manages the UDP transport and request/response lifecycle for
+    a single device. Connections are opened lazily on first request and
+    remain open until explicitly closed.
 
-    Attributes:
-        hits: Number of cache hits (connection found and reused)
-        misses: Number of cache misses (new connection created)
-        evictions: Number of LRU evictions performed
-        total_requests: Total number of connection requests
-        eviction_times_ms: List of eviction times in milliseconds
-    """
-
-    hits: int = 0
-    misses: int = 0
-    evictions: int = 0
-    total_requests: int = 0
-    eviction_times_ms: list[float] = field(default_factory=list)
-
-    @property
-    def hit_rate(self) -> float:
-        """Calculate cache hit rate (0.0-1.0).
-
-        Returns:
-            Hit rate as a fraction (hits / total_requests)
-        """
-        return self.hits / self.total_requests if self.total_requests > 0 else 0.0
-
-    @property
-    def avg_eviction_time_ms(self) -> float:
-        """Calculate average eviction time in milliseconds.
-
-        Returns:
-            Average eviction time, or 0.0 if no evictions
-        """
-        if not self.eviction_times_ms:
-            return 0.0
-        return sum(self.eviction_times_ms) / len(self.eviction_times_ms)
-
-    def reset(self) -> None:
-        """Reset all metrics to zero."""
-        self.hits = 0
-        self.misses = 0
-        self.evictions = 0
-        self.total_requests = 0
-        self.eviction_times_ms.clear()
-
-
-class _ActualConnection:
-    """Internal connection implementation for LIFX devices.
-
-    This is the actual connection with UDP socket and retry logic.
-    Not exposed directly - used internally by ConnectionPool which is
-    in turn used internally by DeviceConnection handles.
-
-    This class handles:
-    - Message sending/receiving to a specific device
-    - Sequence number management
+    Features:
+    - Lazy connection opening (no context manager required)
     - Async generator-based request/response streaming
-    - Retry logic with exponential backoff
+    - Retry logic with exponential backoff and jitter
+    - Request serialization to prevent response mixing
+    - Automatic sequence number management
+
+    Example:
+        ```python
+        conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+
+        # Connection opens automatically on first request
+        state = await conn.request(packets.Light.GetColor())
+        # state.label is already decoded to string
+        # state.color is LightHsbk instance
+
+        # Optionally close when done
+        await conn.close()
+        ```
+
+    With context manager (recommended for cleanup):
+        ```python
+        async with DeviceConnection(...) as conn:
+            state = await conn.request(packets.Light.GetColor())
+        # Connection automatically closed on exit
+        ```
     """
 
     def __init__(
@@ -117,6 +85,9 @@ class _ActualConnection:
     ) -> None:
         """Initialize device connection.
 
+        This is lightweight - doesn't actually create a connection.
+        Connection is opened lazily on first request.
+
         Args:
             serial: Device serial number as 12-digit hex string (e.g., 'd073d5123456')
             ip: Device IP address
@@ -124,26 +95,23 @@ class _ActualConnection:
             source: Client source identifier (random if None)
             max_retries: Maximum number of retry attempts (default: 8)
             timeout: Default timeout for requests in seconds (default: 8.0)
-                    Used as fallback when timeout not specified in requests
         """
         self.serial = serial
         self.ip = ip
         self.port = port
         self.max_retries = max_retries
-        # Renamed to clarify it's a default, not override
-        self.default_timeout = timeout
+        self.timeout = timeout
 
         self._transport: UdpTransport | None = None
         self._builder = MessageBuilder(source=source)
         self._is_open = False
-        # Lock to serialize requests on same connection
-        # This prevents response mixing when multiple concurrent requests
-        # share the same UDP socket
-        self._request_lock = asyncio.Lock()
+        self._is_opening = False  # Flag to prevent concurrent open() calls
+        # Lock is created lazily in open() to bind to the current event loop
+        self._request_lock: asyncio.Lock | None = None
 
     async def __aenter__(self) -> Self:
-        """Enter async context manager and start connection."""
-        await self.open()
+        """Enter async context manager."""
+        # Don't open connection here - it will open lazily on first request
         return self
 
     async def __aexit__(
@@ -159,24 +127,45 @@ class _ActualConnection:
         """Open connection to device.
 
         Opens the UDP transport for sending and receiving packets.
+        Called automatically on first request if not already open.
         """
         if self._is_open:
             return
 
-        # Open transport
-        self._transport = UdpTransport(port=0, broadcast=False)
-        await self._transport.open()
-        self._is_open = True
+        # Prevent concurrent open() calls
+        if self._is_opening:
+            # Another task is already opening, wait for it
+            while self._is_opening:
+                await asyncio.sleep(0.001)
+            return
 
-        _LOGGER.debug(
-            {
-                "class": "_ActualConnection",
-                "method": "open",
-                "serial": self.serial,
-                "ip": self.ip,
-                "port": self.port,
-            }
-        )
+        self._is_opening = True
+        try:
+            # Double-check after setting flag
+            if self._is_open:  # pragma: no cover
+                return
+
+            # Create lock bound to the current event loop
+            # This is necessary because locks created in a different event loop
+            # (e.g., during __init__ in a session fixture) cannot be used
+            self._request_lock = asyncio.Lock()
+
+            # Open transport
+            self._transport = UdpTransport(port=0, broadcast=False)
+            await self._transport.open()
+            self._is_open = True
+
+            _LOGGER.debug(
+                {
+                    "class": "DeviceConnection",
+                    "method": "open",
+                    "serial": self.serial,
+                    "ip": self.ip,
+                    "port": self.port,
+                }
+            )
+        finally:
+            self._is_opening = False
 
     async def close(self) -> None:
         """Close connection to device."""
@@ -191,13 +180,23 @@ class _ActualConnection:
 
         _LOGGER.debug(
             {
-                "class": "_ActualConnection",
+                "class": "DeviceConnection",
                 "method": "close",
                 "serial": self.serial,
                 "ip": self.ip,
             }
         )
         self._transport = None
+
+    async def _ensure_open(self) -> None:
+        """Ensure connection is open, opening it if necessary.
+
+        Note: This relies on open() being idempotent. In rare race conditions,
+        multiple concurrent calls might attempt to open, but open() checks
+        _is_open at the start and returns early if already open.
+        """
+        if not self._is_open:
+            await self.open()
 
     async def send_packet(
         self,
@@ -282,40 +281,22 @@ class _ActualConnection:
         # This spreads retries across time to avoid synchronized retries
         return random.uniform(0, exponential_delay)  # nosec
 
-    async def request_stream(
+    async def _request_stream_impl(
         self,
         request: Any,
         timeout: float | None = None,
         max_retries: int | None = None,
     ) -> AsyncGenerator[tuple[LifxHeader, bytes], None]:
-        """Send request and yield responses as they arrive.
+        """Internal implementation of request_stream with retry logic.
 
         This is an async generator that sends a request and yields each response
         as it arrives. Callers can break early for single-response requests or
         continue iterating for multi-response protocols.
 
-        Single-response pattern:
-            async for header, payload in conn.request_stream(packet):
-                process(header, payload)
-                break  # Exit immediately after first response
-
-        Multi-response pattern:
-            async for header, payload in conn.request_stream(packet, timeout=2.0):
-                results.append((header, payload))
-                # Automatically stops at timeout
-
-        The retry logic is incorporated into the generator: if no response is
-        received within the timeout for an attempt, the generator will retry
-        with exponential backoff until max_retries is exhausted.
-
-        Note: Requests on the same connection are serialized to prevent response
-        mixing. For concurrent operations, use separate connections.
-
         Args:
             request: Request packet to send
             timeout: Overall timeout for all retry attempts
-                    (uses instance default if None)
-            max_retries: Maximum retries (uses instance default if None)
+            max_retries: Maximum retries
 
         Yields:
             Tuple of (LifxHeader, payload bytes)
@@ -330,12 +311,14 @@ class _ActualConnection:
             raise LifxConnectionError("Connection not open")
 
         if timeout is None:
-            timeout = self.default_timeout
+            timeout = self.timeout
 
         if max_retries is None:
             max_retries = self.max_retries
 
         # Serialize requests on same connection to prevent response mixing
+        # Lock is guaranteed to exist after _ensure_open() is called
+        assert self._request_lock is not None, "Connection must be open"  # nosec
         async with self._request_lock:
             # Calculate base timeout for exponential backoff
             # Normalize so total time across all retries equals overall timeout
@@ -448,32 +431,21 @@ class _ActualConnection:
                     f"No response from {self.ip} after {max_retries + 1} attempts"
                 ) from last_error
 
-    async def request_ack_stream(
+    async def _request_ack_stream_impl(
         self,
         request: Any,
         timeout: float | None = None,
         max_retries: int | None = None,
     ) -> AsyncGenerator[None, None]:
-        """Send request and yield when acknowledgement received.
+        """Internal implementation of request_ack_stream with retry logic.
 
         This is an async generator that sends a request requiring acknowledgement
         and yields once when the ACK is received.
 
-        Usage:
-            async for _ in conn.request_ack_stream(packet):
-                break  # Ack received
-
-        The retry logic is incorporated: if no ACK is received within the timeout
-        for an attempt, it will retry with exponential backoff.
-
-        Note: Requests on the same connection are serialized to prevent response
-        mixing. For concurrent operations, use separate connections.
-
         Args:
             request: Request packet to send
             timeout: Overall timeout for all retry attempts
-                    (uses instance default if None)
-            max_retries: Maximum retries (uses instance default if None)
+            max_retries: Maximum retries
 
         Yields:
             None (single yield on successful ack)
@@ -487,12 +459,14 @@ class _ActualConnection:
             raise LifxConnectionError("Connection not open")
 
         if timeout is None:
-            timeout = self.default_timeout
+            timeout = self.timeout
 
         if max_retries is None:
             max_retries = self.max_retries
 
         # Serialize requests on same connection to prevent response mixing
+        # Lock is guaranteed to exist after _ensure_open() is called
+        assert self._request_lock is not None, "Connection must be open"  # nosec
         async with self._request_lock:
             # Calculate base timeout for exponential backoff
             total_weight = (2 ** (max_retries + 1)) - 1
@@ -588,256 +562,6 @@ class _ActualConnection:
         """Get the source identifier for this connection."""
         return self._builder.source
 
-
-class ConnectionPool:
-    """Pool of actual device connections (internal to DeviceConnection).
-
-    Maintains a pool of _ActualConnection objects that can be reused
-    to avoid repeatedly opening/closing connections.
-
-    Uses LRU (Least Recently Used) eviction policy
-
-    Collects performance metrics to help identify bottlenecks.
-    """
-
-    def __init__(self, max_connections: int = MAX_CONNECTIONS) -> None:
-        """Initialize connection pool.
-
-        Args:
-            max_connections: Maximum number of connections to keep open
-        """
-        self.max_connections = max_connections
-        # Use OrderedDict for LRU eviction
-        self.connections: OrderedDict[str, tuple[_ActualConnection, float]] = (
-            OrderedDict()
-        )
-        # Performance metrics
-        self.metrics = ConnectionPoolMetrics()
-        _LOGGER.debug(
-            {
-                "class": "ConnectionPool",
-                "method": "__init__",
-                "max_connections": max_connections,
-            }
-        )
-
-    async def get_connection(
-        self,
-        serial: str,
-        ip: str,
-        port: int = LIFX_UDP_PORT,
-        source: int | None = None,
-        max_retries: int = DEFAULT_MAX_RETRIES,
-        timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    ) -> _ActualConnection:
-        """Get or create actual connection with parameters.
-
-        Args:
-            serial: Device serial number
-            ip: Device IP address
-            port: Device UDP port
-            source: Client source identifier (random if None)
-            max_retries: Maximum retry attempts (default: 8)
-            timeout: Default timeout for requests in seconds (default: 8.0)
-
-        Returns:
-            _ActualConnection instance (opened and ready)
-        """
-        current_time = time.time()
-        self.metrics.total_requests += 1
-
-        # Check if we already have a connection for this device
-        if serial in self.connections:
-            conn, _ = self.connections[serial]
-            if conn.is_open:
-                # Cache hit
-                self.metrics.hits += 1
-                # Update access time (move to end = most recently used)
-                self.connections.move_to_end(serial)
-                self.connections[serial] = (conn, current_time)
-                connections_free = self.max_connections - len(self.connections)
-                _LOGGER.debug(
-                    {
-                        "class": "ConnectionPool",
-                        "method": "get_connection",
-                        "action": "reused",
-                        "serial": serial,
-                        "ip": ip,
-                        "pool_size": len(self.connections),
-                        "connections_free": connections_free,
-                    }
-                )
-                return conn
-
-        # Cache miss - need to create new connection
-        self.metrics.misses += 1
-
-        # Create new actual connection with all parameters
-        conn = _ActualConnection(
-            serial=serial,
-            ip=ip,
-            port=port,
-            source=source,
-            max_retries=max_retries,
-            timeout=timeout,
-        )
-        await conn.open()
-
-        # Add to pool (evict LRU if necessary)
-        if len(self.connections) >= self.max_connections:
-            # Measure eviction time
-            eviction_start = time.monotonic()
-
-            # Evict least recently used item
-            lru_serial, (old_conn, _) = self.connections.popitem(last=False)
-            await old_conn.close()
-
-            # Track eviction metrics
-            eviction_time_ms = (time.monotonic() - eviction_start) * 1000
-            self.metrics.evictions += 1
-            self.metrics.eviction_times_ms.append(eviction_time_ms)
-
-            _LOGGER.debug(
-                {
-                    "class": "ConnectionPool",
-                    "method": "get_connection",
-                    "action": "evicted",
-                    "serial": lru_serial,
-                    "eviction_time_ms": round(eviction_time_ms, 1),
-                    "remaining_pool_size": len(self.connections),
-                }
-            )
-
-        self.connections[serial] = (conn, current_time)
-        connections_free = self.max_connections - len(self.connections)
-        _LOGGER.debug(
-            {
-                "class": "ConnectionPool",
-                "method": "get_connection",
-                "action": "created",
-                "serial": serial,
-                "ip": ip,
-                "pool_size": len(self.connections),
-                "connections_free": connections_free,
-            }
-        )
-        return conn
-
-    async def close_all(self) -> None:
-        """Close all connections in the pool."""
-        connections_to_close = len(self.connections)
-        for conn, _ in self.connections.values():
-            await conn.close()
-        self.connections.clear()
-        _LOGGER.debug(
-            {
-                "class": "ConnectionPool",
-                "method": "close_all",
-                "connections_closed": connections_to_close,
-            }
-        )
-
-    async def __aenter__(self) -> ConnectionPool:
-        """Enter async context manager."""
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        """Exit async context manager."""
-        await self.close_all()
-
-
-class DeviceConnection:
-    """Handle to a device connection (lightweight, user-facing).
-
-    This is a lightweight handle that internally uses a class-level
-    connection pool. Multiple DeviceConnection instances with the
-    same serial/ip/port will share the same underlying connection.
-
-    All connection management (pooling, opening, closing) is internal
-    and completely hidden from Device classes.
-
-    Device classes just call:
-        await self.connection.request(packet)
-
-    Example:
-        ```python
-        conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
-        state = await conn.request(packets.Light.GetColor())
-        # state.label is already decoded to string
-        # state.color is LightHsbk instance
-        ```
-    """
-
-    # Class-level connection pool (shared by all instances)
-    _pool: ClassVar[ConnectionPool | None] = None
-    _pool_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
-
-    def __init__(
-        self,
-        serial: str,
-        ip: str,
-        port: int = LIFX_UDP_PORT,
-        source: int | None = None,
-        max_retries: int = DEFAULT_MAX_RETRIES,
-        timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    ) -> None:
-        """Initialize connection handle.
-
-        This is lightweight - doesn't actually create a connection.
-        Connection is created/retrieved from pool on first request().
-
-        Args:
-            serial: Device serial number as 12-digit hex string
-            ip: Device IP address
-            port: Device UDP port (default LIFX_UDP_PORT)
-            source: Client source identifier (random if None)
-            max_retries: Maximum retry attempts (default: 8)
-            timeout: Default timeout for requests in seconds (default: 8.0)
-        """
-        self.serial = serial
-        self.ip = ip
-        self.port = port
-        self.source = source
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-    @classmethod
-    async def _get_pool(cls, max_connections: int = MAX_CONNECTIONS) -> ConnectionPool:
-        """Get or create the shared connection pool.
-
-        Internal method - not exposed to Device layer.
-
-        Args:
-            max_connections: Maximum connections in pool
-
-        Returns:
-            Shared ConnectionPool instance
-        """
-        async with cls._pool_lock:
-            if cls._pool is None:
-                cls._pool = ConnectionPool(max_connections=max_connections)
-            return cls._pool
-
-    @classmethod
-    async def close_all_connections(cls) -> None:
-        """Close all connections in the shared pool.
-
-        Call this at application shutdown for clean teardown.
-        """
-        async with cls._pool_lock:
-            if cls._pool is not None:
-                await cls._pool.close_all()
-                cls._pool = None
-
-    @classmethod
-    def get_pool_metrics(cls) -> ConnectionPoolMetrics | None:
-        """Get connection pool metrics.
-
-        Returns:
-            ConnectionPoolMetrics if pool exists, None otherwise
-        """
-        return cls._pool.metrics if cls._pool is not None else None
-
     async def request_stream(
         self,
         packet: Any,
@@ -847,7 +571,7 @@ class DeviceConnection:
 
         This is an async generator that handles the complete request/response
         cycle including packet type detection, response unpacking, and label
-        decoding.
+        decoding. Connection is opened automatically if not already open.
 
         Single response (most common):
             async for response in conn.request_stream(GetLabel()):
@@ -896,16 +620,8 @@ class DeviceConnection:
                 pass
             ```
         """
-        # Get pool and retrieve actual connection
-        pool = await self._get_pool()
-        actual_conn = await pool.get_connection(
-            serial=self.serial,
-            ip=self.ip,
-            port=self.port,
-            source=self.source,
-            max_retries=self.max_retries,
-            timeout=self.timeout,
-        )
+        # Ensure connection is open (lazy opening)
+        await self._ensure_open()
 
         # Get packet metadata
         packet_kind = getattr(packet, "_packet_kind", "OTHER")
@@ -915,7 +631,7 @@ class DeviceConnection:
             from lifx.protocol.packets import get_packet_class
 
             # Stream responses and unpack each
-            async for header, payload in actual_conn.request_stream(
+            async for header, payload in self._request_stream_impl(
                 packet, timeout=timeout
             ):
                 packet_class = get_packet_class(header.pkt_type)
@@ -956,7 +672,7 @@ class DeviceConnection:
 
         elif packet_kind == "SET":
             # Request acknowledgement
-            async for _ in actual_conn.request_ack_stream(packet, timeout=timeout):
+            async for _ in self._request_ack_stream_impl(packet, timeout=timeout):
                 # Log the request/ack cycle
                 request_values = packet.as_dict
                 _LOGGER.debug(
@@ -987,7 +703,7 @@ class DeviceConnection:
                 if pkt_type == 58:  # EchoRequest
                     from lifx.protocol.packets import Device
 
-                    async for header, payload in actual_conn.request_stream(
+                    async for header, payload in self._request_stream_impl(
                         packet, timeout=timeout
                     ):
                         response_packet = Device.EchoResponse.unpack(payload)
@@ -1035,6 +751,7 @@ class DeviceConnection:
             await anext(conn.request_stream(packet))
 
         Most device operations use this method since they expect a single response.
+        Connection is opened automatically if not already open.
 
         Args:
             packet: Packet instance to send
