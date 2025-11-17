@@ -57,7 +57,6 @@ async def main():
     for device in devices:
         print(f"Found: {device.label} at {device.ip}")
         print(f"  Serial: {device.serial}")
-        print(f"  Service: {device.service}")
 ```
 
 
