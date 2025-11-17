@@ -1902,8 +1902,8 @@
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_perform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participants</span><span class="p">):</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">power_on</span><span class="p">:</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span><span class="p">:</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>            <span class="n">is_on</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_on</span><span class="p">:</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>            <span class="n">power_level</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>            <span class="k">if</span> <span class="n">power_level</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>                <span class="n">startup_color</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_poweroff_hsbk</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">startup_color</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
@@ -1964,18 +1964,19 @@
 <strong>Value:</strong> <code>RunningEffect</code> containing effect instance and captured <code>PreState</code></p>
 <h3 id="state-capture-details">State Capture Details<a class="headerlink" href="#state-capture-details" title="Permanent link">&para;</a></h3>
 <h4 id="power-state">Power State<a class="headerlink" href="#power-state" title="Permanent link">&para;</a></h4>
-<p>Simple boolean captured via <code>get_power()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">power</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>
+<p>Integer power level captured via <code>get_power()</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">power_level</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>  <span class="c1"># Returns int (0 or 65535)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">is_on</span> <span class="o">=</span> <span class="n">power_level</span> <span class="o">&gt;</span> <span class="mi">0</span>
 </span></code></pre></div>
 <h4 id="color-state">Color State<a class="headerlink" href="#color-state" title="Permanent link">&para;</a></h4>
 <p>HSBK color captured via <code>get_color()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">color</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>  <span class="c1"># power is int (0 or 65535)</span>
 </span></code></pre></div>
 <p>Returns:</p>
 <ul>
 <li><code>color</code>: HSBK (hue, saturation, brightness, kelvin)</li>
-<li><code>power</code>: Power level (unused - we use get_power())</li>
-<li><code>label</code>: Device label (unused)</li>
+<li><code>power</code>: Power level as integer (0 for off, 65535 for on)</li>
+<li><code>label</code>: Device label</li>
 </ul>
 <h4 id="multizone-state">Multizone State<a class="headerlink" href="#multizone-state" title="Permanent link">&para;</a></h4>
 <p>For <code>MultiZoneLight</code> devices, zone colors are captured:</p>
@@ -2364,7 +2365,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 14, 2025 02:16:49 UTC">November 14, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 17, 2025 03:25:48 UTC">November 17, 2025</span>
   </span>
 
     

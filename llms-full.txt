@@ -4673,8 +4673,8 @@ If `effect.power_on == True`, devices are powered on:
 async def async_perform(self, participants):
     if self.power_on:
         for light in self.participants:
-            is_on = await light.get_power()
-            if not is_on:
+            power_level = await light.get_power()
+            if power_level == 0:
                 startup_color = await self.from_poweroff_hsbk(light)
                 await light.set_color(startup_color, duration=0)
                 await light.set_power(True, duration=0.3)
@@ -4759,10 +4759,11 @@ _running: dict[str, RunningEffect]
 
 #### Power State
 
-Simple boolean captured via `get_power()`:
+Integer power level captured via `get_power()`:
 
 ```python
-power = await light.get_power()
+power_level = await light.get_power()  # Returns int (0 or 65535)
+is_on = power_level > 0
 ```
 
 #### Color State
@@ -4770,14 +4771,14 @@ power = await light.get_power()
 HSBK color captured via `get_color()`:
 
 ```python
-color, _, _ = await light.get_color()
+color, power, _ = await light.get_color()  # power is int (0 or 65535)
 ```
 
 Returns:
 
 - `color`: HSBK (hue, saturation, brightness, kelvin)
-- `power`: Power level (unused - we use get_power())
-- `label`: Device label (unused)
+- `power`: Power level as integer (0 for off, 65535 for on)
+- `label`: Device label
 
 #### Multizone State
 
@@ -10246,16 +10247,16 @@ async def set_label(self, label: str) -> None:
 ##### get_power
 
 ```python
-get_power() -> bool
+get_power() -> int
 ```
 
 Get device power state.
 
-Always fetches from device. Use the `power` property to access stored value.
+Always fetches from device.
 
-| RETURNS | DESCRIPTION                                   |
-| ------- | --------------------------------------------- |
-| `bool`  | True if device is powered on, False otherwise |
+| RETURNS | DESCRIPTION                                      |
+| ------- | ------------------------------------------------ |
+| `int`   | Power level as integer (0 for off, 65535 for on) |
 
 | RAISES                    | DESCRIPTION                |
 | ------------------------- | -------------------------- |
@@ -10266,20 +10267,20 @@ Always fetches from device. Use the `power` property to access stored value.
 Example
 
 ```python
-is_on = await device.get_power()
-print(f"Power: {'ON' if is_on else 'OFF'}")
+level = await device.get_power()
+print(f"Power: {'ON' if level > 0 else 'OFF'}")
 ```
 
 Source code in `src/lifx/devices/base.py`
 
 ````python
-async def get_power(self) -> bool:
+async def get_power(self) -> int:
     """Get device power state.
 
-    Always fetches from device. Use the `power` property to access stored value.
+    Always fetches from device.
 
     Returns:
-        True if device is powered on, False otherwise
+        Power level as integer (0 for off, 65535 for on)
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -10288,16 +10289,14 @@ async def get_power(self) -> bool:
 
     Example:
         ```python
-        is_on = await device.get_power()
-        print(f"Power: {'ON' if is_on else 'OFF'}")
+        level = await device.get_power()
+        print(f"Power: {'ON' if level > 0 else 'OFF'}")
         ```
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetPower())
 
     # Power level is uint16 (0 or 65535)
-    is_on = state.level > 0
-
     _LOGGER.debug(
         {
             "class": "Device",
@@ -10306,58 +10305,81 @@ async def get_power(self) -> bool:
             "reply": {"level": state.level},
         }
     )
-    return is_on
+    return state.level
 ````
 
 ##### set_power
 
 ```python
-set_power(on: bool) -> None
+set_power(level: bool | int) -> None
 ```
 
 Set device power state.
 
-| PARAMETER | DESCRIPTION                                         |
-| --------- | --------------------------------------------------- |
-| `on`      | True to turn on, False to turn off **TYPE:** `bool` |
+| PARAMETER | DESCRIPTION                                                 |
+| --------- | ----------------------------------------------------------- |
+| `level`   | True/65535 to turn on, False/0 to turn off **TYPE:** \`bool |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                    | DESCRIPTION                        |
+| ------------------------- | ---------------------------------- |
+| `ValueError`              | If integer value is not 0 or 65535 |
+| `LifxDeviceNotFoundError` | If device is not connected         |
+| `LifxTimeoutError`        | If device does not respond         |
 
 Example
 
 ```python
-# Turn on device
+# Turn on device with boolean
 await device.set_power(True)
+
+# Turn on device with integer
+await device.set_power(65535)
+
+# Turn off device
+await device.set_power(False)
+await device.set_power(0)
 ```
 
 Source code in `src/lifx/devices/base.py`
 
 ````python
-async def set_power(self, on: bool) -> None:
+async def set_power(self, level: bool | int) -> None:
     """Set device power state.
 
     Args:
-        on: True to turn on, False to turn off
+        level: True/65535 to turn on, False/0 to turn off
 
     Raises:
+        ValueError: If integer value is not 0 or 65535
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
 
     Example:
         ```python
-        # Turn on device
+        # Turn on device with boolean
         await device.set_power(True)
+
+        # Turn on device with integer
+        await device.set_power(65535)
+
+        # Turn off device
+        await device.set_power(False)
+        await device.set_power(0)
         ```
     """
     # Power level: 0 for off, 65535 for on
-    level = 65535 if on else 0
+    if isinstance(level, bool):
+        power_level = 65535 if level else 0
+    elif isinstance(level, int):
+        if level not in (0, 65535):
+            raise ValueError(f"Power level must be 0 or 65535, got {level}")
+        power_level = level
+    else:
+        raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
     # Request automatically handles acknowledgement
     await self.connection.request(
-        packets.Device.SetPower(level=level),
+        packets.Device.SetPower(level=power_level),
     )
 
     _LOGGER.debug(
@@ -10365,7 +10387,7 @@ async def set_power(self, on: bool) -> None:
             "class": "Device",
             "method": "set_power",
             "action": "change",
-            "values": {"level": level},
+            "values": {"level": power_level},
         }
     )
 ````
@@ -11379,7 +11401,7 @@ Get the maximum supported kelvin value if available.
 ##### get_color
 
 ```python
-get_color() -> tuple[HSBK, bool, str]
+get_color() -> tuple[HSBK, int, str]
 ```
 
 Get current light color, power, and label.
@@ -11389,12 +11411,12 @@ Always fetches from device. Use the `color` property to access stored value.
 Returns a tuple containing:
 
 - color: HSBK color
-- power: Power state (True=on, False=off)
+- power: Power level as integer (0 for off, 65535 for on)
 - label: Device label/name
 
-| RETURNS                  | DESCRIPTION                    |
-| ------------------------ | ------------------------------ |
-| `tuple[HSBK, bool, str]` | Tuple of (color, power, label) |
+| RETURNS                 | DESCRIPTION                    |
+| ----------------------- | ------------------------------ |
+| `tuple[HSBK, int, str]` | Tuple of (color, power, label) |
 
 | RAISES                    | DESCRIPTION                |
 | ------------------------- | -------------------------- |
@@ -11406,20 +11428,20 @@ Example
 
 ```python
 color, power, label = await light.get_color()
-print(f"{label}: Hue: {color.hue}°, Power: {power}")
+print(f"{label}: Hue: {color.hue}°, Power: {'ON' if power > 0 else 'OFF'}")
 ```
 
 Source code in `src/lifx/devices/light.py`
 
 ````python
-async def get_color(self) -> tuple[HSBK, bool, str]:
+async def get_color(self) -> tuple[HSBK, int, str]:
     """Get current light color, power, and label.
 
     Always fetches from device. Use the `color` property to access stored value.
 
     Returns a tuple containing:
     - color: HSBK color
-    - power: Power state (True=on, False=off)
+    - power: Power level as integer (0 for off, 65535 for on)
     - label: Device label/name
 
     Returns:
@@ -11433,7 +11455,7 @@ async def get_color(self) -> tuple[HSBK, bool, str]:
     Example:
         ```python
         color, power, label = await light.get_color()
-        print(f"{label}: Hue: {color.hue}°, Power: {power}")
+        print(f"{label}: Hue: {color.hue}°, Power: {'ON' if power > 0 else 'OFF'}")
         ```
     """
     # Request automatically unpacks response and decodes labels
@@ -11441,7 +11463,7 @@ async def get_color(self) -> tuple[HSBK, bool, str]:
 
     # Convert from protocol HSBK to user-friendly HSBK
     color = HSBK.from_protocol(state.color)
-    power = state.power > 0
+    power = state.power
     label = state.label
 
     # Store label from StateColor response
@@ -11853,18 +11875,18 @@ async def set_saturation(self, saturation: float, duration: float = 0.0) -> None
 ##### get_power
 
 ```python
-get_power() -> bool
+get_power() -> int
 ```
 
 Get light power state (specific to light, not device).
 
-Always fetches from device. Use the `power` property to access stored value.
+Always fetches from device.
 
 This overrides Device.get_power() as it queries the light-specific power state (packet type 116/118) instead of device power (packet type 20/22).
 
-| RETURNS | DESCRIPTION                                  |
-| ------- | -------------------------------------------- |
-| `bool`  | True if light is powered on, False otherwise |
+| RETURNS | DESCRIPTION                                      |
+| ------- | ------------------------------------------------ |
+| `int`   | Power level as integer (0 for off, 65535 for on) |
 
 | RAISES                    | DESCRIPTION                |
 | ------------------------- | -------------------------- |
@@ -11875,23 +11897,23 @@ This overrides Device.get_power() as it queries the light-specific power state (
 Example
 
 ```python
-is_on = await light.get_power()
-print(f"Light power: {'ON' if is_on else 'OFF'}")
+level = await light.get_power()
+print(f"Light power: {'ON' if level > 0 else 'OFF'}")
 ```
 
 Source code in `src/lifx/devices/light.py`
 
 ````python
-async def get_power(self) -> bool:
+async def get_power(self) -> int:
     """Get light power state (specific to light, not device).
 
-    Always fetches from device. Use the `power` property to access stored value.
+    Always fetches from device.
 
     This overrides Device.get_power() as it queries the light-specific
     power state (packet type 116/118) instead of device power (packet type 20/22).
 
     Returns:
-        True if light is powered on, False otherwise
+        Power level as integer (0 for off, 65535 for on)
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -11900,16 +11922,14 @@ async def get_power(self) -> bool:
 
     Example:
         ```python
-        is_on = await light.get_power()
-        print(f"Light power: {'ON' if is_on else 'OFF'}")
+        level = await light.get_power()
+        print(f"Light power: {'ON' if level > 0 else 'OFF'}")
         ```
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Light.GetPower())
 
     # Power level is uint16 (0 or 65535)
-    is_on = state.level > 0
-
     _LOGGER.debug(
         {
             "class": "Device",
@@ -11919,13 +11939,13 @@ async def get_power(self) -> bool:
         }
     )
 
-    return is_on
+    return state.level
 ````
 
 ##### set_power
 
 ```python
-set_power(on: bool, duration: float = 0.0) -> None
+set_power(level: bool | int, duration: float = 0.0) -> None
 ```
 
 Set light power state (specific to light, not device).
@@ -11934,59 +11954,76 @@ This overrides Device.set_power() as it uses the light-specific power packet (ty
 
 | PARAMETER  | DESCRIPTION                                                                       |
 | ---------- | --------------------------------------------------------------------------------- |
-| `on`       | True to turn on, False to turn off **TYPE:** `bool`                               |
+| `level`    | True/65535 to turn on, False/0 to turn off **TYPE:** \`bool                       |
 | `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                    | DESCRIPTION                        |
+| ------------------------- | ---------------------------------- |
+| `ValueError`              | If integer value is not 0 or 65535 |
+| `LifxDeviceNotFoundError` | If device is not connected         |
+| `LifxTimeoutError`        | If device does not respond         |
 
 Example
 
 ```python
-# Turn on instantly
+# Turn on instantly with boolean
 await light.set_power(True)
+
+# Turn on with integer
+await light.set_power(65535)
 
 # Fade off over 3 seconds
 await light.set_power(False, duration=3.0)
+await light.set_power(0, duration=3.0)
 ```
 
 Source code in `src/lifx/devices/light.py`
 
 ````python
-async def set_power(self, on: bool, duration: float = 0.0) -> None:
+async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
     """Set light power state (specific to light, not device).
 
     This overrides Device.set_power() as it uses the light-specific
     power packet (type 117) which supports transition duration.
 
     Args:
-        on: True to turn on, False to turn off
+        level: True/65535 to turn on, False/0 to turn off
         duration: Transition duration in seconds (default 0.0)
 
     Raises:
+        ValueError: If integer value is not 0 or 65535
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
 
     Example:
         ```python
-        # Turn on instantly
+        # Turn on instantly with boolean
         await light.set_power(True)
+
+        # Turn on with integer
+        await light.set_power(65535)
 
         # Fade off over 3 seconds
         await light.set_power(False, duration=3.0)
+        await light.set_power(0, duration=3.0)
         ```
     """
     # Power level: 0 for off, 65535 for on
-    level = 65535 if on else 0
+    if isinstance(level, bool):
+        power_level = 65535 if level else 0
+    elif isinstance(level, int):
+        if level not in (0, 65535):
+            raise ValueError(f"Power level must be 0 or 65535, got {level}")
+        power_level = level
+    else:
+        raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
     # Convert duration to milliseconds
     duration_ms = int(duration * 1000)
 
     # Request automatically handles acknowledgement
     await self.connection.request(
-        packets.Light.SetPower(level=level, duration=duration_ms),
+        packets.Light.SetPower(level=power_level, duration=duration_ms),
     )
 
     _LOGGER.debug(
@@ -11994,7 +12031,7 @@ async def set_power(self, on: bool, duration: float = 0.0) -> None:
             "class": "Device",
             "method": "set_power",
             "action": "change",
-            "values": {"level": level, "duration": duration_ms},
+            "values": {"level": power_level, "duration": duration_ms},
         }
     )
 ````
