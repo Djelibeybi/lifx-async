@@ -105,7 +105,7 @@ class TestDevice:
 
         power = await device.get_power()
 
-        assert power is True
+        assert power == 65535
 
     async def test_get_power_off(self, device: Device) -> None:
         """Test getting power state when off."""
@@ -116,7 +116,7 @@ class TestDevice:
 
         power = await device.get_power()
 
-        assert power is False
+        assert power == 0
 
     async def test_set_power_on(self, device: Device) -> None:
         """Test turning device on."""
