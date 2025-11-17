@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v3.0.1 (2025-11-17)
+
+### Bug Fixes
+
+- Get_power() now returns an integer value not a boolean ([`3644bb9`](https://github.com/Djelibeybi/lifx-async/commit/3644bb9baf56593a8f4dceaac19689b3a0152384))
+
 ## v3.0.0 (2025-11-16)
 
 ### Features
