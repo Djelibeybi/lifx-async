@@ -120,9 +120,9 @@ uv run mkdocs gh-deploy
 
    - `transport.py`: UDP transport using asyncio
    - `discovery.py`: Device discovery via broadcast with `DiscoveredDevice` dataclass
-   - `connection.py`: Device connection with retry logic and connection pooling
+   - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
-   - Connection pooling with LRU cache and metrics tracking (`ConnectionPoolMetrics`)
+   - Lazy connection opening (auto-opens on first request)
 
 3. **Device Layer** (`src/lifx/devices/`)
 
@@ -201,7 +201,7 @@ except LifxDeviceNotFoundError:
 - **Type Safety**: Full type hints with strict Pyright validation
 - **Auto-Generation**: Protocol structures generated from YAML specification
 - **State Caching**: Device properties cache values to reduce network requests
-- **Connection Pooling**: LRU cache for connection reuse across operations
+- **Lazy Connections**: Connections open automatically on first request
 - **Async Generator Streaming**: Request/response communication via async generators
 
 ### State Caching

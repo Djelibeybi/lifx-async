@@ -6,8 +6,9 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
 
 - **📦 No Runtime Dependencies**: only Python standard libraries required
 - **🎯 Type-Safe**: Full type hints with strict Pyright validation
+- **🔌 Async Generators**: Provides `async for` usage pattern
 - **⚡ Async Context Managers**: Provides `async with` and `await` usage patterns
-- **🔌 Connection Pooling**: Efficient reuse with LRU cache
+- **🔌 Lazy Connections**: Auto-open on first request, explicit cleanup
 - **🏗️ Layered Architecture**: Protocol → Network → Device → API
 - **🔄 Protocol Generator**: generates LIFX protocol `Packets`, `Fields` and `Enum` classes from LIFX public protocol definition
 - **🌈 Comprehensive Support**: supports all LIFX smart lighting products including Color, White, Warm to White, Filament, Clean, Night Vision, Z, Beam, String, Neon, Permanent Outdoor, Tile, Candle, Ceiling, Path, Spot, and Luna.
@@ -21,21 +22,11 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
     from lifx import discover, Colors
 
     async def main():
-        # Discover all devices with automatic connection management
-        async with discover(timeout=3.0) as group:
-            if not group:
-                print("No LIFX devices found!")
-                return
-
-            # Control all devices at once
-            await group.set_power(True)
-            await group.set_color(Colors.BLUE, duration=1.0)
-            await group.set_brightness(0.5)
-
-            # Or control individual devices
-            for device in group:
-                label = await device.get_label()
-                print(f"Controlling: {label}")
+        # Discover devices asynchronously:
+        async for device in discover():
+            # Control each device as it is discovered
+            await device.set_power(True)
+            await device.set_color(Colors.BLUE, duration=1.0)
 
     asyncio.run(main())
     ```
@@ -44,13 +35,15 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
 
     ```python
     import asyncio
-    from lifx import Light, Colors
+    from lifx import Light, HSBK
 
     async def main():
-        # Connect directly without discovery
-        async with await Light.from_ip(ip="192.168.1.100") as light:
-            await light.set_color(Colors.RED)
-            await light.set_brightness(0.8, duration=2.0)
+        # Connect most efficiently without discovery using serial and IP
+        async with Light(serial="d073d5010203", ip="192.168.1.100") as light:
+            # Using Light as a context manager auto-populates non-volatile state information
+            print(f"{light.label} is a {light.model} at {light.location} in the {light.group} group.")
+
+            await light.set_color(HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500), duration=2.0)
 
     asyncio.run(main())
     ```
@@ -62,7 +55,7 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
     from lifx import Light, HSBK, Colors
 
     async def main():
-        async with await Light.from_ip(ip="192.168.1.100") as light:
+        async with Light(serial="d073d5010203", ip="192.168.1.100") as light:
             # Use RGB
             red = HSBK.from_rgb(255, 0, 0)
             await light.set_color(red)
@@ -104,15 +97,15 @@ uv sync
 
 ### Modern Python
 
-- **Async With**: extensive use of async context managers
+- **Async For** and **Async With**: extensive use of asynchronous generators and context managers
 - **Async/Await**: Native asyncio support for concurrent operations
 - **Type Hints**: Full type annotations for better IDE support
 - **Python 3.11+**: Modern language features and performance
 
 ### Reliable
 
-- **Comprehensive Tests**: over 500 tests covering over 80% of the source code
-- **Connection Pooling**: Efficient connection reuse
+- **Comprehensive Tests**: over 700 tests covering over 90% of the source code
+- **Lazy Connections**: Auto-open on first request
 - **Stores State**: Reduces network traffic
 
 ### Developer Friendly
