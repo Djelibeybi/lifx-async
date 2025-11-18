@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.0.1 (2025-11-18)
+
+### Bug Fixes
+
+- **devices**: Prevent connection leaks in temporary device queries ([`0ee8d0c`](https://github.com/Djelibeybi/lifx-async/commit/0ee8d0cc211aa73eac32ebbe6516aa70e7158f29))
+
 ## v4.0.0 (2025-11-18)
 
 ### Features
