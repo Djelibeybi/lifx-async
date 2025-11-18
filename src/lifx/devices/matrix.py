@@ -426,18 +426,7 @@ class MatrixLight(Light):
         )
 
         # Convert protocol colors to HSBK
-        colors = []
-        for proto_color in response.colors:
-            colors.append(
-                HSBK(
-                    hue=proto_color.hue / 65535 * 360,
-                    saturation=proto_color.saturation / 65535,
-                    brightness=proto_color.brightness / 65535,
-                    kelvin=proto_color.kelvin,
-                )
-            )
-
-        return colors
+        return [HSBK.from_protocol(proto_color) for proto_color in response.colors]
 
     async def set64(
         self,
@@ -715,16 +704,12 @@ class MatrixLight(Light):
         )
 
         # Convert protocol effect to MatrixEffect
-        palette = []
-        for proto_color in response.settings.palette[: response.settings.palette_count]:
-            palette.append(
-                HSBK(
-                    hue=proto_color.hue / 65535 * 360,
-                    saturation=proto_color.saturation / 65535,
-                    brightness=proto_color.brightness / 65535,
-                    kelvin=proto_color.kelvin,
-                )
-            )
+        palette = [
+            HSBK.from_protocol(proto_color)
+            for proto_color in response.settings.palette[
+                : response.settings.palette_count
+            ]
+        ]
 
         effect = MatrixEffect(
             effect_type=response.settings.effect_type,

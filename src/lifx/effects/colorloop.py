@@ -11,6 +11,7 @@ import random
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_NEUTRAL
 from lifx.effects.base import LIFXEffect
 
 if TYPE_CHECKING:
@@ -188,7 +189,7 @@ class EffectColorloop(LIFXEffect):
         # Use first light's base hue as reference
         base_hue = initial_colors[0].hue if initial_colors else 0
         hue_offset = (iteration * self.change * direction) % 360
-        shared_hue = (base_hue + hue_offset) % 360
+        shared_hue = round((base_hue + hue_offset) % 360)
 
         # Generate shared saturation (consistent for synchronization)
         shared_saturation = (self.saturation_min + self.saturation_max) / 2
@@ -271,7 +272,7 @@ class EffectColorloop(LIFXEffect):
             base_hue = initial_colors[original_idx].hue
             hue_offset = (iteration * self.change * direction) % 360
             device_spread_offset = (idx * self.spread) % 360
-            new_hue = (base_hue + hue_offset + device_spread_offset) % 360
+            new_hue = round((base_hue + hue_offset + device_spread_offset) % 360)
 
             # Get brightness and saturation
             if self.brightness is not None:
@@ -370,7 +371,7 @@ class EffectColorloop(LIFXEffect):
             hue=random.randint(0, 360),  # nosec
             saturation=random.uniform(self.saturation_min, self.saturation_max),  # nosec
             brightness=self.brightness if self.brightness is not None else 0.8,
-            kelvin=HSBK.KELVIN_NEUTRAL,
+            kelvin=KELVIN_NEUTRAL,
         )
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

@@ -93,9 +93,10 @@ class DiscoveredDevice:
 
         # Create temporary device to query version
         temp_device = Device(**kwargs)
-        await temp_device._ensure_capabilities()
 
         try:
+            await temp_device._ensure_capabilities()
+
             if temp_device.capabilities:
                 if temp_device.capabilities.has_matrix:
                     return MatrixLight(**kwargs)
@@ -115,6 +116,10 @@ class DiscoveredDevice:
 
         except Exception:
             return None
+
+        finally:
+            # Always close the temporary device connection to prevent resource leaks
+            await temp_device.connection.close()
 
         return None
 
