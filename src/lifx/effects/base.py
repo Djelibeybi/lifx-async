@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_NEUTRAL
 from lifx.effects.const import (
     DEFAULT_BRIGHTNESS,
     MIN_VISIBLE_BRIGHTNESS,
@@ -134,7 +135,7 @@ class LIFXEffect(ABC):
             hue=random.randint(0, 360),  # nosec
             saturation=1.0,
             brightness=0.0,
-            kelvin=HSBK.KELVIN_NEUTRAL,
+            kelvin=KELVIN_NEUTRAL,
         )
 
     def inherit_prestate(self, _other: LIFXEffect) -> bool:
@@ -274,7 +275,7 @@ class LIFXEffect(ABC):
             hue=random.randint(0, 360),  # nosec
             saturation=1.0,
             brightness=brightness,
-            kelvin=HSBK.KELVIN_NEUTRAL,
+            kelvin=KELVIN_NEUTRAL,
         )
 
     def __repr__(self) -> str:

@@ -85,6 +85,7 @@ class TestDeviceGroupApplyTheme:
             # Get zone count to verify device is responsive
             zone_count = await multizone.get_zone_count()
             assert zone_count > 0
+            await multizone.connection.close()
 
     async def test_apply_theme_to_tiles(self, emulator_devices: DeviceGroup) -> None:
         """Test that theme is applied to tile devices."""
@@ -104,6 +105,7 @@ class TestDeviceGroupApplyTheme:
             # Get tile chain to verify device is responsive
             tiles_info = await tile.get_device_chain()
             assert len(tiles_info) > 0
+            await tile.connection.close()
 
     async def test_apply_different_themes(self, emulator_devices: DeviceGroup) -> None:
         """Test applying different themes to the group."""
@@ -257,6 +259,8 @@ class TestDeviceGroupApplyTheme:
         self, emulator_devices: DeviceGroup
     ) -> None:
         """Test apply_theme with zero duration (instant change)."""
+        import rich
+
         group = emulator_devices
 
         async with group:
@@ -267,7 +271,8 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.05)
             device = group.lights[0]
             color, _, _ = await device.get_color()
-            assert color is not None
+            rich.inspect(color, methods=True, dunder=True)
+            assert color in theme.colors
 
     async def test_apply_theme_large_duration(
         self, emulator_devices: DeviceGroup
@@ -280,8 +285,8 @@ class TestDeviceGroupApplyTheme:
             # Should accept large duration values
             await group.apply_theme(theme, duration=5.0)
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(5.5)
             # Verify command was sent
             device = group.lights[0]
             color, _, _ = await device.get_color()
-            assert color is not None
+            assert color in theme

@@ -13,9 +13,7 @@ from lifx.color import HSBK
 from lifx.theme.theme import Theme
 
 
-def color_weighting(
-    distances: list[tuple[int, HSBK]],
-) -> Iterable[HSBK]:
+def color_weighting(distances: list[tuple[int, HSBK]]) -> Iterable[HSBK]:
     """Return an array of colors where there is more of a color the closer it is."""
     greatest_distance = max(dist for dist, _ in distances)
 

@@ -10,6 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_COOL, KELVIN_NEUTRAL
 from lifx.effects.base import LIFXEffect
 from lifx.effects.const import EFFECT_COMPLETION_BUFFER
 from lifx.protocol.protocol_types import LightWaveform
@@ -167,9 +168,7 @@ class EffectPulse(LIFXEffect):
             # Otherwise, intelligently select color based on mode and device
             if self.mode == "strobe":
                 # Strobe pulses to full brightness cold white
-                return HSBK(
-                    hue=0, saturation=0, brightness=1.0, kelvin=HSBK.KELVIN_COOL
-                )
+                return HSBK(hue=0, saturation=0, brightness=1.0, kelvin=KELVIN_COOL)
             else:
                 # Use base class method for consistent color fetching with
                 # brightness safety
@@ -243,10 +242,10 @@ class EffectPulse(LIFXEffect):
 
         if self.mode == "strobe":
             # Strobe starts from dark cold white
-            return HSBK(hue=0, saturation=0, brightness=0, kelvin=HSBK.KELVIN_COOL)
+            return HSBK(hue=0, saturation=0, brightness=0, kelvin=KELVIN_COOL)
         else:
             # Other modes start from neutral white with zero brightness
-            return HSBK(hue=0, saturation=0, brightness=0, kelvin=HSBK.KELVIN_NEUTRAL)
+            return HSBK(hue=0, saturation=0, brightness=0, kelvin=KELVIN_NEUTRAL)
 
     def __repr__(self) -> str:
         """String representation of pulse effect."""

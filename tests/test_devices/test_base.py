@@ -47,6 +47,12 @@ class TestDevice:
         with pytest.raises(ValueError, match="Serial number must be 12 hex characters"):
             Device(serial="d073d5", ip="192.168.1.100")
 
+    @pytest.mark.asyncio
+    async def test_create_device_from_ip(self, emulator_server: int) -> None:
+        """Test creating a device from an IP address."""
+        async with await Device.from_ip(ip="127.0.0.1", port=emulator_server) as device:
+            assert isinstance(device, Device)
+
     async def test_get_label(self, device: Device) -> None:
         """Test getting device label."""
 

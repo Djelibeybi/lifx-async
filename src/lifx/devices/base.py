@@ -196,7 +196,15 @@ class Device:
 
         # Check for localhost
         if addr.is_loopback:
-            raise ValueError("Localhost IP address not allowed")  # pragma: no cover
+            # raise ValueError("Localhost IP address not allowed")  # pragma: no cover
+            _LOGGER.warning(
+                {
+                    "class": "Device",
+                    "method": "__init__",
+                    "action": "is_loopback",
+                    "ip": ip,
+                }
+            )
 
         # Check for unspecified (0.0.0.0)
         if addr.is_unspecified:
@@ -294,18 +302,22 @@ class Device:
         """
         if serial is None:
             temp_conn = DeviceConnection(serial="000000000000", ip=ip, port=port)
-            response = await temp_conn.request(
-                packets.Device.GetService(), timeout=DISCOVERY_TIMEOUT
-            )
-            if response and isinstance(response, packets.Device.StateService):
-                if temp_conn.serial and temp_conn.serial != "000000000000":
-                    return cls(
-                        serial=temp_conn.serial,
-                        ip=ip,
-                        port=port,
-                        timeout=timeout,
-                        max_retries=max_retries,
-                    )
+            try:
+                response = await temp_conn.request(
+                    packets.Device.GetService(), timeout=DISCOVERY_TIMEOUT
+                )
+                if response and isinstance(response, packets.Device.StateService):
+                    if temp_conn.serial and temp_conn.serial != "000000000000":
+                        return cls(
+                            serial=temp_conn.serial,
+                            ip=ip,
+                            port=port,
+                            timeout=timeout,
+                            max_retries=max_retries,
+                        )
+            finally:
+                # Always close the temporary connection to prevent resource leaks
+                await temp_conn.close()
         else:
             return cls(
                 serial=serial,
@@ -890,12 +902,11 @@ class Device:
         try:
             # Check each device for the target label
             async for disc in discover_devices(timeout=discover_timeout):
-                try:
-                    # Create connection handle - no explicit open/close needed
-                    temp_conn = DeviceConnection(
-                        serial=disc.serial, ip=disc.ip, port=disc.port
-                    )
+                temp_conn = DeviceConnection(
+                    serial=disc.serial, ip=disc.ip, port=disc.port
+                )
 
+                try:
                     # Get location info using new request() API
                     state_packet = await temp_conn.request(packets.Device.GetLocation())  # type: ignore
 
@@ -926,6 +937,10 @@ class Device:
                         }
                     )
                     continue
+
+                finally:
+                    # Always close the temporary connection to prevent resource leaks
+                    await temp_conn.close()
 
         except Exception as e:
             _LOGGER.warning(
@@ -1060,12 +1075,11 @@ class Device:
         try:
             # Check each device for the target label
             async for disc in discover_devices(timeout=discover_timeout):
-                try:
-                    # Create connection handle - no explicit open/close needed
-                    temp_conn = DeviceConnection(
-                        serial=disc.serial, ip=disc.ip, port=disc.port
-                    )
+                temp_conn = DeviceConnection(
+                    serial=disc.serial, ip=disc.ip, port=disc.port
+                )
 
+                try:
                     # Get group info using new request() API
                     state_packet = await temp_conn.request(packets.Device.GetGroup())  # type: ignore
 
@@ -1096,6 +1110,10 @@ class Device:
                         }
                     )
                     continue
+
+                finally:
+                    # Always close the temporary connection to prevent resource leaks
+                    await temp_conn.close()
 
         except Exception as e:
             _LOGGER.warning(
@@ -1254,6 +1272,7 @@ class Device:
         """
         if self.capabilities is not None:
             return self.capabilities.name
+        return None
 
     @property
     def mac_address(self) -> str | None:

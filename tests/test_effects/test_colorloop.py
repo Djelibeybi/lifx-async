@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_NEUTRAL
 from lifx.effects.colorloop import EffectColorloop
 
 
@@ -356,4 +357,4 @@ async def test_colorloop_from_poweroff_with_custom_brightness():
     # Should return random hue with custom brightness
     assert 0 <= result.hue <= 360
     assert result.brightness == 0.6
-    assert result.kelvin == HSBK.KELVIN_NEUTRAL
+    assert result.kelvin == KELVIN_NEUTRAL

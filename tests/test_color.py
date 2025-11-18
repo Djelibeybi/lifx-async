@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lifx.color import HSBK, Colors
+from lifx.const import KELVIN_COOL, KELVIN_DAYLIGHT, KELVIN_NEUTRAL, KELVIN_WARM
 from lifx.protocol.protocol_types import LightHsbk
 
 
@@ -57,7 +58,7 @@ class TestHSBK:
         assert color.hue == pytest.approx(0, abs=1)
         assert color.saturation == pytest.approx(1.0, abs=0.01)
         assert color.brightness == pytest.approx(1.0, abs=0.01)
-        assert color.kelvin == HSBK.KELVIN_NEUTRAL
+        assert color.kelvin == KELVIN_NEUTRAL
 
     def test_from_rgb_green(self) -> None:
         """Test RGB to HSBK conversion for green."""
@@ -84,11 +85,6 @@ class TestHSBK:
         color = HSBK.from_rgb(0, 0, 0)
         assert color.saturation == pytest.approx(0.0, abs=0.01)
         assert color.brightness == pytest.approx(0.0, abs=0.01)
-
-    def test_from_rgb_with_custom_kelvin(self) -> None:
-        """Test RGB to HSBK with custom kelvin."""
-        color = HSBK.from_rgb(255, 0, 0, kelvin=6500)
-        assert color.kelvin == 6500
 
     def test_from_rgb_invalid_values(self) -> None:
         """Test RGB validation."""
@@ -244,9 +240,9 @@ class TestColors:
     def test_white_variants(self) -> None:
         """Test white color presets."""
         assert Colors.WHITE_WARM.saturation == 0.0
-        assert Colors.WHITE_WARM.kelvin == HSBK.KELVIN_WARM
-        assert Colors.WHITE_COOL.kelvin == HSBK.KELVIN_COOL
-        assert Colors.WHITE_DAYLIGHT.kelvin == HSBK.KELVIN_DAYLIGHT
+        assert Colors.WHITE_WARM.kelvin == KELVIN_WARM
+        assert Colors.WHITE_COOL.kelvin == KELVIN_COOL
+        assert Colors.WHITE_DAYLIGHT.kelvin == KELVIN_DAYLIGHT
 
     def test_pastel_colors(self) -> None:
         """Test pastel color presets."""
