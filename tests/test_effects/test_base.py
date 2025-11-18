@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_NEUTRAL
 from lifx.effects.base import LIFXEffect
 from lifx.effects.const import DEFAULT_BRIGHTNESS
 
@@ -134,7 +135,7 @@ async def test_fetch_light_color_exception_handling(effect, mock_light):
     assert isinstance(result, HSBK)
     assert result.saturation == 1.0
     assert result.brightness == DEFAULT_BRIGHTNESS
-    assert result.kelvin == HSBK.KELVIN_NEUTRAL
+    assert result.kelvin == KELVIN_NEUTRAL
     # Hue should be random (0-360)
     assert 0 <= result.hue <= 360
 
@@ -161,7 +162,7 @@ def test_get_fallback_color_default(effect):
     assert 0 <= result.hue <= 360
     assert result.saturation == 1.0
     assert result.brightness == DEFAULT_BRIGHTNESS
-    assert result.kelvin == HSBK.KELVIN_NEUTRAL
+    assert result.kelvin == KELVIN_NEUTRAL
 
 
 def test_get_fallback_color_custom_brightness(effect):
@@ -192,7 +193,7 @@ async def test_from_poweroff_hsbk_returns_random(effect, mock_light):
     assert 0 <= result.hue <= 360
     assert result.saturation == 1.0
     assert result.brightness == 0.0
-    assert result.kelvin == HSBK.KELVIN_NEUTRAL
+    assert result.kelvin == KELVIN_NEUTRAL
 
 
 @pytest.mark.asyncio

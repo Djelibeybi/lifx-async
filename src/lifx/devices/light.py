@@ -6,6 +6,16 @@ import logging
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
+from lifx.const import (
+    MAX_BRIGHTNESS,
+    MAX_HUE,
+    MAX_KELVIN,
+    MAX_SATURATION,
+    MIN_BRIGHTNESS,
+    MIN_HUE,
+    MIN_KELVIN,
+    MIN_SATURATION,
+)
 from lifx.devices.base import Device
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
@@ -183,9 +193,10 @@ class Light(Device):
             await light.set_brightness(1.0, duration=1.0)
             ```
         """
-        if not (0.0 <= brightness <= 1.0):
+        if not (MIN_BRIGHTNESS <= brightness <= MAX_BRIGHTNESS):
             raise ValueError(
-                f"Brightness must be between 0.0 and 1.0, got {brightness}"
+                f"Brightness must be between {MIN_BRIGHTNESS} "
+                f"and {MAX_BRIGHTNESS}, got {brightness}"
             )
 
         # Use set_waveform_optional with HALF_SINE waveform to set brightness
@@ -226,8 +237,10 @@ class Light(Device):
             await light.set_kelvin(6500, duration=2.0)
             ```
         """
-        if not (HSBK.MIN_KELVIN <= kelvin <= HSBK.MAX_KELVIN):
-            raise ValueError(f"Kelvin must be 1500-9000, got {kelvin}")
+        if not (MIN_KELVIN <= kelvin <= MAX_KELVIN):
+            raise ValueError(
+                f"Kelvin must be between {MIN_KELVIN} and {MAX_KELVIN}, got {kelvin}"
+            )
 
         # Use set_waveform_optional with HALF_SINE waveform to set kelvin
         # and saturation without needing to query current color values
@@ -245,7 +258,7 @@ class Light(Device):
             set_kelvin=True,
         )
 
-    async def set_hue(self, hue: float, duration: float = 0.0) -> None:
+    async def set_hue(self, hue: int, duration: float = 0.0) -> None:
         """Set light hue only, preserving saturation, brightness, and temperature.
 
         Args:
@@ -267,10 +280,8 @@ class Light(Device):
                 await light.set_hue(hue, duration=0.5)
             ```
         """
-        if not (HSBK.MIN_HUE <= hue <= HSBK.MAX_HUE):
-            raise ValueError(
-                f"Hue must be between {HSBK.MIN_HUE} and {HSBK.MAX_HUE}, got {hue}"
-            )
+        if not (MIN_HUE <= hue <= MAX_HUE):
+            raise ValueError(f"Hue must be between {MIN_HUE} and {MAX_HUE}, got {hue}")
 
         # Use set_waveform_optional with HALF_SINE waveform to set hue
         # without needing to query current color values
@@ -309,8 +320,11 @@ class Light(Device):
             await light.set_saturation(0.0, duration=2.0)
             ```
         """
-        if not (HSBK.MIN_SATURATION <= saturation <= HSBK.MAX_SATURATION):
-            raise ValueError(f"Saturation must be 0.0-1.0, got {saturation}")
+        if not (MIN_SATURATION <= saturation <= MAX_SATURATION):
+            raise ValueError(
+                f"Saturation must be between {MIN_SATURATION} "
+                f"and {MAX_SATURATION}, got {saturation}"
+            )
 
         # Use set_waveform_optional with HALF_SINE waveform to set saturation
         # without needing to query current color values
@@ -711,6 +725,8 @@ class Light(Device):
         ):
             return self.capabilities.temperature_range.min
 
+        return None
+
     @property
     def max_kelvin(self) -> int | None:
         """Get the maximum supported kelvin value if available.
@@ -723,6 +739,8 @@ class Light(Device):
             and self.capabilities.temperature_range is not None
         ):
             return self.capabilities.temperature_range.max
+
+        return None
 
     async def apply_theme(
         self,

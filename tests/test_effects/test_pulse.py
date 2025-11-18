@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_COOL
 from lifx.effects.pulse import EffectPulse
 from lifx.protocol.protocol_types import LightWaveform
 
@@ -157,4 +158,4 @@ async def test_pulse_from_poweroff_strobe_mode():
     assert result.hue == 0
     assert result.saturation == 0
     assert result.brightness == 0
-    assert result.kelvin == HSBK.KELVIN_COOL
+    assert result.kelvin == KELVIN_COOL
