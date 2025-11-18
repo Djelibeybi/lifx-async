@@ -156,7 +156,7 @@ Override this to customize the color used when powering on a device.
 ```python
 async def from_poweroff_hsbk(self, light: Light) -> HSBK:
     """Always start with soft blue."""
-    return HSBK.from_rgb(0, 50, 200, kelvin=HSBK.KELVIN_NEUTRAL)
+    return HSBK.from_rgb(0, 50, 200, kelvin=KELVIN_NEUTRAL)
 ```
 
 **Use cases:**
@@ -252,7 +252,7 @@ async def async_play(self) -> None:
         tasks = []
         for light in self.participants:
             hue = random.randint(0, 360)
-            color = HSBK(hue, 1.0, 1.0, HSBK.KELVIN_NEUTRAL)
+            color = HSBK(hue, 1.0, 1.0, KELVIN_NEUTRAL)
             tasks.append(light.set_color(color, duration=1.0))
 
         await asyncio.gather(*tasks)
@@ -504,7 +504,7 @@ class RandomColorEffect(LIFXEffect):
                     hue=random.randint(0, 360),
                     saturation=random.uniform(self.saturation_min, self.saturation_max),
                     brightness=1.0,
-                    kelvin=HSBK.KELVIN_NEUTRAL
+                    kelvin=KELVIN_NEUTRAL
                 )
                 tasks.append(light.set_color(color, duration=self.interval * 0.8))
 

@@ -143,7 +143,15 @@ def __init__(
 
     # Check for localhost
     if addr.is_loopback:
-        raise ValueError("Localhost IP address not allowed")  # pragma: no cover
+        # raise ValueError("Localhost IP address not allowed")  # pragma: no cover
+        _LOGGER.warning(
+            {
+                "class": "Device",
+                "method": "__init__",
+                "action": "is_loopback",
+                "ip": ip,
+            }
+        )
 
     # Check for unspecified (0.0.0.0)
     if addr.is_unspecified:
@@ -424,18 +432,22 @@ async def from_ip(
     """
     if serial is None:
         temp_conn = DeviceConnection(serial="000000000000", ip=ip, port=port)
-        response = await temp_conn.request(
-            packets.Device.GetService(), timeout=DISCOVERY_TIMEOUT
-        )
-        if response and isinstance(response, packets.Device.StateService):
-            if temp_conn.serial and temp_conn.serial != "000000000000":
-                return cls(
-                    serial=temp_conn.serial,
-                    ip=ip,
-                    port=port,
-                    timeout=timeout,
-                    max_retries=max_retries,
-                )
+        try:
+            response = await temp_conn.request(
+                packets.Device.GetService(), timeout=DISCOVERY_TIMEOUT
+            )
+            if response and isinstance(response, packets.Device.StateService):
+                if temp_conn.serial and temp_conn.serial != "000000000000":
+                    return cls(
+                        serial=temp_conn.serial,
+                        ip=ip,
+                        port=port,
+                        timeout=timeout,
+                        max_retries=max_retries,
+                    )
+        finally:
+            # Always close the temporary connection to prevent resource leaks
+            await temp_conn.close()
     else:
         return cls(
             serial=serial,
@@ -1259,12 +1271,11 @@ async def set_location(
     try:
         # Check each device for the target label
         async for disc in discover_devices(timeout=discover_timeout):
-            try:
-                # Create connection handle - no explicit open/close needed
-                temp_conn = DeviceConnection(
-                    serial=disc.serial, ip=disc.ip, port=disc.port
-                )
+            temp_conn = DeviceConnection(
+                serial=disc.serial, ip=disc.ip, port=disc.port
+            )
 
+            try:
                 # Get location info using new request() API
                 state_packet = await temp_conn.request(packets.Device.GetLocation())  # type: ignore
 
@@ -1295,6 +1306,10 @@ async def set_location(
                     }
                 )
                 continue
+
+            finally:
+                # Always close the temporary connection to prevent resource leaks
+                await temp_conn.close()
 
     except Exception as e:
         _LOGGER.warning(
@@ -1497,12 +1512,11 @@ async def set_group(
     try:
         # Check each device for the target label
         async for disc in discover_devices(timeout=discover_timeout):
-            try:
-                # Create connection handle - no explicit open/close needed
-                temp_conn = DeviceConnection(
-                    serial=disc.serial, ip=disc.ip, port=disc.port
-                )
+            temp_conn = DeviceConnection(
+                serial=disc.serial, ip=disc.ip, port=disc.port
+            )
 
+            try:
                 # Get group info using new request() API
                 state_packet = await temp_conn.request(packets.Device.GetGroup())  # type: ignore
 
@@ -1533,6 +1547,10 @@ async def set_group(
                     }
                 )
                 continue
+
+            finally:
+                # Always close the temporary connection to prevent resource leaks
+                await temp_conn.close()
 
     except Exception as e:
         _LOGGER.warning(
@@ -1973,9 +1991,10 @@ async def set_brightness(self, brightness: float, duration: float = 0.0) -> None
         await light.set_brightness(1.0, duration=1.0)
         ```
     """
-    if not (0.0 <= brightness <= 1.0):
+    if not (MIN_BRIGHTNESS <= brightness <= MAX_BRIGHTNESS):
         raise ValueError(
-            f"Brightness must be between 0.0 and 1.0, got {brightness}"
+            f"Brightness must be between {MIN_BRIGHTNESS} "
+            f"and {MAX_BRIGHTNESS}, got {brightness}"
         )
 
     # Use set_waveform_optional with HALF_SINE waveform to set brightness
@@ -2049,8 +2068,10 @@ async def set_kelvin(self, kelvin: int, duration: float = 0.0) -> None:
         await light.set_kelvin(6500, duration=2.0)
         ```
     """
-    if not (HSBK.MIN_KELVIN <= kelvin <= HSBK.MAX_KELVIN):
-        raise ValueError(f"Kelvin must be 1500-9000, got {kelvin}")
+    if not (MIN_KELVIN <= kelvin <= MAX_KELVIN):
+        raise ValueError(
+            f"Kelvin must be between {MIN_KELVIN} and {MAX_KELVIN}, got {kelvin}"
+        )
 
     # Use set_waveform_optional with HALF_SINE waveform to set kelvin
     # and saturation without needing to query current color values
@@ -2072,14 +2093,14 @@ async def set_kelvin(self, kelvin: int, duration: float = 0.0) -> None:
 ##### set_hue
 
 ```python
-set_hue(hue: float, duration: float = 0.0) -> None
+set_hue(hue: int, duration: float = 0.0) -> None
 ```
 
 Set light hue only, preserving saturation, brightness, and temperature.
 
 | PARAMETER  | DESCRIPTION                                                                       |
 | ---------- | --------------------------------------------------------------------------------- |
-| `hue`      | Hue in degrees (0-360) **TYPE:** `float`                                          |
+| `hue`      | Hue in degrees (0-360) **TYPE:** `int`                                            |
 | `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
 
 | RAISES                    | DESCRIPTION                |
@@ -2102,7 +2123,7 @@ for hue in range(0, 360, 10):
 Source code in `src/lifx/devices/light.py`
 
 ````python
-async def set_hue(self, hue: float, duration: float = 0.0) -> None:
+async def set_hue(self, hue: int, duration: float = 0.0) -> None:
     """Set light hue only, preserving saturation, brightness, and temperature.
 
     Args:
@@ -2124,10 +2145,8 @@ async def set_hue(self, hue: float, duration: float = 0.0) -> None:
             await light.set_hue(hue, duration=0.5)
         ```
     """
-    if not (HSBK.MIN_HUE <= hue <= HSBK.MAX_HUE):
-        raise ValueError(
-            f"Hue must be between {HSBK.MIN_HUE} and {HSBK.MAX_HUE}, got {hue}"
-        )
+    if not (MIN_HUE <= hue <= MAX_HUE):
+        raise ValueError(f"Hue must be between {MIN_HUE} and {MAX_HUE}, got {hue}")
 
     # Use set_waveform_optional with HALF_SINE waveform to set hue
     # without needing to query current color values
@@ -2199,8 +2218,11 @@ async def set_saturation(self, saturation: float, duration: float = 0.0) -> None
         await light.set_saturation(0.0, duration=2.0)
         ```
     """
-    if not (HSBK.MIN_SATURATION <= saturation <= HSBK.MAX_SATURATION):
-        raise ValueError(f"Saturation must be 0.0-1.0, got {saturation}")
+    if not (MIN_SATURATION <= saturation <= MAX_SATURATION):
+        raise ValueError(
+            f"Saturation must be between {MIN_SATURATION} "
+            f"and {MAX_SATURATION}, got {saturation}"
+        )
 
     # Use set_waveform_optional with HALF_SINE waveform to set saturation
     # without needing to query current color values
@@ -5109,18 +5131,7 @@ async def get64(
     )
 
     # Convert protocol colors to HSBK
-    colors = []
-    for proto_color in response.colors:
-        colors.append(
-            HSBK(
-                hue=proto_color.hue / 65535 * 360,
-                saturation=proto_color.saturation / 65535,
-                brightness=proto_color.brightness / 65535,
-                kelvin=proto_color.kelvin,
-            )
-        )
-
-    return colors
+    return [HSBK.from_protocol(proto_color) for proto_color in response.colors]
 ```
 
 ##### set64
@@ -5528,16 +5539,12 @@ async def get_tile_effect(self) -> MatrixEffect:
     )
 
     # Convert protocol effect to MatrixEffect
-    palette = []
-    for proto_color in response.settings.palette[: response.settings.palette_count]:
-        palette.append(
-            HSBK(
-                hue=proto_color.hue / 65535 * 360,
-                saturation=proto_color.saturation / 65535,
-                brightness=proto_color.brightness / 65535,
-                kelvin=proto_color.kelvin,
-            )
-        )
+    palette = [
+        HSBK.from_protocol(proto_color)
+        for proto_color in response.settings.palette[
+            : response.settings.palette_count
+        ]
+    ]
 
     effect = MatrixEffect(
         effect_type=response.settings.effect_type,
