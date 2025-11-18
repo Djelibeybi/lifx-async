@@ -113,11 +113,11 @@ async def use_cached_or_fetch():
 - `MultiZoneLight.zone_count` - Number of zones
 - `MultiZoneLight.multizone_effect` - Either MOVE or OFF
 
-#### TileDevice properties:
+#### MatrixLight properties:
 
-- `TileDevice.tile_count` - Number of tiles on the chain
-- `TileDevice.tile_chain` - Details of each tile on the chain
-- `TileDevice.tile_effect` - Either MORPH, FLAME, SKY or OFF
+- `MatrixLight.tile_count` - Number of tiles on the chain
+- `MatrixLight.device_chain` - Details of each tile on the chain
+- `MatrixLight.tile_effect` - Either MORPH, FLAME, SKY or OFF
 
 **Note**: Volatile state properties (power, color, hev_cycle, zones, tile_colors) have been removed. Always use `get_*()` methods to fetch these values from devices as they change too frequently to benefit from caching.
 

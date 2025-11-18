@@ -4800,100 +4800,92 @@ async def apply_theme(
         await self.set_extended_color_zones(0, colors, duration=duration)
 ````
 
-## Tile Device
+## Matrix Light
 
-The `TileDevice` class controls LIFX tile grids with 2D zone control.
+The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 2D zone control.
 
-### TileDevice
+### MatrixLight
 
 ```python
-TileDevice(*args, **kwargs)
+MatrixLight(serial: str, ip: str, port: int = 56700)
 ```
 
 Bases: `Light`
 
-LIFX Tile device with grid control.
+LIFX Matrix Light Device.
 
-Extends the Light class with tile-specific functionality:
+MatrixLight devices have 2D arrays of controllable color zones arranged in tiles. Most MatrixLight devices (LIFX Candle, LIFX Path) have a single tile. The discontinued LIFX Tile product supported up to 5 tiles in a chain (has_chain).
 
-- Tile chain discovery and information
-- Individual tile grid color control
-- Tile effects (morph, flame, sky)
+Zone Addressing:
+
+- Colors are applied row-by-row starting at top-left (0,0)
+- For tiles ≤64 zones: Single set64() call to frame buffer 0
+- For tiles >64 zones (e.g., 16x8 = 128 zones):
+
+1. First set64(): rect=(0,0), 64 colors, frame buffer 1
+1. Second set64(): rect=(0,4), 64 colors, frame buffer 1
+1. copy_frame_buffer(): Copy buffer 1 → buffer 0
 
 Example
 
-```python
-tile = TileDevice(serial="d073d5123456", ip="192.168.1.100")
+> > > async with await MatrixLight.from_ip("192.168.1.100") as matrix: ... # Get device chain info ... chain = await matrix.get_device_chain() ... print(f"Device has {len(chain)} tile(s)") ... ... # Set colors on first tile (8x8 = 64 zones) ... colors = [HSBK.from_rgb(255, 0, 0)] * 64 ... await matrix.set64(tile_index=0, colors=colors, width=8)
 
-async with tile:
-    # Get tile chain information
-    chain = await tile.get_tile_chain()
-    print(f"Device has {len(chain)} tiles")
+| PARAMETER | DESCRIPTION                                                       |
+| --------- | ----------------------------------------------------------------- |
+| `serial`  | Device serial number **TYPE:** `str`                              |
+| `ip`      | Device IP address **TYPE:** `str`                                 |
+| `port`    | Device port (default: 56700) **TYPE:** `int` **DEFAULT:** `56700` |
 
-    # Get colors from first tile
-    colors = await tile.get_tile_colors(tile_index=0)
+| METHOD              | DESCRIPTION                                                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| `get_device_chain`  | Get device chain details (list of Tile objects).                          |
+| `set_user_position` | Position tiles in the chain (only for devices with has_chain capability). |
+| `get64`             | Get up to 64 zones of color state from a tile.                            |
+| `set64`             | Set up to 64 zones of color on a tile.                                    |
+| `copy_frame_buffer` | Copy frame buffer (for tiles with >64 zones).                             |
+| `set_matrix_colors` | Convenience method to set all colors on a tile.                           |
+| `get_tile_effect`   | Get current running tile effect.                                          |
+| `set_tile_effect`   | Set tile effect with configuration.                                       |
+| `apply_theme`       | Apply a theme across matrix tiles using Canvas interpolation.             |
 
-    # Set entire first tile to red
-    red = HSBK.from_rgb(255, 0, 0)
-    await tile.set_tile_colors(
-        tile_index=0, colors=[[red] * 8 for _ in range(8)]
-    )
+| ATTRIBUTE      | DESCRIPTION                                         |
+| -------------- | --------------------------------------------------- |
+| `device_chain` | Get cached device chain. **TYPE:** \`list[TileInfo] |
+| `tile_count`   | Get number of tiles in the chain. **TYPE:** \`int   |
+| `tile_effect`  | Get cached tile effect. **TYPE:** \`MatrixEffect    |
 
-    # Apply a flame effect
-    await tile.set_flame_effect(speed=5.0)
-```
-
-Using the simplified connect method:
-
-```python
-async with await TileDevice.from_ip(ip="192.168.1.100") as light:
-    await tile.set_flame_effect(speed=5.0)
-```
-
-| METHOD              | DESCRIPTION                                                    |
-| ------------------- | -------------------------------------------------------------- |
-| `get_tile_chain`    | Get information about all tiles in the chain.                  |
-| `get_tile_count`    | Get the number of tiles in the chain.                          |
-| `get_tile_colors`   | Get colors from a tile.                                        |
-| `set_tile_colors`   | Set colors on a tile.                                          |
-| `get_tile_effect`   | Get current tile effect.                                       |
-| `set_tile_effect`   | Set tile effect.                                               |
-| `stop_effect`       | Stop any running tile effect.                                  |
-| `copy_frame_buffer` | Copy a rectangular region from one frame buffer to another.    |
-| `set_morph_effect`  | Apply a morph effect that transitions through a color palette. |
-| `set_flame_effect`  | Apply a flame effect.                                          |
-| `apply_theme`       | Apply a theme to this tile device.                             |
-
-| ATTRIBUTE     | DESCRIPTION                                                    |
-| ------------- | -------------------------------------------------------------- |
-| `tile_chain`  | Get cached tile chain if available. **TYPE:** \`list[TileInfo] |
-| `tile_count`  | Get cached tile count if available. **TYPE:** \`int            |
-| `tile_effect` | Get cached tile effect if available. **TYPE:** \`TileEffect    |
-
-Source code in `src/lifx/devices/tile.py`
+Source code in `src/lifx/devices/matrix.py`
 
 ```python
-def __init__(self, *args, **kwargs) -> None:
-    """Initialize TileDevice with additional state attributes."""
-    super().__init__(*args, **kwargs)
-    # Tile-specific state storage
-    self._tile_chain: list[TileInfo] | None = None
-    self._tile_effect: TileEffect | None | None = None
+def __init__(
+    self,
+    serial: str,
+    ip: str,
+    port: int = 56700,
+) -> None:
+    """Initialize MatrixLight device.
+
+    Args:
+        serial: Device serial number
+        ip: Device IP address
+        port: Device port (default: 56700)
+    """
+    super().__init__(serial, ip, port)
+    self._device_chain: list[TileInfo] | None = None
+    self._tile_effect: MatrixEffect | None = None
 ```
 
 #### Attributes
 
-##### tile_chain
+##### device_chain
 
 ```python
-tile_chain: list[TileInfo] | None
+device_chain: list[TileInfo] | None
 ```
 
-Get cached tile chain if available.
+Get cached device chain.
 
-| RETURNS          | DESCRIPTION |
-| ---------------- | ----------- |
-| \`list[TileInfo] | None\`      |
+Returns None if not yet fetched. Use get_device_chain() to fetch.
 
 ##### tile_count
 
@@ -4901,1243 +4893,789 @@ Get cached tile chain if available.
 tile_count: int | None
 ```
 
-Get cached tile count if available.
+Get number of tiles in the chain.
 
-| RETURNS | DESCRIPTION |
-| ------- | ----------- |
-| \`int   | None\`      |
-| \`int   | None\`      |
+Returns None if device chain not yet fetched.
 
 ##### tile_effect
 
 ```python
-tile_effect: TileEffect | None | None
+tile_effect: MatrixEffect | None
 ```
 
-Get cached tile effect if available.
+Get cached tile effect.
 
-| RETURNS      | DESCRIPTION |
-| ------------ | ----------- |
-| \`TileEffect | None        |
+Returns None if not yet fetched. Use get_tile_effect() to fetch.
 
 #### Functions
 
-##### get_tile_chain
+##### get_device_chain
 
 ```python
-get_tile_chain() -> list[TileInfo]
+get_device_chain() -> list[TileInfo]
 ```
 
-Get information about all tiles in the chain.
+Get device chain details (list of Tile objects).
 
-Always fetches from device. Use the `tile_chain` property to access stored value.
+This method fetches the device chain information and caches it.
 
-| RETURNS          | DESCRIPTION                            |
-| ---------------- | -------------------------------------- |
-| `list[TileInfo]` | List of TileInfo objects, one per tile |
-
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RETURNS          | DESCRIPTION                                                |
+| ---------------- | ---------------------------------------------------------- |
+| `list[TileInfo]` | List of TileInfo objects describing each tile in the chain |
 
 Example
 
+> > > chain = await matrix.get_device_chain() for tile in chain: ... print(f"Tile {tile.tile_index}: {tile.width}x{tile.height}")
+
+Source code in `src/lifx/devices/matrix.py`
+
 ```python
-chain = await tile.get_tile_chain()
-for i, tile_info in enumerate(chain):
-    print(f"Tile {i}: {tile_info.width}x{tile_info.height}")
-```
+async def get_device_chain(self) -> list[TileInfo]:
+    """Get device chain details (list of Tile objects).
 
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def get_tile_chain(self) -> list[TileInfo]:
-    """Get information about all tiles in the chain.
-
-    Always fetches from device.
-    Use the `tile_chain` property to access stored value.
+    This method fetches the device chain information and caches it.
 
     Returns:
-        List of TileInfo objects, one per tile
-
-    Raises:
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
-        LifxProtocolError: If response is invalid
+        List of TileInfo objects describing each tile in the chain
 
     Example:
-        ```python
-        chain = await tile.get_tile_chain()
-        for i, tile_info in enumerate(chain):
-            print(f"Tile {i}: {tile_info.width}x{tile_info.height}")
-        ```
+        >>> chain = await matrix.get_device_chain()
+        >>> for tile in chain:
+        ...     print(f"Tile {tile.tile_index}: {tile.width}x{tile.height}")
     """
-    # Request automatically unpacks response
-    state = await self.connection.request(packets.Tile.GetDeviceChain())
+    _LOGGER.debug("Getting device chain for %s", self.label or self.serial)
 
-    # Convert protocol TileDevice objects to TileInfo
-    tiles = [
-        TileInfo.from_protocol(tile_device)
-        for tile_device in state.tile_devices[: state.tile_devices_count]
-    ]
-
-    self._tile_chain = tiles
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "get_tile_chain",
-            "action": "query",
-            "reply": {
-                "tile_devices_count": state.tile_devices_count,
-                "tiles": [
-                    {
-                        "width": tile.width,
-                        "height": tile.height,
-                        "device_version_vendor": tile.device_version_vendor,
-                        "device_version_product": tile.device_version_product,
-                        "firmware_version_major": tile.firmware_version_major,
-                        "firmware_version_minor": tile.firmware_version_minor,
-                    }
-                    for tile in tiles
-                ],
-            },
-        }
+    response: packets.Tile.StateDeviceChain = await self.connection.request(
+        packets.Tile.GetDeviceChain()
     )
 
+    # Parse tiles from response
+    tiles = []
+    for i, protocol_tile in enumerate(response.tile_devices):
+        # Stop at first zero-width tile (indicates end of chain)
+        if protocol_tile.width == 0:
+            break
+        tiles.append(TileInfo.from_protocol(i, protocol_tile))
+
+    self._device_chain = tiles
+    _LOGGER.debug("Device chain has %d tile(s)", len(tiles))
     return tiles
-````
-
-##### get_tile_count
-
-```python
-get_tile_count() -> int
 ```
 
-Get the number of tiles in the chain.
+##### set_user_position
 
-Always fetches from device. Use the `tile_count` property to access stored value.
+```python
+set_user_position(tile_index: int, user_x: float, user_y: float) -> None
+```
 
-| RETURNS | DESCRIPTION     |
-| ------- | --------------- |
-| `int`   | Number of tiles |
+Position tiles in the chain (only for devices with has_chain capability).
+
+| PARAMETER    | DESCRIPTION                                             |
+| ------------ | ------------------------------------------------------- |
+| `tile_index` | Index of the tile to position (0-based) **TYPE:** `int` |
+| `user_x`     | User-defined X position **TYPE:** `float`               |
+| `user_y`     | User-defined Y position **TYPE:** `float`               |
+
+Note
+
+Only applicable for multi-tile devices (has_chain capability). Most MatrixLight devices have a single tile and don't need positioning.
 
 Example
 
-```python
-count = await tile.get_tile_count()
-print(f"Device has {count} tiles")
-```
+> > > ###### Position second tile at coordinates (1.0, 0.0)
+> > >
+> > > await matrix.set_user_position(tile_index=1, user_x=1.0, user_y=0.0)
 
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def get_tile_count(self) -> int:
-    """Get the number of tiles in the chain.
-
-    Always fetches from device.
-    Use the `tile_count` property to access stored value.
-
-    Returns:
-        Number of tiles
-
-    Example:
-        ```python
-        count = await tile.get_tile_count()
-        print(f"Device has {count} tiles")
-        ```
-    """
-    chain = await self.get_tile_chain()
-    count = len(chain)
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "get_tile_count",
-            "action": "query",
-            "reply": {
-                "count": count,
-            },
-        }
-    )
-
-    return count
-````
-
-##### get_tile_colors
+Source code in `src/lifx/devices/matrix.py`
 
 ```python
-get_tile_colors(
-    tile_index: int,
-    x: int = 0,
-    y: int = 0,
-    width: int | None = None,
-    height: int | None = None,
-) -> list[list[HSBK]]
-```
-
-Get colors from a tile.
-
-Always fetches from device. Use the `tile_colors` property to access stored value.
-
-Returns a 2D array of colors representing the zones. For tiles with >64 zones, multiple Get64 requests are sent sequentially.
-
-| PARAMETER    | DESCRIPTION                                                        |
-| ------------ | ------------------------------------------------------------------ |
-| `tile_index` | Index of tile in chain (0-based) **TYPE:** `int`                   |
-| `x`          | Starting X coordinate (default 0) **TYPE:** `int` **DEFAULT:** `0` |
-| `y`          | Starting Y coordinate (default 0) **TYPE:** `int` **DEFAULT:** `0` |
-| `width`      | Rectangle width in zones (default: tile width) **TYPE:** \`int     |
-| `height`     | Rectangle height in zones (default: tile height) **TYPE:** \`int   |
-
-| RETURNS            | DESCRIPTION            |
-| ------------------ | ---------------------- |
-| `list[list[HSBK]]` | 2D list of HSBK colors |
-
-| RAISES                    | DESCRIPTION                             |
-| ------------------------- | --------------------------------------- |
-| `ValueError`              | If tile_index or dimensions are invalid |
-| `LifxDeviceNotFoundError` | If device is not connected              |
-| `LifxTimeoutError`        | If device does not respond              |
-| `LifxProtocolError`       | If response is invalid                  |
-
-Example
-
-```python
-# Get all colors from first tile
-colors = await tile.get_tile_colors(0)
-print(f"Top-left zone: {colors[0][0]}")
-
-# Get colors from specific rectangle
-colors = await tile.get_tile_colors(0, x=2, y=2, width=4, height=4)
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def get_tile_colors(
-    self,
-    tile_index: int,
-    x: int = 0,
-    y: int = 0,
-    width: int | None = None,
-    height: int | None = None,
-) -> list[list[HSBK]]:
-    """Get colors from a tile.
-
-    Always fetches from device.
-    Use the `tile_colors` property to access stored value.
-
-    Returns a 2D array of colors representing the zones.
-    For tiles with >64 zones, multiple Get64 requests are sent sequentially.
+async def set_user_position(
+    self, tile_index: int, user_x: float, user_y: float
+) -> None:
+    """Position tiles in the chain (only for devices with has_chain capability).
 
     Args:
-        tile_index: Index of tile in chain (0-based)
-        x: Starting X coordinate (default 0)
-        y: Starting Y coordinate (default 0)
-        width: Rectangle width in zones (default: tile width)
-        height: Rectangle height in zones (default: tile height)
+        tile_index: Index of the tile to position (0-based)
+        user_x: User-defined X position
+        user_y: User-defined Y position
 
-    Returns:
-        2D list of HSBK colors
-
-    Raises:
-        ValueError: If tile_index or dimensions are invalid
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
-        LifxProtocolError: If response is invalid
+    Note:
+        Only applicable for multi-tile devices (has_chain capability).
+        Most MatrixLight devices have a single tile and don't need positioning.
 
     Example:
-        ```python
-        # Get all colors from first tile
-        colors = await tile.get_tile_colors(0)
-        print(f"Top-left zone: {colors[0][0]}")
-
-        # Get colors from specific rectangle
-        colors = await tile.get_tile_colors(0, x=2, y=2, width=4, height=4)
-        ```
+        >>> # Position second tile at coordinates (1.0, 0.0)
+        >>> await matrix.set_user_position(tile_index=1, user_x=1.0, user_y=0.0)
     """
-    if tile_index < 0:
-        raise ValueError(f"Invalid tile index: {tile_index}")
-    if x < 0 or y < 0:
-        raise ValueError(f"Invalid coordinates: x={x}, y={y}")
-
-    # Get tile info to determine dimensions
-    chain = await self.get_tile_chain()
-    if tile_index >= len(chain):
-        raise ValueError(
-            f"Tile index {tile_index} out of range (chain has {len(chain)} tiles)"
-        )
-
-    tile_info = chain[tile_index]
-
-    # Default to full tile if dimensions not specified
-    if width is None:
-        width = tile_info.width - x
-    if height is None:
-        height = tile_info.height - y
-
-    # Validate dimensions
-    if width <= 0 or height <= 0:
-        raise ValueError(f"Invalid dimensions: width={width}, height={height}")
-    if x + width > tile_info.width or y + height > tile_info.height:
-        raise ValueError(
-            f"Rectangle exceeds tile dimensions ({x},{y},{width},{height}) "
-            f"vs ({tile_info.width}x{tile_info.height})"
-        )
-
-    total_zones = width * height
-
-    if total_zones <= 64:
-        # Single Get64 request sufficient
-        state = await self.connection.request(
-            packets.Tile.Get64(
-                tile_index=tile_index,
-                length=1,
-                rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
-            ),
-        )
-
-        # Convert colors from protocol HSBK to HSBK
-        colors_flat = [
-            HSBK.from_protocol(color) for color in state.colors[:total_zones]
-        ]
-    else:
-        # Multiple Get64 requests needed
-        # Split into chunks by rows, taking as many rows as fit in 64 zones
-        colors_flat: list[HSBK] = []
-        current_y = y
-
-        while current_y < y + height:
-            # Calculate how many rows we can fetch in this chunk (max 64 zones)
-            rows_in_chunk = min((64 // width), (y + height - current_y))
-            if rows_in_chunk == 0:
-                rows_in_chunk = 1  # Always fetch at least 1 row
-
-            # Send Get64 request for this chunk
-            state = await self.connection.request(
-                packets.Tile.Get64(
-                    tile_index=tile_index,
-                    length=1,
-                    rect=TileBufferRect(fb_index=0, x=x, y=current_y, width=width),
-                ),
-            )
-
-            # Extract colors for this chunk
-            zones_in_chunk = width * rows_in_chunk
-            chunk_colors = [
-                HSBK.from_protocol(color) for color in state.colors[:zones_in_chunk]
-            ]
-            colors_flat.extend(chunk_colors)
-
-            current_y += rows_in_chunk
-
-    # Convert flat list to 2D array [y][x]
-    colors_2d: list[list[HSBK]] = []
-    for row_idx in range(height):
-        row: list[HSBK] = []
-        for col_idx in range(width):
-            index = row_idx * width + col_idx
-            if index < len(colors_flat):
-                row.append(colors_flat[index])
-            else:
-                # Pad with black if we don't have enough colors
-                row.append(HSBK(0, 0, 0, 3500))
-        colors_2d.append(row)
-
     _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "get_tile_colors",
-            "action": "query",
-            "reply": {
-                "tile_index": tile_index,
-                "x": x,
-                "y": y,
-                "width": width,
-                "height": height,
-                "total_zones": total_zones,
-            },
-        }
+        "Setting tile %d position to (%f, %f) for %s",
+        tile_index,
+        user_x,
+        user_y,
+        self.label or self.serial,
     )
 
-    return colors_2d
-````
+    await self.connection.send_packet(
+        packets.Tile.SetUserPosition(
+            tile_index=tile_index,
+            user_x=user_x,
+            user_y=user_y,
+        )
+    )
+```
 
-##### set_tile_colors
+##### get64
 
 ```python
-set_tile_colors(
+get64(
+    tile_index: int, length: int, x: int, y: int, width: int, fb_index: int = 0
+) -> list[HSBK]
+```
+
+Get up to 64 zones of color state from a tile.
+
+| PARAMETER    | DESCRIPTION                                                                            |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `tile_index` | Index of the tile (0-based) **TYPE:** `int`                                            |
+| `length`     | Number of tiles to query (usually 1) **TYPE:** `int`                                   |
+| `x`          | X coordinate of the rectangle (0-based) **TYPE:** `int`                                |
+| `y`          | Y coordinate of the rectangle (0-based) **TYPE:** `int`                                |
+| `width`      | Width of the rectangle in zones **TYPE:** `int`                                        |
+| `fb_index`   | Frame buffer index (0 for display, 1 for temp buffer) **TYPE:** `int` **DEFAULT:** `0` |
+
+| RETURNS      | DESCRIPTION                                 |
+| ------------ | ------------------------------------------- |
+| `list[HSBK]` | List of HSBK colors for the requested zones |
+
+Example
+
+> > > ###### Get colors from 8x8 tile (64 zones)
+> > >
+> > > colors = await matrix.get64(tile_index=0, length=1, x=0, y=0, width=8)
+
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+async def get64(
+    self,
     tile_index: int,
-    colors: list[list[HSBK]],
-    x: int = 0,
-    y: int = 0,
-    duration: float = 0.0,
+    length: int,
+    x: int,
+    y: int,
+    width: int,
+    fb_index: int = 0,
+) -> list[HSBK]:
+    """Get up to 64 zones of color state from a tile.
+
+    Args:
+        tile_index: Index of the tile (0-based)
+        length: Number of tiles to query (usually 1)
+        x: X coordinate of the rectangle (0-based)
+        y: Y coordinate of the rectangle (0-based)
+        width: Width of the rectangle in zones
+        fb_index: Frame buffer index (0 for display, 1 for temp buffer)
+
+    Returns:
+        List of HSBK colors for the requested zones
+
+    Example:
+        >>> # Get colors from 8x8 tile (64 zones)
+        >>> colors = await matrix.get64(tile_index=0, length=1, x=0, y=0, width=8)
+    """
+    # Validate parameters
+    if x < 0:
+        raise ValueError(f"x coordinate must be non-negative, got {x}")
+    if y < 0:
+        raise ValueError(f"y coordinate must be non-negative, got {y}")
+    if width <= 0:
+        raise ValueError(f"width must be positive, got {width}")
+
+    _LOGGER.debug(
+        "Getting 64 zones from tile %d (x=%d, y=%d, width=%d, fb=%d) for %s",
+        tile_index,
+        x,
+        y,
+        width,
+        fb_index,
+        self.label or self.serial,
+    )
+
+    response: packets.Tile.State64 = await self.connection.request(
+        packets.Tile.Get64(
+            tile_index=tile_index,
+            length=length,
+            rect=TileBufferRect(fb_index=fb_index, x=x, y=y, width=width),
+        )
+    )
+
+    # Convert protocol colors to HSBK
+    colors = []
+    for proto_color in response.colors:
+        colors.append(
+            HSBK(
+                hue=proto_color.hue / 65535 * 360,
+                saturation=proto_color.saturation / 65535,
+                brightness=proto_color.brightness / 65535,
+                kelvin=proto_color.kelvin,
+            )
+        )
+
+    return colors
+```
+
+##### set64
+
+```python
+set64(
+    tile_index: int,
+    length: int,
+    x: int,
+    y: int,
+    width: int,
+    duration: int,
+    colors: list[HSBK],
+    fb_index: int = 0,
 ) -> None
 ```
 
-Set colors on a tile.
+Set up to 64 zones of color on a tile.
 
-For tiles with >64 zones, multiple Set64 requests are sent to frame buffer 1, then CopyFrameBuffer is used to atomically copy to frame buffer 0 with the specified duration. This eliminates flicker during multi-packet updates.
+Colors are applied row-by-row starting at position (x, y). For tiles >64 zones, use multiple set64() calls with copy_frame_buffer().
 
-If the device is powered off, colors are set instantly (duration=0) and then the device is powered on with the specified duration for a smooth visual effect.
-
-| PARAMETER    | DESCRIPTION                                                                       |
-| ------------ | --------------------------------------------------------------------------------- |
-| `tile_index` | Index of tile in chain (0-based) **TYPE:** `int`                                  |
-| `colors`     | 2D list of HSBK colors **TYPE:** `list[list[HSBK]]`                               |
-| `x`          | Starting X coordinate on tile (default 0) **TYPE:** `int` **DEFAULT:** `0`        |
-| `y`          | Starting Y coordinate on tile (default 0) **TYPE:** `int` **DEFAULT:** `0`        |
-| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
-
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `ValueError`              | If parameters are invalid  |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| PARAMETER    | DESCRIPTION                                                                            |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `tile_index` | Index of the tile (0-based) **TYPE:** `int`                                            |
+| `length`     | Number of tiles to update (usually 1) **TYPE:** `int`                                  |
+| `x`          | X coordinate of the rectangle (0-based) **TYPE:** `int`                                |
+| `y`          | Y coordinate of the rectangle (0-based) **TYPE:** `int`                                |
+| `width`      | Width of the rectangle in zones **TYPE:** `int`                                        |
+| `duration`   | Transition duration in milliseconds **TYPE:** `int`                                    |
+| `colors`     | List of HSBK colors (up to 64) **TYPE:** `list[HSBK]`                                  |
+| `fb_index`   | Frame buffer index (0 for display, 1 for temp buffer) **TYPE:** `int` **DEFAULT:** `0` |
 
 Example
 
+> > > ###### Set 8x8 tile to red
+> > >
+> > > colors = [HSBK.from_rgb(255, 0, 0)] * 64 await matrix.set64( ... tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colors ... )
+
+Source code in `src/lifx/devices/matrix.py`
+
 ```python
-# Set entire 8x8 tile to red
-red = HSBK.from_rgb(255, 0, 0)
-colors = [[red] * 8 for _ in range(8)]
-await tile.set_tile_colors(0, colors)
-
-# Set a 4x4 area starting at (2, 2) with transition
-blue = HSBK.from_rgb(0, 0, 255)
-colors = [[blue] * 4 for _ in range(4)]
-await tile.set_tile_colors(0, colors, x=2, y=2, duration=1.0)
-
-# Set entire 16x8 wide tile with smooth transition
-colors = [[HSBK.from_rgb(255, 0, 0)] * 16 for _ in range(8)]
-await tile.set_tile_colors(0, colors, duration=2.0)
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def set_tile_colors(
+async def set64(
     self,
     tile_index: int,
-    colors: list[list[HSBK]],
-    x: int = 0,
-    y: int = 0,
-    duration: float = 0.0,
+    length: int,
+    x: int,
+    y: int,
+    width: int,
+    duration: int,
+    colors: list[HSBK],
+    fb_index: int = 0,
 ) -> None:
-    """Set colors on a tile.
+    """Set up to 64 zones of color on a tile.
 
-    For tiles with >64 zones, multiple Set64 requests are sent to frame buffer 1,
-    then CopyFrameBuffer is used to atomically copy to frame buffer 0 with the
-    specified duration. This eliminates flicker during multi-packet updates.
-
-    If the device is powered off, colors are set instantly (duration=0) and then
-    the device is powered on with the specified duration for a smooth visual effect.
+    Colors are applied row-by-row starting at position (x, y).
+    For tiles >64 zones, use multiple set64() calls with copy_frame_buffer().
 
     Args:
-        tile_index: Index of tile in chain (0-based)
-        colors: 2D list of HSBK colors
-        x: Starting X coordinate on tile (default 0)
-        y: Starting Y coordinate on tile (default 0)
-        duration: Transition duration in seconds (default 0.0)
-
-    Raises:
-        ValueError: If parameters are invalid
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
+        tile_index: Index of the tile (0-based)
+        length: Number of tiles to update (usually 1)
+        x: X coordinate of the rectangle (0-based)
+        y: Y coordinate of the rectangle (0-based)
+        width: Width of the rectangle in zones
+        duration: Transition duration in milliseconds
+        colors: List of HSBK colors (up to 64)
+        fb_index: Frame buffer index (0 for display, 1 for temp buffer)
 
     Example:
-        ```python
-        # Set entire 8x8 tile to red
-        red = HSBK.from_rgb(255, 0, 0)
-        colors = [[red] * 8 for _ in range(8)]
-        await tile.set_tile_colors(0, colors)
-
-        # Set a 4x4 area starting at (2, 2) with transition
-        blue = HSBK.from_rgb(0, 0, 255)
-        colors = [[blue] * 4 for _ in range(4)]
-        await tile.set_tile_colors(0, colors, x=2, y=2, duration=1.0)
-
-        # Set entire 16x8 wide tile with smooth transition
-        colors = [[HSBK.from_rgb(255, 0, 0)] * 16 for _ in range(8)]
-        await tile.set_tile_colors(0, colors, duration=2.0)
-        ```
+        >>> # Set 8x8 tile to red
+        >>> colors = [HSBK.from_rgb(255, 0, 0)] * 64
+        >>> await matrix.set64(
+        ...     tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colors
+        ... )
     """
-    if tile_index < 0:
-        raise ValueError(f"Invalid tile index: {tile_index}")
-    if x < 0 or y < 0:
-        raise ValueError(f"Invalid coordinates: x={x}, y={y}")
-    if not colors or not colors[0]:
-        raise ValueError("Colors array cannot be empty")
+    # Validate parameters
+    if x < 0:
+        raise ValueError(f"x coordinate must be non-negative, got {x}")
+    if y < 0:
+        raise ValueError(f"y coordinate must be non-negative, got {y}")
+    if width <= 0:
+        raise ValueError(f"width must be positive, got {width}")
 
-    height = len(colors)
-    width = len(colors[0])
+    _LOGGER.debug(
+        "Setting 64 zones on tile %d (x=%d, y=%d, width=%d, fb=%d, "
+        "duration=%d) for %s",
+        tile_index,
+        x,
+        y,
+        width,
+        fb_index,
+        duration,
+        self.label or self.serial,
+    )
 
-    # Validate that all rows have the same width
-    for row in colors:
-        if len(row) != width:
-            raise ValueError("All rows in colors array must have the same width")
-
-    # Flatten colors to 1D array
-    colors_flat: list[HSBK] = []
-    for row in colors:
-        colors_flat.extend(row)
-
-    total_zones = width * height
-
-    # Check power state to optimize duration handling
-    # If device is off, set colors instantly then power on with duration
-    is_powered_on = await self.get_power()
-
-    # Convert duration to milliseconds
-    duration_ms = int(duration * 1000)
-
-    # Apply duration to colors only if device is already on
-    color_duration_ms = duration_ms if is_powered_on else 0
-
-    if total_zones <= 64:
-        # Single Set64 request sufficient - write directly to visible frame buffer 0
-        # Pad to 64 colors
-        protocol_colors = [color.to_protocol() for color in colors_flat]
-        while len(protocol_colors) < 64:
-            protocol_colors.append(HSBK(0, 0, 0, 3500).to_protocol())
-
-        await self.connection.request(
-            packets.Tile.Set64(
-                tile_index=tile_index,
-                length=1,
-                rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
-                duration=color_duration_ms,
-                colors=protocol_colors,
-            ),
-        )
-    else:
-        # Multiple Set64 requests needed for >64 zones
-        # Write to buffer 1, then copy to buffer 0 atomically
-        current_y = y
-        flat_index = 0
-
-        while flat_index < len(colors_flat):
-            # Calculate how many rows we can write in this chunk (max 64 zones)
-            rows_in_chunk = min((64 // width), (y + height - current_y))
-            if rows_in_chunk == 0:
-                rows_in_chunk = 1  # Always write at least 1 row
-
-            # Extract colors for this chunk
-            zones_in_chunk = width * rows_in_chunk
-            chunk_colors = colors_flat[flat_index : flat_index + zones_in_chunk]
-
-            # Pad to 64 colors
-            protocol_colors = [color.to_protocol() for color in chunk_colors]
-            while len(protocol_colors) < 64:
-                protocol_colors.append(HSBK(0, 0, 0, 3500).to_protocol())
-
-            # Write to frame buffer 1 (invisible) with no duration
-            await self.connection.request(
-                packets.Tile.Set64(
-                    tile_index=tile_index,
-                    length=1,
-                    rect=TileBufferRect(fb_index=1, x=x, y=current_y, width=width),
-                    duration=0,
-                    colors=protocol_colors,
-                ),
+    # Convert HSBK colors to protocol format
+    proto_colors = []
+    for color in colors:
+        proto_colors.append(
+            LightHsbk(
+                hue=int(color.hue / 360 * 65535),
+                saturation=int(color.saturation * 65535),
+                brightness=int(color.brightness * 65535),
+                kelvin=color.kelvin,
             )
+        )
 
-            flat_index += zones_in_chunk
-            current_y += rows_in_chunk
+    # Pad to 64 colors if needed
+    while len(proto_colors) < 64:
+        proto_colors.append(LightHsbk(0, 0, 0, 3500))
 
-        # Copy from buffer 1 to buffer 0 with transition duration
-        copy_duration = duration if is_powered_on else 0.0
-        await self.copy_frame_buffer(
+    await self.connection.send_packet(
+        packets.Tile.Set64(
             tile_index=tile_index,
-            src_fb_index=1,
-            dst_fb_index=0,
-            src_x=x,
-            src_y=y,
-            dst_x=x,
-            dst_y=y,
-            width=width,
-            height=height,
-            duration=copy_duration,
-        )
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "set_tile_colors",
-            "action": "change",
-            "values": {
-                "tile_index": tile_index,
-                "x": x,
-                "y": y,
-                "width": width,
-                "height": height,
-                "total_zones": total_zones,
-                "duration": duration,
-            },
-        }
-    )
-
-    # If device was off, power it on with the specified duration
-    if not is_powered_on and duration > 0:
-        await self.set_power(True, duration=duration)
-````
-
-##### get_tile_effect
-
-```python
-get_tile_effect() -> TileEffect | None
-```
-
-Get current tile effect.
-
-Always fetches from device. Use the `tile_effect` property to access stored value.
-
-| RETURNS      | DESCRIPTION |
-| ------------ | ----------- |
-| \`TileEffect | None\`      |
-
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
-
-Example
-
-```python
-effect = await tile.get_tile_effect()
-if effect:
-    print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def get_tile_effect(self) -> TileEffect | None:
-    """Get current tile effect.
-
-    Always fetches from device.
-    Use the `tile_effect` property to access stored value.
-
-    Returns:
-        TileEffect if an effect is active, None if no effect
-
-    Raises:
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
-        LifxProtocolError: If response is invalid
-
-    Example:
-        ```python
-        effect = await tile.get_tile_effect()
-        if effect:
-            print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
-        ```
-    """
-    # Request automatically unpacks response
-    state = await self.connection.request(packets.Tile.GetEffect())
-
-    settings = state.settings
-    effect_type = settings.effect_type
-
-    # Extract parameters from the settings parameter field
-    parameters = [
-        int(settings.parameter.sky_type),
-        settings.parameter.cloud_saturation_min,
-        settings.parameter.cloud_saturation_max,
-    ]
-
-    # Convert palette from protocol HSBK to HSBK
-    palette = [
-        HSBK.from_protocol(color)
-        for color in settings.palette[: settings.palette_count]
-    ]
-
-    if effect_type == TileEffectType.OFF:
-        result = None
-    else:
-        result = TileEffect(
-            effect_type=effect_type,
-            speed=settings.speed,
-            duration=settings.duration,
-            palette=palette,
-            parameters=parameters,
-        )
-
-    self._tile_effect = result
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "get_tile_effect",
-            "action": "query",
-            "reply": {
-                "effect_type": effect_type.name,
-                "speed": settings.speed,
-                "duration": settings.duration,
-                "palette_count": settings.palette_count,
-                "parameters": parameters,
-            },
-        }
-    )
-
-    return result
-````
-
-##### set_tile_effect
-
-```python
-set_tile_effect(effect: TileEffect) -> None
-```
-
-Set tile effect.
-
-| PARAMETER | DESCRIPTION                                      |
-| --------- | ------------------------------------------------ |
-| `effect`  | Tile effect configuration **TYPE:** `TileEffect` |
-
-| RAISES                    | DESCRIPTION                    |
-| ------------------------- | ------------------------------ |
-| `ValueError`              | If palette has too many colors |
-| `LifxDeviceNotFoundError` | If device is not connected     |
-| `LifxTimeoutError`        | If device does not respond     |
-
-Example
-
-```python
-# Apply a morph effect with rainbow palette
-palette = [
-    HSBK(0, 1.0, 1.0, 3500),  # Red
-    HSBK(60, 1.0, 1.0, 3500),  # Yellow
-    HSBK(120, 1.0, 1.0, 3500),  # Green
-    HSBK(240, 1.0, 1.0, 3500),  # Blue
-]
-effect = TileEffect(
-    effect_type=TileEffectType.MORPH,
-    speed=5000,
-    palette=palette,
-)
-await tile.set_tile_effect(effect)
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def set_tile_effect(self, effect: TileEffect) -> None:
-    """Set tile effect.
-
-    Args:
-        effect: Tile effect configuration
-
-    Raises:
-        ValueError: If palette has too many colors
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
-
-    Example:
-        ```python
-        # Apply a morph effect with rainbow palette
-        palette = [
-            HSBK(0, 1.0, 1.0, 3500),  # Red
-            HSBK(60, 1.0, 1.0, 3500),  # Yellow
-            HSBK(120, 1.0, 1.0, 3500),  # Green
-            HSBK(240, 1.0, 1.0, 3500),  # Blue
-        ]
-        effect = TileEffect(
-            effect_type=TileEffectType.MORPH,
-            speed=5000,
-            palette=palette,
-        )
-        await tile.set_tile_effect(effect)
-        ```
-    """
-    palette = effect.palette or [HSBK(0, 0, 1.0, 3500)]
-    if len(palette) > 16:
-        raise ValueError(f"Palette too large: {len(palette)} colors (max 16)")
-
-    # Convert palette to protocol HSBK and pad to 16
-    protocol_palette = [color.to_protocol() for color in palette]
-
-    while len(protocol_palette) < 16:
-        protocol_palette.append(HSBK(0, 0, 0, 3500).to_protocol())
-
-    # Ensure parameters list is 3 elements (sky_type, cloud_sat_min, cloud_sat_max)
-    parameters = effect.parameters or [0] * 3
-    if len(parameters) < 3:
-        parameters.extend([0] * (3 - len(parameters)))
-    parameters = parameters[:3]
-
-    # Request automatically handles acknowledgement
-    await self.connection.request(
-        packets.Tile.SetEffect(
-            settings=TileEffectSettings(
-                instanceid=0,  # 0 for new effect
-                effect_type=effect.effect_type,
-                speed=effect.speed,
-                duration=effect.duration,
-                parameter=TileEffectParameter(
-                    sky_type=TileEffectSkyType(value=parameters[0]),
-                    cloud_saturation_min=parameters[1],
-                    cloud_saturation_max=parameters[2],
-                ),
-                palette_count=len(palette),
-                palette=protocol_palette,
-            ),
-        ),
-    )
-
-    # Update cached state
-    result = effect if effect.effect_type != TileEffectType.OFF else None
-    self._tile_effect = result
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "set_tile_effect",
-            "action": "change",
-            "values": {
-                "effect_type": effect.effect_type.name,
-                "speed": effect.speed,
-                "duration": effect.duration,
-                "palette_count": len(palette),
-                "parameters": parameters,
-            },
-        }
-    )
-````
-
-##### stop_effect
-
-```python
-stop_effect() -> None
-```
-
-Stop any running tile effect.
-
-Example
-
-```python
-await tile.stop_effect()
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def stop_effect(self) -> None:
-    """Stop any running tile effect.
-
-    Example:
-        ```python
-        await tile.stop_effect()
-        ```
-    """
-    await self.set_tile_effect(
-        TileEffect(
-            effect_type=TileEffectType.OFF,
-            speed=0,
-            duration=0,
+            length=length,
+            rect=TileBufferRect(fb_index=fb_index, x=x, y=y, width=width),
+            duration=duration,
+            colors=proto_colors,
         )
     )
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "stop_effect",
-            "action": "change",
-            "values": {},
-        }
-    )
-````
+```
 
 ##### copy_frame_buffer
 
 ```python
 copy_frame_buffer(
-    tile_index: int,
-    src_fb_index: int = 0,
-    dst_fb_index: int = 0,
-    src_x: int = 0,
-    src_y: int = 0,
-    dst_x: int = 0,
-    dst_y: int = 0,
-    width: int = 8,
-    height: int = 8,
-    duration: float = 0.0,
+    tile_index: int, source_fb: int = 1, target_fb: int = 0
 ) -> None
 ```
 
-Copy a rectangular region from one frame buffer to another.
+Copy frame buffer (for tiles with >64 zones).
 
-This allows copying pixel data between frame buffers or within the same frame buffer on a tile. Useful for double-buffering effects or moving pixel regions.
+This is used for tiles with more than 64 zones. After setting colors in the temporary buffer (fb=1), copy to the display buffer (fb=0).
 
-| PARAMETER      | DESCRIPTION                                                                       |
-| -------------- | --------------------------------------------------------------------------------- |
-| `tile_index`   | Index of tile in chain (0-based) **TYPE:** `int`                                  |
-| `src_fb_index` | Source frame buffer index (default 0) **TYPE:** `int` **DEFAULT:** `0`            |
-| `dst_fb_index` | Destination frame buffer index (default 0) **TYPE:** `int` **DEFAULT:** `0`       |
-| `src_x`        | Source rectangle X coordinate (default 0) **TYPE:** `int` **DEFAULT:** `0`        |
-| `src_y`        | Source rectangle Y coordinate (default 0) **TYPE:** `int` **DEFAULT:** `0`        |
-| `dst_x`        | Destination rectangle X coordinate (default 0) **TYPE:** `int` **DEFAULT:** `0`   |
-| `dst_y`        | Destination rectangle Y coordinate (default 0) **TYPE:** `int` **DEFAULT:** `0`   |
-| `width`        | Rectangle width in zones (default 8) **TYPE:** `int` **DEFAULT:** `8`             |
-| `height`       | Rectangle height in zones (default 8) **TYPE:** `int` **DEFAULT:** `8`            |
-| `duration`     | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
-
-| RAISES                    | DESCRIPTION                               |
-| ------------------------- | ----------------------------------------- |
-| `ValueError`              | If parameters are invalid or out of range |
-| `LifxDeviceNotFoundError` | If device is not connected                |
-| `LifxTimeoutError`        | If device does not respond                |
+| PARAMETER    | DESCRIPTION                                                            |
+| ------------ | ---------------------------------------------------------------------- |
+| `tile_index` | Index of the tile (0-based) **TYPE:** `int`                            |
+| `source_fb`  | Source frame buffer index (usually 1) **TYPE:** `int` **DEFAULT:** `1` |
+| `target_fb`  | Target frame buffer index (usually 0) **TYPE:** `int` **DEFAULT:** `0` |
 
 Example
 
+> > > ###### For 16x8 tile (128 zones):
+> > >
+> > > ###### 1. Set first 64 zones to buffer 1
+> > >
+> > > await matrix.set64( ... tile_index=0, ... length=1, ... x=0, ... y=0, ... width=16, ... duration=0, ... colors=colors[:64], ... fb_index=1, ... )
+> > >
+> > > ###### 2. Set second 64 zones to buffer 1
+> > >
+> > > await matrix.set64( ... tile_index=0, ... length=1, ... x=0, ... y=4, ... width=16, ... duration=0, ... colors=colors[64:], ... fb_index=1, ... )
+> > >
+> > > ###### 3. Copy buffer 1 to buffer 0 (display)
+> > >
+> > > await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
+
+Source code in `src/lifx/devices/matrix.py`
+
 ```python
-# Copy entire tile from frame buffer 0 to frame buffer 1
-await tile.copy_frame_buffer(tile_index=0, src_fb_index=0, dst_fb_index=1)
-
-# Copy a 4x4 region from (0,0) to (2,2) within same buffer with transition
-await tile.copy_frame_buffer(
-    tile_index=0,
-    src_x=0,
-    src_y=0,
-    dst_x=2,
-    dst_y=2,
-    width=4,
-    height=4,
-    duration=1.0,
-)
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
 async def copy_frame_buffer(
-    self,
-    tile_index: int,
-    src_fb_index: int = 0,
-    dst_fb_index: int = 0,
-    src_x: int = 0,
-    src_y: int = 0,
-    dst_x: int = 0,
-    dst_y: int = 0,
-    width: int = 8,
-    height: int = 8,
-    duration: float = 0.0,
+    self, tile_index: int, source_fb: int = 1, target_fb: int = 0
 ) -> None:
-    """Copy a rectangular region from one frame buffer to another.
+    """Copy frame buffer (for tiles with >64 zones).
 
-    This allows copying pixel data between frame buffers or within the same
-    frame buffer on a tile. Useful for double-buffering effects or moving
-    pixel regions.
+    This is used for tiles with more than 64 zones. After setting colors
+    in the temporary buffer (fb=1), copy to the display buffer (fb=0).
 
     Args:
-        tile_index: Index of tile in chain (0-based)
-        src_fb_index: Source frame buffer index (default 0)
-        dst_fb_index: Destination frame buffer index (default 0)
-        src_x: Source rectangle X coordinate (default 0)
-        src_y: Source rectangle Y coordinate (default 0)
-        dst_x: Destination rectangle X coordinate (default 0)
-        dst_y: Destination rectangle Y coordinate (default 0)
-        width: Rectangle width in zones (default 8)
-        height: Rectangle height in zones (default 8)
-        duration: Transition duration in seconds (default 0.0)
-
-    Raises:
-        ValueError: If parameters are invalid or out of range
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
+        tile_index: Index of the tile (0-based)
+        source_fb: Source frame buffer index (usually 1)
+        target_fb: Target frame buffer index (usually 0)
 
     Example:
-        ```python
-        # Copy entire tile from frame buffer 0 to frame buffer 1
-        await tile.copy_frame_buffer(tile_index=0, src_fb_index=0, dst_fb_index=1)
-
-        # Copy a 4x4 region from (0,0) to (2,2) within same buffer with transition
-        await tile.copy_frame_buffer(
-            tile_index=0,
-            src_x=0,
-            src_y=0,
-            dst_x=2,
-            dst_y=2,
-            width=4,
-            height=4,
-            duration=1.0,
-        )
-        ```
+        >>> # For 16x8 tile (128 zones):
+        >>> # 1. Set first 64 zones to buffer 1
+        >>> await matrix.set64(
+        ...     tile_index=0,
+        ...     length=1,
+        ...     x=0,
+        ...     y=0,
+        ...     width=16,
+        ...     duration=0,
+        ...     colors=colors[:64],
+        ...     fb_index=1,
+        ... )
+        >>> # 2. Set second 64 zones to buffer 1
+        >>> await matrix.set64(
+        ...     tile_index=0,
+        ...     length=1,
+        ...     x=0,
+        ...     y=4,
+        ...     width=16,
+        ...     duration=0,
+        ...     colors=colors[64:],
+        ...     fb_index=1,
+        ... )
+        >>> # 3. Copy buffer 1 to buffer 0 (display)
+        >>> await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
     """
-    if tile_index < 0:
-        raise ValueError(f"Invalid tile index: {tile_index}")
-    if src_fb_index < 0 or dst_fb_index < 0:
-        raise ValueError(
-            f"Invalid frame buffer indices: src={src_fb_index}, dst={dst_fb_index}"
-        )
-    if src_x < 0 or src_y < 0 or dst_x < 0 or dst_y < 0:
-        raise ValueError(
-            f"Invalid coordinates: src=({src_x},{src_y}), dst=({dst_x},{dst_y})"
-        )
-    if width <= 0 or height <= 0:
-        raise ValueError(f"Invalid dimensions: {width}x{height}")
+    _LOGGER.debug(
+        "Copying frame buffer %d -> %d for tile %d on %s",
+        source_fb,
+        target_fb,
+        tile_index,
+        self.label or self.serial,
+    )
 
-    # Get tile info to validate dimensions
-    chain = await self.get_tile_chain()
-    if tile_index >= len(chain):
-        raise ValueError(
-            f"Tile index {tile_index} out of range (chain has {len(chain)} tiles)"
-        )
+    # Get tile dimensions for the copy operation
+    if self._device_chain is None:
+        await self.get_device_chain()
 
-    tile_info = chain[tile_index]
+    if self._device_chain is None or tile_index >= len(self._device_chain):
+        raise ValueError(f"Invalid tile_index {tile_index}")
 
-    # Validate source rectangle
-    if src_x + width > tile_info.width or src_y + height > tile_info.height:
-        raise ValueError(
-            f"Source rectangle ({src_x},{src_y},{width},{height}) "
-            f"exceeds tile dimensions ({tile_info.width}x{tile_info.height})"
-        )
+    tile = self._device_chain[tile_index]
 
-    # Validate destination rectangle
-    if dst_x + width > tile_info.width or dst_y + height > tile_info.height:
-        raise ValueError(
-            f"Destination rectangle ({dst_x},{dst_y},{width},{height}) "
-            f"exceeds tile dimensions ({tile_info.width}x{tile_info.height})"
-        )
-
-    # Convert duration to milliseconds
-    duration_ms = int(duration * 1000)
-
-    # Send copy command
-    await self.connection.request(
+    await self.connection.send_packet(
         packets.Tile.CopyFrameBuffer(
             tile_index=tile_index,
             length=1,
-            src_fb_index=src_fb_index,
-            dst_fb_index=dst_fb_index,
-            src_x=src_x,
-            src_y=src_y,
-            dst_x=dst_x,
-            dst_y=dst_y,
-            width=width,
-            height=height,
-            duration=duration_ms,
-        ),
-    )
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "copy_frame_buffer",
-            "action": "change",
-            "values": {
-                "tile_index": tile_index,
-                "src_fb_index": src_fb_index,
-                "dst_fb_index": dst_fb_index,
-                "src_x": src_x,
-                "src_y": src_y,
-                "dst_x": dst_x,
-                "dst_y": dst_y,
-                "width": width,
-                "height": height,
-                "duration": duration_ms,
-            },
-        }
-    )
-````
-
-##### set_morph_effect
-
-```python
-set_morph_effect(
-    palette: list[HSBK], speed: float = 5.0, duration: float = 0.0
-) -> None
-```
-
-Apply a morph effect that transitions through a color palette.
-
-| PARAMETER  | DESCRIPTION                                                                                  |
-| ---------- | -------------------------------------------------------------------------------------------- |
-| `palette`  | List of colors to morph between (2-16 colors) **TYPE:** `list[HSBK]`                         |
-| `speed`    | Speed in seconds per cycle (default 5.0) **TYPE:** `float` **DEFAULT:** `5.0`                |
-| `duration` | Total duration in seconds (0 for infinite, default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
-
-| RAISES       | DESCRIPTION           |
-| ------------ | --------------------- |
-| `ValueError` | If palette is invalid |
-
-Example
-
-```python
-# Morph between red, green, and blue
-palette = [
-    HSBK.from_rgb(255, 0, 0),
-    HSBK.from_rgb(0, 255, 0),
-    HSBK.from_rgb(0, 0, 255),
-]
-await tile.set_morph_effect(palette, speed=5.0)
-```
-
-Source code in `src/lifx/devices/tile.py`
-
-````python
-async def set_morph_effect(
-    self,
-    palette: list[HSBK],
-    speed: float = 5.0,
-    duration: float = 0.0,
-) -> None:
-    """Apply a morph effect that transitions through a color palette.
-
-    Args:
-        palette: List of colors to morph between (2-16 colors)
-        speed: Speed in seconds per cycle (default 5.0)
-        duration: Total duration in seconds (0 for infinite, default 0.0)
-
-    Raises:
-        ValueError: If palette is invalid
-
-    Example:
-        ```python
-        # Morph between red, green, and blue
-        palette = [
-            HSBK.from_rgb(255, 0, 0),
-            HSBK.from_rgb(0, 255, 0),
-            HSBK.from_rgb(0, 0, 255),
-        ]
-        await tile.set_morph_effect(palette, speed=5.0)
-        ```
-    """
-    if len(palette) < 2:
-        raise ValueError("Palette must have at least 2 colors")
-    if len(palette) > 16:
-        raise ValueError(f"Palette too large: {len(palette)} colors (max 16)")
-
-    # Convert speed to milliseconds
-    speed_ms = int(speed * 1000)
-
-    # Convert duration to nanoseconds
-    duration_ns = int(duration * 1_000_000_000)
-
-    await self.set_tile_effect(
-        TileEffect(
-            effect_type=TileEffectType.MORPH,
-            speed=speed_ms,
-            duration=duration_ns,
-            palette=palette,
+            src_fb_index=source_fb,
+            dst_fb_index=target_fb,
+            src_x=0,
+            src_y=0,
+            dst_x=0,
+            dst_y=0,
+            width=tile.width,
+            height=tile.height,
+            duration=0,
         )
     )
+```
 
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "set_morph_effect",
-            "action": "change",
-            "values": {
-                "palette_count": len(palette),
-                "speed": speed,
-                "duration": duration,
-            },
-        }
-    )
-````
-
-##### set_flame_effect
+##### set_matrix_colors
 
 ```python
-set_flame_effect(
-    speed: float = 5.0, duration: float = 0.0, palette: list[HSBK] | None = None
+set_matrix_colors(
+    tile_index: int, colors: list[HSBK], duration: int = 0
 ) -> None
 ```
 
-Apply a flame effect.
+Convenience method to set all colors on a tile.
 
-| PARAMETER  | DESCRIPTION                                                                                  |
-| ---------- | -------------------------------------------------------------------------------------------- |
-| `speed`    | Effect speed in seconds per cycle (default 5.0) **TYPE:** `float` **DEFAULT:** `5.0`         |
-| `duration` | Total duration in seconds (0 for infinite, default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
-| `palette`  | Optional color palette (default: fire colors) **TYPE:** \`list[HSBK]                         |
+If all colors are the same, uses SetColor() packet which sets all zones across all tiles. Otherwise, automatically handles tiles with >64 zones using frame buffer strategy.
+
+| PARAMETER    | DESCRIPTION                                                                     |
+| ------------ | ------------------------------------------------------------------------------- |
+| `tile_index` | Index of the tile (0-based) **TYPE:** `int`                                     |
+| `colors`     | List of HSBK colors (length must match tile total_zones) **TYPE:** `list[HSBK]` |
+| `duration`   | Transition duration in milliseconds **TYPE:** `int` **DEFAULT:** `0`            |
 
 Example
 
-```python
-# Apply default flame effect
-await tile.set_flame_effect()
+> > > ###### Set entire tile to solid red (uses SetColor packet)
+> > >
+> > > colors = [HSBK.from_rgb(255, 0, 0)] * 64 await matrix.set_matrix_colors(tile_index=0, colors=colors)
+> > >
+> > > ###### Set 8x8 tile to gradient (uses set64 with zones)
+> > >
+> > > colors = [HSBK(i * 360 / 64, 1.0, 1.0, 3500) for i in range(64)] await matrix.set_matrix_colors(tile_index=0, colors=colors)
 
-# Custom flame colors
-palette = [
-    HSBK.from_rgb(255, 0, 0),  # Red
-    HSBK.from_rgb(255, 100, 0),  # Orange
-    HSBK.from_rgb(255, 200, 0),  # Yellow
-]
-await tile.set_flame_effect(speed=3.0, palette=palette)
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+async def set_matrix_colors(
+    self, tile_index: int, colors: list[HSBK], duration: int = 0
+) -> None:
+    """Convenience method to set all colors on a tile.
+
+    If all colors are the same, uses SetColor() packet which sets all zones
+    across all tiles. Otherwise, automatically handles tiles with >64 zones
+    using frame buffer strategy.
+
+    Args:
+        tile_index: Index of the tile (0-based)
+        colors: List of HSBK colors (length must match tile total_zones)
+        duration: Transition duration in milliseconds
+
+    Example:
+        >>> # Set entire tile to solid red (uses SetColor packet)
+        >>> colors = [HSBK.from_rgb(255, 0, 0)] * 64
+        >>> await matrix.set_matrix_colors(tile_index=0, colors=colors)
+
+        >>> # Set 8x8 tile to gradient (uses set64 with zones)
+        >>> colors = [HSBK(i * 360 / 64, 1.0, 1.0, 3500) for i in range(64)]
+        >>> await matrix.set_matrix_colors(tile_index=0, colors=colors)
+    """
+    # Get device chain to determine tile dimensions
+    if self._device_chain is None:
+        await self.get_device_chain()
+
+    if not self._device_chain or tile_index >= len(self._device_chain):
+        raise ValueError(f"Invalid tile_index: {tile_index}")
+
+    tile = self._device_chain[tile_index]
+
+    if len(colors) != tile.total_zones:
+        raise ValueError(
+            f"Color count mismatch: expected {tile.total_zones}, got {len(colors)}"
+        )
+
+    # Check if all colors are the same
+    first_color = colors[0]
+    all_same = all(
+        c.hue == first_color.hue
+        and c.saturation == first_color.saturation
+        and c.brightness == first_color.brightness
+        and c.kelvin == first_color.kelvin
+        for c in colors
+    )
+
+    if all_same:
+        # All zones same color - use SetColor packet (much faster!)
+        _LOGGER.debug(
+            "All zones same color, using SetColor packet for tile %d",
+            tile_index,
+        )
+        await self.set_color(first_color, duration=duration / 1000.0)
+        return
+
+    if tile.requires_frame_buffer:
+        # Tile has >64 zones, use frame buffer strategy
+        _LOGGER.debug(
+            "Using frame buffer strategy for tile %d (%dx%d = %d zones)",
+            tile_index,
+            tile.width,
+            tile.height,
+            tile.total_zones,
+        )
+
+        # Calculate rows per batch (64 zones / width)
+        rows_per_batch = 64 // tile.width
+        total_batches = (tile.height + rows_per_batch - 1) // rows_per_batch
+
+        for batch in range(total_batches):
+            start_row = batch * rows_per_batch
+            end_row = min(start_row + rows_per_batch, tile.height)
+
+            # Extract colors for this batch
+            start_idx = start_row * tile.width
+            end_idx = end_row * tile.width
+            batch_colors = colors[start_idx:end_idx]
+
+            # Set colors to frame buffer 1
+            await self.set64(
+                tile_index=tile_index,
+                length=1,
+                x=0,
+                y=start_row,
+                width=tile.width,
+                duration=duration if batch == total_batches - 1 else 0,
+                colors=batch_colors,
+                fb_index=1,
+            )
+
+        # Copy frame buffer 1 to 0 (display)
+        await self.copy_frame_buffer(
+            tile_index=tile_index, source_fb=1, target_fb=0
+        )
+    else:
+        # Tile has ≤64 zones, single set64() call
+        await self.set64(
+            tile_index=tile_index,
+            length=1,
+            x=0,
+            y=0,
+            width=tile.width,
+            duration=duration,
+            colors=colors,
+        )
 ```
 
-Source code in `src/lifx/devices/tile.py`
+##### get_tile_effect
 
-````python
-async def set_flame_effect(
-    self,
-    speed: float = 5.0,
-    duration: float = 0.0,
+```python
+get_tile_effect() -> MatrixEffect
+```
+
+Get current running tile effect.
+
+| RETURNS        | DESCRIPTION                                      |
+| -------------- | ------------------------------------------------ |
+| `MatrixEffect` | MatrixEffect describing the current effect state |
+
+Example
+
+> > > effect = await matrix.get_tile_effect() print(f"Effect type: {effect.effect_type}")
+
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+async def get_tile_effect(self) -> MatrixEffect:
+    """Get current running tile effect.
+
+    Returns:
+        MatrixEffect describing the current effect state
+
+    Example:
+        >>> effect = await matrix.get_tile_effect()
+        >>> print(f"Effect type: {effect.effect_type}")
+    """
+    _LOGGER.debug("Getting tile effect for %s", self.label or self.serial)
+
+    response: packets.Tile.StateEffect = await self.connection.request(
+        packets.Tile.GetEffect()
+    )
+
+    # Convert protocol effect to MatrixEffect
+    palette = []
+    for proto_color in response.settings.palette[: response.settings.palette_count]:
+        palette.append(
+            HSBK(
+                hue=proto_color.hue / 65535 * 360,
+                saturation=proto_color.saturation / 65535,
+                brightness=proto_color.brightness / 65535,
+                kelvin=proto_color.kelvin,
+            )
+        )
+
+    effect = MatrixEffect(
+        effect_type=response.settings.effect_type,
+        speed=response.settings.speed,
+        duration=response.settings.duration,
+        palette=palette if palette else None,
+        sky_type=response.settings.parameter.sky_type,
+        cloud_saturation_min=response.settings.parameter.cloud_saturation_min,
+        cloud_saturation_max=response.settings.parameter.cloud_saturation_max,
+    )
+
+    self._tile_effect = effect
+    return effect
+```
+
+##### set_tile_effect
+
+```python
+set_tile_effect(
+    effect_type: TileEffectType,
+    speed: int = 3000,
+    duration: int = 0,
     palette: list[HSBK] | None = None,
+    sky_type: TileEffectSkyType = SUNRISE,
+    cloud_saturation_min: int = 0,
+    cloud_saturation_max: int = 0,
+) -> None
+```
+
+Set tile effect with configuration.
+
+| PARAMETER              | DESCRIPTION                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `TileEffectType`                             |
+| `speed`                | Effect speed in milliseconds (default: 3000) **TYPE:** `int` **DEFAULT:** `3000`               |
+| `duration`             | Total effect duration in nanoseconds (0 for infinite) **TYPE:** `int` **DEFAULT:** `0`         |
+| `palette`              | Color palette for the effect (max 16 colors) **TYPE:** \`list[HSBK]                            |
+| `sky_type`             | Sky effect type (SUNRISE, SUNSET, CLOUDS) **TYPE:** `TileEffectSkyType` **DEFAULT:** `SUNRISE` |
+| `cloud_saturation_min` | Minimum cloud saturation (0-255, for CLOUDS) **TYPE:** `int` **DEFAULT:** `0`                  |
+| `cloud_saturation_max` | Maximum cloud saturation (0-255, for CLOUDS) **TYPE:** `int` **DEFAULT:** `0`                  |
+
+Example
+
+> > > ###### Set MORPH effect with rainbow palette
+> > >
+> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_tile_effect( ... effect_type=TileEffectType.MORPH, ... speed=5000, ... palette=rainbow, ... )
+
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+async def set_tile_effect(
+    self,
+    effect_type: TileEffectType,
+    speed: int = 3000,
+    duration: int = 0,
+    palette: list[HSBK] | None = None,
+    sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE,
+    cloud_saturation_min: int = 0,
+    cloud_saturation_max: int = 0,
 ) -> None:
-    """Apply a flame effect.
+    """Set tile effect with configuration.
 
     Args:
-        speed: Effect speed in seconds per cycle (default 5.0)
-        duration: Total duration in seconds (0 for infinite, default 0.0)
-        palette: Optional color palette (default: fire colors)
+        effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
+        speed: Effect speed in milliseconds (default: 3000)
+        duration: Total effect duration in nanoseconds (0 for infinite)
+        palette: Color palette for the effect (max 16 colors)
+        sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
+        cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
+        cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
 
     Example:
-        ```python
-        # Apply default flame effect
-        await tile.set_flame_effect()
-
-        # Custom flame colors
-        palette = [
-            HSBK.from_rgb(255, 0, 0),  # Red
-            HSBK.from_rgb(255, 100, 0),  # Orange
-            HSBK.from_rgb(255, 200, 0),  # Yellow
-        ]
-        await tile.set_flame_effect(speed=3.0, palette=palette)
-        ```
+        >>> # Set MORPH effect with rainbow palette
+        >>> rainbow = [
+        ...     HSBK(0, 1.0, 1.0, 3500),  # Red
+        ...     HSBK(60, 1.0, 1.0, 3500),  # Yellow
+        ...     HSBK(120, 1.0, 1.0, 3500),  # Green
+        ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
+        ... ]
+        >>> await matrix.set_tile_effect(
+        ...     effect_type=TileEffectType.MORPH,
+        ...     speed=5000,
+        ...     palette=rainbow,
+        ... )
     """
-    if palette is None:
-        # Default fire palette
-        palette = [
-            HSBK(0, 1.0, 1.0, 3500),  # Red
-            HSBK(30, 1.0, 1.0, 3500),  # Orange
-            HSBK(45, 1.0, 0.8, 3500),  # Yellow-orange
-        ]
-
-    # Convert speed to milliseconds
-    speed_ms = int(speed * 1000)
-
-    # Convert duration to nanoseconds
-    duration_ns = int(duration * 1_000_000_000)
-
-    await self.set_tile_effect(
-        TileEffect(
-            effect_type=TileEffectType.FLAME,
-            speed=speed_ms,
-            duration=duration_ns,
-            palette=palette,
-        )
-    )
-
     _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "set_flame_effect",
-            "action": "change",
-            "values": {
-                "palette_count": len(palette),
-                "speed": speed,
-                "duration": duration,
-            },
-        }
+        "Setting tile effect %s (speed=%d) for %s",
+        effect_type,
+        speed,
+        self.label or self.serial,
     )
-````
+
+    # Create and validate MatrixEffect
+    effect = MatrixEffect(
+        effect_type=effect_type,
+        speed=speed,
+        duration=duration,
+        palette=palette,
+        sky_type=sky_type,
+        cloud_saturation_min=cloud_saturation_min,
+        cloud_saturation_max=cloud_saturation_max,
+    )
+
+    # Convert to protocol format
+    # Note: palette is guaranteed to be non-None by MatrixEffect.__post_init__
+    palette = effect.palette if effect.palette is not None else []
+    proto_palette = []
+    for color in palette:
+        proto_palette.append(
+            LightHsbk(
+                hue=int(color.hue / 360 * 65535),
+                saturation=int(color.saturation * 65535),
+                brightness=int(color.brightness * 65535),
+                kelvin=color.kelvin,
+            )
+        )
+
+    # Pad palette to 16 colors
+    while len(proto_palette) < 16:
+        proto_palette.append(LightHsbk(0, 0, 0, 3500))
+
+    settings = TileEffectSettings(
+        instanceid=0,
+        effect_type=effect.effect_type,
+        speed=effect.speed,
+        duration=effect.duration,
+        parameter=TileEffectParameter(
+            sky_type=effect.sky_type,
+            cloud_saturation_min=effect.cloud_saturation_min,
+            cloud_saturation_max=effect.cloud_saturation_max,
+        ),
+        palette_count=len(palette),
+        palette=proto_palette,
+    )
+
+    await self.connection.send_packet(packets.Tile.SetEffect(settings=settings))
+    self._tile_effect = effect
+```
 
 ##### apply_theme
 
@@ -6147,14 +5685,14 @@ apply_theme(
 ) -> None
 ```
 
-Apply a theme to this tile device.
+Apply a theme across matrix tiles using Canvas interpolation.
 
-Distributes theme colors across all tiles in the chain using Canvas-based rendering to create natural color splotches that grow outward.
+Distributes theme colors across the tile matrix with smooth color blending using the Canvas API for visually pleasing transitions.
 
 | PARAMETER  | DESCRIPTION                                                         |
 | ---------- | ------------------------------------------------------------------- |
 | `theme`    | Theme to apply **TYPE:** `Theme`                                    |
-| `power_on` | Turn on the device **TYPE:** `bool` **DEFAULT:** `False`            |
+| `power_on` | Turn on the light **TYPE:** `bool` **DEFAULT:** `False`             |
 | `duration` | Transition duration in seconds **TYPE:** `float` **DEFAULT:** `0.0` |
 
 Example
@@ -6162,86 +5700,69 @@ Example
 ```python
 from lifx.theme import get_theme
 
-theme = get_theme("sunset")
-await tile.apply_theme(theme, power_on=True, duration=2.0)
+theme = get_theme("evening")
+await matrix.apply_theme(theme, power_on=True, duration=0.5)
 ```
 
-Source code in `src/lifx/devices/tile.py`
+Source code in `src/lifx/devices/matrix.py`
 
 ````python
 async def apply_theme(
     self,
-    theme: Theme,
+    theme: "Theme",
     power_on: bool = False,
     duration: float = 0.0,
 ) -> None:
-    """Apply a theme to this tile device.
+    """Apply a theme across matrix tiles using Canvas interpolation.
 
-    Distributes theme colors across all tiles in the chain using Canvas-based
-    rendering to create natural color splotches that grow outward.
+    Distributes theme colors across the tile matrix with smooth color blending
+    using the Canvas API for visually pleasing transitions.
 
     Args:
         theme: Theme to apply
-        power_on: Turn on the device
+        power_on: Turn on the light
         duration: Transition duration in seconds
 
     Example:
         ```python
         from lifx.theme import get_theme
 
-        theme = get_theme("sunset")
-        await tile.apply_theme(theme, power_on=True, duration=2.0)
+        theme = get_theme("evening")
+        await matrix.apply_theme(theme, power_on=True, duration=0.5)
         ```
     """
-    from lifx.theme.generators import MatrixGenerator
+    from lifx.theme.canvas import Canvas
 
-    # Get tile dimensions
-    tiles = (
-        await self.get_tile_chain() if self.tile_chain is None else self.tile_chain
-    )
+    # Get device chain
+    tiles = await self.get_device_chain()
+
     if not tiles:
-        _LOGGER.warning("No tiles available, skipping theme application")
         return
 
-    # Build coords_and_sizes for all tiles
-    left_x = 0
-    coords_and_sizes = []
+    # Create canvas and populate with theme colors
+    canvas = Canvas()
     for tile in tiles:
-        coords_and_sizes.append(((left_x, 0), (tile.width, tile.height)))
-        left_x += tile.width
+        canvas.add_points_for_tile(None, theme)
+    canvas.shuffle_points()
+    canvas.blur_by_distance()
 
-    # Create generator with all tile coordinates
-    generator = MatrixGenerator(coords_and_sizes)
-
-    # Generate colors for all tiles at once
-    tile_colors_list = generator.get_theme_colors(theme)
-
-    # Check if device is on
+    # Check if light is on
     is_on = await self.get_power()
 
-    # Determine duration for color setting
-    color_duration = 0 if (power_on and not is_on) else duration
-
     # Apply colors to each tile
-    for tile_idx, colors_flat in enumerate(tile_colors_list):
-        tile_info = tiles[tile_idx]
+    for tile in tiles:
+        # Extract tile colors from canvas as 1D list
+        colors = canvas.points_for_tile(None, width=tile.width, height=tile.height)
 
-        # Convert to 2D grid for set_tile_colors
-        colors_2d = []
-        for y in range(tile_info.height):
-            row = []
-            for x in range(tile_info.width):
-                idx = y * tile_info.width + x
-                if idx < len(colors_flat):
-                    row.append(colors_flat[idx])
-                else:
-                    row.append(HSBK(0, 0, 1.0, 3500))  # White fallback
-            colors_2d.append(row)
+        # Apply with appropriate timing
+        if power_on and not is_on:
+            await self.set_matrix_colors(tile.tile_index, colors, duration=0)
+        else:
+            await self.set_matrix_colors(
+                tile.tile_index, colors, duration=int(duration * 1000)
+            )
 
-        # Apply colors to tile
-        await self.set_tile_colors(tile_idx, colors_2d, duration=color_duration)
-
-    # Turn on if requested
+    # Turn on light if requested and currently off
     if power_on and not is_on:
         await self.set_power(True, duration=duration)
 ````

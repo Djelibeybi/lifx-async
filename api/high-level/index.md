@@ -439,7 +439,7 @@ async def find_by_ip(
 ```python
 DeviceGroup(
     devices: Sequence[
-        Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
+        Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
     ],
 )
 ```
@@ -472,6 +472,7 @@ await group.set_color(Colors.BLUE)
 | `__aexit__`                 | Exit async context manager.                        |
 | `__iter__`                  | Iterate over devices in the group.                 |
 | `__len__`                   | Get number of devices in the group.                |
+| `__getitem__`               | Get device by index.                               |
 | `set_power`                 | Set power state for all devices in the group.      |
 | `set_color`                 | Set color for all Light devices in the group.      |
 | `set_brightness`            | Set brightness for all Light devices in the group. |
@@ -491,7 +492,7 @@ await group.set_color(Colors.BLUE)
 | `hev_lights`       | Get the HEV lights in the group. **TYPE:** `list[HevLight]`                    |
 | `infrared_lights`  | Get the Infrared lights in the group. **TYPE:** `list[InfraredLight]`          |
 | `multizone_lights` | Get all MultiZone light devices in the group. **TYPE:** `list[MultiZoneLight]` |
-| `tiles`            | Get all Tile devices in the group. **TYPE:** `list[TileDevice]`                |
+| `matrix_lights`    | Get all Matrix light devices in the group. **TYPE:** `list[MatrixLight]`       |
 
 Source code in `src/lifx/api.py`
 
@@ -499,7 +500,7 @@ Source code in `src/lifx/api.py`
 def __init__(
     self,
     devices: Sequence[
-        Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
+        Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
     ],
 ) -> None:
     """Initialize device group.
@@ -516,7 +517,7 @@ def __init__(
     self._multizone_lights = [
         light for light in devices if type(light) is MultiZoneLight
     ]
-    self._tile_devices = [light for light in devices if type(light) is TileDevice]
+    self._matrix_lights = [light for light in devices if type(light) is MatrixLight]
     self._locations_cache: dict[str, DeviceGroup] | None = None
     self._groups_cache: dict[str, DeviceGroup] | None = None
     self._location_metadata: dict[bytes, LocationGrouping] | None = None
@@ -529,7 +530,7 @@ def __init__(
 
 ```python
 devices: Sequence[
-    Device | HevLight | InfraredLight | Light | MultiZoneLight | TileDevice
+    Device | HevLight | InfraredLight | Light | MultiZoneLight | MatrixLight
 ]
 ```
 
@@ -567,13 +568,13 @@ multizone_lights: list[MultiZoneLight]
 
 Get all MultiZone light devices in the group.
 
-##### tiles
+##### matrix_lights
 
 ```python
-tiles: list[TileDevice]
+matrix_lights: list[MatrixLight]
 ```
 
-Get all Tile devices in the group.
+Get all Matrix light devices in the group.
 
 #### Functions
 
@@ -622,7 +623,7 @@ async def __aexit__(
 
 ```python
 __iter__() -> Iterator[
-    Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
+    Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
 ]
 ```
 
@@ -634,7 +635,7 @@ Source code in `src/lifx/api.py`
 def __iter__(
     self,
 ) -> Iterator[
-    Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
+    Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
 ]:
     """Iterate over devices in the group."""
     return iter(self._devices)
@@ -654,6 +655,26 @@ Source code in `src/lifx/api.py`
 def __len__(self) -> int:
     """Get number of devices in the group."""
     return len(self._devices)
+```
+
+##### __getitem__
+
+```python
+__getitem__(
+    index: int,
+) -> Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
+```
+
+Get device by index.
+
+Source code in `src/lifx/api.py`
+
+```python
+def __getitem__(
+    self, index: int
+) -> Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+    """Get device by index."""
+    return self._devices[index]
 ```
 
 ##### set_power
@@ -1226,7 +1247,7 @@ Each device applies the theme according to its capabilities:
 
 - Light: Selects random color from theme
 - MultiZoneLight: Distributes colors evenly across zones
-- TileDevice: Uses interpolation for smooth gradients
+- MatrixLight: Uses interpolation for smooth gradients
 - Other devices: No action (themes only apply to color devices)
 
 | PARAMETER  | DESCRIPTION                                                         |
@@ -1259,7 +1280,7 @@ async def apply_theme(
     Each device applies the theme according to its capabilities:
     - Light: Selects random color from theme
     - MultiZoneLight: Distributes colors evenly across zones
-    - TileDevice: Uses interpolation for smooth gradients
+    - MatrixLight: Uses interpolation for smooth gradients
     - Other devices: No action (themes only apply to color devices)
 
     Args:
@@ -1288,9 +1309,9 @@ async def apply_theme(
         for multizone in self.multizone_lights:
             tg.create_task(multizone.apply_theme(theme, power_on, duration))
 
-        # Apply theme to all tile devices
-        for tile in self.tiles:
-            tg.create_task(tile.apply_theme(theme, power_on, duration))
+        # Apply theme to all matrix light devices
+        for matrix in self.matrix_lights:
+            tg.create_task(matrix.apply_theme(theme, power_on, duration))
 ````
 
 ##### invalidate_metadata_cache

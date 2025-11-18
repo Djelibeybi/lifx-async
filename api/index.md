@@ -17,7 +17,7 @@ lifx/
 │   ├── hev.py               # HevLight device (anti-bacterial cleaning)
 │   ├── infrared.py          # InfraredLight device (night vision)
 │   ├── multizone.py         # MultiZoneLight (strips/beams)
-│   └── tile.py              # TileDevice (2D pixel grids)
+│   └── matrix.py            # MatrixLight (2D matrix devices: tiles, candle, path)
 ├── network/                  # Network layer
 │   ├── connection.py        # Device connections with lazy opening
 │   ├── discovery.py         # Network device discovery
@@ -58,7 +58,7 @@ Control your LIFX devices:
 - [`HevLight`](devices/#lifx.devices.hev.HevLight) - Anti-bacterial cleaning cycles
 - [`InfraredLight`](devices/#lifx.devices.infrared.InfraredLight) - Night vision infrared LED
 - [`MultiZoneLight`](devices/#lifx.devices.multizone.MultiZoneLight) - Strips/beams
-- [`TileDevice`](devices/#lifx.devices.tile.TileDevice) - 2D tile grids
+- [`MatrixLight`](devices/#lifx.devices.matrix.MatrixLight) - 2D matrix devices (tiles, candle, path)
 
 ### Color Utilities
 
@@ -173,7 +173,7 @@ Simple, batteries-included API for common tasks
 
 ______________________________________________________________________
 
-Control LIFX lights, strips, and tiles
+Control LIFX lights, strips, tiles, and matrix devices
 
 [Devices](devices/)
 

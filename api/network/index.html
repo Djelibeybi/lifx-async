@@ -2448,7 +2448,7 @@ Implements DoS protection via timeout, source validation, and serial validation.
         <p>Create appropriate device instance based on product capabilities.</p>
 <p>Queries the device for its product ID and uses the product registry
 to instantiate the appropriate device class (Device, Light, HevLight,
-InfraredLight, MultiZoneLight, or TileDevice) based on the product
+InfraredLight, MultiZoneLight, or MatrixLight) based on the product
 capabilities.</p>
 <p>This is the single source of truth for device type detection and
 instantiation across the library.</p>
@@ -2609,7 +2609,7 @@ instantiation across the library.</p>
 </span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54"></a>
 </span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55"></a><span class="sd">    Queries the device for its product ID and uses the product registry</span>
 </span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56"></a><span class="sd">    to instantiate the appropriate device class (Device, Light, HevLight,</span>
-</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57"></a><span class="sd">    InfraredLight, MultiZoneLight, or TileDevice) based on the product</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57"></a><span class="sd">    InfraredLight, MultiZoneLight, or MatrixLight) based on the product</span>
 </span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a><span class="sd">    capabilities.</span>
 </span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59"></a>
 </span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60"></a><span class="sd">    This is the single source of truth for device type detection and</span>
@@ -2635,8 +2635,8 @@ instantiation across the library.</p>
 </span><span id="__span-0-80"><a id="__codelineno-0-80" name="__codelineno-0-80"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.hev</span><span class="w"> </span><span class="kn">import</span> <span class="n">HevLight</span>
 </span><span id="__span-0-81"><a id="__codelineno-0-81" name="__codelineno-0-81"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.infrared</span><span class="w"> </span><span class="kn">import</span> <span class="n">InfraredLight</span>
 </span><span id="__span-0-82"><a id="__codelineno-0-82" name="__codelineno-0-82"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.light</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span>
-</span><span id="__span-0-83"><a id="__codelineno-0-83" name="__codelineno-0-83"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.multizone</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiZoneLight</span>
-</span><span id="__span-0-84"><a id="__codelineno-0-84" name="__codelineno-0-84"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.tile</span><span class="w"> </span><span class="kn">import</span> <span class="n">TileDevice</span>
+</span><span id="__span-0-83"><a id="__codelineno-0-83" name="__codelineno-0-83"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.matrix</span><span class="w"> </span><span class="kn">import</span> <span class="n">MatrixLight</span>
+</span><span id="__span-0-84"><a id="__codelineno-0-84" name="__codelineno-0-84"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.devices.multizone</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiZoneLight</span>
 </span><span id="__span-0-85"><a id="__codelineno-0-85" name="__codelineno-0-85"></a>
 </span><span id="__span-0-86"><a id="__codelineno-0-86" name="__codelineno-0-86"></a>    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span>
 </span><span id="__span-0-87"><a id="__codelineno-0-87" name="__codelineno-0-87"></a>        <span class="s2">&quot;serial&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
@@ -2653,7 +2653,7 @@ instantiation across the library.</p>
 </span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a>    <span class="k">try</span><span class="p">:</span>
 </span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a>        <span class="k">if</span> <span class="n">temp_device</span><span class="o">.</span><span class="n">capabilities</span><span class="p">:</span>
 </span><span id="__span-0-100"><a id="__codelineno-0-100" name="__codelineno-0-100"></a>            <span class="k">if</span> <span class="n">temp_device</span><span class="o">.</span><span class="n">capabilities</span><span class="o">.</span><span class="n">has_matrix</span><span class="p">:</span>
-</span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a>                <span class="k">return</span> <span class="n">TileDevice</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a>                <span class="k">return</span> <span class="n">MatrixLight</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </span><span id="__span-0-102"><a id="__codelineno-0-102" name="__codelineno-0-102"></a>            <span class="k">if</span> <span class="n">temp_device</span><span class="o">.</span><span class="n">capabilities</span><span class="o">.</span><span class="n">has_multizone</span><span class="p">:</span>
 </span><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a>                <span class="k">return</span> <span class="n">MultiZoneLight</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a>            <span class="k">if</span> <span class="n">temp_device</span><span class="o">.</span><span class="n">capabilities</span><span class="o">.</span><span class="n">has_infrared</span><span class="p">:</span>

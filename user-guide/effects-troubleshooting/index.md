@@ -348,20 +348,20 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-### Tile Devices
+### Matrix Lights (Tile/Candle/Path)
 
-**Full Support** (tiles treated as single unit).
+**Full Support** (treated as single unit).
 
 **Works Well:**
 
-- EffectPulse: All tiles pulse together
-- EffectColorloop: All tiles cycle color together
+- EffectPulse: All tiles/zones pulse together
+- EffectColorloop: All tiles/zones cycle color together
 
 **Limitation:** Current implementation doesn't use per-tile control. All tiles show same color.
 
 **Potential Enhancement:** Future versions could support per-tile effects (similar to theme support).
 
-**Models:** LIFX Tile
+**Models:** LIFX Tile, LIFX Candle, LIFX Path
 
 ______________________________________________________________________
 
@@ -720,7 +720,7 @@ Current implementation treats tiles as a single unit.
 
 **Workaround:** Use theme support for per-tile colors, or wait for future enhancement.
 
-**Potential Future:** Per-tile effect logic could be added using `TileDevice.set_tile_colors()`.
+**Potential Future:** Per-tile effect logic could be added using `MatrixLight.set_matrix_colors()`.
 
 ______________________________________________________________________
 

@@ -17,7 +17,7 @@ graph TB
         Hev[HevLight<br />HEV support]
         Infrared[InfraredLight<br />Infrared support]
         MultiZone[MultiZoneLight<br/>Linear/1D zones]
-        Tile[TileDevice<br/>Matrix/2D zones]
+        Matrix[MatrixLight<br/>Matrix/2D zones]
     end
 
     subgraph "Layer 2: Network Layer"
@@ -42,14 +42,14 @@ graph TB
     DeviceGroup --> Hev
     DeviceGroup --> Infrared
     DeviceGroup --> MultiZone
-    DeviceGroup --> Tile
+    DeviceGroup --> Matrix
     API --> Discovery
     Device --> Connection
     Light --> Device
     Hev --> Light
     Infrared --> Light
     MultiZone --> Light
-    Tile --> Light
+    Matrix --> Light
     Connection --> Transport
     Connection --> Packets
     Discovery --> Transport
@@ -127,7 +127,7 @@ response = await conn.request(packet)
 
 **Purpose**: Device abstractions with high-level operations
 
-- **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, TileDevice
+- **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight
 - **State Caching**: Cached state properties for efficient access
 - **Type Detection**: Automatic capability detection
 - **Async Context Managers**: Automatic resource cleanup
@@ -139,7 +139,7 @@ response = await conn.request(packet)
 - `hev.py` - HevLight class
 - `infrared.py` - InfraredLight class
 - `multizone.py` - MultiZoneLight class
-- `tile.py` - TileDevice class
+- `matrix.py` - MatrixLight class
 
 **Example**:
 
