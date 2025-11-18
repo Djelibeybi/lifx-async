@@ -1,6 +1,6 @@
 """Tests for Canvas class.
 
-This tests only the Canvas methods actually called by TileDevice.apply_theme().
+This tests only the Canvas methods actually called by MatrixLight.apply_theme().
 """
 
 from __future__ import annotations

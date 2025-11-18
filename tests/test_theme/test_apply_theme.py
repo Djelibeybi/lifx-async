@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 from lifx.color import HSBK, Colors
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.devices.tile import TileDevice
 from lifx.theme import Theme
 
 
@@ -165,14 +165,14 @@ class TestMultiZoneLightApplyTheme:
         assert 240 in hues or any(abs(h - 240) < 1 for h in hues)  # Blue or similar
 
 
-class TestTileDeviceApplyTheme:
-    """Tests for TileDevice.apply_theme method."""
+class TestMatrixLightApplyTheme:
+    """Tests for MatrixLight.apply_theme method."""
 
-    def test_apply_theme_basic(self, tile_device: TileDevice) -> None:
+    def test_apply_theme_basic(self, matrix_light: MatrixLight) -> None:
         """Test creating a tile device for apply_theme tests."""
-        assert tile_device.serial == "d073d5010203"
+        assert matrix_light.serial == "d073d5010203"
 
-    async def test_apply_theme_uses_canvas(self, tile_device: TileDevice) -> None:
+    async def test_apply_theme_uses_canvas(self, matrix_light: MatrixLight) -> None:
         """Test that apply_theme uses Canvas for interpolation."""
         theme = Theme([Colors.RED, Colors.BLUE])
 
@@ -180,70 +180,73 @@ class TestTileDeviceApplyTheme:
         tile_info = MagicMock()
         tile_info.width = 8
         tile_info.height = 8
+        tile_info.tile_index = 0
 
         # Mock methods
-        tile_device.get_tile_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
 
-        await tile_device.apply_theme(theme)
+        await matrix_light.apply_theme(theme)
 
-        # Verify set_tile_colors was called
-        tile_device.set_tile_colors.assert_called_once()
-        args, kwargs = tile_device.set_tile_colors.call_args
+        # Verify set_matrix_colors was called
+        matrix_light.set_matrix_colors.assert_called_once()
+        args, kwargs = matrix_light.set_matrix_colors.call_args
 
         # First arg should be tile index (0)
         assert args[0] == 0
 
-        # Second arg should be 2D list of colors
-        colors_2d = args[1]
-        assert len(colors_2d) == 8
-        assert all(len(row) == 8 for row in colors_2d)
-        assert all(all(isinstance(c, HSBK) for c in row) for row in colors_2d)
+        # Second arg should be 1D list of colors (8x8=64)
+        colors = args[1]
+        assert len(colors) == 64
+        assert all(isinstance(c, HSBK) for c in colors)
 
-    async def test_apply_theme_with_no_tiles(self, tile_device: TileDevice) -> None:
+    async def test_apply_theme_with_no_tiles(self, matrix_light: MatrixLight) -> None:
         """Test apply_theme when no tiles are available."""
         theme = Theme([Colors.RED])
-        tile_device.get_tile_chain = AsyncMock(return_value=[])
+        matrix_light.get_device_chain = AsyncMock(return_value=[])
 
-        await tile_device.apply_theme(theme)
+        await matrix_light.apply_theme(theme)
 
-        # Should not call set_tile_colors
-        tile_device.set_tile_colors.assert_not_called()
-        tile_device.set_power.assert_not_called()
+        # Should not call set_matrix_colors
+        matrix_light.set_matrix_colors.assert_not_called()
+        matrix_light.set_power.assert_not_called()
 
-    async def test_apply_theme_with_duration(self, tile_device: TileDevice) -> None:
+    async def test_apply_theme_with_duration(self, matrix_light: MatrixLight) -> None:
         """Test apply_theme with transition duration."""
         theme = Theme([Colors.RED, Colors.BLUE])
 
         tile_info = MagicMock()
         tile_info.width = 8
         tile_info.height = 8
+        tile_info.tile_index = 0
 
-        tile_device.get_tile_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
 
-        await tile_device.apply_theme(theme, duration=3.0)
+        await matrix_light.apply_theme(theme, duration=3.0)
 
-        args, kwargs = tile_device.set_tile_colors.call_args
-        assert kwargs.get("duration", 0.0) == 3.0
+        args, kwargs = matrix_light.set_matrix_colors.call_args
+        # Duration should be converted to milliseconds
+        assert kwargs.get("duration", 0) == 3000
 
-    async def test_apply_theme_with_power_on(self, tile_device: TileDevice) -> None:
+    async def test_apply_theme_with_power_on(self, matrix_light: MatrixLight) -> None:
         """Test apply_theme with power_on=True."""
         theme = Theme([Colors.RED])
 
         tile_info = MagicMock()
         tile_info.width = 8
         tile_info.height = 8
+        tile_info.tile_index = 0
 
-        tile_device.get_tile_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
 
-        await tile_device.apply_theme(theme, power_on=True)
+        await matrix_light.apply_theme(theme, power_on=True)
 
-        tile_device.set_tile_colors.assert_called_once()
-        tile_device.set_power.assert_called_once()
+        matrix_light.set_matrix_colors.assert_called_once()
+        matrix_light.set_power.assert_called_once()
         # Check that set_power was called with True (and default duration)
-        args, kwargs = tile_device.set_power.call_args
+        args, kwargs = matrix_light.set_power.call_args
         assert args[0] is True
 
-    async def test_apply_theme_multiple_tiles(self, tile_device: TileDevice) -> None:
+    async def test_apply_theme_multiple_tiles(self, matrix_light: MatrixLight) -> None:
         """Test apply_theme with multiple tiles in chain."""
         theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
 
@@ -251,19 +254,21 @@ class TestTileDeviceApplyTheme:
         tile_info1 = MagicMock()
         tile_info1.width = 8
         tile_info1.height = 8
+        tile_info1.tile_index = 0
 
         tile_info2 = MagicMock()
         tile_info2.width = 8
         tile_info2.height = 8
+        tile_info2.tile_index = 1
 
-        tile_device.get_tile_chain = AsyncMock(return_value=[tile_info1, tile_info2])
+        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info1, tile_info2])
 
-        await tile_device.apply_theme(theme)
+        await matrix_light.apply_theme(theme)
 
-        # Should call set_tile_colors twice (once per tile)
-        assert tile_device.set_tile_colors.call_count == 2
+        # Should call set_matrix_colors twice (once per tile)
+        assert matrix_light.set_matrix_colors.call_count == 2
 
         # Check that tile indices are correct
-        calls = tile_device.set_tile_colors.call_args_list
+        calls = matrix_light.set_matrix_colors.call_args_list
         assert calls[0][0][0] == 0  # First call uses tile index 0
         assert calls[1][0][0] == 1  # Second call uses tile index 1

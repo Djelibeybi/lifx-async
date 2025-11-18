@@ -10,8 +10,8 @@ from lifx.devices.base import Device, FirmwareInfo
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.devices.tile import TileDevice
 from lifx.products.registry import ProductCapability, ProductInfo, TemperatureRange
 
 
@@ -62,9 +62,9 @@ def multizone_light(mock_device_factory) -> MultiZoneLight:
 
 
 @pytest.fixture
-def tile_device(mock_device_factory) -> TileDevice:
-    """Create a test tile device with mocked connection."""
-    return mock_device_factory(TileDevice)
+def matrix_light(mock_device_factory) -> MatrixLight:
+    """Create a test matrix light with mocked connection."""
+    return mock_device_factory(MatrixLight)
 
 
 @pytest.fixture

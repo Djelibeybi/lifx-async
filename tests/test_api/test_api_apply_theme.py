@@ -90,7 +90,7 @@ class TestDeviceGroupApplyTheme:
         """Test that theme is applied to tile devices."""
         group = emulator_devices
 
-        if len(group.tiles) == 0:
+        if len(group.matrix_lights) == 0:
             # Skip if no tile devices
             return
 
@@ -100,9 +100,9 @@ class TestDeviceGroupApplyTheme:
 
             await asyncio.sleep(0.1)
             # Verify tile device was updated
-            tile = group.tiles[0]
+            tile = group.matrix_lights[0]
             # Get tile chain to verify device is responsive
-            tiles_info = await tile.get_tile_chain()
+            tiles_info = await tile.get_device_chain()
             assert len(tiles_info) > 0
 
     async def test_apply_different_themes(self, emulator_devices: DeviceGroup) -> None:
@@ -144,7 +144,7 @@ class TestDeviceGroupApplyTheme:
         # Should have mix of device types from emulator
         assert len(group.lights) > 0
         assert len(group.multizone_lights) > 0
-        assert len(group.tiles) > 0
+        assert len(group.matrix_lights) > 0
 
         async with group:
             theme = ThemeLibrary.get("relaxing")
@@ -240,7 +240,7 @@ class TestDeviceGroupApplyTheme:
         # Should only iterate lights, skip multizone/tiles
         assert len(group.lights) == 2
         assert len(group.multizone_lights) == 0
-        assert len(group.tiles) == 0
+        assert len(group.matrix_lights) == 0
 
         # Theme application should handle this gracefully
         async with group:

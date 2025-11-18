@@ -54,7 +54,7 @@ class DiscoveredDevice:
 
         Queries the device for its product ID and uses the product registry
         to instantiate the appropriate device class (Device, Light, HevLight,
-        InfraredLight, MultiZoneLight, or TileDevice) based on the product
+        InfraredLight, MultiZoneLight, or MatrixLight) based on the product
         capabilities.
 
         This is the single source of truth for device type detection and
@@ -80,8 +80,8 @@ class DiscoveredDevice:
         from lifx.devices.hev import HevLight
         from lifx.devices.infrared import InfraredLight
         from lifx.devices.light import Light
+        from lifx.devices.matrix import MatrixLight
         from lifx.devices.multizone import MultiZoneLight
-        from lifx.devices.tile import TileDevice
 
         kwargs = {
             "serial": self.serial,
@@ -98,7 +98,7 @@ class DiscoveredDevice:
         try:
             if temp_device.capabilities:
                 if temp_device.capabilities.has_matrix:
-                    return TileDevice(**kwargs)
+                    return MatrixLight(**kwargs)
                 if temp_device.capabilities.has_multizone:
                     return MultiZoneLight(**kwargs)
                 if temp_device.capabilities.has_infrared:
