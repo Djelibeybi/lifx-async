@@ -31,7 +31,7 @@ The Light Effects Framework is built on a layered architecture that separates co
                  │
 ┌────────────────▼────────────────────────────────────┐
 │            Device Layer (lifx.devices)               │
-│   • Light, MultiZoneLight, TileDevice               │
+│   • Light, MultiZoneLight, MatrixLight              │
 │   • Device state methods (get_color, set_color)     │
 └────────────────┬────────────────────────────────────┘
                  │
@@ -579,10 +579,10 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - **Effect Behavior:** Entire device pulses/cycles together (zones not individually controlled)
 - **Timing:** 0.3s delay after zone restoration
 
-#### Tile Devices (`TileDevice`)
+#### Matrix Lights (`MatrixLight`)
 
-- **Current Implementation:** Treated like color lights (no tile-specific logic yet)
-- **Future Enhancement:** Could apply effects to individual tiles using tile chain
+- **Current Implementation:** Treated like color lights (no matrix-specific logic yet)
+- **Future Enhancement:** Could apply effects to individual tiles using device chain
 
 #### HEV Lights (`HevLight`)
 
@@ -698,7 +698,7 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 3. **Future Enhancement:** Architecture supports adding tile-specific effects later
 4. **Current Usefulness:** Effects still work on tiles (just not tile-aware)
 
-**Future Work:** Tile-specific effects would use `TileDevice.set_tile_colors()` and apply per-tile logic similar to theme support.
+**Future Work:** Tile-specific effects would use `MatrixLight.set_matrix_colors()` and apply per-tile logic similar to theme support.
 
 ## Integration Points
 

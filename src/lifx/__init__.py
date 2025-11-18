@@ -23,12 +23,11 @@ from lifx.devices import (
     HevLight,
     InfraredLight,
     Light,
+    MatrixEffect,
+    MatrixLight,
     MultiZoneEffect,
     MultiZoneLight,
-    TileDevice,
-    TileEffect,
     TileInfo,
-    TileRect,
     WifiInfo,
 )
 from lifx.effects import Conductor, EffectColorloop, EffectPulse, LIFXEffect
@@ -61,7 +60,7 @@ __all__ = [
     "HevLight",
     "InfraredLight",
     "MultiZoneLight",
-    "TileDevice",
+    "MatrixLight",
     # Color
     "HSBK",
     "Colors",
@@ -72,10 +71,9 @@ __all__ = [
     "WifiInfo",
     # MultiZone
     "MultiZoneEffect",
-    # Tile
-    "TileEffect",
+    # Matrix (Tile)
+    "MatrixEffect",
     "TileInfo",
-    "TileRect",
     # Effects
     "Conductor",
     "LIFXEffect",

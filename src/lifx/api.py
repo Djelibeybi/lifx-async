@@ -33,8 +33,8 @@ from lifx.devices import (
     InfraredLight,
     Light,
     LocationInfo,
+    MatrixLight,
     MultiZoneLight,
-    TileDevice,
 )
 from lifx.network.discovery import (
     DiscoveredDevice,
@@ -97,7 +97,7 @@ class DeviceGroup:
     def __init__(
         self,
         devices: Sequence[
-            Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
+            Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
         ],
     ) -> None:
         """Initialize device group.
@@ -114,7 +114,7 @@ class DeviceGroup:
         self._multizone_lights = [
             light for light in devices if type(light) is MultiZoneLight
         ]
-        self._tile_devices = [light for light in devices if type(light) is TileDevice]
+        self._matrix_lights = [light for light in devices if type(light) is MatrixLight]
         self._locations_cache: dict[str, DeviceGroup] | None = None
         self._groups_cache: dict[str, DeviceGroup] | None = None
         self._location_metadata: dict[bytes, LocationGrouping] | None = None
@@ -136,7 +136,7 @@ class DeviceGroup:
     def __iter__(
         self,
     ) -> Iterator[
-        Device | Light | HevLight | InfraredLight | MultiZoneLight | TileDevice
+        Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
     ]:
         """Iterate over devices in the group."""
         return iter(self._devices)
@@ -145,11 +145,17 @@ class DeviceGroup:
         """Get number of devices in the group."""
         return len(self._devices)
 
+    def __getitem__(
+        self, index: int
+    ) -> Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+        """Get device by index."""
+        return self._devices[index]
+
     @property
     def devices(
         self,
     ) -> Sequence[
-        Device | HevLight | InfraredLight | Light | MultiZoneLight | TileDevice
+        Device | HevLight | InfraredLight | Light | MultiZoneLight | MatrixLight
     ]:
         """Get all the devices in the group."""
         return self._devices
@@ -175,9 +181,9 @@ class DeviceGroup:
         return self._multizone_lights
 
     @property
-    def tiles(self) -> list[TileDevice]:
-        """Get all Tile devices in the group."""
-        return self._tile_devices
+    def matrix_lights(self) -> list[MatrixLight]:
+        """Get all Matrix light devices in the group."""
+        return self._matrix_lights
 
     async def set_power(self, on: bool, duration: float = 0.0) -> None:
         """Set power state for all devices in the group.
@@ -689,7 +695,7 @@ class DeviceGroup:
         Each device applies the theme according to its capabilities:
         - Light: Selects random color from theme
         - MultiZoneLight: Distributes colors evenly across zones
-        - TileDevice: Uses interpolation for smooth gradients
+        - MatrixLight: Uses interpolation for smooth gradients
         - Other devices: No action (themes only apply to color devices)
 
         Args:
@@ -718,9 +724,9 @@ class DeviceGroup:
             for multizone in self.multizone_lights:
                 tg.create_task(multizone.apply_theme(theme, power_on, duration))
 
-            # Apply theme to all tile devices
-            for tile in self.tiles:
-                tg.create_task(tile.apply_theme(theme, power_on, duration))
+            # Apply theme to all matrix light devices
+            for matrix in self.matrix_lights:
+                tg.create_task(matrix.apply_theme(theme, power_on, duration))
 
     def invalidate_metadata_cache(self) -> None:
         """Clear all cached location and group metadata.

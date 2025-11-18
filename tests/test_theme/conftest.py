@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.devices.tile import TileDevice
 
 
 @pytest.fixture
@@ -58,11 +58,11 @@ def multizone_light(mock_device_factory) -> MultiZoneLight:
 
 
 @pytest.fixture
-def tile_device(mock_device_factory) -> TileDevice:
-    """Create a test tile device with mocked theme methods."""
-    device = mock_device_factory(TileDevice)
-    device.set_tile_colors = AsyncMock()
+def matrix_light(mock_device_factory) -> MatrixLight:
+    """Create a test matrix light with mocked theme methods."""
+    device = mock_device_factory(MatrixLight)
+    device.set_matrix_colors = AsyncMock()
     device.set_power = AsyncMock()
     device.get_power = AsyncMock(return_value=False)
-    device.get_tile_chain = AsyncMock(return_value=[])
+    device.get_device_chain = AsyncMock(return_value=[])
     return device

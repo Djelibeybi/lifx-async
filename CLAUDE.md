@@ -105,7 +105,7 @@ uv run mkdocs gh-deploy
 1. **Protocol Layer** (`src/lifx/protocol/`)
 
    - Auto-generated from `protocol.yml` using `generator.py`
-   - `protocol_types.py`: Enums and field structures (HSBK, TileDevice, etc.)
+   - `protocol_types.py`: Enums and field structures (HSBK, TileStateDevice, etc.)
    - `packets.py`: Packet classes with PKT_TYPE constants
    - `header.py`: LIFX protocol header (36 bytes)
    - `serializer.py`: Binary serialization/deserialization
@@ -131,7 +131,7 @@ uv run mkdocs gh-deploy
    - `hev.py`: `HevLight` class (Light with HEV anti-bacterial cleaning cycle control)
    - `infrared.py`: `InfraredLight` class (Light with infrared LED control for night vision)
    - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
-   - `tile.py`: `TileDevice` for tile grids (2D pixel control)
+   - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
    - State caching with configurable TTL to reduce network traffic
 
 4. **High-Level API** (`src/lifx/api.py`)
@@ -157,14 +157,14 @@ uv run mkdocs gh-deploy
 
 Different LIFX device types support different features:
 
-| Device Type | Color | Multizone | Tiles | Infrared | HEV | Variable Temperature |
-|-------------|-------|-----------|-------|----------|-----|----------------------|
-| Device      | ❌    | ❌        | ❌    | ❌       | ❌  | ❌                   |
-| Light       | ✅    | ❌        | ❌    | ❌       | ❌  | ✅                   |
-| InfraredLight | ✅  | ❌        | ❌    | ✅       | ❌  | ✅                   |
-| HevLight    | ✅    | ❌        | ❌    | ❌       | ✅  | ✅                   |
-| MultiZoneLight | ✅ | ✅        | ❌    | ❌       | ❌  | ✅                   |
-| TileDevice  | ✅    | ❌        | ✅    | ❌       | ❌  | ✅                   |
+| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature |
+|-------------|-------|-----------|--------|----------|-----|----------------------|
+| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   |
+| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   |
+| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   |
+| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   |
+| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   |
+| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   |
 
 **Device Detection**: The `products` registry automatically detects device capabilities based on
 product ID and instantiates the appropriate device class.
@@ -653,7 +653,7 @@ tests/
 │   ├── test_hev.py              # HEV light tests
 │   ├── test_infrared.py         # Infrared light tests
 │   ├── test_multizone.py        # MultiZone light tests
-│   └── test_tile.py             # Tile device tests
+│   └── test_matrix.py           # Matrix light tests
 ├── test_api/
 │   ├── test_api_discovery.py    # High-level discovery tests
 │   ├── test_api_batch_operations.py  # Batch operation tests
@@ -679,7 +679,7 @@ The file structure:
 - **types**: Basic types (uint8, uint16, etc.)
 - **enums**: Protocol enums (LightWaveform, Service, etc.)
 - **fields**: Reusable field structures (HSBK, Rect)
-- **compound_fields**: Complex nested structures (TileDevice)
+- **compound_fields**: Complex nested structures (TileStateDevice)
 - **packets**: Message definitions with pkt_type and category
 
 Local generator quirks:
@@ -725,7 +725,7 @@ Device type detection is performed by `DiscoveredDevice.create_device()`, which 
 of truth for device instantiation across the library.
 
 The detection uses capability-based logic in the following priority order:
-1. Matrix capability → `TileDevice`
+1. Matrix capability → `MatrixLight`
 2. Multizone capability → `MultiZoneLight`
 3. Infrared capability → `InfraredLight`
 4. HEV capability → `HevLight`
