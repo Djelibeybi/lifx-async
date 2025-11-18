@@ -76,7 +76,7 @@ class TestDeviceGroupBatchOperations:
         assert len(group) == 0
         assert group.lights == []
         assert group.multizone_lights == []
-        assert group.tiles == []
+        assert group.matrix_lights == []
 
         # Batch operations should not raise on empty group
         async with group:
@@ -92,7 +92,7 @@ class TestDeviceGroupBatchOperations:
         # Should have mix of device types
         assert len(group.lights) > 0
         assert len(group.multizone_lights) > 0
-        assert len(group.tiles) > 0
+        assert len(group.matrix_lights) > 0
 
         # Test batch operation works on mixed types
         await group.set_power(True, duration=0.0)

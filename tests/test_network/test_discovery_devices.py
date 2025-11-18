@@ -12,8 +12,8 @@ from lifx.devices.base import Device
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.devices.tile import TileDevice
 from lifx.network.discovery import discover_devices
 
 
@@ -47,7 +47,7 @@ class TestDiscoveredDeviceCreateDevice:
         # Verify it's some type of device
         assert isinstance(
             device,
-            Device | Light | MultiZoneLight | HevLight | InfraredLight | TileDevice,
+            Device | Light | MultiZoneLight | HevLight | InfraredLight | MatrixLight,
         )
 
     @pytest.mark.asyncio

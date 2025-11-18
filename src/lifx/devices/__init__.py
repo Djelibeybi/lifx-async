@@ -14,8 +14,8 @@ from lifx.devices.base import (
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
-from lifx.devices.tile import TileDevice, TileEffect, TileInfo, TileRect
 
 __all__ = [
     "Device",
@@ -27,11 +27,10 @@ __all__ = [
     "InfraredLight",
     "Light",
     "LocationInfo",
+    "MatrixEffect",
+    "MatrixLight",
     "MultiZoneEffect",
     "MultiZoneLight",
-    "TileDevice",
-    "TileEffect",
     "TileInfo",
-    "TileRect",
     "WifiInfo",
 ]

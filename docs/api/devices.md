@@ -68,11 +68,11 @@ The `MultiZoneLight` class controls LIFX strips and beams with multiple color zo
       filters:
         - "!^_"
 
-## Tile Device
+## Matrix Light
 
-The `TileDevice` class controls LIFX tile grids with 2D zone control.
+The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 2D zone control.
 
-::: lifx.devices.tile.TileDevice
+::: lifx.devices.matrix.MatrixLight
     options:
       show_root_heading: true
       heading_level: 3
