@@ -2,6 +2,18 @@
 
 <!-- version list -->
 
+## v4.0.0 (2025-11-18)
+
+### Features
+
+- **devices**: Replace TileDevice with MatrixLight implementation
+  ([`1b8bc39`](https://github.com/Djelibeybi/lifx-async/commit/1b8bc397495443ad857c96052de2694a4b350011))
+
+### Breaking Changes
+
+- **devices**: TileDevice class has been removed and replaced with MatrixLight
+
+
 ## v3.1.0 (2025-11-17)
 
 ### Features
