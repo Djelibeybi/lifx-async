@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
+from lifx.api import DeviceGroup
 from lifx.color import HSBK, Colors
-from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.theme import Theme
@@ -14,12 +14,12 @@ from lifx.theme import Theme
 class TestLightApplyTheme:
     """Tests for Light.apply_theme method."""
 
-    def test_apply_theme_basic(self, light: Light) -> None:
-        """Test creating a light for apply_theme tests."""
-        assert light.serial == "d073d5010203"
-
-    async def test_apply_theme_selects_random_color(self, light: Light) -> None:
+    async def test_apply_theme_selects_random_color(
+        self, emulator_devices: DeviceGroup
+    ) -> None:
         """Test that apply_theme selects a random color from theme."""
+        light = emulator_devices[0]
+
         light.set_color = AsyncMock()
         light.set_power = AsyncMock()
         light.get_power = AsyncMock(return_value=False)
@@ -36,8 +36,16 @@ class TestLightApplyTheme:
         # Verify set_power was not called
         light.set_power.assert_not_called()
 
-    async def test_apply_theme_with_duration(self, light: Light) -> None:
+        light.set_color.reset_mock()
+        light.set_power.reset_mock()
+        light.get_power.reset_mock()
+
+    async def test_apply_theme_with_duration(
+        self, emulator_devices: DeviceGroup
+    ) -> None:
         """Test apply_theme with transition duration."""
+        light = emulator_devices[0]
+
         light.get_power = AsyncMock(return_value=True)
         theme = Theme([Colors.RED, Colors.BLUE])
 
@@ -47,8 +55,17 @@ class TestLightApplyTheme:
         args, kwargs = light.set_color.call_args
         assert kwargs.get("duration", 0.0) == 1.5
 
-    async def test_apply_theme_with_power_on(self, light: Light) -> None:
+        light.set_color.reset_mock()
+        light.set_power.reset_mock()
+        light.get_power.reset_mock()
+
+    async def test_apply_theme_with_power_on(
+        self, emulator_devices: DeviceGroup
+    ) -> None:
         """Test apply_theme with power_on=True."""
+        light = emulator_devices[0]
+        light.get_power = AsyncMock(return_value=False)
+
         theme = Theme([Colors.RED])
 
         await light.apply_theme(theme, power_on=True)
@@ -59,8 +76,16 @@ class TestLightApplyTheme:
         args, kwargs = light.set_power.call_args
         assert args[0] is True
 
-    async def test_apply_theme_color_from_theme(self, light: Light) -> None:
+        light.set_color.reset_mock()
+        light.set_power.reset_mock()
+        light.get_power.reset_mock()
+
+    async def test_apply_theme_color_from_theme(
+        self, emulator_devices: DeviceGroup
+    ) -> None:
         """Test that apply_theme receives a color from the theme."""
+        light = emulator_devices[0]
+
         original_color = HSBK(hue=45, saturation=0.8, brightness=0.9, kelvin=4000)
         theme = Theme([original_color])
 
@@ -75,6 +100,10 @@ class TestLightApplyTheme:
         assert applied_color.saturation == original_color.saturation
         assert applied_color.brightness == original_color.brightness
         assert applied_color.kelvin == original_color.kelvin
+
+        light.set_color.reset_mock()
+        light.set_power.reset_mock()
+        light.get_power.reset_mock()
 
 
 class TestMultiZoneLightApplyTheme:

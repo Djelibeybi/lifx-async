@@ -408,53 +408,6 @@ class ProductRegistry:
         """
         return self._products.get(pid)
 
-    def get_device_class_name(self, pid: int, firmware_version: int | None = None) -> str:
-        """Get appropriate device class name for a product.
-
-        Args:
-            pid: Product ID
-            firmware_version: Firmware version (optional)
-
-        Returns:
-            Device class name: "TileDevice", "MultiZoneLight", "HevLight", "InfraredLight", "Light", or "Device"
-        """
-        product = self.get_product(pid)
-        if product is None:
-            # Unknown product - default to Light if we don't know
-            return "Light"
-
-        # Matrix devices (Tiles, Candles) → TileDevice
-        if product.has_matrix:
-            return "TileDevice"
-
-        # MultiZone devices (Strips, Beams) → MultiZoneLight
-        if product.has_multizone:
-            return "MultiZoneLight"
-
-        # HEV lights → HevLight
-        if product.has_hev:
-            return "HevLight"
-
-        # Infrared lights → InfraredLight
-        if product.has_infrared:
-            return "InfraredLight"
-
-        # Color lights → Light
-        if product.has_color:
-            return "Light"
-
-        # Devices with relays (switches/relays) → Device
-        if product.has_relays:
-            return "Device"
-
-        # Devices with buttons but no color (switches) → Device
-        if product.has_buttons:
-            return "Device"
-
-        # Everything else (basic lights, white-to-warm lights) → Light
-        # These have no special capabilities but still support Light protocol
-        return "Light"
-
     def __len__(self) -> int:
         """Get number of products in registry."""
         return len(self._products)
@@ -477,29 +430,27 @@ def get_registry() -> ProductRegistry:
     return _registry
 
 
-def get_product(pid: int) -> ProductInfo | None:
+def get_product(pid: int) -> ProductInfo:
     """Get product info by product ID.
 
     Args:
         pid: Product ID
 
     Returns:
-        ProductInfo if found, None otherwise
+        ProductInfo if found, otherwise a default ProductInfo with no capabilities
     """
-    return _registry.get_product(pid)
-
-
-def get_device_class_name(pid: int, firmware_version: int | None = None) -> str:
-    """Get appropriate device class name for a product.
-
-    Args:
-        pid: Product ID
-        firmware_version: Firmware version (optional)
-
-    Returns:
-        Device class name: "TileDevice", "MultiZoneLight", "Light", or "Device"
-    """
-    return _registry.get_device_class_name(pid, firmware_version)
+    product = _registry.get_product(pid)
+    if product is None:
+        # Return default product with no capabilities for unknown products
+        return ProductInfo(
+            pid=0,
+            name="LIFX Light",
+            vendor=1,
+            capabilities=0,
+            temperature_range=None,
+            min_ext_mz_firmware=None,
+        )
+    return product
 '''
 
     return header + products_code + helper_functions

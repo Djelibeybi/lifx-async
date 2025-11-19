@@ -148,98 +148,48 @@ def emulator_devices(emulator_server: int) -> DeviceGroup:
         - 2 MultiZoneLight devices (d073d5000005, d073d5000006)
         - 1 MatrixLight (d073d5000007)
     """
-    # import ipaddress
-
-    # # Temporarily allow localhost for device creation
-    # original_is_loopback = ipaddress.IPv4Address.is_loopback.fget
-
-    # def fake_is_loopback(_addr_self):
-    #     return False
-
-    # # Patch the property
-    # ipaddress.IPv4Address.is_loopback = property(fake_is_loopback)
     devices: list[Device] = []
 
-    try:
-        devices.extend(
-            [
-                Light(
-                    serial="d073d5000001",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-                Light(
-                    serial="d073d5000002",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-                InfraredLight(
-                    serial="d073d5000003",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-                HevLight(
-                    serial="d073d5000004",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-                MultiZoneLight(
-                    serial="d073d5000005",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-                MultiZoneLight(
-                    serial="d073d5000006",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-                MatrixLight(
-                    serial="d073d5000007",
-                    ip="127.0.0.1",
-                    port=emulator_server,
-                ),
-            ]
-        )
-        return DeviceGroup(devices)
-    finally:
-        pass
-
-        # Restore original
-        # ipaddress.IPv4Address.is_loopback = property(original_is_loopback)
-
-
-# @pytest.fixture(autouse=True)
-# def allow_localhost_for_tests(monkeypatch):
-#     """Allow localhost IPs for testing with emulator.
-
-#     The Device class normally rejects localhost IPs, but for testing with
-#     the emulator running on 127.0.0.1, we need to bypass this validation.
-#     """
-
-#     original_init = Device.__init__
-
-#     def patched_init(self, *args, **kwargs):
-#         # Temporarily replace is_loopback check
-#         original_is_loopback = ipaddress.IPv4Address.is_loopback.fget
-
-#         def fake_is_loopback(_addr_self):
-#             # Allow loopback addresses in tests
-#             return False
-
-#         # Monkeypatch the property
-#         monkeypatch.setattr(
-#             ipaddress.IPv4Address, "is_loopback", property(fake_is_loopback)
-#         )
-
-#         try:
-#             original_init(self, *args, **kwargs)
-#         finally:
-#             # Restore original
-#             monkeypatch.setattr(
-#                 ipaddress.IPv4Address, "is_loopback", property(original_is_loopback)
-#             )
-
-#     monkeypatch.setattr(Device, "__init__", patched_init)
+    devices.extend(
+        [
+            Light(
+                serial="d073d5000001",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+            Light(
+                serial="d073d5000002",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+            InfraredLight(
+                serial="d073d5000003",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+            HevLight(
+                serial="d073d5000004",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+            MultiZoneLight(
+                serial="d073d5000005",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+            MultiZoneLight(
+                serial="d073d5000006",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+            MatrixLight(
+                serial="d073d5000007",
+                ip="127.0.0.1",
+                port=emulator_server,
+            ),
+        ]
+    )
+    return DeviceGroup(devices)
 
 
 @pytest.fixture(autouse=True)
@@ -304,15 +254,6 @@ def ceiling_device(emulator_server: int, emulator_api_url: str):
     )
     response.raise_for_status()  # 201 Created is expected
 
-    # # Temporarily allow localhost for device creation
-    # original_is_loopback = ipaddress.IPv4Address.is_loopback.fget
-
-    # def fake_is_loopback(_addr_self):
-    #     return False
-
-    # # Patch the property
-    # ipaddress.IPv4Address.is_loopback = property(fake_is_loopback)
-
     try:
         ceiling = MatrixLight(
             serial="d073d5000100",
@@ -321,9 +262,6 @@ def ceiling_device(emulator_server: int, emulator_api_url: str):
         )
         yield ceiling
     finally:
-        # Restore original
-        # ipaddress.IPv4Address.is_loopback = property(original_is_loopback)
-
         # Clean up: delete the device
         try:
             requests.delete(
