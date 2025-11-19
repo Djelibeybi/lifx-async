@@ -458,7 +458,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "hatchling", specifier = ">=1.27.0" },
-    { name = "lifx-emulator", specifier = ">=2.3.1" },
+    { name = "lifx-emulator", specifier = ">=2.4.0" },
     { name = "mkdocs-git-revision-date-localized-plugin", specifier = ">=1.4.7" },
     { name = "mkdocs-llmstxt", specifier = ">=0.4.0" },
     { name = "mkdocs-material", specifier = ">=9.6.22" },
@@ -475,7 +475,7 @@ dev = [
 
 [[package]]
 name = "lifx-emulator"
-version = "2.3.1"
+version = "2.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cyclopts" },
@@ -484,9 +484,9 @@ dependencies = [
     { name = "rich" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/41/da/4c89cb747629d17783eaf6f5a3a45917f5ce03466707805b8396e8d4a10e/lifx_emulator-2.3.1.tar.gz", hash = "sha256:4a8869be6a5eec459e2a1ff210d0c502b29b521b73a5fee28133f8533f51a41b", size = 348674, upload-time = "2025-11-18T08:38:56.244Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/2f/e71fc3431524ea25d2457ec63a8e9c792e4ba96c6d4509ef69183c074c2c/lifx_emulator-2.4.0.tar.gz", hash = "sha256:36ad7fa7e0ce9491e4bb377debebf8af46454baec54d62cd5e55d8b753b79f66", size = 352495, upload-time = "2025-11-19T14:56:21.769Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/a4/9251f7ae435bbc0cc59eed949de5b167af44181e65000ed34e473334a277/lifx_emulator-2.3.1-py3-none-any.whl", hash = "sha256:590d82f51658ce76c6816217bb0ad9e8f81e0ec15c0cf1e6a402a60a1f0dded8", size = 127735, upload-time = "2025-11-18T08:38:55.112Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/0d/a71224bfd5916cb38681face34611a7198bc2c7249bedcc099986f8e22d4/lifx_emulator-2.4.0-py3-none-any.whl", hash = "sha256:ebb310bf27e27de34cd3433cef31e6f083094254640d227e2bf7dc4c002b2ad8", size = 128474, upload-time = "2025-11-19T14:56:20.346Z" },
 ]
 
 [[package]]
