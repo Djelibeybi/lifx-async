@@ -3,7 +3,7 @@
 import pytest
 
 from lifx.exceptions import LifxProtocolError as ProtocolError
-from lifx.network.message import MessageBuilder, create_message, parse_message
+from lifx.network.message import create_message, parse_message
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device, Light
 from lifx.protocol.protocol_types import LightHsbk
@@ -81,14 +81,6 @@ class TestCreateMessage:
         assert header.pkt_type == Device.SetPower.PKT_TYPE
         assert header.size == len(message)
 
-    def test_create_message_random_source(self) -> None:
-        """Test creating message with random source."""
-        packet = Device.GetService()
-        message = create_message(packet)  # No source specified
-
-        header = LifxHeader.unpack(message[:36])
-        assert header.source > 0  # Should be non-zero random value
-
     def test_create_message_sequence(self) -> None:
         """Test creating message with sequence number."""
         packet = Device.GetService()
@@ -151,78 +143,3 @@ class TestParseMessage:
 
         with pytest.raises(ProtocolError):
             parse_message(bytes(message))
-
-
-class TestMessageBuilder:
-    """Test MessageBuilder class."""
-
-    def test_builder_consistent_source(self) -> None:
-        """Test builder uses consistent source ID."""
-        builder = MessageBuilder(source=12345)
-        packet1 = Device.GetService()
-        packet2 = Device.GetLabel()
-
-        message1 = builder.create_message(packet1)
-        message2 = builder.create_message(packet2)
-
-        header1 = LifxHeader.unpack(message1[:36])
-        header2 = LifxHeader.unpack(message2[:36])
-
-        assert header1.source == 12345
-        assert header2.source == 12345
-
-    def test_builder_auto_increment_sequence(self) -> None:
-        """Test builder auto-increments sequence numbers."""
-        builder = MessageBuilder(source=12345)
-        packet = Device.GetService()
-
-        message1 = builder.create_message(packet)
-        message2 = builder.create_message(packet)
-        message3 = builder.create_message(packet)
-
-        header1 = LifxHeader.unpack(message1[:36])
-        header2 = LifxHeader.unpack(message2[:36])
-        header3 = LifxHeader.unpack(message3[:36])
-
-        assert header1.sequence == 0
-        assert header2.sequence == 1
-        assert header3.sequence == 2
-
-    def test_builder_sequence_wraps(self) -> None:
-        """Test builder sequence wraps at 255."""
-        builder = MessageBuilder(source=12345)
-        packet = Device.GetService()
-
-        # Set sequence to near max
-        builder._sequence = 254
-
-        message1 = builder.create_message(packet)
-        message2 = builder.create_message(packet)
-        message3 = builder.create_message(packet)
-
-        header1 = LifxHeader.unpack(message1[:36])
-        header2 = LifxHeader.unpack(message2[:36])
-        header3 = LifxHeader.unpack(message3[:36])
-
-        assert header1.sequence == 254
-        assert header2.sequence == 255
-        assert header3.sequence == 0  # Wrapped
-
-    def test_builder_random_source(self) -> None:
-        """Test builder with random source."""
-        builder = MessageBuilder()  # No source specified
-        assert builder.source > 0
-
-    def test_builder_next_sequence(self) -> None:
-        """Test next_sequence method allocates and increments atomically."""
-        builder = MessageBuilder(source=12345)
-
-        # next_sequence() returns 0 and increments to 1
-        seq = builder.next_sequence()
-        assert seq == 0
-
-        # Create message with explicit sequence
-        builder.create_message(Device.GetService(), sequence=seq)
-
-        # next_sequence() returns 1 and increments to 2
-        assert builder.next_sequence() == 1

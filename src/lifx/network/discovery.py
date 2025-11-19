@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -17,7 +18,7 @@ from lifx.const import (
     MAX_RESPONSE_TIME,
 )
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
-from lifx.network.message import MessageBuilder, parse_message
+from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
 from lifx.protocol.base import Packet
 from lifx.protocol.models import Serial
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from lifx.devices.base import Device
 
 _LOGGER = logging.getLogger(__name__)
+_DEFAULT_SEQUENCE_START: int = 0
 
 
 @dataclass
@@ -208,9 +210,13 @@ async def _discover_with_packet(
     start_time = time.time()
 
     async with UdpTransport(port=0, broadcast=True) as transport:
-        builder = MessageBuilder()
-        message = builder.create_message(
+        # Allocate unique source for this discovery session
+        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+
+        message = create_message(
             packet=packet,
+            source=discovery_source,
+            sequence=_DEFAULT_SEQUENCE_START,
             target=b"\x00" * 8,  # Broadcast
             res_required=True,
             ack_required=False,
@@ -270,7 +276,7 @@ async def _discover_with_packet(
                 header, payload = parse_message(data)
 
                 # Validate source
-                if header.source != builder.source:
+                if header.source != discovery_source:
                     continue
 
                 # Check for expected response type
@@ -455,11 +461,15 @@ async def discover_devices(
 
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
+        # Allocate unique source for this discovery session
+        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+
         # Create discovery message
-        builder = MessageBuilder()
         discovery_packet = DevicePackets.GetService()
-        message = builder.create_message(
+        message = create_message(
             packet=discovery_packet,
+            source=discovery_source,
+            sequence=_DEFAULT_SEQUENCE_START,
             target=b"\x00" * 8,  # Broadcast
             res_required=True,
             ack_required=False,
@@ -544,13 +554,13 @@ async def discover_devices(
                 header, payload = parse_message(data)
 
                 # Validate source matches expected source
-                if header.source != builder.source:
+                if header.source != discovery_source:
                     _LOGGER.debug(
                         {
                             "class": "discover_devices",
                             "method": "discover",
                             "action": "source_mismatch",
-                            "expected_source": builder.source,
+                            "expected_source": discovery_source,
                             "received_source": header.source,
                             "source_ip": addr[0],
                         }
