@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.2 (2025-11-19)
+
+### Bug Fixes
+
+- Product registry generation
+  ([`2742a18`](https://github.com/Djelibeybi/lifx-async/commit/2742a184f805ba3863c376670c323f9d078766f3))
+
+
 ## v4.0.1 (2025-11-18)
 
 ### Bug Fixes
