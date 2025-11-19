@@ -9,7 +9,6 @@ from lifx.products import (
     ProductInfo,
     ProductRegistry,
     TemperatureRange,
-    get_device_class_name,
     get_registry,
 )
 
@@ -225,53 +224,6 @@ class TestProductRegistry:
         assert 31 in registry
         assert 999 not in registry
 
-    def test_get_device_class_name_tile(self, registry: ProductRegistry) -> None:
-        """Test device class for tile products."""
-        class_name = registry.get_device_class_name(55)  # LIFX Tile
-        assert class_name == "TileDevice"
-
-    def test_get_device_class_name_multizone(self, registry: ProductRegistry) -> None:
-        """Test device class for multizone products."""
-        class_name = registry.get_device_class_name(31)  # LIFX Z
-        assert class_name == "MultiZoneLight"
-
-    def test_get_device_class_name_hev(self, registry: ProductRegistry) -> None:
-        """Test device class for HEV products."""
-        class_name = registry.get_device_class_name(90)  # LIFX Clean
-        assert class_name == "HevLight"
-
-    def test_get_device_class_name_infrared(self, registry: ProductRegistry) -> None:
-        """Test device class for infrared products."""
-        class_name = registry.get_device_class_name(29)  # LIFX A19 Night Vision
-        assert class_name == "InfraredLight"
-
-    def test_get_device_class_name_light(self, registry: ProductRegistry) -> None:
-        """Test device class for color lights."""
-        class_name = registry.get_device_class_name(1)  # LIFX Original
-        assert class_name == "Light"
-
-    def test_get_device_class_name_white_light(self, registry: ProductRegistry) -> None:
-        """Test device class for basic white lights (brightness-only)."""
-        class_name = registry.get_device_class_name(10)  # LIFX White 800
-        assert class_name == "Light"
-
-    def test_get_device_class_name_white_to_warm(
-        self, registry: ProductRegistry
-    ) -> None:
-        """Test device class for white-to-warm lights (brightness + temperature)."""
-        class_name = registry.get_device_class_name(11)  # LIFX White to Warm 800
-        assert class_name == "Light"
-
-    def test_get_device_class_name_device(self, registry: ProductRegistry) -> None:
-        """Test device class for non-light products (switches)."""
-        class_name = registry.get_device_class_name(89)  # LIFX Switch
-        assert class_name == "Device"
-
-    def test_get_device_class_name_unknown(self, registry: ProductRegistry) -> None:
-        """Test device class for unknown product."""
-        class_name = registry.get_device_class_name(999)
-        assert class_name == "Light"  # Default to Light
-
     def test_load_array_format(self) -> None:
         """Test loading array format (multiple vendors)."""
         data = [
@@ -323,38 +275,3 @@ class TestGlobalFunctions:
         """Test getting global registry."""
         reg = get_registry()
         assert isinstance(reg, ProductRegistry)
-
-    def test_get_device_class_name_with_registry(
-        self, registry: ProductRegistry
-    ) -> None:
-        """Test get_device_class_name function with test registry."""
-        # Test with the sample registry fixture
-        assert registry.get_device_class_name(55) == "TileDevice"
-        assert registry.get_device_class_name(31) == "MultiZoneLight"
-        assert registry.get_device_class_name(90) == "HevLight"
-        assert registry.get_device_class_name(29) == "InfraredLight"
-        assert registry.get_device_class_name(1) == "Light"
-        assert registry.get_device_class_name(10) == "Light"  # White (brightness-only)
-        assert registry.get_device_class_name(11) == "Light"  # White to Warm
-        assert registry.get_device_class_name(89) == "Device"
-
-    def test_get_device_class_name_global(self) -> None:
-        """Test global get_device_class_name function uses pre-loaded registry."""
-        # The global registry should be pre-loaded
-        reg = get_registry()
-        assert reg.is_loaded
-        assert len(reg) > 0
-
-        # Test that function works (using actual product IDs from generated registry)
-        # We can't predict exact PIDs, but we can verify it returns valid class names
-        valid_classes = {
-            "TileDevice",
-            "MultiZoneLight",
-            "HevLight",
-            "InfraredLight",
-            "Light",
-            "Device",
-        }
-        for pid in [1, 10, 27, 31, 55]:  # Common LIFX product IDs
-            class_name = get_device_class_name(pid)
-            assert class_name in valid_classes
