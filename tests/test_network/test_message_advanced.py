@@ -5,34 +5,9 @@ from __future__ import annotations
 import pytest
 
 from lifx.exceptions import LifxProtocolError
-from lifx.network.message import (
-    MessageBuilder,
-    create_message,
-)
+from lifx.network.message import create_message
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
-
-
-class TestMessageBuilderSequence:
-    """Test MessageBuilder sequence handling - edge cases and verification."""
-
-    def test_message_builder_sequence_in_header(self) -> None:
-        """Test that sequence is correctly placed in header."""
-        builder = MessageBuilder(source=12345)
-        builder._sequence = 42
-
-        message = builder.create_message(Device.GetService())
-        header = LifxHeader.unpack(message[:36])
-
-        assert header.sequence == 42
-
-    def test_message_builder_custom_source(self) -> None:
-        """Test MessageBuilder with custom source."""
-        builder = MessageBuilder(source=99999)
-        message = builder.create_message(Device.GetService())
-
-        header = LifxHeader.unpack(message[:36])
-        assert header.source == 99999
 
 
 class TestCreateMessageErrors:
@@ -45,7 +20,7 @@ class TestCreateMessageErrors:
             pass
 
         with pytest.raises(LifxProtocolError, match="PKT_TYPE"):
-            create_message(InvalidPacket())
+            create_message(InvalidPacket(), source=12345)
 
     def test_create_message_with_ack_required(self) -> None:
         """Test creating message with ack_required flag."""

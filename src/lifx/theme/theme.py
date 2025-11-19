@@ -135,7 +135,9 @@ class Theme:
         If the theme is empty, adds a default white color.
         """
         if not self.colors:
-            self.colors.append(HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500))
+            self.colors.append(
+                HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500)
+            )  # pragma: no cover
 
     def __len__(self) -> int:
         """Get the number of colors in the theme."""

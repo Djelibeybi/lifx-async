@@ -285,12 +285,7 @@ class MatrixLight(Light):
         ...     await matrix.set64(tile_index=0, colors=colors, width=8)
     """
 
-    def __init__(
-        self,
-        serial: str,
-        ip: str,
-        port: int = 56700,
-    ) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         """Initialize MatrixLight device.
 
         Args:
@@ -298,7 +293,8 @@ class MatrixLight(Light):
             ip: Device IP address
             port: Device port (default: 56700)
         """
-        super().__init__(serial, ip, port)
+        super().__init__(*args, **kwargs)
+        # Matrix specific properties
         self._device_chain: list[TileInfo] | None = None
         self._tile_effect: MatrixEffect | None = None
 

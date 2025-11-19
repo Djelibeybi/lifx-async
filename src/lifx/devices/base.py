@@ -355,39 +355,24 @@ class Device:
             tg.create_task(self.get_location())
             tg.create_task(self.get_group())
 
-    def _calculate_mac_address(self) -> None:
-        """Calculate MAC address from serial and host firmware version.
+    async def get_mac_address(self) -> str:
+        """Calculate and return the MAC address for this device."""
+        if self._mac_address is None:
+            firmware = (
+                self._host_firmware
+                if self._host_firmware is not None
+                else await self.get_host_firmware()
+            )
+            octets = [
+                int(self.serial[i : i + 2], 16) for i in range(0, len(self.serial), 2)
+            ]
 
-        The MAC address calculation depends on the major version of the host firmware:
-        - Version 2 or 4: MAC address matches the serial
-        - Version 3: MAC address is serial with LSB + 1 (with wraparound from FF to 00)
-        - Unknown versions: Default to serial
+            if firmware.version_major == 3:
+                octets[5] = (octets[5] + 1) % 256
 
-        This method is called automatically when host firmware is fetched.
-        """
-        if self._host_firmware is None:  # pragma: no cover
-            return
+            self._mac_address = ":".join(f"{octet:02x}" for octet in octets)
 
-        # Get serial bytes
-        serial_obj = Serial.from_string(self.serial)
-        serial_bytes = bytearray(serial_obj.value)
-
-        # Check firmware major version
-        major_version = self._host_firmware.version_major
-
-        if major_version in (2, 4):
-            # MAC address matches serial
-            mac_bytes = bytes(serial_bytes)
-        elif major_version == 3:
-            # Add 1 to least significant byte (with wraparound)
-            serial_bytes[5] = (serial_bytes[5] + 1) % 256
-            mac_bytes = bytes(serial_bytes)
-        else:
-            # For unknown versions, default to serial
-            mac_bytes = bytes(serial_bytes)
-
-        # Convert to colon-separated hex string format (e.g., "d0:73:d5:01:02:03")
-        self._mac_address = ":".join(f"{b:02x}" for b in mac_bytes)
+        return self._mac_address
 
     async def _ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
@@ -753,7 +738,8 @@ class Device:
         self._host_firmware = firmware
 
         # Calculate MAC address now that we have firmware info
-        self._calculate_mac_address()
+        if self.mac_address is None:
+            await self.get_mac_address()
 
         _LOGGER.debug(
             {

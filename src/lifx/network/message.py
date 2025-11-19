@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import secrets
 from typing import Any
 
 from lifx.exceptions import LifxProtocolError
@@ -11,7 +10,7 @@ from lifx.protocol.header import LifxHeader
 
 def create_message(
     packet: Any,
-    source: int | None = None,
+    source: int,  # Now required
     target: bytes = b"\x00" * 8,
     sequence: int = 0,
     ack_required: bool = False,
@@ -21,8 +20,8 @@ def create_message(
 
     Args:
         packet: Packet dataclass instance
-        source: Client identifier (random if None)
-        target: Device serial number in bytes
+        source: Client identifier (required, range [2, 0xFFFFFFFF])
+        target: Device serial number in bytes (8 bytes with padding)
         sequence: Sequence number for matching requests/responses
         ack_required: Request acknowledgement
         res_required: Request response
@@ -35,10 +34,6 @@ def create_message(
     """
     if not hasattr(packet, "PKT_TYPE"):
         raise LifxProtocolError(f"Packet must have PKT_TYPE attribute: {type(packet)}")
-
-    # Generate random source if not provided
-    if source is None:
-        source = secrets.randbelow(0xFFFFFFFF) + 1
 
     # Pack payload using the packet's own pack() method
     # This ensures reserved fields and proper field types are handled correctly
@@ -94,69 +89,3 @@ def parse_message(data: bytes) -> tuple[LifxHeader, bytes]:
         )
 
     return header, payload
-
-
-class MessageBuilder:
-    """Builder for creating LIFX messages with consistent source and sequence.
-
-    This class maintains state for source ID and sequence numbers,
-    making it easier to create multiple messages from the same client.
-    """
-
-    def __init__(self, source: int | None = None) -> None:
-        """Initialize message builder.
-
-        Args:
-            source: Client identifier (random if None)
-        """
-        self.source = (
-            source if source is not None else secrets.randbelow(0xFFFFFFFF) + 1
-        )
-        self._sequence = 0
-
-    def create_message(
-        self,
-        packet: Any,
-        target: bytes = b"\x00" * 8,
-        ack_required: bool = False,
-        res_required: bool = True,
-        sequence: int | None = None,
-    ) -> bytes:
-        """Create a message with specified or auto-incrementing sequence.
-
-        Args:
-            packet: Packet dataclass instance
-            target: Device serial number in bytes
-            ack_required: Request acknowledgement
-            res_required: Request response
-            sequence: Explicit sequence number (allocates new one if None)
-
-        Returns:
-            Complete message bytes
-        """
-        # If sequence not provided, allocate atomically
-        if sequence is None:
-            sequence = self.next_sequence()
-
-        msg = create_message(
-            packet=packet,
-            source=self.source,
-            target=target,
-            sequence=sequence,
-            ack_required=ack_required,
-            res_required=res_required,
-        )
-        return msg
-
-    def next_sequence(self) -> int:
-        """Atomically allocate and return the next sequence number.
-
-        This method increments the internal counter immediately to prevent
-        race conditions in concurrent request handling.
-
-        Returns:
-            Allocated sequence number for this request
-        """
-        seq = self._sequence
-        self._sequence = (self._sequence + 1) % 256
-        return seq

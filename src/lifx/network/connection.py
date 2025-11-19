@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import secrets
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -23,7 +24,7 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.network.message import MessageBuilder, parse_message
+from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
@@ -37,6 +38,10 @@ T = TypeVar("T")
 _RETRY_SLEEP_BASE: float = 0.1  # Base sleep time between retries (seconds)
 _STATE_UNHANDLED_PKT_TYPE: int = 223  # Device.StateUnhandled packet type
 _DEFAULT_IDLE_TIMEOUT: float = 0.1  # Idle timeout for response polling within generator
+_RECEIVER_SHUTDOWN_TIMEOUT: float = (
+    2.0  # How long to wait for the receiver to shutdown gracefully
+)
+_RECEIVER_POLL_TIMEOUT: float = 0.1  # How often the background receiver will sleep
 
 
 class DeviceConnection:
@@ -79,7 +84,6 @@ class DeviceConnection:
         serial: str,
         ip: str,
         port: int = LIFX_UDP_PORT,
-        source: int | None = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
@@ -92,7 +96,6 @@ class DeviceConnection:
             serial: Device serial number as 12-digit hex string (e.g., 'd073d5123456')
             ip: Device IP address
             port: Device UDP port (default LIFX_UDP_PORT)
-            source: Client source identifier (random if None)
             max_retries: Maximum number of retry attempts (default: 8)
             timeout: Default timeout for requests in seconds (default: 8.0)
         """
@@ -103,11 +106,16 @@ class DeviceConnection:
         self.timeout = timeout
 
         self._transport: UdpTransport | None = None
-        self._builder = MessageBuilder(source=source)
         self._is_open = False
         self._is_opening = False  # Flag to prevent concurrent open() calls
-        # Lock is created lazily in open() to bind to the current event loop
-        self._request_lock: asyncio.Lock | None = None
+
+        # Background receiver task infrastructure
+        # Key: (source, sequence, serial) → Queue of (header, payload) tuples
+        self._pending_requests: dict[
+            tuple[int, int, str], asyncio.Queue[tuple[LifxHeader, bytes]]
+        ] = {}
+        self._receiver_task: asyncio.Task[None] | None = None
+        self._receiver_shutdown: asyncio.Event | None = None
 
     async def __aenter__(self) -> Self:
         """Enter async context manager."""
@@ -145,15 +153,16 @@ class DeviceConnection:
             if self._is_open:  # pragma: no cover
                 return
 
-            # Create lock bound to the current event loop
-            # This is necessary because locks created in a different event loop
-            # (e.g., during __init__ in a session fixture) cannot be used
-            self._request_lock = asyncio.Lock()
+            # Create shutdown event for receiver task
+            self._receiver_shutdown = asyncio.Event()
 
             # Open transport
             self._transport = UdpTransport(port=0, broadcast=False)
             await self._transport.open()
             self._is_open = True
+
+            # Start background receiver task
+            self._receiver_task = asyncio.create_task(self._background_receiver())
 
             _LOGGER.debug(
                 {
@@ -173,6 +182,33 @@ class DeviceConnection:
             return
 
         self._is_open = False
+
+        # Signal shutdown to receiver task
+        if self._receiver_shutdown:
+            self._receiver_shutdown.set()
+
+        # Wait for receiver to stop (with timeout)
+        if self._receiver_task:
+            try:
+                await asyncio.wait_for(
+                    self._receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
+                )
+            except TimeoutError:
+                self._receiver_task.cancel()
+                try:
+                    await self._receiver_task
+                except asyncio.CancelledError:
+                    pass
+
+        # Cancel all pending request queues
+        for queue in self._pending_requests.values():
+            # Drain queue
+            while not queue.empty():
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+        self._pending_requests.clear()
 
         # Close transport
         if self._transport is not None:
@@ -201,17 +237,19 @@ class DeviceConnection:
     async def send_packet(
         self,
         packet: Any,
+        source: int | None = None,
+        sequence: int = 0,
         ack_required: bool = False,
         res_required: bool = False,
-        sequence: int | None = None,
     ) -> None:
         """Send a packet to the device.
 
         Args:
             packet: Packet dataclass instance
+            source: Client source identifier (optional, allocated if None)
+            sequence: Sequence number (default: 0)
             ack_required: Request acknowledgement
             res_required: Request response
-            sequence: Explicit sequence number (allocates new one if None)
 
         Raises:
             ConnectionError: If connection is not open or send fails
@@ -219,12 +257,18 @@ class DeviceConnection:
         if not self._is_open or self._transport is None:
             raise LifxConnectionError("Connection not open")
 
-        message = self._builder.create_message(
+        # Allocate source if not provided
+        if source is None:
+            source = self._allocate_source()
+
+        target = Serial.from_string(self.serial).to_protocol()
+        message = create_message(
             packet=packet,
-            target=Serial.from_string(self.serial).to_protocol(),
+            source=source,
+            sequence=sequence,
+            target=target,
             ack_required=ack_required,
             res_required=res_required,
-            sequence=sequence,
         )
 
         # Send to device
@@ -281,6 +325,96 @@ class DeviceConnection:
         # This spreads retries across time to avoid synchronized retries
         return random.uniform(0, exponential_delay)  # nosec
 
+    @staticmethod
+    def _allocate_source() -> int:
+        """Allocate unique source identifier for a request.
+
+        LIFX protocol defines source as Uint32, with 0 and 1 reserved.
+        We generate values in range [2, 0xFFFFFFFF].
+
+        Returns:
+            Unique source identifier (range: 2 to 4294967295)
+        """
+        return secrets.randbelow(0xFFFFFFFF - 1) + 2
+
+    async def _background_receiver(self) -> None:
+        """Background task to receive and route packets.
+
+        Continuously receives packets and routes them to waiting requests
+        by correlation key (source, sequence, serial). Unmatched responses
+        are logged and discarded.
+
+        The timeout in receive_packet() does NOT add latency to packet handling
+        because packets are queued immediately by the UDP protocol's
+        datagram_received() callback. The timeout is only for checking the
+        shutdown flag.
+        """
+        while self._receiver_shutdown is None or not self._receiver_shutdown.is_set():
+            try:
+                # Poll with timeout to allow periodic shutdown checks
+                # Note: This timeout does NOT delay packet handling!
+                # Packets are queued immediately when they arrive.
+                header, payload = await self.receive_packet(
+                    timeout=_RECEIVER_POLL_TIMEOUT
+                )
+
+                # Compute correlation key (includes serial for defense-in-depth)
+                # For discovery connections (self.serial == "000000000000"), always use
+                # "000000000000" for correlation regardless of response serial
+                if self.serial == "000000000000":
+                    serial = "000000000000"
+                else:
+                    serial = Serial.from_protocol(header.target).to_string()
+                key = (header.source, header.sequence, serial)
+
+                # Route to waiting request
+                if key in self._pending_requests:
+                    queue = self._pending_requests[key]
+                    try:
+                        # Put in queue for request coroutine to consume
+                        queue.put_nowait((header, payload))
+                    except asyncio.QueueFull:
+                        _LOGGER.warning(
+                            {
+                                "class": "DeviceConnection",
+                                "method": "_background_receiver",
+                                "action": "queue_full",
+                                "source": header.source,
+                                "sequence": header.sequence,
+                                "serial": serial,
+                            }
+                        )
+                else:
+                    # Unmatched response - log and discard
+                    _LOGGER.debug(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "_background_receiver",
+                            "action": "unmatched_response",
+                            "source": header.source,
+                            "sequence": header.sequence,
+                            "serial": serial,
+                            "pkt_type": header.pkt_type,
+                        }
+                    )
+
+            except LifxTimeoutError:
+                # No packet available, continue loop (allows shutdown check)
+                continue
+
+            except Exception as e:
+                if self._is_open:
+                    _LOGGER.error(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "_background_receiver",
+                            "action": "error",
+                            "error": str(e),
+                        },
+                        exc_info=True,
+                    )
+                break
+
     async def _request_stream_impl(
         self,
         request: Any,
@@ -290,8 +424,12 @@ class DeviceConnection:
         """Internal implementation of request_stream with retry logic.
 
         This is an async generator that sends a request and yields each response
-        as it arrives. Callers can break early for single-response requests or
-        continue iterating for multi-response protocols.
+        as it arrives. Uses queue-based correlation for multi-response support.
+
+        All correlation keys (one per retry attempt) are kept registered until
+        the entire request completes or all retries are exhausted. This allows
+        late responses from earlier attempts to be accepted, preventing spurious
+        "unmatched response" logs.
 
         Args:
             request: Request packet to send
@@ -303,7 +441,7 @@ class DeviceConnection:
 
         Raises:
             LifxConnectionError: If connection is not open
-            LifxProtocolError: If response is malformed or has wrong packet type
+            LifxProtocolError: If response correlation validation fails
             LifxTimeoutError: If no response after all retries
             LifxUnsupportedCommandError: If device doesn't support command
         """
@@ -316,102 +454,161 @@ class DeviceConnection:
         if max_retries is None:
             max_retries = self.max_retries
 
-        # Serialize requests on same connection to prevent response mixing
-        # Lock is guaranteed to exist after _ensure_open() is called
-        assert self._request_lock is not None, "Connection must be open"  # nosec
-        async with self._request_lock:
-            # Calculate base timeout for exponential backoff
-            # Normalize so total time across all retries equals overall timeout
-            # Geometric series: 1 + 2 + 4 + ... + 2^n = 2^(n+1) - 1
-            total_weight = (2 ** (max_retries + 1)) - 1
-            base_timeout = timeout / total_weight
+        # Allocate ONE source for this logical request
+        request_source = self._allocate_source()
 
-            # Get expected response type from packet (if defined)
-            expected_pkt_type = getattr(request, "STATE_TYPE", None)
+        # Create ONE shared queue for ALL retry attempts
+        # Responses from any attempt can satisfy the request
+        response_queue: asyncio.Queue[tuple[LifxHeader, bytes]] = asyncio.Queue(
+            maxsize=100
+        )
 
-            last_error: Exception | None = None
-            has_yielded = False
+        # Track all correlation keys for cleanup
+        correlation_keys: list[tuple[int, int, str]] = []
 
+        # Calculate per-attempt timeouts with exponential backoff
+        # Start with a reasonable minimum (100ms) to avoid too-short initial timeouts
+        min_attempt_timeout = 0.1  # 100ms minimum
+        if max_retries > 0:
+            attempt_timeout = max(min_attempt_timeout, timeout / (2 * max_retries))
+        else:
+            # Only one attempt total, use entire timeout
+            attempt_timeout = timeout
+
+        # Idle timeout for multi-response protocols
+        # Stop streaming if no responses for this long after first response
+        idle_timeout = 2.0
+
+        last_error: Exception | None = None
+        has_yielded = False
+        overall_start = time.monotonic()
+
+        try:
             for attempt in range(max_retries + 1):
-                # Calculate timeout with exponential backoff (normalized)
-                current_timeout = base_timeout * (2**attempt)
+                # Calculate current attempt timeout with exponential backoff
+                current_timeout = min(
+                    attempt_timeout * (2**attempt),
+                    timeout - (time.monotonic() - overall_start),
+                )
+
+                # Check if we've exceeded overall timeout budget
+                if current_timeout <= 0:
+                    break
+
+                # Sequence increments per retry
+                sequence = attempt  # 0, 1, 2, 3, ...
+
+                # Correlation key: (source, sequence, serial)
+                key = (request_source, sequence, self.serial)
+
+                # Register correlation key with SHARED queue
+                # All attempts share the same queue so any response can be consumed
+                self._pending_requests[key] = response_queue
+                correlation_keys.append(key)
 
                 try:
-                    # Atomically allocate sequence number for this attempt
-                    sequence = self._builder.next_sequence()
-
                     # Send request
                     await self.send_packet(
                         request,
+                        source=request_source,
+                        sequence=sequence,
                         ack_required=False,
                         res_required=True,
-                        sequence=sequence,
                     )
 
-                    # Track time for this attempt
                     attempt_start = time.monotonic()
                     attempt_deadline = attempt_start + current_timeout
+                    last_response_time = attempt_start
 
-                    # Receive responses until timeout
+                    # Stream responses from queue until timeout or idle timeout
                     while True:
                         remaining_time = attempt_deadline - time.monotonic()
-                        if remaining_time <= 0:  # pragma: no cover
-                            # Attempt timeout reached (race condition edge case)
+                        if remaining_time <= 0:
                             if not has_yielded:
-                                # No response received this attempt
+                                # No responses this attempt, retry
                                 raise TimeoutError(
                                     f"No response within {current_timeout:.3f}s "
                                     f"(attempt {attempt + 1}/{max_retries + 1})"
                                 )
-                            # Had responses, done with this stream
-                            return  # pragma: no cover (race condition edge case)
+                            # Had responses, stream complete
+                            return
 
-                        # Use short idle timeout for polling, but respect remaining time
-                        recv_timeout = min(_DEFAULT_IDLE_TIMEOUT, remaining_time)
+                        # Check idle timeout (only after first response)
+                        if has_yielded:
+                            idle_elapsed = time.monotonic() - last_response_time
+                            if idle_elapsed >= idle_timeout:
+                                # No more responses coming, done
+                                _LOGGER.debug(
+                                    {
+                                        "class": "DeviceConnection",
+                                        "method": "_request_stream_impl",
+                                        "action": "idle_timeout",
+                                        "idle_elapsed": idle_elapsed,
+                                        "responses_received": True,
+                                    }
+                                )
+                                return
 
-                        try:
-                            header, payload = await self.receive_packet(
-                                timeout=recv_timeout
+                            # Adjust remaining time for idle timeout
+                            remaining_time = min(
+                                remaining_time, idle_timeout - idle_elapsed
                             )
-                        except LifxTimeoutError:
-                            # No packet received within poll interval
-                            if has_yielded:
-                                # Already got at least one response, continue polling
-                                continue
-                            # No response yet, check if attempt timeout reached
-                            if time.monotonic() >= attempt_deadline:
+
+                        # Wait for next response from queue
+                        # Can come from ANY registered correlation key
+                        try:
+                            header, payload = await asyncio.wait_for(
+                                response_queue.get(), timeout=remaining_time
+                            )
+                        except TimeoutError:
+                            if not has_yielded:
+                                # No response this attempt, retry
                                 raise TimeoutError(
                                     f"No response within {current_timeout:.3f}s "
                                     f"(attempt {attempt + 1}/{max_retries + 1})"
-                                ) from None
-                            continue
+                                )
+                            # Had responses, done
+                            return
 
-                        # Check sequence number matches
-                        if header.sequence != sequence:
-                            # Not our response, ignore and continue
-                            continue
+                        # Validate correlation (defense in depth)
+                        # For discovery connections, skip serial validation
+                        if self.serial != "000000000000":
+                            response_serial = Serial.from_protocol(
+                                header.target
+                            ).to_string()
+                            if response_serial != self.serial:
+                                raise LifxProtocolError(
+                                    f"Response serial mismatch: "
+                                    f"expected {self.serial}, got {response_serial}"
+                                )
 
-                        # Check for StateUnhandled (unsupported command)
+                        # Validate source matches (sequence can be from any attempt)
+                        if header.source != request_source:
+                            raise LifxProtocolError(
+                                f"Response source mismatch: "
+                                f"expected {request_source}, got {header.source}"
+                            )
+
+                        # Validate sequence is from one of our registered attempts
+                        if header.sequence >= len(correlation_keys):
+                            max_expected = len(correlation_keys) - 1
+                            raise LifxProtocolError(
+                                f"Response sequence out of range: "
+                                f"got {header.sequence}, max expected {max_expected}"
+                            )
+
+                        # Check for StateUnhandled
                         if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
                             raise LifxUnsupportedCommandError(
-                                "Device does not support the requested command "
-                                "(received StateUnhandled)"
+                                "Request unsupported by device: received StateUnhandled"
                             )
 
-                        # Validate packet type if expected type is specified
-                        if (
-                            expected_pkt_type is not None
-                            and header.pkt_type != expected_pkt_type
-                        ):
-                            raise LifxProtocolError(
-                                f"Received unexpected packet type "
-                                f"{header.pkt_type} for sequence {sequence}, "
-                                f"expected {expected_pkt_type}"
-                            )
-
-                        # Valid response - yield it
+                        # Yield response (can be from any retry attempt)
                         has_yielded = True
+                        last_response_time = time.monotonic()
                         yield header, payload
+
+                        # Continue loop to wait for more responses
 
                 except TimeoutError as e:
                     last_error = LifxTimeoutError(str(e))
@@ -424,12 +621,16 @@ class DeviceConnection:
                         # All retries exhausted
                         break
 
-            # All retries exhausted without yielding any response
-            if not has_yielded:
-                # last_error is always set since we only break after TimeoutError
-                raise LifxTimeoutError(
-                    f"No response from {self.ip} after {max_retries + 1} attempts"
-                ) from last_error
+        finally:
+            # Cleanup: remove ALL correlation keys at once
+            for key in correlation_keys:
+                self._pending_requests.pop(key, None)
+
+        # All retries exhausted without yielding any response
+        if not has_yielded:
+            raise LifxTimeoutError(
+                f"No response from {self.ip} after {max_retries + 1} attempts"
+            ) from last_error
 
     async def _request_ack_stream_impl(
         self,
@@ -464,103 +665,94 @@ class DeviceConnection:
         if max_retries is None:
             max_retries = self.max_retries
 
-        # Serialize requests on same connection to prevent response mixing
-        # Lock is guaranteed to exist after _ensure_open() is called
-        assert self._request_lock is not None, "Connection must be open"  # nosec
-        async with self._request_lock:
-            # Calculate base timeout for exponential backoff
-            total_weight = (2 ** (max_retries + 1)) - 1
-            base_timeout = timeout / total_weight
+        # Allocate ONE source for this logical request
+        request_source = self._allocate_source()
 
-            last_error: Exception | None = None
+        # Calculate timeouts with exponential backoff
+        total_weight = (2 ** (max_retries + 1)) - 1
+        base_timeout = timeout / total_weight
 
-            for attempt in range(max_retries + 1):
-                # Calculate timeout with exponential backoff (normalized)
-                current_timeout = base_timeout * (2**attempt)
+        last_error: Exception | None = None
 
+        for attempt in range(max_retries + 1):
+            current_timeout = base_timeout * (2**attempt)
+            sequence = attempt
+
+            # Correlation key: (source, sequence, serial)
+            key = (request_source, sequence, self.serial)
+
+            # Create queue for ACK (bounded, though only expect 1 response)
+            response_queue: asyncio.Queue[tuple[LifxHeader, bytes]] = asyncio.Queue(
+                maxsize=10
+            )
+            self._pending_requests[key] = response_queue
+
+            try:
+                # Send request with ACK required
+                await self.send_packet(
+                    request,
+                    source=request_source,
+                    sequence=sequence,
+                    ack_required=True,
+                    res_required=False,
+                )
+
+                # Wait for single ACK response
                 try:
-                    # Atomically allocate sequence number for this attempt
-                    sequence = self._builder.next_sequence()
-
-                    # Send request with ACK required
-                    await self.send_packet(
-                        request,
-                        ack_required=True,
-                        res_required=False,
-                        sequence=sequence,
+                    header, _payload = await asyncio.wait_for(
+                        response_queue.get(), timeout=current_timeout
+                    )
+                except TimeoutError:
+                    raise TimeoutError(
+                        f"No acknowledgement within {current_timeout:.3f}s "
+                        f"(attempt {attempt + 1}/{max_retries + 1})"
                     )
 
-                    # Track time for this attempt
-                    attempt_start = time.monotonic()
-                    attempt_deadline = attempt_start + current_timeout
+                # Validate correlation
+                if (
+                    header.source != request_source
+                    or header.sequence != sequence
+                    or Serial.from_protocol(header.target).to_string() != self.serial
+                ):
+                    raise LifxProtocolError(
+                        f"ACK correlation mismatch: "
+                        f"expected ({request_source}, {sequence}, {self.serial}), "
+                        f"got ({header.source}, {header.sequence}, "
+                        f"{Serial.from_protocol(header.target).to_string()})"
+                    )
 
-                    # Receive ACK
-                    while True:
-                        remaining_time = attempt_deadline - time.monotonic()
-                        if remaining_time <= 0:  # pragma: no cover
-                            # Race condition edge case
-                            raise TimeoutError(
-                                f"No acknowledgement within {current_timeout:.3f}s "
-                                f"(attempt {attempt + 1}/{max_retries + 1})"
-                            )
+                # Check for StateUnhandled
+                if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
+                    raise LifxUnsupportedCommandError(
+                        "Request unsupported by device: received StateUnhandled"
+                    )
 
-                        recv_timeout = min(_DEFAULT_IDLE_TIMEOUT, remaining_time)
+                # ACK received successfully
+                yield
+                return
 
-                        try:
-                            header, _payload = await self.receive_packet(
-                                timeout=recv_timeout
-                            )
-                        except LifxTimeoutError:
-                            # No packet received within poll interval
-                            if time.monotonic() >= attempt_deadline:
-                                raise TimeoutError(
-                                    f"No acknowledgement within {current_timeout:.3f}s "
-                                    f"(attempt {attempt + 1}/{max_retries + 1})"
-                                ) from None
-                            continue
+            except TimeoutError as e:
+                last_error = LifxTimeoutError(str(e))
+                if attempt < max_retries:
+                    # Sleep with jitter before retry
+                    sleep_time = self._calculate_retry_sleep_with_jitter(attempt)
+                    await asyncio.sleep(sleep_time)
+                    continue
+                else:
+                    break
 
-                        # Check sequence number matches
-                        if header.sequence != sequence:
-                            # Not our ACK, ignore and continue
-                            continue
+            finally:
+                self._pending_requests.pop(key, None)
 
-                        # Check for StateUnhandled (unsupported command)
-                        if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
-                            raise LifxUnsupportedCommandError(
-                                "Device does not support the requested command "
-                                "(received StateUnhandled)"
-                            )
-
-                        # ACK received (any packet with matching sequence is ACK)
-                        yield
-                        return
-
-                except TimeoutError as e:
-                    last_error = LifxTimeoutError(str(e))
-                    if attempt < max_retries:
-                        # Sleep with jitter before retry
-                        sleep_time = self._calculate_retry_sleep_with_jitter(attempt)
-                        await asyncio.sleep(sleep_time)
-                        continue
-                    else:
-                        # All retries exhausted
-                        break
-
-            # All retries exhausted
-            # last_error is always set since we only break after TimeoutError
-            raise LifxTimeoutError(
-                f"No acknowledgement from {self.ip} after {max_retries + 1} attempts"
-            ) from last_error
+        # All retries exhausted
+        raise LifxTimeoutError(
+            f"No acknowledgement from {self.ip} after {max_retries + 1} attempts"
+        ) from last_error
 
     @property
     def is_open(self) -> bool:
         """Check if connection is open."""
         return self._is_open
-
-    @property
-    def source(self) -> int:
-        """Get the source identifier for this connection."""
-        return self._builder.source
 
     async def request_stream(
         self,
