@@ -481,7 +481,6 @@ class TestGenerateRegistryFile:
         assert "def __init__" in code
         assert "def load_from_dict" in code
         assert "def get_product" in code
-        assert "def get_device_class_name" in code
 
         # Check product definitions
         assert "PRODUCTS: dict[int, ProductInfo]" in code
@@ -489,7 +488,6 @@ class TestGenerateRegistryFile:
         # Check helper functions
         assert "def get_registry()" in code
         assert "def get_product(pid: int)" in code
-        assert "def get_device_class_name(pid: int" in code
 
     def test_registry_file_has_product_info_methods(
         self, minimal_products_data: dict
@@ -519,7 +517,6 @@ class TestGenerateRegistryFile:
         # Check registry methods
         assert "def is_loaded(self) -> bool:" in code
         assert "def get_product(self, pid: int)" in code
-        assert "def get_device_class_name(self, pid: int" in code
         assert "def __len__(self)" in code
         assert "def __contains__(self, pid: int)" in code
 

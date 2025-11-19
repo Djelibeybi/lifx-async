@@ -14,7 +14,6 @@ from lifx.products.registry import (
     ProductInfo,
     ProductRegistry,
     TemperatureRange,
-    get_device_class_name,
     get_product,
     get_registry,
 )
@@ -24,7 +23,6 @@ __all__ = [
     "ProductInfo",
     "ProductRegistry",
     "TemperatureRange",
-    "get_device_class_name",
     "get_product",
     "get_registry",
 ]
