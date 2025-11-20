@@ -2,6 +2,7 @@
 
 from lifx.protocol.generator import (
     TypeRegistry,
+    apply_sensor_packet_quirks,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
@@ -1037,3 +1038,65 @@ class TestValidateProtocolSpecAdvanced:
         errors = validate_protocol_spec(protocol)
         assert len(errors) == 1
         assert "UnknownType" in errors[0]
+
+
+class TestSensorPacketQuirks:
+    """Test sensor packet quirks."""
+
+    def test_apply_sensor_packet_quirks_adds_packets(self):
+        """Test that sensor packet quirks add the two sensor packets."""
+        packets = {}
+        result = apply_sensor_packet_quirks(packets)
+
+        assert "sensor" in result
+        assert "SensorGetAmbientLight" in result["sensor"]
+        assert "SensorStateAmbientLight" in result["sensor"]
+
+    def test_sensor_get_ambient_light_structure(self):
+        """Test SensorGetAmbientLight packet structure."""
+        packets = {}
+        result = apply_sensor_packet_quirks(packets)
+
+        get_packet = result["sensor"]["SensorGetAmbientLight"]
+        assert get_packet["pkt_type"] == 401
+        assert get_packet["fields"] == []
+
+    def test_sensor_state_ambient_light_structure(self):
+        """Test SensorStateAmbientLight packet structure."""
+        packets = {}
+        result = apply_sensor_packet_quirks(packets)
+
+        state_packet = result["sensor"]["SensorStateAmbientLight"]
+        assert state_packet["pkt_type"] == 402
+        assert len(state_packet["fields"]) == 1
+        assert state_packet["fields"][0]["name"] == "Lux"
+        assert state_packet["fields"][0]["type"] == "float32"
+
+    def test_apply_sensor_packet_quirks_preserves_existing(self):
+        """Test that applying quirks preserves existing packets."""
+        packets = {
+            "device": {
+                "DeviceGetService": {"pkt_type": 2, "fields": []},
+            }
+        }
+        result = apply_sensor_packet_quirks(packets)
+
+        # Existing packets should still be there
+        assert "device" in result
+        assert "DeviceGetService" in result["device"]
+
+        # New sensor packets should be added
+        assert "sensor" in result
+        assert "SensorGetAmbientLight" in result["sensor"]
+        assert "SensorStateAmbientLight" in result["sensor"]
+
+    def test_apply_sensor_packet_quirks_idempotent(self):
+        """Test that applying quirks multiple times doesn't duplicate."""
+        packets = {}
+        result1 = apply_sensor_packet_quirks(packets)
+        result2 = apply_sensor_packet_quirks(result1)
+
+        # Should still have exactly 2 sensor packets
+        assert len(result2["sensor"]) == 2
+        assert "SensorGetAmbientLight" in result2["sensor"]
+        assert "SensorStateAmbientLight" in result2["sensor"]

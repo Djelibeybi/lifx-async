@@ -209,7 +209,7 @@ except LifxDeviceNotFoundError:
 **Current Behavior**:
 - Selected properties cache static/semi-static values to reduce network requests
 - Cached properties: `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
-- Volatile state (power, color, hev_cycle, zones, tile_colors) is **not** cached - always use `get_*()` methods to fetch fresh data
+- Volatile state (power, color, hev_cycle, zones, tile_colors, ambient_light_level) is **not** cached - always use `get_*()` methods to fetch fresh data
 - Use `get_*()` methods to fetch fresh data from devices for any property
 - No automatic expiration - application controls when to refresh
 - Use `get_color()` to retrieve color, power, and label values as two of the three are volatile and it returns all three in a single request/response pair.
@@ -228,7 +228,7 @@ async with device:
     is_on = power_level > 0
 ```
 
-**Note**: Volatile state properties (`power`, `color`, `hev_cycle`, `zones`, `tile_colors`) were removed as they change too frequently to benefit from caching. Always fetch these values using `get_*()` methods.
+**Note**: Volatile state properties (`power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level`) were removed as they change too frequently to benefit from caching. Always fetch these values using `get_*()` methods.
 
 ## Common Patterns
 
@@ -403,6 +403,31 @@ async with await InfraredLight.from_ip("192.168.1.100") as light:
     brightness = await light.get_infrared()
     print(f"IR brightness: {brightness * 100}%")
 ```
+
+### Ambient Light Sensor (Light Level Detection)
+
+Light devices with ambient light sensors can measure the current ambient light level in lux:
+
+```python
+from lifx.devices import Light
+
+async with await Light.from_ip("192.168.1.100") as light:
+    # Turn light off for accurate reading
+    await light.set_power(False)
+
+    # Get ambient light level in lux
+    lux = await light.get_ambient_light_level()
+    if lux > 0:
+        print(f"Ambient light: {lux} lux")
+    else:
+        print("No ambient light sensor or completely dark")
+```
+
+**Notes:**
+- This is a volatile property and is never cached - always fetched fresh from the device
+- Devices without ambient light sensors return 0.0 (not an error)
+- For accurate readings, the light should be off - otherwise the light's own illumination interferes with the sensor
+- A reading of 0.0 could mean either no sensor or complete darkness
 
 ### MultiZone Light Control (Strips and Beams)
 
@@ -695,6 +720,10 @@ Local generator quirks:
   - Unions starting with "Button" or "Relay" are excluded
   - All packets in "button" and "relay" categories are excluded
   - This keeps the library focused on LIFX lighting devices
+- **sensor packets**: Adds undocumented ambient light sensor packets:
+  - `SensorGetAmbientLight` (401): Request packet with no parameters
+  - `SensorStateAmbientLight` (402): Response packet with lux field (float32)
+  - These packets are not in the official protocol.yml but are supported by LIFX devices with ambient light sensors
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 

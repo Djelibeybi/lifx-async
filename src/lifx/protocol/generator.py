@@ -219,6 +219,43 @@ def apply_tile_effect_parameter_quirk(
     return fields
 
 
+def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
+    """Add undocumented sensor packets for ambient light level reading.
+
+    These packets are not documented in the official protocol.yml but are supported
+    by LIFX devices with ambient light sensors.
+
+    Quirks applied:
+        - SensorGetAmbientLight (401): Request packet with no parameters
+        - SensorStateAmbientLight (402): Response packet with lux field (float)
+
+    Args:
+        packets: Dictionary of packet definitions
+
+    Returns:
+        Dictionary with sensor packet quirks applied
+    """
+    # Ensure sensor category exists
+    if "sensor" not in packets:
+        packets["sensor"] = {}
+
+    # Add SensorGetAmbientLight (401) - request with no parameters
+    packets["sensor"]["SensorGetAmbientLight"] = {
+        "pkt_type": 401,
+        "fields": [],
+    }
+
+    # Add SensorStateAmbientLight (402) - response with lux field
+    packets["sensor"]["SensorStateAmbientLight"] = {
+        "pkt_type": 402,
+        "fields": [
+            {"name": "Lux", "type": "float32"},
+        ],
+    }
+
+    return packets
+
+
 def format_long_import(
     items: list[str], prefix: str = "from lifx.protocol.protocol_types import "
 ) -> str:
@@ -1438,6 +1475,7 @@ def main() -> None:
     # Apply local quirks to fix protocol issues
     print("Applying local protocol quirks...")
     fields = apply_tile_effect_parameter_quirk(fields)
+    packets = apply_sensor_packet_quirks(packets)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {
