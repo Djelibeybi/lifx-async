@@ -1073,6 +1073,39 @@ class MultiZone(Packet):
         color: LightHsbk
 
 
+class Sensor(Packet):
+    """Sensor category packets."""
+
+    @dataclass
+    class GetAmbientLight(Packet):
+        """Packet type 401."""
+
+        PKT_TYPE: ClassVar[int] = 401
+        STATE_TYPE: ClassVar[int] = 402
+        _fields: ClassVar[list[dict[str, Any]]] = []
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "GET"
+        _requires_ack: ClassVar[bool] = False
+        _requires_response: ClassVar[bool] = False
+
+        pass
+
+    @dataclass
+    class StateAmbientLight(Packet):
+        """Packet type 402."""
+
+        PKT_TYPE: ClassVar[int] = 402
+        _fields: ClassVar[list[dict[str, Any]]] = [{"name": "Lux", "type": "float32"}]
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "STATE"
+        _requires_ack: ClassVar[bool] = False
+        _requires_response: ClassVar[bool] = False
+
+        lux: float
+
+
 class Tile(Packet):
     """Tile category packets."""
 
@@ -1339,6 +1372,8 @@ PACKET_REGISTRY: dict[int, type[Packet]] = {
     148: Light.GetLastHevCycleResult,
     149: Light.StateLastHevCycleResult,
     223: Device.StateUnhandled,
+    401: Sensor.GetAmbientLight,
+    402: Sensor.StateAmbientLight,
     501: MultiZone.SetColorZones,
     502: MultiZone.GetColorZones,
     503: MultiZone.StateZone,

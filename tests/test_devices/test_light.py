@@ -202,6 +202,40 @@ class TestLight:
 
         assert power == 65535
 
+    async def test_get_ambient_light_level(self, light: Light) -> None:
+        """Test getting ambient light level from sensor."""
+        # Mock response with lux reading
+        mock_state = packets.Sensor.StateAmbientLight(lux=125.5)
+        light.connection.request.return_value = mock_state
+
+        lux = await light.get_ambient_light_level()
+
+        assert lux == 125.5
+        light.connection.request.assert_called_once()
+        call_args = light.connection.request.call_args
+        packet = call_args[0][0]
+        assert isinstance(packet, packets.Sensor.GetAmbientLight)
+
+    async def test_get_ambient_light_level_zero(self, light: Light) -> None:
+        """Test getting zero ambient light level (dark)."""
+        # Mock response with zero lux (dark)
+        mock_state = packets.Sensor.StateAmbientLight(lux=0.0)
+        light.connection.request.return_value = mock_state
+
+        lux = await light.get_ambient_light_level()
+
+        assert lux == 0.0
+
+    async def test_get_ambient_light_level_high(self, light: Light) -> None:
+        """Test getting high ambient light level (bright)."""
+        # Mock response with high lux (bright daylight)
+        mock_state = packets.Sensor.StateAmbientLight(lux=10000.0)
+        light.connection.request.return_value = mock_state
+
+        lux = await light.get_ambient_light_level()
+
+        assert lux == 10000.0
+
     async def test_set_power(self, light: Light) -> None:
         """Test setting light power."""
         # Mock SET operation returns True

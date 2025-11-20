@@ -379,6 +379,45 @@ class Light(Device):
 
         return state.level
 
+    async def get_ambient_light_level(self) -> float:
+        """Get ambient light level from device sensor.
+
+        Always fetches from device (volatile property, not cached).
+
+        This method queries the device's ambient light sensor to get the current
+        lux reading. Devices without ambient light sensors will return 0.0.
+
+        Returns:
+            Ambient light level in lux (0.0 if device has no sensor)
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxProtocolError: If response is invalid
+
+        Example:
+            ```python
+            lux = await light.get_ambient_light_level()
+            if lux > 0:
+                print(f"Ambient light: {lux} lux")
+            else:
+                print("No ambient light sensor or completely dark")
+            ```
+        """
+        # Request automatically unpacks response
+        state = await self.connection.request(packets.Sensor.GetAmbientLight())
+
+        _LOGGER.debug(
+            {
+                "class": "Light",
+                "method": "get_ambient_light_level",
+                "action": "query",
+                "reply": {"lux": state.lux},
+            }
+        )
+
+        return state.lux
+
     async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
         """Set light power state (specific to light, not device).
 

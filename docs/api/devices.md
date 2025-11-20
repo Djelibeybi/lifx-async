@@ -182,6 +182,35 @@ async def main():
         print(f"IR brightness: {brightness * 100}%")
 ```
 
+### Ambient Light Sensor
+
+Light devices with ambient light sensors can measure the current ambient light level in lux:
+
+```python
+from lifx import Light
+
+
+async def main():
+    async with await Light.from_ip("192.168.1.100") as light:
+        # Ensure light is off for accurate reading
+        await light.set_power(False)
+
+        # Get ambient light level in lux
+        lux = await light.get_ambient_light_level()
+        if lux > 0:
+            print(f"Ambient light: {lux} lux")
+        else:
+            print("No ambient light sensor or completely dark")
+```
+
+**Notes:**
+
+- Devices without ambient light sensors return 0.0 (not an error)
+- For accurate readings, the light should be turned off (otherwise the light's own illumination interferes with the sensor)
+- This is a volatile property - always fetched fresh from the device
+- A reading of 0.0 could mean either no sensor or complete darkness
+- Returns ambient light level in lux (higher values indicate brighter ambient light)
+
 ### MultiZone Control
 
 ```python
