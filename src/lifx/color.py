@@ -119,40 +119,6 @@ class HSBK:
         self._brightness = brightness
         self._kelvin = kelvin
 
-    def __lt__(self, other: object) -> bool:
-        """A color is less than another color if it has lower HSBK values."""
-        if not isinstance(other, HSBK):  # pragma: no cover
-            return NotImplemented
-
-        return (
-            self.hue,
-            self.saturation,
-            self.brightness,
-            self.kelvin,
-        ) < (  # pragma: #no cover
-            other.hue,
-            other.saturation,
-            other.brightness,
-            other.kelvin,
-        )
-
-    def __gt__(self, other: object) -> bool:
-        """A color is more than another color if it has higher HSBK values."""
-        if not isinstance(other, HSBK):  # pragma: no cover
-            return NotImplemented
-
-        return (
-            self.hue,
-            self.saturation,
-            self.brightness,
-            self.kelvin,
-        ) > (  # pragma: no cover
-            other.hue,
-            other.saturation,
-            other.brightness,
-            other.kelvin,
-        )
-
     def __eq__(self, other: object) -> bool:
         """Two colors are equal if they have the same HSBK values."""
         if not isinstance(other, HSBK):  # pragma: no cover
