@@ -31,17 +31,6 @@ Low-level UDP transport for sending and receiving LIFX protocol messages.
       filters:
         - "!^_"
 
-## Message Building
-
-Utilities for building and parsing LIFX protocol messages.
-
-::: lifx.network.message.MessageBuilder
-    options:
-      show_root_heading: true
-      heading_level: 3
-      members_order: source
-      show_if_no_docstring: false
-
 ## Examples
 
 ### Device Discovery
