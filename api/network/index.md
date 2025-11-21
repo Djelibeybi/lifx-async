@@ -100,11 +100,15 @@ async def discover_devices(
 
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
+        # Allocate unique source for this discovery session
+        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+
         # Create discovery message
-        builder = MessageBuilder()
         discovery_packet = DevicePackets.GetService()
-        message = builder.create_message(
+        message = create_message(
             packet=discovery_packet,
+            source=discovery_source,
+            sequence=_DEFAULT_SEQUENCE_START,
             target=b"\x00" * 8,  # Broadcast
             res_required=True,
             ack_required=False,
@@ -189,13 +193,13 @@ async def discover_devices(
                 header, payload = parse_message(data)
 
                 # Validate source matches expected source
-                if header.source != builder.source:
+                if header.source != discovery_source:
                     _LOGGER.debug(
                         {
                             "class": "discover_devices",
                             "method": "discover",
                             "action": "source_mismatch",
-                            "expected_source": builder.source,
+                            "expected_source": discovery_source,
                             "received_source": header.source,
                             "source_ip": addr[0],
                         }
@@ -897,141 +901,6 @@ async def close(self) -> None:
         )
 ```
 
-## Message Building
-
-Utilities for building and parsing LIFX protocol messages.
-
-### MessageBuilder
-
-```python
-MessageBuilder(source: int | None = None)
-```
-
-Builder for creating LIFX messages with consistent source and sequence.
-
-This class maintains state for source ID and sequence numbers, making it easier to create multiple messages from the same client.
-
-| PARAMETER | DESCRIPTION                                        |
-| --------- | -------------------------------------------------- |
-| `source`  | Client identifier (random if None) **TYPE:** \`int |
-
-| METHOD           | DESCRIPTION                                                    |
-| ---------------- | -------------------------------------------------------------- |
-| `create_message` | Create a message with specified or auto-incrementing sequence. |
-| `next_sequence`  | Atomically allocate and return the next sequence number.       |
-
-Source code in `src/lifx/network/message.py`
-
-```python
-def __init__(self, source: int | None = None) -> None:
-    """Initialize message builder.
-
-    Args:
-        source: Client identifier (random if None)
-    """
-    self.source = (
-        source if source is not None else secrets.randbelow(0xFFFFFFFF) + 1
-    )
-    self._sequence = 0
-```
-
-#### Functions
-
-##### create_message
-
-```python
-create_message(
-    packet: Any,
-    target: bytes = b"\x00" * 8,
-    ack_required: bool = False,
-    res_required: bool = True,
-    sequence: int | None = None,
-) -> bytes
-```
-
-Create a message with specified or auto-incrementing sequence.
-
-| PARAMETER      | DESCRIPTION                                                                |
-| -------------- | -------------------------------------------------------------------------- |
-| `packet`       | Packet dataclass instance **TYPE:** `Any`                                  |
-| `target`       | Device serial number in bytes **TYPE:** `bytes` **DEFAULT:** `b'\x00' * 8` |
-| `ack_required` | Request acknowledgement **TYPE:** `bool` **DEFAULT:** `False`              |
-| `res_required` | Request response **TYPE:** `bool` **DEFAULT:** `True`                      |
-| `sequence`     | Explicit sequence number (allocates new one if None) **TYPE:** \`int       |
-
-| RETURNS | DESCRIPTION            |
-| ------- | ---------------------- |
-| `bytes` | Complete message bytes |
-
-Source code in `src/lifx/network/message.py`
-
-```python
-def create_message(
-    self,
-    packet: Any,
-    target: bytes = b"\x00" * 8,
-    ack_required: bool = False,
-    res_required: bool = True,
-    sequence: int | None = None,
-) -> bytes:
-    """Create a message with specified or auto-incrementing sequence.
-
-    Args:
-        packet: Packet dataclass instance
-        target: Device serial number in bytes
-        ack_required: Request acknowledgement
-        res_required: Request response
-        sequence: Explicit sequence number (allocates new one if None)
-
-    Returns:
-        Complete message bytes
-    """
-    # If sequence not provided, allocate atomically
-    if sequence is None:
-        sequence = self.next_sequence()
-
-    msg = create_message(
-        packet=packet,
-        source=self.source,
-        target=target,
-        sequence=sequence,
-        ack_required=ack_required,
-        res_required=res_required,
-    )
-    return msg
-```
-
-##### next_sequence
-
-```python
-next_sequence() -> int
-```
-
-Atomically allocate and return the next sequence number.
-
-This method increments the internal counter immediately to prevent race conditions in concurrent request handling.
-
-| RETURNS | DESCRIPTION                                |
-| ------- | ------------------------------------------ |
-| `int`   | Allocated sequence number for this request |
-
-Source code in `src/lifx/network/message.py`
-
-```python
-def next_sequence(self) -> int:
-    """Atomically allocate and return the next sequence number.
-
-    This method increments the internal counter immediately to prevent
-    race conditions in concurrent request handling.
-
-    Returns:
-        Allocated sequence number for this request
-    """
-    seq = self._sequence
-    self._sequence = (self._sequence + 1) % 256
-    return seq
-```
-
 ## Examples
 
 ### Device Discovery
@@ -1104,7 +973,6 @@ DeviceConnection(
     serial: str,
     ip: str,
     port: int = LIFX_UDP_PORT,
-    source: int | None = None,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
 )
@@ -1151,7 +1019,6 @@ This is lightweight - doesn't actually create a connection. Connection is opened
 | `serial`      | Device serial number as 12-digit hex string (e.g., 'd073d5123456') **TYPE:** `str`                              |
 | `ip`          | Device IP address **TYPE:** `str`                                                                               |
 | `port`        | Device UDP port (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
-| `source`      | Client source identifier (random if None) **TYPE:** \`int                                                       |
 | `max_retries` | Maximum number of retry attempts (default: 8) **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                |
 | `timeout`     | Default timeout for requests in seconds (default: 8.0) **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
@@ -1166,10 +1033,9 @@ This is lightweight - doesn't actually create a connection. Connection is opened
 | `request_stream` | Send request and yield unpacked responses.                  |
 | `request`        | Send request and get single response (convenience wrapper). |
 
-| ATTRIBUTE | DESCRIPTION                                                    |
-| --------- | -------------------------------------------------------------- |
-| `is_open` | Check if connection is open. **TYPE:** `bool`                  |
-| `source`  | Get the source identifier for this connection. **TYPE:** `int` |
+| ATTRIBUTE | DESCRIPTION                                   |
+| --------- | --------------------------------------------- |
+| `is_open` | Check if connection is open. **TYPE:** `bool` |
 
 Source code in `src/lifx/network/connection.py`
 
@@ -1179,7 +1045,6 @@ def __init__(
     serial: str,
     ip: str,
     port: int = LIFX_UDP_PORT,
-    source: int | None = None,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> None:
@@ -1192,7 +1057,6 @@ def __init__(
         serial: Device serial number as 12-digit hex string (e.g., 'd073d5123456')
         ip: Device IP address
         port: Device UDP port (default LIFX_UDP_PORT)
-        source: Client source identifier (random if None)
         max_retries: Maximum number of retry attempts (default: 8)
         timeout: Default timeout for requests in seconds (default: 8.0)
     """
@@ -1203,11 +1067,16 @@ def __init__(
     self.timeout = timeout
 
     self._transport: UdpTransport | None = None
-    self._builder = MessageBuilder(source=source)
     self._is_open = False
     self._is_opening = False  # Flag to prevent concurrent open() calls
-    # Lock is created lazily in open() to bind to the current event loop
-    self._request_lock: asyncio.Lock | None = None
+
+    # Background receiver task infrastructure
+    # Key: (source, sequence, serial) → Queue of (header, payload) tuples
+    self._pending_requests: dict[
+        tuple[int, int, str], asyncio.Queue[tuple[LifxHeader, bytes]]
+    ] = {}
+    self._receiver_task: asyncio.Task[None] | None = None
+    self._receiver_shutdown: asyncio.Event | None = None
 ```
 
 #### Attributes
@@ -1219,14 +1088,6 @@ is_open: bool
 ```
 
 Check if connection is open.
-
-##### source
-
-```python
-source: int
-```
-
-Get the source identifier for this connection.
 
 #### Functions
 
@@ -1307,15 +1168,16 @@ async def open(self) -> None:
         if self._is_open:  # pragma: no cover
             return
 
-        # Create lock bound to the current event loop
-        # This is necessary because locks created in a different event loop
-        # (e.g., during __init__ in a session fixture) cannot be used
-        self._request_lock = asyncio.Lock()
+        # Create shutdown event for receiver task
+        self._receiver_shutdown = asyncio.Event()
 
         # Open transport
         self._transport = UdpTransport(port=0, broadcast=False)
         await self._transport.open()
         self._is_open = True
+
+        # Start background receiver task
+        self._receiver_task = asyncio.create_task(self._background_receiver())
 
         _LOGGER.debug(
             {
@@ -1348,6 +1210,33 @@ async def close(self) -> None:
 
     self._is_open = False
 
+    # Signal shutdown to receiver task
+    if self._receiver_shutdown:
+        self._receiver_shutdown.set()
+
+    # Wait for receiver to stop (with timeout)
+    if self._receiver_task:
+        try:
+            await asyncio.wait_for(
+                self._receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
+            )
+        except TimeoutError:
+            self._receiver_task.cancel()
+            try:
+                await self._receiver_task
+            except asyncio.CancelledError:
+                pass
+
+    # Cancel all pending request queues
+    for queue in self._pending_requests.values():
+        # Drain queue
+        while not queue.empty():
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+    self._pending_requests.clear()
+
     # Close transport
     if self._transport is not None:
         await self._transport.close()
@@ -1368,20 +1257,22 @@ async def close(self) -> None:
 ```python
 send_packet(
     packet: Any,
+    source: int | None = None,
+    sequence: int = 0,
     ack_required: bool = False,
     res_required: bool = False,
-    sequence: int | None = None,
 ) -> None
 ```
 
 Send a packet to the device.
 
-| PARAMETER      | DESCRIPTION                                                          |
-| -------------- | -------------------------------------------------------------------- |
-| `packet`       | Packet dataclass instance **TYPE:** `Any`                            |
-| `ack_required` | Request acknowledgement **TYPE:** `bool` **DEFAULT:** `False`        |
-| `res_required` | Request response **TYPE:** `bool` **DEFAULT:** `False`               |
-| `sequence`     | Explicit sequence number (allocates new one if None) **TYPE:** \`int |
+| PARAMETER      | DESCRIPTION                                                            |
+| -------------- | ---------------------------------------------------------------------- |
+| `packet`       | Packet dataclass instance **TYPE:** `Any`                              |
+| `source`       | Client source identifier (optional, allocated if None) **TYPE:** \`int |
+| `sequence`     | Sequence number (default: 0) **TYPE:** `int` **DEFAULT:** `0`          |
+| `ack_required` | Request acknowledgement **TYPE:** `bool` **DEFAULT:** `False`          |
+| `res_required` | Request response **TYPE:** `bool` **DEFAULT:** `False`                 |
 
 | RAISES            | DESCRIPTION                             |
 | ----------------- | --------------------------------------- |
@@ -1393,17 +1284,19 @@ Source code in `src/lifx/network/connection.py`
 async def send_packet(
     self,
     packet: Any,
+    source: int | None = None,
+    sequence: int = 0,
     ack_required: bool = False,
     res_required: bool = False,
-    sequence: int | None = None,
 ) -> None:
     """Send a packet to the device.
 
     Args:
         packet: Packet dataclass instance
+        source: Client source identifier (optional, allocated if None)
+        sequence: Sequence number (default: 0)
         ack_required: Request acknowledgement
         res_required: Request response
-        sequence: Explicit sequence number (allocates new one if None)
 
     Raises:
         ConnectionError: If connection is not open or send fails
@@ -1411,12 +1304,18 @@ async def send_packet(
     if not self._is_open or self._transport is None:
         raise LifxConnectionError("Connection not open")
 
-    message = self._builder.create_message(
+    # Allocate source if not provided
+    if source is None:
+        source = self._allocate_source()
+
+    target = Serial.from_string(self.serial).to_protocol()
+    message = create_message(
         packet=packet,
-        target=Serial.from_string(self.serial).to_protocol(),
+        source=source,
+        sequence=sequence,
+        target=target,
         ack_required=ack_required,
         res_required=res_required,
-        sequence=sequence,
     )
 
     # Send to device

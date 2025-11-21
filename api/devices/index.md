@@ -66,6 +66,7 @@ async with device:
 | METHOD              | DESCRIPTION                                             |
 | ------------------- | ------------------------------------------------------- |
 | `from_ip`           | Create and return an instance for the given IP address. |
+| `get_mac_address`   | Calculate and return the MAC address for this device.   |
 | `get_label`         | Get device label/name.                                  |
 | `set_label`         | Set device label/name.                                  |
 | `get_power`         | Get device power state.                                 |
@@ -459,6 +460,37 @@ async def from_ip(
 
     raise LifxDeviceNotFoundError()
 ````
+
+##### get_mac_address
+
+```python
+get_mac_address() -> str
+```
+
+Calculate and return the MAC address for this device.
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+async def get_mac_address(self) -> str:
+    """Calculate and return the MAC address for this device."""
+    if self._mac_address is None:
+        firmware = (
+            self._host_firmware
+            if self._host_firmware is not None
+            else await self.get_host_firmware()
+        )
+        octets = [
+            int(self.serial[i : i + 2], 16) for i in range(0, len(self.serial), 2)
+        ]
+
+        if firmware.version_major == 3:
+            octets[5] = (octets[5] + 1) % 256
+
+        self._mac_address = ":".join(f"{octet:02x}" for octet in octets)
+
+    return self._mac_address
+```
 
 ##### get_label
 
@@ -1021,7 +1053,8 @@ async def get_host_firmware(self) -> FirmwareInfo:
     self._host_firmware = firmware
 
     # Calculate MAC address now that we have firmware info
-    self._calculate_mac_address()
+    if self.mac_address is None:
+        await self.get_mac_address()
 
     _LOGGER.debug(
         {
@@ -4829,7 +4862,7 @@ The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 
 ### MatrixLight
 
 ```python
-MatrixLight(serial: str, ip: str, port: int = 56700)
+MatrixLight(*args, **kwargs)
 ```
 
 Bases: `Light`
@@ -4852,11 +4885,11 @@ Example
 
 > > > async with await MatrixLight.from_ip("192.168.1.100") as matrix: ... # Get device chain info ... chain = await matrix.get_device_chain() ... print(f"Device has {len(chain)} tile(s)") ... ... # Set colors on first tile (8x8 = 64 zones) ... colors = [HSBK.from_rgb(255, 0, 0)] * 64 ... await matrix.set64(tile_index=0, colors=colors, width=8)
 
-| PARAMETER | DESCRIPTION                                                       |
-| --------- | ----------------------------------------------------------------- |
-| `serial`  | Device serial number **TYPE:** `str`                              |
-| `ip`      | Device IP address **TYPE:** `str`                                 |
-| `port`    | Device port (default: 56700) **TYPE:** `int` **DEFAULT:** `56700` |
+| PARAMETER | DESCRIPTION                  |
+| --------- | ---------------------------- |
+| `serial`  | Device serial number         |
+| `ip`      | Device IP address            |
+| `port`    | Device port (default: 56700) |
 
 | METHOD              | DESCRIPTION                                                               |
 | ------------------- | ------------------------------------------------------------------------- |
@@ -4879,12 +4912,7 @@ Example
 Source code in `src/lifx/devices/matrix.py`
 
 ```python
-def __init__(
-    self,
-    serial: str,
-    ip: str,
-    port: int = 56700,
-) -> None:
+def __init__(self, *args, **kwargs) -> None:
     """Initialize MatrixLight device.
 
     Args:
@@ -4892,7 +4920,8 @@ def __init__(
         ip: Device IP address
         port: Device port (default: 56700)
     """
-    super().__init__(serial, ip, port)
+    super().__init__(*args, **kwargs)
+    # Matrix specific properties
     self._device_chain: list[TileInfo] | None = None
     self._tile_effect: MatrixEffect | None = None
 ```

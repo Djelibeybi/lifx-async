@@ -129,7 +129,12 @@ def __lt__(self, other: object) -> bool:
     if not isinstance(other, HSBK):  # pragma: no cover
         return NotImplemented
 
-    return (self.hue, self.saturation, self.brightness, self.kelvin) < (
+    return (
+        self.hue,
+        self.saturation,
+        self.brightness,
+        self.kelvin,
+    ) < (  # pragma: #no cover
         other.hue,
         other.saturation,
         other.brightness,
@@ -153,7 +158,12 @@ def __gt__(self, other: object) -> bool:
     if not isinstance(other, HSBK):  # pragma: no cover
         return NotImplemented
 
-    return (self.hue, self.saturation, self.brightness, self.kelvin) > (
+    return (
+        self.hue,
+        self.saturation,
+        self.brightness,
+        self.kelvin,
+    ) > (  # pragma: no cover
         other.hue,
         other.saturation,
         other.brightness,

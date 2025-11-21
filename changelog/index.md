@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.1.0 (2025-11-20)
+
+### Features
+
+- **network**: Replace polling architecture with event-driven background receiver ([`9862eac`](https://github.com/Djelibeybi/lifx-async/commit/9862eac1eea162fa66bf19d277a3772de7c70db1))
+
 ## v4.0.2 (2025-11-19)
 
 ### Bug Fixes
