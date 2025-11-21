@@ -7,7 +7,8 @@ import ipaddress
 import logging
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from math import floor, log10
 from typing import Self
 
 from lifx.const import (
@@ -60,14 +61,16 @@ class WifiInfo:
     """Device WiFi module information.
 
     Attributes:
-        signal: WiFi signal strength (mW)
-        tx: Bytes transmitted since power on
-        rx: Bytes received since power on
+        signal: WiFi signal strength
+        rssi: WiFi RSSI
     """
 
     signal: float
-    tx: int
-    rx: int
+    rssi: int = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Calculate RSSI from signal."""
+        self.rssi = int(floor(10 * log10(self.signal) + 0.5))
 
 
 @dataclass
@@ -677,7 +680,7 @@ class Device:
         Always fetches from device.
 
         Returns:
-            WifiInfo with signal strength and network stats
+            WifiInfo with signal strength and RSSI
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -687,22 +690,22 @@ class Device:
         Example:
             ```python
             wifi_info = await device.get_wifi_info()
-            print(f"WiFi signal: {wifi_info.signal} mW")
-            print(f"TX: {wifi_info.tx} bytes, RX: {wifi_info.rx} bytes")
+            print(f"WiFi signal: {wifi_info.signal}")
+            print(f"WiFi RSSI: {wifi_info.rssi}")
             ```
         """
         # Request WiFi info from device
         state = await self.connection.request(packets.Device.GetWifiInfo())
 
         # Extract WiFi info from response
-        wifi_info = WifiInfo(signal=state.signal, tx=state.tx, rx=state.rx)
+        wifi_info = WifiInfo(signal=state.signal)
 
         _LOGGER.debug(
             {
                 "class": "Device",
                 "method": "get_wifi_info",
                 "action": "query",
-                "reply": {"signal": state.signal, "tx": state.tx, "rx": state.rx},
+                "reply": {"signal": state.signal},
             }
         )
         return wifi_info
