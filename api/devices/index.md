@@ -934,9 +934,9 @@ Get device WiFi module information.
 
 Always fetches from device.
 
-| RETURNS    | DESCRIPTION                                     |
-| ---------- | ----------------------------------------------- |
-| `WifiInfo` | WifiInfo with signal strength and network stats |
+| RETURNS    | DESCRIPTION                            |
+| ---------- | -------------------------------------- |
+| `WifiInfo` | WifiInfo with signal strength and RSSI |
 
 | RAISES                    | DESCRIPTION                |
 | ------------------------- | -------------------------- |
@@ -948,8 +948,8 @@ Example
 
 ```python
 wifi_info = await device.get_wifi_info()
-print(f"WiFi signal: {wifi_info.signal} mW")
-print(f"TX: {wifi_info.tx} bytes, RX: {wifi_info.rx} bytes")
+print(f"WiFi signal: {wifi_info.signal}")
+print(f"WiFi RSSI: {wifi_info.rssi}")
 ```
 
 Source code in `src/lifx/devices/base.py`
@@ -961,7 +961,7 @@ async def get_wifi_info(self) -> WifiInfo:
     Always fetches from device.
 
     Returns:
-        WifiInfo with signal strength and network stats
+        WifiInfo with signal strength and RSSI
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -971,22 +971,22 @@ async def get_wifi_info(self) -> WifiInfo:
     Example:
         ```python
         wifi_info = await device.get_wifi_info()
-        print(f"WiFi signal: {wifi_info.signal} mW")
-        print(f"TX: {wifi_info.tx} bytes, RX: {wifi_info.rx} bytes")
+        print(f"WiFi signal: {wifi_info.signal}")
+        print(f"WiFi RSSI: {wifi_info.rssi}")
         ```
     """
     # Request WiFi info from device
     state = await self.connection.request(packets.Device.GetWifiInfo())
 
     # Extract WiFi info from response
-    wifi_info = WifiInfo(signal=state.signal, tx=state.tx, rx=state.rx)
+    wifi_info = WifiInfo(signal=state.signal)
 
     _LOGGER.debug(
         {
             "class": "Device",
             "method": "get_wifi_info",
             "action": "query",
-            "reply": {"signal": state.signal, "tx": state.tx, "rx": state.rx},
+            "reply": {"signal": state.signal},
         }
     )
     return wifi_info
