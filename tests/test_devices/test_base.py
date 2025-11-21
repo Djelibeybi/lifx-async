@@ -186,17 +186,13 @@ class TestDevice:
 
         # Mock response with WiFi info data
         mock_state = MagicMock()
-        mock_state.signal = 50.5
-        mock_state.tx = 1000
-        mock_state.rx = 2000
+        mock_state.signal = 7.943283890199382e-06
         device.connection.request.return_value = mock_state
 
         wifi_info = await device.get_wifi_info()
 
         assert isinstance(wifi_info, WifiInfo)
-        assert wifi_info.signal == pytest.approx(50.5, abs=0.1)
-        assert wifi_info.tx == 1000
-        assert wifi_info.rx == 2000
+        assert wifi_info.rssi == -51
 
     async def test_get_host_firmware(self, device: Device) -> None:
         """Test getting host firmware info."""
