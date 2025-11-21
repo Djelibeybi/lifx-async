@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v4.2.0 (2025-11-21)
+
+### Documentation
+
+- **api**: Remove obsolete reference to MessageBuilder ([`9847948`](https://github.com/Djelibeybi/lifx-async/commit/98479483d00c875e324d5a7dcd88bf08f11f73cb))
+
+### Features
+
+- **devices**: Add ambient light sensor support ([`75f0673`](https://github.com/Djelibeybi/lifx-async/commit/75f0673dc9b6e8bce30a5b5958215a600925357e))
+
 ## v4.1.0 (2025-11-20)
 
 ### Features
