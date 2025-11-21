@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.2.1 (2025-11-21)
+
+### Bug Fixes
+
+- Get_wifi_info now returns signal and rssi correctly
+  ([`6db03b3`](https://github.com/Djelibeybi/lifx-async/commit/6db03b334a36de6faa1b9749f545f3775a01d7dd))
+
+
 ## v4.2.0 (2025-11-21)
 
 ### Documentation
