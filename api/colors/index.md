@@ -38,8 +38,6 @@ r, g, b = purple.to_rgb()
 
 | METHOD              | DESCRIPTION                                                           |
 | ------------------- | --------------------------------------------------------------------- |
-| `__lt__`            | A color is less than another color if it has lower HSBK values.       |
-| `__gt__`            | A color is more than another color if it has higher HSBK values.      |
 | `__eq__`            | Two colors are equal if they have the same HSBK values.               |
 | `__hash__`          | Returns a hash of this color as an integer.                           |
 | `__str__`           | Return a string representation of the HSBK values for this color.     |
@@ -112,64 +110,6 @@ kelvin: int
 Return kelvin.
 
 #### Functions
-
-##### __lt__
-
-```python
-__lt__(other: object) -> bool
-```
-
-A color is less than another color if it has lower HSBK values.
-
-Source code in `src/lifx/color.py`
-
-```python
-def __lt__(self, other: object) -> bool:
-    """A color is less than another color if it has lower HSBK values."""
-    if not isinstance(other, HSBK):  # pragma: no cover
-        return NotImplemented
-
-    return (
-        self.hue,
-        self.saturation,
-        self.brightness,
-        self.kelvin,
-    ) < (  # pragma: #no cover
-        other.hue,
-        other.saturation,
-        other.brightness,
-        other.kelvin,
-    )
-```
-
-##### __gt__
-
-```python
-__gt__(other: object) -> bool
-```
-
-A color is more than another color if it has higher HSBK values.
-
-Source code in `src/lifx/color.py`
-
-```python
-def __gt__(self, other: object) -> bool:
-    """A color is more than another color if it has higher HSBK values."""
-    if not isinstance(other, HSBK):  # pragma: no cover
-        return NotImplemented
-
-    return (
-        self.hue,
-        self.saturation,
-        self.brightness,
-        self.kelvin,
-    ) > (  # pragma: no cover
-        other.hue,
-        other.saturation,
-        other.brightness,
-        other.kelvin,
-    )
-```
 
 ##### __eq__
 

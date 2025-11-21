@@ -1739,21 +1739,22 @@ async with await Light.from_ip(ip="192.168.1.100") as light:
     await light.set_color(HSBK.from_rgb(255, 0, 0))
 ```
 
-| METHOD                  | DESCRIPTION                                                             |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `get_color`             | Get current light color, power, and label.                              |
-| `set_color`             | Set light color.                                                        |
-| `set_brightness`        | Set light brightness only, preserving hue, saturation, and temperature. |
-| `set_kelvin`            | Set light color temperature, preserving brightness. Saturation is       |
-| `set_hue`               | Set light hue only, preserving saturation, brightness, and temperature. |
-| `set_saturation`        | Set light saturation only, preserving hue, brightness, and temperature. |
-| `get_power`             | Get light power state (specific to light, not device).                  |
-| `set_power`             | Set light power state (specific to light, not device).                  |
-| `set_waveform`          | Apply a waveform effect to the light.                                   |
-| `set_waveform_optional` | Apply a waveform effect with selective color component control.         |
-| `pulse`                 | Pulse the light to a specific color.                                    |
-| `breathe`               | Make the light breathe to a specific color.                             |
-| `apply_theme`           | Apply a theme to this light.                                            |
+| METHOD                    | DESCRIPTION                                                             |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `get_color`               | Get current light color, power, and label.                              |
+| `set_color`               | Set light color.                                                        |
+| `set_brightness`          | Set light brightness only, preserving hue, saturation, and temperature. |
+| `set_kelvin`              | Set light color temperature, preserving brightness. Saturation is       |
+| `set_hue`                 | Set light hue only, preserving saturation, brightness, and temperature. |
+| `set_saturation`          | Set light saturation only, preserving hue, brightness, and temperature. |
+| `get_power`               | Get light power state (specific to light, not device).                  |
+| `get_ambient_light_level` | Get ambient light level from device sensor.                             |
+| `set_power`               | Set light power state (specific to light, not device).                  |
+| `set_waveform`            | Apply a waveform effect to the light.                                   |
+| `set_waveform_optional`   | Apply a waveform effect with selective color component control.         |
+| `pulse`                   | Pulse the light to a specific color.                                    |
+| `breathe`                 | Make the light breathe to a specific color.                             |
+| `apply_theme`             | Apply a theme to this light.                                            |
 
 | ATTRIBUTE    | DESCRIPTION                                                          |
 | ------------ | -------------------------------------------------------------------- |
@@ -2342,6 +2343,81 @@ async def get_power(self) -> int:
     )
 
     return state.level
+````
+
+##### get_ambient_light_level
+
+```python
+get_ambient_light_level() -> float
+```
+
+Get ambient light level from device sensor.
+
+Always fetches from device (volatile property, not cached).
+
+This method queries the device's ambient light sensor to get the current lux reading. Devices without ambient light sensors will return 0.0.
+
+| RETURNS | DESCRIPTION                                              |
+| ------- | -------------------------------------------------------- |
+| `float` | Ambient light level in lux (0.0 if device has no sensor) |
+
+| RAISES                    | DESCRIPTION                |
+| ------------------------- | -------------------------- |
+| `LifxDeviceNotFoundError` | If device is not connected |
+| `LifxTimeoutError`        | If device does not respond |
+| `LifxProtocolError`       | If response is invalid     |
+
+Example
+
+```python
+lux = await light.get_ambient_light_level()
+if lux > 0:
+    print(f"Ambient light: {lux} lux")
+else:
+    print("No ambient light sensor or completely dark")
+```
+
+Source code in `src/lifx/devices/light.py`
+
+````python
+async def get_ambient_light_level(self) -> float:
+    """Get ambient light level from device sensor.
+
+    Always fetches from device (volatile property, not cached).
+
+    This method queries the device's ambient light sensor to get the current
+    lux reading. Devices without ambient light sensors will return 0.0.
+
+    Returns:
+        Ambient light level in lux (0.0 if device has no sensor)
+
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxProtocolError: If response is invalid
+
+    Example:
+        ```python
+        lux = await light.get_ambient_light_level()
+        if lux > 0:
+            print(f"Ambient light: {lux} lux")
+        else:
+            print("No ambient light sensor or completely dark")
+        ```
+    """
+    # Request automatically unpacks response
+    state = await self.connection.request(packets.Sensor.GetAmbientLight())
+
+    _LOGGER.debug(
+        {
+            "class": "Light",
+            "method": "get_ambient_light_level",
+            "action": "query",
+            "reply": {"lux": state.lux},
+        }
+    )
+
+    return state.lux
 ````
 
 ##### set_power
@@ -5900,6 +5976,35 @@ async def main():
         brightness = await light.get_infrared()
         print(f"IR brightness: {brightness * 100}%")
 ```
+
+### Ambient Light Sensor
+
+Light devices with ambient light sensors can measure the current ambient light level in lux:
+
+```python
+from lifx import Light
+
+
+async def main():
+    async with await Light.from_ip("192.168.1.100") as light:
+        # Ensure light is off for accurate reading
+        await light.set_power(False)
+
+        # Get ambient light level in lux
+        lux = await light.get_ambient_light_level()
+        if lux > 0:
+            print(f"Ambient light: {lux} lux")
+        else:
+            print("No ambient light sensor or completely dark")
+```
+
+**Notes:**
+
+- Devices without ambient light sensors return 0.0 (not an error)
+- For accurate readings, the light should be turned off (otherwise the light's own illumination interferes with the sensor)
+- This is a volatile property - always fetched fresh from the device
+- A reading of 0.0 could mean either no sensor or complete darkness
+- Returns ambient light level in lux (higher values indicate brighter ambient light)
 
 ### MultiZone Control
 

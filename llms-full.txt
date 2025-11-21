@@ -8900,8 +8900,6 @@ r, g, b = purple.to_rgb()
 
 | METHOD              | DESCRIPTION                                                           |
 | ------------------- | --------------------------------------------------------------------- |
-| `__lt__`            | A color is less than another color if it has lower HSBK values.       |
-| `__gt__`            | A color is more than another color if it has higher HSBK values.      |
 | `__eq__`            | Two colors are equal if they have the same HSBK values.               |
 | `__hash__`          | Returns a hash of this color as an integer.                           |
 | `__str__`           | Return a string representation of the HSBK values for this color.     |
@@ -8974,64 +8972,6 @@ kelvin: int
 Return kelvin.
 
 #### Functions
-
-##### __lt__
-
-```python
-__lt__(other: object) -> bool
-```
-
-A color is less than another color if it has lower HSBK values.
-
-Source code in `src/lifx/color.py`
-
-```python
-def __lt__(self, other: object) -> bool:
-    """A color is less than another color if it has lower HSBK values."""
-    if not isinstance(other, HSBK):  # pragma: no cover
-        return NotImplemented
-
-    return (
-        self.hue,
-        self.saturation,
-        self.brightness,
-        self.kelvin,
-    ) < (  # pragma: #no cover
-        other.hue,
-        other.saturation,
-        other.brightness,
-        other.kelvin,
-    )
-```
-
-##### __gt__
-
-```python
-__gt__(other: object) -> bool
-```
-
-A color is more than another color if it has higher HSBK values.
-
-Source code in `src/lifx/color.py`
-
-```python
-def __gt__(self, other: object) -> bool:
-    """A color is more than another color if it has higher HSBK values."""
-    if not isinstance(other, HSBK):  # pragma: no cover
-        return NotImplemented
-
-    return (
-        self.hue,
-        self.saturation,
-        self.brightness,
-        self.kelvin,
-    ) > (  # pragma: no cover
-        other.hue,
-        other.saturation,
-        other.brightness,
-        other.kelvin,
-    )
-```
 
 ##### __eq__
 
@@ -11650,21 +11590,22 @@ async with await Light.from_ip(ip="192.168.1.100") as light:
     await light.set_color(HSBK.from_rgb(255, 0, 0))
 ```
 
-| METHOD                  | DESCRIPTION                                                             |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `get_color`             | Get current light color, power, and label.                              |
-| `set_color`             | Set light color.                                                        |
-| `set_brightness`        | Set light brightness only, preserving hue, saturation, and temperature. |
-| `set_kelvin`            | Set light color temperature, preserving brightness. Saturation is       |
-| `set_hue`               | Set light hue only, preserving saturation, brightness, and temperature. |
-| `set_saturation`        | Set light saturation only, preserving hue, brightness, and temperature. |
-| `get_power`             | Get light power state (specific to light, not device).                  |
-| `set_power`             | Set light power state (specific to light, not device).                  |
-| `set_waveform`          | Apply a waveform effect to the light.                                   |
-| `set_waveform_optional` | Apply a waveform effect with selective color component control.         |
-| `pulse`                 | Pulse the light to a specific color.                                    |
-| `breathe`               | Make the light breathe to a specific color.                             |
-| `apply_theme`           | Apply a theme to this light.                                            |
+| METHOD                    | DESCRIPTION                                                             |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `get_color`               | Get current light color, power, and label.                              |
+| `set_color`               | Set light color.                                                        |
+| `set_brightness`          | Set light brightness only, preserving hue, saturation, and temperature. |
+| `set_kelvin`              | Set light color temperature, preserving brightness. Saturation is       |
+| `set_hue`                 | Set light hue only, preserving saturation, brightness, and temperature. |
+| `set_saturation`          | Set light saturation only, preserving hue, brightness, and temperature. |
+| `get_power`               | Get light power state (specific to light, not device).                  |
+| `get_ambient_light_level` | Get ambient light level from device sensor.                             |
+| `set_power`               | Set light power state (specific to light, not device).                  |
+| `set_waveform`            | Apply a waveform effect to the light.                                   |
+| `set_waveform_optional`   | Apply a waveform effect with selective color component control.         |
+| `pulse`                   | Pulse the light to a specific color.                                    |
+| `breathe`                 | Make the light breathe to a specific color.                             |
+| `apply_theme`             | Apply a theme to this light.                                            |
 
 | ATTRIBUTE    | DESCRIPTION                                                          |
 | ------------ | -------------------------------------------------------------------- |
@@ -12253,6 +12194,81 @@ async def get_power(self) -> int:
     )
 
     return state.level
+````
+
+##### get_ambient_light_level
+
+```python
+get_ambient_light_level() -> float
+```
+
+Get ambient light level from device sensor.
+
+Always fetches from device (volatile property, not cached).
+
+This method queries the device's ambient light sensor to get the current lux reading. Devices without ambient light sensors will return 0.0.
+
+| RETURNS | DESCRIPTION                                              |
+| ------- | -------------------------------------------------------- |
+| `float` | Ambient light level in lux (0.0 if device has no sensor) |
+
+| RAISES                    | DESCRIPTION                |
+| ------------------------- | -------------------------- |
+| `LifxDeviceNotFoundError` | If device is not connected |
+| `LifxTimeoutError`        | If device does not respond |
+| `LifxProtocolError`       | If response is invalid     |
+
+Example
+
+```python
+lux = await light.get_ambient_light_level()
+if lux > 0:
+    print(f"Ambient light: {lux} lux")
+else:
+    print("No ambient light sensor or completely dark")
+```
+
+Source code in `src/lifx/devices/light.py`
+
+````python
+async def get_ambient_light_level(self) -> float:
+    """Get ambient light level from device sensor.
+
+    Always fetches from device (volatile property, not cached).
+
+    This method queries the device's ambient light sensor to get the current
+    lux reading. Devices without ambient light sensors will return 0.0.
+
+    Returns:
+        Ambient light level in lux (0.0 if device has no sensor)
+
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxProtocolError: If response is invalid
+
+    Example:
+        ```python
+        lux = await light.get_ambient_light_level()
+        if lux > 0:
+            print(f"Ambient light: {lux} lux")
+        else:
+            print("No ambient light sensor or completely dark")
+        ```
+    """
+    # Request automatically unpacks response
+    state = await self.connection.request(packets.Sensor.GetAmbientLight())
+
+    _LOGGER.debug(
+        {
+            "class": "Light",
+            "method": "get_ambient_light_level",
+            "action": "query",
+            "reply": {"lux": state.lux},
+        }
+    )
+
+    return state.lux
 ````
 
 ##### set_power
@@ -15812,6 +15828,35 @@ async def main():
         print(f"IR brightness: {brightness * 100}%")
 ```
 
+### Ambient Light Sensor
+
+Light devices with ambient light sensors can measure the current ambient light level in lux:
+
+```python
+from lifx import Light
+
+
+async def main():
+    async with await Light.from_ip("192.168.1.100") as light:
+        # Ensure light is off for accurate reading
+        await light.set_power(False)
+
+        # Get ambient light level in lux
+        lux = await light.get_ambient_light_level()
+        if lux > 0:
+            print(f"Ambient light: {lux} lux")
+        else:
+            print("No ambient light sensor or completely dark")
+```
+
+**Notes:**
+
+- Devices without ambient light sensors return 0.0 (not an error)
+- For accurate readings, the light should be turned off (otherwise the light's own illumination interferes with the sensor)
+- This is a volatile property - always fetched fresh from the device
+- A reading of 0.0 could mean either no sensor or complete darkness
+- Returns ambient light level in lux (higher values indicate brighter ambient light)
+
 ### MultiZone Control
 
 ```python
@@ -18762,6 +18807,7 @@ Downloads the official protocol.yml from the LIFX GitHub repository and generate
 | `apply_field_name_quirks`                | Apply quirks to field names to avoid Python built-ins and reserved words.         |
 | `apply_extended_multizone_packet_quirks` | Apply quirks to extended multizone packet names to follow LIFX naming convention. |
 | `apply_tile_effect_parameter_quirk`      | Apply local quirk to fix TileEffectParameter structure.                           |
+| `apply_sensor_packet_quirks`             | Add undocumented sensor packets for ambient light level reading.                  |
 | `format_long_import`                     | Format a long import statement across multiple lines.                             |
 | `format_long_list`                       | Format a long list across multiple lines.                                         |
 | `parse_field_type`                       | Parse a field type string.                                                        |
@@ -19222,6 +19268,69 @@ def apply_tile_effect_parameter_quirk(
             ],
         }
     return fields
+```
+
+##### apply_sensor_packet_quirks
+
+```python
+apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]
+```
+
+Add undocumented sensor packets for ambient light level reading.
+
+These packets are not documented in the official protocol.yml but are supported by LIFX devices with ambient light sensors.
+
+Quirks applied
+
+- SensorGetAmbientLight (401): Request packet with no parameters
+- SensorStateAmbientLight (402): Response packet with lux field (float)
+
+| PARAMETER | DESCRIPTION                                                 |
+| --------- | ----------------------------------------------------------- |
+| `packets` | Dictionary of packet definitions **TYPE:** `dict[str, Any]` |
+
+| RETURNS          | DESCRIPTION                                  |
+| ---------------- | -------------------------------------------- |
+| `dict[str, Any]` | Dictionary with sensor packet quirks applied |
+
+Source code in `src/lifx/protocol/generator.py`
+
+```python
+def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
+    """Add undocumented sensor packets for ambient light level reading.
+
+    These packets are not documented in the official protocol.yml but are supported
+    by LIFX devices with ambient light sensors.
+
+    Quirks applied:
+        - SensorGetAmbientLight (401): Request packet with no parameters
+        - SensorStateAmbientLight (402): Response packet with lux field (float)
+
+    Args:
+        packets: Dictionary of packet definitions
+
+    Returns:
+        Dictionary with sensor packet quirks applied
+    """
+    # Ensure sensor category exists
+    if "sensor" not in packets:
+        packets["sensor"] = {}
+
+    # Add SensorGetAmbientLight (401) - request with no parameters
+    packets["sensor"]["SensorGetAmbientLight"] = {
+        "pkt_type": 401,
+        "fields": [],
+    }
+
+    # Add SensorStateAmbientLight (402) - response with lux field
+    packets["sensor"]["SensorStateAmbientLight"] = {
+        "pkt_type": 402,
+        "fields": [
+            {"name": "Lux", "type": "float32"},
+        ],
+    }
+
+    return packets
 ```
 
 ##### format_long_import
@@ -20862,6 +20971,7 @@ def main() -> None:
     # Apply local quirks to fix protocol issues
     print("Applying local protocol quirks...")
     fields = apply_tile_effect_parameter_quirk(fields)
+    packets = apply_sensor_packet_quirks(packets)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {
