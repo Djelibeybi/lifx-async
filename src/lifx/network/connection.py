@@ -467,13 +467,10 @@ class DeviceConnection:
         correlation_keys: list[tuple[int, int, str]] = []
 
         # Calculate per-attempt timeouts with exponential backoff
-        # Start with a reasonable minimum (100ms) to avoid too-short initial timeouts
-        min_attempt_timeout = 0.1  # 100ms minimum
-        if max_retries > 0:
-            attempt_timeout = max(min_attempt_timeout, timeout / (2 * max_retries))
-        else:
-            # Only one attempt total, use entire timeout
-            attempt_timeout = timeout
+        # Use proper exponential backoff distribution: timeout / (2^(n+1) - 1)
+        # This ensures total of all attempt timeouts equals the overall timeout budget
+        total_weight = (2 ** (max_retries + 1)) - 1
+        base_timeout = timeout / total_weight
 
         # Idle timeout for multi-response protocols
         # Stop streaming if no responses for this long after first response
@@ -482,14 +479,17 @@ class DeviceConnection:
         last_error: Exception | None = None
         has_yielded = False
         overall_start = time.monotonic()
+        total_sleep_time = 0.0  # Track sleep time to exclude from timeout budget
 
         try:
             for attempt in range(max_retries + 1):
                 # Calculate current attempt timeout with exponential backoff
-                current_timeout = min(
-                    attempt_timeout * (2**attempt),
-                    timeout - (time.monotonic() - overall_start),
+                # Exclude sleep time from elapsed time to preserve timeout budget
+                elapsed_response_time = (
+                    time.monotonic() - overall_start - total_sleep_time
                 )
+                ideal_timeout = base_timeout * (2**attempt)
+                current_timeout = min(ideal_timeout, timeout - elapsed_response_time)
 
                 # Check if we've exceeded overall timeout budget
                 if current_timeout <= 0:
@@ -616,6 +616,9 @@ class DeviceConnection:
                         # Sleep with jitter before retry
                         sleep_time = self._calculate_retry_sleep_with_jitter(attempt)
                         await asyncio.sleep(sleep_time)
+                        total_sleep_time += (
+                            sleep_time  # Track sleep to exclude from timeout
+                        )
                         continue
                     else:
                         # All retries exhausted
@@ -673,9 +676,14 @@ class DeviceConnection:
         base_timeout = timeout / total_weight
 
         last_error: Exception | None = None
+        total_sleep_time = 0.0  # Track sleep time to exclude from timeout budget
+        overall_start = time.monotonic()
 
         for attempt in range(max_retries + 1):
-            current_timeout = base_timeout * (2**attempt)
+            # Calculate timeout with budget remaining after excluding sleep time
+            elapsed_response_time = time.monotonic() - overall_start - total_sleep_time
+            ideal_timeout = base_timeout * (2**attempt)
+            current_timeout = min(ideal_timeout, timeout - elapsed_response_time)
             sequence = attempt
 
             # Correlation key: (source, sequence, serial)
@@ -737,6 +745,9 @@ class DeviceConnection:
                     # Sleep with jitter before retry
                     sleep_time = self._calculate_retry_sleep_with_jitter(attempt)
                     await asyncio.sleep(sleep_time)
+                    total_sleep_time += (
+                        sleep_time  # Track sleep to exclude from timeout
+                    )
                     continue
                 else:
                     break
