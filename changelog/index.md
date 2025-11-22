@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.3.1 (2025-11-22)
+
+### Bug Fixes
+
+- Actually rename the matrix methods ([`061aaa7`](https://github.com/Djelibeybi/lifx-async/commit/061aaa7c1931b2fc606363d5acc14ec7fa1b039b))
+
 ## v4.3.0 (2025-11-22)
 
 ### Features
