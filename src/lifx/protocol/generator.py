@@ -256,6 +256,103 @@ def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
     return packets
 
 
+def apply_firmware_effect_enum_quirk(
+    enums: dict[str, Any], fields: dict[str, Any], compound_fields: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.
+
+    Both MultiZone and Tile effects use the same firmware effect protocol values,
+    so they should share a single enum. This quirk:
+    - Creates FirmwareEffect enum combining values from both
+    - Removes MultiZoneEffectType and TileEffectType
+    - Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
+    - Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, RESERVED_*)
+    - Also adds DIRECTION enum for move effect parameter
+
+    Args:
+        enums: Dictionary of enum definitions
+        fields: Dictionary of field definitions
+        compound_fields: Dictionary of compound field definitions
+
+    Returns:
+        Tuple of (enums, fields, compound_fields) with FirmwareEffect enum quirk applied
+    """
+    # Create FirmwareEffect enum with clean names manually
+    # Based on protocol spec:
+    # MultiZone: OFF=0, MOVE=1, reserved=2, reserved=3
+    # Tile: OFF=0, reserved=1, MORPH=2, FLAME=3, reserved=4, SKY=5
+    # Note: Reserved values are intentionally omitted
+    firmware_effect_values = {
+        "OFF": 0,
+        "MOVE": 1,
+        "MORPH": 2,
+        "FLAME": 3,
+        "SKY": 5,
+    }
+
+    # Create FirmwareEffect enum
+    enums["FirmwareEffect"] = firmware_effect_values
+
+    # Remove the old separate enums
+    enums.pop("MultiZoneEffectType", None)
+    enums.pop("TileEffectType", None)
+
+    # Update fields to use FirmwareEffect (check both fields and compound_fields)
+    for field_dict in [fields, compound_fields]:
+        if "MultiZoneEffectSettings" in field_dict:
+            for field in field_dict["MultiZoneEffectSettings"].get("fields", []):
+                if field.get("name") == "Type":
+                    field["type"] = "<FirmwareEffect>"
+
+        if "TileEffectSettings" in field_dict:
+            for field in field_dict["TileEffectSettings"].get("fields", []):
+                if field.get("name") == "Type":
+                    field["type"] = "<FirmwareEffect>"
+
+    # Add DIRECTION enum for move effect
+    enums["Direction"] = {
+        "REVERSED": 0,
+        "FORWARD": 1,
+    }
+
+    return enums, fields, compound_fields
+
+
+def apply_multizone_application_request_quirk(
+    enums: dict[str, Any], packets: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Suppress MultiZoneExtendedApplicationRequest enum.
+
+    Both MultiZoneApplicationRequest and MultiZoneExtendedApplicationRequest have
+    identical values (NO_APPLY=0, APPLY=1, APPLY_ONLY=2), so we suppress the
+    extended version and use the standard one for both SetColorZones and
+    SetExtendedColorZones packets.
+
+    Args:
+        enums: Dictionary of enum definitions
+        packets: Dictionary of packet definitions
+
+    Returns:
+        Tuple of (enums, packets) with MultiZoneExtendedApplicationRequest removed
+        and packets updated to use MultiZoneApplicationRequest
+    """
+    # Remove the duplicate enum
+    enums.pop("MultiZoneExtendedApplicationRequest", None)
+
+    # Update packets in multi_zone category to use MultiZoneApplicationRequest
+    if "multi_zone" in packets:
+        for packet_name, packet_def in packets["multi_zone"].items():
+            if "fields" in packet_def:
+                for field in packet_def["fields"]:
+                    if (
+                        isinstance(field, dict)
+                        and field.get("type") == "<MultiZoneExtendedApplicationRequest>"
+                    ):
+                        field["type"] = "<MultiZoneApplicationRequest>"
+
+    return enums, packets
+
+
 def format_long_import(
     items: list[str], prefix: str = "from lifx.protocol.protocol_types import "
 ) -> str:
@@ -381,7 +478,6 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
         if isinstance(enum_def, dict) and "values" in enum_def:
             # New format: {type: "uint16", values: [{name: "X", value: 1}, ...]}
             values = enum_def["values"]
-            reserved_counter = 0
 
             # Check if all values share a common prefix (enum name)
             expected_prefix = camel_to_snake_upper(enum_name) + "_"
@@ -396,12 +492,12 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
                 protocol_name = item["name"]
                 member_value = item["value"]
 
-                # Handle reserved fields by making names unique
+                # Skip reserved fields entirely
                 if protocol_name.lower() == "reserved":
-                    member_name = f"RESERVED_{reserved_counter}"
-                    reserved_counter += 1
+                    continue
+
                 # Remove redundant prefix for cleaner Python names
-                elif has_common_prefix and protocol_name.startswith(expected_prefix):
+                if has_common_prefix and protocol_name.startswith(expected_prefix):
                     member_name = protocol_name[len(expected_prefix) :]
                 else:
                     member_name = protocol_name
@@ -1474,6 +1570,10 @@ def main() -> None:
 
     # Apply local quirks to fix protocol issues
     print("Applying local protocol quirks...")
+    enums, fields, compound_fields = apply_firmware_effect_enum_quirk(
+        enums, fields, compound_fields
+    )
+    enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
     packets = apply_sensor_packet_quirks(packets)
 

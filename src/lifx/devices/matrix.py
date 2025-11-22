@@ -23,12 +23,12 @@ if TYPE_CHECKING:
 from lifx.devices.light import Light
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
+    FirmwareEffect,
     LightHsbk,
     TileBufferRect,
     TileEffectParameter,
     TileEffectSettings,
     TileEffectSkyType,
-    TileEffectType,
 )
 from lifx.protocol.protocol_types import (
     TileStateDevice as LifxProtocolTileDevice,
@@ -161,7 +161,7 @@ class MatrixEffect:
         cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS sky type)
     """
 
-    effect_type: TileEffectType
+    effect_type: FirmwareEffect
     speed: int
     duration: int = 0
     palette: list[HSBK] | None = None
@@ -178,7 +178,7 @@ class MatrixEffect:
 
         # Validate all fields
         # Speed can be 0 only when effect is OFF
-        if self.effect_type != TileEffectType.OFF:
+        if self.effect_type != FirmwareEffect.OFF:
             self._validate_speed_active(self.speed)
         elif self.speed < 0:
             raise ValueError(f"Effect speed must be non-negative, got {self.speed}")
@@ -190,7 +190,7 @@ class MatrixEffect:
 
         # Apply cloud saturation defaults only for CLOUDS sky type
         if (
-            self.effect_type == TileEffectType.SKY
+            self.effect_type == FirmwareEffect.SKY
             and self.sky_type == TileEffectSkyType.CLOUDS
         ):
             # Apply sensible defaults for cloud saturation if not specified
@@ -722,7 +722,7 @@ class MatrixLight(Light):
 
     async def set_tile_effect(
         self,
-        effect_type: TileEffectType,
+        effect_type: FirmwareEffect,
         speed: int = 3000,
         duration: int = 0,
         palette: list[HSBK] | None = None,
@@ -750,7 +750,7 @@ class MatrixLight(Light):
             ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
             ... ]
             >>> await matrix.set_tile_effect(
-            ...     effect_type=TileEffectType.MORPH,
+            ...     effect_type=FirmwareEffect.MORPH,
             ...     speed=5000,
             ...     palette=rainbow,
             ... )

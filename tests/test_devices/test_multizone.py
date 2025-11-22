@@ -9,7 +9,7 @@ import pytest
 from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
 from lifx.protocol import packets
-from lifx.protocol.protocol_types import MultiZoneEffectType
+from lifx.protocol.protocol_types import Direction, FirmwareEffect
 
 
 def async_generator_mock(items: list):
@@ -429,8 +429,12 @@ class TestMultiZoneLight:
         with pytest.raises(ValueError, match="Too many colors"):
             await multizone_light.set_extended_color_zones(0, colors)
 
-    async def test_get_multizone_effect(self, multizone_light: MultiZoneLight) -> None:
-        """Test getting multizone effect."""
+
+class TestMultiZoneEffect:
+    """Tests for MultiZoneEffect class."""
+
+    async def test_get_effect(self, multizone_light: MultiZoneLight) -> None:
+        """Test getting multizone effect with direction."""
         # Mock StateEffect response
         from lifx.protocol.protocol_types import (
             MultiZoneEffectParameter,
@@ -440,11 +444,49 @@ class TestMultiZoneLight:
         mock_state = packets.MultiZone.StateEffect(
             settings=MultiZoneEffectSettings(
                 instanceid=12345,
-                effect_type=MultiZoneEffectType.MOVE,
+                effect_type=FirmwareEffect.MOVE,
                 speed=5000,
                 duration=0,
                 parameter=MultiZoneEffectParameter(
-                    parameter0=1,  # backward
+                    parameter0=0,
+                    parameter1=int(Direction.REVERSED),  # Direction in parameter1
+                    parameter2=0,
+                    parameter3=0,
+                    parameter4=0,
+                    parameter5=0,
+                    parameter6=0,
+                    parameter7=0,
+                ),
+            )
+        )
+        multizone_light.connection.request.return_value = mock_state
+
+        effect = await multizone_light.get_effect()
+
+        assert effect is not None
+        assert effect.effect_type == FirmwareEffect.MOVE
+        assert effect.speed == 5000
+        assert effect.duration == 0
+        assert effect.parameters[1] == int(Direction.REVERSED)
+        # Verify direction property extracts correctly from parameters
+        assert effect.direction == Direction.REVERSED
+
+    async def test_get_effect_when_off(self, multizone_light: MultiZoneLight) -> None:
+        """Test getting effect returns None when effect type is OFF."""
+        # Mock StateEffect response with OFF effect type
+        from lifx.protocol.protocol_types import (
+            MultiZoneEffectParameter,
+            MultiZoneEffectSettings,
+        )
+
+        mock_state = packets.MultiZone.StateEffect(
+            settings=MultiZoneEffectSettings(
+                instanceid=0,
+                effect_type=FirmwareEffect.OFF,
+                speed=0,
+                duration=0,
+                parameter=MultiZoneEffectParameter(
+                    parameter0=0,
                     parameter1=0,
                     parameter2=0,
                     parameter3=0,
@@ -457,26 +499,23 @@ class TestMultiZoneLight:
         )
         multizone_light.connection.request.return_value = mock_state
 
-        effect = await multizone_light.get_multizone_effect()
+        effect = await multizone_light.get_effect()
 
-        assert effect is not None
-        assert effect.effect_type == MultiZoneEffectType.MOVE
-        assert effect.speed == 5000
-        assert effect.duration == 0
-        assert effect.parameters[0] == 1
+        # When effect type is OFF, get_effect returns None (no active effect)
+        assert effect is None
 
-    async def test_set_multizone_effect(self, multizone_light: MultiZoneLight) -> None:
+    async def test_set_effect(self, multizone_light: MultiZoneLight) -> None:
         """Test setting multizone effect."""
         # Mock SET operation returns True
         multizone_light.connection.request.return_value = True
 
         effect = MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
+            effect_type=FirmwareEffect.MOVE,
             speed=5000,
             duration=60_000_000_000,  # 60 seconds in nanoseconds
             parameters=[0, 0, 0, 0, 0, 0, 0, 0],
         )
-        await multizone_light.set_multizone_effect(effect)
+        await multizone_light.set_effect(effect)
 
         # Verify packet was sent
         multizone_light.connection.request.assert_called_once()
@@ -484,9 +523,34 @@ class TestMultiZoneLight:
         packet = call_args[0][0]
 
         # Verify packet has correct values
-        assert packet.settings.effect_type == MultiZoneEffectType.MOVE
+        assert packet.settings.effect_type == FirmwareEffect.MOVE
         assert packet.settings.speed == 5000
         assert packet.settings.duration == 60_000_000_000
+
+    async def test_set_effect_with_direction(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test setting multizone effect with direction property."""
+        # Mock SET operation returns True
+        multizone_light.connection.request.return_value = True
+
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5000,
+            duration=0,
+        )
+        effect.direction = Direction.FORWARD
+        await multizone_light.set_effect(effect)
+
+        # Verify packet was sent
+        multizone_light.connection.request.assert_called_once()
+        call_args = multizone_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        # Verify packet has correct values including direction in parameter1
+        assert packet.settings.effect_type == FirmwareEffect.MOVE
+        assert packet.settings.speed == 5000
+        assert packet.settings.parameter.parameter1 == int(Direction.FORWARD)
 
     async def test_stop_effect(self, multizone_light: MultiZoneLight) -> None:
         """Test stopping effect."""
@@ -499,75 +563,16 @@ class TestMultiZoneLight:
         multizone_light.connection.request.assert_called_once()
         call_args = multizone_light.connection.request.call_args
         packet = call_args[0][0]
-        assert packet.settings.effect_type == MultiZoneEffectType.OFF
-
-    async def test_set_move_effect_forward(
-        self, multizone_light: MultiZoneLight
-    ) -> None:
-        """Test setting move effect forward."""
-        # Mock SET operation returns True
-        multizone_light.connection.request.return_value = True
-
-        await multizone_light.set_move_effect(speed=5.0, direction="forward")
-
-        # Verify packet was sent
-        multizone_light.connection.request.assert_called_once()
-        call_args = multizone_light.connection.request.call_args
-        packet = call_args[0][0]
-
-        # Verify packet has correct values
-        assert packet.settings.effect_type == MultiZoneEffectType.MOVE
-        assert packet.settings.speed == 5000
-        assert packet.settings.parameter.parameter0 == 0  # Forward
-
-    async def test_set_move_effect_backward(
-        self, multizone_light: MultiZoneLight
-    ) -> None:
-        """Test setting move effect backward."""
-        # Mock SET operation returns True
-        multizone_light.connection.request.return_value = True
-
-        await multizone_light.set_move_effect(
-            speed=10.0, direction="backward", duration=60.0
-        )
-
-        # Verify packet was sent
-        multizone_light.connection.request.assert_called_once()
-        call_args = multizone_light.connection.request.call_args
-        packet = call_args[0][0]
-
-        # Verify packet has correct values
-        assert packet.settings.effect_type == MultiZoneEffectType.MOVE
-        assert packet.settings.speed == 10000
-        assert packet.settings.duration == 60_000_000_000  # 60 seconds in nanoseconds
-        assert packet.settings.parameter.parameter0 == 1  # Backward
-
-    async def test_set_move_effect_invalid_direction(
-        self, multizone_light: MultiZoneLight
-    ) -> None:
-        """Test that invalid direction raises error."""
-        with pytest.raises(ValueError, match="Direction must be"):
-            await multizone_light.set_move_effect(speed=5.0, direction="sideways")
-
-    async def test_set_move_effect_invalid_speed(
-        self, multizone_light: MultiZoneLight
-    ) -> None:
-        """Test that invalid speed raises error."""
-        with pytest.raises(ValueError, match="Speed must be positive"):
-            await multizone_light.set_move_effect(speed=0.0, direction="forward")
-
-
-class TestMultiZoneEffect:
-    """Tests for MultiZoneEffect class."""
+        assert packet.settings.effect_type == FirmwareEffect.OFF
 
     def test_create_effect(self) -> None:
         """Test creating a multizone effect."""
         effect = MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
+            effect_type=FirmwareEffect.MOVE,
             speed=5000,
             duration=0,
         )
-        assert effect.effect_type == MultiZoneEffectType.MOVE
+        assert effect.effect_type == FirmwareEffect.MOVE
         assert effect.speed == 5000
         assert effect.duration == 0
         assert effect.parameters == [0] * 8  # Default parameters
@@ -576,9 +581,47 @@ class TestMultiZoneEffect:
         """Test creating effect with custom parameters."""
         params = [1, 2, 3, 4, 5, 6, 7, 8]
         effect = MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
+            effect_type=FirmwareEffect.MOVE,
             speed=5000,
             duration=0,
             parameters=params,
         )
         assert effect.parameters == params
+
+    def test_direction_property_get_for_move_effect(self) -> None:
+        """Test getting direction for MOVE effect."""
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5000,
+            parameters=[0, int(Direction.REVERSED), 0, 0, 0, 0, 0, 0],
+        )
+        assert effect.direction == Direction.REVERSED
+
+    def test_direction_property_get_for_non_move_effect(self) -> None:
+        """Test getting direction for non-MOVE effect returns None."""
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.OFF,
+            speed=0,
+        )
+        assert effect.direction is None
+
+    def test_direction_property_set_for_move_effect(self) -> None:
+        """Test setting direction for MOVE effect."""
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5000,
+        )
+        effect.direction = Direction.FORWARD
+        assert effect.parameters[1] == int(Direction.FORWARD)
+        assert effect.direction == Direction.FORWARD
+
+    def test_direction_property_set_for_non_move_effect_raises_error(self) -> None:
+        """Test setting direction for non-MOVE effect raises ValueError."""
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.OFF,
+            speed=0,
+        )
+        with pytest.raises(
+            ValueError, match="Direction can only be set for MOVE effects"
+        ):
+            effect.direction = Direction.FORWARD

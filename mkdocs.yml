@@ -148,6 +148,8 @@ plugins:
       - api/network.md: Network layer components
       - api/protocol.md: Protocol layer and packet structures
       - api/exceptions.md: Exception hierarchy
+      Migration:
+      - migration/effect-api-changes.md: Effect API breaking changes and migration guide
       Additional Resources:
       - faq.md: Frequently asked questions
       - changelog.md: Version history and release notes
@@ -215,6 +217,8 @@ nav:
   - Network Layer: api/network.md
   - Protocol Layer: api/protocol.md
   - Exceptions: api/exceptions.md
+- Migration:
+  - Effect API Changes: migration/effect-api-changes.md
 - FAQ: faq.md
 - Changelog: changelog.md
 
