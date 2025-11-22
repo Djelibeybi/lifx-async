@@ -186,11 +186,11 @@ class TestMatrixLight:
             assert colors[0].saturation > 0.9
             assert colors[0].brightness > 0.9
 
-    async def test_get_tile_effect(self, emulator_devices) -> None:
+    async def test_get_effect(self, emulator_devices) -> None:
         """Test getting current tile effect."""
         matrix = emulator_devices[6]
         async with matrix:
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
 
             assert isinstance(effect, MatrixEffect)
             assert isinstance(effect.effect_type, FirmwareEffect)
@@ -204,14 +204,14 @@ class TestMatrixLight:
         matrix = emulator_devices[6]
         async with matrix:
             # Fetch tile effect
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
 
             # Should be cached in property
             assert matrix.tile_effect is not None
             assert isinstance(matrix.tile_effect, MatrixEffect)
             assert matrix.tile_effect == effect
 
-    async def test_set_tile_effect_morph(self, emulator_devices) -> None:
+    async def test_set_effect_morph(self, emulator_devices) -> None:
         """Test setting MORPH effect."""
         matrix = emulator_devices[6]
         async with matrix:
@@ -223,18 +223,18 @@ class TestMatrixLight:
                 HSBK(240, 1.0, 1.0, 3500),  # Blue
             ]
 
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.MORPH,
                 speed=5000,
                 palette=rainbow,
             )
 
             # Verify effect was set
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.MORPH
             assert len(effect.palette) == 4
 
-    async def test_set_tile_effect_flame(self, emulator_devices) -> None:
+    async def test_set_effect_flame(self, emulator_devices) -> None:
         """Test setting FLAME effect."""
         matrix = emulator_devices[6]
         async with matrix:
@@ -246,17 +246,17 @@ class TestMatrixLight:
                 HSBK.from_rgb(255, 215, 0),  # Gold
             ]
 
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.FLAME,
                 speed=3000,
                 palette=fire_palette,
             )
 
             # Verify effect was set
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.FLAME
 
-    async def test_set_tile_effect_sky_sunrise(self, ceiling_device) -> None:
+    async def test_set_effect_sky_sunrise(self, ceiling_device) -> None:
         """Test setting SKY effect with SUNRISE.
 
         SKY effects are only supported on LIFX Ceiling devices
@@ -265,18 +265,18 @@ class TestMatrixLight:
         """
         matrix = ceiling_device
         async with matrix:
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.SKY,
                 speed=2000,
                 sky_type=TileEffectSkyType.SUNRISE,
             )
 
             # Verify effect was set
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.SKY
             assert effect.sky_type == TileEffectSkyType.SUNRISE
 
-    async def test_set_tile_effect_sky_sunset(self, ceiling_device) -> None:
+    async def test_set_effect_sky_sunset(self, ceiling_device) -> None:
         """Test setting SKY effect with SUNSET.
 
         SKY effects are only supported on LIFX Ceiling devices
@@ -285,18 +285,18 @@ class TestMatrixLight:
         """
         matrix = ceiling_device
         async with matrix:
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.SKY,
                 speed=2000,
                 sky_type=TileEffectSkyType.SUNSET,
             )
 
             # Verify effect was set
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.SKY
             assert effect.sky_type == TileEffectSkyType.SUNSET
 
-    async def test_set_tile_effect_sky_clouds(self, ceiling_device) -> None:
+    async def test_set_effect_sky_clouds(self, ceiling_device) -> None:
         """Test setting SKY effect with CLOUDS and saturation parameters.
 
         SKY effects are only supported on LIFX Ceiling devices
@@ -305,7 +305,7 @@ class TestMatrixLight:
         """
         matrix = ceiling_device
         async with matrix:
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.SKY,
                 speed=4000,
                 sky_type=TileEffectSkyType.CLOUDS,
@@ -314,30 +314,30 @@ class TestMatrixLight:
             )
 
             # Verify effect was set
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.SKY
             assert effect.sky_type == TileEffectSkyType.CLOUDS
             assert effect.cloud_saturation_min == 50
             assert effect.cloud_saturation_max == 200
 
-    async def test_set_tile_effect_off(self, emulator_devices) -> None:
+    async def test_set_effect_off(self, emulator_devices) -> None:
         """Test turning off tile effect."""
         matrix = emulator_devices[6]
         async with matrix:
             # First set an effect
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.MORPH,
                 speed=3000,
             )
 
             # Then turn it off
-            await matrix.set_tile_effect(
+            await matrix.set_effect(
                 effect_type=FirmwareEffect.OFF,
                 speed=0,
             )
 
             # Verify effect was turned off
-            effect = await matrix.get_tile_effect()
+            effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.OFF
 
     async def test_get64_large_tile(self, ceiling_device) -> None:

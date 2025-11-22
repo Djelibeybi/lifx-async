@@ -683,17 +683,17 @@ class MatrixLight(Light):
                 colors=colors,
             )
 
-    async def get_tile_effect(self) -> MatrixEffect:
-        """Get current running tile effect.
+    async def get_effect(self) -> MatrixEffect:
+        """Get current running matrix effect.
 
         Returns:
             MatrixEffect describing the current effect state
 
         Example:
-            >>> effect = await matrix.get_tile_effect()
+            >>> effect = await matrix.get_effect()
             >>> print(f"Effect type: {effect.effect_type}")
         """
-        _LOGGER.debug("Getting tile effect for %s", self.label or self.serial)
+        _LOGGER.debug("Getting matrix effect for %s", self.label or self.serial)
 
         response: packets.Tile.StateEffect = await self.connection.request(
             packets.Tile.GetEffect()
@@ -720,7 +720,7 @@ class MatrixLight(Light):
         self._tile_effect = effect
         return effect
 
-    async def set_tile_effect(
+    async def set_effect(
         self,
         effect_type: FirmwareEffect,
         speed: int = 3000,
@@ -730,7 +730,7 @@ class MatrixLight(Light):
         cloud_saturation_min: int = 0,
         cloud_saturation_max: int = 0,
     ) -> None:
-        """Set tile effect with configuration.
+        """Set matrix effect with configuration.
 
         Args:
             effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
@@ -749,14 +749,14 @@ class MatrixLight(Light):
             ...     HSBK(120, 1.0, 1.0, 3500),  # Green
             ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
             ... ]
-            >>> await matrix.set_tile_effect(
+            >>> await matrix.set_effect(
             ...     effect_type=FirmwareEffect.MORPH,
             ...     speed=5000,
             ...     palette=rainbow,
             ... )
         """
         _LOGGER.debug(
-            "Setting tile effect %s (speed=%d) for %s",
+            "Setting matrix effect %s (speed=%d) for %s",
             effect_type,
             speed,
             self.label or self.serial,
