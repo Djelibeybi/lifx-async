@@ -21,7 +21,6 @@ from lifx.protocol.protocol_types import (
     LightWaveform,
     MultiZoneApplicationRequest,
     MultiZoneEffectSettings,
-    MultiZoneExtendedApplicationRequest,
     TileBufferRect,
     TileEffectSettings,
     TileStateDevice,
@@ -899,11 +898,7 @@ class MultiZone(Packet):
         PKT_TYPE: ClassVar[int] = 510
         _fields: ClassVar[list[dict[str, Any]]] = [
             {"name": "Duration", "type": "uint32", "size_bytes": 4},
-            {
-                "name": "Apply",
-                "type": "<MultiZoneExtendedApplicationRequest>",
-                "size_bytes": 1,
-            },
+            {"name": "Apply", "type": "<MultiZoneApplicationRequest>", "size_bytes": 1},
             {"name": "Index", "type": "uint16", "size_bytes": 2},
             {"name": "ColorsCount", "type": "uint8", "size_bytes": 1},
             {"name": "Colors", "type": "[82]<LightHsbk>", "size_bytes": 656},
@@ -915,7 +910,7 @@ class MultiZone(Packet):
         _requires_response: ClassVar[bool] = False
 
         duration: int
-        apply: MultiZoneExtendedApplicationRequest
+        apply: MultiZoneApplicationRequest
         index: int
         colors_count: int
         colors: list[LightHsbk]

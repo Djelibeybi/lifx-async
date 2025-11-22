@@ -79,17 +79,21 @@ Common protocol type definitions and enums.
       heading_level: 4
       members_order: source
 
-### MultiZone Effect Type
+### Firmware Effect
 
-::: lifx.protocol.protocol_types.MultiZoneEffectType
+Unified enum for all firmware effects (multizone and matrix devices):
+
+::: lifx.protocol.protocol_types.FirmwareEffect
     options:
       show_root_heading: true
       heading_level: 4
       members_order: source
 
-### Tile Effect Type
+### Direction
 
-::: lifx.protocol.protocol_types.TileEffectType
+Direction enum for MOVE effects:
+
+::: lifx.protocol.protocol_types.Direction
     options:
       show_root_heading: true
       heading_level: 4
@@ -311,6 +315,23 @@ LightWaveform.SINE
 LightWaveform.HALF_SINE
 LightWaveform.TRIANGLE
 LightWaveform.PULSE
+```
+
+### Firmware Effects
+
+```python
+from lifx.protocol.protocol_types import FirmwareEffect, Direction
+
+# Available firmware effects (for multizone and matrix devices)
+FirmwareEffect.OFF
+FirmwareEffect.MOVE       # MultiZone only
+FirmwareEffect.MORPH      # Tile/Matrix only
+FirmwareEffect.FLAME      # Tile/Matrix only
+FirmwareEffect.SKY        # Tile/Matrix only
+
+# Direction for MOVE effects
+Direction.FORWARD   # Move forward through zones
+Direction.REVERSED  # Move backward through zones
 ```
 
 ## Product Registry

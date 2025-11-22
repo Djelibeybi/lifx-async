@@ -43,9 +43,9 @@ from lifx.exceptions import (
 from lifx.network.discovery import DiscoveredDevice, discover_devices
 from lifx.products import ProductCapability, ProductInfo, ProductRegistry
 from lifx.protocol.protocol_types import (
+    Direction,
+    FirmwareEffect,
     LightWaveform,
-    MultiZoneEffectType,
-    TileEffectType,
 )
 from lifx.theme import Theme, ThemeLibrary, get_theme
 
@@ -98,8 +98,8 @@ __all__ = [
     "ProductCapability",
     # Protocol types
     "LightWaveform",
-    "MultiZoneEffectType",
-    "TileEffectType",
+    "FirmwareEffect",
+    "Direction",
     # Exceptions
     "LifxError",
     "LifxDeviceNotFoundError",

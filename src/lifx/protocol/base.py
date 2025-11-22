@@ -172,8 +172,7 @@ class Packet:
             "LightLastHevCycleResult",
             "LightWaveform",
             "MultiZoneApplicationRequest",
-            "MultiZoneEffectType",
-            "MultiZoneExtendedApplicationRequest",
+            "FirmwareEffect",
         }
         is_enum = is_nested and base_type in enum_types
 
@@ -215,11 +214,10 @@ class Packet:
         from lifx.protocol import serializer
         from lifx.protocol.protocol_types import (
             DeviceService,
+            FirmwareEffect,
             LightLastHevCycleResult,
             LightWaveform,
             MultiZoneApplicationRequest,
-            MultiZoneEffectType,
-            MultiZoneExtendedApplicationRequest,
         )
 
         # Parse field type
@@ -231,8 +229,7 @@ class Packet:
             "LightLastHevCycleResult": LightLastHevCycleResult,
             "LightWaveform": LightWaveform,
             "MultiZoneApplicationRequest": MultiZoneApplicationRequest,
-            "MultiZoneEffectType": MultiZoneEffectType,
-            "MultiZoneExtendedApplicationRequest": MultiZoneExtendedApplicationRequest,
+            "FirmwareEffect": FirmwareEffect,
         }
         is_enum = is_nested and base_type in enum_types
 

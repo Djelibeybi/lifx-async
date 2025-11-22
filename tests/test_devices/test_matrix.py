@@ -6,7 +6,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
-from lifx.protocol.protocol_types import TileEffectSkyType, TileEffectType
+from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
 
 
 class TestMatrixLight:
@@ -193,7 +193,7 @@ class TestMatrixLight:
             effect = await matrix.get_tile_effect()
 
             assert isinstance(effect, MatrixEffect)
-            assert isinstance(effect.effect_type, TileEffectType)
+            assert isinstance(effect.effect_type, FirmwareEffect)
             assert effect.speed >= 0
             assert effect.duration >= 0
             assert effect.palette is not None
@@ -224,14 +224,14 @@ class TestMatrixLight:
             ]
 
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.MORPH,
+                effect_type=FirmwareEffect.MORPH,
                 speed=5000,
                 palette=rainbow,
             )
 
             # Verify effect was set
             effect = await matrix.get_tile_effect()
-            assert effect.effect_type == TileEffectType.MORPH
+            assert effect.effect_type == FirmwareEffect.MORPH
             assert len(effect.palette) == 4
 
     async def test_set_tile_effect_flame(self, emulator_devices) -> None:
@@ -247,14 +247,14 @@ class TestMatrixLight:
             ]
 
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.FLAME,
+                effect_type=FirmwareEffect.FLAME,
                 speed=3000,
                 palette=fire_palette,
             )
 
             # Verify effect was set
             effect = await matrix.get_tile_effect()
-            assert effect.effect_type == TileEffectType.FLAME
+            assert effect.effect_type == FirmwareEffect.FLAME
 
     async def test_set_tile_effect_sky_sunrise(self, ceiling_device) -> None:
         """Test setting SKY effect with SUNRISE.
@@ -266,14 +266,14 @@ class TestMatrixLight:
         matrix = ceiling_device
         async with matrix:
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.SKY,
+                effect_type=FirmwareEffect.SKY,
                 speed=2000,
                 sky_type=TileEffectSkyType.SUNRISE,
             )
 
             # Verify effect was set
             effect = await matrix.get_tile_effect()
-            assert effect.effect_type == TileEffectType.SKY
+            assert effect.effect_type == FirmwareEffect.SKY
             assert effect.sky_type == TileEffectSkyType.SUNRISE
 
     async def test_set_tile_effect_sky_sunset(self, ceiling_device) -> None:
@@ -286,14 +286,14 @@ class TestMatrixLight:
         matrix = ceiling_device
         async with matrix:
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.SKY,
+                effect_type=FirmwareEffect.SKY,
                 speed=2000,
                 sky_type=TileEffectSkyType.SUNSET,
             )
 
             # Verify effect was set
             effect = await matrix.get_tile_effect()
-            assert effect.effect_type == TileEffectType.SKY
+            assert effect.effect_type == FirmwareEffect.SKY
             assert effect.sky_type == TileEffectSkyType.SUNSET
 
     async def test_set_tile_effect_sky_clouds(self, ceiling_device) -> None:
@@ -306,7 +306,7 @@ class TestMatrixLight:
         matrix = ceiling_device
         async with matrix:
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.SKY,
+                effect_type=FirmwareEffect.SKY,
                 speed=4000,
                 sky_type=TileEffectSkyType.CLOUDS,
                 cloud_saturation_min=50,
@@ -315,7 +315,7 @@ class TestMatrixLight:
 
             # Verify effect was set
             effect = await matrix.get_tile_effect()
-            assert effect.effect_type == TileEffectType.SKY
+            assert effect.effect_type == FirmwareEffect.SKY
             assert effect.sky_type == TileEffectSkyType.CLOUDS
             assert effect.cloud_saturation_min == 50
             assert effect.cloud_saturation_max == 200
@@ -326,19 +326,19 @@ class TestMatrixLight:
         async with matrix:
             # First set an effect
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.MORPH,
+                effect_type=FirmwareEffect.MORPH,
                 speed=3000,
             )
 
             # Then turn it off
             await matrix.set_tile_effect(
-                effect_type=TileEffectType.OFF,
+                effect_type=FirmwareEffect.OFF,
                 speed=0,
             )
 
             # Verify effect was turned off
             effect = await matrix.get_tile_effect()
-            assert effect.effect_type == TileEffectType.OFF
+            assert effect.effect_type == FirmwareEffect.OFF
 
     async def test_get64_large_tile(self, ceiling_device) -> None:
         """Test getting colors from 16x8 tile (128 zones).
@@ -581,12 +581,12 @@ class TestMatrixEffect:
     def test_create_valid_effect(self) -> None:
         """Test creating a valid matrix effect."""
         effect = MatrixEffect(
-            effect_type=TileEffectType.MORPH,
+            effect_type=FirmwareEffect.MORPH,
             speed=3000,
             duration=0,
             palette=[HSBK(0, 1.0, 1.0, 3500)],
         )
-        assert effect.effect_type == TileEffectType.MORPH
+        assert effect.effect_type == FirmwareEffect.MORPH
         assert effect.speed == 3000
         assert effect.duration == 0
         assert effect.palette is not None
@@ -595,7 +595,7 @@ class TestMatrixEffect:
     def test_effect_default_palette(self) -> None:
         """Test that default palette is created if not provided."""
         effect = MatrixEffect(
-            effect_type=TileEffectType.MORPH,
+            effect_type=FirmwareEffect.MORPH,
             speed=3000,
         )
         assert effect.palette is not None
@@ -606,7 +606,7 @@ class TestMatrixEffect:
         """Test that negative speed raises error."""
         with pytest.raises(ValueError, match="speed must be non-negative"):
             MatrixEffect(
-                effect_type=TileEffectType.OFF,
+                effect_type=FirmwareEffect.OFF,
                 speed=-1,
             )
 
@@ -616,24 +616,24 @@ class TestMatrixEffect:
             ValueError, match="speed must be positive for active effects"
         ):
             MatrixEffect(
-                effect_type=TileEffectType.MORPH,
+                effect_type=FirmwareEffect.MORPH,
                 speed=0,
             )
 
     def test_effect_validation_zero_speed_for_off(self) -> None:
         """Test that zero speed is valid when effect is OFF."""
         effect = MatrixEffect(
-            effect_type=TileEffectType.OFF,
+            effect_type=FirmwareEffect.OFF,
             speed=0,
         )
         assert effect.speed == 0
-        assert effect.effect_type == TileEffectType.OFF
+        assert effect.effect_type == FirmwareEffect.OFF
 
     def test_effect_validation_negative_duration(self) -> None:
         """Test that negative duration raises error."""
         with pytest.raises(ValueError, match="duration must be non-negative"):
             MatrixEffect(
-                effect_type=TileEffectType.MORPH,
+                effect_type=FirmwareEffect.MORPH,
                 speed=3000,
                 duration=-1,
             )
@@ -642,7 +642,7 @@ class TestMatrixEffect:
         """Test that empty palette raises error."""
         with pytest.raises(ValueError, match="palette must contain at least one color"):
             MatrixEffect(
-                effect_type=TileEffectType.MORPH,
+                effect_type=FirmwareEffect.MORPH,
                 speed=3000,
                 palette=[],
             )
@@ -652,7 +652,7 @@ class TestMatrixEffect:
         palette = [HSBK(0, 1.0, 1.0, 3500)] * 17
         with pytest.raises(ValueError, match="at most 16 colors"):
             MatrixEffect(
-                effect_type=TileEffectType.MORPH,
+                effect_type=FirmwareEffect.MORPH,
                 speed=3000,
                 palette=palette,
             )
@@ -661,14 +661,14 @@ class TestMatrixEffect:
         """Test that saturation values out of range raise error."""
         with pytest.raises(ValueError, match="cloud_saturation_min must be in range"):
             MatrixEffect(
-                effect_type=TileEffectType.SKY,
+                effect_type=FirmwareEffect.SKY,
                 speed=3000,
                 cloud_saturation_min=256,
             )
 
         with pytest.raises(ValueError, match="cloud_saturation_max must be in range"):
             MatrixEffect(
-                effect_type=TileEffectType.SKY,
+                effect_type=FirmwareEffect.SKY,
                 speed=3000,
                 cloud_saturation_max=-1,
             )

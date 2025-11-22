@@ -15,7 +15,6 @@ from lifx.effects.const import COLOR_UPDATE_SETTLE_DELAY, ZONE_UPDATE_SETTLE_DEL
 from lifx.effects.models import PreState
 from lifx.protocol.protocol_types import (
     MultiZoneApplicationRequest,
-    MultiZoneExtendedApplicationRequest,
 )
 
 if TYPE_CHECKING:
@@ -176,7 +175,7 @@ class DeviceStateManager:
                     zone_index=0,
                     colors=zone_colors,
                     duration=0.0,
-                    apply=MultiZoneExtendedApplicationRequest.APPLY,
+                    apply=MultiZoneApplicationRequest.APPLY,
                 )
             else:
                 # Restore zones individually, applying only on last update
