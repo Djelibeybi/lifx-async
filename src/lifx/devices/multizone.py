@@ -13,13 +13,14 @@ from lifx.protocol import packets
 if TYPE_CHECKING:
     from lifx.theme import Theme
 from lifx.protocol.protocol_types import (
+    Direction,
+    FirmwareEffect,
     MultiZoneApplicationRequest,
     MultiZoneEffectParameter,
     MultiZoneEffectSettings,
-    MultiZoneEffectType,
 )
 from lifx.protocol.protocol_types import (
-    MultiZoneExtendedApplicationRequest as ExtendedAppReq,
+    MultiZoneApplicationRequest as ExtendedAppReq,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ class MultiZoneEffect:
         parameters: Effect-specific parameters (8 uint32 values)
     """
 
-    effect_type: MultiZoneEffectType
+    effect_type: FirmwareEffect
     speed: int
     duration: int = 0
     parameters: list[int] | None = None
@@ -97,6 +98,34 @@ class MultiZoneEffect:
                 raise ValueError(
                     f"Parameter {i} must be a uint32 (0-{2**32 - 1}), got {param}"
                 )
+
+    @property
+    def direction(self) -> Direction | None:
+        """Get direction for MOVE effect.
+
+        Returns:
+            Direction enum value if effect is MOVE, None otherwise
+        """
+        if self.effect_type != FirmwareEffect.MOVE:
+            return None
+        return Direction(self.parameters[1]) if self.parameters else Direction.FORWARD
+
+    @direction.setter
+    def direction(self, value: Direction) -> None:
+        """Set direction for MOVE effect.
+
+        Args:
+            value: Direction enum value
+
+        Raises:
+            ValueError: If effect type is not MOVE
+        """
+        if self.effect_type != FirmwareEffect.MOVE:
+            raise ValueError(
+                f"Direction can only be set for MOVE effects, "
+                f"current type is {self.effect_type.name}"
+            )
+        self.parameters = [0, int(value), 0, 0, 0, 0, 0, 0, 0]
 
 
 class MultiZoneLight(Light):
@@ -560,7 +589,7 @@ class MultiZoneLight(Light):
             }
         )
 
-    async def get_multizone_effect(self) -> MultiZoneEffect | None:
+    async def get_effect(self) -> MultiZoneEffect | None:
         """Get current multizone effect.
 
         Always fetches from device.
@@ -576,9 +605,13 @@ class MultiZoneLight(Light):
 
         Example:
             ```python
-            effect = await light.get_multizone_effect()
+            from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+            effect = await light.get_effect()
             if effect:
-                print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
+                print(f"Effect: {effect.effect_type.name}, Speed: {effect.speed}ms")
+                if effect.effect_type == FirmwareEffect.MOVE:
+                    print(f"Direction: {effect.direction.name}")
             ```
         """
         # Request automatically unpacks response
@@ -599,7 +632,7 @@ class MultiZoneLight(Light):
             settings.parameter.parameter7,
         ]
 
-        if effect_type == MultiZoneEffectType.OFF:
+        if effect_type == FirmwareEffect.OFF:
             result = None
         else:
             result = MultiZoneEffect(
@@ -614,7 +647,7 @@ class MultiZoneLight(Light):
         _LOGGER.debug(
             {
                 "class": "Device",
-                "method": "get_multizone_effect",
+                "method": "get_effect",
                 "action": "query",
                 "reply": {
                     "effect_type": effect_type.name,
@@ -627,7 +660,7 @@ class MultiZoneLight(Light):
 
         return result
 
-    async def set_multizone_effect(
+    async def set_effect(
         self,
         effect: MultiZoneEffect,
     ) -> None:
@@ -642,13 +675,24 @@ class MultiZoneLight(Light):
 
         Example:
             ```python
-            # Apply a move effect
+            from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+            # Apply a move effect moving forward
             effect = MultiZoneEffect(
-                effect_type=MultiZoneEffectType.MOVE,
+                effect_type=FirmwareEffect.MOVE,
                 speed=5000,  # 5 seconds per cycle
                 duration=0,  # Infinite
             )
-            await light.set_multizone_effect(effect)
+            effect.direction = Direction.FORWARD
+            await light.set_effect(effect)
+
+            # Or use parameters directly
+            effect = MultiZoneEffect(
+                effect_type=FirmwareEffect.MOVE,
+                speed=5000,
+                parameters=[0, int(Direction.REVERSED), 0, 0, 0, 0, 0, 0],
+            )
+            await light.set_effect(effect)
             ```
         """  # Ensure parameters list is 8 elements
         parameters = effect.parameters or [0] * 8
@@ -679,13 +723,13 @@ class MultiZoneLight(Light):
         )
 
         # Update cached state
-        result = effect if effect.effect_type != MultiZoneEffectType.OFF else None
+        result = effect if effect.effect_type != FirmwareEffect.OFF else None
         self._multizone_effect = result
 
         _LOGGER.debug(
             {
                 "class": "Device",
-                "method": "set_multizone_effect",
+                "method": "set_effect",
                 "action": "change",
                 "values": {
                     "effect_type": effect.effect_type.name,
@@ -704,9 +748,9 @@ class MultiZoneLight(Light):
             await light.stop_effect()
             ```
         """
-        await self.set_multizone_effect(
+        await self.set_effect(
             MultiZoneEffect(
-                effect_type=MultiZoneEffectType.OFF,
+                effect_type=FirmwareEffect.OFF,
                 speed=0,
                 duration=0,
             )
@@ -718,69 +762,6 @@ class MultiZoneLight(Light):
                 "method": "stop_effect",
                 "action": "change",
                 "values": {},
-            }
-        )
-
-    async def set_move_effect(
-        self,
-        speed: float = 5.0,
-        direction: str = "forward",
-        duration: float = 0.0,
-    ) -> None:
-        """Apply a moving effect that shifts colors along the strip.
-
-        Args:
-            speed: Speed in seconds per complete cycle (default 5.0)
-            direction: "forward" or "backward" (default "forward")
-            duration: Total duration in seconds (0 for infinite, default 0.0)
-
-        Raises:
-            ValueError: If direction is invalid or speed is non-positive
-
-        Example:
-            ```python
-            # Move forward at moderate speed
-            await light.set_move_effect(speed=5.0, direction="forward")
-
-            # Move backward slowly for 60 seconds
-            await light.set_move_effect(speed=10.0, direction="backward", duration=60.0)
-            ```
-        """
-        if speed <= 0:
-            raise ValueError(f"Speed must be positive, got {speed}")
-        if direction not in ("forward", "backward"):
-            raise ValueError(
-                f"Direction must be 'forward' or 'backward', got {direction}"
-            )
-
-        # Convert speed to milliseconds
-        speed_ms = int(speed * 1000)
-
-        # Convert duration to nanoseconds
-        duration_ns = int(duration * 1_000_000_000)
-
-        # Set parameter[0] to 1 for backward, 0 for forward
-        parameters = [1 if direction == "backward" else 0] + [0] * 7
-
-        await self.set_multizone_effect(
-            MultiZoneEffect(
-                effect_type=MultiZoneEffectType.MOVE,
-                speed=speed_ms,
-                duration=duration_ns,
-                parameters=parameters,
-            )
-        )
-
-        _LOGGER.debug(
-            {
-                "class": "Device",
-                "method": "set_move_effect",
-                "action": "change",
-                "values": {
-                    "speed": speed,
-                    "direction": direction,
-                    "duration": duration,
-                },
             }
         )
 
@@ -801,7 +782,7 @@ class MultiZoneLight(Light):
 
         Returns:
             Effect or None if never fetched.
-            Use get_multizone_effect() to fetch from device.
+            Use get_effect() to fetch from device.
         """
         return self._multizone_effect
 

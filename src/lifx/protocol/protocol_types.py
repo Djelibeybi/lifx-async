@@ -18,10 +18,23 @@ class DeviceService(IntEnum):
     """Auto-generated enum."""
 
     UDP = 1
-    RESERVED_0 = 2
-    RESERVED_1 = 3
-    RESERVED_2 = 4
-    RESERVED_3 = 5
+
+
+class Direction(IntEnum):
+    """Auto-generated enum."""
+
+    REVERSED = 0
+    FORWARD = 1
+
+
+class FirmwareEffect(IntEnum):
+    """Auto-generated enum."""
+
+    OFF = 0
+    MOVE = 1
+    MORPH = 2
+    FLAME = 3
+    SKY = 5
 
 
 class LightLastHevCycleResult(IntEnum):
@@ -54,23 +67,6 @@ class MultiZoneApplicationRequest(IntEnum):
     APPLY_ONLY = 2
 
 
-class MultiZoneEffectType(IntEnum):
-    """Auto-generated enum."""
-
-    OFF = 0
-    MOVE = 1
-    RESERVED_0 = 2
-    RESERVED_1 = 3
-
-
-class MultiZoneExtendedApplicationRequest(IntEnum):
-    """Auto-generated enum."""
-
-    NO_APPLY = 0
-    APPLY = 1
-    APPLY_ONLY = 2
-
-
 class TileEffectSkyPalette(IntEnum):
     """Auto-generated enum."""
 
@@ -89,17 +85,6 @@ class TileEffectSkyType(IntEnum):
     SUNRISE = 0
     SUNSET = 1
     CLOUDS = 2
-
-
-class TileEffectType(IntEnum):
-    """Auto-generated enum."""
-
-    OFF = 0
-    RESERVED_0 = 1
-    MORPH = 2
-    FLAME = 3
-    RESERVED_1 = 4
-    SKY = 5
 
 
 @dataclass
@@ -342,7 +327,7 @@ class MultiZoneEffectSettings:
     """Auto-generated field structure."""
 
     instanceid: int
-    effect_type: MultiZoneEffectType
+    effect_type: FirmwareEffect
     speed: int
     duration: int
     parameter: MultiZoneEffectParameter
@@ -355,7 +340,7 @@ class MultiZoneEffectSettings:
 
         # instanceid: uint32
         result += serializer.pack_value(self.instanceid, "uint32")
-        # effect_type: MultiZoneEffectType (enum)
+        # effect_type: FirmwareEffect (enum)
         result += serializer.pack_value(int(self.effect_type), "uint8")
         # Reserved 2 bytes
         result += serializer.pack_reserved(2)
@@ -384,11 +369,11 @@ class MultiZoneEffectSettings:
         instanceid, current_offset = serializer.unpack_value(
             data, "uint32", current_offset
         )
-        # effect_type: MultiZoneEffectType (enum)
+        # effect_type: FirmwareEffect (enum)
         effect_type_raw, current_offset = serializer.unpack_value(
             data, "uint8", current_offset
         )
-        effect_type = MultiZoneEffectType(effect_type_raw)
+        effect_type = FirmwareEffect(effect_type_raw)
         # Skip reserved 2 bytes
         current_offset += 2
         # speed: uint32
@@ -573,7 +558,7 @@ class TileEffectSettings:
     """Auto-generated field structure."""
 
     instanceid: int
-    effect_type: TileEffectType
+    effect_type: FirmwareEffect
     speed: int
     duration: int
     parameter: TileEffectParameter
@@ -588,7 +573,7 @@ class TileEffectSettings:
 
         # instanceid: uint32
         result += serializer.pack_value(self.instanceid, "uint32")
-        # effect_type: TileEffectType (enum)
+        # effect_type: FirmwareEffect (enum)
         result += serializer.pack_value(int(self.effect_type), "uint8")
         # speed: uint32
         result += serializer.pack_value(self.speed, "uint32")
@@ -618,11 +603,11 @@ class TileEffectSettings:
         instanceid, current_offset = serializer.unpack_value(
             data, "uint32", current_offset
         )
-        # effect_type: TileEffectType (enum)
+        # effect_type: FirmwareEffect (enum)
         effect_type_raw, current_offset = serializer.unpack_value(
             data, "uint8", current_offset
         )
-        effect_type = TileEffectType(effect_type_raw)
+        effect_type = FirmwareEffect(effect_type_raw)
         # speed: uint32
         speed, current_offset = serializer.unpack_value(data, "uint32", current_offset)
         # duration: uint64

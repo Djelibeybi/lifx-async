@@ -591,7 +591,7 @@ class TestGenerateEnumCode:
         assert "ERROR = 1" in code
 
     def test_generate_enum_with_reserved(self):
-        """Test enum generation with reserved values."""
+        """Test enum generation with reserved values - should be suppressed."""
         enums = {
             "MyEnum": {
                 "type": "uint8",
@@ -604,8 +604,9 @@ class TestGenerateEnumCode:
         }
 
         code = generate_enum_code(enums)
-        assert "RESERVED_0 = 2" in code
-        assert "RESERVED_1 = 3" in code
+        # Reserved values should be suppressed
+        assert "RESERVED" not in code
+        assert "VALUE1 = 1" in code
 
 
 class TestGenerateFieldCode:

@@ -214,32 +214,57 @@ async def main():
 ### MultiZone Control
 
 ```python
-from lifx import find_lights, Colors
+from lifx import MultiZoneLight, Colors, FirmwareEffect, Direction
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            # Get all zones - automatically uses best method
-            colors = await light.get_all_color_zones()
-            print(f"Device has {len(colors)} zones")
+    async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+        # Get all zones - automatically uses best method
+        colors = await light.get_all_color_zones()
+        print(f"Device has {len(colors)} zones")
 
+        # Set a MOVE effect
+        await light.set_effect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5.0,  # seconds per cycle
+            direction=Direction.FORWARD,
+        )
+
+        # Get current effect
+        effect = await light.get_effect()
+        print(f"Effect: {effect.effect_type.name}")
+        if effect.effect_type == FirmwareEffect.MOVE:
+            print(f"Direction: {effect.direction.name}")
+
+        # Stop the effect
+        await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
 
 ### Tile Control
 
 ```python
-from lifx import find_lights, HSBK
+from lifx import MatrixLight, HSBK, FirmwareEffect
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            if light.has_matrix:
-                # Set a gradient across the tile
-                colors = [
-                    HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
-                    for h in range(0, 360, 10)
-                ]
-                await light.set_tile_colors(colors)
+    async with await MatrixLight.from_ip("192.168.1.100") as light:
+        # Set a gradient across the tile
+        colors = [
+            HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
+            for h in range(0, 360, 10)
+        ]
+        await light.set_tile_colors(colors)
+
+        # Set a tile effect (MORPH, FLAME, or SKY)
+        await light.set_effect(
+            effect_type=FirmwareEffect.FLAME,
+            speed=5.0,  # seconds per cycle
+        )
+
+        # Get current effect
+        effect = await light.get_effect()
+        print(f"Tile effect: {effect.effect_type.name}")
+
+        # Stop the effect
+        await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
