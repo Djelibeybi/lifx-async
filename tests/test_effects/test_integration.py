@@ -392,6 +392,11 @@ async def test_conductor_exception_during_async_perform():
 
     # Create a custom effect that raises exception during async_perform
     class FailingEffect(LIFXEffect):
+        @property
+        def name(self) -> str:
+            """Return the name of the effect."""
+            return "failing"
+
         async def async_play(self):
             raise RuntimeError("Effect failed during execution")
 

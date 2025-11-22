@@ -14,6 +14,7 @@ def test_pulse_default_mode():
     """Test EffectPulse with default mode (blink)."""
     effect = EffectPulse()
 
+    assert effect.name == "pulse"
     assert effect.mode == "blink"
     assert effect.period == 1.0
     assert effect.cycles == 1

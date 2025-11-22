@@ -10,6 +10,11 @@ from lifx.effects.models import PreState, RunningEffect
 class DummyEffect(LIFXEffect):
     """Dummy effect for testing."""
 
+    @property
+    def name(self) -> str:
+        """Return the name of the effect."""
+        return "dummy"
+
     async def async_play(self) -> None:
         """Dummy play method."""
         pass

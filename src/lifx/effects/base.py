@@ -59,6 +59,16 @@ class LIFXEffect(ABC):
         self.conductor: Conductor | None = None
         self.participants: list[Light] = []
 
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Return the name of the effect.
+
+        Returns:
+            The effect name as a string
+        """
+        raise NotImplementedError("Subclasses must implement name property")
+
     async def async_perform(self, participants: list[Light]) -> None:
         """Perform common setup and play the effect.
 
