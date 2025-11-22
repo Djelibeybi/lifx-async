@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.3.2 (2025-11-22)
+
+### Bug Fixes
+
+- **effects**: Add name property to LIFXEffect and subclasses
+  ([`deb8a54`](https://github.com/Djelibeybi/lifx-async/commit/deb8a54f674d2d4cd9b8dce519dc6ca8678e048a))
+
+
 ## v4.3.1 (2025-11-22)
 
 ### Bug Fixes
