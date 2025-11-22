@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.3.0 (2025-11-22)
+
+### Features
+
+- **effects**: Unify effect enums and simplify API ([`df1c3c8`](https://github.com/Djelibeybi/lifx-async/commit/df1c3c8ba63dbf6cbfa5b973cdfe648c100a1371))
+
 ## v4.2.1 (2025-11-21)
 
 ### Bug Fixes
