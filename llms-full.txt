@@ -15534,7 +15534,7 @@ Set matrix effect with configuration.
 | `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `FirmwareEffect`                             |
 | `speed`                | Effect speed in seconds (default: 3) **TYPE:** `float` **DEFAULT:** `3.0`                      |
 | `duration`             | Total effect duration in nanoseconds (0 for infinite) **TYPE:** `int` **DEFAULT:** `0`         |
-| `palette`              | Color palette for the effect (max 16 colors) **TYPE:** \`list[HSBK]                            |
+| `palette`              | Color palette for the effect (max 16 colors, None for no palette) **TYPE:** \`list[HSBK]       |
 | `sky_type`             | Sky effect type (SUNRISE, SUNSET, CLOUDS) **TYPE:** `TileEffectSkyType` **DEFAULT:** `SUNRISE` |
 | `cloud_saturation_min` | Minimum cloud saturation (0-255, for CLOUDS) **TYPE:** `int` **DEFAULT:** `0`                  |
 | `cloud_saturation_max` | Maximum cloud saturation (0-255, for CLOUDS) **TYPE:** `int` **DEFAULT:** `0`                  |
@@ -15544,6 +15544,10 @@ Example
 > > > ###### Set MORPH effect with rainbow palette
 > > >
 > > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_effect( ... effect_type=FirmwareEffect.MORPH, ... speed=5.0, ... palette=rainbow, ... )
+> > >
+> > > ###### Set effect without a palette
+> > >
+> > > await matrix.set_effect( ... effect_type=FirmwareEffect.FLAME, ... speed=3.0, ... )
 
 Source code in `src/lifx/devices/matrix.py`
 
@@ -15564,7 +15568,7 @@ async def set_effect(
         effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
         speed: Effect speed in seconds (default: 3)
         duration: Total effect duration in nanoseconds (0 for infinite)
-        palette: Color palette for the effect (max 16 colors)
+        palette: Color palette for the effect (max 16 colors, None for no palette)
         sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
         cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
         cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
@@ -15581,6 +15585,12 @@ async def set_effect(
         ...     effect_type=FirmwareEffect.MORPH,
         ...     speed=5.0,
         ...     palette=rainbow,
+        ... )
+
+        >>> # Set effect without a palette
+        >>> await matrix.set_effect(
+        ...     effect_type=FirmwareEffect.FLAME,
+        ...     speed=3.0,
         ... )
     """
     _LOGGER.debug(
@@ -15603,20 +15613,22 @@ async def set_effect(
     )
 
     # Convert to protocol format
-    # Note: palette is guaranteed to be non-None by MatrixEffect.__post_init__
-    palette = effect.palette if effect.palette is not None else []
     proto_palette = []
-    for color in palette:
-        proto_palette.append(
-            LightHsbk(
-                hue=int(color.hue / 360 * 65535),
-                saturation=int(color.saturation * 65535),
-                brightness=int(color.brightness * 65535),
-                kelvin=color.kelvin,
-            )
-        )
+    palette_count = 0
 
-    # Pad palette to 16 colors
+    if effect.palette is not None:
+        palette_count = len(effect.palette)
+        for color in effect.palette:
+            proto_palette.append(
+                LightHsbk(
+                    hue=int(color.hue / 360 * 65535),
+                    saturation=int(color.saturation * 65535),
+                    brightness=int(color.brightness * 65535),
+                    kelvin=color.kelvin,
+                )
+            )
+
+    # Pad palette to 16 colors (protocol requirement)
     while len(proto_palette) < 16:
         proto_palette.append(LightHsbk(0, 0, 0, 3500))
 
@@ -15630,7 +15642,7 @@ async def set_effect(
             cloud_saturation_min=effect.cloud_saturation_min,
             cloud_saturation_max=effect.cloud_saturation_max,
         ),
-        palette_count=len(palette),
+        palette_count=palette_count,
         palette=proto_palette,
     )
 
