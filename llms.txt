@@ -49,6 +49,10 @@ Key features:
 - [Protocol Layer](https://djelibeybi.github.io/lifx-async/api/protocol/index.md): Protocol layer and packet structures
 - [Exceptions](https://djelibeybi.github.io/lifx-async/api/exceptions/index.md): Exception hierarchy
 
+## Migration
+
+- [Effect API Changes](https://djelibeybi.github.io/lifx-async/migration/effect-api-changes/index.md): Effect API breaking changes and migration guide
+
 ## Additional Resources
 
 - [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md): Frequently asked questions

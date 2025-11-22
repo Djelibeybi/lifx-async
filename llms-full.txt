@@ -13652,10 +13652,9 @@ async with await MultiZoneLight.from_ip(ip="192.168.1.100") as light:
 | `get_all_color_zones`      | Get colors for all zones, automatically using the best method.       |
 | `set_color_zones`          | Set color for a range of zones.                                      |
 | `set_extended_color_zones` | Set colors for multiple zones efficiently (up to 82 zones per call). |
-| `get_multizone_effect`     | Get current multizone effect.                                        |
-| `set_multizone_effect`     | Set multizone effect.                                                |
+| `get_effect`               | Get current multizone effect.                                        |
+| `set_effect`               | Set multizone effect.                                                |
 | `stop_effect`              | Stop any running multizone effect.                                   |
-| `set_move_effect`          | Apply a moving effect that shifts colors along the strip.            |
 | `apply_theme`              | Apply a theme across zones.                                          |
 
 | ATTRIBUTE          | DESCRIPTION                                                           |
@@ -14241,7 +14240,7 @@ set_extended_color_zones(
     zone_index: int,
     colors: list[HSBK],
     duration: float = 0.0,
-    apply: MultiZoneExtendedApplicationRequest = APPLY,
+    apply: MultiZoneApplicationRequest = APPLY,
 ) -> None
 ```
 
@@ -14249,12 +14248,12 @@ Set colors for multiple zones efficiently (up to 82 zones per call).
 
 This is more efficient than set_color_zones when setting different colors for many zones at once.
 
-| PARAMETER    | DESCRIPTION                                                                                           |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| `zone_index` | Starting zone index **TYPE:** `int`                                                                   |
-| `colors`     | List of HSBK colors to set (max 82) **TYPE:** `list[HSBK]`                                            |
-| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                     |
-| `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneExtendedApplicationRequest` **DEFAULT:** `APPLY` |
+| PARAMETER    | DESCRIPTION                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `zone_index` | Starting zone index **TYPE:** `int`                                                           |
+| `colors`     | List of HSBK colors to set (max 82) **TYPE:** `list[HSBK]`                                    |
+| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`             |
+| `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneApplicationRequest` **DEFAULT:** `APPLY` |
 
 | RAISES                    | DESCRIPTION                                         |
 | ------------------------- | --------------------------------------------------- |
@@ -14359,10 +14358,10 @@ async def set_extended_color_zones(
     )
 ````
 
-##### get_multizone_effect
+##### get_effect
 
 ```python
-get_multizone_effect() -> MultiZoneEffect | None
+get_effect() -> MultiZoneEffect | None
 ```
 
 Get current multizone effect.
@@ -14382,15 +14381,19 @@ Always fetches from device. Use the `multizone_effect` property to access stored
 Example
 
 ```python
-effect = await light.get_multizone_effect()
+from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+effect = await light.get_effect()
 if effect:
-    print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
+    print(f"Effect: {effect.effect_type.name}, Speed: {effect.speed}ms")
+    if effect.effect_type == FirmwareEffect.MOVE:
+        print(f"Direction: {effect.direction.name}")
 ```
 
 Source code in `src/lifx/devices/multizone.py`
 
 ````python
-async def get_multizone_effect(self) -> MultiZoneEffect | None:
+async def get_effect(self) -> MultiZoneEffect | None:
     """Get current multizone effect.
 
     Always fetches from device.
@@ -14406,9 +14409,13 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
 
     Example:
         ```python
-        effect = await light.get_multizone_effect()
+        from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+        effect = await light.get_effect()
         if effect:
-            print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
+            print(f"Effect: {effect.effect_type.name}, Speed: {effect.speed}ms")
+            if effect.effect_type == FirmwareEffect.MOVE:
+                print(f"Direction: {effect.direction.name}")
         ```
     """
     # Request automatically unpacks response
@@ -14429,7 +14436,7 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
         settings.parameter.parameter7,
     ]
 
-    if effect_type == MultiZoneEffectType.OFF:
+    if effect_type == FirmwareEffect.OFF:
         result = None
     else:
         result = MultiZoneEffect(
@@ -14444,7 +14451,7 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
     _LOGGER.debug(
         {
             "class": "Device",
-            "method": "get_multizone_effect",
+            "method": "get_effect",
             "action": "query",
             "reply": {
                 "effect_type": effect_type.name,
@@ -14458,10 +14465,10 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
     return result
 ````
 
-##### set_multizone_effect
+##### set_effect
 
 ```python
-set_multizone_effect(effect: MultiZoneEffect) -> None
+set_effect(effect: MultiZoneEffect) -> None
 ```
 
 Set multizone effect.
@@ -14478,19 +14485,30 @@ Set multizone effect.
 Example
 
 ```python
-# Apply a move effect
+from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+# Apply a move effect moving forward
 effect = MultiZoneEffect(
-    effect_type=MultiZoneEffectType.MOVE,
+    effect_type=FirmwareEffect.MOVE,
     speed=5000,  # 5 seconds per cycle
     duration=0,  # Infinite
 )
-await light.set_multizone_effect(effect)
+effect.direction = Direction.FORWARD
+await light.set_effect(effect)
+
+# Or use parameters directly
+effect = MultiZoneEffect(
+    effect_type=FirmwareEffect.MOVE,
+    speed=5000,
+    parameters=[0, int(Direction.REVERSED), 0, 0, 0, 0, 0, 0],
+)
+await light.set_effect(effect)
 ```
 
 Source code in `src/lifx/devices/multizone.py`
 
 ````python
-async def set_multizone_effect(
+async def set_effect(
     self,
     effect: MultiZoneEffect,
 ) -> None:
@@ -14505,13 +14523,24 @@ async def set_multizone_effect(
 
     Example:
         ```python
-        # Apply a move effect
+        from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+        # Apply a move effect moving forward
         effect = MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
+            effect_type=FirmwareEffect.MOVE,
             speed=5000,  # 5 seconds per cycle
             duration=0,  # Infinite
         )
-        await light.set_multizone_effect(effect)
+        effect.direction = Direction.FORWARD
+        await light.set_effect(effect)
+
+        # Or use parameters directly
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5000,
+            parameters=[0, int(Direction.REVERSED), 0, 0, 0, 0, 0, 0],
+        )
+        await light.set_effect(effect)
         ```
     """  # Ensure parameters list is 8 elements
     parameters = effect.parameters or [0] * 8
@@ -14542,13 +14571,13 @@ async def set_multizone_effect(
     )
 
     # Update cached state
-    result = effect if effect.effect_type != MultiZoneEffectType.OFF else None
+    result = effect if effect.effect_type != FirmwareEffect.OFF else None
     self._multizone_effect = result
 
     _LOGGER.debug(
         {
             "class": "Device",
-            "method": "set_multizone_effect",
+            "method": "set_effect",
             "action": "change",
             "values": {
                 "effect_type": effect.effect_type.name,
@@ -14585,9 +14614,9 @@ async def stop_effect(self) -> None:
         await light.stop_effect()
         ```
     """
-    await self.set_multizone_effect(
+    await self.set_effect(
         MultiZoneEffect(
-            effect_type=MultiZoneEffectType.OFF,
+            effect_type=FirmwareEffect.OFF,
             speed=0,
             duration=0,
         )
@@ -14599,103 +14628,6 @@ async def stop_effect(self) -> None:
             "method": "stop_effect",
             "action": "change",
             "values": {},
-        }
-    )
-````
-
-##### set_move_effect
-
-```python
-set_move_effect(
-    speed: float = 5.0, direction: str = "forward", duration: float = 0.0
-) -> None
-```
-
-Apply a moving effect that shifts colors along the strip.
-
-| PARAMETER   | DESCRIPTION                                                                                  |
-| ----------- | -------------------------------------------------------------------------------------------- |
-| `speed`     | Speed in seconds per complete cycle (default 5.0) **TYPE:** `float` **DEFAULT:** `5.0`       |
-| `direction` | "forward" or "backward" (default "forward") **TYPE:** `str` **DEFAULT:** `'forward'`         |
-| `duration`  | Total duration in seconds (0 for infinite, default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
-
-| RAISES       | DESCRIPTION                                      |
-| ------------ | ------------------------------------------------ |
-| `ValueError` | If direction is invalid or speed is non-positive |
-
-Example
-
-```python
-# Move forward at moderate speed
-await light.set_move_effect(speed=5.0, direction="forward")
-
-# Move backward slowly for 60 seconds
-await light.set_move_effect(speed=10.0, direction="backward", duration=60.0)
-```
-
-Source code in `src/lifx/devices/multizone.py`
-
-````python
-async def set_move_effect(
-    self,
-    speed: float = 5.0,
-    direction: str = "forward",
-    duration: float = 0.0,
-) -> None:
-    """Apply a moving effect that shifts colors along the strip.
-
-    Args:
-        speed: Speed in seconds per complete cycle (default 5.0)
-        direction: "forward" or "backward" (default "forward")
-        duration: Total duration in seconds (0 for infinite, default 0.0)
-
-    Raises:
-        ValueError: If direction is invalid or speed is non-positive
-
-    Example:
-        ```python
-        # Move forward at moderate speed
-        await light.set_move_effect(speed=5.0, direction="forward")
-
-        # Move backward slowly for 60 seconds
-        await light.set_move_effect(speed=10.0, direction="backward", duration=60.0)
-        ```
-    """
-    if speed <= 0:
-        raise ValueError(f"Speed must be positive, got {speed}")
-    if direction not in ("forward", "backward"):
-        raise ValueError(
-            f"Direction must be 'forward' or 'backward', got {direction}"
-        )
-
-    # Convert speed to milliseconds
-    speed_ms = int(speed * 1000)
-
-    # Convert duration to nanoseconds
-    duration_ns = int(duration * 1_000_000_000)
-
-    # Set parameter[0] to 1 for backward, 0 for forward
-    parameters = [1 if direction == "backward" else 0] + [0] * 7
-
-    await self.set_multizone_effect(
-        MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
-            speed=speed_ms,
-            duration=duration_ns,
-            parameters=parameters,
-        )
-    )
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "set_move_effect",
-            "action": "change",
-            "values": {
-                "speed": speed,
-                "direction": direction,
-                "duration": duration,
-            },
         }
     )
 ````
@@ -15520,7 +15452,7 @@ async def get_tile_effect(self) -> MatrixEffect:
 
 ```python
 set_tile_effect(
-    effect_type: TileEffectType,
+    effect_type: FirmwareEffect,
     speed: int = 3000,
     duration: int = 0,
     palette: list[HSBK] | None = None,
@@ -15534,7 +15466,7 @@ Set tile effect with configuration.
 
 | PARAMETER              | DESCRIPTION                                                                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `TileEffectType`                             |
+| `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `FirmwareEffect`                             |
 | `speed`                | Effect speed in milliseconds (default: 3000) **TYPE:** `int` **DEFAULT:** `3000`               |
 | `duration`             | Total effect duration in nanoseconds (0 for infinite) **TYPE:** `int` **DEFAULT:** `0`         |
 | `palette`              | Color palette for the effect (max 16 colors) **TYPE:** \`list[HSBK]                            |
@@ -15546,14 +15478,14 @@ Example
 
 > > > ###### Set MORPH effect with rainbow palette
 > > >
-> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_tile_effect( ... effect_type=TileEffectType.MORPH, ... speed=5000, ... palette=rainbow, ... )
+> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_tile_effect( ... effect_type=FirmwareEffect.MORPH, ... speed=5000, ... palette=rainbow, ... )
 
 Source code in `src/lifx/devices/matrix.py`
 
 ```python
 async def set_tile_effect(
     self,
-    effect_type: TileEffectType,
+    effect_type: FirmwareEffect,
     speed: int = 3000,
     duration: int = 0,
     palette: list[HSBK] | None = None,
@@ -15581,7 +15513,7 @@ async def set_tile_effect(
         ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
         ... ]
         >>> await matrix.set_tile_effect(
-        ...     effect_type=TileEffectType.MORPH,
+        ...     effect_type=FirmwareEffect.MORPH,
         ...     speed=5000,
         ...     palette=rainbow,
         ... )
@@ -15860,33 +15792,59 @@ async def main():
 ### MultiZone Control
 
 ```python
-from lifx import find_lights, Colors
+from lifx import MultiZoneLight, Colors, FirmwareEffect, Direction
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            # Get all zones - automatically uses best method
-            colors = await light.get_all_color_zones()
-            print(f"Device has {len(colors)} zones")
+    async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+        # Get all zones - automatically uses best method
+        colors = await light.get_all_color_zones()
+        print(f"Device has {len(colors)} zones")
+
+        # Set a MOVE effect
+        await light.set_effect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5.0,  # seconds per cycle
+            direction=Direction.FORWARD,
+        )
+
+        # Get current effect
+        effect = await light.get_effect()
+        print(f"Effect: {effect.effect_type.name}")
+        if effect.effect_type == FirmwareEffect.MOVE:
+            print(f"Direction: {effect.direction.name}")
+
+        # Stop the effect
+        await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
 
 ### Tile Control
 
 ```python
-from lifx import find_lights, HSBK
+from lifx import MatrixLight, HSBK, FirmwareEffect
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            if light.has_matrix:
-                # Set a gradient across the tile
-                colors = [
-                    HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
-                    for h in range(0, 360, 10)
-                ]
-                await light.set_tile_colors(colors)
+    async with await MatrixLight.from_ip("192.168.1.100") as light:
+        # Set a gradient across the tile
+        colors = [
+            HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
+            for h in range(0, 360, 10)
+        ]
+        await light.set_tile_colors(colors)
+
+        # Set a tile effect (MORPH, FLAME, or SKY)
+        await light.set_effect(
+            effect_type=FirmwareEffect.FLAME,
+            speed=5.0,  # seconds per cycle
+        )
+
+        # Get current effect
+        effect = await light.get_effect()
+        print(f"Tile effect: {effect.effect_type.name}")
+
+        # Stop the effect
+        await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
 
 # Network Layer
@@ -18383,17 +18341,21 @@ Bases: `IntEnum`
 
 Auto-generated enum.
 
-### MultiZone Effect Type
+### Firmware Effect
 
-#### MultiZoneEffectType
+Unified enum for all firmware effects (multizone and matrix devices):
+
+#### FirmwareEffect
 
 Bases: `IntEnum`
 
 Auto-generated enum.
 
-### Tile Effect Type
+### Direction
 
-#### TileEffectType
+Direction enum for MOVE effects:
+
+#### Direction
 
 Bases: `IntEnum`
 
@@ -18801,32 +18763,34 @@ Downloads the official protocol.yml from the LIFX GitHub repository and generate
 | -------------- | ---------------------------------------------- |
 | `TypeRegistry` | Registry of all protocol types for validation. |
 
-| FUNCTION                                 | DESCRIPTION                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `to_snake_case`                          | Convert PascalCase or camelCase to snake_case.                                    |
-| `apply_field_name_quirks`                | Apply quirks to field names to avoid Python built-ins and reserved words.         |
-| `apply_extended_multizone_packet_quirks` | Apply quirks to extended multizone packet names to follow LIFX naming convention. |
-| `apply_tile_effect_parameter_quirk`      | Apply local quirk to fix TileEffectParameter structure.                           |
-| `apply_sensor_packet_quirks`             | Add undocumented sensor packets for ambient light level reading.                  |
-| `format_long_import`                     | Format a long import statement across multiple lines.                             |
-| `format_long_list`                       | Format a long list across multiple lines.                                         |
-| `parse_field_type`                       | Parse a field type string.                                                        |
-| `camel_to_snake_upper`                   | Convert CamelCase to UPPER_SNAKE_CASE.                                            |
-| `generate_enum_code`                     | Generate Python Enum definitions with shortened names.                            |
-| `convert_type_to_python`                 | Convert a protocol field type to Python type annotation.                          |
-| `generate_pack_method`                   | Generate pack() method code for a field structure or packet.                      |
-| `generate_unpack_method`                 | Generate unpack() classmethod code for a field structure or packet.               |
-| `generate_field_code`                    | Generate Python dataclass definitions for field structures.                       |
-| `generate_nested_packet_code`            | Generate nested Python packet class definitions.                                  |
-| `generate_types_file`                    | Generate complete types.py file.                                                  |
-| `generate_packets_file`                  | Generate complete packets.py file.                                                |
-| `download_protocol`                      | Download and parse protocol.yml from LIFX GitHub repository.                      |
-| `validate_protocol_spec`                 | Validate protocol specification for missing type references.                      |
-| `should_skip_button_relay`               | Check if a name should be skipped (Button or Relay related).                      |
-| `filter_button_relay_items`              | Filter out Button and Relay items from a dictionary.                              |
-| `filter_button_relay_packets`            | Filter out button and relay category packets.                                     |
-| `extract_packets_as_fields`              | Extract packets that are used as field types in other structures.                 |
-| `main`                                   | Main generator entry point.                                                       |
+| FUNCTION                                    | DESCRIPTION                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| `to_snake_case`                             | Convert PascalCase or camelCase to snake_case.                                    |
+| `apply_field_name_quirks`                   | Apply quirks to field names to avoid Python built-ins and reserved words.         |
+| `apply_extended_multizone_packet_quirks`    | Apply quirks to extended multizone packet names to follow LIFX naming convention. |
+| `apply_tile_effect_parameter_quirk`         | Apply local quirk to fix TileEffectParameter structure.                           |
+| `apply_sensor_packet_quirks`                | Add undocumented sensor packets for ambient light level reading.                  |
+| `apply_firmware_effect_enum_quirk`          | Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.            |
+| `apply_multizone_application_request_quirk` | Suppress MultiZoneExtendedApplicationRequest enum.                                |
+| `format_long_import`                        | Format a long import statement across multiple lines.                             |
+| `format_long_list`                          | Format a long list across multiple lines.                                         |
+| `parse_field_type`                          | Parse a field type string.                                                        |
+| `camel_to_snake_upper`                      | Convert CamelCase to UPPER_SNAKE_CASE.                                            |
+| `generate_enum_code`                        | Generate Python Enum definitions with shortened names.                            |
+| `convert_type_to_python`                    | Convert a protocol field type to Python type annotation.                          |
+| `generate_pack_method`                      | Generate pack() method code for a field structure or packet.                      |
+| `generate_unpack_method`                    | Generate unpack() classmethod code for a field structure or packet.               |
+| `generate_field_code`                       | Generate Python dataclass definitions for field structures.                       |
+| `generate_nested_packet_code`               | Generate nested Python packet class definitions.                                  |
+| `generate_types_file`                       | Generate complete types.py file.                                                  |
+| `generate_packets_file`                     | Generate complete packets.py file.                                                |
+| `download_protocol`                         | Download and parse protocol.yml from LIFX GitHub repository.                      |
+| `validate_protocol_spec`                    | Validate protocol specification for missing type references.                      |
+| `should_skip_button_relay`                  | Check if a name should be skipped (Button or Relay related).                      |
+| `filter_button_relay_items`                 | Filter out Button and Relay items from a dictionary.                              |
+| `filter_button_relay_packets`               | Filter out button and relay category packets.                                     |
+| `extract_packets_as_fields`                 | Extract packets that are used as field types in other structures.                 |
+| `main`                                      | Main generator entry point.                                                       |
 
 #### Classes
 
@@ -19333,6 +19297,161 @@ def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
     return packets
 ```
 
+##### apply_firmware_effect_enum_quirk
+
+```python
+apply_firmware_effect_enum_quirk(
+    enums: dict[str, Any],
+    fields: dict[str, Any],
+    compound_fields: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
+```
+
+Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.
+
+Both MultiZone and Tile effects use the same firmware effect protocol values, so they should share a single enum. This quirk:
+
+- Creates FirmwareEffect enum combining values from both
+- Removes MultiZoneEffectType and TileEffectType
+- Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
+- Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, RESERVED\_\*)
+- Also adds DIRECTION enum for move effect parameter
+
+| PARAMETER         | DESCRIPTION                                                         |
+| ----------------- | ------------------------------------------------------------------- |
+| `enums`           | Dictionary of enum definitions **TYPE:** `dict[str, Any]`           |
+| `fields`          | Dictionary of field definitions **TYPE:** `dict[str, Any]`          |
+| `compound_fields` | Dictionary of compound field definitions **TYPE:** `dict[str, Any]` |
+
+| RETURNS                                                 | DESCRIPTION                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `tuple[dict[str, Any], dict[str, Any], dict[str, Any]]` | Tuple of (enums, fields, compound_fields) with FirmwareEffect enum quirk applied |
+
+Source code in `src/lifx/protocol/generator.py`
+
+```python
+def apply_firmware_effect_enum_quirk(
+    enums: dict[str, Any], fields: dict[str, Any], compound_fields: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.
+
+    Both MultiZone and Tile effects use the same firmware effect protocol values,
+    so they should share a single enum. This quirk:
+    - Creates FirmwareEffect enum combining values from both
+    - Removes MultiZoneEffectType and TileEffectType
+    - Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
+    - Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, RESERVED_*)
+    - Also adds DIRECTION enum for move effect parameter
+
+    Args:
+        enums: Dictionary of enum definitions
+        fields: Dictionary of field definitions
+        compound_fields: Dictionary of compound field definitions
+
+    Returns:
+        Tuple of (enums, fields, compound_fields) with FirmwareEffect enum quirk applied
+    """
+    # Create FirmwareEffect enum with clean names manually
+    # Based on protocol spec:
+    # MultiZone: OFF=0, MOVE=1, reserved=2, reserved=3
+    # Tile: OFF=0, reserved=1, MORPH=2, FLAME=3, reserved=4, SKY=5
+    # Note: Reserved values are intentionally omitted
+    firmware_effect_values = {
+        "OFF": 0,
+        "MOVE": 1,
+        "MORPH": 2,
+        "FLAME": 3,
+        "SKY": 5,
+    }
+
+    # Create FirmwareEffect enum
+    enums["FirmwareEffect"] = firmware_effect_values
+
+    # Remove the old separate enums
+    enums.pop("MultiZoneEffectType", None)
+    enums.pop("TileEffectType", None)
+
+    # Update fields to use FirmwareEffect (check both fields and compound_fields)
+    for field_dict in [fields, compound_fields]:
+        if "MultiZoneEffectSettings" in field_dict:
+            for field in field_dict["MultiZoneEffectSettings"].get("fields", []):
+                if field.get("name") == "Type":
+                    field["type"] = "<FirmwareEffect>"
+
+        if "TileEffectSettings" in field_dict:
+            for field in field_dict["TileEffectSettings"].get("fields", []):
+                if field.get("name") == "Type":
+                    field["type"] = "<FirmwareEffect>"
+
+    # Add DIRECTION enum for move effect
+    enums["Direction"] = {
+        "REVERSED": 0,
+        "FORWARD": 1,
+    }
+
+    return enums, fields, compound_fields
+```
+
+##### apply_multizone_application_request_quirk
+
+```python
+apply_multizone_application_request_quirk(
+    enums: dict[str, Any], packets: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]
+```
+
+Suppress MultiZoneExtendedApplicationRequest enum.
+
+Both MultiZoneApplicationRequest and MultiZoneExtendedApplicationRequest have identical values (NO_APPLY=0, APPLY=1, APPLY_ONLY=2), so we suppress the extended version and use the standard one for both SetColorZones and SetExtendedColorZones packets.
+
+| PARAMETER | DESCRIPTION                                                 |
+| --------- | ----------------------------------------------------------- |
+| `enums`   | Dictionary of enum definitions **TYPE:** `dict[str, Any]`   |
+| `packets` | Dictionary of packet definitions **TYPE:** `dict[str, Any]` |
+
+| RETURNS          | DESCRIPTION                                                                |
+| ---------------- | -------------------------------------------------------------------------- |
+| `dict[str, Any]` | Tuple of (enums, packets) with MultiZoneExtendedApplicationRequest removed |
+| `dict[str, Any]` | and packets updated to use MultiZoneApplicationRequest                     |
+
+Source code in `src/lifx/protocol/generator.py`
+
+```python
+def apply_multizone_application_request_quirk(
+    enums: dict[str, Any], packets: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Suppress MultiZoneExtendedApplicationRequest enum.
+
+    Both MultiZoneApplicationRequest and MultiZoneExtendedApplicationRequest have
+    identical values (NO_APPLY=0, APPLY=1, APPLY_ONLY=2), so we suppress the
+    extended version and use the standard one for both SetColorZones and
+    SetExtendedColorZones packets.
+
+    Args:
+        enums: Dictionary of enum definitions
+        packets: Dictionary of packet definitions
+
+    Returns:
+        Tuple of (enums, packets) with MultiZoneExtendedApplicationRequest removed
+        and packets updated to use MultiZoneApplicationRequest
+    """
+    # Remove the duplicate enum
+    enums.pop("MultiZoneExtendedApplicationRequest", None)
+
+    # Update packets in multi_zone category to use MultiZoneApplicationRequest
+    if "multi_zone" in packets:
+        for packet_name, packet_def in packets["multi_zone"].items():
+            if "fields" in packet_def:
+                for field in packet_def["fields"]:
+                    if (
+                        isinstance(field, dict)
+                        and field.get("type") == "<MultiZoneExtendedApplicationRequest>"
+                    ):
+                        field["type"] = "<MultiZoneApplicationRequest>"
+
+    return enums, packets
+```
+
 ##### format_long_import
 
 ```python
@@ -19562,7 +19681,6 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
         if isinstance(enum_def, dict) and "values" in enum_def:
             # New format: {type: "uint16", values: [{name: "X", value: 1}, ...]}
             values = enum_def["values"]
-            reserved_counter = 0
 
             # Check if all values share a common prefix (enum name)
             expected_prefix = camel_to_snake_upper(enum_name) + "_"
@@ -19577,12 +19695,12 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
                 protocol_name = item["name"]
                 member_value = item["value"]
 
-                # Handle reserved fields by making names unique
+                # Skip reserved fields entirely
                 if protocol_name.lower() == "reserved":
-                    member_name = f"RESERVED_{reserved_counter}"
-                    reserved_counter += 1
+                    continue
+
                 # Remove redundant prefix for cleaner Python names
-                elif has_common_prefix and protocol_name.startswith(expected_prefix):
+                if has_common_prefix and protocol_name.startswith(expected_prefix):
                     member_name = protocol_name[len(expected_prefix) :]
                 else:
                     member_name = protocol_name
@@ -20970,6 +21088,10 @@ def main() -> None:
 
     # Apply local quirks to fix protocol issues
     print("Applying local protocol quirks...")
+    enums, fields, compound_fields = apply_firmware_effect_enum_quirk(
+        enums, fields, compound_fields
+    )
+    enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
     packets = apply_sensor_packet_quirks(packets)
 
@@ -21159,6 +21281,23 @@ LightWaveform.SINE
 LightWaveform.HALF_SINE
 LightWaveform.TRIANGLE
 LightWaveform.PULSE
+```
+
+### Firmware Effects
+
+```python
+from lifx.protocol.protocol_types import FirmwareEffect, Direction
+
+# Available firmware effects (for multizone and matrix devices)
+FirmwareEffect.OFF
+FirmwareEffect.MOVE       # MultiZone only
+FirmwareEffect.MORPH      # Tile/Matrix only
+FirmwareEffect.FLAME      # Tile/Matrix only
+FirmwareEffect.SKY        # Tile/Matrix only
+
+# Direction for MOVE effects
+Direction.FORWARD   # Move forward through zones
+Direction.REVERSED  # Move backward through zones
 ```
 
 ## Product Registry
@@ -21712,6 +21851,267 @@ Causes:
 - Protocol parsing failure
 - Corrupted message data
 - Unexpected packet type
+# Migration
+
+# Effect API Changes (v4.3.0)
+
+This document describes changes to the effect handling API introduced in version 4.3.0.
+
+## Overview
+
+The effect handling API has been simplified and unified to provide a cleaner, more consistent interface:
+
+1. **Unified Effect Enum**: `MultiZoneEffectType` and `TileEffectType` merged into `FirmwareEffect`
+1. **Direction Enum**: New `Direction` enum for MOVE effect direction control
+1. **Simplified Methods**: Effect methods renamed for clarity (`set_effect`, `get_effect`)
+1. **Unified Application Request**: `MultiZoneExtendedApplicationRequest` removed in favor of single `MultiZoneApplicationRequest`
+
+## Changes
+
+### 1. Effect Type Enums Consolidated
+
+**Before:**
+
+```python
+from lifx import MultiZoneEffectType, TileEffectType
+
+# MultiZone effects
+effect = MultiZoneEffectType.MOVE
+
+# Tile effects
+effect = TileEffectType.MORPH
+```
+
+**After:**
+
+```python
+from lifx import FirmwareEffect
+
+# All firmware effects (multizone and matrix)
+effect = FirmwareEffect.MOVE   # MultiZone
+effect = FirmwareEffect.MORPH  # Matrix/Tile
+effect = FirmwareEffect.FLAME  # Matrix/Tile
+effect = FirmwareEffect.SKY    # Matrix/Tile
+```
+
+### 2. Direction Control for MOVE Effects
+
+**Before:**
+
+```python
+# Direction was embedded in specialized methods
+await light.set_move_effect(speed=5.0, direction=1)  # 0=reversed, 1=forward
+```
+
+**After:**
+
+```python
+from lifx import FirmwareEffect, Direction
+
+# Direction is a proper enum with named values
+await light.set_effect(
+    effect_type=FirmwareEffect.MOVE,
+    speed=5.0,
+    direction=Direction.FORWARD,  # or Direction.REVERSED
+)
+
+# Direction can also be accessed as a property on MultiZoneEffect
+effect = await light.get_effect()
+if effect.effect_type == FirmwareEffect.MOVE:
+    print(f"Direction: {effect.direction.name}")  # FORWARD or REVERSED
+```
+
+### 3. Method Naming Simplified
+
+**Before:**
+
+```python
+# MultiZone devices
+await multizone_light.set_multizone_effect(...)
+effect = await multizone_light.get_multizone_effect()
+
+# Tile/Matrix devices
+await matrix_light.set_tile_effect(...)
+effect = await matrix_light.get_tile_effect()
+
+# Specialized MOVE method
+await multizone_light.set_move_effect(speed=5.0, direction=1)
+```
+
+**After:**
+
+```python
+# Unified naming across all device types
+await multizone_light.set_effect(effect_type=FirmwareEffect.MOVE, ...)
+effect = await multizone_light.get_effect()
+
+await matrix_light.set_effect(effect_type=FirmwareEffect.FLAME, ...)
+effect = await matrix_light.get_effect()
+
+# No more specialized methods - use set_effect with Direction enum
+```
+
+### 4. Application Request Enum Unified
+
+**Before:**
+
+```python
+from lifx import MultiZoneApplicationRequest, MultiZoneExtendedApplicationRequest
+
+# Different enums for different packet types
+await light.set_color_zones(..., apply=MultiZoneApplicationRequest.APPLY)
+await light.set_extended_color_zones(..., apply=MultiZoneExtendedApplicationRequest.APPLY)
+```
+
+**After:**
+
+```python
+from lifx import MultiZoneApplicationRequest
+
+# Single enum for all multizone application control
+await light.set_color_zones(..., apply=MultiZoneApplicationRequest.APPLY)
+await light.set_extended_color_zones(..., apply=MultiZoneApplicationRequest.APPLY)
+```
+
+## Migration Guide
+
+### Updating MultiZone Effect Code
+
+**Old Code:**
+
+```python
+from lifx import MultiZoneLight, MultiZoneEffectType
+
+async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+    # Old API
+    await light.set_multizone_effect(
+        effect_type=MultiZoneEffectType.MOVE,
+        speed=5.0,
+    )
+
+    # Or using specialized method
+    await light.set_move_effect(speed=5.0, direction=1)
+
+    effect = await light.get_multizone_effect()
+```
+
+**New Code:**
+
+```python
+from lifx import MultiZoneLight, FirmwareEffect, Direction
+
+async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+    # New unified API
+    await light.set_effect(
+        effect_type=FirmwareEffect.MOVE,
+        speed=5.0,
+        direction=Direction.FORWARD,
+    )
+
+    effect = await light.get_effect()
+    if effect.effect_type == FirmwareEffect.MOVE:
+        print(f"Direction: {effect.direction.name}")
+```
+
+### Updating Matrix/Tile Effect Code
+
+**Old Code:**
+
+```python
+from lifx import MatrixLight, TileEffectType
+
+async with await MatrixLight.from_ip("192.168.1.100") as light:
+    # Old API
+    await light.set_tile_effect(
+        effect_type=TileEffectType.FLAME,
+        speed=5.0,
+    )
+
+    effect = await light.get_tile_effect()
+```
+
+**New Code:**
+
+```python
+from lifx import MatrixLight, FirmwareEffect
+
+async with await MatrixLight.from_ip("192.168.1.100") as light:
+    # New unified API
+    await light.set_effect(
+        effect_type=FirmwareEffect.FLAME,
+        speed=5.0,
+    )
+
+    effect = await light.get_effect()
+```
+
+### Updating Application Request Code
+
+**Old Code:**
+
+```python
+from lifx import MultiZoneApplicationRequest, MultiZoneExtendedApplicationRequest
+
+# Standard zones
+await light.set_color_zones(
+    start=0,
+    end=9,
+    color=color,
+    apply=MultiZoneApplicationRequest.APPLY,
+)
+
+# Extended zones
+await light.set_extended_color_zones(
+    zone_index=0,
+    colors=colors,
+    apply=MultiZoneExtendedApplicationRequest.APPLY,
+)
+```
+
+**New Code:**
+
+```python
+from lifx import MultiZoneApplicationRequest
+
+# Standard zones
+await light.set_color_zones(
+    start=0,
+    end=9,
+    color=color,
+    apply=MultiZoneApplicationRequest.APPLY,
+)
+
+# Extended zones
+await light.set_extended_color_zones(
+    zone_index=0,
+    colors=colors,
+    apply=MultiZoneApplicationRequest.APPLY,  # Same enum
+)
+```
+
+## Summary of Removals
+
+The following have been **removed** in v4.3.0:
+
+- `lifx.protocol.protocol_types.MultiZoneEffectType` → use `FirmwareEffect`
+- `lifx.protocol.protocol_types.TileEffectType` → use `FirmwareEffect`
+- `lifx.protocol.protocol_types.MultiZoneExtendedApplicationRequest` → use `MultiZoneApplicationRequest`
+- `MultiZoneLight.set_multizone_effect()` → use `set_effect()`
+- `MultiZoneLight.get_multizone_effect()` → use `get_effect()`
+- `MultiZoneLight.set_move_effect()` → use `set_effect(effect_type=FirmwareEffect.MOVE, direction=Direction.FORWARD)`
+- `MultiZoneLight.get_move_effect()` → use `get_effect()` and access `effect.direction`
+- `MatrixLight.set_tile_effect()` → use `set_effect()`
+- `MatrixLight.get_tile_effect()` → use `get_effect()`
+
+## Benefits
+
+These changes provide several improvements:
+
+1. **Consistency**: All firmware effects use the same enum and method names
+1. **Type Safety**: Direction is now a proper enum instead of integer values (0/1)
+1. **Discoverability**: Cleaner API with fewer specialized methods
+1. **Simplicity**: One enum for application requests instead of two identical ones
+1. **Maintainability**: Easier to extend with new effect types in the future
 # Additional Resources
 
 # Frequently Asked Questions

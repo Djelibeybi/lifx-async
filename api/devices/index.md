@@ -3801,10 +3801,9 @@ async with await MultiZoneLight.from_ip(ip="192.168.1.100") as light:
 | `get_all_color_zones`      | Get colors for all zones, automatically using the best method.       |
 | `set_color_zones`          | Set color for a range of zones.                                      |
 | `set_extended_color_zones` | Set colors for multiple zones efficiently (up to 82 zones per call). |
-| `get_multizone_effect`     | Get current multizone effect.                                        |
-| `set_multizone_effect`     | Set multizone effect.                                                |
+| `get_effect`               | Get current multizone effect.                                        |
+| `set_effect`               | Set multizone effect.                                                |
 | `stop_effect`              | Stop any running multizone effect.                                   |
-| `set_move_effect`          | Apply a moving effect that shifts colors along the strip.            |
 | `apply_theme`              | Apply a theme across zones.                                          |
 
 | ATTRIBUTE          | DESCRIPTION                                                           |
@@ -4390,7 +4389,7 @@ set_extended_color_zones(
     zone_index: int,
     colors: list[HSBK],
     duration: float = 0.0,
-    apply: MultiZoneExtendedApplicationRequest = APPLY,
+    apply: MultiZoneApplicationRequest = APPLY,
 ) -> None
 ```
 
@@ -4398,12 +4397,12 @@ Set colors for multiple zones efficiently (up to 82 zones per call).
 
 This is more efficient than set_color_zones when setting different colors for many zones at once.
 
-| PARAMETER    | DESCRIPTION                                                                                           |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| `zone_index` | Starting zone index **TYPE:** `int`                                                                   |
-| `colors`     | List of HSBK colors to set (max 82) **TYPE:** `list[HSBK]`                                            |
-| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                     |
-| `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneExtendedApplicationRequest` **DEFAULT:** `APPLY` |
+| PARAMETER    | DESCRIPTION                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `zone_index` | Starting zone index **TYPE:** `int`                                                           |
+| `colors`     | List of HSBK colors to set (max 82) **TYPE:** `list[HSBK]`                                    |
+| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`             |
+| `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneApplicationRequest` **DEFAULT:** `APPLY` |
 
 | RAISES                    | DESCRIPTION                                         |
 | ------------------------- | --------------------------------------------------- |
@@ -4508,10 +4507,10 @@ async def set_extended_color_zones(
     )
 ````
 
-##### get_multizone_effect
+##### get_effect
 
 ```python
-get_multizone_effect() -> MultiZoneEffect | None
+get_effect() -> MultiZoneEffect | None
 ```
 
 Get current multizone effect.
@@ -4531,15 +4530,19 @@ Always fetches from device. Use the `multizone_effect` property to access stored
 Example
 
 ```python
-effect = await light.get_multizone_effect()
+from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+effect = await light.get_effect()
 if effect:
-    print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
+    print(f"Effect: {effect.effect_type.name}, Speed: {effect.speed}ms")
+    if effect.effect_type == FirmwareEffect.MOVE:
+        print(f"Direction: {effect.direction.name}")
 ```
 
 Source code in `src/lifx/devices/multizone.py`
 
 ````python
-async def get_multizone_effect(self) -> MultiZoneEffect | None:
+async def get_effect(self) -> MultiZoneEffect | None:
     """Get current multizone effect.
 
     Always fetches from device.
@@ -4555,9 +4558,13 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
 
     Example:
         ```python
-        effect = await light.get_multizone_effect()
+        from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+        effect = await light.get_effect()
         if effect:
-            print(f"Effect: {effect.effect_type}, Speed: {effect.speed}ms")
+            print(f"Effect: {effect.effect_type.name}, Speed: {effect.speed}ms")
+            if effect.effect_type == FirmwareEffect.MOVE:
+                print(f"Direction: {effect.direction.name}")
         ```
     """
     # Request automatically unpacks response
@@ -4578,7 +4585,7 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
         settings.parameter.parameter7,
     ]
 
-    if effect_type == MultiZoneEffectType.OFF:
+    if effect_type == FirmwareEffect.OFF:
         result = None
     else:
         result = MultiZoneEffect(
@@ -4593,7 +4600,7 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
     _LOGGER.debug(
         {
             "class": "Device",
-            "method": "get_multizone_effect",
+            "method": "get_effect",
             "action": "query",
             "reply": {
                 "effect_type": effect_type.name,
@@ -4607,10 +4614,10 @@ async def get_multizone_effect(self) -> MultiZoneEffect | None:
     return result
 ````
 
-##### set_multizone_effect
+##### set_effect
 
 ```python
-set_multizone_effect(effect: MultiZoneEffect) -> None
+set_effect(effect: MultiZoneEffect) -> None
 ```
 
 Set multizone effect.
@@ -4627,19 +4634,30 @@ Set multizone effect.
 Example
 
 ```python
-# Apply a move effect
+from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+# Apply a move effect moving forward
 effect = MultiZoneEffect(
-    effect_type=MultiZoneEffectType.MOVE,
+    effect_type=FirmwareEffect.MOVE,
     speed=5000,  # 5 seconds per cycle
     duration=0,  # Infinite
 )
-await light.set_multizone_effect(effect)
+effect.direction = Direction.FORWARD
+await light.set_effect(effect)
+
+# Or use parameters directly
+effect = MultiZoneEffect(
+    effect_type=FirmwareEffect.MOVE,
+    speed=5000,
+    parameters=[0, int(Direction.REVERSED), 0, 0, 0, 0, 0, 0],
+)
+await light.set_effect(effect)
 ```
 
 Source code in `src/lifx/devices/multizone.py`
 
 ````python
-async def set_multizone_effect(
+async def set_effect(
     self,
     effect: MultiZoneEffect,
 ) -> None:
@@ -4654,13 +4672,24 @@ async def set_multizone_effect(
 
     Example:
         ```python
-        # Apply a move effect
+        from lifx.protocol.protocol_types import Direction, FirmwareEffect
+
+        # Apply a move effect moving forward
         effect = MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
+            effect_type=FirmwareEffect.MOVE,
             speed=5000,  # 5 seconds per cycle
             duration=0,  # Infinite
         )
-        await light.set_multizone_effect(effect)
+        effect.direction = Direction.FORWARD
+        await light.set_effect(effect)
+
+        # Or use parameters directly
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5000,
+            parameters=[0, int(Direction.REVERSED), 0, 0, 0, 0, 0, 0],
+        )
+        await light.set_effect(effect)
         ```
     """  # Ensure parameters list is 8 elements
     parameters = effect.parameters or [0] * 8
@@ -4691,13 +4720,13 @@ async def set_multizone_effect(
     )
 
     # Update cached state
-    result = effect if effect.effect_type != MultiZoneEffectType.OFF else None
+    result = effect if effect.effect_type != FirmwareEffect.OFF else None
     self._multizone_effect = result
 
     _LOGGER.debug(
         {
             "class": "Device",
-            "method": "set_multizone_effect",
+            "method": "set_effect",
             "action": "change",
             "values": {
                 "effect_type": effect.effect_type.name,
@@ -4734,9 +4763,9 @@ async def stop_effect(self) -> None:
         await light.stop_effect()
         ```
     """
-    await self.set_multizone_effect(
+    await self.set_effect(
         MultiZoneEffect(
-            effect_type=MultiZoneEffectType.OFF,
+            effect_type=FirmwareEffect.OFF,
             speed=0,
             duration=0,
         )
@@ -4748,103 +4777,6 @@ async def stop_effect(self) -> None:
             "method": "stop_effect",
             "action": "change",
             "values": {},
-        }
-    )
-````
-
-##### set_move_effect
-
-```python
-set_move_effect(
-    speed: float = 5.0, direction: str = "forward", duration: float = 0.0
-) -> None
-```
-
-Apply a moving effect that shifts colors along the strip.
-
-| PARAMETER   | DESCRIPTION                                                                                  |
-| ----------- | -------------------------------------------------------------------------------------------- |
-| `speed`     | Speed in seconds per complete cycle (default 5.0) **TYPE:** `float` **DEFAULT:** `5.0`       |
-| `direction` | "forward" or "backward" (default "forward") **TYPE:** `str` **DEFAULT:** `'forward'`         |
-| `duration`  | Total duration in seconds (0 for infinite, default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
-
-| RAISES       | DESCRIPTION                                      |
-| ------------ | ------------------------------------------------ |
-| `ValueError` | If direction is invalid or speed is non-positive |
-
-Example
-
-```python
-# Move forward at moderate speed
-await light.set_move_effect(speed=5.0, direction="forward")
-
-# Move backward slowly for 60 seconds
-await light.set_move_effect(speed=10.0, direction="backward", duration=60.0)
-```
-
-Source code in `src/lifx/devices/multizone.py`
-
-````python
-async def set_move_effect(
-    self,
-    speed: float = 5.0,
-    direction: str = "forward",
-    duration: float = 0.0,
-) -> None:
-    """Apply a moving effect that shifts colors along the strip.
-
-    Args:
-        speed: Speed in seconds per complete cycle (default 5.0)
-        direction: "forward" or "backward" (default "forward")
-        duration: Total duration in seconds (0 for infinite, default 0.0)
-
-    Raises:
-        ValueError: If direction is invalid or speed is non-positive
-
-    Example:
-        ```python
-        # Move forward at moderate speed
-        await light.set_move_effect(speed=5.0, direction="forward")
-
-        # Move backward slowly for 60 seconds
-        await light.set_move_effect(speed=10.0, direction="backward", duration=60.0)
-        ```
-    """
-    if speed <= 0:
-        raise ValueError(f"Speed must be positive, got {speed}")
-    if direction not in ("forward", "backward"):
-        raise ValueError(
-            f"Direction must be 'forward' or 'backward', got {direction}"
-        )
-
-    # Convert speed to milliseconds
-    speed_ms = int(speed * 1000)
-
-    # Convert duration to nanoseconds
-    duration_ns = int(duration * 1_000_000_000)
-
-    # Set parameter[0] to 1 for backward, 0 for forward
-    parameters = [1 if direction == "backward" else 0] + [0] * 7
-
-    await self.set_multizone_effect(
-        MultiZoneEffect(
-            effect_type=MultiZoneEffectType.MOVE,
-            speed=speed_ms,
-            duration=duration_ns,
-            parameters=parameters,
-        )
-    )
-
-    _LOGGER.debug(
-        {
-            "class": "Device",
-            "method": "set_move_effect",
-            "action": "change",
-            "values": {
-                "speed": speed,
-                "direction": direction,
-                "duration": duration,
-            },
         }
     )
 ````
@@ -5669,7 +5601,7 @@ async def get_tile_effect(self) -> MatrixEffect:
 
 ```python
 set_tile_effect(
-    effect_type: TileEffectType,
+    effect_type: FirmwareEffect,
     speed: int = 3000,
     duration: int = 0,
     palette: list[HSBK] | None = None,
@@ -5683,7 +5615,7 @@ Set tile effect with configuration.
 
 | PARAMETER              | DESCRIPTION                                                                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `TileEffectType`                             |
+| `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `FirmwareEffect`                             |
 | `speed`                | Effect speed in milliseconds (default: 3000) **TYPE:** `int` **DEFAULT:** `3000`               |
 | `duration`             | Total effect duration in nanoseconds (0 for infinite) **TYPE:** `int` **DEFAULT:** `0`         |
 | `palette`              | Color palette for the effect (max 16 colors) **TYPE:** \`list[HSBK]                            |
@@ -5695,14 +5627,14 @@ Example
 
 > > > ###### Set MORPH effect with rainbow palette
 > > >
-> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_tile_effect( ... effect_type=TileEffectType.MORPH, ... speed=5000, ... palette=rainbow, ... )
+> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_tile_effect( ... effect_type=FirmwareEffect.MORPH, ... speed=5000, ... palette=rainbow, ... )
 
 Source code in `src/lifx/devices/matrix.py`
 
 ```python
 async def set_tile_effect(
     self,
-    effect_type: TileEffectType,
+    effect_type: FirmwareEffect,
     speed: int = 3000,
     duration: int = 0,
     palette: list[HSBK] | None = None,
@@ -5730,7 +5662,7 @@ async def set_tile_effect(
         ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
         ... ]
         >>> await matrix.set_tile_effect(
-        ...     effect_type=TileEffectType.MORPH,
+        ...     effect_type=FirmwareEffect.MORPH,
         ...     speed=5000,
         ...     palette=rainbow,
         ... )
@@ -6009,31 +5941,57 @@ async def main():
 ### MultiZone Control
 
 ```python
-from lifx import find_lights, Colors
+from lifx import MultiZoneLight, Colors, FirmwareEffect, Direction
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            # Get all zones - automatically uses best method
-            colors = await light.get_all_color_zones()
-            print(f"Device has {len(colors)} zones")
+    async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+        # Get all zones - automatically uses best method
+        colors = await light.get_all_color_zones()
+        print(f"Device has {len(colors)} zones")
+
+        # Set a MOVE effect
+        await light.set_effect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5.0,  # seconds per cycle
+            direction=Direction.FORWARD,
+        )
+
+        # Get current effect
+        effect = await light.get_effect()
+        print(f"Effect: {effect.effect_type.name}")
+        if effect.effect_type == FirmwareEffect.MOVE:
+            print(f"Direction: {effect.direction.name}")
+
+        # Stop the effect
+        await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
 
 ### Tile Control
 
 ```python
-from lifx import find_lights, HSBK
+from lifx import MatrixLight, HSBK, FirmwareEffect
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            if light.has_matrix:
-                # Set a gradient across the tile
-                colors = [
-                    HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
-                    for h in range(0, 360, 10)
-                ]
-                await light.set_tile_colors(colors)
+    async with await MatrixLight.from_ip("192.168.1.100") as light:
+        # Set a gradient across the tile
+        colors = [
+            HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
+            for h in range(0, 360, 10)
+        ]
+        await light.set_tile_colors(colors)
+
+        # Set a tile effect (MORPH, FLAME, or SKY)
+        await light.set_effect(
+            effect_type=FirmwareEffect.FLAME,
+            speed=5.0,  # seconds per cycle
+        )
+
+        # Get current effect
+        effect = await light.get_effect()
+        print(f"Tile effect: {effect.effect_type.name}")
+
+        # Stop the effect
+        await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```

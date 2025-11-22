@@ -754,17 +754,21 @@ Bases: `IntEnum`
 
 Auto-generated enum.
 
-### MultiZone Effect Type
+### Firmware Effect
 
-#### MultiZoneEffectType
+Unified enum for all firmware effects (multizone and matrix devices):
+
+#### FirmwareEffect
 
 Bases: `IntEnum`
 
 Auto-generated enum.
 
-### Tile Effect Type
+### Direction
 
-#### TileEffectType
+Direction enum for MOVE effects:
+
+#### Direction
 
 Bases: `IntEnum`
 
@@ -1172,32 +1176,34 @@ Downloads the official protocol.yml from the LIFX GitHub repository and generate
 | -------------- | ---------------------------------------------- |
 | `TypeRegistry` | Registry of all protocol types for validation. |
 
-| FUNCTION                                 | DESCRIPTION                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `to_snake_case`                          | Convert PascalCase or camelCase to snake_case.                                    |
-| `apply_field_name_quirks`                | Apply quirks to field names to avoid Python built-ins and reserved words.         |
-| `apply_extended_multizone_packet_quirks` | Apply quirks to extended multizone packet names to follow LIFX naming convention. |
-| `apply_tile_effect_parameter_quirk`      | Apply local quirk to fix TileEffectParameter structure.                           |
-| `apply_sensor_packet_quirks`             | Add undocumented sensor packets for ambient light level reading.                  |
-| `format_long_import`                     | Format a long import statement across multiple lines.                             |
-| `format_long_list`                       | Format a long list across multiple lines.                                         |
-| `parse_field_type`                       | Parse a field type string.                                                        |
-| `camel_to_snake_upper`                   | Convert CamelCase to UPPER_SNAKE_CASE.                                            |
-| `generate_enum_code`                     | Generate Python Enum definitions with shortened names.                            |
-| `convert_type_to_python`                 | Convert a protocol field type to Python type annotation.                          |
-| `generate_pack_method`                   | Generate pack() method code for a field structure or packet.                      |
-| `generate_unpack_method`                 | Generate unpack() classmethod code for a field structure or packet.               |
-| `generate_field_code`                    | Generate Python dataclass definitions for field structures.                       |
-| `generate_nested_packet_code`            | Generate nested Python packet class definitions.                                  |
-| `generate_types_file`                    | Generate complete types.py file.                                                  |
-| `generate_packets_file`                  | Generate complete packets.py file.                                                |
-| `download_protocol`                      | Download and parse protocol.yml from LIFX GitHub repository.                      |
-| `validate_protocol_spec`                 | Validate protocol specification for missing type references.                      |
-| `should_skip_button_relay`               | Check if a name should be skipped (Button or Relay related).                      |
-| `filter_button_relay_items`              | Filter out Button and Relay items from a dictionary.                              |
-| `filter_button_relay_packets`            | Filter out button and relay category packets.                                     |
-| `extract_packets_as_fields`              | Extract packets that are used as field types in other structures.                 |
-| `main`                                   | Main generator entry point.                                                       |
+| FUNCTION                                    | DESCRIPTION                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| `to_snake_case`                             | Convert PascalCase or camelCase to snake_case.                                    |
+| `apply_field_name_quirks`                   | Apply quirks to field names to avoid Python built-ins and reserved words.         |
+| `apply_extended_multizone_packet_quirks`    | Apply quirks to extended multizone packet names to follow LIFX naming convention. |
+| `apply_tile_effect_parameter_quirk`         | Apply local quirk to fix TileEffectParameter structure.                           |
+| `apply_sensor_packet_quirks`                | Add undocumented sensor packets for ambient light level reading.                  |
+| `apply_firmware_effect_enum_quirk`          | Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.            |
+| `apply_multizone_application_request_quirk` | Suppress MultiZoneExtendedApplicationRequest enum.                                |
+| `format_long_import`                        | Format a long import statement across multiple lines.                             |
+| `format_long_list`                          | Format a long list across multiple lines.                                         |
+| `parse_field_type`                          | Parse a field type string.                                                        |
+| `camel_to_snake_upper`                      | Convert CamelCase to UPPER_SNAKE_CASE.                                            |
+| `generate_enum_code`                        | Generate Python Enum definitions with shortened names.                            |
+| `convert_type_to_python`                    | Convert a protocol field type to Python type annotation.                          |
+| `generate_pack_method`                      | Generate pack() method code for a field structure or packet.                      |
+| `generate_unpack_method`                    | Generate unpack() classmethod code for a field structure or packet.               |
+| `generate_field_code`                       | Generate Python dataclass definitions for field structures.                       |
+| `generate_nested_packet_code`               | Generate nested Python packet class definitions.                                  |
+| `generate_types_file`                       | Generate complete types.py file.                                                  |
+| `generate_packets_file`                     | Generate complete packets.py file.                                                |
+| `download_protocol`                         | Download and parse protocol.yml from LIFX GitHub repository.                      |
+| `validate_protocol_spec`                    | Validate protocol specification for missing type references.                      |
+| `should_skip_button_relay`                  | Check if a name should be skipped (Button or Relay related).                      |
+| `filter_button_relay_items`                 | Filter out Button and Relay items from a dictionary.                              |
+| `filter_button_relay_packets`               | Filter out button and relay category packets.                                     |
+| `extract_packets_as_fields`                 | Extract packets that are used as field types in other structures.                 |
+| `main`                                      | Main generator entry point.                                                       |
 
 #### Classes
 
@@ -1704,6 +1710,161 @@ def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
     return packets
 ```
 
+##### apply_firmware_effect_enum_quirk
+
+```python
+apply_firmware_effect_enum_quirk(
+    enums: dict[str, Any],
+    fields: dict[str, Any],
+    compound_fields: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
+```
+
+Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.
+
+Both MultiZone and Tile effects use the same firmware effect protocol values, so they should share a single enum. This quirk:
+
+- Creates FirmwareEffect enum combining values from both
+- Removes MultiZoneEffectType and TileEffectType
+- Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
+- Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, RESERVED\_\*)
+- Also adds DIRECTION enum for move effect parameter
+
+| PARAMETER         | DESCRIPTION                                                         |
+| ----------------- | ------------------------------------------------------------------- |
+| `enums`           | Dictionary of enum definitions **TYPE:** `dict[str, Any]`           |
+| `fields`          | Dictionary of field definitions **TYPE:** `dict[str, Any]`          |
+| `compound_fields` | Dictionary of compound field definitions **TYPE:** `dict[str, Any]` |
+
+| RETURNS                                                 | DESCRIPTION                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `tuple[dict[str, Any], dict[str, Any], dict[str, Any]]` | Tuple of (enums, fields, compound_fields) with FirmwareEffect enum quirk applied |
+
+Source code in `src/lifx/protocol/generator.py`
+
+```python
+def apply_firmware_effect_enum_quirk(
+    enums: dict[str, Any], fields: dict[str, Any], compound_fields: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.
+
+    Both MultiZone and Tile effects use the same firmware effect protocol values,
+    so they should share a single enum. This quirk:
+    - Creates FirmwareEffect enum combining values from both
+    - Removes MultiZoneEffectType and TileEffectType
+    - Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
+    - Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, RESERVED_*)
+    - Also adds DIRECTION enum for move effect parameter
+
+    Args:
+        enums: Dictionary of enum definitions
+        fields: Dictionary of field definitions
+        compound_fields: Dictionary of compound field definitions
+
+    Returns:
+        Tuple of (enums, fields, compound_fields) with FirmwareEffect enum quirk applied
+    """
+    # Create FirmwareEffect enum with clean names manually
+    # Based on protocol spec:
+    # MultiZone: OFF=0, MOVE=1, reserved=2, reserved=3
+    # Tile: OFF=0, reserved=1, MORPH=2, FLAME=3, reserved=4, SKY=5
+    # Note: Reserved values are intentionally omitted
+    firmware_effect_values = {
+        "OFF": 0,
+        "MOVE": 1,
+        "MORPH": 2,
+        "FLAME": 3,
+        "SKY": 5,
+    }
+
+    # Create FirmwareEffect enum
+    enums["FirmwareEffect"] = firmware_effect_values
+
+    # Remove the old separate enums
+    enums.pop("MultiZoneEffectType", None)
+    enums.pop("TileEffectType", None)
+
+    # Update fields to use FirmwareEffect (check both fields and compound_fields)
+    for field_dict in [fields, compound_fields]:
+        if "MultiZoneEffectSettings" in field_dict:
+            for field in field_dict["MultiZoneEffectSettings"].get("fields", []):
+                if field.get("name") == "Type":
+                    field["type"] = "<FirmwareEffect>"
+
+        if "TileEffectSettings" in field_dict:
+            for field in field_dict["TileEffectSettings"].get("fields", []):
+                if field.get("name") == "Type":
+                    field["type"] = "<FirmwareEffect>"
+
+    # Add DIRECTION enum for move effect
+    enums["Direction"] = {
+        "REVERSED": 0,
+        "FORWARD": 1,
+    }
+
+    return enums, fields, compound_fields
+```
+
+##### apply_multizone_application_request_quirk
+
+```python
+apply_multizone_application_request_quirk(
+    enums: dict[str, Any], packets: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]
+```
+
+Suppress MultiZoneExtendedApplicationRequest enum.
+
+Both MultiZoneApplicationRequest and MultiZoneExtendedApplicationRequest have identical values (NO_APPLY=0, APPLY=1, APPLY_ONLY=2), so we suppress the extended version and use the standard one for both SetColorZones and SetExtendedColorZones packets.
+
+| PARAMETER | DESCRIPTION                                                 |
+| --------- | ----------------------------------------------------------- |
+| `enums`   | Dictionary of enum definitions **TYPE:** `dict[str, Any]`   |
+| `packets` | Dictionary of packet definitions **TYPE:** `dict[str, Any]` |
+
+| RETURNS          | DESCRIPTION                                                                |
+| ---------------- | -------------------------------------------------------------------------- |
+| `dict[str, Any]` | Tuple of (enums, packets) with MultiZoneExtendedApplicationRequest removed |
+| `dict[str, Any]` | and packets updated to use MultiZoneApplicationRequest                     |
+
+Source code in `src/lifx/protocol/generator.py`
+
+```python
+def apply_multizone_application_request_quirk(
+    enums: dict[str, Any], packets: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Suppress MultiZoneExtendedApplicationRequest enum.
+
+    Both MultiZoneApplicationRequest and MultiZoneExtendedApplicationRequest have
+    identical values (NO_APPLY=0, APPLY=1, APPLY_ONLY=2), so we suppress the
+    extended version and use the standard one for both SetColorZones and
+    SetExtendedColorZones packets.
+
+    Args:
+        enums: Dictionary of enum definitions
+        packets: Dictionary of packet definitions
+
+    Returns:
+        Tuple of (enums, packets) with MultiZoneExtendedApplicationRequest removed
+        and packets updated to use MultiZoneApplicationRequest
+    """
+    # Remove the duplicate enum
+    enums.pop("MultiZoneExtendedApplicationRequest", None)
+
+    # Update packets in multi_zone category to use MultiZoneApplicationRequest
+    if "multi_zone" in packets:
+        for packet_name, packet_def in packets["multi_zone"].items():
+            if "fields" in packet_def:
+                for field in packet_def["fields"]:
+                    if (
+                        isinstance(field, dict)
+                        and field.get("type") == "<MultiZoneExtendedApplicationRequest>"
+                    ):
+                        field["type"] = "<MultiZoneApplicationRequest>"
+
+    return enums, packets
+```
+
 ##### format_long_import
 
 ```python
@@ -1933,7 +2094,6 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
         if isinstance(enum_def, dict) and "values" in enum_def:
             # New format: {type: "uint16", values: [{name: "X", value: 1}, ...]}
             values = enum_def["values"]
-            reserved_counter = 0
 
             # Check if all values share a common prefix (enum name)
             expected_prefix = camel_to_snake_upper(enum_name) + "_"
@@ -1948,12 +2108,12 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
                 protocol_name = item["name"]
                 member_value = item["value"]
 
-                # Handle reserved fields by making names unique
+                # Skip reserved fields entirely
                 if protocol_name.lower() == "reserved":
-                    member_name = f"RESERVED_{reserved_counter}"
-                    reserved_counter += 1
+                    continue
+
                 # Remove redundant prefix for cleaner Python names
-                elif has_common_prefix and protocol_name.startswith(expected_prefix):
+                if has_common_prefix and protocol_name.startswith(expected_prefix):
                     member_name = protocol_name[len(expected_prefix) :]
                 else:
                     member_name = protocol_name
@@ -3341,6 +3501,10 @@ def main() -> None:
 
     # Apply local quirks to fix protocol issues
     print("Applying local protocol quirks...")
+    enums, fields, compound_fields = apply_firmware_effect_enum_quirk(
+        enums, fields, compound_fields
+    )
+    enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
     packets = apply_sensor_packet_quirks(packets)
 
@@ -3530,6 +3694,23 @@ LightWaveform.SINE
 LightWaveform.HALF_SINE
 LightWaveform.TRIANGLE
 LightWaveform.PULSE
+```
+
+### Firmware Effects
+
+```python
+from lifx.protocol.protocol_types import FirmwareEffect, Direction
+
+# Available firmware effects (for multizone and matrix devices)
+FirmwareEffect.OFF
+FirmwareEffect.MOVE       # MultiZone only
+FirmwareEffect.MORPH      # Tile/Matrix only
+FirmwareEffect.FLAME      # Tile/Matrix only
+FirmwareEffect.SKY        # Tile/Matrix only
+
+# Direction for MOVE effects
+Direction.FORWARD   # Move forward through zones
+Direction.REVERSED  # Move backward through zones
 ```
 
 ## Product Registry
