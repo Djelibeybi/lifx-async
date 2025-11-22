@@ -13,6 +13,11 @@ from lifx.effects.const import DEFAULT_BRIGHTNESS
 class ConcreteEffect(LIFXEffect):
     """Concrete implementation for testing abstract base class."""
 
+    @property
+    def name(self) -> str:
+        """Return the name of the effect."""
+        return "test"
+
     async def async_play(self) -> None:
         """Minimal implementation for testing."""
         pass
