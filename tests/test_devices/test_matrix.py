@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lifx.color import HSBK
+from lifx.color import HSBK, Colors
 from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
 from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
 
@@ -74,23 +74,22 @@ class TestMatrixLight:
             assert matrix.tile_count == len(await matrix.get_device_chain())
 
     async def test_get64_single_tile(self, emulator_devices) -> None:
-        """Test getting colors from 8x8 tile (64 zones)."""
+        """Test getting colors from 8x8 tile (64 zones) with default parameters."""
         matrix = emulator_devices[6]
         async with matrix:
             chain = await matrix.get_device_chain()
             tile = chain[0]
 
-            # Get colors from first tile
-            colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-            )
+            # Verify tile dimensions
+            assert tile.width == 8
+            assert tile.height == 8
+            assert tile.total_zones == 64
+
+            # Get colors using default parameters (no args needed)
+            colors = await matrix.get64()
 
             assert isinstance(colors, list)
-            assert len(colors) > 0
+            assert len(colors) == 64  # Returns actual number of zones
             assert all(isinstance(color, HSBK) for color in colors)
 
     async def test_set64_single_tile(self, emulator_devices) -> None:
@@ -102,7 +101,7 @@ class TestMatrixLight:
 
             # Set all zones to red
             zone_count = tile.width * tile.height
-            red_colors = [HSBK.from_rgb(255, 0, 0)] * min(zone_count, 64)
+            red_colors = [Colors.RED] * min(zone_count, 64)
 
             await matrix.set64(
                 tile_index=0,
@@ -115,13 +114,7 @@ class TestMatrixLight:
             )
 
             # Verify colors were set (read back)
-            colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-            )
+            colors = await matrix.get64()
 
             # First color should be red (allow protocol conversion tolerance)
             assert colors[0].hue < 10 or colors[0].hue > 350  # Red ~0 deg
@@ -144,13 +137,7 @@ class TestMatrixLight:
             await matrix.set_matrix_colors(tile_index=0, colors=gradient, duration=0)
 
             # Verify first few colors (partial verification to avoid test complexity)
-            colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-            )
+            colors = await matrix.get64()
             assert len(colors) > 0
 
     async def test_set_matrix_colors_solid_color(self, emulator_devices) -> None:
@@ -167,24 +154,18 @@ class TestMatrixLight:
             tile = chain[0]
 
             # Create solid red across all zones
-            red_colors = [HSBK.from_rgb(255, 0, 0)] * tile.total_zones
+            red_colors = [Colors.RED] * tile.total_zones
 
             # Set all zones to red (should use SetColor packet)
             await matrix.set_matrix_colors(tile_index=0, colors=red_colors, duration=0)
 
             # Verify the color was set by reading back
-            colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-            )
+            colors = await matrix.get64()
 
             # Verify first zone is red
-            assert colors[0].hue < 10 or colors[0].hue > 350
-            assert colors[0].saturation > 0.9
-            assert colors[0].brightness > 0.9
+            assert colors[0].hue == 0
+            assert colors[0].saturation == 1.0
+            assert colors[0].brightness == 1.0
 
     async def test_get_effect(self, emulator_devices) -> None:
         """Test getting current tile effect."""
@@ -217,10 +198,10 @@ class TestMatrixLight:
         async with matrix:
             # Create rainbow palette
             rainbow = [
-                HSBK(0, 1.0, 1.0, 3500),  # Red
-                HSBK(60, 1.0, 1.0, 3500),  # Yellow
-                HSBK(120, 1.0, 1.0, 3500),  # Green
-                HSBK(240, 1.0, 1.0, 3500),  # Blue
+                Colors.RED,  # Red
+                Colors.YELLOW,  # Yellow
+                Colors.GREEN,  # Green
+                Colors.BLUE,  # Blue
             ]
 
             await matrix.set_effect(
@@ -240,10 +221,10 @@ class TestMatrixLight:
         async with matrix:
             # Flame effect with fire colors
             fire_palette = [
-                HSBK.from_rgb(255, 0, 0),  # Red
-                HSBK.from_rgb(255, 69, 0),  # Orange-red
-                HSBK.from_rgb(255, 140, 0),  # Orange
-                HSBK.from_rgb(255, 215, 0),  # Gold
+                Colors.RED,  # Red
+                HSBK(hue=16, saturation=1.0, brightness=1.0, kelvin=3500),
+                Colors.ORANGE,  # Orange
+                HSBK(hue=51, saturation=1.0, brightness=1.0, kelvin=3500),
             ]
 
             await matrix.set_effect(
@@ -341,11 +322,11 @@ class TestMatrixLight:
             assert effect.effect_type == FirmwareEffect.OFF
 
     async def test_get64_large_tile(self, ceiling_device) -> None:
-        """Test getting colors from 16x8 tile (128 zones).
+        """Test getting colors from 16x8 tile (128 zones) with default parameters.
 
-        Ceiling devices have 16x8 tiles with 128 zones, which is larger than
-        the 64-zone limit for direct get64 operations. This tests the protocol
-        can handle reading from tiles with >64 zones.
+        Ceiling devices have 16x8 tiles with 128 zones. The get64() method returns
+        up to 64 colors due to protocol limitations, so we have to send two get64
+        requests.
         """
         matrix = ceiling_device
         async with matrix:
@@ -357,17 +338,13 @@ class TestMatrixLight:
             assert tile.height == 8
             assert tile.total_zones == 128
 
-            # Get first 64 zones from the large tile
-            colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-            )
+            # Get zones using two get64 requests, 64 zones per request.
+            colors: list[HSBK] = []
+            colors.extend(await matrix.get64())
+            colors.extend(await matrix.get64(y=4))
 
             assert isinstance(colors, list)
-            assert len(colors) == 64  # get64 returns max 64 colors
+            assert len(colors) == 128
             assert all(isinstance(color, HSBK) for color in colors)
 
     async def test_set64_large_tile(self, ceiling_device) -> None:
@@ -385,9 +362,12 @@ class TestMatrixLight:
             assert tile.total_zones == 128
 
             # Create 64 blue colors for first 64 zones
-            blue_colors = [HSBK.from_rgb(0, 0, 255)] * 64
+            blue_colors = [Colors.BLUE] * 64
 
-            # Set first 64 zones to blue (writes to frame buffer 1)
+            # Create 64 red colors for the second 64 zones
+            red_colors = [Colors.RED] * 64
+
+            # Set first 64 zones to blue (on frame buffer 1)
             await matrix.set64(
                 tile_index=0,
                 length=1,
@@ -399,32 +379,39 @@ class TestMatrixLight:
                 fb_index=1,  # Write to temp buffer
             )
 
-            # Copy frame buffer 1 to frame buffer 0 (display)
-            await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
-
-            # Read back the first 64 zones from display buffer
-            colors = await matrix.get64(
+            # Set the second 64 zones to red (on frame buffer 1)
+            await matrix.set64(
                 tile_index=0,
                 length=1,
                 x=0,
-                y=0,
+                y=4,
                 width=tile.width,
-                fb_index=0,  # Read from display buffer
+                duration=0,
+                colors=red_colors,
+                fb_index=1,  # Write to temp buffer
             )
 
+            # Copy frame buffer 1 to frame buffer 0 (display)
+            await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
+
+            # Get the updated colors
+            colors: list[HSBK] = []
+            colors.extend(await matrix.get64())
+            colors.extend(await matrix.get64(y=4))
+
             # Verify the colors were set correctly
-            assert len(colors) == 64
+            assert len(colors) == 128
             # Blue is hue ~240
             assert 230 < colors[0].hue < 250
             assert colors[0].saturation > 0.9  # High saturation
             assert colors[0].brightness > 0.9  # Full brightness
-
-            # Note: We can't easily verify this without copying to display buffer
-            # since get64 reads from display buffer (fb_index=0)
-            # This test verifies the operation completes without error
+            # Red is hue ~0
+            assert colors[64].hue == 0
+            assert colors[64].saturation == 1.0
+            assert colors[64].brightness == 1.0
 
     async def test_set_matrix_colors_large_tile(self, ceiling_device) -> None:
-        """Test setting all colors on 16x8 tile (128 zones) using frame buffer strategy.
+        """Test setting all colors on 16x8 tile (128 zones) set_matrix_colors()
 
         This tests the automatic frame buffer strategy for tiles with >64 zones.
         The method should automatically batch the colors and use the frame buffer.
@@ -439,7 +426,7 @@ class TestMatrixLight:
             assert tile.total_zones == 128
 
             # Create a gradient (different colors, so uses set64 not SetColor)
-            colors = [HSBK(i * 360.0 / 128, 1.0, 1.0, 3500) for i in range(128)]
+            colors = [HSBK(round(i * 360.0 / 128), 1.0, 1.0, 3500) for i in range(128)]
 
             # Set all 128 zones at once (should use frame buffer strategy)
             # This requires:
@@ -449,13 +436,7 @@ class TestMatrixLight:
             await matrix.set_matrix_colors(tile_index=0, colors=colors, duration=0)
 
             # Verify first 64 zones
-            first_half = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-            )
+            first_half = await matrix.get64()
 
             assert len(first_half) == 64
             # First zone should be hue 0 (red)
@@ -464,13 +445,7 @@ class TestMatrixLight:
             assert first_half[0].brightness > 0.9  # Full brightness
 
             # Verify second 64 zones
-            second_half = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=4,  # Start at row 4
-                width=tile.width,
-            )
+            second_half = await matrix.get64(y=4)  # Start at row 4
 
             assert len(second_half) == 64
             # Zone 64 should be hue ~180 (cyan)
@@ -508,9 +483,9 @@ class TestMatrixLight:
                 tile_index=0, colors=white_colors, duration=0
             )
 
-            # Create gradient: first 64 zones blue, second 64 zones green
-            blue_colors = [HSBK.from_rgb(0, 0, 255)] * 64
-            green_colors = [HSBK.from_rgb(0, 255, 0)] * 64
+            # Create colors: first 64 zones blue, second 64 zones green
+            blue_colors = [Colors.BLUE] * 64
+            green_colors = [Colors.GREEN] * 64
 
             # Step 1: Set first 64 zones (rows 0-3) to blue in frame buffer 1
             await matrix.set64(
@@ -540,25 +515,11 @@ class TestMatrixLight:
             # This should copy all 128 zones using the tile's width and height
             await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
 
-            # Step 4: Read back first 64 zones from frame buffer 0 (display)
-            first_64_colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=0,
-                width=tile.width,
-                fb_index=0,  # Read from display buffer
-            )
+            # Step 4: Read back first 64 zones
+            first_64_colors = await matrix.get64()
 
-            # Step 5: Read back second 64 zones from frame buffer 0 (display)
-            second_64_colors = await matrix.get64(
-                tile_index=0,
-                length=1,
-                x=0,
-                y=4,
-                width=tile.width,
-                fb_index=0,  # Read from display buffer
-            )
+            # Step 5: Read back second 64 zones
+            second_64_colors = await matrix.get64(y=4)
 
             # Verify all 128 zones were retrieved
             assert len(first_64_colors) == 64
