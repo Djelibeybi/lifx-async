@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.3.5 (2025-11-22)
+
+### Bug Fixes
+
+- **devices**: Allow MatrixEffect without palette ([`fb31df5`](https://github.com/Djelibeybi/lifx-async/commit/fb31df51b1af9d8c7c2f573ec9619566b4f7393b))
+
 ## v4.3.4 (2025-11-22)
 
 ### Bug Fixes
