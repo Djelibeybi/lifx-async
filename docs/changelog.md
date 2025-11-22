@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v4.3.3 (2025-11-22)
+
+### Bug Fixes
+
+- Give MatrixLight.get64() some default parameters
+  ([`a69a49c`](https://github.com/Djelibeybi/lifx-async/commit/a69a49c93488c79c8c3be58a9304fd01b4b12231))
+
+- **themes**: Apply theme colors to all zones via proper canvas interpolation
+  ([`f1628c4`](https://github.com/Djelibeybi/lifx-async/commit/f1628c4a071d257d7db79a7945d1516c783d8d52))
+
+
 ## v4.3.2 (2025-11-22)
 
 ### Bug Fixes
