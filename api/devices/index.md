@@ -4907,8 +4907,8 @@ Example
 | `set64`             | Set up to 64 zones of color on a tile.                                    |
 | `copy_frame_buffer` | Copy frame buffer (for tiles with >64 zones).                             |
 | `set_matrix_colors` | Convenience method to set all colors on a tile.                           |
-| `get_tile_effect`   | Get current running tile effect.                                          |
-| `set_tile_effect`   | Set tile effect with configuration.                                       |
+| `get_effect`        | Get current running matrix effect.                                        |
+| `set_effect`        | Set matrix effect with configuration.                                     |
 | `apply_theme`       | Apply a theme across matrix tiles using Canvas interpolation.             |
 
 | ATTRIBUTE      | DESCRIPTION                                         |
@@ -5540,13 +5540,13 @@ async def set_matrix_colors(
         )
 ```
 
-##### get_tile_effect
+##### get_effect
 
 ```python
-get_tile_effect() -> MatrixEffect
+get_effect() -> MatrixEffect
 ```
 
-Get current running tile effect.
+Get current running matrix effect.
 
 | RETURNS        | DESCRIPTION                                      |
 | -------------- | ------------------------------------------------ |
@@ -5554,22 +5554,22 @@ Get current running tile effect.
 
 Example
 
-> > > effect = await matrix.get_tile_effect() print(f"Effect type: {effect.effect_type}")
+> > > effect = await matrix.get_effect() print(f"Effect type: {effect.effect_type}")
 
 Source code in `src/lifx/devices/matrix.py`
 
 ```python
-async def get_tile_effect(self) -> MatrixEffect:
-    """Get current running tile effect.
+async def get_effect(self) -> MatrixEffect:
+    """Get current running matrix effect.
 
     Returns:
         MatrixEffect describing the current effect state
 
     Example:
-        >>> effect = await matrix.get_tile_effect()
+        >>> effect = await matrix.get_effect()
         >>> print(f"Effect type: {effect.effect_type}")
     """
-    _LOGGER.debug("Getting tile effect for %s", self.label or self.serial)
+    _LOGGER.debug("Getting matrix effect for %s", self.label or self.serial)
 
     response: packets.Tile.StateEffect = await self.connection.request(
         packets.Tile.GetEffect()
@@ -5597,10 +5597,10 @@ async def get_tile_effect(self) -> MatrixEffect:
     return effect
 ```
 
-##### set_tile_effect
+##### set_effect
 
 ```python
-set_tile_effect(
+set_effect(
     effect_type: FirmwareEffect,
     speed: int = 3000,
     duration: int = 0,
@@ -5611,7 +5611,7 @@ set_tile_effect(
 ) -> None
 ```
 
-Set tile effect with configuration.
+Set matrix effect with configuration.
 
 | PARAMETER              | DESCRIPTION                                                                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
@@ -5627,12 +5627,12 @@ Example
 
 > > > ###### Set MORPH effect with rainbow palette
 > > >
-> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_tile_effect( ... effect_type=FirmwareEffect.MORPH, ... speed=5000, ... palette=rainbow, ... )
+> > > rainbow = [ ... HSBK(0, 1.0, 1.0, 3500), # Red ... HSBK(60, 1.0, 1.0, 3500), # Yellow ... HSBK(120, 1.0, 1.0, 3500), # Green ... HSBK(240, 1.0, 1.0, 3500), # Blue ... ] await matrix.set_effect( ... effect_type=FirmwareEffect.MORPH, ... speed=5000, ... palette=rainbow, ... )
 
 Source code in `src/lifx/devices/matrix.py`
 
 ```python
-async def set_tile_effect(
+async def set_effect(
     self,
     effect_type: FirmwareEffect,
     speed: int = 3000,
@@ -5642,7 +5642,7 @@ async def set_tile_effect(
     cloud_saturation_min: int = 0,
     cloud_saturation_max: int = 0,
 ) -> None:
-    """Set tile effect with configuration.
+    """Set matrix effect with configuration.
 
     Args:
         effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
@@ -5661,14 +5661,14 @@ async def set_tile_effect(
         ...     HSBK(120, 1.0, 1.0, 3500),  # Green
         ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
         ... ]
-        >>> await matrix.set_tile_effect(
+        >>> await matrix.set_effect(
         ...     effect_type=FirmwareEffect.MORPH,
         ...     speed=5000,
         ...     palette=rainbow,
         ... )
     """
     _LOGGER.debug(
-        "Setting tile effect %s (speed=%d) for %s",
+        "Setting matrix effect %s (speed=%d) for %s",
         effect_type,
         speed,
         self.label or self.serial,

@@ -15375,28 +15375,28 @@ discontinued LIFX Tile product supported up to 5 tiles in a chain (has_chain).</
               </td>
             </tr>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            get_tile_effect
+              <td><code><a class="autorefs autorefs-internal" title="            get_effect
 
 
   
       async
-   (lifx.devices.matrix.MatrixLight.get_tile_effect)" href="#lifx.devices.matrix.MatrixLight.get_tile_effect">get_tile_effect</a></code></td>
+   (lifx.devices.matrix.MatrixLight.get_effect)" href="#lifx.devices.matrix.MatrixLight.get_effect">get_effect</a></code></td>
               <td class="doc-function-details">
                 <div class="doc-md-description">
-                  <p>Get current running tile effect.</p>
+                  <p>Get current running matrix effect.</p>
                 </div>
               </td>
             </tr>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            set_tile_effect
+              <td><code><a class="autorefs autorefs-internal" title="            set_effect
 
 
   
       async
-   (lifx.devices.matrix.MatrixLight.set_tile_effect)" href="#lifx.devices.matrix.MatrixLight.set_tile_effect">set_tile_effect</a></code></td>
+   (lifx.devices.matrix.MatrixLight.set_effect)" href="#lifx.devices.matrix.MatrixLight.set_effect">set_effect</a></code></td>
               <td class="doc-function-details">
                 <div class="doc-md-description">
-                  <p>Set tile effect with configuration.</p>
+                  <p>Set matrix effect with configuration.</p>
                 </div>
               </td>
             </tr>
@@ -17142,21 +17142,21 @@ await matrix.set_matrix_colors(tile_index=0, colors=colors)</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="lifx.devices.matrix.MatrixLight.get_tile_effect" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">get_tile_effect</span>
+<h5 id="lifx.devices.matrix.MatrixLight.get_effect" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">get_effect</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lifx.devices.matrix.MatrixLight.get_tile_effect" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_tile_effect</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="lifx.devices.matrix.MatrixEffect">MatrixEffect</span></span>
+<a href="#lifx.devices.matrix.MatrixLight.get_effect" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_effect</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="lifx.devices.matrix.MatrixEffect">MatrixEffect</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Get current running tile effect.</p>
+        <p>Get current running matrix effect.</p>
 
 
 <table>
@@ -17188,7 +17188,7 @@ await matrix.set_matrix_colors(tile_index=0, colors=colors)</p>
   <blockquote>
 <blockquote>
 <blockquote>
-<p>effect = await matrix.get_tile_effect()
+<p>effect = await matrix.get_effect()
 print(f"Effect type: {effect.effect_type}")</p>
 </blockquote>
 </blockquote>
@@ -17232,17 +17232,17 @@ print(f"Effect type: {effect.effect_type}")</p>
 <span class="normal"><a href="#__codelineno-0-718">718</a></span>
 <span class="normal"><a href="#__codelineno-0-719">719</a></span>
 <span class="normal"><a href="#__codelineno-0-720">720</a></span>
-<span class="normal"><a href="#__codelineno-0-721">721</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-686"><a id="__codelineno-0-686" name="__codelineno-0-686"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_tile_effect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MatrixEffect</span><span class="p">:</span>
-</span><span id="__span-0-687"><a id="__codelineno-0-687" name="__codelineno-0-687"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get current running tile effect.</span>
+<span class="normal"><a href="#__codelineno-0-721">721</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-686"><a id="__codelineno-0-686" name="__codelineno-0-686"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_effect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MatrixEffect</span><span class="p">:</span>
+</span><span id="__span-0-687"><a id="__codelineno-0-687" name="__codelineno-0-687"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get current running matrix effect.</span>
 </span><span id="__span-0-688"><a id="__codelineno-0-688" name="__codelineno-0-688"></a>
 </span><span id="__span-0-689"><a id="__codelineno-0-689" name="__codelineno-0-689"></a><span class="sd">    Returns:</span>
 </span><span id="__span-0-690"><a id="__codelineno-0-690" name="__codelineno-0-690"></a><span class="sd">        MatrixEffect describing the current effect state</span>
 </span><span id="__span-0-691"><a id="__codelineno-0-691" name="__codelineno-0-691"></a>
 </span><span id="__span-0-692"><a id="__codelineno-0-692" name="__codelineno-0-692"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-693"><a id="__codelineno-0-693" name="__codelineno-0-693"></a><span class="sd">        &gt;&gt;&gt; effect = await matrix.get_tile_effect()</span>
+</span><span id="__span-0-693"><a id="__codelineno-0-693" name="__codelineno-0-693"></a><span class="sd">        &gt;&gt;&gt; effect = await matrix.get_effect()</span>
 </span><span id="__span-0-694"><a id="__codelineno-0-694" name="__codelineno-0-694"></a><span class="sd">        &gt;&gt;&gt; print(f&quot;Effect type: {effect.effect_type}&quot;)</span>
 </span><span id="__span-0-695"><a id="__codelineno-0-695" name="__codelineno-0-695"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-696"><a id="__codelineno-0-696" name="__codelineno-0-696"></a>    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Getting tile effect for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">serial</span><span class="p">)</span>
+</span><span id="__span-0-696"><a id="__codelineno-0-696" name="__codelineno-0-696"></a>    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Getting matrix effect for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">serial</span><span class="p">)</span>
 </span><span id="__span-0-697"><a id="__codelineno-0-697" name="__codelineno-0-697"></a>
 </span><span id="__span-0-698"><a id="__codelineno-0-698" name="__codelineno-0-698"></a>    <span class="n">response</span><span class="p">:</span> <span class="n">packets</span><span class="o">.</span><span class="n">Tile</span><span class="o">.</span><span class="n">StateEffect</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">request</span><span class="p">(</span>
 </span><span id="__span-0-699"><a id="__codelineno-0-699" name="__codelineno-0-699"></a>        <span class="n">packets</span><span class="o">.</span><span class="n">Tile</span><span class="o">.</span><span class="n">GetEffect</span><span class="p">()</span>
@@ -17277,16 +17277,16 @@ print(f"Effect type: {effect.effect_type}")</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="lifx.devices.matrix.MatrixLight.set_tile_effect" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_tile_effect</span>
+<h5 id="lifx.devices.matrix.MatrixLight.set_effect" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_effect</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lifx.devices.matrix.MatrixLight.set_tile_effect" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_tile_effect</span><span class="p">(</span>
+<a href="#lifx.devices.matrix.MatrixLight.set_effect" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_effect</span><span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">effect_type</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            FirmwareEffect (lifx.protocol.protocol_types.FirmwareEffect)" href="../protocol/#lifx.protocol.protocol_types.FirmwareEffect">FirmwareEffect</a></span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">speed</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span> <span class="o">=</span> <span class="mi">3000</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">duration</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
@@ -17299,7 +17299,7 @@ print(f"Effect type: {effect.effect_type}")</p>
 
     <div class="doc doc-contents ">
 
-        <p>Set tile effect with configuration.</p>
+        <p>Set matrix effect with configuration.</p>
 
 
 <table>
@@ -17455,14 +17455,14 @@ print(f"Effect type: {effect.effect_type}")</p>
   <blockquote>
 <blockquote>
 <blockquote>
-<h6 id="lifx.devices.matrix.MatrixLight.set_tile_effect--set-morph-effect-with-rainbow-palette">Set MORPH effect with rainbow palette<a class="headerlink" href="#lifx.devices.matrix.MatrixLight.set_tile_effect--set-morph-effect-with-rainbow-palette" title="Permanent link">&para;</a></h6>
+<h6 id="lifx.devices.matrix.MatrixLight.set_effect--set-morph-effect-with-rainbow-palette">Set MORPH effect with rainbow palette<a class="headerlink" href="#lifx.devices.matrix.MatrixLight.set_effect--set-morph-effect-with-rainbow-palette" title="Permanent link">&para;</a></h6>
 <p>rainbow = [
 ...     HSBK(0, 1.0, 1.0, 3500),  # Red
 ...     HSBK(60, 1.0, 1.0, 3500),  # Yellow
 ...     HSBK(120, 1.0, 1.0, 3500),  # Green
 ...     HSBK(240, 1.0, 1.0, 3500),  # Blue
 ... ]
-await matrix.set_tile_effect(
+await matrix.set_effect(
 ...     effect_type=FirmwareEffect.MORPH,
 ...     speed=5000,
 ...     palette=rainbow,
@@ -17560,7 +17560,7 @@ await matrix.set_tile_effect(
 <span class="normal"><a href="#__codelineno-0-806">806</a></span>
 <span class="normal"><a href="#__codelineno-0-807">807</a></span>
 <span class="normal"><a href="#__codelineno-0-808">808</a></span>
-<span class="normal"><a href="#__codelineno-0-809">809</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-723"><a id="__codelineno-0-723" name="__codelineno-0-723"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_tile_effect</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-809">809</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-723"><a id="__codelineno-0-723" name="__codelineno-0-723"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_effect</span><span class="p">(</span>
 </span><span id="__span-0-724"><a id="__codelineno-0-724" name="__codelineno-0-724"></a>    <span class="bp">self</span><span class="p">,</span>
 </span><span id="__span-0-725"><a id="__codelineno-0-725" name="__codelineno-0-725"></a>    <span class="n">effect_type</span><span class="p">:</span> <span class="n">FirmwareEffect</span><span class="p">,</span>
 </span><span id="__span-0-726"><a id="__codelineno-0-726" name="__codelineno-0-726"></a>    <span class="n">speed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3000</span><span class="p">,</span>
@@ -17570,7 +17570,7 @@ await matrix.set_tile_effect(
 </span><span id="__span-0-730"><a id="__codelineno-0-730" name="__codelineno-0-730"></a>    <span class="n">cloud_saturation_min</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
 </span><span id="__span-0-731"><a id="__codelineno-0-731" name="__codelineno-0-731"></a>    <span class="n">cloud_saturation_max</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
 </span><span id="__span-0-732"><a id="__codelineno-0-732" name="__codelineno-0-732"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-733"><a id="__codelineno-0-733" name="__codelineno-0-733"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set tile effect with configuration.</span>
+</span><span id="__span-0-733"><a id="__codelineno-0-733" name="__codelineno-0-733"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set matrix effect with configuration.</span>
 </span><span id="__span-0-734"><a id="__codelineno-0-734" name="__codelineno-0-734"></a>
 </span><span id="__span-0-735"><a id="__codelineno-0-735" name="__codelineno-0-735"></a><span class="sd">    Args:</span>
 </span><span id="__span-0-736"><a id="__codelineno-0-736" name="__codelineno-0-736"></a><span class="sd">        effect_type: Type of effect (OFF, MORPH, FLAME, SKY)</span>
@@ -17589,14 +17589,14 @@ await matrix.set_tile_effect(
 </span><span id="__span-0-749"><a id="__codelineno-0-749" name="__codelineno-0-749"></a><span class="sd">        ...     HSBK(120, 1.0, 1.0, 3500),  # Green</span>
 </span><span id="__span-0-750"><a id="__codelineno-0-750" name="__codelineno-0-750"></a><span class="sd">        ...     HSBK(240, 1.0, 1.0, 3500),  # Blue</span>
 </span><span id="__span-0-751"><a id="__codelineno-0-751" name="__codelineno-0-751"></a><span class="sd">        ... ]</span>
-</span><span id="__span-0-752"><a id="__codelineno-0-752" name="__codelineno-0-752"></a><span class="sd">        &gt;&gt;&gt; await matrix.set_tile_effect(</span>
+</span><span id="__span-0-752"><a id="__codelineno-0-752" name="__codelineno-0-752"></a><span class="sd">        &gt;&gt;&gt; await matrix.set_effect(</span>
 </span><span id="__span-0-753"><a id="__codelineno-0-753" name="__codelineno-0-753"></a><span class="sd">        ...     effect_type=FirmwareEffect.MORPH,</span>
 </span><span id="__span-0-754"><a id="__codelineno-0-754" name="__codelineno-0-754"></a><span class="sd">        ...     speed=5000,</span>
 </span><span id="__span-0-755"><a id="__codelineno-0-755" name="__codelineno-0-755"></a><span class="sd">        ...     palette=rainbow,</span>
 </span><span id="__span-0-756"><a id="__codelineno-0-756" name="__codelineno-0-756"></a><span class="sd">        ... )</span>
 </span><span id="__span-0-757"><a id="__codelineno-0-757" name="__codelineno-0-757"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-758"><a id="__codelineno-0-758" name="__codelineno-0-758"></a>    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="__span-0-759"><a id="__codelineno-0-759" name="__codelineno-0-759"></a>        <span class="s2">&quot;Setting tile effect </span><span class="si">%s</span><span class="s2"> (speed=</span><span class="si">%d</span><span class="s2">) for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-0-759"><a id="__codelineno-0-759" name="__codelineno-0-759"></a>        <span class="s2">&quot;Setting matrix effect </span><span class="si">%s</span><span class="s2"> (speed=</span><span class="si">%d</span><span class="s2">) for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
 </span><span id="__span-0-760"><a id="__codelineno-0-760" name="__codelineno-0-760"></a>        <span class="n">effect_type</span><span class="p">,</span>
 </span><span id="__span-0-761"><a id="__codelineno-0-761" name="__codelineno-0-761"></a>        <span class="n">speed</span><span class="p">,</span>
 </span><span id="__span-0-762"><a id="__codelineno-0-762" name="__codelineno-0-762"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">label</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
