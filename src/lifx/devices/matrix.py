@@ -870,9 +870,23 @@ class MatrixLight(Light):
         # Create canvas and populate with theme colors
         canvas = Canvas()
         for tile in tiles:
-            canvas.add_points_for_tile(None, theme)
-        canvas.shuffle_points()
-        canvas.blur_by_distance()
+            canvas.add_points_for_tile((int(tile.user_x), int(tile.user_y)), theme)
+            canvas.shuffle_points()
+            canvas.blur_by_distance()
+
+        # Create tile canvas and fill in gaps for smooth interpolation
+        tile_canvas = Canvas()
+        for tile in tiles:
+            tile_canvas.fill_in_points(
+                canvas,
+                int(tile.user_x),
+                int(tile.user_y),
+                tile.width,
+                tile.height,
+            )
+
+        # Final blur for smooth gradients
+        tile_canvas.blur()
 
         # Check if light is on
         is_on = await self.get_power()
@@ -880,7 +894,10 @@ class MatrixLight(Light):
         # Apply colors to each tile
         for tile in tiles:
             # Extract tile colors from canvas as 1D list
-            colors = canvas.points_for_tile(None, width=tile.width, height=tile.height)
+            tile_coords = (int(tile.user_x), int(tile.user_y))
+            colors = tile_canvas.points_for_tile(
+                tile_coords, width=tile.width, height=tile.height
+            )
 
             # Apply with appropriate timing
             if power_on and not is_on:
