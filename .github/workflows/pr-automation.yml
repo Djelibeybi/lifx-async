@@ -71,6 +71,8 @@ jobs:
           docs
           ci
           deps
+          effects
+          themes
         requireScope: false
         subjectPattern: ^(?![A-Z]).+$
         subjectPatternError: |

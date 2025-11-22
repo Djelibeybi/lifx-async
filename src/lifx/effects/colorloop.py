@@ -127,6 +127,15 @@ class EffectColorloop(LIFXEffect):
         self._running = False
         self._stop_event = asyncio.Event()
 
+    @property
+    def name(self) -> str:
+        """Return the name of the effect.
+
+        Returns:
+            The effect name 'colorloop'
+        """
+        return "colorloop"
+
     async def async_play(self) -> None:
         """Execute the colorloop effect continuously."""
         self._running = True

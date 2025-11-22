@@ -14,6 +14,7 @@ def test_colorloop_default_parameters():
     """Test EffectColorloop with default parameters."""
     effect = EffectColorloop()
 
+    assert effect.name == "colorloop"
     assert effect.period == 60
     assert effect.change == 20
     assert effect.spread == 30

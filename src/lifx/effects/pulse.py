@@ -136,6 +136,15 @@ class EffectPulse(LIFXEffect):
         if self.cycles < 1:
             raise ValueError(f"Cycles must be 1 or higher, got {self.cycles}")
 
+    @property
+    def name(self) -> str:
+        """Return the name of the effect.
+
+        Returns:
+            The effect name 'pulse'
+        """
+        return "pulse"
+
     async def async_play(self) -> None:
         """Execute the pulse effect on all participants."""
         # Determine colors for each light
