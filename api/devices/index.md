@@ -197,6 +197,8 @@ def __init__(
     self.serial = serial_obj.to_string()
     self.ip = ip
     self.port = port
+    self._timeout = timeout
+    self._max_retries = max_retries
 
     # Create lightweight connection handle - connection pooling is internal
     self.connection = DeviceConnection(
@@ -432,10 +434,16 @@ async def from_ip(
         ```
     """
     if serial is None:
-        temp_conn = DeviceConnection(serial="000000000000", ip=ip, port=port)
+        temp_conn = DeviceConnection(
+            serial="000000000000",
+            ip=ip,
+            port=port,
+            timeout=timeout,
+            max_retries=max_retries,
+        )
         try:
             response = await temp_conn.request(
-                packets.Device.GetService(), timeout=DISCOVERY_TIMEOUT
+                packets.Device.GetService(), timeout=timeout
             )
             if response and isinstance(response, packets.Device.StateService):
                 if temp_conn.serial and temp_conn.serial != "000000000000":
@@ -1303,9 +1311,17 @@ async def set_location(
 
     try:
         # Check each device for the target label
-        async for disc in discover_devices(timeout=discover_timeout):
+        async for disc in discover_devices(
+            timeout=discover_timeout,
+            device_timeout=self._timeout,
+            max_retries=self._max_retries,
+        ):
             temp_conn = DeviceConnection(
-                serial=disc.serial, ip=disc.ip, port=disc.port
+                serial=disc.serial,
+                ip=disc.ip,
+                port=disc.port,
+                timeout=self._timeout,
+                max_retries=self._max_retries,
             )
 
             try:
@@ -1544,9 +1560,17 @@ async def set_group(
 
     try:
         # Check each device for the target label
-        async for disc in discover_devices(timeout=discover_timeout):
+        async for disc in discover_devices(
+            timeout=discover_timeout,
+            device_timeout=self._timeout,
+            max_retries=self._max_retries,
+        ):
             temp_conn = DeviceConnection(
-                serial=disc.serial, ip=disc.ip, port=disc.port
+                serial=disc.serial,
+                ip=disc.ip,
+                port=disc.port,
+                timeout=self._timeout,
+                max_retries=self._max_retries,
             )
 
             try:
