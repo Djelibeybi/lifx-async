@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.3.4 (2025-11-22)
+
+### Bug Fixes
+
+- **network**: Exclude retry sleep time from timeout budget
+  ([`312d7a7`](https://github.com/Djelibeybi/lifx-async/commit/312d7a7e2561de7d2bbf142c8a521daca31651bb))
+
+
 ## v4.3.3 (2025-11-22)
 
 ### Bug Fixes
