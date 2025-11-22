@@ -371,45 +371,58 @@ class MatrixLight(Light):
 
     async def get64(
         self,
-        tile_index: int,
-        length: int,
-        x: int,
-        y: int,
-        width: int,
-        fb_index: int = 0,
+        tile_index: int = 0,
+        length: int = 1,
+        x: int = 0,
+        y: int = 0,
+        width: int | None = None,
     ) -> list[HSBK]:
         """Get up to 64 zones of color state from a tile.
 
+        For devices with ≤64 zones, returns all zones. For devices with >64 zones,
+        returns up to 64 zones due to protocol limitations.
+
         Args:
-            tile_index: Index of the tile (0-based)
-            length: Number of tiles to query (usually 1)
-            x: X coordinate of the rectangle (0-based)
-            y: Y coordinate of the rectangle (0-based)
-            width: Width of the rectangle in zones
-            fb_index: Frame buffer index (0 for display, 1 for temp buffer)
+            tile_index: Index of the tile (0-based). Defaults to 0.
+            length: Number of tiles to query (usually 1). Defaults to 1.
+            x: X coordinate of the rectangle (0-based). Defaults to 0.
+            y: Y coordinate of the rectangle (0-based). Defaults to 0.
+            width: Width of the rectangle in zones. Defaults to tile width.
 
         Returns:
-            List of HSBK colors for the requested zones
+            List of HSBK colors for the requested zones. For tiles with ≤64 zones,
+            returns the actual zone count (e.g., 64 for 8x8, 16 for 4x4). For tiles
+            with >64 zones (e.g., 128 for 16x8 Ceiling), returns 64 (protocol limit).
 
         Example:
-            >>> # Get colors from 8x8 tile (64 zones)
-            >>> colors = await matrix.get64(tile_index=0, length=1, x=0, y=0, width=8)
+            >>> # Get all colors from first tile (no parameters needed)
+            >>> colors = await matrix.get64()
+            >>>
+            >>> # Get colors from specific region
+            >>> colors = await matrix.get64(y=4)  # Start at row 4
         """
         # Validate parameters
         if x < 0:
             raise ValueError(f"x coordinate must be non-negative, got {x}")
         if y < 0:
             raise ValueError(f"y coordinate must be non-negative, got {y}")
-        if width <= 0:
+        if width is not None and width <= 0:
             raise ValueError(f"width must be positive, got {width}")
 
+        if self._device_chain is None:
+            device_chain = await self.get_device_chain()
+        else:
+            device_chain = self._device_chain
+
+        if width is None:
+            width = device_chain[0].width
+
         _LOGGER.debug(
-            "Getting 64 zones from tile %d (x=%d, y=%d, width=%d, fb=%d) for %s",
+            "Getting 64 zones from tile %d (x=%d, y=%d, width=%d) for %s",
             tile_index,
             x,
             y,
             width,
-            fb_index,
             self.label or self.serial,
         )
 
@@ -417,12 +430,17 @@ class MatrixLight(Light):
             packets.Tile.Get64(
                 tile_index=tile_index,
                 length=length,
-                rect=TileBufferRect(fb_index=fb_index, x=x, y=y, width=width),
+                rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
             )
         )
 
+        max_colors = device_chain[0].width * device_chain[0].height
+
         # Convert protocol colors to HSBK
-        return [HSBK.from_protocol(proto_color) for proto_color in response.colors]
+        return [
+            HSBK.from_protocol(proto_color)
+            for proto_color in response.colors[:max_colors]
+        ]
 
     async def set64(
         self,
@@ -504,7 +522,11 @@ class MatrixLight(Light):
         )
 
     async def copy_frame_buffer(
-        self, tile_index: int, source_fb: int = 1, target_fb: int = 0
+        self,
+        tile_index: int,
+        source_fb: int = 1,
+        target_fb: int = 0,
+        duration: float = 0.0,
     ) -> None:
         """Copy frame buffer (for tiles with >64 zones).
 
@@ -515,6 +537,7 @@ class MatrixLight(Light):
             tile_index: Index of the tile (0-based)
             source_fb: Source frame buffer index (usually 1)
             target_fb: Target frame buffer index (usually 0)
+            duration: time in seconds to transition if target_fb is 0
 
         Example:
             >>> # For 16x8 tile (128 zones):
@@ -541,7 +564,9 @@ class MatrixLight(Light):
             ...     fb_index=1,
             ... )
             >>> # 3. Copy buffer 1 to buffer 0 (display)
-            >>> await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
+            >>> await matrix.copy_frame_buffer(
+            ...     tile_index=0, source_fb=1, target_fb=0, duration=2.0
+            ... )
         """
         _LOGGER.debug(
             "Copying frame buffer %d -> %d for tile %d on %s",
@@ -559,6 +584,7 @@ class MatrixLight(Light):
             raise ValueError(f"Invalid tile_index {tile_index}")
 
         tile = self._device_chain[tile_index]
+        duration_ms = round(duration * 1000 if duration else 0)
 
         await self.connection.send_packet(
             packets.Tile.CopyFrameBuffer(
@@ -572,7 +598,7 @@ class MatrixLight(Light):
                 dst_y=0,
                 width=tile.width,
                 height=tile.height,
-                duration=0,
+                duration=duration_ms,
             )
         )
 
@@ -723,7 +749,7 @@ class MatrixLight(Light):
     async def set_effect(
         self,
         effect_type: FirmwareEffect,
-        speed: int = 3000,
+        speed: float = 3.0,
         duration: int = 0,
         palette: list[HSBK] | None = None,
         sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE,
@@ -734,7 +760,7 @@ class MatrixLight(Light):
 
         Args:
             effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
-            speed: Effect speed in milliseconds (default: 3000)
+            speed: Effect speed in seconds (default: 3)
             duration: Total effect duration in nanoseconds (0 for infinite)
             palette: Color palette for the effect (max 16 colors)
             sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
@@ -751,7 +777,7 @@ class MatrixLight(Light):
             ... ]
             >>> await matrix.set_effect(
             ...     effect_type=FirmwareEffect.MORPH,
-            ...     speed=5000,
+            ...     speed=5.0,
             ...     palette=rainbow,
             ... )
         """
@@ -761,11 +787,12 @@ class MatrixLight(Light):
             speed,
             self.label or self.serial,
         )
+        speed_ms = round(speed * 1000) if speed else 3000
 
         # Create and validate MatrixEffect
         effect = MatrixEffect(
             effect_type=effect_type,
-            speed=speed,
+            speed=speed_ms,
             duration=duration,
             palette=palette,
             sky_type=sky_type,

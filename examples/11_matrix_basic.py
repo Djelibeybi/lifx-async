@@ -35,9 +35,7 @@ async def main(ip: str):
 
         # Get current colors from first tile
         print("Getting current colors from tile 0...")
-        tile_colors = await matrix.get64(
-            tile_index=0, length=1, x=0, y=0, width=device_chain[0].width
-        )
+        tile_colors = await matrix.get64()
         print(f"Retrieved {len(tile_colors)} colors\n")
 
         if power == 0:
