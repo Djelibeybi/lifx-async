@@ -527,7 +527,7 @@ class TestLocationAndGroupManagement:
         mock_discovered_conn.request = AsyncMock(return_value=mock_state_location)
 
         # Create async generator mock for discover_devices
-        async def mock_discover_gen(timeout: float = 5.0):
+        async def mock_discover_gen(timeout: float = 5.0, **kwargs):
             for disc in discovered_devices:
                 yield disc
 
@@ -537,8 +537,10 @@ class TestLocationAndGroupManagement:
             ),
             patch("lifx.devices.base.DeviceConnection") as mock_conn_class,
         ):
-            # First call: discovered device, second call: this device
-            mock_conn_class.side_effect = [mock_discovered_conn, device.connection]
+            # Only one DeviceConnection created for discovered device
+            mock_conn_class.return_value = mock_discovered_conn
+            # Add async close method to mock
+            mock_discovered_conn.close = AsyncMock()
 
             await device.set_location(label)
 
@@ -581,7 +583,7 @@ class TestLocationAndGroupManagement:
         mock_discovered_conn.request = AsyncMock(return_value=mock_state_location)
 
         # Create async generator mock for discover_devices
-        async def mock_discover_gen(timeout: float = 5.0):
+        async def mock_discover_gen(timeout: float = 5.0, **kwargs):
             for disc in discovered_devices:
                 yield disc
 
@@ -591,7 +593,10 @@ class TestLocationAndGroupManagement:
             ),
             patch("lifx.devices.base.DeviceConnection") as mock_conn_class,
         ):
-            mock_conn_class.side_effect = [mock_discovered_conn, device.connection]
+            # Only one DeviceConnection created for discovered device
+            mock_conn_class.return_value = mock_discovered_conn
+            # Add async close method to mock
+            mock_discovered_conn.close = AsyncMock()
 
             await device.set_location(label)
 
@@ -629,7 +634,7 @@ class TestLocationAndGroupManagement:
         mock_discovered_conn.request = AsyncMock(return_value=mock_state_group)
 
         # Create async generator mock for discover_devices
-        async def mock_discover_gen(timeout: float = 5.0):
+        async def mock_discover_gen(timeout: float = 5.0, **kwargs):
             for disc in discovered_devices:
                 yield disc
 
@@ -639,7 +644,10 @@ class TestLocationAndGroupManagement:
             ),
             patch("lifx.devices.base.DeviceConnection") as mock_conn_class,
         ):
-            mock_conn_class.side_effect = [mock_discovered_conn, device.connection]
+            # Only one DeviceConnection created for discovered device
+            mock_conn_class.return_value = mock_discovered_conn
+            # Add async close method to mock
+            mock_discovered_conn.close = AsyncMock()
 
             await device.set_group(label)
 
@@ -682,7 +690,7 @@ class TestLocationAndGroupManagement:
         mock_discovered_conn.request = AsyncMock(return_value=mock_state_group)
 
         # Create async generator mock for discover_devices
-        async def mock_discover_gen(timeout: float = 5.0):
+        async def mock_discover_gen(timeout: float = 5.0, **kwargs):
             for disc in discovered_devices:
                 yield disc
 
@@ -692,7 +700,10 @@ class TestLocationAndGroupManagement:
             ),
             patch("lifx.devices.base.DeviceConnection") as mock_conn_class,
         ):
-            mock_conn_class.side_effect = [mock_discovered_conn, device.connection]
+            # Only one DeviceConnection created for discovered device
+            mock_conn_class.return_value = mock_discovered_conn
+            # Add async close method to mock
+            mock_discovered_conn.close = AsyncMock()
 
             await device.set_group(label)
 
