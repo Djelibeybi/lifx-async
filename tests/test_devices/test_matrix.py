@@ -177,8 +177,9 @@ class TestMatrixLight:
             assert isinstance(effect.effect_type, FirmwareEffect)
             assert effect.speed >= 0
             assert effect.duration >= 0
-            assert effect.palette is not None
-            assert len(effect.palette) > 0
+            # Palette can be None if palette_count is 0
+            if effect.palette is not None:
+                assert len(effect.palette) > 0
 
     async def test_tile_effect_cached_property(self, emulator_devices) -> None:
         """Test tile_effect property caching."""
@@ -320,6 +321,21 @@ class TestMatrixLight:
             # Verify effect was turned off
             effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.OFF
+
+    async def test_set_effect_without_palette(self, emulator_devices) -> None:
+        """Test setting effect without a palette (palette_count=0)."""
+        matrix = emulator_devices[6]
+        async with matrix:
+            # Set effect without palette - should send palette_count=0
+            await matrix.set_effect(
+                effect_type=FirmwareEffect.MORPH,
+                speed=3000,
+            )
+
+            # Verify effect was set
+            effect = await matrix.get_effect()
+            assert effect.effect_type == FirmwareEffect.MORPH
+            assert effect.palette is None
 
     async def test_get64_large_tile(self, ceiling_device) -> None:
         """Test getting colors from 16x8 tile (128 zones) with default parameters.
@@ -553,15 +569,13 @@ class TestMatrixEffect:
         assert effect.palette is not None
         assert len(effect.palette) == 1
 
-    def test_effect_default_palette(self) -> None:
-        """Test that default palette is created if not provided."""
+    def test_effect_none_palette(self) -> None:
+        """Test that palette can be None (no palette specified)."""
         effect = MatrixEffect(
             effect_type=FirmwareEffect.MORPH,
             speed=3000,
         )
-        assert effect.palette is not None
-        assert len(effect.palette) == 1
-        assert isinstance(effect.palette[0], HSBK)
+        assert effect.palette is None
 
     def test_effect_validation_negative_speed(self) -> None:
         """Test that negative speed raises error."""
