@@ -171,11 +171,6 @@ class MatrixEffect:
 
     def __post_init__(self) -> None:
         """Initialize defaults and validate fields."""
-        # Initialize default palette if not provided
-        if self.palette is None:
-            # Default palette: single white color
-            self.palette = [HSBK(0, 0, 1.0, 3500)]
-
         # Validate all fields
         # Speed can be 0 only when effect is OFF
         if self.effect_type != FirmwareEffect.OFF:
@@ -184,7 +179,11 @@ class MatrixEffect:
             raise ValueError(f"Effect speed must be non-negative, got {self.speed}")
 
         self._validate_duration(self.duration)
-        self._validate_palette(self.palette)
+
+        # Only validate palette if provided
+        if self.palette is not None:
+            self._validate_palette(self.palette)
+
         self._validate_saturation(self.cloud_saturation_min, "cloud_saturation_min")
         self._validate_saturation(self.cloud_saturation_max, "cloud_saturation_max")
 
@@ -762,7 +761,7 @@ class MatrixLight(Light):
             effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
             speed: Effect speed in seconds (default: 3)
             duration: Total effect duration in nanoseconds (0 for infinite)
-            palette: Color palette for the effect (max 16 colors)
+            palette: Color palette for the effect (max 16 colors, None for no palette)
             sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
@@ -779,6 +778,12 @@ class MatrixLight(Light):
             ...     effect_type=FirmwareEffect.MORPH,
             ...     speed=5.0,
             ...     palette=rainbow,
+            ... )
+
+            >>> # Set effect without a palette
+            >>> await matrix.set_effect(
+            ...     effect_type=FirmwareEffect.FLAME,
+            ...     speed=3.0,
             ... )
         """
         _LOGGER.debug(
@@ -801,20 +806,22 @@ class MatrixLight(Light):
         )
 
         # Convert to protocol format
-        # Note: palette is guaranteed to be non-None by MatrixEffect.__post_init__
-        palette = effect.palette if effect.palette is not None else []
         proto_palette = []
-        for color in palette:
-            proto_palette.append(
-                LightHsbk(
-                    hue=int(color.hue / 360 * 65535),
-                    saturation=int(color.saturation * 65535),
-                    brightness=int(color.brightness * 65535),
-                    kelvin=color.kelvin,
-                )
-            )
+        palette_count = 0
 
-        # Pad palette to 16 colors
+        if effect.palette is not None:
+            palette_count = len(effect.palette)
+            for color in effect.palette:
+                proto_palette.append(
+                    LightHsbk(
+                        hue=int(color.hue / 360 * 65535),
+                        saturation=int(color.saturation * 65535),
+                        brightness=int(color.brightness * 65535),
+                        kelvin=color.kelvin,
+                    )
+                )
+
+        # Pad palette to 16 colors (protocol requirement)
         while len(proto_palette) < 16:
             proto_palette.append(LightHsbk(0, 0, 0, 3500))
 
@@ -828,7 +835,7 @@ class MatrixLight(Light):
                 cloud_saturation_min=effect.cloud_saturation_min,
                 cloud_saturation_max=effect.cloud_saturation_max,
             ),
-            palette_count=len(palette),
+            palette_count=palette_count,
             palette=proto_palette,
         )
 
