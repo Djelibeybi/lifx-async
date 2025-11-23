@@ -3,34 +3,37 @@
 from __future__ import annotations
 
 from lifx.devices.base import (
+    CollectionInfo,
     Device,
     DeviceInfo,
     DeviceVersion,
     FirmwareInfo,
-    GroupInfo,
-    LocationInfo,
     WifiInfo,
 )
-from lifx.devices.hev import HevLight
-from lifx.devices.infrared import InfraredLight
-from lifx.devices.light import Light
-from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
-from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.devices.hev import HevLight, HevLightState
+from lifx.devices.infrared import InfraredLight, InfraredLightState
+from lifx.devices.light import Light, LightState
+from lifx.devices.matrix import MatrixEffect, MatrixLight, MatrixLightState, TileInfo
+from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
 
 __all__ = [
+    "CollectionInfo",
     "Device",
     "DeviceInfo",
     "DeviceVersion",
     "FirmwareInfo",
-    "GroupInfo",
     "HevLight",
+    "HevLightState",
     "InfraredLight",
+    "InfraredLightState",
     "Light",
-    "LocationInfo",
+    "LightState",
     "MatrixEffect",
     "MatrixLight",
+    "MatrixLightState",
     "MultiZoneEffect",
     "MultiZoneLight",
+    "MultiZoneLightState",
     "TileInfo",
     "WifiInfo",
 ]

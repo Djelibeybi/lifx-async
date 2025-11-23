@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import TYPE_CHECKING
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.const import (
@@ -16,7 +18,11 @@ from lifx.const import (
     MIN_KELVIN,
     MIN_SATURATION,
 )
-from lifx.devices.base import Device
+from lifx.devices.base import (
+    Device,
+    DeviceState,
+)
+from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
 
@@ -26,7 +32,23 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-class Light(Device):
+@dataclass
+class LightState(DeviceState):
+    """Light device state with color control.
+
+    Attributes:
+        color: Current HSBK color
+    """
+
+    color: HSBK
+
+    @property
+    def as_dict(self) -> Any:
+        """Return LightState as a dict."""
+        return asdict(self)
+
+
+class Light(Device[LightState]):
     """LIFX light device with color control.
 
     Extends the base Device class with light-specific functionality:
@@ -61,10 +83,19 @@ class Light(Device):
         """Initialize Light with additional state attributes."""
         super().__init__(*args, **kwargs)
 
-    async def _setup(self) -> None:
-        """Populate light capabilities, state and metadata."""
-        await super()._setup()
-        await self.get_color()
+    @property
+    def state(self) -> LightState:
+        """Get light state (guaranteed to be initialized when using Device.connect()).
+
+        Returns:
+            LightState with current light state
+
+        Raises:
+            RuntimeError: If accessed before state initialization
+        """
+        if self._state is None:
+            raise RuntimeError("State not found.")
+        return self._state
 
     async def get_color(self) -> tuple[HSBK, int, str]:
         """Get current light color, power, and label.
@@ -102,6 +133,17 @@ class Light(Device):
 
         # Store label from StateColor response
         self._label = label  # Already decoded to string
+
+        # Update state if it exists (including all subclasses)
+        if self._state is not None:
+            # Update base fields available on all device states
+            self._state.power = power
+            self._state.label = label
+
+            if hasattr(self._state, "color"):
+                self._state.color = color
+
+            self._state.last_updated = __import__("time").time()
 
         _LOGGER.debug(
             {
@@ -163,7 +205,7 @@ class Light(Device):
 
         _LOGGER.debug(
             {
-                "class": "Device",
+                "class": "Light",
                 "method": "set_color",
                 "action": "change",
                 "values": {
@@ -175,6 +217,11 @@ class Light(Device):
                 },
             }
         )
+
+        # Update state on acknowledgement
+        if result and self._state is not None:
+            self._state.color = color
+            await self._schedule_refresh()
 
     async def set_brightness(self, brightness: float, duration: float = 0.0) -> None:
         """Set light brightness only, preserving hue, saturation, and temperature.
@@ -476,12 +523,20 @@ class Light(Device):
 
         _LOGGER.debug(
             {
-                "class": "Device",
+                "class": "Light",
                 "method": "set_power",
                 "action": "change",
                 "values": {"level": power_level, "duration": duration_ms},
             }
         )
+
+        # Update state on acknowledgement
+        if result and self._state is not None:
+            self._state.power = power_level
+
+        # Schedule refresh to validate state
+        if self._state is not None:
+            await self._schedule_refresh()
 
     async def set_waveform(
         self,
@@ -577,6 +632,10 @@ class Light(Device):
                 },
             }
         )
+
+        # Schedule refresh to update state
+        if self._state is not None:
+            await self._schedule_refresh()
 
     async def set_waveform_optional(
         self,
@@ -677,7 +736,7 @@ class Light(Device):
         self._raise_if_unhandled(result)
         _LOGGER.debug(
             {
-                "class": "Device",
+                "class": "Light",
                 "method": "set_waveform_optional",
                 "action": "change",
                 "values": {
@@ -697,6 +756,22 @@ class Light(Device):
                 },
             }
         )
+
+        # Update state on acknowledgement (only if non-transient)
+        if result and not transient and self._state is not None:
+            # Create a new color with only the specified components updated
+            current = self._state.color
+            new_color = HSBK(
+                hue=color.hue if set_hue else current.hue,
+                saturation=color.saturation if set_saturation else current.saturation,
+                brightness=color.brightness if set_brightness else current.brightness,
+                kelvin=color.kelvin if set_kelvin else current.kelvin,
+            )
+            self._state.color = new_color
+
+        # Schedule refresh to validate state
+        if self._state is not None:
+            await self._schedule_refresh()
 
     async def pulse(
         self,
@@ -842,3 +917,93 @@ class Light(Device):
     def __repr__(self) -> str:
         """String representation of light."""
         return f"Light(serial={self.serial}, ip={self.ip}, port={self.port})"
+
+    async def refresh_state(self) -> None:
+        """Refresh light state from hardware.
+
+        Fetches color (which includes power and label) and updates state.
+
+        Raises:
+            RuntimeError: If state has not been initialized
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        import time
+
+        if self._state is None:
+            await self._initialize_state()
+            return
+
+        # GetColor returns color, power, and label in one request
+        color, power, label = await self.get_color()
+
+        self._state.color = color
+        self._state.power = power
+        self._state.label = label
+        self._state.last_updated = time.time()
+
+    async def _initialize_state(self) -> LightState:
+        """Initialize light state transactionally.
+
+        Extends base implementation to fetch color in addition to base state.
+
+        Args:
+            timeout: Timeout for state initialization
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        import time
+
+        # Ensure capabilities are loaded
+        await self._ensure_capabilities()
+        capabilities = self._create_capabilities()
+
+        # Fetch semi-static and volatile state in parallel
+        # get_color returns color, power, and label in one request
+        try:
+            async with asyncio.TaskGroup() as tg:
+                color_task = tg.create_task(self.get_color())
+                host_fw_task = tg.create_task(self.get_host_firmware())
+                wifi_fw_task = tg.create_task(self.get_wifi_firmware())
+                location_task = tg.create_task(self.get_location())
+                group_task = tg.create_task(self.get_group())
+
+            # Extract results
+            color, power, label = color_task.result()
+            host_firmware = host_fw_task.result()
+            wifi_firmware = wifi_fw_task.result()
+            location_info = location_task.result()
+            group_info = group_task.result()
+
+            # Get MAC address (already calculated in get_host_firmware)
+            mac_address = await self.get_mac_address()
+
+            # Get model name
+            assert self._capabilities is not None
+            model = self._capabilities.name
+
+            # Create state instance with color
+            self._state = LightState(
+                model=model,
+                label=label,
+                serial=self.serial,
+                mac_address=mac_address,
+                capabilities=capabilities,
+                power=power,
+                host_firmware=host_firmware,
+                wifi_firmware=wifi_firmware,
+                location=location_info,
+                group=group_info,
+                color=color,
+                last_updated=time.time(),
+            )
+
+            return self._state
+
+        except* LifxTimeoutError:
+            raise LifxTimeoutError(f"Error initializing state for {self.serial}")
+        except* LifxError:
+            raise LifxError(f"Error initializing state for {self.serial}")

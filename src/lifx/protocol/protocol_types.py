@@ -653,6 +653,7 @@ class TileStateDevice:
     user_y: float
     width: int
     height: int
+    supported_frame_buffers: int
     device_version: DeviceStateVersion
     firmware: DeviceStateHostFirmware
 
@@ -676,8 +677,8 @@ class TileStateDevice:
         result += serializer.pack_value(self.width, "uint8")
         # height: uint8
         result += serializer.pack_value(self.height, "uint8")
-        # Reserved 1 bytes
-        result += serializer.pack_reserved(1)
+        # supported_frame_buffers: uint8
+        result += serializer.pack_value(self.supported_frame_buffers, "uint8")
         # device_version: DeviceStateVersion
         result += self.device_version.pack()
         # firmware: DeviceStateHostFirmware
@@ -711,8 +712,10 @@ class TileStateDevice:
         width, current_offset = serializer.unpack_value(data, "uint8", current_offset)
         # height: uint8
         height, current_offset = serializer.unpack_value(data, "uint8", current_offset)
-        # Skip reserved 1 bytes
-        current_offset += 1
+        # supported_frame_buffers: uint8
+        supported_frame_buffers, current_offset = serializer.unpack_value(
+            data, "uint8", current_offset
+        )
         # device_version: DeviceStateVersion
         device_version, current_offset = DeviceStateVersion.unpack(data, current_offset)
         # firmware: DeviceStateHostFirmware
@@ -727,6 +730,7 @@ class TileStateDevice:
                 user_y=user_y,
                 width=width,
                 height=height,
+                supported_frame_buffers=supported_frame_buffers,
                 device_version=device_version,
                 firmware=firmware,
             ),
@@ -790,6 +794,7 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
         "device_version": "DeviceVersion",
         "firmware": "Firmware",
         "height": "Height",
+        "supported_frame_buffers": "SupportedFrameBuffers",
         "user_x": "UserX",
         "user_y": "UserY",
         "width": "Width",

@@ -10,7 +10,6 @@ This module provides simplified interfaces for common operations:
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Iterator, Sequence
 from dataclasses import dataclass
@@ -27,12 +26,11 @@ from lifx.const import (
     MAX_RESPONSE_TIME,
 )
 from lifx.devices import (
+    CollectionInfo,
     Device,
-    GroupInfo,
     HevLight,
     InfraredLight,
     Light,
-    LocationInfo,
     MatrixLight,
     MultiZoneLight,
 )
@@ -44,14 +42,12 @@ from lifx.network.discovery import (
 from lifx.protocol import packets
 from lifx.theme import Theme
 
-_LOGGER = logging.getLogger(__name__)
-
 
 @dataclass
 class LocationGrouping:
     """Organizational structure for location-based grouping."""
 
-    uuid: bytes
+    uuid: str
     label: str
     devices: list[Device]
     updated_at: int  # Most recent updated_at from all devices
@@ -65,7 +61,7 @@ class LocationGrouping:
 class GroupGrouping:
     """Organizational structure for group-based grouping."""
 
-    uuid: bytes
+    uuid: str
     label: str
     devices: list[Device]
     updated_at: int
@@ -117,8 +113,8 @@ class DeviceGroup:
         self._matrix_lights = [light for light in devices if type(light) is MatrixLight]
         self._locations_cache: dict[str, DeviceGroup] | None = None
         self._groups_cache: dict[str, DeviceGroup] | None = None
-        self._location_metadata: dict[bytes, LocationGrouping] | None = None
-        self._group_metadata: dict[bytes, GroupGrouping] | None = None
+        self._location_metadata: dict[str, LocationGrouping] | None = None
+        self._group_metadata: dict[str, GroupGrouping] | None = None
 
     async def __aenter__(self) -> DeviceGroup:
         """Enter async context manager."""
@@ -278,17 +274,17 @@ class DeviceGroup:
         Skips devices with empty UUID (b'\\x00' * 16).
         Logs warnings for failed queries but continues gracefully.
         """
-        location_data: dict[bytes, list[tuple[Device, LocationInfo]]] = defaultdict(
+        location_data: dict[str, list[tuple[Device, CollectionInfo]]] = defaultdict(
             list
         )
 
         # Fetch all location info concurrently
-        tasks: dict[str, asyncio.Task[LocationInfo | None]] = {}
+        tasks: dict[str, asyncio.Task[CollectionInfo | None]] = {}
         async with asyncio.TaskGroup() as tg:
             for device in self._devices:
                 tasks[device.serial] = tg.create_task(device.get_location())
 
-        results: list[tuple[Device, LocationInfo | None]] = []
+        results: list[tuple[Device, CollectionInfo | None]] = []
         for device in self._devices:
             results.append((device, tasks[device.serial].result()))
 
@@ -298,10 +294,10 @@ class DeviceGroup:
                 continue
 
             # Skip empty UUIDs (unassigned)
-            if location_info.location == b"\x00" * 16:
+            if location_info.uuid == "0000000000000000":
                 continue
 
-            location_data[location_info.location].append((device, location_info))
+            location_data[location_info.uuid].append((device, location_info))
 
         # Build metadata dictionary with conflict resolution
         self._location_metadata = {}
@@ -333,15 +329,15 @@ class DeviceGroup:
         Logs warnings for failed queries but continues gracefully.
         """
         # Collect group info from all devices concurrently
-        group_data: dict[bytes, list[tuple[Device, GroupInfo]]] = defaultdict(list)
+        group_data: dict[str, list[tuple[Device, CollectionInfo]]] = defaultdict(list)
 
-        tasks: dict[str, asyncio.Task[GroupInfo | None]] = {}
+        tasks: dict[str, asyncio.Task[CollectionInfo | None]] = {}
         async with asyncio.TaskGroup() as tg:
             for device in self._devices:
                 tasks[device.serial] = tg.create_task(device.get_group())
 
         # Fetch all group info concurrently
-        results: list[tuple[Device, GroupInfo | None]] = []
+        results: list[tuple[Device, CollectionInfo | None]] = []
         for device in self._devices:
             results.append((device, tasks[device.serial].result()))
 
@@ -351,10 +347,10 @@ class DeviceGroup:
                 continue
 
             # Skip empty UUIDs (unassigned)
-            if group_info.group == b"\x00" * 16:
+            if group_info.uuid == "0000000000000000":
                 continue
 
-            group_data[group_info.group].append((device, group_info))
+            group_data[group_info.uuid].append((device, group_info))
 
         # Build metadata dictionary with conflict resolution
         self._group_metadata = {}
@@ -397,7 +393,7 @@ class DeviceGroup:
             )
 
         result: dict[str, DeviceGroup] = {}
-        label_uuids: dict[str, bytes] = {}
+        label_uuids: dict[str, str] = {}
 
         for location_uuid, grouping in self._location_metadata.items():
             label = grouping.label
@@ -405,7 +401,7 @@ class DeviceGroup:
             # Handle naming conflicts: if two different UUIDs have the same label,
             # append UUID suffix
             if label in label_uuids and label_uuids[label] != location_uuid:
-                label = f"{label} ({location_uuid.hex()[:8]})"
+                label = f"{label} ({location_uuid[:8]})"
 
             label_uuids[label] = location_uuid
             result[label] = DeviceGroup(grouping.devices)
@@ -436,7 +432,7 @@ class DeviceGroup:
             )
 
         result: dict[str, DeviceGroup] = {}
-        label_uuids: dict[str, bytes] = {}
+        label_uuids: dict[str, str] = {}
 
         for group_uuid, grouping in self._group_metadata.items():
             label = grouping.label
@@ -444,7 +440,7 @@ class DeviceGroup:
             # Handle naming conflicts: if two different UUIDs have the same label,
             # append UUID suffix
             if label in label_uuids and label_uuids[label] != group_uuid:
-                label = f"{label} ({group_uuid.hex()[:8]})"
+                label = f"{label} ({group_uuid[:8]})"
 
             label_uuids[label] = group_uuid
             result[label] = DeviceGroup(grouping.devices)

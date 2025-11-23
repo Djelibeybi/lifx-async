@@ -32,7 +32,8 @@ MAX_RESPONSE_TIME: Final[float] = 1.0  # 1 second
 IDLE_TIMEOUT_MULTIPLIER: Final[float] = 4.0  # 4 seconds (1.0 x 4.0)
 
 # Default timeout for device requests in seconds
-DEFAULT_REQUEST_TIMEOUT: Final[float] = 8.0
+DEFAULT_REQUEST_TIMEOUT: Final[float] = 16.0
+STATE_REFRESH_DEBOUNCE_MS: Final[int] = 300
 
 # Default maximum number of retry attempts for failed requests
 DEFAULT_MAX_RETRIES: Final[int] = 8

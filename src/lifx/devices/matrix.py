@@ -12,15 +12,16 @@ Terminology:
 - Rare case: Multi-tile chain (discontinued LIFX Tile product only)
 """
 
+from __future__ import annotations
+
+import asyncio
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+import time
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
-
-if TYPE_CHECKING:
-    from lifx.theme import Theme
-from lifx.devices.light import Light
+from lifx.devices.light import Light, LightState
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     FirmwareEffect,
@@ -33,6 +34,10 @@ from lifx.protocol.protocol_types import (
 from lifx.protocol.protocol_types import (
     TileStateDevice as LifxProtocolTileDevice,
 )
+
+if TYPE_CHECKING:
+    from lifx.theme import Theme
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +55,7 @@ class TileInfo:
         user_y: User-defined Y position
         width: Tile width in zones
         height: Tile height in zones
+        supported_frame_buffers: frame buffer count
         device_version_vendor: Device vendor ID
         device_version_product: Device product ID
         device_version_version: Device version
@@ -66,6 +72,7 @@ class TileInfo:
     user_y: float
     width: int
     height: int
+    supported_frame_buffers: int
     device_version_vendor: int
     device_version_product: int
     device_version_version: int
@@ -76,7 +83,7 @@ class TileInfo:
     @classmethod
     def from_protocol(
         cls, tile_index: int, protocol_tile: LifxProtocolTileDevice
-    ) -> "TileInfo":
+    ) -> TileInfo:
         """Create TileInfo from protocol TileStateDevice.
 
         Args:
@@ -95,6 +102,7 @@ class TileInfo:
             user_y=protocol_tile.user_y,
             width=protocol_tile.width,
             height=protocol_tile.height,
+            supported_frame_buffers=protocol_tile.supported_frame_buffers,
             device_version_vendor=protocol_tile.device_version.vendor,
             device_version_product=protocol_tile.device_version.product,
             device_version_version=0,  # Not available in TileStateDevice
@@ -102,6 +110,11 @@ class TileInfo:
             firmware_version_minor=protocol_tile.firmware.version_minor,
             firmware_version_major=protocol_tile.firmware.version_major,
         )
+
+    @property
+    def as_dict(self) -> Any:
+        """Return TileInfo as dictionary."""
+        return asdict(self)
 
     @property
     def total_zones(self) -> int:
@@ -258,6 +271,59 @@ class MatrixEffect:
             raise ValueError(f"{name} must be in range 0-255, got {value}")
 
 
+@dataclass
+class MatrixLightState(LightState):
+    """Matrix light device state with tile-based control.
+
+    Attributes:
+        tiles: List of tile information for each tile in the chain
+        tile_colors: List of HSBK colors for all pixels across all tiles
+        tile_count: Total number of tiles in chain
+        effect: Current matrix effect configuration
+    """
+
+    chain: list[TileInfo]
+    tile_orientations: dict[int, str]
+    tile_colors: list[HSBK]
+    tile_count: int
+    effect: FirmwareEffect
+
+    @property
+    def as_dict(self) -> Any:
+        """Return MatrixLightState as dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_light_state(
+        cls,
+        light_state: LightState,
+        chain: list[TileInfo],
+        tile_orientations: dict[int, str],
+        tile_colors: list[HSBK],
+        effect: FirmwareEffect,
+    ) -> MatrixLightState:
+        """Create MatrixLightState from LightState."""
+        return cls(
+            model=light_state.model,
+            label=light_state.label,
+            serial=light_state.serial,
+            mac_address=light_state.mac_address,
+            power=light_state.power,
+            capabilities=light_state.capabilities,
+            host_firmware=light_state.host_firmware,
+            wifi_firmware=light_state.wifi_firmware,
+            location=light_state.location,
+            group=light_state.group,
+            color=light_state.color,
+            chain=chain,
+            tile_orientations=tile_orientations,
+            tile_colors=tile_colors,
+            tile_count=len(chain),
+            effect=effect,
+            last_updated=time.time(),
+        )
+
+
 class MatrixLight(Light):
     """LIFX Matrix Light Device.
 
@@ -284,6 +350,8 @@ class MatrixLight(Light):
         ...     await matrix.set64(tile_index=0, colors=colors, width=8)
     """
 
+    _state: MatrixLightState
+
     def __init__(self, *args, **kwargs) -> None:
         """Initialize MatrixLight device.
 
@@ -297,11 +365,19 @@ class MatrixLight(Light):
         self._device_chain: list[TileInfo] | None = None
         self._tile_effect: MatrixEffect | None = None
 
-    async def _setup(self) -> None:
-        """Setup device by fetching initial state."""
-        await super()._setup()
-        # Fetch device chain on setup
-        await self.get_device_chain()
+    @property
+    def state(self) -> MatrixLightState:
+        """Get matrix light state (guaranteed when using Device.connect()).
+
+        Returns:
+            MatrixLightState with current matrix light state
+
+        Raises:
+            RuntimeError: If accessed before state initialization
+        """
+        if self._state is None:
+            raise RuntimeError("State not found.")
+        return self._state
 
     async def get_device_chain(self) -> list[TileInfo]:
         """Get device chain details (list of Tile objects).
@@ -337,6 +413,13 @@ class MatrixLight(Light):
             tiles.append(TileInfo.from_protocol(i, protocol_tile))
 
         self._device_chain = tiles
+
+        # Update state if it exists
+        if self._state is not None and hasattr(self._state, "chain"):
+            self._state.chain = tiles
+            self._state.tile_count = len(tiles)
+            self._state.last_updated = __import__("time").time()
+
         _LOGGER.debug("Device chain has %d tile(s)", len(tiles))
         return tiles
 
@@ -448,10 +531,18 @@ class MatrixLight(Light):
         max_colors = device_chain[0].width * device_chain[0].height
 
         # Convert protocol colors to HSBK
-        return [
+        result = [
             HSBK.from_protocol(proto_color)
             for proto_color in response.colors[:max_colors]
         ]
+
+        # Update state if it exists and we fetched all colors from tile 0
+        if self._state is not None and hasattr(self._state, "tile_colors"):
+            if tile_index == 0 and x == 0 and y == 0 and len(result) == max_colors:
+                self._state.tile_colors = result
+                self._state.last_updated = __import__("time").time()
+
+        return result
 
     async def set64(
         self,
@@ -761,6 +852,12 @@ class MatrixLight(Light):
         )
 
         self._tile_effect = effect
+
+        # Update state if it exists
+        if self._state is not None and hasattr(self._state, "effect"):
+            self._state.effect = effect.effect_type
+            self._state.last_updated = __import__("time").time()
+
         return effect
 
     async def set_effect(
@@ -862,7 +959,7 @@ class MatrixLight(Light):
 
     async def apply_theme(
         self,
-        theme: "Theme",
+        theme: Theme,
         power_on: bool = False,
         duration: float = 0.0,
     ) -> None:
@@ -967,3 +1064,64 @@ class MatrixLight(Light):
         return (
             f"MatrixLight(label={self.label!r}, serial={self.serial!r}, ip={self.ip!r})"
         )
+
+    async def refresh_state(self) -> None:
+        """Refresh matrix light state from hardware.
+
+        Fetches color, tiles, tile colors, and effect.
+
+        Raises:
+            RuntimeError: If state has not been initialized
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        await super().refresh_state()
+
+        # Fetch all matrix light state
+        async with asyncio.TaskGroup() as tg:
+            colors_task = tg.create_task(self.get64())
+            effect_task = tg.create_task(self.get_effect())
+
+        tile_colors = colors_task.result()
+        effect = effect_task.result()
+
+        self._state.tile_colors = tile_colors
+        self._state.effect = effect.effect_type
+
+    async def _initialize_state(self) -> MatrixLightState:
+        """Initialize matrix light state transactionally.
+
+        Extends Light implementation to fetch tiles and effect.
+
+        Args:
+            timeout: Timeout for state initialization
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        light_state = await super()._initialize_state()
+
+        async with asyncio.TaskGroup() as tg:
+            chain_task = tg.create_task(self.get_device_chain())
+            tile_colors_task = tg.create_task(self.get64())
+            effect_task = tg.create_task(self.get_effect())
+
+        chain = chain_task.result()
+        tile_orientations = {
+            index: tile.nearest_orientation for index, tile in enumerate(chain)
+        }
+        tile_colors = tile_colors_task.result()
+        effect = effect_task.result()
+
+        # Create state instance with matrix fields
+        self._state = MatrixLightState.from_light_state(
+            light_state,
+            chain=chain,
+            tile_orientations=tile_orientations,
+            tile_colors=tile_colors,
+            effect=effect.effect_type,
+        )
+
+        return self._state

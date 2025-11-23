@@ -11,12 +11,11 @@ import pytest
 from lifx.devices.base import (
     LIFX_GROUP_NAMESPACE,
     LIFX_LOCATION_NAMESPACE,
+    CollectionInfo,
     Device,
     DeviceInfo,
     DeviceVersion,
     FirmwareInfo,
-    GroupInfo,
-    LocationInfo,
     WifiInfo,
 )
 from lifx.network.connection import DeviceConnection
@@ -461,12 +460,12 @@ class TestLocationAndGroupManagement:
         older_timestamp = int(time.time() * 1e9) - 1000000000  # 1 second ago
         newer_timestamp = int(time.time() * 1e9)
 
-        device1_location = LocationInfo(
-            location=location_uuid, label="Kitchen (old)", updated_at=older_timestamp
+        device1_location = CollectionInfo(
+            uuid=location_uuid.hex(), label="Kitchen (old)", updated_at=older_timestamp
         )
 
-        device2_location = LocationInfo(
-            location=location_uuid, label="Kitchen (new)", updated_at=newer_timestamp
+        device2_location = CollectionInfo(
+            uuid=location_uuid.hex(), label="Kitchen (new)", updated_at=newer_timestamp
         )
 
         # When displaying the location, clients should use the newer label
@@ -494,12 +493,12 @@ class TestLocationAndGroupManagement:
         older_timestamp = int(time.time() * 1e9) - 1000000000  # 1 second ago
         newer_timestamp = int(time.time() * 1e9)
 
-        device1_group = GroupInfo(
-            group=group_uuid, label="Bedroom (old)", updated_at=older_timestamp
+        device1_group = CollectionInfo(
+            uuid=group_uuid.hex(), label="Bedroom (old)", updated_at=older_timestamp
         )
 
-        device2_group = GroupInfo(
-            group=group_uuid, label="Bedroom (new)", updated_at=newer_timestamp
+        device2_group = CollectionInfo(
+            uuid=group_uuid.hex(), label="Bedroom (new)", updated_at=newer_timestamp
         )
 
         # When displaying the group, clients should use the newer label

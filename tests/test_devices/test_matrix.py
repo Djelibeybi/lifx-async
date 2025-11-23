@@ -322,6 +322,57 @@ class TestMatrixLight:
             effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.OFF
 
+    async def test_copy_frame_buffer(self, emulator_devices) -> None:
+        """Test copy_frame_buffer() copies frame buffer between tiles."""
+        matrix = emulator_devices[6]
+        async with matrix:
+            chain = await matrix.get_device_chain()
+            tile = chain[0]
+
+            # Set initial state on display buffer (fb_index=0) - all white
+            white_colors = [HSBK(0, 0, 1.0, 3500)] * 64
+            await matrix.set64(
+                tile_index=0,
+                length=1,
+                x=0,
+                y=0,
+                width=tile.width,
+                duration=0,
+                colors=white_colors,
+                fb_index=0,  # Display buffer
+            )
+
+            # Verify initial state is white
+            initial_colors = await matrix.get64()
+            assert initial_colors[0].saturation == 0.0  # White has no saturation
+            assert initial_colors[0].brightness == 1.0
+
+            # Set different pattern on temp buffer (fb_index=1) - all red
+            red_colors = [Colors.RED] * 64
+            await matrix.set64(
+                tile_index=0,
+                length=1,
+                x=0,
+                y=0,
+                width=tile.width,
+                duration=0,
+                colors=red_colors,
+                fb_index=1,  # Temp buffer
+            )
+
+            # Display buffer should still be white (not affected by fb_index=1)
+            display_colors = await matrix.get64()
+            assert display_colors[0].saturation == 0.0  # Still white
+
+            # Copy temp buffer (fb_index=1) to display buffer (fb_index=0)
+            await matrix.copy_frame_buffer(tile_index=0, source_fb=1, target_fb=0)
+
+            # Now display buffer should be red (copied from fb_index=1)
+            copied_colors = await matrix.get64()
+            assert copied_colors[0].hue == 0  # Red
+            assert copied_colors[0].saturation == 1.0
+            assert copied_colors[0].brightness == 1.0
+
     async def test_set_effect_without_palette(self, emulator_devices) -> None:
         """Test setting effect without a palette (palette_count=0)."""
         matrix = emulator_devices[6]
@@ -669,6 +720,7 @@ class TestTileInfo:
             user_y=0.0,
             width=8,
             height=8,
+            supported_frame_buffers=2,
             device_version=DeviceStateVersion(vendor=1, product=27),
             firmware=DeviceStateHostFirmware(
                 build=1234567890, version_minor=3, version_major=2
@@ -695,6 +747,7 @@ class TestTileInfo:
             user_y=0.0,
             width=8,
             height=8,
+            supported_frame_buffers=2,
             device_version=DeviceStateVersion(vendor=1, product=27),
             firmware=DeviceStateHostFirmware(
                 build=1234567890, version_minor=3, version_major=2
@@ -722,6 +775,7 @@ class TestTileInfo:
             user_y=0.0,
             width=16,
             height=8,
+            supported_frame_buffers=2,
             device_version=DeviceStateVersion(vendor=1, product=27),
             firmware=DeviceStateHostFirmware(
                 build=1234567890, version_minor=3, version_major=2

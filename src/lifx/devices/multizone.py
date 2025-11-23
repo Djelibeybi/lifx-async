@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+import time
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
-from lifx.devices.light import Light
+from lifx.devices.light import Light, LightState
 from lifx.protocol import packets
-
-if TYPE_CHECKING:
-    from lifx.theme import Theme
 from lifx.protocol.protocol_types import (
     Direction,
     FirmwareEffect,
@@ -22,6 +21,9 @@ from lifx.protocol.protocol_types import (
 from lifx.protocol.protocol_types import (
     MultiZoneApplicationRequest as ExtendedAppReq,
 )
+
+if TYPE_CHECKING:
+    from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,6 +130,52 @@ class MultiZoneEffect:
         self.parameters = [0, int(value), 0, 0, 0, 0, 0, 0, 0]
 
 
+@dataclass
+class MultiZoneLightState(LightState):
+    """MultiZone light device state with zone-based control.
+
+    Attributes:
+        zones: List of HSBK colors for each zone
+        zone_count: Total number of zones
+        effect: Current multizone effect configuration
+    """
+
+    zones: list[HSBK]
+    zone_count: int
+    effect: FirmwareEffect
+
+    @property
+    def as_dict(self) -> Any:
+        """Return MultiZoneLightState as dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_light_state(
+        cls,
+        light_state: LightState,
+        zones: list[HSBK],
+        effect: FirmwareEffect,
+    ) -> MultiZoneLightState:
+        """Create MatrixLightState from LightState."""
+        return cls(
+            model=light_state.model,
+            label=light_state.label,
+            serial=light_state.serial,
+            mac_address=light_state.mac_address,
+            power=light_state.power,
+            capabilities=light_state.capabilities,
+            host_firmware=light_state.host_firmware,
+            wifi_firmware=light_state.wifi_firmware,
+            location=light_state.location,
+            group=light_state.group,
+            color=light_state.color,
+            zones=zones,
+            zone_count=len(zones),
+            effect=effect,
+            last_updated=time.time(),
+        )
+
+
 class MultiZoneLight(Light):
     """LIFX MultiZone light device (strips, beams).
 
@@ -164,6 +212,8 @@ class MultiZoneLight(Light):
         ```
     """
 
+    _state: MultiZoneLightState
+
     def __init__(self, *args, **kwargs) -> None:
         """Initialize MultiZoneLight with additional state attributes."""
         super().__init__(*args, **kwargs)
@@ -171,10 +221,19 @@ class MultiZoneLight(Light):
         self._zone_count: int | None = None
         self._multizone_effect: MultiZoneEffect | None | None = None
 
-    async def _setup(self) -> None:
-        """Populate MultiZone light capabilities, state and metadata."""
-        await super()._setup()
-        await self.get_all_color_zones()
+    @property
+    def state(self) -> MultiZoneLightState:
+        """Get multizone light state (guaranteed when using Device.connect()).
+
+        Returns:
+            MultiZoneLightState with current multizone light state
+
+        Raises:
+            RuntimeError: If accessed before state initialization
+        """
+        if self._state is None:
+            raise RuntimeError("State not found.")
+        return self._state
 
     async def get_zone_count(self) -> int:
         """Get the number of zones in the device.
@@ -296,6 +355,18 @@ class MultiZoneLight(Light):
 
         result = colors
 
+        # Update state if it exists and we fetched all zones
+        if self._state is not None and hasattr(self._state, "zones"):
+            if start == 0 and len(result) == zone_count:
+                self._state.zones = result
+                self._state.last_updated = __import__("time").time()
+
+        # Update state if it exists and we fetched all zones
+        if self._state is not None and hasattr(self._state, "zones"):
+            if start == 0 and len(result) == zone_count:
+                self._state.zones = result
+                self._state.last_updated = __import__("time").time()
+
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -380,6 +451,18 @@ class MultiZoneLight(Light):
 
         # Return only the requested range to caller
         result = colors[start : end + 1]
+
+        # Update state if it exists and we fetched all zones
+        if self._state is not None and hasattr(self._state, "zones"):
+            if start == 0 and len(result) == zone_count:
+                self._state.zones = result
+                self._state.last_updated = __import__("time").time()
+
+        # Update state if it exists and we fetched all zones
+        if self._state is not None and hasattr(self._state, "zones"):
+            if start == 0 and len(result) == zone_count:
+                self._state.zones = result
+                self._state.last_updated = __import__("time").time()
 
         _LOGGER.debug(
             {
@@ -599,14 +682,14 @@ class MultiZoneLight(Light):
             }
         )
 
-    async def get_effect(self) -> MultiZoneEffect | None:
+    async def get_effect(self) -> MultiZoneEffect:
         """Get current multizone effect.
 
         Always fetches from device.
         Use the `multizone_effect` property to access stored value.
 
         Returns:
-            MultiZoneEffect if an effect is active, None if no effect
+            MultiZoneEffect with either FirmwareEffect.OFF or FirmwareEffect.MOVE
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -644,17 +727,19 @@ class MultiZoneLight(Light):
             settings.parameter.parameter7,
         ]
 
-        if effect_type == FirmwareEffect.OFF:
-            result = None
-        else:
-            result = MultiZoneEffect(
-                effect_type=effect_type,
-                speed=settings.speed,
-                duration=settings.duration,
-                parameters=parameters,
-            )
+        result = MultiZoneEffect(
+            effect_type=effect_type,
+            speed=settings.speed,
+            duration=settings.duration,
+            parameters=parameters,
+        )
 
         self._multizone_effect = result
+
+        # Update state if it exists
+        if self._state is not None and hasattr(self._state, "effect"):
+            self._state.effect = result.effect_type
+            self._state.last_updated = __import__("time").time()
 
         _LOGGER.debug(
             {
@@ -850,3 +935,53 @@ class MultiZoneLight(Light):
     def __repr__(self) -> str:
         """String representation of multizone light."""
         return f"MultiZoneLight(serial={self.serial}, ip={self.ip}, port={self.port})"
+
+    async def refresh_state(self) -> None:
+        """Refresh multizone light state from hardware.
+
+        Fetches color, zones, and effect.
+
+        Raises:
+            RuntimeError: If state has not been initialized
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        await super().refresh_state()
+
+        async with asyncio.TaskGroup() as tg:
+            zones_task = tg.create_task(self.get_all_color_zones())
+            effect_task = tg.create_task(self.get_effect())
+
+        zones = zones_task.result()
+        effect = effect_task.result()
+
+        self._state.zones = zones
+        self._state.effect = effect.effect_type
+
+    async def _initialize_state(self) -> MultiZoneLightState:
+        """Initialize multizone light state transactionally.
+
+        Extends Light implementation to fetch zones and effect.
+
+        Args:
+            timeout: Timeout for state initialization
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        light_state = await super()._initialize_state()
+
+        async with asyncio.TaskGroup() as tg:
+            zones_task = tg.create_task(self.get_all_color_zones())
+            effect_task = tg.create_task(self.get_effect())
+
+        zones = zones_task.result()
+        effect = effect_task.result()
+
+        self._state = MultiZoneLightState.from_light_state(
+            light_state=light_state, zones=zones, effect=effect.effect_type
+        )
+
+        return self._state
