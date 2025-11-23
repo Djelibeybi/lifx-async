@@ -9,7 +9,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from math import floor, log10
-from typing import Self
+from typing import TYPE_CHECKING, Generic, Self, TypeVar, cast
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -24,6 +24,9 @@ from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
 from lifx.protocol.models import Serial
+
+if TYPE_CHECKING:
+    from lifx.devices import HevLight, InfraredLight, Light, MatrixLight, MultiZoneLight
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,38 +90,175 @@ class FirmwareInfo:
     version_major: int
     version_minor: int
 
-
-@dataclass
-class LocationInfo:
-    """Device location information.
-
-    Attributes:
-        location: Location UUID (16 bytes)
-        label: Location label (up to 32 characters)
-        updated_at: Timestamp when location was last updated (nanoseconds)
-    """
-
-    location: bytes
-    label: str
-    updated_at: int
+    @property
+    def as_dict(self) -> dict[str, int]:
+        """Return firmware info as dict."""
+        return {
+            "version_major": self.version_major,
+            "version_minor": self.version_minor,
+        }
 
 
 @dataclass
-class GroupInfo:
-    """Device group information.
+class CollectionInfo:
+    """Device location and group collection information.
 
     Attributes:
-        group: Group UUID (16 bytes)
-        label: Group label (up to 32 characters)
+        uuid: Collection UUID (16 hexadecimal characters)
+        label: Collection label (up to 32 characters)
         updated_at: Timestamp when group was last updated (nanoseconds)
     """
 
-    group: bytes
+    uuid: str
     label: str
     updated_at: int
 
+    @property
+    def as_dict(self) -> dict[str, str | int]:
+        """Return group info as dict."""
+        return {"uuid": self.uuid, "label": self.label, "updated_at": self.updated_at}
 
-class Device:
+
+@dataclass
+class DeviceCapabilities:
+    """Device capabilities from product registry.
+
+    Attributes:
+        has_color: Supports color control
+        has_multizone: Supports multizone control (strips, beams)
+        has_chain: Supports chaining (tiles)
+        has_matrix: Supports 2D matrix control (tiles, candle, path)
+        has_infrared: Supports infrared LED
+        has_hev: Supports HEV (High Energy Visible) cleaning cycles
+        has_extended_multizone: Supports extended multizone protocol
+        kelvin_min: Minimum color temperature (Kelvin)
+        kelvin_max: Maximum color temperature (Kelvin)
+    """
+
+    has_color: bool
+    has_multizone: bool
+    has_chain: bool
+    has_matrix: bool
+    has_infrared: bool
+    has_hev: bool
+    has_extended_multizone: bool
+    kelvin_min: int | None
+    kelvin_max: int | None
+
+    @property
+    def has_variable_color_temp(self) -> bool:
+        """Check if device supports variable color temperature."""
+        return (
+            self.kelvin_min is not None
+            and self.kelvin_max is not None
+            and self.kelvin_min != self.kelvin_max
+        )
+
+    @property
+    def as_dict(self) -> dict[str, bool | int]:
+        """Return DeviceCapabilities as a dict."""
+        return {
+            "has_color": self.has_color,
+            "has_multizone": self.has_multizone,
+            "has_extended_multizone": self.has_extended_multizone,
+            "has_chain": self.has_chain,
+            "has_matrix": self.has_matrix,
+            "has_infrared": self.has_infrared,
+            "has_hev": self.has_hev,
+            "has_variable_color_temp": self.has_variable_color_temp,
+            "kelvin_max": self.kelvin_max if self.kelvin_max is not None else 9000,
+            "kelvin_min": self.kelvin_min if self.kelvin_min is not None else 1500,
+        }
+
+
+@dataclass
+class DeviceState:
+    """Base device state.
+
+    Attributes:
+        model: Friendly product name (e.g., "LIFX A19")
+        label: Device label (user-assigned name)
+        serial: Device serial number (6 bytes)
+        mac_address: Device MAC address (formatted string)
+        capabilities: Device capabilities from product registry
+        power: Power level (0 = off, 65535 = on)
+        host_firmware: Host firmware version
+        wifi_firmware: WiFi firmware version
+        location: Location tuple (UUID bytes, label, updated_at)
+        group: Group tuple (UUID bytes, label, updated_at)
+        last_updated: Timestamp of last state refresh
+    """
+
+    model: str
+    label: str
+    serial: str
+    mac_address: str
+    capabilities: DeviceCapabilities
+    power: int
+    host_firmware: FirmwareInfo
+    wifi_firmware: FirmwareInfo
+    location: CollectionInfo
+    group: CollectionInfo
+    last_updated: float
+
+    @property
+    def as_dict(
+        self,
+    ) -> dict[str, str | int | float | dict[str, bool | int] | dict[str, str | int]]:
+        """Return DeviceState as a dictionary."""
+        return {
+            "model": self.model,
+            "label": self.label,
+            "serial": self.serial,
+            "mac_address": self.mac_address,
+            "capabilities": self.capabilities.as_dict,
+            "power": self.power,
+            "host_firmware": self.host_firmware.as_dict,
+            "wifi_firmware": self.wifi_firmware.as_dict,
+            "location": self.location.as_dict,
+            "group": self.group.as_dict,
+            "last_updated": self.last_updated,
+        }
+
+    @property
+    def is_on(self) -> bool:
+        """Check if device is powered on."""
+        return self.power > 0
+
+    @property
+    def location_name(self) -> str:
+        """Get location label."""
+        return self.location.label
+
+    @property
+    def group_name(self) -> str:
+        """Get group label."""
+        return self.group.label
+
+    @property
+    def age(self) -> float:
+        """Get age of state in seconds."""
+        import time
+
+        return time.time() - self.last_updated
+
+    def is_fresh(self, max_age: float = 5.0) -> bool:
+        """Check if state is fresh (recently updated).
+
+        Args:
+            max_age: Maximum age in seconds (default: 5.0)
+
+        Returns:
+            True if state age is less than max_age
+        """
+        return self.age < max_age
+
+
+# TypeVar for generic state type, bound to DeviceState
+StateT = TypeVar("StateT", bound=DeviceState)
+
+
+class Device(Generic[StateT]):
     """Base class for LIFX devices.
 
     This class provides common functionality for all LIFX devices:
@@ -284,12 +424,18 @@ class Device:
         self._version: DeviceVersion | None = None
         self._host_firmware: FirmwareInfo | None = None
         self._wifi_firmware: FirmwareInfo | None = None
-        self._location: LocationInfo | None = None
-        self._group: GroupInfo | None = None
+        self._location: CollectionInfo | None = None
+        self._group: CollectionInfo | None = None
         self._mac_address: str | None = None
 
         # Product capabilities for device features (populated on first use)
         self._capabilities: ProductInfo | None = None
+
+        # State management (populated by connect() factory or _initialize_state())
+        self._state: StateT | None = None
+        self._refresh_task: asyncio.Task[None] | None = None
+        self._refresh_lock = asyncio.Lock()
+        self._is_closed = False
 
     @classmethod
     async def from_ip(
@@ -355,10 +501,157 @@ class Device:
 
         raise LifxDeviceNotFoundError()
 
+    @classmethod
+    async def connect(
+        cls,
+        ip: str,
+        serial: str | None = None,
+        port: int = LIFX_UDP_PORT,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+    ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+        """Create and return a fully initialized device instance.
+
+        This factory method creates the appropriate device type (Light, etc)
+        based on the device's capabilities and initializes its state. The returned
+        device MUST be used with an async context manager.
+
+        The returned device subclass has guaranteed initialized state - the state
+        property will never be None for devices created via this method.
+
+        Args:
+            ip: IP address of the device
+            serial: Optional serial number (12-digit hex, with or without colons).
+                    If None, queries device to get serial.
+            port: Port number (default LIFX_UDP_PORT)
+            timeout: Request timeout for this device instance
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            Fully initialized device instance (Light, MultiZoneLight, MatrixLight, etc.)
+            with complete state loaded and guaranteed non-None state property.
+
+        Raises:
+            LifxDeviceNotFoundError: If device cannot be found or contacted
+            LifxTimeoutError: If device does not respond
+            ValueError: If serial format is invalid
+
+        Example:
+            ```python
+            # Connect by IP (serial auto-detected)
+            device = await Device.connect(ip="192.168.1.100")
+            async with device:
+                # device.state is guaranteed to be initialized
+                print(f"{device.state.model}: {device.state.label}")
+                if device.state.is_on:
+                    print("Device is on")
+
+            # Connect with known serial
+            device = await Device.connect(ip="192.168.1.100", serial="d073d5123456")
+            async with device:
+                await device.set_power(True)
+            ```
+        """
+        # Step 1: Get serial if not provided
+        if serial is None:
+            temp_conn = DeviceConnection(
+                serial="000000000000",
+                ip=ip,
+                port=port,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+            try:
+                response = await temp_conn.request(
+                    packets.Device.GetService(), timeout=timeout
+                )
+                if response and isinstance(response, packets.Device.StateService):
+                    if temp_conn.serial and temp_conn.serial != "000000000000":
+                        serial = temp_conn.serial
+                    else:
+                        raise LifxDeviceNotFoundError(
+                            "Could not determine device serial"
+                        )
+                else:
+                    raise LifxDeviceNotFoundError("No response from device")
+            finally:
+                await temp_conn.close()
+
+        # Step 2: Normalize serial (accept with or without colons)
+        serial = serial.replace(":", "")
+
+        # Step 3: Create temporary device to get product info
+        temp_device = cls(
+            serial=serial,
+            ip=ip,
+            port=port,
+            timeout=timeout,
+            max_retries=max_retries,
+        )
+
+        try:
+            # Get version to determine product
+            version = await temp_device.get_version()
+            product_info = get_product(version.product)
+
+            if product_info is None:
+                raise LifxDeviceNotFoundError(f"Unknown product ID: {version.product}")
+
+            # Step 4: Determine correct device class based on capabilities
+            # Import device classes here to avoid circular imports
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                from lifx.devices.hev import HevLight
+                from lifx.devices.infrared import InfraredLight
+                from lifx.devices.light import Light
+                from lifx.devices.matrix import MatrixLight
+                from lifx.devices.multizone import MultiZoneLight
+
+            device_class: type[Device] = cls
+
+            if product_info.has_matrix:
+                from lifx.devices.matrix import MatrixLight
+
+                device_class = MatrixLight
+            elif product_info.has_multizone:
+                from lifx.devices.multizone import MultiZoneLight
+
+                device_class = MultiZoneLight
+            elif product_info.has_infrared:
+                from lifx.devices.infrared import InfraredLight
+
+                device_class = InfraredLight
+            elif product_info.has_hev:
+                from lifx.devices.hev import HevLight
+
+                device_class = HevLight
+            elif product_info.has_color:
+                from lifx.devices.light import Light
+
+                device_class = Light
+
+            # Step 5: Create instance of correct device class
+            device = device_class(
+                serial=serial,
+                ip=ip,
+                port=port,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+
+            # Type system note: device._state is guaranteed non-None after
+            # _initialize_state().
+            # Each subclass overrides _state to be non-optional
+            return device  # type: ignore[return-value]
+
+        finally:
+            # Clean up temporary device
+            await temp_device.connection.close()
+
     async def __aenter__(self) -> Self:
         """Enter async context manager."""
-        # No connection setup needed - connection pool handles everything
-        await self._setup()
+        await self._initialize_state()
         return self
 
     async def __aexit__(
@@ -368,8 +661,8 @@ class Device:
         exc_tb: object,
     ) -> None:
         """Exit async context manager and close connection."""
-        # Close connection for explicit cleanup
-        await self.connection.close()
+        # Close device (cancels refresh tasks and connection)
+        await self.close()
 
     async def _setup(self) -> None:
         """Populate device capabilities, state and metadata."""
@@ -488,16 +781,22 @@ class Device:
         self._raise_if_unhandled(state)
 
         # Store label
-        self._label = state.label
+        label_value = state.label
+        self._label = label_value
+        # Update state if it exists
+        if self._state is not None:
+            self._state.label = label_value
+            self._state.last_updated = __import__("time").time()
+
         _LOGGER.debug(
             {
                 "class": "Device",
                 "method": "get_label",
                 "action": "query",
-                "reply": {"label": state.label},
+                "reply": {"label": label_value},
             }
         )
-        return state.label
+        return label_value
 
     async def set_label(self, label: str) -> None:
         """Set device label/name.
@@ -531,8 +830,13 @@ class Device:
         )
         self._raise_if_unhandled(result)
 
-        # Update cached state
-        self._label = label
+        if result:
+            self._label = label
+
+            if self._state is not None:
+                self._state.label = label
+                await self._schedule_refresh()
+
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -567,15 +871,21 @@ class Device:
         self._raise_if_unhandled(state)
 
         # Power level is uint16 (0 or 65535)
+        power_level = state.level
+        # Update state if it exists
+        if self._state is not None:
+            self._state.power = power_level
+            self._state.last_updated = __import__("time").time()
+
         _LOGGER.debug(
             {
                 "class": "Device",
                 "method": "get_power",
                 "action": "query",
-                "reply": {"level": state.level},
+                "reply": {"level": power_level},
             }
         )
-        return state.level
+        return power_level
 
     async def set_power(self, level: bool | int) -> None:
         """Set device power state.
@@ -609,8 +919,6 @@ class Device:
             if level not in (0, 65535):
                 raise ValueError(f"Power level must be 0 or 65535, got {level}")
             power_level = level
-        else:
-            raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
         # Request automatically handles acknowledgement
         result = await self.connection.request(
@@ -626,6 +934,9 @@ class Device:
                 "values": {"level": power_level},
             }
         )
+
+        if result and self._state is not None:
+            await self._schedule_refresh()
 
     async def get_version(self) -> DeviceVersion:
         """Get device version information.
@@ -843,13 +1154,13 @@ class Device:
         )
         return firmware
 
-    async def get_location(self) -> LocationInfo:
+    async def get_location(self) -> CollectionInfo:
         """Get device location information.
 
         Always fetches from device.
 
         Returns:
-            LocationInfo with location UUID, label, and updated timestamp
+            CollectionInfo with location UUID, label, and updated timestamp
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -861,20 +1172,22 @@ class Device:
             ```python
             location = await device.get_location()
             print(f"Location: {location.label}")
-            print(f"Location ID: {location.location.hex()}")
+            print(f"Location ID: {location.uuid}")
             ```
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetLocation())  # type: ignore
         self._raise_if_unhandled(state)
 
-        location = LocationInfo(
-            location=state.location,
+        location = CollectionInfo(
+            uuid=state.location.hex(),
             label=state.label,
             updated_at=state.updated_at,
         )
 
         self._location = location
+        if self._state is not None:
+            self._state.location = location
 
         _LOGGER.debug(
             {
@@ -958,6 +1271,7 @@ class Device:
                         and isinstance(state_packet.location, bytes)
                     ):
                         location_uuid_to_use = state_packet.location
+                        assert location_uuid_to_use is not None
                         # Type narrowing: we know location_uuid_to_use is not None here
                         _LOGGER.debug(
                             {
@@ -1010,11 +1324,17 @@ class Device:
         )
         self._raise_if_unhandled(result)
 
-        # Update cached state
-        location_info = LocationInfo(
-            location=location_uuid_to_use, label=label, updated_at=updated_at
-        )
-        self._location = location_info
+        if result:
+            self._location = CollectionInfo(
+                uuid=location_uuid_to_use.hex(), label=label, updated_at=updated_at
+            )
+
+        if result and self._state is not None:
+            self._state.location.uuid = location_uuid_to_use.hex()
+            self._state.location.label = label
+            self._state.location.updated_at = updated_at
+            await self._schedule_refresh()
+
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -1028,13 +1348,13 @@ class Device:
             }
         )
 
-    async def get_group(self) -> GroupInfo:
+    async def get_group(self) -> CollectionInfo:
         """Get device group information.
 
         Always fetches from device.
 
         Returns:
-            GroupInfo with group UUID, label, and updated timestamp
+            CollectionInfo with group UUID, label, and updated timestamp
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -1046,20 +1366,22 @@ class Device:
             ```python
             group = await device.get_group()
             print(f"Group: {group.label}")
-            print(f"Group ID: {group.group.hex()}")
+            print(f"Group ID: {group.uuid}")
             ```
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetGroup())  # type: ignore
         self._raise_if_unhandled(state)
 
-        group = GroupInfo(
-            group=state.group,
+        group = CollectionInfo(
+            uuid=state.group.hex(),
             label=state.label,
             updated_at=state.updated_at,
         )
 
         self._group = group
+        if self._state is not None:
+            self._state.group = group
 
         _LOGGER.debug(
             {
@@ -1067,7 +1389,7 @@ class Device:
                 "method": "get_group",
                 "action": "query",
                 "reply": {
-                    "group": state.group.hex(),
+                    "uuid": state.group.hex(),
                     "label": state.label,
                     "updated_at": state.updated_at,
                 },
@@ -1143,6 +1465,7 @@ class Device:
                         and isinstance(state_packet.group, bytes)
                     ):
                         group_uuid_to_use = state_packet.group
+                        assert group_uuid_to_use is not None
                         # Type narrowing: we know group_uuid_to_use is not None here
                         _LOGGER.debug(
                             {
@@ -1195,11 +1518,17 @@ class Device:
         )
         self._raise_if_unhandled(result)
 
-        # Update cached state
-        group_info = GroupInfo(
-            group=group_uuid_to_use, label=label, updated_at=updated_at
-        )
-        self._group = group_info
+        if result:
+            self._group = CollectionInfo(
+                uuid=group_uuid_to_use.hex(), label=label, updated_at=updated_at
+            )
+
+        if result and self._state is not None:
+            self._state.location.uuid = group_uuid_to_use.hex()
+            self._state.location.label = label
+            self._state.location.updated_at = updated_at
+            await self._schedule_refresh()
+
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -1249,6 +1578,187 @@ class Device:
             }
         )
 
+    async def close(self) -> None:
+        """Close device connection and cleanup resources.
+
+        Cancels any pending refresh tasks and closes the network connection.
+        Called automatically when exiting the async context manager.
+        """
+        self._is_closed = True
+        if self._refresh_task and not self._refresh_task.done():
+            self._refresh_task.cancel()
+            try:
+                await self._refresh_task
+            except asyncio.CancelledError:
+                pass
+        await self.connection.close()
+
+    @property
+    def state(self) -> StateT | None:
+        """Get device state if available.
+
+        State is populated by the connect() factory method or by calling
+        _initialize_state() directly. Returns None if state has not been initialized.
+
+        Returns:
+            State with current device state, or None if not initialized
+        """
+        return self._state
+
+    def _create_capabilities(self) -> DeviceCapabilities:
+        """Create DeviceCapabilities instance from product registry.
+
+        Returns:
+            DeviceCapabilities instance
+
+        Raises:
+            RuntimeError: If capabilities have not been loaded
+        """
+        assert self._capabilities is not None
+        product_info = self._capabilities
+
+        return DeviceCapabilities(
+            has_color=product_info.has_color,
+            has_multizone=product_info.has_multizone,
+            has_chain=product_info.has_chain,
+            has_matrix=product_info.has_matrix,
+            has_infrared=product_info.has_infrared,
+            has_hev=product_info.has_hev,
+            has_extended_multizone=product_info.has_extended_multizone,
+            kelvin_min=(
+                product_info.temperature_range.min
+                if product_info.temperature_range
+                else None
+            ),
+            kelvin_max=(
+                product_info.temperature_range.max
+                if product_info.temperature_range
+                else None
+            ),
+        )
+
+    async def _initialize_state(self) -> StateT:
+        """Initialize device state transactionally.
+
+        Fetches all required device state in parallel and creates the state instance.
+        This is an all-or-nothing operation - either all state is fetched successfully
+        or an exception is raised.
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        # Ensure capabilities are loaded
+        await self._ensure_capabilities()
+        capabilities = self._create_capabilities()
+
+        # Fetch semi-static and volatile state in parallel
+        # get_color returns color, power, and label in one request
+        async with asyncio.TaskGroup() as tg:
+            label_task = tg.create_task(self.get_label())
+            power_task = tg.create_task(self.get_power())
+            host_fw_task = tg.create_task(self.get_host_firmware())
+            wifi_fw_task = tg.create_task(self.get_wifi_firmware())
+            location_task = tg.create_task(self.get_location())
+            group_task = tg.create_task(self.get_group())
+
+        # Extract results
+        label = label_task.result()
+        power = power_task.result()
+        host_firmware = host_fw_task.result()
+        wifi_firmware = wifi_fw_task.result()
+        location_info = location_task.result()
+        group_info = group_task.result()
+
+        # Get MAC address (already calculated in get_host_firmware)
+        mac_address = await self.get_mac_address()
+
+        # Get model name
+        assert self._capabilities is not None
+        model = self._capabilities.name
+
+        # Create state instance
+        # Cast is needed because when Device is used directly, StateT = DeviceState
+        # Subclasses override this method to create their specific state type
+        self._state = cast(
+            StateT,
+            DeviceState(
+                model=model,
+                label=label,
+                serial=self.serial,
+                mac_address=mac_address,
+                capabilities=capabilities,
+                power=power,
+                host_firmware=host_firmware,
+                wifi_firmware=wifi_firmware,
+                location=location_info,
+                group=group_info,
+                last_updated=time.time(),
+            ),
+        )
+
+        return self._state
+
+    async def refresh_state(self) -> None:
+        """Refresh device state from hardware.
+
+        Fetches current state from device and updates the state instance.
+        Base implementation fetches label, power, and updates timestamp.
+        Subclasses override to add device-specific state updates.
+
+        Raises:
+            RuntimeError: If state has not been initialized
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        if not self._state:
+            await self._initialize_state()
+            return
+
+    async def _schedule_refresh(self) -> None:
+        """Schedule debounced state refresh.
+
+        Schedules a refresh task that waits for STATE_REFRESH_DEBOUNCE_MS milliseconds
+        before executing. If another refresh is scheduled before the delay expires,
+        the previous task is cancelled and a new one is scheduled.
+
+        This ensures that rapid state changes only trigger one refresh.
+        """
+        from lifx.const import STATE_REFRESH_DEBOUNCE_MS
+
+        if self._is_closed:
+            return
+
+        # Cancel existing refresh task if running
+        if self._refresh_task and not self._refresh_task.done():
+            self._refresh_task.cancel()
+            try:
+                await self._refresh_task
+            except asyncio.CancelledError:
+                pass
+
+        # Schedule new refresh task
+        async def _debounced_refresh() -> None:
+            try:
+                await asyncio.sleep(STATE_REFRESH_DEBOUNCE_MS / 1000.0)
+                if not self._is_closed:
+                    async with self._refresh_lock:
+                        await self.refresh_state()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                _LOGGER.warning(
+                    {
+                        "class": "Device",
+                        "method": "_schedule_refresh",
+                        "action": "refresh_failed",
+                        "error": str(e),
+                    }
+                )
+
+        self._refresh_task = asyncio.create_task(_debounced_refresh())
+
     @property
     def label(self) -> str | None:
         """Get cached label if available.
@@ -1258,7 +1768,11 @@ class Device:
         Returns:
             Device label or None if never fetched.
         """
-        return self._label
+        if self._state is not None:
+            return self._state.label
+        elif self._label is not None:
+            return self._label
+        return None
 
     @property
     def version(self) -> DeviceVersion | None:
@@ -1280,7 +1794,11 @@ class Device:
         Returns:
             Firmware info or None if never fetched.
         """
-        return self._host_firmware
+        if self._state is not None:
+            return self._state.host_firmware
+        elif self._host_firmware is not None:
+            return self._host_firmware
+        return None
 
     @property
     def wifi_firmware(self) -> FirmwareInfo | None:
@@ -1291,7 +1809,11 @@ class Device:
         Returns:
             Firmware info or None if never fetched.
         """
-        return self._wifi_firmware
+        if self._state is not None:
+            return self._state.wifi_firmware
+        elif self._wifi_firmware is not None:
+            return self._wifi_firmware
+        return None
 
     @property
     def location(self) -> str | None:
@@ -1302,7 +1824,9 @@ class Device:
         Returns:
             Location name or None if never fetched.
         """
-        if self._location is not None:
+        if self._state is not None:
+            return self._state.location_name
+        elif self._location is not None:
             return self._location.label
         return None
 
@@ -1315,7 +1839,9 @@ class Device:
         Returns:
             Group name or None if never fetched.
         """
-        if self._group is not None:
+        if self._state is not None:
+            return self._state.group_name
+        elif self._group is not None:
             return self._group.label
         return None
 
@@ -1326,7 +1852,9 @@ class Device:
         Returns:
             Model string from product registry.
         """
-        if self.capabilities is not None:
+        if self._state is not None:
+            return self._state.model
+        elif self.capabilities is not None:
             return self.capabilities.name
         return None
 
@@ -1340,7 +1868,11 @@ class Device:
             MAC address in colon-separated format (e.g., "d0:73:d5:01:02:03"),
             or None if not yet calculated.
         """
-        return self._mac_address
+        if self._state is not None:
+            return self._state.mac_address
+        elif self._mac_address is not None:
+            return self._mac_address
+        return None
 
     def __repr__(self) -> str:
         """String representation of device."""

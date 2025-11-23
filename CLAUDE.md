@@ -789,3 +789,4 @@ Critical constants are defined in `src/lifx/const.py`:
 - Button/Relay/Switch devices are explicitly out of scope (library focuses on lighting devices)
 - Not yet published to PyPI
 - Never update docs/changelog.md manually as it is auto-generated during the release process by the CI/CD workflow.
+- If a field is user-visible, it must never be bytes. This means things like serial, label, location and group must always be converted to a string prior to storing it anywhere a user would be able to access it. Conversion to and from bytes should happen either as close to sending or receiving the packet as possible.

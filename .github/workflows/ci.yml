@@ -59,8 +59,8 @@ jobs:
 
     - name: Check for security issues
       run: |
-        uv pip install bandit
-        uv run bandit -r src/
+        uv pip install "bandit[toml]"
+        uv run bandit -c pyproject.toml -r src/
 
   # Testing matrix across Python versions and platforms
   test:

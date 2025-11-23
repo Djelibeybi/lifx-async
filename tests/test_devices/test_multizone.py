@@ -501,8 +501,8 @@ class TestMultiZoneEffect:
 
         effect = await multizone_light.get_effect()
 
-        # When effect type is OFF, get_effect returns None (no active effect)
-        assert effect is None
+        assert effect is not None
+        assert effect.effect_type is FirmwareEffect.OFF
 
     async def test_set_effect(self, multizone_light: MultiZoneLight) -> None:
         """Test setting multizone effect."""
