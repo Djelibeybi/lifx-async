@@ -3,11 +3,51 @@
 from __future__ import annotations
 
 import logging
+import time
+from dataclasses import asdict, dataclass
+from typing import Any
 
-from lifx.devices.light import Light
+from lifx.devices.light import Light, LightState
 from lifx.protocol import packets
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class InfraredLightState(LightState):
+    """Infrared light device state with IR control.
+
+    Attributes:
+        infrared: Infrared brightness (0.0-1.0)
+    """
+
+    infrared: float
+
+    @property
+    def as_dict(self) -> Any:
+        """Return InfraredLightState as dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_light_state(
+        cls, light_state: LightState, infrared: float
+    ) -> InfraredLightState:
+        """Create InfraredLightState from LightState."""
+        return cls(
+            model=light_state.model,
+            label=light_state.label,
+            serial=light_state.serial,
+            mac_address=light_state.mac_address,
+            power=light_state.power,
+            capabilities=light_state.capabilities,
+            host_firmware=light_state.host_firmware,
+            wifi_firmware=light_state.wifi_firmware,
+            location=light_state.location,
+            group=light_state.group,
+            color=light_state.color,
+            infrared=infrared,
+            last_updated=time.time(),
+        )
 
 
 class InfraredLight(Light):
@@ -37,11 +77,27 @@ class InfraredLight(Light):
         ```
     """
 
+    _state: InfraredLightState
+
     def __init__(self, *args, **kwargs) -> None:
         """Initialize InfraredLight with additional state attributes."""
         super().__init__(*args, **kwargs)
         # Infrared-specific state storage
         self._infrared: float | None = None
+
+    @property
+    def state(self) -> InfraredLightState:
+        """Get infrared light state (guaranteed when using Device.connect()).
+
+        Returns:
+            InfraredLightState with current infrared light state
+
+        Raises:
+            RuntimeError: If accessed before state initialization
+        """
+        if self._state is None:
+            raise RuntimeError("State not found.")
+        return self._state
 
     async def _setup(self) -> None:
         """Populate Infrared light capabilities, state and metadata."""
@@ -76,6 +132,16 @@ class InfraredLight(Light):
 
         # Store cached state
         self._infrared = brightness
+
+        # Update state if it exists
+        if self._state is not None and hasattr(self._state, "infrared"):
+            self._state.infrared = brightness
+            self._state.last_updated = __import__("time").time()
+
+        # Update state if it exists
+        if self._state is not None and hasattr(self._state, "infrared"):
+            self._state.infrared = brightness
+            self._state.last_updated = __import__("time").time()
 
         _LOGGER.debug(
             {
@@ -123,16 +189,24 @@ class InfraredLight(Light):
         )
         self._raise_if_unhandled(result)
 
-        # Update cached state
-        self._infrared = brightness
         _LOGGER.debug(
             {
-                "class": "Device",
+                "class": "InfraredLight",
                 "method": "set_infrared",
                 "action": "change",
                 "values": {"brightness": brightness_u16},
             }
         )
+
+        # Update cache and state on acknowledgement
+        if result:
+            self._infrared = brightness
+            if self._state is not None:
+                self._state.infrared = brightness
+
+        # Schedule refresh to validate state
+        if self._state is not None:
+            await self._schedule_refresh()
 
     @property
     def infrared(self) -> float | None:
@@ -143,3 +217,42 @@ class InfraredLight(Light):
             Use get_infrared() to fetch from device.
         """
         return self._infrared
+
+    async def refresh_state(self) -> None:
+        """Refresh infrared light state from hardware.
+
+        Fetches color and infrared brightness.
+
+        Raises:
+            RuntimeError: If state has not been initialized
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        await super().refresh_state()
+
+        infrared = await self.get_infrared()
+        self._state.infrared = infrared
+
+    async def _initialize_state(self) -> InfraredLightState:
+        """Initialize infrared light state transactionally.
+
+        Extends Light implementation to fetch infrared brightness.
+
+        Args:
+            timeout: Timeout for state initialization
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        light_state = await super()._initialize_state()
+        infrared = await self.get_infrared()
+
+        # Create state instance with infrared field
+        self._state: InfraredLightState = InfraredLightState.from_light_state(
+            light_state=light_state,
+            infrared=infrared,
+        )
+
+        return self._state

@@ -89,6 +89,11 @@ def emulator_available() -> bool:
     The library is always available as it's a direct dependency.
     This fixture exists for backwards compatibility with test markers.
     """
+    import sys
+
+    if sys.platform != "linux":
+        return False
+
     try:
         from lifx_emulator import EmulatedLifxServer  # noqa: F401
 

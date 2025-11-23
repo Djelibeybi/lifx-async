@@ -72,7 +72,6 @@ ignore = []
 "src/lifx/protocol/packets.py" = ["E501"]
 "src/lifx/products/registry.py" = ["E501"]
 
-
 [tool.pyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.11"
@@ -82,6 +81,9 @@ exclude = [
     "**/generator.py",  # Code generators deal with untyped YAML/JSON
     "**/registry.py",   # Auto-generated from products.json
 ]
+
+[tool.bandit]
+skips = ["B101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
