@@ -272,6 +272,62 @@ def ceiling_device(emulator_server: int, emulator_api_url: str):
             pass  # Best effort cleanup
 
 
+@pytest.fixture(scope="session")
+def switch_device(emulator_server: int, emulator_api_url: str):
+    """Create a LIFX Switch device (product 70) for StateUnhandled testing.
+
+    The Switch device does not support Light commands (GetColor, SetColor, etc.)
+    and will return StateUnhandled responses. This is useful for testing that
+    the library correctly handles unsupported command responses.
+
+    Returns:
+        DeviceConnection instance for the Switch device
+    """
+    from lifx.network.connection import DeviceConnection
+
+    # Wait for API to be ready (emulator might not have HTTP API ready immediately)
+    max_retries = 10
+    for i in range(max_retries):
+        try:
+            response = requests.get(f"{emulator_api_url}/docs", timeout=1.0)
+            if response.status_code == 200:
+                break
+        except requests.exceptions.ConnectionError:
+            if i < max_retries - 1:
+                time.sleep(0.5)
+            else:
+                raise
+
+    # Create Switch device via API (product 70 = LIFX Switch)
+    response = requests.post(
+        f"{emulator_api_url}/devices",
+        json={
+            "product_id": 70,  # LIFX Switch
+            # Use serial that doesn't conflict with existing devices
+            "serial": "d073d5000200",
+        },
+        timeout=5.0,
+    )
+    response.raise_for_status()  # 201 Created is expected
+
+    try:
+        switch = DeviceConnection(
+            serial="d073d5000200",
+            ip="127.0.0.1",
+            port=emulator_server,
+        )
+        yield switch
+    finally:
+        # Clean up: delete the device
+        try:
+            requests.delete(
+                f"{emulator_api_url}/devices/d073d5000200",
+                timeout=5.0,
+            )
+        except Exception:
+            pass  # Best effort cleanup
+
+
 @pytest.fixture
 def scenario_manager(emulator_api_url: str):
     """Provide a context manager for scenario management.
