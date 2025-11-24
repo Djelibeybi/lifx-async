@@ -351,7 +351,7 @@ class TestDeviceConnectionRequestStream:
             as_dict: dict[str, object] = {}
 
         with patch.object(conn, "_ensure_open", return_value=None):
-            with pytest.raises(LifxUnsupportedCommandError, match="auto-handle"):
+            with pytest.raises(LifxProtocolError, match="auto-handle"):
                 async for _ in conn.request_stream(UnknownPacket()):
                     pass
 
@@ -381,8 +381,8 @@ class TestDeviceConnectionRequestStream:
         )
 
         async def mock_ack_stream_impl(packet, timeout=None, max_retries=None):
-            # Yield once to indicate ACK received
-            yield
+            # Yield True to indicate ACK received
+            yield True
 
         with (
             patch.object(conn, "_ensure_open", return_value=None),
@@ -546,3 +546,51 @@ class TestDeviceConnectionRequestStream:
 
             with pytest.raises(LifxTimeoutError, match="No response from"):
                 await conn.request(get_packet)
+
+
+class TestStateUnhandledResponses:
+    """Test StateUnhandled responses from devices that don't support commands."""
+
+    @pytest.mark.emulator
+    async def test_get_color_returns_state_unhandled_for_switch(
+        self, switch_device
+    ) -> None:
+        """Test GetColor to a Switch device returns StateUnhandled packet.
+
+        Switch devices don't support Light commands, so GetColor should
+        return a StateUnhandled packet instead of raising an exception.
+        """
+        from lifx.protocol import packets
+
+        async with switch_device:
+            # Send GetColor to a Switch - should return StateUnhandled
+            response = await switch_device.request(packets.Light.GetColor())
+
+            # Should return StateUnhandled packet, not raise an exception
+            assert isinstance(response, packets.Device.StateUnhandled)
+            # The unhandled_type field contains the packet type that wasn't handled
+            assert response.unhandled_type == packets.Light.GetColor.PKT_TYPE
+
+    @pytest.mark.emulator
+    async def test_set_color_returns_false_for_switch(self, switch_device) -> None:
+        """Test SetColor to a Switch device returns False.
+
+        Switch devices don't support Light commands, so SetColor should
+        return False (indicating StateUnhandled) instead of True (ACK).
+        """
+        from lifx.color import HSBK
+        from lifx.protocol import packets
+
+        async with switch_device:
+            # Create a SetColor packet
+            color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+            set_packet = packets.Light.SetColor(
+                color=color.to_protocol(),
+                duration=0,
+            )
+
+            # Send SetColor to a Switch - should return False (StateUnhandled)
+            result = await switch_device.request(set_packet)
+
+            # Should return False, not True or raise an exception
+            assert result is False
