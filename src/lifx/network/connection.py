@@ -22,7 +22,6 @@ from lifx.exceptions import (
     LifxConnectionError,
     LifxProtocolError,
     LifxTimeoutError,
-    LifxUnsupportedCommandError,
 )
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
@@ -443,13 +442,12 @@ class DeviceConnection:
             LifxConnectionError: If connection is not open
             LifxProtocolError: If response correlation validation fails
             LifxTimeoutError: If no response after all retries
-            LifxUnsupportedCommandError: If device doesn't support command
         """
         if not self._is_open or self._transport is None:
-            raise LifxConnectionError("Connection not open")
+            raise LifxConnectionError("Connection not open")  # pragma: no cover
 
         if timeout is None:
-            timeout = self.timeout
+            timeout = self.timeout  # pragma: no cover
 
         if max_retries is None:
             max_retries = self.max_retries
@@ -597,12 +595,6 @@ class DeviceConnection:
                                 f"got {header.sequence}, max expected {max_expected}"
                             )
 
-                        # Check for StateUnhandled
-                        if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
-                            raise LifxUnsupportedCommandError(
-                                "Request unsupported by device: received StateUnhandled"
-                            )
-
                         # Yield response (can be from any retry attempt)
                         has_yielded = True
                         last_response_time = time.monotonic()
@@ -640,7 +632,7 @@ class DeviceConnection:
         request: Any,
         timeout: float | None = None,
         max_retries: int | None = None,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[bool, None]:
         """Internal implementation of request_ack_stream with retry logic.
 
         This is an async generator that sends a request requiring acknowledgement
@@ -652,18 +644,17 @@ class DeviceConnection:
             max_retries: Maximum retries
 
         Yields:
-            None (single yield on successful ack)
+            True for successful ACK, False if device returned StateUnhandled
 
         Raises:
             LifxConnectionError: If connection is not open
             LifxTimeoutError: If no ack after all retries
-            LifxUnsupportedCommandError: If device doesn't support command
         """
         if not self._is_open or self._transport is None:
-            raise LifxConnectionError("Connection not open")
+            raise LifxConnectionError("Connection not open")  # pragma: no cover
 
         if timeout is None:
-            timeout = self.timeout
+            timeout = self.timeout  # pragma: no cover
 
         if max_retries is None:
             max_retries = self.max_retries
@@ -729,14 +720,13 @@ class DeviceConnection:
                         f"{Serial.from_protocol(header.target).to_string()})"
                     )
 
-                # Check for StateUnhandled
+                # Check for StateUnhandled - return False to indicate unsupported
                 if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
-                    raise LifxUnsupportedCommandError(
-                        "Request unsupported by device: received StateUnhandled"
-                    )
+                    yield False
+                    return
 
                 # ACK received successfully
-                yield
+                yield True
                 return
 
             except TimeoutError as e:
@@ -791,14 +781,14 @@ class DeviceConnection:
             timeout: Request timeout in seconds
 
         Yields:
-            Unpacked response packet instances
-            For SET packets: yields True once (acknowledgement)
+            Unpacked response packet instances (including StateUnhandled if device
+            doesn't support the command)
+            For SET packets: yields True (acknowledgement) or False (StateUnhandled)
 
         Raises:
             LifxTimeoutError: If request times out
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
-            LifxUnsupportedCommandError: If command not supported
 
         Example:
             ```python
@@ -808,11 +798,16 @@ class DeviceConnection:
                 label = state.label  # Already decoded to string
                 break
 
-            # SET request yields True (acknowledgement)
-            async for _ in conn.request_stream(
+            # SET request yields True (acknowledgement) or False (StateUnhandled)
+            async for result in conn.request_stream(
                 packets.Light.SetColor(color=hsbk, duration=1000)
             ):
-                # Acknowledgement received
+                if result:
+                    # Acknowledgement received
+                    pass
+                else:
+                    # Device doesn't support this command
+                    pass
                 break
 
             # Multi-response GET - stream all responses
@@ -875,9 +870,12 @@ class DeviceConnection:
 
         elif packet_kind == "SET":
             # Request acknowledgement
-            async for _ in self._request_ack_stream_impl(packet, timeout=timeout):
+            async for ack_result in self._request_ack_stream_impl(
+                packet, timeout=timeout
+            ):
                 # Log the request/ack cycle
                 request_values = packet.as_dict
+                reply_packet = "Acknowledgement" if ack_result else "StateUnhandled"
                 _LOGGER.debug(
                     {
                         "class": "DeviceConnection",
@@ -887,7 +885,7 @@ class DeviceConnection:
                             "values": request_values,
                         },
                         "reply": {
-                            "packet": "Acknowledgement",
+                            "packet": reply_packet,
                             "values": {},
                         },
                         "serial": self.serial,
@@ -895,7 +893,7 @@ class DeviceConnection:
                     }
                 )
 
-                yield True
+                yield ack_result
                 return
 
         else:
@@ -934,7 +932,7 @@ class DeviceConnection:
                         yield response_packet
                         return
                 else:
-                    raise LifxUnsupportedCommandError(
+                    raise LifxProtocolError(
                         f"Cannot auto-handle packet kind: {packet_kind}"
                     )
             else:
@@ -961,14 +959,14 @@ class DeviceConnection:
             timeout: Request timeout in seconds
 
         Returns:
-            Single unpacked response packet
-            True for SET acknowledgement
+            Single unpacked response packet (including StateUnhandled if device
+            doesn't support the command)
+            For SET packets: True (acknowledgement) or False (StateUnhandled)
 
         Raises:
             LifxTimeoutError: If no response within timeout
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
-            LifxUnsupportedCommandError: If command not supported
 
         Example:
             ```python
@@ -977,10 +975,13 @@ class DeviceConnection:
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
 
-            # SET request returns True
+            # SET request returns True or False
             success = await conn.request(
                 packets.Light.SetColor(color=hsbk, duration=1000)
             )
+            if not success:
+                # Device doesn't support this command (returned StateUnhandled)
+                pass
             ```
         """
         async for response in self.request_stream(packet, timeout):
