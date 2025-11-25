@@ -1407,17 +1407,17 @@ async for state in conn.request_stream(GetColorZones()): process(state)
 | `packet`  | Packet instance to send **TYPE:** `Any`                                             |
 | `timeout` | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
-| YIELDS                      | DESCRIPTION                                         |
-| --------------------------- | --------------------------------------------------- |
-| `AsyncGenerator[Any, None]` | Unpacked response packet instances                  |
-| `AsyncGenerator[Any, None]` | For SET packets: yields True once (acknowledgement) |
+| YIELDS                      | DESCRIPTION                                                              |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `AsyncGenerator[Any, None]` | Unpacked response packet instances (including StateUnhandled if device   |
+| `AsyncGenerator[Any, None]` | doesn't support the command)                                             |
+| `AsyncGenerator[Any, None]` | For SET packets: yields True (acknowledgement) or False (StateUnhandled) |
 
-| RAISES                        | DESCRIPTION              |
-| ----------------------------- | ------------------------ |
-| `LifxTimeoutError`            | If request times out     |
-| `LifxProtocolError`           | If response invalid      |
-| `LifxConnectionError`         | If connection fails      |
-| `LifxUnsupportedCommandError` | If command not supported |
+| RAISES                | DESCRIPTION          |
+| --------------------- | -------------------- |
+| `LifxTimeoutError`    | If request times out |
+| `LifxProtocolError`   | If response invalid  |
+| `LifxConnectionError` | If connection fails  |
 
 Example
 
@@ -1428,11 +1428,16 @@ async for state in conn.request_stream(packets.Light.GetColor()):
     label = state.label  # Already decoded to string
     break
 
-# SET request yields True (acknowledgement)
-async for _ in conn.request_stream(
+# SET request yields True (acknowledgement) or False (StateUnhandled)
+async for result in conn.request_stream(
     packets.Light.SetColor(color=hsbk, duration=1000)
 ):
-    # Acknowledgement received
+    if result:
+        # Acknowledgement received
+        pass
+    else:
+        # Device doesn't support this command
+        pass
     break
 
 # Multi-response GET - stream all responses
@@ -1472,14 +1477,14 @@ async def request_stream(
         timeout: Request timeout in seconds
 
     Yields:
-        Unpacked response packet instances
-        For SET packets: yields True once (acknowledgement)
+        Unpacked response packet instances (including StateUnhandled if device
+        doesn't support the command)
+        For SET packets: yields True (acknowledgement) or False (StateUnhandled)
 
     Raises:
         LifxTimeoutError: If request times out
         LifxProtocolError: If response invalid
         LifxConnectionError: If connection fails
-        LifxUnsupportedCommandError: If command not supported
 
     Example:
         ```python
@@ -1489,11 +1494,16 @@ async def request_stream(
             label = state.label  # Already decoded to string
             break
 
-        # SET request yields True (acknowledgement)
-        async for _ in conn.request_stream(
+        # SET request yields True (acknowledgement) or False (StateUnhandled)
+        async for result in conn.request_stream(
             packets.Light.SetColor(color=hsbk, duration=1000)
         ):
-            # Acknowledgement received
+            if result:
+                # Acknowledgement received
+                pass
+            else:
+                # Device doesn't support this command
+                pass
             break
 
         # Multi-response GET - stream all responses
@@ -1556,9 +1566,12 @@ async def request_stream(
 
     elif packet_kind == "SET":
         # Request acknowledgement
-        async for _ in self._request_ack_stream_impl(packet, timeout=timeout):
+        async for ack_result in self._request_ack_stream_impl(
+            packet, timeout=timeout
+        ):
             # Log the request/ack cycle
             request_values = packet.as_dict
+            reply_packet = "Acknowledgement" if ack_result else "StateUnhandled"
             _LOGGER.debug(
                 {
                     "class": "DeviceConnection",
@@ -1568,7 +1581,7 @@ async def request_stream(
                         "values": request_values,
                     },
                     "reply": {
-                        "packet": "Acknowledgement",
+                        "packet": reply_packet,
                         "values": {},
                     },
                     "serial": self.serial,
@@ -1576,7 +1589,7 @@ async def request_stream(
                 }
             )
 
-            yield True
+            yield ack_result
             return
 
     else:
@@ -1615,7 +1628,7 @@ async def request_stream(
                     yield response_packet
                     return
             else:
-                raise LifxUnsupportedCommandError(
+                raise LifxProtocolError(
                     f"Cannot auto-handle packet kind: {packet_kind}"
                 )
         else:
@@ -1641,17 +1654,17 @@ Most device operations use this method since they expect a single response. Conn
 | `packet`  | Packet instance to send **TYPE:** `Any`                                             |
 | `timeout` | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
 
-| RETURNS | DESCRIPTION                     |
-| ------- | ------------------------------- |
-| `Any`   | Single unpacked response packet |
-| `Any`   | True for SET acknowledgement    |
+| RETURNS | DESCRIPTION                                                         |
+| ------- | ------------------------------------------------------------------- |
+| `Any`   | Single unpacked response packet (including StateUnhandled if device |
+| `Any`   | doesn't support the command)                                        |
+| `Any`   | For SET packets: True (acknowledgement) or False (StateUnhandled)   |
 
-| RAISES                        | DESCRIPTION                   |
-| ----------------------------- | ----------------------------- |
-| `LifxTimeoutError`            | If no response within timeout |
-| `LifxProtocolError`           | If response invalid           |
-| `LifxConnectionError`         | If connection fails           |
-| `LifxUnsupportedCommandError` | If command not supported      |
+| RAISES                | DESCRIPTION                   |
+| --------------------- | ----------------------------- |
+| `LifxTimeoutError`    | If no response within timeout |
+| `LifxProtocolError`   | If response invalid           |
+| `LifxConnectionError` | If connection fails           |
 
 Example
 
@@ -1661,10 +1674,13 @@ state = await conn.request(packets.Light.GetColor())
 color = HSBK.from_protocol(state.color)
 label = state.label  # Already decoded to string
 
-# SET request returns True
+# SET request returns True or False
 success = await conn.request(
     packets.Light.SetColor(color=hsbk, duration=1000)
 )
+if not success:
+    # Device doesn't support this command (returned StateUnhandled)
+    pass
 ```
 
 Source code in `src/lifx/network/connection.py`
@@ -1689,14 +1705,14 @@ async def request(
         timeout: Request timeout in seconds
 
     Returns:
-        Single unpacked response packet
-        True for SET acknowledgement
+        Single unpacked response packet (including StateUnhandled if device
+        doesn't support the command)
+        For SET packets: True (acknowledgement) or False (StateUnhandled)
 
     Raises:
         LifxTimeoutError: If no response within timeout
         LifxProtocolError: If response invalid
         LifxConnectionError: If connection fails
-        LifxUnsupportedCommandError: If command not supported
 
     Example:
         ```python
@@ -1705,10 +1721,13 @@ async def request(
         color = HSBK.from_protocol(state.color)
         label = state.label  # Already decoded to string
 
-        # SET request returns True
+        # SET request returns True or False
         success = await conn.request(
             packets.Light.SetColor(color=hsbk, duration=1000)
         )
+        if not success:
+            # Device doesn't support this command (returned StateUnhandled)
+            pass
         ```
     """
     async for response in self.request_stream(packet, timeout):
