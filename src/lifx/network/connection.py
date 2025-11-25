@@ -22,6 +22,7 @@ from lifx.exceptions import (
     LifxConnectionError,
     LifxProtocolError,
     LifxTimeoutError,
+    LifxUnsupportedCommandError,
 )
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
@@ -722,8 +723,9 @@ class DeviceConnection:
 
                 # Check for StateUnhandled - return False to indicate unsupported
                 if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
-                    yield False
-                    return
+                    raise LifxUnsupportedCommandError(
+                        "Device does not support this command"
+                    )
 
                 # ACK received successfully
                 yield True

@@ -572,11 +572,12 @@ class TestStateUnhandledResponses:
             assert response.unhandled_type == packets.Light.GetColor.PKT_TYPE
 
     @pytest.mark.emulator
-    async def test_set_color_returns_false_for_switch(self, switch_device) -> None:
-        """Test SetColor to a Switch device returns False.
+    async def test_set_color_raises_for_switch(self, switch_device) -> None:
+        """Test SetColor to a Switch device raises LifxUnsupportedCommandError.
 
         Switch devices don't support Light commands, so SetColor should
-        return False (indicating StateUnhandled) instead of True (ACK).
+        raise LifxUnsupportedCommandError. We don't return False, because
+        that means the Acknowledgement timed out.
         """
         from lifx.color import HSBK
         from lifx.protocol import packets
@@ -589,8 +590,6 @@ class TestStateUnhandledResponses:
                 duration=0,
             )
 
-            # Send SetColor to a Switch - should return False (StateUnhandled)
-            result = await switch_device.request(set_packet)
-
-            # Should return False, not True or raise an exception
-            assert result is False
+            with pytest.raises(LifxUnsupportedCommandError):
+                # Send SetColor to a Switch, should raise LifxUnsupportedCommandError
+                await switch_device.request(set_packet)

@@ -166,8 +166,6 @@ class Device:
             raise LifxUnsupportedCommandError(
                 f"Device does not support packet type {response.unhandled_type}"
             )
-        if response is False:
-            raise LifxUnsupportedCommandError("Device does not support this command")
 
     def __init__(
         self,
