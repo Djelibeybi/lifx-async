@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.3.8 (2025-11-25)
+
+### Bug Fixes
+
+- **network**: Raise exception on StateUnhandled instead of returning False ([`5ca3e8a`](https://github.com/Djelibeybi/lifx-async/commit/5ca3e8abcde0ec0eefe77645aeb0a2e63b18418c))
+
 ## v4.3.7 (2025-11-25)
 
 ### Bug Fixes
