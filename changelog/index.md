@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.3.6 (2025-11-25)
+
+### Bug Fixes
+
+- **network**: Return StateUnhandled packets instead of raising exception ([`f27e848`](https://github.com/Djelibeybi/lifx-async/commit/f27e84849656a84e7e120d66d1dba7bbabe18ed5))
+
 ## v4.3.5 (2025-11-22)
 
 ### Bug Fixes
