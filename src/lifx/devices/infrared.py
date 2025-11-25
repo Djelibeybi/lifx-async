@@ -58,6 +58,7 @@ class InfraredLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -68,6 +69,7 @@ class InfraredLight(Light):
         """
         # Request infrared state
         state = await self.connection.request(packets.Light.GetInfrared())
+        self._raise_if_unhandled(state)
 
         # Convert from uint16 (0-65535) to float (0.0-1.0)
         brightness = state.brightness / 65535.0
@@ -96,6 +98,7 @@ class InfraredLight(Light):
             ValueError: If brightness is out of range
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -115,9 +118,10 @@ class InfraredLight(Light):
         brightness_u16 = max(0, min(65535, int(round(brightness * 65535))))
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetInfrared(brightness=brightness_u16),
         )
+        self._raise_if_unhandled(result)
 
         # Update cached state
         self._infrared = brightness

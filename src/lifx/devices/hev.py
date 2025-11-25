@@ -70,6 +70,7 @@ class HevLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -82,6 +83,7 @@ class HevLight(Light):
         """
         # Request HEV cycle state
         state = await self.connection.request(packets.Light.GetHevCycle())
+        self._raise_if_unhandled(state)
 
         # Create state object
         cycle_state = HevCycleState(
@@ -116,6 +118,7 @@ class HevLight(Light):
             ValueError: If duration is negative
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -130,12 +133,13 @@ class HevLight(Light):
             raise ValueError(f"Duration must be non-negative, got {duration_seconds}")
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetHevCycle(
                 enable=enable,
                 duration_s=duration_seconds,
             ),
         )
+        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -156,6 +160,7 @@ class HevLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -166,6 +171,7 @@ class HevLight(Light):
         """
         # Request HEV configuration
         state = await self.connection.request(packets.Light.GetHevCycleConfiguration())
+        self._raise_if_unhandled(state)
 
         # Create config object
         config = HevConfig(
@@ -201,6 +207,7 @@ class HevLight(Light):
             ValueError: If duration is negative
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -212,12 +219,13 @@ class HevLight(Light):
             raise ValueError(f"Duration must be non-negative, got {duration_seconds}")
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetHevCycleConfiguration(
                 indication=indication,
                 duration_s=duration_seconds,
             ),
         )
+        self._raise_if_unhandled(result)
 
         # Update cached state
         self._hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
@@ -242,6 +250,7 @@ class HevLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -254,6 +263,7 @@ class HevLight(Light):
         """
         # Request last HEV result
         state = await self.connection.request(packets.Light.GetLastHevCycleResult())
+        self._raise_if_unhandled(state)
 
         # Store cached state
         self._hev_result = state.result
