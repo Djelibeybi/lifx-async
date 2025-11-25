@@ -20,6 +20,7 @@ import pytest
 from lifx.api import DeviceGroup
 
 
+@pytest.mark.emulator
 class TestOrganizeMetadata:
     """Test organization by location and group metadata."""
 
@@ -65,6 +66,7 @@ class TestOrganizeMetadata:
         assert by_metadata1 is by_metadata2
 
 
+@pytest.mark.emulator
 class TestFilterMetadata:
     """Test filtering by location and group metadata."""
 
@@ -124,6 +126,7 @@ class TestFilterMetadata:
             await filter_func(error_name)
 
 
+@pytest.mark.emulator
 class TestGetUnassignedDevices:
     """Test get_unassigned_devices() method."""
 
@@ -171,6 +174,7 @@ class TestGetUnassignedDevices:
             fresh_group.get_unassigned_devices(metadata_type=metadata_type)
 
 
+@pytest.mark.emulator
 class TestMetadataStore:
     """Test metadata caching and invalidation."""
 
@@ -196,6 +200,7 @@ class TestMetadataStore:
         assert set(by_location1.keys()) == set(by_location2.keys())
 
 
+@pytest.mark.emulator
 class TestOrganizeEdgeCases:
     """Test edge cases in organization methods."""
 
