@@ -514,11 +514,12 @@ Always fetches from device. Use the `label` property to access stored value.
 | ------- | ------------------------------------------- |
 | `str`   | Device label as string (max 32 bytes UTF-8) |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -546,6 +547,7 @@ async def get_label(self) -> str:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -559,6 +561,7 @@ async def get_label(self) -> str:
     """
     # Request automatically unpacks and decodes label
     state = await self.connection.request(packets.Device.GetLabel())
+    self._raise_if_unhandled(state)
 
     # Store label
     self._label = state.label
@@ -585,11 +588,12 @@ Set device label/name.
 | --------- | ----------------------------------------------------- |
 | `label`   | New device label (max 32 bytes UTF-8) **TYPE:** `str` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `ValueError`              | If label is too long       |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If label is too long                   |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -611,6 +615,7 @@ async def set_label(self, label: str) -> None:
         ValueError: If label is too long
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -627,9 +632,10 @@ async def set_label(self, label: str) -> None:
     label_bytes = label_bytes.ljust(32, b"\x00")
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Device.SetLabel(label=label_bytes),
     )
+    self._raise_if_unhandled(result)
 
     # Update cached state
     self._label = label
@@ -657,11 +663,12 @@ Always fetches from device.
 | ------- | ------------------------------------------------ |
 | `int`   | Power level as integer (0 for off, 65535 for on) |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -685,6 +692,7 @@ async def get_power(self) -> int:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -694,6 +702,7 @@ async def get_power(self) -> int:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetPower())
+    self._raise_if_unhandled(state)
 
     # Power level is uint16 (0 or 65535)
     _LOGGER.debug(
@@ -719,11 +728,12 @@ Set device power state.
 | --------- | ----------------------------------------------------------- |
 | `level`   | True/65535 to turn on, False/0 to turn off **TYPE:** \`bool |
 
-| RAISES                    | DESCRIPTION                        |
-| ------------------------- | ---------------------------------- |
-| `ValueError`              | If integer value is not 0 or 65535 |
-| `LifxDeviceNotFoundError` | If device is not connected         |
-| `LifxTimeoutError`        | If device does not respond         |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If integer value is not 0 or 65535     |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -752,6 +762,7 @@ async def set_power(self, level: bool | int) -> None:
         ValueError: If integer value is not 0 or 65535
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -777,9 +788,10 @@ async def set_power(self, level: bool | int) -> None:
         raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Device.SetPower(level=power_level),
     )
+    self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -805,11 +817,12 @@ Always fetches from device.
 | --------------- | -------------------------------------------- |
 | `DeviceVersion` | DeviceVersion with vendor and product fields |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -833,6 +846,7 @@ async def get_version(self) -> DeviceVersion:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -842,6 +856,7 @@ async def get_version(self) -> DeviceVersion:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetVersion())
+    self._raise_if_unhandled(state)
 
     version = DeviceVersion(
         vendor=state.vendor,
@@ -875,11 +890,12 @@ Always fetches from device.
 | ------------ | ------------------------------------------ |
 | `DeviceInfo` | DeviceInfo with time, uptime, and downtime |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -904,6 +920,7 @@ async def get_info(self) -> DeviceInfo:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -914,6 +931,7 @@ async def get_info(self) -> DeviceInfo:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetInfo())  # type: ignore
+    self._raise_if_unhandled(state)
 
     info = DeviceInfo(time=state.time, uptime=state.uptime, downtime=state.downtime)
 
@@ -946,11 +964,12 @@ Always fetches from device.
 | ---------- | -------------------------------------- |
 | `WifiInfo` | WifiInfo with signal strength and RSSI |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -975,6 +994,7 @@ async def get_wifi_info(self) -> WifiInfo:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -985,6 +1005,7 @@ async def get_wifi_info(self) -> WifiInfo:
     """
     # Request WiFi info from device
     state = await self.connection.request(packets.Device.GetWifiInfo())
+    self._raise_if_unhandled(state)
 
     # Extract WiFi info from response
     wifi_info = WifiInfo(signal=state.signal)
@@ -1014,11 +1035,12 @@ Always fetches from device.
 | -------------- | --------------------------------------------- |
 | `FirmwareInfo` | FirmwareInfo with build timestamp and version |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1042,6 +1064,7 @@ async def get_host_firmware(self) -> FirmwareInfo:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1051,6 +1074,7 @@ async def get_host_firmware(self) -> FirmwareInfo:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetHostFirmware())  # type: ignore
+    self._raise_if_unhandled(state)
 
     firmware = FirmwareInfo(
         build=state.build,
@@ -1093,11 +1117,12 @@ Always fetches from device.
 | -------------- | --------------------------------------------- |
 | `FirmwareInfo` | FirmwareInfo with build timestamp and version |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1121,6 +1146,7 @@ async def get_wifi_firmware(self) -> FirmwareInfo:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1130,6 +1156,7 @@ async def get_wifi_firmware(self) -> FirmwareInfo:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetWifiFirmware())  # type: ignore
+    self._raise_if_unhandled(state)
 
     firmware = FirmwareInfo(
         build=state.build,
@@ -1168,11 +1195,12 @@ Always fetches from device.
 | -------------- | ------------------------------------------------------------- |
 | `LocationInfo` | LocationInfo with location UUID, label, and updated timestamp |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1197,6 +1225,7 @@ async def get_location(self) -> LocationInfo:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1207,6 +1236,7 @@ async def get_location(self) -> LocationInfo:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetLocation())  # type: ignore
+    self._raise_if_unhandled(state)
 
     location = LocationInfo(
         location=state.location,
@@ -1248,11 +1278,12 @@ Automatically discovers devices on the network to check if any device already ha
 | `label`            | Location label (max 32 characters) **TYPE:** `str`                                         |
 | `discover_timeout` | Timeout for device discovery in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `ValueError`              | If label is invalid        |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `ValueError`                  | If label is invalid                    |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1286,6 +1317,7 @@ async def set_location(
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         ValueError: If label is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1380,11 +1412,12 @@ async def set_location(
     updated_at = int(time.time() * 1e9)
 
     # Update this device
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Device.SetLocation(
             location=location_uuid_to_use, label=label_bytes, updated_at=updated_at
         ),
     )
+    self._raise_if_unhandled(result)
 
     # Update cached state
     location_info = LocationInfo(
@@ -1419,11 +1452,12 @@ Always fetches from device.
 | ----------- | ------------------------------------------------------- |
 | `GroupInfo` | GroupInfo with group UUID, label, and updated timestamp |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1448,6 +1482,7 @@ async def get_group(self) -> GroupInfo:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1458,6 +1493,7 @@ async def get_group(self) -> GroupInfo:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetGroup())  # type: ignore
+    self._raise_if_unhandled(state)
 
     group = GroupInfo(
         group=state.group,
@@ -1497,11 +1533,12 @@ Automatically discovers devices on the network to check if any device already ha
 | `label`            | Group label (max 32 characters) **TYPE:** `str`                                            |
 | `discover_timeout` | Timeout for device discovery in seconds **TYPE:** `float` **DEFAULT:** `DISCOVERY_TIMEOUT` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `ValueError`              | If label is invalid        |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `ValueError`                  | If label is invalid                    |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1535,6 +1572,7 @@ async def set_group(
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         ValueError: If label is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1629,11 +1667,12 @@ async def set_group(
     updated_at = int(time.time() * 1e9)
 
     # Update this device
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Device.SetGroup(
             group=group_uuid_to_use, label=label_bytes, updated_at=updated_at
         ),
     )
+    self._raise_if_unhandled(result)
 
     # Update cached state
     group_info = GroupInfo(
@@ -1664,10 +1703,11 @@ Reboot the device.
 
 This sends a reboot command to the device. The device will disconnect and restart. You should disconnect from the device after calling this method.
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1693,6 +1733,7 @@ async def set_reboot(self) -> None:
     Raises:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1706,9 +1747,10 @@ async def set_reboot(self) -> None:
         comes back online and is discoverable again.
     """
     # Send reboot request
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Device.SetReboot(),
     )
+    self._raise_if_unhandled(result)
     _LOGGER.debug(
         {
             "class": "Device",
@@ -1841,11 +1883,12 @@ Returns a tuple containing:
 | ----------------------- | ------------------------------ |
 | `tuple[HSBK, int, str]` | Tuple of (color, power, label) |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1874,6 +1917,7 @@ async def get_color(self) -> tuple[HSBK, int, str]:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1883,6 +1927,7 @@ async def get_color(self) -> tuple[HSBK, int, str]:
     """
     # Request automatically unpacks response and decodes labels
     state = await self.connection.request(packets.Light.GetColor())
+    self._raise_if_unhandled(state)
 
     # Convert from protocol HSBK to user-friendly HSBK
     color = HSBK.from_protocol(state.color)
@@ -1924,10 +1969,11 @@ Set light color.
 | `color`    | HSBK color to set **TYPE:** `HSBK`                                                |
 | `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -1956,6 +2002,7 @@ async def set_color(
     Raises:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -1973,12 +2020,13 @@ async def set_color(
     duration_ms = int(duration * 1000)
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetColor(
             color=protocol_color,
             duration=duration_ms,
         ),
     )
+    self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -2315,11 +2363,12 @@ This overrides Device.get_power() as it queries the light-specific power state (
 | ------- | ------------------------------------------------ |
 | `int`   | Power level as integer (0 for off, 65535 for on) |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -2346,6 +2395,7 @@ async def get_power(self) -> int:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -2355,6 +2405,7 @@ async def get_power(self) -> int:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Light.GetPower())
+    self._raise_if_unhandled(state)
 
     # Power level is uint16 (0 or 65535)
     _LOGGER.debug(
@@ -2385,11 +2436,12 @@ This method queries the device's ambient light sensor to get the current lux rea
 | ------- | -------------------------------------------------------- |
 | `float` | Ambient light level in lux (0.0 if device has no sensor) |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -2419,6 +2471,7 @@ async def get_ambient_light_level(self) -> float:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -2431,6 +2484,7 @@ async def get_ambient_light_level(self) -> float:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Sensor.GetAmbientLight())
+    self._raise_if_unhandled(state)
 
     _LOGGER.debug(
         {
@@ -2459,11 +2513,12 @@ This overrides Device.set_power() as it uses the light-specific power packet (ty
 | `level`    | True/65535 to turn on, False/0 to turn off **TYPE:** \`bool                       |
 | `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
 
-| RAISES                    | DESCRIPTION                        |
-| ------------------------- | ---------------------------------- |
-| `ValueError`              | If integer value is not 0 or 65535 |
-| `LifxDeviceNotFoundError` | If device is not connected         |
-| `LifxTimeoutError`        | If device does not respond         |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If integer value is not 0 or 65535     |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -2496,6 +2551,7 @@ async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
         ValueError: If integer value is not 0 or 65535
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -2524,9 +2580,10 @@ async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
     duration_ms = int(duration * 1000)
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetPower(level=power_level, duration=duration_ms),
     )
+    self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -2564,11 +2621,12 @@ Waveforms create repeating color transitions. Useful for effects like pulsing, b
 | `transient`  | If True, return to original color after effect (default True) **TYPE:** `bool` **DEFAULT:** `True` |
 | `skew_ratio` | Waveform skew (0.0-1.0, default 0.5 for symmetric) **TYPE:** `float` **DEFAULT:** `0.5`            |
 
-| RAISES                    | DESCRIPTION                    |
-| ------------------------- | ------------------------------ |
-| `ValueError`              | If parameters are out of range |
-| `LifxDeviceNotFoundError` | If device is not connected     |
-| `LifxTimeoutError`        | If device does not respond     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If parameters are out of range         |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -2622,6 +2680,7 @@ async def set_waveform(
         ValueError: If parameters are out of range
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -2660,7 +2719,7 @@ async def set_waveform(
     skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
 
     # Send request
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetWaveform(
             transient=bool(transient),
             color=protocol_color,
@@ -2670,6 +2729,7 @@ async def set_waveform(
             waveform=waveform,
         ),
     )
+    self._raise_if_unhandled(result)
     _LOGGER.debug(
         {
             "class": "Device",
@@ -2724,11 +2784,12 @@ Similar to set_waveform() but allows fine-grained control over which color compo
 | `set_brightness` | Apply waveform to brightness component (default True) **TYPE:** `bool` **DEFAULT:** `True`         |
 | `set_kelvin`     | Apply waveform to kelvin component (default True) **TYPE:** `bool` **DEFAULT:** `True`             |
 
-| RAISES                    | DESCRIPTION                    |
-| ------------------------- | ------------------------------ |
-| `ValueError`              | If parameters are out of range |
-| `LifxDeviceNotFoundError` | If device is not connected     |
-| `LifxTimeoutError`        | If device does not respond     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If parameters are out of range         |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -2799,6 +2860,7 @@ async def set_waveform_optional(
         ValueError: If parameters are out of range
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -2844,7 +2906,7 @@ async def set_waveform_optional(
     skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
 
     # Send request
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetWaveformOptional(
             transient=bool(transient),
             color=protocol_color,
@@ -2858,6 +2920,7 @@ async def set_waveform_optional(
             set_kelvin=set_kelvin,
         ),
     )
+    self._raise_if_unhandled(result)
     _LOGGER.debug(
         {
             "class": "Device",
@@ -3195,11 +3258,12 @@ Always fetches from device. Use the `hev_cycle` property to access stored value.
 | --------------- | ----------------------------------------------------------------- |
 | `HevCycleState` | HevCycleState with duration, remaining time, and last power state |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3226,6 +3290,7 @@ async def get_hev_cycle(self) -> HevCycleState:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3238,6 +3303,7 @@ async def get_hev_cycle(self) -> HevCycleState:
     """
     # Request HEV cycle state
     state = await self.connection.request(packets.Light.GetHevCycle())
+    self._raise_if_unhandled(state)
 
     # Create state object
     cycle_state = HevCycleState(
@@ -3275,11 +3341,12 @@ Start or stop a HEV cleaning cycle.
 | `enable`           | True to start cycle, False to stop **TYPE:** `bool`       |
 | `duration_seconds` | Duration of the cleaning cycle in seconds **TYPE:** `int` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `ValueError`              | If duration is negative    |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If duration is negative                |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3305,6 +3372,7 @@ async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
         ValueError: If duration is negative
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3319,12 +3387,13 @@ async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
         raise ValueError(f"Duration must be non-negative, got {duration_seconds}")
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetHevCycle(
             enable=enable,
             duration_s=duration_seconds,
         ),
     )
+    self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -3348,11 +3417,12 @@ Get HEV cycle configuration.
 | ----------- | ------------------------------------------------------- |
 | `HevConfig` | HevConfig with indication and default duration settings |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3375,6 +3445,7 @@ async def get_hev_config(self) -> HevConfig:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3385,6 +3456,7 @@ async def get_hev_config(self) -> HevConfig:
     """
     # Request HEV configuration
     state = await self.connection.request(packets.Light.GetHevCycleConfiguration())
+    self._raise_if_unhandled(state)
 
     # Create config object
     config = HevConfig(
@@ -3423,11 +3495,12 @@ Configure HEV cycle defaults.
 | `indication`       | Whether to show visual indication during cleaning **TYPE:** `bool` |
 | `duration_seconds` | Default duration for cleaning cycles in seconds **TYPE:** `int`    |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `ValueError`              | If duration is negative    |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If duration is negative                |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3450,6 +3523,7 @@ async def set_hev_config(self, indication: bool, duration_seconds: int) -> None:
         ValueError: If duration is negative
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3461,12 +3535,13 @@ async def set_hev_config(self, indication: bool, duration_seconds: int) -> None:
         raise ValueError(f"Duration must be non-negative, got {duration_seconds}")
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetHevCycleConfiguration(
             indication=indication,
             duration_s=duration_seconds,
         ),
     )
+    self._raise_if_unhandled(result)
 
     # Update cached state
     self._hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
@@ -3492,11 +3567,12 @@ Get result of the last HEV cleaning cycle.
 | ------------------------- | ---------------------------------------------------------------------------- |
 | `LightLastHevCycleResult` | LightLastHevCycleResult enum value indicating success or interruption reason |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3523,6 +3599,7 @@ async def get_last_hev_result(
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3535,6 +3612,7 @@ async def get_last_hev_result(
     """
     # Request last HEV result
     state = await self.connection.request(packets.Light.GetLastHevCycleResult())
+    self._raise_if_unhandled(state)
 
     # Store cached state
     self._hev_result = state.result
@@ -3636,11 +3714,12 @@ Get current infrared brightness.
 | ------- | ----------------------------- |
 | `float` | Infrared brightness (0.0-1.0) |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3663,6 +3742,7 @@ async def get_infrared(self) -> float:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3673,6 +3753,7 @@ async def get_infrared(self) -> float:
     """
     # Request infrared state
     state = await self.connection.request(packets.Light.GetInfrared())
+    self._raise_if_unhandled(state)
 
     # Convert from uint16 (0-65535) to float (0.0-1.0)
     brightness = state.brightness / 65535.0
@@ -3704,11 +3785,12 @@ Set infrared brightness.
 | ------------ | ----------------------------------------------- |
 | `brightness` | Infrared brightness (0.0-1.0) **TYPE:** `float` |
 
-| RAISES                    | DESCRIPTION                   |
-| ------------------------- | ----------------------------- |
-| `ValueError`              | If brightness is out of range |
-| `LifxDeviceNotFoundError` | If device is not connected    |
-| `LifxTimeoutError`        | If device does not respond    |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If brightness is out of range          |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3733,6 +3815,7 @@ async def set_infrared(self, brightness: float) -> None:
         ValueError: If brightness is out of range
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3752,9 +3835,10 @@ async def set_infrared(self, brightness: float) -> None:
     brightness_u16 = max(0, min(65535, int(round(brightness * 65535))))
 
     # Request automatically handles acknowledgement
-    await self.connection.request(
+    result = await self.connection.request(
         packets.Light.SetInfrared(brightness=brightness_u16),
     )
+    self._raise_if_unhandled(result)
 
     # Update cached state
     self._infrared = brightness
@@ -3890,11 +3974,12 @@ Always fetches from device. Use the `zone_count` property to access stored value
 | ------- | --------------- |
 | `int`   | Number of zones |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -3919,6 +4004,7 @@ async def get_zone_count(self) -> int:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -3935,6 +4021,7 @@ async def get_zone_count(self) -> int:
         state = await self.connection.request(
             packets.MultiZone.GetColorZones(start_index=0, end_index=0)
         )
+    self._raise_if_unhandled(state)
 
     count = state.count
 
@@ -3973,12 +4060,13 @@ Always fetches from device. Use `zones` property to access stored values.
 | ------------ | --------------------------------- |
 | `list[HSBK]` | List of HSBK colors, one per zone |
 
-| RAISES                    | DESCRIPTION                 |
-| ------------------------- | --------------------------- |
-| `ValueError`              | If zone indices are invalid |
-| `LifxDeviceNotFoundError` | If device is not connected  |
-| `LifxTimeoutError`        | If device does not respond  |
-| `LifxProtocolError`       | If response is invalid      |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If zone indices are invalid            |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -4017,6 +4105,7 @@ async def get_color_zones(
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -4051,6 +4140,7 @@ async def get_color_zones(
                 start_index=current_start, end_index=current_end
             )
         ):
+            self._raise_if_unhandled(state)
             # Extract colors from response (up to 8 colors)
             zones_in_response = min(8, current_end - current_start + 1)
             for i in range(zones_in_response):
@@ -4108,12 +4198,13 @@ Always fetches from device. Use `zones` property to access stored values.
 | ------------ | --------------------------------- |
 | `list[HSBK]` | List of HSBK colors, one per zone |
 
-| RAISES                    | DESCRIPTION                 |
-| ------------------------- | --------------------------- |
-| `ValueError`              | If zone indices are invalid |
-| `LifxDeviceNotFoundError` | If device is not connected  |
-| `LifxTimeoutError`        | If device does not respond  |
-| `LifxProtocolError`       | If response is invalid      |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If zone indices are invalid            |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -4150,6 +4241,7 @@ async def get_extended_color_zones(
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -4175,6 +4267,7 @@ async def get_extended_color_zones(
         packets.MultiZone.GetExtendedColorZones(),
         timeout=2.0,  # Allow time for multiple responses
     ):
+        self._raise_if_unhandled(packet)
         # Only process valid colors based on colors_count
         for i in range(packet.colors_count):
             if i >= len(packet.colors):
@@ -4296,11 +4389,12 @@ Set color for a range of zones.
 | `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                                                                                                            |
 | `apply`    | Application mode (default APPLY) - NO_APPLY: Don't apply immediately (use for batching) - APPLY: Apply this change and any pending changes - APPLY_ONLY: Apply only this change **TYPE:** `MultiZoneApplicationRequest` **DEFAULT:** `APPLY` |
 
-| RAISES                    | DESCRIPTION                 |
-| ------------------------- | --------------------------- |
-| `ValueError`              | If zone indices are invalid |
-| `LifxDeviceNotFoundError` | If device is not connected  |
-| `LifxTimeoutError`        | If device does not respond  |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `ValueError`                  | If zone indices are invalid            |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -4347,6 +4441,7 @@ async def set_color_zones(
         ValueError: If zone indices are invalid
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -4375,7 +4470,7 @@ async def set_color_zones(
     duration_ms = int(duration * 1000)
 
     # Send request
-    await self.connection.request(
+    result = await self.connection.request(
         packets.MultiZone.SetColorZones(
             start_index=start,
             end_index=end,
@@ -4384,6 +4479,7 @@ async def set_color_zones(
             apply=apply,
         ),
     )
+    self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -4428,11 +4524,12 @@ This is more efficient than set_color_zones when setting different colors for ma
 | `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`             |
 | `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneApplicationRequest` **DEFAULT:** `APPLY` |
 
-| RAISES                    | DESCRIPTION                                         |
-| ------------------------- | --------------------------------------------------- |
-| `ValueError`              | If colors list is too long or zone index is invalid |
-| `LifxDeviceNotFoundError` | If device is not connected                          |
-| `LifxTimeoutError`        | If device does not respond                          |
+| RAISES                        | DESCRIPTION                                         |
+| ----------------------------- | --------------------------------------------------- |
+| `ValueError`                  | If colors list is too long or zone index is invalid |
+| `LifxDeviceNotFoundError`     | If device is not connected                          |
+| `LifxTimeoutError`            | If device does not respond                          |
+| `LifxUnsupportedCommandError` | If device doesn't support this command              |
 
 Example
 
@@ -4470,6 +4567,7 @@ async def set_extended_color_zones(
         ValueError: If colors list is too long or zone index is invalid
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -4497,7 +4595,7 @@ async def set_extended_color_zones(
     duration_ms = int(duration * 1000)
 
     # Send request
-    await self.connection.request(
+    result = await self.connection.request(
         packets.MultiZone.SetExtendedColorZones(
             duration=duration_ms,
             apply=apply,
@@ -4506,6 +4604,7 @@ async def set_extended_color_zones(
             colors=protocol_colors,
         ),
     )
+    self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -4545,11 +4644,12 @@ Always fetches from device. Use the `multizone_effect` property to access stored
 | ----------------- | ----------- |
 | \`MultiZoneEffect | None\`      |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
-| `LifxProtocolError`       | If response is invalid     |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxProtocolError`           | If response is invalid                 |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -4579,6 +4679,7 @@ async def get_effect(self) -> MultiZoneEffect | None:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
         LifxProtocolError: If response is invalid
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -4593,6 +4694,7 @@ async def get_effect(self) -> MultiZoneEffect | None:
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.MultiZone.GetEffect())
+    self._raise_if_unhandled(state)
 
     settings = state.settings
     effect_type = settings.effect_type
@@ -4650,10 +4752,11 @@ Set multizone effect.
 | --------- | ---------------------------------------------------------- |
 | `effect`  | MultiZone effect configuration **TYPE:** `MultiZoneEffect` |
 
-| RAISES                    | DESCRIPTION                |
-| ------------------------- | -------------------------- |
-| `LifxDeviceNotFoundError` | If device is not connected |
-| `LifxTimeoutError`        | If device does not respond |
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
 
 Example
 
@@ -4693,6 +4796,7 @@ async def set_effect(
     Raises:
         LifxDeviceNotFoundError: If device is not connected
         LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         ```python
@@ -4722,7 +4826,7 @@ async def set_effect(
     parameters = parameters[:8]
 
     # Send request
-    await self.connection.request(
+    result = await self.connection.request(
         packets.MultiZone.SetEffect(
             settings=MultiZoneEffectSettings(
                 instanceid=0,  # 0 for new effect
@@ -4742,10 +4846,11 @@ async def set_effect(
             ),
         ),
     )
+    self._raise_if_unhandled(result)
 
     # Update cached state
-    result = effect if effect.effect_type != FirmwareEffect.OFF else None
-    self._multizone_effect = result
+    cached_effect = effect if effect.effect_type != FirmwareEffect.OFF else None
+    self._multizone_effect = cached_effect
 
     _LOGGER.debug(
         {
@@ -5006,6 +5111,12 @@ This method fetches the device chain information and caches it.
 | ---------------- | ---------------------------------------------------------- |
 | `list[TileInfo]` | List of TileInfo objects describing each tile in the chain |
 
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
+
 Example
 
 > > > chain = await matrix.get_device_chain() for tile in chain: ... print(f"Tile {tile.tile_index}: {tile.width}x{tile.height}")
@@ -5021,6 +5132,11 @@ async def get_device_chain(self) -> list[TileInfo]:
     Returns:
         List of TileInfo objects describing each tile in the chain
 
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
+
     Example:
         >>> chain = await matrix.get_device_chain()
         >>> for tile in chain:
@@ -5031,6 +5147,7 @@ async def get_device_chain(self) -> list[TileInfo]:
     response: packets.Tile.StateDeviceChain = await self.connection.request(
         packets.Tile.GetDeviceChain()
     )
+    self._raise_if_unhandled(response)
 
     # Parse tiles from response
     tiles = []
@@ -5137,6 +5254,12 @@ For devices with ≤64 zones, returns all zones. For devices with >64 zones, ret
 | `list[HSBK]` | returns the actual zone count (e.g., 64 for 8x8, 16 for 4x4). For tiles   |
 | `list[HSBK]` | with >64 zones (e.g., 128 for 16x8 Ceiling), returns 64 (protocol limit). |
 
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
+
 Example
 
 > > > ###### Get all colors from first tile (no parameters needed)
@@ -5174,6 +5297,11 @@ async def get64(
         List of HSBK colors for the requested zones. For tiles with ≤64 zones,
         returns the actual zone count (e.g., 64 for 8x8, 16 for 4x4). For tiles
         with >64 zones (e.g., 128 for 16x8 Ceiling), returns 64 (protocol limit).
+
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
 
     Example:
         >>> # Get all colors from first tile (no parameters needed)
@@ -5214,6 +5342,7 @@ async def get64(
             rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
         )
     )
+    self._raise_if_unhandled(response)
 
     max_colors = device_chain[0].width * device_chain[0].height
 
@@ -5617,6 +5746,12 @@ Get current running matrix effect.
 | -------------- | ------------------------------------------------ |
 | `MatrixEffect` | MatrixEffect describing the current effect state |
 
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
+
 Example
 
 > > > effect = await matrix.get_effect() print(f"Effect type: {effect.effect_type}")
@@ -5630,6 +5765,11 @@ async def get_effect(self) -> MatrixEffect:
     Returns:
         MatrixEffect describing the current effect state
 
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
+
     Example:
         >>> effect = await matrix.get_effect()
         >>> print(f"Effect type: {effect.effect_type}")
@@ -5639,6 +5779,7 @@ async def get_effect(self) -> MatrixEffect:
     response: packets.Tile.StateEffect = await self.connection.request(
         packets.Tile.GetEffect()
     )
+    self._raise_if_unhandled(response)
 
     # Convert protocol effect to MatrixEffect
     palette = [
