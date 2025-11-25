@@ -311,6 +311,11 @@ class MatrixLight(Light):
         Returns:
             List of TileInfo objects describing each tile in the chain
 
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
         Example:
             >>> chain = await matrix.get_device_chain()
             >>> for tile in chain:
@@ -321,6 +326,7 @@ class MatrixLight(Light):
         response: packets.Tile.StateDeviceChain = await self.connection.request(
             packets.Tile.GetDeviceChain()
         )
+        self._raise_if_unhandled(response)
 
         # Parse tiles from response
         tiles = []
@@ -393,6 +399,11 @@ class MatrixLight(Light):
             returns the actual zone count (e.g., 64 for 8x8, 16 for 4x4). For tiles
             with >64 zones (e.g., 128 for 16x8 Ceiling), returns 64 (protocol limit).
 
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
         Example:
             >>> # Get all colors from first tile (no parameters needed)
             >>> colors = await matrix.get64()
@@ -432,6 +443,7 @@ class MatrixLight(Light):
                 rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
             )
         )
+        self._raise_if_unhandled(response)
 
         max_colors = device_chain[0].width * device_chain[0].height
 
@@ -714,6 +726,11 @@ class MatrixLight(Light):
         Returns:
             MatrixEffect describing the current effect state
 
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
         Example:
             >>> effect = await matrix.get_effect()
             >>> print(f"Effect type: {effect.effect_type}")
@@ -723,6 +740,7 @@ class MatrixLight(Light):
         response: packets.Tile.StateEffect = await self.connection.request(
             packets.Tile.GetEffect()
         )
+        self._raise_if_unhandled(response)
 
         # Convert protocol effect to MatrixEffect
         palette = [

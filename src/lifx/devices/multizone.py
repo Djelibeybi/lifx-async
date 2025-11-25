@@ -189,6 +189,7 @@ class MultiZoneLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -205,6 +206,7 @@ class MultiZoneLight(Light):
             state = await self.connection.request(
                 packets.MultiZone.GetColorZones(start_index=0, end_index=0)
             )
+        self._raise_if_unhandled(state)
 
         count = state.count
 
@@ -245,6 +247,7 @@ class MultiZoneLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -279,6 +282,7 @@ class MultiZoneLight(Light):
                     start_index=current_start, end_index=current_end
                 )
             ):
+                self._raise_if_unhandled(state)
                 # Extract colors from response (up to 8 colors)
                 zones_in_response = min(8, current_end - current_start + 1)
                 for i in range(zones_in_response):
@@ -336,6 +340,7 @@ class MultiZoneLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -361,6 +366,7 @@ class MultiZoneLight(Light):
             packets.MultiZone.GetExtendedColorZones(),
             timeout=2.0,  # Allow time for multiple responses
         ):
+            self._raise_if_unhandled(packet)
             # Only process valid colors based on colors_count
             for i in range(packet.colors_count):
                 if i >= len(packet.colors):
@@ -449,6 +455,7 @@ class MultiZoneLight(Light):
             ValueError: If zone indices are invalid
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -477,7 +484,7 @@ class MultiZoneLight(Light):
         duration_ms = int(duration * 1000)
 
         # Send request
-        await self.connection.request(
+        result = await self.connection.request(
             packets.MultiZone.SetColorZones(
                 start_index=start,
                 end_index=end,
@@ -486,6 +493,7 @@ class MultiZoneLight(Light):
                 apply=apply,
             ),
         )
+        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -529,6 +537,7 @@ class MultiZoneLight(Light):
             ValueError: If colors list is too long or zone index is invalid
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -556,7 +565,7 @@ class MultiZoneLight(Light):
         duration_ms = int(duration * 1000)
 
         # Send request
-        await self.connection.request(
+        result = await self.connection.request(
             packets.MultiZone.SetExtendedColorZones(
                 duration=duration_ms,
                 apply=apply,
@@ -565,6 +574,7 @@ class MultiZoneLight(Light):
                 colors=protocol_colors,
             ),
         )
+        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -602,6 +612,7 @@ class MultiZoneLight(Light):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -616,6 +627,7 @@ class MultiZoneLight(Light):
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.MultiZone.GetEffect())
+        self._raise_if_unhandled(state)
 
         settings = state.settings
         effect_type = settings.effect_type
@@ -672,6 +684,7 @@ class MultiZoneLight(Light):
         Raises:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -701,7 +714,7 @@ class MultiZoneLight(Light):
         parameters = parameters[:8]
 
         # Send request
-        await self.connection.request(
+        result = await self.connection.request(
             packets.MultiZone.SetEffect(
                 settings=MultiZoneEffectSettings(
                     instanceid=0,  # 0 for new effect
@@ -721,10 +734,11 @@ class MultiZoneLight(Light):
                 ),
             ),
         )
+        self._raise_if_unhandled(result)
 
         # Update cached state
-        result = effect if effect.effect_type != FirmwareEffect.OFF else None
-        self._multizone_effect = result
+        cached_effect = effect if effect.effect_type != FirmwareEffect.OFF else None
+        self._multizone_effect = cached_effect
 
         _LOGGER.debug(
             {
