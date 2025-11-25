@@ -480,3 +480,67 @@ class TestLight:
         repr_str = repr(light)
         assert "Light" in repr_str
         assert "192.168.1.100" in repr_str
+
+
+class TestLightStateUnhandled:
+    """Tests for Light methods raising LifxUnsupportedCommandError on StateUnhandled."""
+
+    @pytest.mark.emulator
+    async def test_get_color_raises_on_state_unhandled(self, switch_device) -> None:
+        """Test get_color() raises LifxUnsupportedCommandError for unsupported device.
+
+        Switch devices don't support Light commands, so get_color() should
+        raise LifxUnsupportedCommandError when the device returns StateUnhandled.
+        """
+        from lifx.exceptions import LifxUnsupportedCommandError
+
+        # Create a Light instance using the switch connection (without context manager)
+        light = Light(
+            serial=switch_device.serial,
+            ip=switch_device.ip,
+            port=switch_device.port,
+        )
+
+        # Manually open the connection
+        await light.connection.open()
+
+        try:
+            # get_color() should raise LifxUnsupportedCommandError
+            with pytest.raises(LifxUnsupportedCommandError) as exc_info:
+                await light.get_color()
+
+            # Verify the exception message contains the packet type
+            assert "packet type" in str(exc_info.value).lower()
+        finally:
+            await light.connection.close()
+
+    @pytest.mark.emulator
+    async def test_set_color_raises_on_state_unhandled(self, switch_device) -> None:
+        """Test set_color() raises LifxUnsupportedCommandError for unsupported device.
+
+        Switch devices don't support Light commands, so set_color() should
+        raise LifxUnsupportedCommandError when the device returns StateUnhandled.
+        """
+        from lifx.exceptions import LifxUnsupportedCommandError
+
+        # Create a Light instance using the switch connection (without context manager)
+        light = Light(
+            serial=switch_device.serial,
+            ip=switch_device.ip,
+            port=switch_device.port,
+        )
+
+        # Manually open the connection
+        await light.connection.open()
+
+        try:
+            color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+
+            # set_color() should raise LifxUnsupportedCommandError
+            with pytest.raises(LifxUnsupportedCommandError) as exc_info:
+                await light.set_color(color)
+
+            # Verify the exception message indicates unsupported command
+            assert "does not support" in str(exc_info.value).lower()
+        finally:
+            await light.connection.close()

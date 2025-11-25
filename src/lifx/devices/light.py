@@ -83,6 +83,7 @@ class Light(Device):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -92,6 +93,7 @@ class Light(Device):
         """
         # Request automatically unpacks response and decodes labels
         state = await self.connection.request(packets.Light.GetColor())
+        self._raise_if_unhandled(state)
 
         # Convert from protocol HSBK to user-friendly HSBK
         color = HSBK.from_protocol(state.color)
@@ -133,6 +135,7 @@ class Light(Device):
         Raises:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -150,12 +153,13 @@ class Light(Device):
         duration_ms = int(duration * 1000)
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetColor(
                 color=protocol_color,
                 duration=duration_ms,
             ),
         )
+        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -357,6 +361,7 @@ class Light(Device):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -366,6 +371,7 @@ class Light(Device):
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Light.GetPower())
+        self._raise_if_unhandled(state)
 
         # Power level is uint16 (0 or 65535)
         _LOGGER.debug(
@@ -394,6 +400,7 @@ class Light(Device):
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -406,6 +413,7 @@ class Light(Device):
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Sensor.GetAmbientLight())
+        self._raise_if_unhandled(state)
 
         _LOGGER.debug(
             {
@@ -432,6 +440,7 @@ class Light(Device):
             ValueError: If integer value is not 0 or 65535
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -460,9 +469,10 @@ class Light(Device):
         duration_ms = int(duration * 1000)
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetPower(level=power_level, duration=duration_ms),
         )
+        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -499,6 +509,7 @@ class Light(Device):
             ValueError: If parameters are out of range
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -537,7 +548,7 @@ class Light(Device):
         skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
 
         # Send request
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetWaveform(
                 transient=bool(transient),
                 color=protocol_color,
@@ -547,6 +558,7 @@ class Light(Device):
                 waveform=waveform,
             ),
         )
+        self._raise_if_unhandled(result)
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -602,6 +614,7 @@ class Light(Device):
             ValueError: If parameters are out of range
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -647,7 +660,7 @@ class Light(Device):
         skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
 
         # Send request
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Light.SetWaveformOptional(
                 transient=bool(transient),
                 color=protocol_color,
@@ -661,6 +674,7 @@ class Light(Device):
                 set_kelvin=set_kelvin,
             ),
         )
+        self._raise_if_unhandled(result)
         _LOGGER.debug(
             {
                 "class": "Device",

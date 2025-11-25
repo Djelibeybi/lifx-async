@@ -19,7 +19,7 @@ from lifx.const import (
     LIFX_LOCATION_NAMESPACE,
     LIFX_UDP_PORT,
 )
-from lifx.exceptions import LifxDeviceNotFoundError
+from lifx.exceptions import LifxDeviceNotFoundError, LifxUnsupportedCommandError
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
@@ -151,6 +151,23 @@ class Device:
                 print(f"Power: {'ON' if is_on else 'OFF'}")
         ```
     """
+
+    @staticmethod
+    def _raise_if_unhandled(response: object) -> None:
+        """Raise LifxUnsupportedCommandError if device doesn't support the command.
+
+        Args:
+            response: The response from connection.request()
+
+        Raises:
+            LifxUnsupportedCommandError: If response is StateUnhandled or False
+        """
+        if isinstance(response, packets.Device.StateUnhandled):
+            raise LifxUnsupportedCommandError(
+                f"Device does not support packet type {response.unhandled_type}"
+            )
+        if response is False:
+            raise LifxUnsupportedCommandError("Device does not support this command")
 
     def __init__(
         self,
@@ -456,6 +473,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -469,6 +487,7 @@ class Device:
         """
         # Request automatically unpacks and decodes label
         state = await self.connection.request(packets.Device.GetLabel())
+        self._raise_if_unhandled(state)
 
         # Store label
         self._label = state.label
@@ -492,6 +511,7 @@ class Device:
             ValueError: If label is too long
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -508,9 +528,10 @@ class Device:
         label_bytes = label_bytes.ljust(32, b"\x00")
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Device.SetLabel(label=label_bytes),
         )
+        self._raise_if_unhandled(result)
 
         # Update cached state
         self._label = label
@@ -535,6 +556,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -544,6 +566,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetPower())
+        self._raise_if_unhandled(state)
 
         # Power level is uint16 (0 or 65535)
         _LOGGER.debug(
@@ -566,6 +589,7 @@ class Device:
             ValueError: If integer value is not 0 or 65535
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -591,9 +615,10 @@ class Device:
             raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
         # Request automatically handles acknowledgement
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Device.SetPower(level=power_level),
         )
+        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -616,6 +641,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -625,6 +651,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetVersion())
+        self._raise_if_unhandled(state)
 
         version = DeviceVersion(
             vendor=state.vendor,
@@ -655,6 +682,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -665,6 +693,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetInfo())  # type: ignore
+        self._raise_if_unhandled(state)
 
         info = DeviceInfo(time=state.time, uptime=state.uptime, downtime=state.downtime)
 
@@ -694,6 +723,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -704,6 +734,7 @@ class Device:
         """
         # Request WiFi info from device
         state = await self.connection.request(packets.Device.GetWifiInfo())
+        self._raise_if_unhandled(state)
 
         # Extract WiFi info from response
         wifi_info = WifiInfo(signal=state.signal)
@@ -730,6 +761,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -739,6 +771,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetHostFirmware())  # type: ignore
+        self._raise_if_unhandled(state)
 
         firmware = FirmwareInfo(
             build=state.build,
@@ -778,6 +811,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -787,6 +821,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetWifiFirmware())  # type: ignore
+        self._raise_if_unhandled(state)
 
         firmware = FirmwareInfo(
             build=state.build,
@@ -822,6 +857,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -832,6 +868,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetLocation())  # type: ignore
+        self._raise_if_unhandled(state)
 
         location = LocationInfo(
             location=state.location,
@@ -873,6 +910,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             ValueError: If label is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -967,11 +1005,12 @@ class Device:
         updated_at = int(time.time() * 1e9)
 
         # Update this device
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Device.SetLocation(
                 location=location_uuid_to_use, label=label_bytes, updated_at=updated_at
             ),
         )
+        self._raise_if_unhandled(result)
 
         # Update cached state
         location_info = LocationInfo(
@@ -1003,6 +1042,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -1013,6 +1053,7 @@ class Device:
         """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetGroup())  # type: ignore
+        self._raise_if_unhandled(state)
 
         group = GroupInfo(
             group=state.group,
@@ -1054,6 +1095,7 @@ class Device:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             ValueError: If label is invalid
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -1148,11 +1190,12 @@ class Device:
         updated_at = int(time.time() * 1e9)
 
         # Update this device
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Device.SetGroup(
                 group=group_uuid_to_use, label=label_bytes, updated_at=updated_at
             ),
         )
+        self._raise_if_unhandled(result)
 
         # Update cached state
         group_info = GroupInfo(
@@ -1181,6 +1224,7 @@ class Device:
         Raises:
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             ```python
@@ -1194,9 +1238,10 @@ class Device:
             comes back online and is discoverable again.
         """
         # Send reboot request
-        await self.connection.request(
+        result = await self.connection.request(
             packets.Device.SetReboot(),
         )
+        self._raise_if_unhandled(result)
         _LOGGER.debug(
             {
                 "class": "Device",
