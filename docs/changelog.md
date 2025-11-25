@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.3.7 (2025-11-25)
+
+### Bug Fixes
+
+- **devices**: Raise LifxUnsupportedCommandError on StateUnhandled responses
+  ([`ec142cf`](https://github.com/Djelibeybi/lifx-async/commit/ec142cf0130847d65d4b9cd825575658936ef823))
+
+
 ## v4.3.6 (2025-11-25)
 
 ### Bug Fixes
