@@ -17,6 +17,7 @@ from lifx.network.discovery import discover_devices
 from tests.conftest import get_free_port
 
 
+@pytest.mark.emulator
 class TestDiscover:
     """Test discover() async generator."""
 
@@ -51,6 +52,7 @@ class TestDiscover:
             pytest.fail(f"Unexpected yield of {device} from discover.")
 
 
+@pytest.mark.emulator
 class TestFindBySerial:
     """Test find_by_serial() helper function."""
 
@@ -165,6 +167,7 @@ class TestFindBySerial:
         assert device is None
 
 
+@pytest.mark.emulator
 class TestFindByIp:
     """Tests for find_by_ip function."""
 
@@ -205,6 +208,7 @@ class TestFindByIp:
         assert device is None
 
 
+@pytest.mark.emulator
 class TestFindByLabel:
     """Tests for find_by_label function."""
 

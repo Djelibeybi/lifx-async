@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from lifx.api import DeviceGroup
 from lifx.color import HSBK
 
 
+@pytest.mark.emulator
 class TestDeviceGroupBatchOperations:
     """Test DeviceGroup batch operations."""
 

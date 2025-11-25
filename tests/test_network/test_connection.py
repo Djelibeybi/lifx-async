@@ -227,6 +227,7 @@ class TestDeviceConnection:
         assert not conn.is_open
 
 
+@pytest.mark.emulator
 class TestAsyncGeneratorStreaming:
     """Test async generator streaming functionality."""
 

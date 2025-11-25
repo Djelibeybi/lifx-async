@@ -102,6 +102,9 @@ addopts = """\
     """
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "emulator: tests that require the lifx-emulator (only run on Linux)",
+]
 
 [tool.coverage.run]
 omit = [

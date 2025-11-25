@@ -30,6 +30,7 @@ class TestConcurrentRequests:
             await conn.request(Device.GetPower(), timeout=0.1)
 
 
+@pytest.mark.emulator
 class TestErrorHandling:
     """Test error handling in concurrent scenarios using DeviceConnection."""
 
@@ -112,6 +113,7 @@ class TestErrorHandling:
         assert results[1] == "label_success"
 
 
+@pytest.mark.emulator
 class TestAsyncGeneratorRequests:
     """Test async generator-based request streaming."""
 
@@ -199,6 +201,7 @@ class TestAsyncGeneratorRequests:
             await conn.close()
 
 
+@pytest.mark.emulator
 class TestRetryTimeoutBudget:
     """Test that retry sleep time doesn't consume the timeout budget.
 

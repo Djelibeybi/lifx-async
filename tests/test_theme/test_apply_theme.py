@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from lifx.api import DeviceGroup
 from lifx.color import HSBK, Colors
 from lifx.devices.matrix import MatrixLight
@@ -11,6 +13,7 @@ from lifx.devices.multizone import MultiZoneLight
 from lifx.theme import Theme
 
 
+@pytest.mark.emulator
 class TestLightApplyTheme:
     """Tests for Light.apply_theme method."""
 

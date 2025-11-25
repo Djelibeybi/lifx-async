@@ -19,6 +19,7 @@ from lifx.devices import Light
 from tests.conftest import get_free_port
 
 
+@pytest.mark.emulator
 class TestBatchOperationPartialFailures:
     """Test batch operations with partial failures."""
 
@@ -54,6 +55,7 @@ class TestBatchOperationPartialFailures:
         )
 
 
+@pytest.mark.emulator
 class TestBatchOperationScalability:
     """Test batch operations with large numbers of devices."""
 
@@ -71,6 +73,7 @@ class TestBatchOperationScalability:
         assert is_on
 
 
+@pytest.mark.emulator
 class TestBatchOperationConcurrency:
     """Test batch operation concurrent execution."""
 
@@ -93,6 +96,7 @@ class TestBatchOperationConcurrency:
             assert is_on, f"Device {i} should be on"
 
 
+@pytest.mark.emulator
 class TestBatchOperationEdgeCases:
     """Test edge cases for batch operations."""
 
@@ -171,6 +175,7 @@ class TestBatchOperationEdgeCases:
         assert is_on  # Real device should be on
 
 
+@pytest.mark.emulator
 class TestBatchOperationErrorDetails:
     """Test detailed error information from batch operations."""
 

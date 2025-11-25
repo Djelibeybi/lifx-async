@@ -46,6 +46,7 @@ class TestParseDeviceStateServiceErrors:
         assert port == 56700
 
 
+@pytest.mark.emulator
 class TestDiscoveryMalformedPackets:
     """Test discovery handling of malformed packets."""
 
@@ -90,6 +91,7 @@ class TestDiscoveryWithEmulatorErrors:
         assert count == 0
 
 
+@pytest.mark.emulator
 class TestDiscoveryDeduplication:
     """Test that discovered devices are properly deduplicated."""
 
