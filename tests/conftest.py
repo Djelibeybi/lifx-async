@@ -45,7 +45,17 @@ def find_lifx_emulator() -> Path | None:
 
 @pytest.fixture(scope="session")
 def emulator_available() -> bool:
-    """Check if lifx-emulator is available."""
+    """Check if lifx-emulator is available.
+
+    The emulator is only available on Linux. On macOS and Windows,
+    this fixture always returns False to skip emulator tests.
+    """
+    import sys
+
+    # Only run emulator tests on Linux
+    if sys.platform != "linux":
+        return False
+
     return find_lifx_emulator() is not None
 
 
@@ -193,17 +203,28 @@ def emulator_devices(emulator_server: int) -> DeviceGroup:
 
 
 @pytest.fixture(autouse=True)
-async def cleanup_device_connections(emulator_devices):
+async def cleanup_device_connections(request, emulator_available):
     """Clean up device connections after each test.
 
     This ensures test isolation by closing all device connections
     after each test completes. Since each test has its own event loop,
     connections must be closed so they can reopen with the new loop.
+
+    Only runs for tests marked with @pytest.mark.emulator and when
+    the emulator is available.
     """
     yield
-    # Close all device connections after test completes
-    for device in emulator_devices:
-        await device.connection.close()
+
+    # Skip cleanup if emulator is not available or test doesn't use it
+    if not emulator_available:
+        return
+
+    # Get the emulator_devices fixture if it was used
+    if "emulator_devices" in request.fixturenames:
+        emulator_devices = request.getfixturevalue("emulator_devices")
+        # Close all device connections after test completes
+        for device in emulator_devices:
+            await device.connection.close()
 
 
 @pytest.fixture(scope="session")
