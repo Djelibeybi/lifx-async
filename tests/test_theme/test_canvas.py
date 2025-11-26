@@ -90,6 +90,31 @@ class TestAddPointsForTile:
         # Original point should still be there
         assert canvas[(0, 0)] == original_point
 
+    def test_add_points_skips_existing_points_in_tile_area(self) -> None:
+        """Test that add_points_for_tile skips points already in the tile area.
+
+        This covers the branch 87->91 where (i, j) IS in self.points,
+        so we skip the inner if block and continue to the next iteration.
+        """
+        canvas = Canvas()
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+
+        # Pre-populate canvas with many points in the tile area
+        # The tile area for None (default) with width=8 spans roughly -12 to 12
+        # We fill multiple points to ensure the branch is hit
+        for x in range(-5, 6):
+            for y in range(-5, 6):
+                canvas[(x, y)] = Colors.BLUE
+
+        # Call add_points_for_tile - it should skip existing points
+        canvas.add_points_for_tile(None, theme)
+
+        # Check that original points are preserved
+        for x in range(-5, 6):
+            for y in range(-5, 6):
+                # Original points should still be blue
+                assert canvas[(x, y)] == Colors.BLUE
+
 
 class TestShufflePoints:
     """Tests for shuffle_points method."""
@@ -159,6 +184,25 @@ class TestBlurByDistance:
         # Color should be modified (blurred average of red and blue)
         assert blurred_color.hue != original_color.hue
 
+    def test_blur_by_distance_single_point_at_origin(self) -> None:
+        """Test blur_by_distance with single point where weighted is empty.
+
+        When a point queries itself as the only closest point, distance is 0,
+        greatest_distance is 0, and color_weighting yields nothing (weighted is empty).
+        This covers the branch where 'if weighted:' is False.
+        """
+        canvas = Canvas()
+        canvas[(0, 0)] = Colors.RED
+
+        # With only one point, when we query closest_points for (0,0),
+        # the only point is itself at distance 0.
+        # color_weighting with greatest_distance=0 yields nothing.
+        canvas.blur_by_distance()
+
+        # Point should be removed since weighted was empty
+        # (new_points[(i,j)] was never assigned)
+        assert len(canvas.points) == 0
+
 
 class TestFillInPoints:
     """Tests for fill_in_points method."""
@@ -186,6 +230,26 @@ class TestFillInPoints:
 
         # Should fill the 16x16 area
         assert len(target_canvas.points) > 0
+
+    def test_fill_in_points_single_source_point_at_query_location(self) -> None:
+        """Test fill_in_points where weighted is empty for some pixels.
+
+        When the source canvas has only one point and a query pixel is at
+        that exact location, distance is 0, greatest_distance is 0, and
+        color_weighting yields nothing. This covers the branch where
+        'if weighted:' is False.
+        """
+        source_canvas = Canvas()
+        source_canvas[(0, 0)] = Colors.RED
+
+        target_canvas = Canvas()
+        # Query a 1x1 tile at exactly (0, 0) where the source point is
+        target_canvas.fill_in_points(source_canvas, 0, 0, 1, 1)
+
+        # The point at (0,0) queries closest_points which returns [(0, RED)]
+        # color_weighting with greatest_distance=0 yields nothing
+        # so weighted is empty and self[(0,0)] is never assigned
+        assert (0, 0) not in target_canvas.points
 
 
 class TestBlur:
