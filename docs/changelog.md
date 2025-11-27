@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.3.9 (2025-11-27)
+
+### Bug Fixes
+
+- **network**: Propagate timeout from request() to internal methods
+  ([`b35ebea`](https://github.com/Djelibeybi/lifx-async/commit/b35ebea46120bfd4ad9ce149f5e25125d3694b30))
+
+
 ## v4.3.8 (2025-11-25)
 
 ### Bug Fixes
