@@ -17471,7 +17471,7 @@ async def receive_packet(self, timeout: float = 0.5) -> tuple[LifxHeader, bytes]
 
 ```python
 request_stream(
-    packet: Any, timeout: float = DEFAULT_REQUEST_TIMEOUT
+    packet: Any, timeout: float | None = None
 ) -> AsyncGenerator[Any, None]
 ```
 
@@ -17487,10 +17487,10 @@ async for state in conn.request_stream(GetColorZones()): process(state)
 
 # Continues until timeout
 
-| PARAMETER | DESCRIPTION                                                                         |
-| --------- | ----------------------------------------------------------------------------------- |
-| `packet`  | Packet instance to send **TYPE:** `Any`                                             |
-| `timeout` | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| PARAMETER | DESCRIPTION                                  |
+| --------- | -------------------------------------------- |
+| `packet`  | Packet instance to send **TYPE:** `Any`      |
+| `timeout` | Request timeout in seconds **TYPE:** \`float |
 
 | YIELDS                      | DESCRIPTION                                                              |
 | --------------------------- | ------------------------------------------------------------------------ |
@@ -17539,7 +17539,7 @@ Source code in `src/lifx/network/connection.py`
 async def request_stream(
     self,
     packet: Any,
-    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    timeout: float | None = None,
 ) -> AsyncGenerator[Any, None]:
     """Send request and yield unpacked responses.
 
@@ -17601,6 +17601,9 @@ async def request_stream(
     """
     # Ensure connection is open (lazy opening)
     await self._ensure_open()
+
+    if timeout is None:
+        timeout = self.timeout
 
     # Get packet metadata
     packet_kind = getattr(packet, "_packet_kind", "OTHER")
@@ -17725,7 +17728,7 @@ async def request_stream(
 ##### request
 
 ```python
-request(packet: Any, timeout: float = DEFAULT_REQUEST_TIMEOUT) -> Any
+request(packet: Any, timeout: float | None = None) -> Any
 ```
 
 Send request and get single response (convenience wrapper).
@@ -17734,10 +17737,10 @@ This is a convenience method that returns the first response from request_stream
 
 Most device operations use this method since they expect a single response. Connection is opened automatically if not already open.
 
-| PARAMETER | DESCRIPTION                                                                         |
-| --------- | ----------------------------------------------------------------------------------- |
-| `packet`  | Packet instance to send **TYPE:** `Any`                                             |
-| `timeout` | Request timeout in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| PARAMETER | DESCRIPTION                                  |
+| --------- | -------------------------------------------- |
+| `packet`  | Packet instance to send **TYPE:** `Any`      |
+| `timeout` | Request timeout in seconds **TYPE:** \`float |
 
 | RETURNS | DESCRIPTION                                                         |
 | ------- | ------------------------------------------------------------------- |
@@ -17771,11 +17774,7 @@ if not success:
 Source code in `src/lifx/network/connection.py`
 
 ````python
-async def request(
-    self,
-    packet: Any,
-    timeout: float = DEFAULT_REQUEST_TIMEOUT,
-) -> Any:
+async def request(self, packet: Any, timeout: float | None = None) -> Any:
     """Send request and get single response (convenience wrapper).
 
     This is a convenience method that returns the first response from
