@@ -51,7 +51,7 @@ class TestDiscoveryMalformedPackets:
     """Test discovery handling of malformed packets."""
 
     @pytest.mark.asyncio
-    async def test_discovery_with_malformed_header(self, emulator_server: int) -> None:
+    async def test_discovery_with_malformed_header(self, emulator_port: int) -> None:
         """Test discovery continues when receiving malformed packets.
 
         The discovery should skip malformed responses and continue waiting
@@ -63,7 +63,7 @@ class TestDiscoveryMalformedPackets:
         async for disc in discover_devices(
             timeout=2.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
         ):
             found_device = True
             break
@@ -96,13 +96,13 @@ class TestDiscoveryDeduplication:
     """Test that discovered devices are properly deduplicated."""
 
     @pytest.mark.asyncio
-    async def test_devices_deduplicated_by_serial(self, emulator_server: int) -> None:
+    async def test_devices_deduplicated_by_serial(self, emulator_port: int) -> None:
         """Test that duplicate responses are deduplicated by serial."""
         seen_serials: set[str] = set()
         async for disc in discover_devices(
             timeout=1.5,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
         ):
             # Each yielded device should have a unique serial
             assert disc.serial not in seen_serials, f"Duplicate serial: {disc.serial}"

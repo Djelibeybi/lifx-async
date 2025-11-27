@@ -21,22 +21,22 @@ from tests.conftest import get_free_port
 class TestDiscover:
     """Test discover() async generator."""
 
-    async def test_discover_basic(self, emulator_server: int):
+    async def test_discover_basic(self, emulator_port: int):
         """Test basic discovery with async generator."""
         async for device in discover(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             assert isinstance(device, Light)
 
-    async def test_discover_with_timeout(self, emulator_server: int):
+    async def test_discover_with_timeout(self, emulator_port: int):
         """Test discovery with custom timeout."""
         async for device in discover(
             timeout=0.5,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             assert device is not None
@@ -56,14 +56,14 @@ class TestDiscover:
 class TestFindBySerial:
     """Test find_by_serial() helper function."""
 
-    async def test_find_by_serial_found_string(self, emulator_server: int):
+    async def test_find_by_serial_found_string(self, emulator_port: int):
         """Test finding device by serial number (string format)."""
         # First discover a device to get a real serial number
         target_serial = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             target_serial = disc.serial
@@ -76,7 +76,7 @@ class TestFindBySerial:
             target_serial,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         )
 
@@ -84,14 +84,14 @@ class TestFindBySerial:
         assert device.serial == target_serial
         assert isinstance(device, Light)
 
-    async def test_find_by_serial_with_colons(self, emulator_server: int):
+    async def test_find_by_serial_with_colons(self, emulator_port: int):
         """Test finding device by serial with colon separators."""
         # Discover first device
         target_serial = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             target_serial = disc.serial
@@ -107,34 +107,34 @@ class TestFindBySerial:
             serial_with_colons,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         )
 
         assert device is not None
         assert device.serial == target_serial
 
-    async def test_find_by_serial_not_found(self, emulator_server: int):
+    async def test_find_by_serial_not_found(self, emulator_port: int):
         """Test finding device with non-existent serial."""
         device = await find_by_serial(
             "d073d5999999",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         )
 
         # Should return None
         assert device is None
 
-    async def test_find_by_serial_case_insensitive(self, emulator_server: int):
+    async def test_find_by_serial_case_insensitive(self, emulator_port: int):
         """Test that serial matching is case-insensitive."""
         # Discover first device
         target_serial = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             target_serial = disc.serial
@@ -148,7 +148,7 @@ class TestFindBySerial:
             uppercase_serial,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         )
 
@@ -171,13 +171,13 @@ class TestFindBySerial:
 class TestFindByIp:
     """Tests for find_by_ip function."""
 
-    async def test_find_by_ip_found(self, emulator_server: int):
+    async def test_find_by_ip_found(self, emulator_port: int):
         """Test find_by_ip returns device when IP matches."""
         # Emulator devices are all at 127.0.0.1
         device = await find_by_ip(
             "127.0.0.1",
             timeout=1.0,
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         )
 
@@ -185,13 +185,13 @@ class TestFindByIp:
         # Should get one of the emulator devices (d073d5000001-d073d5000007)
         assert device.serial.startswith("d073d5")
 
-    async def test_find_by_ip_not_found(self, emulator_server: int):
+    async def test_find_by_ip_not_found(self, emulator_port: int):
         """Test find_by_ip returns None when IP doesn't match any device."""
         # Use an IP that's definitely not the emulator (192.168.200.254)
         device = await find_by_ip(
             "192.168.200.254",
             timeout=1.0,
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         )
 
@@ -212,14 +212,14 @@ class TestFindByIp:
 class TestFindByLabel:
     """Tests for find_by_label function."""
 
-    async def test_find_by_label_found(self, emulator_server: int):
+    async def test_find_by_label_found(self, emulator_port: int):
         """Test find_by_label can find devices by label."""
         # First discover a device and get its label
         first_disc = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             first_disc = disc
@@ -232,7 +232,8 @@ class TestFindByLabel:
         if device is None:
             pytest.skip("Device creation returned None")
 
-        device_label = await device.get_label()
+        async with device:
+            device_label = await device.get_label()
 
         # Now search for that device by label using find_by_label
         found_devices = []
@@ -240,22 +241,27 @@ class TestFindByLabel:
             device_label,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             found_devices.append(d)
 
-        assert len(found_devices) >= 1
-        assert any(d.serial == first_disc.serial for d in found_devices)
+        try:
+            assert len(found_devices) >= 1
+            assert any(d.serial == first_disc.serial for d in found_devices)
+        finally:
+            # Close all found device connections
+            for d in found_devices:
+                await d.connection.close()
 
-    async def test_find_by_label_case_insensitive(self, emulator_server: int):
+    async def test_find_by_label_case_insensitive(self, emulator_port: int):
         """Test find_by_label is case-insensitive."""
         # Get a device label
         first_disc = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             first_disc = disc
@@ -276,22 +282,27 @@ class TestFindByLabel:
             device_label.upper(),
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             found_devices.append(d)
 
-        assert len(found_devices) >= 1
-        assert any(d.serial == first_disc.serial for d in found_devices)
+        try:
+            assert len(found_devices) >= 1
+            assert any(d.serial == first_disc.serial for d in found_devices)
+        finally:
+            # Close all found device connections
+            for d in found_devices:
+                await d.connection.close()
 
-    async def test_find_by_label_not_found(self, emulator_server: int):
+    async def test_find_by_label_not_found(self, emulator_port: int):
         """Test find_by_label returns empty list when label doesn't match any device."""
         # Use a label that definitely doesn't exist
         async for d in find_by_label(
             "Nonexistent Device Label XYZ999",
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             pytest.fail(f"Unexpected yield of {d} from find_by_label()")
@@ -307,14 +318,14 @@ class TestFindByLabel:
         ):
             pytest.fail(f"Unexpected yield of {d} from find_by_label()")
 
-    async def test_find_by_label_substring_match(self, emulator_server: int):
+    async def test_find_by_label_substring_match(self, emulator_port: int):
         """Test find_by_label substring matching (default behavior)."""
         # Get a device label
         first_disc = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             first_disc = disc
@@ -326,7 +337,8 @@ class TestFindByLabel:
         if device is None:
             pytest.skip("Device creation returned None")
 
-        device_label = await device.get_label()
+        async with device:
+            device_label = await device.get_label()
 
         # Search with partial label (should match if label contains the substring)
         # E.g., if label is "LIFX Color 000001", search for "Color"
@@ -337,20 +349,21 @@ class TestFindByLabel:
                 exact_match=False,
                 timeout=1.0,
                 broadcast_address="127.0.0.1",
-                port=emulator_server,
+                port=emulator_port,
                 idle_timeout_multiplier=0.5,
             ):
                 assert d is not None
+                await d.connection.close()
                 break
 
-    async def test_find_by_label_exact_match(self, emulator_server: int):
+    async def test_find_by_label_exact_match(self, emulator_port: int):
         """Test find_by_label exact matching."""
         # Get a device label
         first_disc = None
         async for disc in discover_devices(
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             first_disc = disc
@@ -362,7 +375,8 @@ class TestFindByLabel:
         if device is None:
             pytest.skip("Device creation returned None")
 
-        device_label = await device.get_label()
+        async with device:
+            device_label = await device.get_label()
 
         # Exact match should work
         async for d in find_by_label(
@@ -370,10 +384,11 @@ class TestFindByLabel:
             exact_match=True,
             timeout=1.0,
             broadcast_address="127.0.0.1",
-            port=emulator_server,
+            port=emulator_port,
             idle_timeout_multiplier=0.5,
         ):
             assert d.serial == first_disc.serial
+            await d.connection.close()
 
         # Partial label with exact_match=True should NOT match
         if len(device_label) > 4:
@@ -383,7 +398,7 @@ class TestFindByLabel:
                 exact_match=True,
                 timeout=1.0,
                 broadcast_address="127.0.0.1",
-                port=emulator_server,
+                port=emulator_port,
                 idle_timeout_multiplier=0.5,
             ):
                 pytest.fail(f"Unexpected yield of {d} from find_by_label()")

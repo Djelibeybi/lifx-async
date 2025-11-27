@@ -2,24 +2,37 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
-import shutil
 import socket
-import time
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
-from pathlib import Path
-from types import SimpleNamespace
-from typing import ClassVar
 
 import pytest
-import requests
-from xprocess import ProcessStarter
+
+# Import emulator library components
+from lifx_emulator import EmulatedLifxServer
+from lifx_emulator.devices import DeviceManager
+from lifx_emulator.factories import (
+    create_color_light,
+    create_color_temperature_light,
+    create_device,
+    create_hev_light,
+    create_infrared_light,
+    create_multizone_light,
+    create_switch,
+    create_tile_device,
+)
+from lifx_emulator.repositories import DeviceRepository
+from lifx_emulator.scenarios import HierarchicalScenarioManager
+from lifx_emulator.scenarios.models import ScenarioConfig
 
 from lifx.api import DeviceGroup
 from lifx.devices import HevLight, InfraredLight, Light, MultiZoneLight
 from lifx.devices.base import Device
 from lifx.devices.matrix import MatrixLight
+from lifx.network.connection import DeviceConnection
 
 
 def get_free_port() -> int:
@@ -29,56 +42,81 @@ def get_free_port() -> int:
         return s.getsockname()[1]
 
 
-def find_lifx_emulator() -> Path | None:
-    """Find the lifx-emulator executable.
+class EmulatorRunner:
+    """Manages the emulator server in a background thread with its own event loop."""
 
-    Returns:
-        Path to lifx-emulator executable, or None if not found
-    """
-    # Check system PATH
-    system_path = shutil.which("lifx-emulator")
-    if system_path:
-        return Path(system_path)
+    def __init__(self, server: EmulatedLifxServer):
+        self.server = server
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
+        self._started = threading.Event()
 
-    return None
+    def _run_loop(self) -> None:
+        """Run the event loop in the background thread."""
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+
+        # Start the server
+        self._loop.run_until_complete(self.server.start())
+        self._started.set()
+
+        # Run until stopped
+        self._loop.run_forever()
+
+        # Cleanup
+        self._loop.run_until_complete(self.server.stop())
+        self._loop.close()
+
+    def start(self) -> None:
+        """Start the emulator in a background thread."""
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        # Wait for server to start
+        self._started.wait(timeout=5.0)
+
+    def stop(self) -> None:
+        """Stop the emulator and its event loop."""
+        if self._loop is not None:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
 
 
 @pytest.fixture(scope="session")
 def emulator_available() -> bool:
-    """Check if lifx-emulator is available.
+    """Check if lifx-emulator-core is available.
 
-    The emulator is only available on Linux. On macOS and Windows,
-    this fixture always returns False to skip emulator tests.
+    The library is always available as it's a direct dependency.
+    This fixture exists for backwards compatibility with test markers.
     """
-    import sys
+    try:
+        from lifx_emulator import EmulatedLifxServer  # noqa: F401
 
-    # Only run emulator tests on Linux
-    if sys.platform != "linux":
+        return True
+    except ImportError:
         return False
-
-    return find_lifx_emulator() is not None
 
 
 @pytest.fixture(scope="session")
-def emulator_server(emulator_available: bool, xprocess) -> Generator[int]:
-    """Start lifx-emulator as a subprocess for the entire test session.
+def emulator_server(
+    emulator_available: bool,
+) -> Generator[tuple[int, EmulatedLifxServer, HierarchicalScenarioManager]]:
+    """Start embedded lifx-emulator for the entire test session.
 
-    The emulator starts once at the beginning and stops when all tests complete.
-    This significantly reduces test overhead compared to per-test startup.
-
-    Only starts if lifx-emulator is available. Tests that require the emulator
-    should check emulator_available or will be skipped automatically.
-
-    Uses pytest-xprocess for robust process management and cleanup.
+    The emulator runs in-process in a background thread, providing faster
+    startup (~5-10ms vs 500ms+) and cross-platform support.
 
     External emulator mode:
-        Set LIFX_EMULATOR_EXTERNAL=1 to skip starting the emulator subprocess.
+        Set LIFX_EMULATOR_EXTERNAL=1 to skip starting the embedded emulator.
         Use LIFX_EMULATOR_PORT to specify the port (default: 56700).
         This is useful for testing against actual hardware or a manually managed
         emulator instance with custom configuration.
 
     Yields:
-        UDP port number where the emulator is listening
+        Tuple of (port, server, scenario_manager) where:
+        - port: UDP port number where the emulator is listening
+        - server: EmulatedLifxServer instance for direct manipulation
+        - scenario_manager: HierarchicalScenarioManager for scenario configuration
     """
     # Check if using external emulator
     use_external = os.environ.get("LIFX_EMULATOR_EXTERNAL", "").lower() in (
@@ -88,62 +126,76 @@ def emulator_server(emulator_available: bool, xprocess) -> Generator[int]:
     )
 
     if use_external:
-        # Use external emulator - don't start subprocess
+        # Use external emulator - don't start embedded server
         port = int(os.environ.get("LIFX_EMULATOR_PORT", "56700"))
-        yield port
-        # No cleanup needed for external emulator
+        # Return None for server and scenario_manager since we don't control it
+        yield port, None, None  # type: ignore[misc]
         return
 
-    # Standard mode: use xprocess to start emulator subprocess
     if not emulator_available:
-        pytest.skip("lifx-emulator not available")
+        pytest.skip("lifx-emulator-core not available")
 
-    emulator_path = find_lifx_emulator()
-    if not emulator_path:
-        pytest.skip("Failed to find lifx-emulator")
+    # Create scenario manager for all devices to share
+    scenario_manager = HierarchicalScenarioManager()
+
+    # Create the 7 default devices matching the old CLI configuration:
+    # --color 1 --multizone 2 --tile 1 --hev 1 --infrared 1 --color-temperature 1
+    devices = [
+        create_color_light(serial="d073d5000001", scenario_manager=scenario_manager),
+        create_color_temperature_light(
+            serial="d073d5000002", scenario_manager=scenario_manager
+        ),
+        create_infrared_light(serial="d073d5000003", scenario_manager=scenario_manager),
+        create_hev_light(serial="d073d5000004", scenario_manager=scenario_manager),
+        create_multizone_light(
+            serial="d073d5000005", scenario_manager=scenario_manager
+        ),
+        create_multizone_light(
+            serial="d073d5000006", scenario_manager=scenario_manager
+        ),
+        create_tile_device(
+            serial="d073d5000007", tile_count=1, scenario_manager=scenario_manager
+        ),
+    ]
 
     port = get_free_port()
+    device_manager = DeviceManager(DeviceRepository())
 
-    class EmulatorServer(ProcessStarter):
-        """Process starter for use with pytest-xprocess."""
+    server = EmulatedLifxServer(
+        devices=devices,
+        device_manager=device_manager,
+        bind_address="127.0.0.1",
+        port=port,
+        scenario_manager=scenario_manager,
+    )
 
-        pattern = "Starting LIFX Emulator"
-        args: ClassVar[list[str]] = [
-            str(emulator_path),
-            "--bind",
-            "127.0.0.1",  # bind emulator to localhost
-            "--port",
-            str(port),
-            "--api",  # Enable HTTP API on port 8080
-            "--color",
-            "1",  # 1 color light
-            "--multizone",
-            "2",  # 2 multizone devices
-            "--tile",
-            "1",  # 1 tile device
-            "--tile-count",
-            "1",  # 1 tile on the chain
-            "--hev",
-            "1",  # 1 HEV light
-            "--infrared",
-            "1",  # 1 infrared light
-            "--color-temperature",
-            "1",  # 1 color temperature light
-        ]
+    # Start the server in a background thread
+    runner = EmulatorRunner(server)
+    runner.start()
 
-        # # Terminate the process on interrupt
-        # terminate_on_interrupt = True
+    yield port, server, scenario_manager
 
-    # Use xprocess to manage the emulator subprocess
-    _ = xprocess.ensure("lifx_emulator", EmulatorServer)
-
-    yield port
-
-    xprocess.getinfo("lifx_emulator").terminate()
+    # Stop the server
+    runner.stop()
 
 
 @pytest.fixture(scope="session")
-def emulator_devices(emulator_server: int) -> DeviceGroup:
+def emulator_port(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+) -> int:
+    """Return just the emulator port for tests that don't need server access.
+
+    This is a convenience fixture for backwards compatibility with tests
+    that only need the port number.
+    """
+    port, _, _ = emulator_server
+    return port
+
+
+@pytest.fixture(scope="session")
+def emulator_devices(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+) -> DeviceGroup:
     """Return a DeviceGroup with the 7 hardcoded emulated devices.
 
     This fixture hard-codes the seven devices created by the emulator to avoid
@@ -158,47 +210,58 @@ def emulator_devices(emulator_server: int) -> DeviceGroup:
         - 2 MultiZoneLight devices (d073d5000005, d073d5000006)
         - 1 MatrixLight (d073d5000007)
     """
-    devices: list[Device] = []
-
-    devices.extend(
-        [
-            Light(
-                serial="d073d5000001",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-            Light(
-                serial="d073d5000002",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-            InfraredLight(
-                serial="d073d5000003",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-            HevLight(
-                serial="d073d5000004",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-            MultiZoneLight(
-                serial="d073d5000005",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-            MultiZoneLight(
-                serial="d073d5000006",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-            MatrixLight(
-                serial="d073d5000007",
-                ip="127.0.0.1",
-                port=emulator_server,
-            ),
-        ]
-    )
+    port, _, _ = emulator_server
+    devices: list[Device] = [
+        Light(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+        Light(
+            serial="d073d5000002",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+        InfraredLight(
+            serial="d073d5000003",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+        HevLight(
+            serial="d073d5000004",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+        MultiZoneLight(
+            serial="d073d5000005",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+        MultiZoneLight(
+            serial="d073d5000006",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+        MatrixLight(
+            serial="d073d5000007",
+            ip="127.0.0.1",
+            port=port,
+            timeout=2.0,
+            max_retries=2,
+        ),
+    ]
     return DeviceGroup(devices)
 
 
@@ -228,73 +291,46 @@ async def cleanup_device_connections(request, emulator_available):
 
 
 @pytest.fixture(scope="session")
-def emulator_api_url() -> str:
-    """Return the base URL for the emulator's HTTP API.
-
-    The API is enabled with the --api flag and runs on port 8080.
-
-    Returns:
-        Base URL like "http://127.0.0.1:8080/api"
-    """
-    return "http://127.0.0.1:8080/api"
-
-
-@pytest.fixture(scope="session")
-def ceiling_device(emulator_server: int, emulator_api_url: str):
+def ceiling_device(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+):
     """Create a LIFX Ceiling device (product 201) for SKY effect testing.
 
     The Ceiling device supports SKY effects and has >128 zones (16x8 tile).
-    This fixture uses the emulator's HTTP API to create the device.
+    This fixture dynamically adds the device to the running emulator.
 
     Returns:
         MatrixLight instance for the Ceiling device
     """
+    port, server, scenario_manager = emulator_server
 
-    # Wait for API to be ready (emulator might not have HTTP API ready immediately)
-    max_retries = 10
-    for i in range(max_retries):
-        try:
-            response = requests.get(f"{emulator_api_url}/docs", timeout=1.0)
-            if response.status_code == 200:
-                break
-        except requests.exceptions.ConnectionError:
-            if i < max_retries - 1:
-                time.sleep(0.5)
-            else:
-                raise
+    if server is None:
+        pytest.skip("Cannot create ceiling device with external emulator")
 
-    # Create Ceiling device via API (product 201 = LIFX Ceiling with >128 zones)
-    response = requests.post(
-        f"{emulator_api_url}/devices",
-        json={
-            "product_id": 201,  # LIFX Ceiling (16x8 = 128 zones)
-            # Use serial that doesn't conflict with existing devices
-            "serial": "d073d5000100",
-        },
-        timeout=5.0,
+    # Create Ceiling device (product 201 = LIFX Ceiling with 16x8 = 128 zones)
+    ceiling = create_device(
+        product_id=201,
+        serial="d073d5000100",
+        scenario_manager=scenario_manager,
     )
-    response.raise_for_status()  # 201 Created is expected
+    server.add_device(ceiling)
 
-    try:
-        ceiling = MatrixLight(
-            serial="d073d5000100",
-            ip="127.0.0.1",
-            port=emulator_server,
-        )
-        yield ceiling
-    finally:
-        # Clean up: delete the device
-        try:
-            requests.delete(
-                f"{emulator_api_url}/devices/d073d5000100",
-                timeout=5.0,
-            )
-        except Exception:
-            pass  # Best effort cleanup
+    yield MatrixLight(
+        serial="d073d5000100",
+        ip="127.0.0.1",
+        port=port,
+        timeout=2.0,
+        max_retries=2,
+    )
+
+    # Clean up: remove the device
+    server.remove_device("d073d5000100")
 
 
 @pytest.fixture(scope="session")
-def switch_device(emulator_server: int, emulator_api_url: str):
+def switch_device(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+):
     """Create a LIFX Switch device (product 70) for StateUnhandled testing.
 
     The Switch device does not support Light commands (GetColor, SetColor, etc.)
@@ -304,53 +340,34 @@ def switch_device(emulator_server: int, emulator_api_url: str):
     Returns:
         DeviceConnection instance for the Switch device
     """
-    from lifx.network.connection import DeviceConnection
+    port, server, scenario_manager = emulator_server
 
-    # Wait for API to be ready (emulator might not have HTTP API ready immediately)
-    max_retries = 10
-    for i in range(max_retries):
-        try:
-            response = requests.get(f"{emulator_api_url}/docs", timeout=1.0)
-            if response.status_code == 200:
-                break
-        except requests.exceptions.ConnectionError:
-            if i < max_retries - 1:
-                time.sleep(0.5)
-            else:
-                raise
+    if server is None:
+        pytest.skip("Cannot create switch device with external emulator")
 
-    # Create Switch device via API (product 70 = LIFX Switch)
-    response = requests.post(
-        f"{emulator_api_url}/devices",
-        json={
-            "product_id": 70,  # LIFX Switch
-            # Use serial that doesn't conflict with existing devices
-            "serial": "d073d5000200",
-        },
-        timeout=5.0,
+    # Create Switch device (product 70 = LIFX Switch)
+    switch = create_switch(
+        serial="d073d5000200",
+        scenario_manager=scenario_manager,
     )
-    response.raise_for_status()  # 201 Created is expected
+    server.add_device(switch)
 
-    try:
-        switch = DeviceConnection(
-            serial="d073d5000200",
-            ip="127.0.0.1",
-            port=emulator_server,
-        )
-        yield switch
-    finally:
-        # Clean up: delete the device
-        try:
-            requests.delete(
-                f"{emulator_api_url}/devices/d073d5000200",
-                timeout=5.0,
-            )
-        except Exception:
-            pass  # Best effort cleanup
+    yield DeviceConnection(
+        serial="d073d5000200",
+        ip="127.0.0.1",
+        port=port,
+        timeout=2.0,
+        max_retries=2,
+    )
+
+    # Clean up: remove the device
+    server.remove_device("d073d5000200")
 
 
 @pytest.fixture
-def scenario_manager(emulator_api_url: str):
+def scenario_manager(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+):
     """Provide a context manager for scenario management.
 
     Automatically cleans up scenarios after each test to prevent
@@ -363,8 +380,11 @@ def scenario_manager(emulator_api_url: str):
                 pass
             # Scenario automatically cleaned up
     """
+    _, server, sm = emulator_server
 
-    active_scenarios = []
+    if server is None:
+        pytest.skip("Cannot manage scenarios with external emulator")
+    active_scenarios: list[tuple[str, str]] = []
 
     @contextmanager
     def manage_scenario(scope: str, identifier: str, config: dict):
@@ -380,50 +400,73 @@ def scenario_manager(emulator_api_url: str):
                    - malformed_packets: [pkt_types]
                    - etc.
         """
-        url = f"{emulator_api_url}/scenarios/{scope}"
-        if identifier:
-            url = f"{url}/{identifier}"
+        scenario_config = ScenarioConfig(**config)
 
-        # Wait for API to be ready (emulator might not have HTTP API ready immediately)
-        max_retries = 10
-        for i in range(max_retries):
-            try:
-                response = requests.get(f"{emulator_api_url}/docs", timeout=1.0)
-                if response.status_code == 200:
-                    break
-            except requests.exceptions.ConnectionError:
-                if i < max_retries - 1:
-                    time.sleep(0.5)
-                else:
-                    raise
+        # Set the scenario based on scope
+        if scope == "global":
+            sm.set_global_scenario(scenario_config)
+        elif scope == "devices":
+            sm.set_device_scenario(identifier, scenario_config)
+        elif scope == "types":
+            sm.set_type_scenario(identifier, scenario_config)
+        elif scope == "locations":
+            sm.set_location_scenario(identifier, scenario_config)
+        elif scope == "groups":
+            sm.set_group_scenario(identifier, scenario_config)
+        else:
+            raise ValueError(f"Unknown scope: {scope}")
 
-        # Add the scenario
-        response = requests.put(url, json=config, timeout=5.0)
-        response.raise_for_status()
-        active_scenarios.append(url)
+        active_scenarios.append((scope, identifier))
+
+        # Invalidate all scenario caches so devices pick up the new scenario
+        server.invalidate_all_scenario_caches()
 
         try:
             yield
         finally:
             # Clean up this scenario
+            if scope == "global":
+                sm.clear_global_scenario()
+            elif scope == "devices":
+                sm.delete_device_scenario(identifier)
+            elif scope == "types":
+                sm.delete_type_scenario(identifier)
+            elif scope == "locations":
+                sm.delete_location_scenario(identifier)
+            elif scope == "groups":
+                sm.delete_group_scenario(identifier)
+
             try:
-                requests.delete(url, timeout=5.0)
-                active_scenarios.remove(url)
-            except Exception:
-                pass  # Best effort cleanup
+                active_scenarios.remove((scope, identifier))
+            except ValueError:
+                pass
+
+            # Invalidate caches after cleanup
+            server.invalidate_all_scenario_caches()
 
     yield manage_scenario
 
     # Clean up any remaining scenarios
-    for url in active_scenarios:
+    for scope, identifier in active_scenarios:
         try:
-            requests.delete(url, timeout=5.0)
+            if scope == "global":
+                sm.clear_global_scenario()
+            elif scope == "devices":
+                sm.delete_device_scenario(identifier)
+            elif scope == "types":
+                sm.delete_type_scenario(identifier)
+            elif scope == "locations":
+                sm.delete_location_scenario(identifier)
+            elif scope == "groups":
+                sm.delete_group_scenario(identifier)
         except Exception:
-            pass
+            pass  # Best effort cleanup
 
 
 @pytest.fixture
-async def emulator_server_with_scenarios(emulator_server: int, emulator_api_url: str):
+async def emulator_server_with_scenarios(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+):
     """Create devices with specific scenario configurations.
 
     This fixture provides a callable that applies scenarios to devices
@@ -434,12 +477,17 @@ async def emulator_server_with_scenarios(emulator_server: int, emulator_api_url:
             server, device = await emulator_server_with_scenarios(
                 device_type="color",
                 serial="d073d5000001",
-                scenarios={"drop_packets": {"20": 1.0}}
+                scenarios={"drop_packets": {20: 1.0}}
             )
             # Test code using server.port and device info
     """
+    from types import SimpleNamespace
 
-    applied_scenarios = []
+    port, server, sm = emulator_server
+
+    if server is None:
+        pytest.skip("Cannot manage scenarios with external emulator")
+    applied_scenarios: list[str] = []
 
     async def create_device_with_scenario(
         device_type: str, serial: str, scenarios: dict
@@ -456,27 +504,15 @@ async def emulator_server_with_scenarios(emulator_server: int, emulator_api_url:
             - server_info has .port attribute
             - device_info has device details
         """
-        # Wait for API to be ready (emulator might not have HTTP API ready immediately)
-        max_retries = 10
-        for i in range(max_retries):
-            try:
-                response = requests.get(f"{emulator_api_url}/docs", timeout=1.0)
-                if response.status_code == 200:
-                    break
-            except requests.exceptions.ConnectionError:
-                if i < max_retries - 1:
-                    time.sleep(0.5)
-                else:
-                    raise
+        scenario_config = ScenarioConfig(**scenarios)
+        sm.set_device_scenario(serial, scenario_config)
+        applied_scenarios.append(serial)
 
-        # Apply scenario to the specified device
-        url = f"{emulator_api_url}/scenarios/devices/{serial}"
-        response = requests.put(url, json=scenarios, timeout=5.0)
-        response.raise_for_status()
-        applied_scenarios.append(url)
+        # Invalidate caches so devices pick up the new scenario
+        server.invalidate_all_scenario_caches()
 
         # Create namespace objects for server and device info
-        server_info = SimpleNamespace(port=emulator_server)
+        server_info = SimpleNamespace(port=port)
         device_info = SimpleNamespace(serial=serial, type=device_type)
 
         return server_info, device_info
@@ -484,8 +520,11 @@ async def emulator_server_with_scenarios(emulator_server: int, emulator_api_url:
     yield create_device_with_scenario
 
     # Clean up all scenarios after test
-    for url in applied_scenarios:
+    for serial in applied_scenarios:
         try:
-            requests.delete(url, timeout=5.0)
+            sm.delete_device_scenario(serial)
         except Exception:
             pass  # Best effort cleanup
+
+    # Invalidate caches after cleanup
+    server.invalidate_all_scenario_caches()

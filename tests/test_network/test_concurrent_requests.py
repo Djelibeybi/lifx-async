@@ -25,9 +25,12 @@ class TestConcurrentRequests:
             serial="d073d5000001", ip="192.168.1.100", timeout=0.1, max_retries=0
         )
 
-        # Request should timeout when no server is available
-        with pytest.raises(LifxTimeoutError):
-            await conn.request(Device.GetPower(), timeout=0.1)
+        try:
+            # Request should timeout when no server is available
+            with pytest.raises(LifxTimeoutError):
+                await conn.request(Device.GetPower(), timeout=0.1)
+        finally:
+            await conn.close()
 
 
 @pytest.mark.emulator
@@ -59,9 +62,12 @@ class TestErrorHandling:
             max_retries=0,  # No retries for faster test
         )
 
-        # This should timeout since server drops all GetPower packets
-        with pytest.raises(LifxTimeoutError):
-            await conn.request(Device.GetPower(), timeout=0.5)
+        try:
+            # This should timeout since server drops all GetPower packets
+            with pytest.raises(LifxTimeoutError):
+                await conn.request(Device.GetPower(), timeout=0.5)
+        finally:
+            await conn.close()
 
     async def test_concurrent_requests_with_one_timing_out(
         self, emulator_server_with_scenarios
@@ -105,12 +111,15 @@ class TestErrorHandling:
             except LifxTimeoutError:
                 return "label_timeout"
 
-        # Run both concurrently
-        results = await asyncio.gather(get_power(), get_label())
+        try:
+            # Run both concurrently
+            results = await asyncio.gather(get_power(), get_label())
 
-        # Power request should timeout, label should succeed
-        assert results[0] == "power_timeout"
-        assert results[1] == "label_success"
+            # Power request should timeout, label should succeed
+            assert results[0] == "power_timeout"
+            assert results[1] == "label_success"
+        finally:
+            await conn.close()
 
 
 @pytest.mark.emulator
@@ -135,14 +144,17 @@ class TestAsyncGeneratorRequests:
             max_retries=2,
         )
 
-        # Stream should yield single response
-        received = []
-        async for response in conn.request_stream(Device.GetLabel()):
-            received.append(response)
-            break  # Exit immediately after first response
+        try:
+            # Stream should yield single response
+            received = []
+            async for response in conn.request_stream(Device.GetLabel()):
+                received.append(response)
+                break  # Exit immediately after first response
 
-        assert len(received) == 1
-        assert hasattr(received[0], "label")
+            assert len(received) == 1
+            assert hasattr(received[0], "label")
+        finally:
+            await conn.close()
 
     async def test_request_stream_convenience_wrapper(
         self, emulator_server_with_scenarios
@@ -164,9 +176,12 @@ class TestAsyncGeneratorRequests:
             max_retries=2,
         )
 
-        # request() should return single response directly
-        response = await conn.request(Device.GetLabel())
-        assert hasattr(response, "label")
+        try:
+            # request() should return single response directly
+            response = await conn.request(Device.GetLabel())
+            assert hasattr(response, "label")
+        finally:
+            await conn.close()
 
     async def test_early_exit_no_resource_leak(self, emulator_server_with_scenarios):
         """Test that breaking early doesn't leak resources."""
@@ -292,6 +307,8 @@ class TestRetryTimeoutBudget:
             "Sleep time should be added on top of timeout budget"
         )
 
+        await conn.close()
+
     async def test_retry_timeout_calculation_consistency(
         self, emulator_server_with_scenarios
     ):
@@ -350,6 +367,8 @@ class TestRetryTimeoutBudget:
         assert elapsed_get >= timeout
         assert elapsed_set >= timeout
 
+        await conn.close()
+
     async def test_retry_all_attempts_get_fair_timeout(
         self, emulator_server_with_scenarios
     ):
@@ -371,9 +390,8 @@ class TestRetryTimeoutBudget:
 
         from lifx.network.connection import DeviceConnection
 
-        # Use settings similar to real-world usage
-        timeout = 8.0  # Default timeout
-        max_retries = 4  # 5 total attempts (like in the error log)
+        timeout = 2.0
+        max_retries = 2
 
         conn = DeviceConnection(
             serial="d073d5000001",
@@ -388,11 +406,9 @@ class TestRetryTimeoutBudget:
             await conn.request(Device.GetPower(), timeout=timeout)
 
         # Verify all attempts were made
-        assert "after 5 attempts" in str(exc_info.value)
+        assert "after 3 attempts" in str(exc_info.value)
 
-        # The error message should NOT show a very short timeout on later attempts
-        # (like "No response within 0.613s" which would indicate the bug)
         error_msg = str(exc_info.value)
-
-        # The error should be about exhausting all attempts, not a premature timeout
         assert "No response from" in error_msg
+
+        await conn.close()

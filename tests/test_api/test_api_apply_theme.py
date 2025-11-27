@@ -259,8 +259,6 @@ class TestDeviceGroupApplyTheme:
         self, emulator_devices: DeviceGroup
     ) -> None:
         """Test apply_theme with zero duration (instant change)."""
-        import rich
-
         group = emulator_devices
 
         async with group:
@@ -271,7 +269,6 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.05)
             device = group.lights[0]
             color, _, _ = await device.get_color()
-            rich.inspect(color, methods=True, dunder=True)
             assert color in theme.colors
 
     async def test_apply_theme_large_duration(

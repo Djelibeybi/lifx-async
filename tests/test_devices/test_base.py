@@ -48,9 +48,9 @@ class TestDevice:
             Device(serial="d073d5", ip="192.168.1.100")
 
     @pytest.mark.asyncio
-    async def test_create_device_from_ip(self, emulator_server: int) -> None:
+    async def test_create_device_from_ip(self, emulator_port: int) -> None:
         """Test creating a device from an IP address."""
-        async with await Device.from_ip(ip="127.0.0.1", port=emulator_server) as device:
+        async with await Device.from_ip(ip="127.0.0.1", port=emulator_port) as device:
             assert isinstance(device, Device)
 
     async def test_get_label(self, device: Device) -> None:
@@ -296,10 +296,12 @@ class TestLocationAndGroupManagement:
         # Replace device's connection with mock
 
         # Mock discovery to return no devices (so new UUID is generated)
-        with patch(
-            "lifx.network.discovery.discover_devices", new_callable=AsyncMock
-        ) as mock_discover:
-            mock_discover.return_value = []
+        # Use a proper async generator mock since discover_devices is an async generator
+        async def empty_async_gen(*args, **kwargs):
+            return
+            yield  # Makes this an async generator
+
+        with patch("lifx.network.discovery.discover_devices", empty_async_gen):
             await device.set_location(label)
 
         # Verify request was called with new connection API
@@ -326,10 +328,12 @@ class TestLocationAndGroupManagement:
         # Replace device's connection with mock
 
         # Mock discovery to return no devices (so new UUID is generated)
-        with patch(
-            "lifx.network.discovery.discover_devices", new_callable=AsyncMock
-        ) as mock_discover:
-            mock_discover.return_value = []
+        # Use a proper async generator mock since discover_devices is an async generator
+        async def empty_async_gen(*args, **kwargs):
+            return
+            yield  # Makes this an async generator
+
+        with patch("lifx.network.discovery.discover_devices", empty_async_gen):
             await device.set_group(label)
 
         # Verify request was called with new connection API
@@ -362,10 +366,12 @@ class TestLocationAndGroupManagement:
         device2.connection = mock_conn
 
         # Mock discovery to return no devices for both calls
-        with patch(
-            "lifx.network.discovery.discover_devices", new_callable=AsyncMock
-        ) as mock_discover:
-            mock_discover.return_value = []
+        # Use a proper async generator mock since discover_devices is an async generator
+        async def empty_async_gen(*args, **kwargs):
+            return
+            yield  # Makes this an async generator
+
+        with patch("lifx.network.discovery.discover_devices", empty_async_gen):
             await device1.set_location(label)
             mock_conn.request.reset_mock()
             await device2.set_location(label)
@@ -389,10 +395,12 @@ class TestLocationAndGroupManagement:
         device2.connection = mock_conn
 
         # Mock discovery to return no devices for both calls
-        with patch(
-            "lifx.network.discovery.discover_devices", new_callable=AsyncMock
-        ) as mock_discover:
-            mock_discover.return_value = []
+        # Use a proper async generator mock since discover_devices is an async generator
+        async def empty_async_gen(*args, **kwargs):
+            return
+            yield  # Makes this an async generator
+
+        with patch("lifx.network.discovery.discover_devices", empty_async_gen):
             await device1.set_group(label)
             mock_conn.request.reset_mock()
             await device2.set_group(label)
