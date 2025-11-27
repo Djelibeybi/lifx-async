@@ -19,6 +19,10 @@ class TestHSBK:
         assert color.saturation == 0.5
         assert color.brightness == 0.75
         assert color.kelvin == 3500
+        assert repr(color) == (
+            f"HSBK(hue={color.hue}, saturation={color.saturation:.2f}, "
+            f"brightness={color.brightness:.2f}, kelvin={color.kelvin})"
+        )
 
     def test_validate_hue_range(self) -> None:
         """Test hue validation."""
