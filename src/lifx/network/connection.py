@@ -760,7 +760,7 @@ class DeviceConnection:
     async def request_stream(
         self,
         packet: Any,
-        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        timeout: float | None = None,
     ) -> AsyncGenerator[Any, None]:
         """Send request and yield unpacked responses.
 
@@ -822,6 +822,9 @@ class DeviceConnection:
         """
         # Ensure connection is open (lazy opening)
         await self._ensure_open()
+
+        if timeout is None:
+            timeout = self.timeout
 
         # Get packet metadata
         packet_kind = getattr(packet, "_packet_kind", "OTHER")
@@ -942,11 +945,7 @@ class DeviceConnection:
                     f"Packet missing PKT_TYPE: {type(packet).__name__}"
                 )
 
-    async def request(
-        self,
-        packet: Any,
-        timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    ) -> Any:
+    async def request(self, packet: Any, timeout: float | None = None) -> Any:
         """Send request and get single response (convenience wrapper).
 
         This is a convenience method that returns the first response from
