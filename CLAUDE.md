@@ -12,7 +12,7 @@ structures from a YAML specification.
 **Python Versions**: 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI)
 **Runtime Dependencies**: Zero - completely dependency-free!
 **Async Framework**: Python's built-in `asyncio` (no external async library required)
-**Test Isolation**: lifx-emulator runs as subprocess, not a dependency
+**Test Isolation**: lifx-emulator-core runs embedded in-process for fast, cross-platform testing
 
 ## Essential Commands
 
@@ -610,38 +610,27 @@ The `discover_devices()` function implements DoS protection through:
 Test files mirror source structure: `tests/test_devices/test_light.py` tests
 `src/lifx/devices/light.py`
 
-### Integration Tests with lifx-emulator
+### Integration Tests with lifx-emulator-core
 
-Some tests require the `lifx-emulator` to run integration tests against real protocol implementations.
-The emulator runs as a **separate subprocess** and is **not** a dependency of lifx.
+Some tests require `lifx-emulator-core` to run integration tests against real protocol implementations.
+The emulator runs **embedded in-process** as a dev dependency, providing:
+- Fast startup (~5-10ms vs 500ms+ for subprocess)
+- Cross-platform support (Windows, macOS, Linux)
+- Direct access to emulator internals for scenario testing
 
-**Setup Options**:
-
-1. **Development setup** (recommended): Clone lifx-emulator as a sibling directory
-   ```bash
-   cd ..
-   git clone https://github.com/Djelibeybi/lifx-emulator.git
-   cd lifx-emulator
-   uv sync
-   cd ../lifx
-   ```
-
-2. **System install**: Install lifx-emulator globally (requires Python 3.13+)
-   ```bash
-   uv tool install lifx-emulator
-   ```
+**Setup**: The emulator is automatically installed as a dev dependency:
+```bash
+uv sync  # Installs lifx-emulator-core automatically
+```
 
 **Running Integration Tests**:
+- Tests marked with `@pytest.mark.emulator` use the embedded emulator
 - If emulator is not available, these tests are automatically skipped
-- No code changes needed - pytest plugin handles everything
-- **Works on all Python versions (3.11+)** since emulator runs as separate process
-
-**Note**: The emulator itself requires Python 3.13+, but it runs as a subprocess so your
-lifx tests can run on any supported Python version (3.11-3.14).
+- **Works on all Python versions (3.11+)**
 
 **External Emulator Management**:
 
-For cases where you want to manage the emulator separately (or test against actual hardware), you can skip the automatic emulator subprocess startup:
+For cases where you want to manage the emulator separately (or test against actual hardware):
 
 ```bash
 # Use an externally managed emulator instance
@@ -654,7 +643,6 @@ LIFX_EMULATOR_EXTERNAL=1 pytest
 This is useful when:
 - Testing against actual LIFX hardware on your network
 - Running the emulator with custom configuration or device setup
-- Using a shared emulator instance across multiple test runs
 - Debugging emulator behavior separately from the test suite
 
 **Key Test Files:**

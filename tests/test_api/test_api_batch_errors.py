@@ -42,17 +42,21 @@ class TestBatchOperationPartialFailures:
 
         group = DeviceGroup(real_devices)
 
-        # Should raise ExceptionGroup because fake device will timeout
-        with pytest.raises(ExceptionGroup) as exc_info:
-            await group.set_power(True, duration=0.0)
+        try:
+            # Should raise ExceptionGroup because fake device will timeout
+            with pytest.raises(ExceptionGroup) as exc_info:
+                await group.set_power(True, duration=0.0)
 
-        # ExceptionGroup should contain at least one timeout error
-        exceptions = exc_info.value.exceptions
-        assert len(exceptions) > 0
-        assert any(
-            "timeout" in str(e).lower() or "Timeout" in type(e).__name__
-            for e in exceptions
-        )
+            # ExceptionGroup should contain at least one timeout error
+            exceptions = exc_info.value.exceptions
+            assert len(exceptions) > 0
+            assert any(
+                "timeout" in str(e).lower() or "Timeout" in type(e).__name__
+                for e in exceptions
+            )
+        finally:
+            # Clean up fake device connection
+            await fake_device.connection.close()
 
 
 @pytest.mark.emulator
@@ -128,16 +132,21 @@ class TestBatchOperationEdgeCases:
         ]
         group = DeviceGroup(light_devices)
 
-        # Should raise ExceptionGroup with all 3 failing
-        with pytest.raises(ExceptionGroup) as exc_info:
-            await group.set_power(True, duration=0.0)
+        try:
+            # Should raise ExceptionGroup with all 3 failing
+            with pytest.raises(ExceptionGroup) as exc_info:
+                await group.set_power(True, duration=0.0)
 
-        exceptions = exc_info.value.exceptions
-        assert len(exceptions) > 0
-        assert any(
-            "timeout" in str(e).lower() or "Timeout" in type(e).__name__
-            for e in exceptions
-        )
+            exceptions = exc_info.value.exceptions
+            assert len(exceptions) > 0
+            assert any(
+                "timeout" in str(e).lower() or "Timeout" in type(e).__name__
+                for e in exceptions
+            )
+        finally:
+            # Clean up fake device connections
+            for device in light_devices:
+                await device.connection.close()
 
     async def test_batch_operation_mixed_success_failure(
         self, emulator_devices: DeviceGroup
@@ -146,33 +155,38 @@ class TestBatchOperationEdgeCases:
         # Use one real device from emulator and add fake ones
         real_device = emulator_devices.devices[0]
 
+        # Create fake devices that will fail
+        fake_device_1 = Light(
+            serial="d073d5999998",
+            ip="127.0.0.1",
+            port=get_free_port(),
+            timeout=0.1,
+            max_retries=0,
+        )
+        fake_device_2 = Light(
+            serial="d073d5999999",
+            ip="127.0.0.1",
+            port=get_free_port(),
+            timeout=0.1,
+            max_retries=0,
+        )
+
         # Create group with real device and fake ones
-        light_devices = [
-            real_device,  # Real
-            Light(
-                serial="d073d5999998",
-                ip="127.0.0.1",
-                port=get_free_port(),
-                timeout=0.1,
-                max_retries=0,
-            ),  # Fake (will fail)
-            Light(
-                serial="d073d5999999",
-                ip="127.0.0.1",
-                port=get_free_port(),
-                timeout=0.1,
-                max_retries=0,
-            ),  # Fake (will fail)
-        ]
+        light_devices = [real_device, fake_device_1, fake_device_2]
         group = DeviceGroup(light_devices)
 
-        # Attempt batch operation - should raise ExceptionGroup
-        with pytest.raises(ExceptionGroup):
-            await group.set_power(True, duration=0.0)
+        try:
+            # Attempt batch operation - should raise ExceptionGroup
+            with pytest.raises(ExceptionGroup):
+                await group.set_power(True, duration=0.0)
 
-        # Verify that the real device actually changed state
-        is_on = await real_device.get_power()
-        assert is_on  # Real device should be on
+            # Verify that the real device actually changed state
+            is_on = await real_device.get_power()
+            assert is_on  # Real device should be on
+        finally:
+            # Clean up fake device connections
+            await fake_device_1.connection.close()
+            await fake_device_2.connection.close()
 
 
 @pytest.mark.emulator
@@ -186,40 +200,44 @@ class TestBatchOperationErrorDetails:
         # Use one real device from emulator and add a fake device
         real_device = emulator_devices.devices[0]
 
+        # Create fake device that will timeout
+        fake_device = Light(
+            serial="d073d5999999",
+            ip="127.0.0.1",
+            port=get_free_port(),
+            timeout=0.5,
+            max_retries=0,
+        )
+
         # Create group with real and fake devices
-        light_devices = [
-            real_device,
-            Light(
-                serial="d073d5999999",
-                ip="127.0.0.1",
-                port=get_free_port(),
-                timeout=0.5,
-                max_retries=0,
-            ),
-        ]
+        light_devices = [real_device, fake_device]
         group = DeviceGroup(light_devices)
 
-        # Trigger failure
-        with pytest.raises(ExceptionGroup) as exc_info:
-            await group.set_power(True, duration=0.0)
+        try:
+            # Trigger failure
+            with pytest.raises(ExceptionGroup) as exc_info:
+                await group.set_power(True, duration=0.0)
 
-        # ExceptionGroup should be present
-        assert exc_info.value is not None
+            # ExceptionGroup should be present
+            assert exc_info.value is not None
 
-        # Should have at least one exception
-        exceptions = exc_info.value.exceptions
-        assert len(exceptions) > 0
+            # Should have at least one exception
+            exceptions = exc_info.value.exceptions
+            assert len(exceptions) > 0
 
-        # Exceptions should be specific LIFX exception types
-        for exc in exceptions:
-            # Should be a LIFX exception type
-            from lifx.exceptions import (
-                LifxConnectionError,
-                LifxProtocolError,
-                LifxTimeoutError,
-            )
+            # Exceptions should be specific LIFX exception types
+            for exc in exceptions:
+                # Should be a LIFX exception type
+                from lifx.exceptions import (
+                    LifxConnectionError,
+                    LifxProtocolError,
+                    LifxTimeoutError,
+                )
 
-            assert isinstance(
-                exc,
-                LifxTimeoutError | LifxConnectionError | LifxProtocolError,
-            ), f"Expected LIFX exception type, got {type(exc).__name__}: {exc}"
+                assert isinstance(
+                    exc,
+                    LifxTimeoutError | LifxConnectionError | LifxProtocolError,
+                ), f"Expected LIFX exception type, got {type(exc).__name__}: {exc}"
+        finally:
+            # Clean up the fake device connection
+            await fake_device.connection.close()
