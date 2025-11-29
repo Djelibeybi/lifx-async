@@ -1182,6 +1182,7 @@ Downloads the official protocol.yml from the LIFX GitHub repository and generate
 | `apply_field_name_quirks`                   | Apply quirks to field names to avoid Python built-ins and reserved words.         |
 | `apply_extended_multizone_packet_quirks`    | Apply quirks to extended multizone packet names to follow LIFX naming convention. |
 | `apply_tile_effect_parameter_quirk`         | Apply local quirk to fix TileEffectParameter structure.                           |
+| `apply_tile_state_device_quirk`             | Apply local quirk to add supported_frame_buffers field to TileStateDevice.        |
 | `apply_sensor_packet_quirks`                | Add undocumented sensor packets for ambient light level reading.                  |
 | `apply_firmware_effect_enum_quirk`          | Merge MultiZoneEffectType and TileEffectType into FirmwareEffect enum.            |
 | `apply_multizone_application_request_quirk` | Suppress MultiZoneExtendedApplicationRequest enum.                                |
@@ -1644,6 +1645,67 @@ def apply_tile_effect_parameter_quirk(
                 {"size_bytes": 23},
             ],
         }
+    return fields
+```
+
+##### apply_tile_state_device_quirk
+
+```python
+apply_tile_state_device_quirk(fields: dict[str, Any]) -> dict[str, Any]
+```
+
+Apply local quirk to add supported_frame_buffers field to TileStateDevice.
+
+The upstream protocol.yml has a reserved field between height and device_version. This quirk replaces that reserved field with supported_frame_buffers (uint8).
+
+| PARAMETER | DESCRIPTION                                                |
+| --------- | ---------------------------------------------------------- |
+| `fields`  | Dictionary of field definitions **TYPE:** `dict[str, Any]` |
+
+| RETURNS          | DESCRIPTION                                   |
+| ---------------- | --------------------------------------------- |
+| `dict[str, Any]` | Dictionary with TileStateDevice quirk applied |
+
+Source code in `src/lifx/protocol/generator.py`
+
+```python
+def apply_tile_state_device_quirk(
+    fields: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply local quirk to add supported_frame_buffers field to TileStateDevice.
+
+    The upstream protocol.yml has a reserved field between height and device_version.
+    This quirk replaces that reserved field with supported_frame_buffers (uint8).
+
+    Args:
+        fields: Dictionary of field definitions
+
+    Returns:
+        Dictionary with TileStateDevice quirk applied
+    """
+    if "TileStateDevice" in fields:
+        tile_def = fields["TileStateDevice"]
+        if "fields" in tile_def:
+            # Find and replace the reserved field between height and device_version
+            fields_list = tile_def["fields"]
+            for i, field in enumerate(fields_list):
+                # Look for height field
+                if field.get("name") == "Height":
+                    # Check if next field is reserved (1 byte) and followed by DeviceVersion
+                    if (
+                        i + 1 < len(fields_list)
+                        and i + 2 < len(fields_list)
+                        and fields_list[i + 1].get("type") == "reserved"
+                        and fields_list[i + 1].get("size_bytes") == 1
+                        and fields_list[i + 2].get("name") == "DeviceVersion"
+                    ):
+                        # Replace the reserved field with supported_frame_buffers
+                        fields_list[i + 1] = {
+                            "name": "SupportedFrameBuffers",
+                            "type": "uint8",
+                        }
+                        break
+
     return fields
 ```
 
@@ -3506,6 +3568,7 @@ def main() -> None:
     )
     enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
+    fields = apply_tile_state_device_quirk(fields)
     packets = apply_sensor_packet_quirks(packets)
 
     # Rebuild protocol dict with filtered items for validation

@@ -18,6 +18,8 @@ Device(
 )
 ```
 
+Bases: `Generic[StateT]`
+
 Base class for LIFX devices.
 
 This class provides common functionality for all LIFX devices:
@@ -66,6 +68,7 @@ async with device:
 | METHOD              | DESCRIPTION                                             |
 | ------------------- | ------------------------------------------------------- |
 | `from_ip`           | Create and return an instance for the given IP address. |
+| `connect`           | Create and return a fully initialized device instance.  |
 | `get_mac_address`   | Calculate and return the MAC address for this device.   |
 | `get_label`         | Get device label/name.                                  |
 | `set_label`         | Set device label/name.                                  |
@@ -81,10 +84,13 @@ async with device:
 | `get_group`         | Get device group information.                           |
 | `set_group`         | Set device group information.                           |
 | `set_reboot`        | Reboot the device.                                      |
+| `close`             | Close device connection and cleanup resources.          |
+| `refresh_state`     | Refresh device state from hardware.                     |
 
 | ATTRIBUTE       | DESCRIPTION                                                     |
 | --------------- | --------------------------------------------------------------- |
 | `capabilities`  | Get device product capabilities. **TYPE:** \`ProductInfo        |
+| `state`         | Get device state if available. **TYPE:** \`StateT               |
 | `label`         | Get cached label if available. **TYPE:** \`str                  |
 | `version`       | Get cached version if available. **TYPE:** \`DeviceVersion      |
 | `host_firmware` | Get cached host firmware if available. **TYPE:** \`FirmwareInfo |
@@ -214,12 +220,18 @@ def __init__(
     self._version: DeviceVersion | None = None
     self._host_firmware: FirmwareInfo | None = None
     self._wifi_firmware: FirmwareInfo | None = None
-    self._location: LocationInfo | None = None
-    self._group: GroupInfo | None = None
+    self._location: CollectionInfo | None = None
+    self._group: CollectionInfo | None = None
     self._mac_address: str | None = None
 
     # Product capabilities for device features (populated on first use)
     self._capabilities: ProductInfo | None = None
+
+    # State management (populated by connect() factory or _initialize_state())
+    self._state: StateT | None = None
+    self._refresh_task: asyncio.Task[None] | None = None
+    self._refresh_lock = asyncio.Lock()
+    self._is_closed = False
 ```
 
 #### Attributes
@@ -253,6 +265,20 @@ async with device:
     if device.capabilities and device.capabilities.has_extended_multizone:
         print("Device supports extended multizone")
 ```
+
+##### state
+
+```python
+state: StateT | None
+```
+
+Get device state if available.
+
+State is populated by the connect() factory method or by calling \_initialize_state() directly. Returns None if state has not been initialized.
+
+| RETURNS  | DESCRIPTION |
+| -------- | ----------- |
+| \`StateT | None\`      |
 
 ##### label
 
@@ -469,6 +495,212 @@ async def from_ip(
     raise LifxDeviceNotFoundError()
 ````
 
+##### connect
+
+```python
+connect(
+    ip: str,
+    serial: str | None = None,
+    port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
+```
+
+Create and return a fully initialized device instance.
+
+This factory method creates the appropriate device type (Light, etc) based on the device's capabilities and initializes its state. The returned device MUST be used with an async context manager.
+
+The returned device subclass has guaranteed initialized state - the state property will never be None for devices created via this method.
+
+| PARAMETER     | DESCRIPTION                                                                                                           |
+| ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `ip`          | IP address of the device **TYPE:** `str`                                                                              |
+| `serial`      | Optional serial number (12-digit hex, with or without colons). If None, queries device to get serial. **TYPE:** \`str |
+| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                                      |
+| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT`                     |
+| `max_retries` | Maximum number of retry attempts **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`                                   |
+
+| RETURNS | DESCRIPTION |
+| ------- | ----------- |
+| \`Light | HevLight    |
+| \`Light | HevLight    |
+
+| RAISES                    | DESCRIPTION                            |
+| ------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError` | If device cannot be found or contacted |
+| `LifxTimeoutError`        | If device does not respond             |
+| `ValueError`              | If serial format is invalid            |
+
+Example
+
+```python
+# Connect by IP (serial auto-detected)
+device = await Device.connect(ip="192.168.1.100")
+async with device:
+    # device.state is guaranteed to be initialized
+    print(f"{device.state.model}: {device.state.label}")
+    if device.state.is_on:
+        print("Device is on")
+
+# Connect with known serial
+device = await Device.connect(ip="192.168.1.100", serial="d073d5123456")
+async with device:
+    await device.set_power(True)
+```
+
+Source code in `src/lifx/devices/base.py`
+
+````python
+@classmethod
+async def connect(
+    cls,
+    ip: str,
+    serial: str | None = None,
+    port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+    """Create and return a fully initialized device instance.
+
+    This factory method creates the appropriate device type (Light, etc)
+    based on the device's capabilities and initializes its state. The returned
+    device MUST be used with an async context manager.
+
+    The returned device subclass has guaranteed initialized state - the state
+    property will never be None for devices created via this method.
+
+    Args:
+        ip: IP address of the device
+        serial: Optional serial number (12-digit hex, with or without colons).
+                If None, queries device to get serial.
+        port: Port number (default LIFX_UDP_PORT)
+        timeout: Request timeout for this device instance
+        max_retries: Maximum number of retry attempts
+
+    Returns:
+        Fully initialized device instance (Light, MultiZoneLight, MatrixLight, etc.)
+        with complete state loaded and guaranteed non-None state property.
+
+    Raises:
+        LifxDeviceNotFoundError: If device cannot be found or contacted
+        LifxTimeoutError: If device does not respond
+        ValueError: If serial format is invalid
+
+    Example:
+        ```python
+        # Connect by IP (serial auto-detected)
+        device = await Device.connect(ip="192.168.1.100")
+        async with device:
+            # device.state is guaranteed to be initialized
+            print(f"{device.state.model}: {device.state.label}")
+            if device.state.is_on:
+                print("Device is on")
+
+        # Connect with known serial
+        device = await Device.connect(ip="192.168.1.100", serial="d073d5123456")
+        async with device:
+            await device.set_power(True)
+        ```
+    """
+    # Step 1: Get serial if not provided
+    if serial is None:
+        temp_conn = DeviceConnection(
+            serial="000000000000",
+            ip=ip,
+            port=port,
+            timeout=timeout,
+            max_retries=max_retries,
+        )
+        try:
+            response = await temp_conn.request(
+                packets.Device.GetService(), timeout=timeout
+            )
+            if response and isinstance(response, packets.Device.StateService):
+                if temp_conn.serial and temp_conn.serial != "000000000000":
+                    serial = temp_conn.serial
+                else:
+                    raise LifxDeviceNotFoundError(
+                        "Could not determine device serial"
+                    )
+            else:
+                raise LifxDeviceNotFoundError("No response from device")
+        finally:
+            await temp_conn.close()
+
+    # Step 2: Normalize serial (accept with or without colons)
+    serial = serial.replace(":", "")
+
+    # Step 3: Create temporary device to get product info
+    temp_device = cls(
+        serial=serial,
+        ip=ip,
+        port=port,
+        timeout=timeout,
+        max_retries=max_retries,
+    )
+
+    try:
+        # Get version to determine product
+        version = await temp_device.get_version()
+        product_info = get_product(version.product)
+
+        if product_info is None:
+            raise LifxDeviceNotFoundError(f"Unknown product ID: {version.product}")
+
+        # Step 4: Determine correct device class based on capabilities
+        # Import device classes here to avoid circular imports
+        from typing import TYPE_CHECKING
+
+        if TYPE_CHECKING:
+            from lifx.devices.hev import HevLight
+            from lifx.devices.infrared import InfraredLight
+            from lifx.devices.light import Light
+            from lifx.devices.matrix import MatrixLight
+            from lifx.devices.multizone import MultiZoneLight
+
+        device_class: type[Device] = cls
+
+        if product_info.has_matrix:
+            from lifx.devices.matrix import MatrixLight
+
+            device_class = MatrixLight
+        elif product_info.has_multizone:
+            from lifx.devices.multizone import MultiZoneLight
+
+            device_class = MultiZoneLight
+        elif product_info.has_infrared:
+            from lifx.devices.infrared import InfraredLight
+
+            device_class = InfraredLight
+        elif product_info.has_hev:
+            from lifx.devices.hev import HevLight
+
+            device_class = HevLight
+        elif product_info.has_color:
+            from lifx.devices.light import Light
+
+            device_class = Light
+
+        # Step 5: Create instance of correct device class
+        device = device_class(
+            serial=serial,
+            ip=ip,
+            port=port,
+            timeout=timeout,
+            max_retries=max_retries,
+        )
+
+        # Type system note: device._state is guaranteed non-None after
+        # _initialize_state().
+        # Each subclass overrides _state to be non-optional
+        return device  # type: ignore[return-value]
+
+    finally:
+        # Clean up temporary device
+        await temp_device.connection.close()
+````
+
 ##### get_mac_address
 
 ```python
@@ -564,16 +796,22 @@ async def get_label(self) -> str:
     self._raise_if_unhandled(state)
 
     # Store label
-    self._label = state.label
+    label_value = state.label
+    self._label = label_value
+    # Update state if it exists
+    if self._state is not None:
+        self._state.label = label_value
+        self._state.last_updated = __import__("time").time()
+
     _LOGGER.debug(
         {
             "class": "Device",
             "method": "get_label",
             "action": "query",
-            "reply": {"label": state.label},
+            "reply": {"label": label_value},
         }
     )
-    return state.label
+    return label_value
 ````
 
 ##### set_label
@@ -637,8 +875,13 @@ async def set_label(self, label: str) -> None:
     )
     self._raise_if_unhandled(result)
 
-    # Update cached state
-    self._label = label
+    if result:
+        self._label = label
+
+        if self._state is not None:
+            self._state.label = label
+            await self._schedule_refresh()
+
     _LOGGER.debug(
         {
             "class": "Device",
@@ -705,15 +948,21 @@ async def get_power(self) -> int:
     self._raise_if_unhandled(state)
 
     # Power level is uint16 (0 or 65535)
+    power_level = state.level
+    # Update state if it exists
+    if self._state is not None:
+        self._state.power = power_level
+        self._state.last_updated = __import__("time").time()
+
     _LOGGER.debug(
         {
             "class": "Device",
             "method": "get_power",
             "action": "query",
-            "reply": {"level": state.level},
+            "reply": {"level": power_level},
         }
     )
-    return state.level
+    return power_level
 ````
 
 ##### set_power
@@ -784,8 +1033,6 @@ async def set_power(self, level: bool | int) -> None:
         if level not in (0, 65535):
             raise ValueError(f"Power level must be 0 or 65535, got {level}")
         power_level = level
-    else:
-        raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
     # Request automatically handles acknowledgement
     result = await self.connection.request(
@@ -801,6 +1048,9 @@ async def set_power(self, level: bool | int) -> None:
             "values": {"level": power_level},
         }
     )
+
+    if result and self._state is not None:
+        await self._schedule_refresh()
 ````
 
 ##### get_version
@@ -1184,16 +1434,16 @@ async def get_wifi_firmware(self) -> FirmwareInfo:
 ##### get_location
 
 ```python
-get_location() -> LocationInfo
+get_location() -> CollectionInfo
 ```
 
 Get device location information.
 
 Always fetches from device.
 
-| RETURNS        | DESCRIPTION                                                   |
-| -------------- | ------------------------------------------------------------- |
-| `LocationInfo` | LocationInfo with location UUID, label, and updated timestamp |
+| RETURNS          | DESCRIPTION                                                     |
+| ---------------- | --------------------------------------------------------------- |
+| `CollectionInfo` | CollectionInfo with location UUID, label, and updated timestamp |
 
 | RAISES                        | DESCRIPTION                            |
 | ----------------------------- | -------------------------------------- |
@@ -1207,19 +1457,19 @@ Example
 ```python
 location = await device.get_location()
 print(f"Location: {location.label}")
-print(f"Location ID: {location.location.hex()}")
+print(f"Location ID: {location.uuid}")
 ```
 
 Source code in `src/lifx/devices/base.py`
 
 ````python
-async def get_location(self) -> LocationInfo:
+async def get_location(self) -> CollectionInfo:
     """Get device location information.
 
     Always fetches from device.
 
     Returns:
-        LocationInfo with location UUID, label, and updated timestamp
+        CollectionInfo with location UUID, label, and updated timestamp
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -1231,20 +1481,22 @@ async def get_location(self) -> LocationInfo:
         ```python
         location = await device.get_location()
         print(f"Location: {location.label}")
-        print(f"Location ID: {location.location.hex()}")
+        print(f"Location ID: {location.uuid}")
         ```
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetLocation())  # type: ignore
     self._raise_if_unhandled(state)
 
-    location = LocationInfo(
-        location=state.location,
+    location = CollectionInfo(
+        uuid=state.location.hex(),
         label=state.label,
         updated_at=state.updated_at,
     )
 
     self._location = location
+    if self._state is not None:
+        self._state.location = location
 
     _LOGGER.debug(
         {
@@ -1367,6 +1619,7 @@ async def set_location(
                     and isinstance(state_packet.location, bytes)
                 ):
                     location_uuid_to_use = state_packet.location
+                    assert location_uuid_to_use is not None
                     # Type narrowing: we know location_uuid_to_use is not None here
                     _LOGGER.debug(
                         {
@@ -1419,11 +1672,17 @@ async def set_location(
     )
     self._raise_if_unhandled(result)
 
-    # Update cached state
-    location_info = LocationInfo(
-        location=location_uuid_to_use, label=label, updated_at=updated_at
-    )
-    self._location = location_info
+    if result:
+        self._location = CollectionInfo(
+            uuid=location_uuid_to_use.hex(), label=label, updated_at=updated_at
+        )
+
+    if result and self._state is not None:
+        self._state.location.uuid = location_uuid_to_use.hex()
+        self._state.location.label = label
+        self._state.location.updated_at = updated_at
+        await self._schedule_refresh()
+
     _LOGGER.debug(
         {
             "class": "Device",
@@ -1441,16 +1700,16 @@ async def set_location(
 ##### get_group
 
 ```python
-get_group() -> GroupInfo
+get_group() -> CollectionInfo
 ```
 
 Get device group information.
 
 Always fetches from device.
 
-| RETURNS     | DESCRIPTION                                             |
-| ----------- | ------------------------------------------------------- |
-| `GroupInfo` | GroupInfo with group UUID, label, and updated timestamp |
+| RETURNS          | DESCRIPTION                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `CollectionInfo` | CollectionInfo with group UUID, label, and updated timestamp |
 
 | RAISES                        | DESCRIPTION                            |
 | ----------------------------- | -------------------------------------- |
@@ -1464,19 +1723,19 @@ Example
 ```python
 group = await device.get_group()
 print(f"Group: {group.label}")
-print(f"Group ID: {group.group.hex()}")
+print(f"Group ID: {group.uuid}")
 ```
 
 Source code in `src/lifx/devices/base.py`
 
 ````python
-async def get_group(self) -> GroupInfo:
+async def get_group(self) -> CollectionInfo:
     """Get device group information.
 
     Always fetches from device.
 
     Returns:
-        GroupInfo with group UUID, label, and updated timestamp
+        CollectionInfo with group UUID, label, and updated timestamp
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -1488,20 +1747,22 @@ async def get_group(self) -> GroupInfo:
         ```python
         group = await device.get_group()
         print(f"Group: {group.label}")
-        print(f"Group ID: {group.group.hex()}")
+        print(f"Group ID: {group.uuid}")
         ```
     """
     # Request automatically unpacks response
     state = await self.connection.request(packets.Device.GetGroup())  # type: ignore
     self._raise_if_unhandled(state)
 
-    group = GroupInfo(
-        group=state.group,
+    group = CollectionInfo(
+        uuid=state.group.hex(),
         label=state.label,
         updated_at=state.updated_at,
     )
 
     self._group = group
+    if self._state is not None:
+        self._state.group = group
 
     _LOGGER.debug(
         {
@@ -1509,7 +1770,7 @@ async def get_group(self) -> GroupInfo:
             "method": "get_group",
             "action": "query",
             "reply": {
-                "group": state.group.hex(),
+                "uuid": state.group.hex(),
                 "label": state.label,
                 "updated_at": state.updated_at,
             },
@@ -1622,6 +1883,7 @@ async def set_group(
                     and isinstance(state_packet.group, bytes)
                 ):
                     group_uuid_to_use = state_packet.group
+                    assert group_uuid_to_use is not None
                     # Type narrowing: we know group_uuid_to_use is not None here
                     _LOGGER.debug(
                         {
@@ -1674,11 +1936,17 @@ async def set_group(
     )
     self._raise_if_unhandled(result)
 
-    # Update cached state
-    group_info = GroupInfo(
-        group=group_uuid_to_use, label=label, updated_at=updated_at
-    )
-    self._group = group_info
+    if result:
+        self._group = CollectionInfo(
+            uuid=group_uuid_to_use.hex(), label=label, updated_at=updated_at
+        )
+
+    if result and self._state is not None:
+        self._state.location.uuid = group_uuid_to_use.hex()
+        self._state.location.label = label
+        self._state.location.updated_at = updated_at
+        await self._schedule_refresh()
+
     _LOGGER.debug(
         {
             "class": "Device",
@@ -1761,6 +2029,71 @@ async def set_reboot(self) -> None:
     )
 ````
 
+##### close
+
+```python
+close() -> None
+```
+
+Close device connection and cleanup resources.
+
+Cancels any pending refresh tasks and closes the network connection. Called automatically when exiting the async context manager.
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+async def close(self) -> None:
+    """Close device connection and cleanup resources.
+
+    Cancels any pending refresh tasks and closes the network connection.
+    Called automatically when exiting the async context manager.
+    """
+    self._is_closed = True
+    if self._refresh_task and not self._refresh_task.done():
+        self._refresh_task.cancel()
+        try:
+            await self._refresh_task
+        except asyncio.CancelledError:
+            pass
+    await self.connection.close()
+```
+
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh device state from hardware.
+
+Fetches current state from device and updates the state instance. Base implementation fetches label, power, and updates timestamp. Subclasses override to add device-specific state updates.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh device state from hardware.
+
+    Fetches current state from device and updates the state instance.
+    Base implementation fetches label, power, and updates timestamp.
+    Subclasses override to add device-specific state updates.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    if not self._state:
+        await self._initialize_state()
+        return
+```
+
 ## Light
 
 The `Light` class provides color control and effects for standard LIFX lights.
@@ -1771,7 +2104,7 @@ The `Light` class provides color control and effects for standard LIFX lights.
 Light(*args, **kwargs)
 ```
 
-Bases: `Device`
+Bases: `Device[LightState]`
 
 LIFX light device with color control.
 
@@ -1821,11 +2154,13 @@ async with await Light.from_ip(ip="192.168.1.100") as light:
 | `pulse`                   | Pulse the light to a specific color.                                    |
 | `breathe`                 | Make the light breathe to a specific color.                             |
 | `apply_theme`             | Apply a theme to this light.                                            |
+| `refresh_state`           | Refresh light state from hardware.                                      |
 
-| ATTRIBUTE    | DESCRIPTION                                                          |
-| ------------ | -------------------------------------------------------------------- |
-| `min_kelvin` | Get the minimum supported kelvin value if available. **TYPE:** \`int |
-| `max_kelvin` | Get the maximum supported kelvin value if available. **TYPE:** \`int |
+| ATTRIBUTE    | DESCRIPTION                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| `state`      | Get light state (guaranteed to be initialized when using Device.connect()). **TYPE:** `LightState` |
+| `min_kelvin` | Get the minimum supported kelvin value if available. **TYPE:** \`int                               |
+| `max_kelvin` | Get the maximum supported kelvin value if available. **TYPE:** \`int                               |
 
 Source code in `src/lifx/devices/light.py`
 
@@ -1836,6 +2171,22 @@ def __init__(self, *args, **kwargs) -> None:
 ```
 
 #### Attributes
+
+##### state
+
+```python
+state: LightState
+```
+
+Get light state (guaranteed to be initialized when using Device.connect()).
+
+| RETURNS      | DESCRIPTION                         |
+| ------------ | ----------------------------------- |
+| `LightState` | LightState with current light state |
+
+| RAISES         | DESCRIPTION                             |
+| -------------- | --------------------------------------- |
+| `RuntimeError` | If accessed before state initialization |
 
 ##### min_kelvin
 
@@ -1937,6 +2288,17 @@ async def get_color(self) -> tuple[HSBK, int, str]:
     # Store label from StateColor response
     self._label = label  # Already decoded to string
 
+    # Update state if it exists (including all subclasses)
+    if self._state is not None:
+        # Update base fields available on all device states
+        self._state.power = power
+        self._state.label = label
+
+        if hasattr(self._state, "color"):
+            self._state.color = color
+
+        self._state.last_updated = __import__("time").time()
+
     _LOGGER.debug(
         {
             "class": "Device",
@@ -2030,7 +2392,7 @@ async def set_color(
 
     _LOGGER.debug(
         {
-            "class": "Device",
+            "class": "Light",
             "method": "set_color",
             "action": "change",
             "values": {
@@ -2042,6 +2404,11 @@ async def set_color(
             },
         }
     )
+
+    # Update state on acknowledgement
+    if result and self._state is not None:
+        self._state.color = color
+        await self._schedule_refresh()
 ````
 
 ##### set_brightness
@@ -2587,12 +2954,20 @@ async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
 
     _LOGGER.debug(
         {
-            "class": "Device",
+            "class": "Light",
             "method": "set_power",
             "action": "change",
             "values": {"level": power_level, "duration": duration_ms},
         }
     )
+
+    # Update state on acknowledgement
+    if result and self._state is not None:
+        self._state.power = power_level
+
+    # Schedule refresh to validate state
+    if self._state is not None:
+        await self._schedule_refresh()
 ````
 
 ##### set_waveform
@@ -2748,6 +3123,10 @@ async def set_waveform(
             },
         }
     )
+
+    # Schedule refresh to update state
+    if self._state is not None:
+        await self._schedule_refresh()
 ````
 
 ##### set_waveform_optional
@@ -2923,7 +3302,7 @@ async def set_waveform_optional(
     self._raise_if_unhandled(result)
     _LOGGER.debug(
         {
-            "class": "Device",
+            "class": "Light",
             "method": "set_waveform_optional",
             "action": "change",
             "values": {
@@ -2943,6 +3322,22 @@ async def set_waveform_optional(
             },
         }
     )
+
+    # Update state on acknowledgement (only if non-transient)
+    if result and not transient and self._state is not None:
+        # Create a new color with only the specified components updated
+        current = self._state.color
+        new_color = HSBK(
+            hue=color.hue if set_hue else current.hue,
+            saturation=color.saturation if set_saturation else current.saturation,
+            brightness=color.brightness if set_brightness else current.brightness,
+            kelvin=color.kelvin if set_kelvin else current.kelvin,
+        )
+        self._state.color = new_color
+
+    # Schedule refresh to validate state
+    if self._state is not None:
+        await self._schedule_refresh()
 ````
 
 ##### pulse
@@ -3149,6 +3544,50 @@ async def apply_theme(
         await self.set_color(color, duration=duration)
 ````
 
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh light state from hardware.
+
+Fetches color (which includes power and label) and updates state.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/light.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh light state from hardware.
+
+    Fetches color (which includes power and label) and updates state.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    import time
+
+    if self._state is None:
+        await self._initialize_state()
+        return
+
+    # GetColor returns color, power, and label in one request
+    color, power, label = await self.get_color()
+
+    self._state.color = color
+    self._state.power = power
+    self._state.label = label
+    self._state.last_updated = time.time()
+```
+
 ## HEV Light
 
 The `HevLight` class extends `Light` with anti-bacterial cleaning cycle control for LIFX HEV devices.
@@ -3197,11 +3636,13 @@ async with await HevLight.from_ip(ip="192.168.1.100") as light:
 | `get_hev_config`      | Get HEV cycle configuration.               |
 | `set_hev_config`      | Configure HEV cycle defaults.              |
 | `get_last_hev_result` | Get result of the last HEV cleaning cycle. |
+| `refresh_state`       | Refresh HEV light state from hardware.     |
 
-| ATTRIBUTE    | DESCRIPTION                                                                        |
-| ------------ | ---------------------------------------------------------------------------------- |
-| `hev_config` | Get cached HEV configuration if available. **TYPE:** \`HevConfig                   |
-| `hev_result` | Get cached last HEV cycle result if available. **TYPE:** \`LightLastHevCycleResult |
+| ATTRIBUTE    | DESCRIPTION                                                                             |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `state`      | Get HEV light state (guaranteed when using Device.connect()). **TYPE:** `HevLightState` |
+| `hev_config` | Get cached HEV configuration if available. **TYPE:** \`HevConfig                        |
+| `hev_result` | Get cached last HEV cycle result if available. **TYPE:** \`LightLastHevCycleResult      |
 
 Source code in `src/lifx/devices/hev.py`
 
@@ -3215,6 +3656,22 @@ def __init__(self, *args, **kwargs) -> None:
 ```
 
 #### Attributes
+
+##### state
+
+```python
+state: HevLightState
+```
+
+Get HEV light state (guaranteed when using Device.connect()).
+
+| RETURNS         | DESCRIPTION                                |
+| --------------- | ------------------------------------------ |
+| `HevLightState` | HevLightState with current HEV light state |
+
+| RAISES         | DESCRIPTION                             |
+| -------------- | --------------------------------------- |
+| `RuntimeError` | If accessed before state initialization |
 
 ##### hev_config
 
@@ -3312,6 +3769,16 @@ async def get_hev_cycle(self) -> HevCycleState:
         last_power=state.last_power,
     )
 
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "hev_cycle"):
+        self._state.hev_cycle = cycle_state
+        self._state.last_updated = __import__("time").time()
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "hev_cycle"):
+        self._state.hev_cycle = cycle_state
+        self._state.last_updated = __import__("time").time()
+
     _LOGGER.debug(
         {
             "class": "Device",
@@ -3397,12 +3864,17 @@ async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
 
     _LOGGER.debug(
         {
-            "class": "Device",
+            "class": "HevLight",
             "method": "set_hev_cycle",
             "action": "change",
             "values": {"enable": enable, "duration_s": duration_seconds},
         }
     )
+
+    # Schedule debounced refresh to update HEV cycle state
+    # (No optimistic update - cycle state is complex)
+    if self._state is not None:
+        await self._schedule_refresh()
 ````
 
 ##### get_hev_config
@@ -3466,6 +3938,11 @@ async def get_hev_config(self) -> HevConfig:
 
     # Store cached state
     self._hev_config = config
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "hev_config"):
+        self._state.hev_config = config
+        self._state.last_updated = __import__("time").time()
 
     _LOGGER.debug(
         {
@@ -3543,16 +4020,25 @@ async def set_hev_config(self, indication: bool, duration_seconds: int) -> None:
     )
     self._raise_if_unhandled(result)
 
-    # Update cached state
-    self._hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
     _LOGGER.debug(
         {
-            "class": "Device",
+            "class": "HevLight",
             "method": "set_hev_config",
             "action": "change",
             "values": {"indication": indication, "duration_s": duration_seconds},
         }
     )
+
+    # Update cache and state on acknowledgement
+    if result:
+        hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
+        self._hev_config = hev_config
+        if self._state is not None:
+            self._state.hev_config = hev_config
+
+    # Schedule refresh to validate state
+    if self._state is not None:
+        await self._schedule_refresh()
 ````
 
 ##### get_last_hev_result
@@ -3615,19 +4101,68 @@ async def get_last_hev_result(
     self._raise_if_unhandled(state)
 
     # Store cached state
-    self._hev_result = state.result
+    result = state.result
+    self._hev_result = result
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "hev_result"):
+        self._state.hev_result = result
+        self._state.last_updated = __import__("time").time()
 
     _LOGGER.debug(
         {
             "class": "Device",
             "method": "get_last_hev_result",
             "action": "query",
-            "reply": {"result": state.result.value},
+            "reply": {"result": result.value},
         }
     )
 
-    return state.result
+    return result
 ````
+
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh HEV light state from hardware.
+
+Fetches color, HEV cycle, config, and last result.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/hev.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh HEV light state from hardware.
+
+    Fetches color, HEV cycle, config, and last result.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    await super().refresh_state()
+
+    # Fetch all HEV light state
+    async with asyncio.TaskGroup() as tg:
+        hev_cycle_task = tg.create_task(self.get_hev_cycle())
+        hev_result_task = tg.create_task(self.get_last_hev_result())
+
+    hev_cycle = hev_cycle_task.result()
+    hev_result = hev_result_task.result()
+
+    self._state.hev_cycle = hev_cycle
+    self._state.hev_result = hev_result
+```
 
 ## Infrared Light
 
@@ -3666,14 +4201,16 @@ async with await InfraredLight.from_ip(ip="192.168.1.100") as light:
     await light.set_infrared(0.8)
 ```
 
-| METHOD         | DESCRIPTION                      |
-| -------------- | -------------------------------- |
-| `get_infrared` | Get current infrared brightness. |
-| `set_infrared` | Set infrared brightness.         |
+| METHOD          | DESCRIPTION                                 |
+| --------------- | ------------------------------------------- |
+| `get_infrared`  | Get current infrared brightness.            |
+| `set_infrared`  | Set infrared brightness.                    |
+| `refresh_state` | Refresh infrared light state from hardware. |
 
-| ATTRIBUTE  | DESCRIPTION                                                    |
-| ---------- | -------------------------------------------------------------- |
-| `infrared` | Get cached infrared brightness if available. **TYPE:** \`float |
+| ATTRIBUTE  | DESCRIPTION                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| `state`    | Get infrared light state (guaranteed when using Device.connect()). **TYPE:** `InfraredLightState` |
+| `infrared` | Get cached infrared brightness if available. **TYPE:** \`float                                    |
 
 Source code in `src/lifx/devices/infrared.py`
 
@@ -3686,6 +4223,22 @@ def __init__(self, *args, **kwargs) -> None:
 ```
 
 #### Attributes
+
+##### state
+
+```python
+state: InfraredLightState
+```
+
+Get infrared light state (guaranteed when using Device.connect()).
+
+| RETURNS              | DESCRIPTION                                          |
+| -------------------- | ---------------------------------------------------- |
+| `InfraredLightState` | InfraredLightState with current infrared light state |
+
+| RAISES         | DESCRIPTION                             |
+| -------------- | --------------------------------------- |
+| `RuntimeError` | If accessed before state initialization |
 
 ##### infrared
 
@@ -3760,6 +4313,16 @@ async def get_infrared(self) -> float:
 
     # Store cached state
     self._infrared = brightness
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "infrared"):
+        self._state.infrared = brightness
+        self._state.last_updated = __import__("time").time()
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "infrared"):
+        self._state.infrared = brightness
+        self._state.last_updated = __import__("time").time()
 
     _LOGGER.debug(
         {
@@ -3840,17 +4403,60 @@ async def set_infrared(self, brightness: float) -> None:
     )
     self._raise_if_unhandled(result)
 
-    # Update cached state
-    self._infrared = brightness
     _LOGGER.debug(
         {
-            "class": "Device",
+            "class": "InfraredLight",
             "method": "set_infrared",
             "action": "change",
             "values": {"brightness": brightness_u16},
         }
     )
+
+    # Update cache and state on acknowledgement
+    if result:
+        self._infrared = brightness
+        if self._state is not None:
+            self._state.infrared = brightness
+
+    # Schedule refresh to validate state
+    if self._state is not None:
+        await self._schedule_refresh()
 ````
+
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh infrared light state from hardware.
+
+Fetches color and infrared brightness.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/infrared.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh infrared light state from hardware.
+
+    Fetches color and infrared brightness.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    await super().refresh_state()
+
+    infrared = await self.get_infrared()
+    self._state.infrared = infrared
+```
 
 ## MultiZone Light
 
@@ -3913,11 +4519,13 @@ async with await MultiZoneLight.from_ip(ip="192.168.1.100") as light:
 | `set_effect`               | Set multizone effect.                                                |
 | `stop_effect`              | Stop any running multizone effect.                                   |
 | `apply_theme`              | Apply a theme across zones.                                          |
+| `refresh_state`            | Refresh multizone light state from hardware.                         |
 
-| ATTRIBUTE          | DESCRIPTION                                                           |
-| ------------------ | --------------------------------------------------------------------- |
-| `zone_count`       | Get cached zone count if available. **TYPE:** \`int                   |
-| `multizone_effect` | Get cached multizone effect if available. **TYPE:** \`MultiZoneEffect |
+| ATTRIBUTE          | DESCRIPTION                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| `state`            | Get multizone light state (guaranteed when using Device.connect()). **TYPE:** `MultiZoneLightState` |
+| `zone_count`       | Get cached zone count if available. **TYPE:** \`int                                                 |
+| `multizone_effect` | Get cached multizone effect if available. **TYPE:** \`MultiZoneEffect                               |
 
 Source code in `src/lifx/devices/multizone.py`
 
@@ -3931,6 +4539,22 @@ def __init__(self, *args, **kwargs) -> None:
 ```
 
 #### Attributes
+
+##### state
+
+```python
+state: MultiZoneLightState
+```
+
+Get multizone light state (guaranteed when using Device.connect()).
+
+| RETURNS               | DESCRIPTION                                            |
+| --------------------- | ------------------------------------------------------ |
+| `MultiZoneLightState` | MultiZoneLightState with current multizone light state |
+
+| RAISES         | DESCRIPTION                             |
+| -------------- | --------------------------------------- |
+| `RuntimeError` | If accessed before state initialization |
 
 ##### zone_count
 
@@ -4154,6 +4778,18 @@ async def get_color_zones(
 
     result = colors
 
+    # Update state if it exists and we fetched all zones
+    if self._state is not None and hasattr(self._state, "zones"):
+        if start == 0 and len(result) == zone_count:
+            self._state.zones = result
+            self._state.last_updated = __import__("time").time()
+
+    # Update state if it exists and we fetched all zones
+    if self._state is not None and hasattr(self._state, "zones"):
+        if start == 0 and len(result) == zone_count:
+            self._state.zones = result
+            self._state.last_updated = __import__("time").time()
+
     _LOGGER.debug(
         {
             "class": "Device",
@@ -4281,6 +4917,18 @@ async def get_extended_color_zones(
 
     # Return only the requested range to caller
     result = colors[start : end + 1]
+
+    # Update state if it exists and we fetched all zones
+    if self._state is not None and hasattr(self._state, "zones"):
+        if start == 0 and len(result) == zone_count:
+            self._state.zones = result
+            self._state.last_updated = __import__("time").time()
+
+    # Update state if it exists and we fetched all zones
+    if self._state is not None and hasattr(self._state, "zones"):
+        if start == 0 and len(result) == zone_count:
+            self._state.zones = result
+            self._state.last_updated = __import__("time").time()
 
     _LOGGER.debug(
         {
@@ -4633,16 +5281,16 @@ async def set_extended_color_zones(
 ##### get_effect
 
 ```python
-get_effect() -> MultiZoneEffect | None
+get_effect() -> MultiZoneEffect
 ```
 
 Get current multizone effect.
 
 Always fetches from device. Use the `multizone_effect` property to access stored value.
 
-| RETURNS           | DESCRIPTION |
-| ----------------- | ----------- |
-| \`MultiZoneEffect | None\`      |
+| RETURNS           | DESCRIPTION                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `MultiZoneEffect` | MultiZoneEffect with either FirmwareEffect.OFF or FirmwareEffect.MOVE |
 
 | RAISES                        | DESCRIPTION                            |
 | ----------------------------- | -------------------------------------- |
@@ -4666,14 +5314,14 @@ if effect:
 Source code in `src/lifx/devices/multizone.py`
 
 ````python
-async def get_effect(self) -> MultiZoneEffect | None:
+async def get_effect(self) -> MultiZoneEffect:
     """Get current multizone effect.
 
     Always fetches from device.
     Use the `multizone_effect` property to access stored value.
 
     Returns:
-        MultiZoneEffect if an effect is active, None if no effect
+        MultiZoneEffect with either FirmwareEffect.OFF or FirmwareEffect.MOVE
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -4711,17 +5359,19 @@ async def get_effect(self) -> MultiZoneEffect | None:
         settings.parameter.parameter7,
     ]
 
-    if effect_type == FirmwareEffect.OFF:
-        result = None
-    else:
-        result = MultiZoneEffect(
-            effect_type=effect_type,
-            speed=settings.speed,
-            duration=settings.duration,
-            parameters=parameters,
-        )
+    result = MultiZoneEffect(
+        effect_type=effect_type,
+        speed=settings.speed,
+        duration=settings.duration,
+        parameters=parameters,
+    )
 
     self._multizone_effect = result
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "effect"):
+        self._state.effect = result.effect_type
+        self._state.last_updated = __import__("time").time()
 
     _LOGGER.debug(
         {
@@ -4992,6 +5642,48 @@ async def apply_theme(
         await self.set_extended_color_zones(0, colors, duration=duration)
 ````
 
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh multizone light state from hardware.
+
+Fetches color, zones, and effect.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/multizone.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh multizone light state from hardware.
+
+    Fetches color, zones, and effect.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    await super().refresh_state()
+
+    async with asyncio.TaskGroup() as tg:
+        zones_task = tg.create_task(self.get_all_color_zones())
+        effect_task = tg.create_task(self.get_effect())
+
+    zones = zones_task.result()
+    effect = effect_task.result()
+
+    self._state.zones = zones
+    self._state.effect = effect.effect_type
+```
+
 ## Matrix Light
 
 The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 2D zone control.
@@ -5039,12 +5731,14 @@ Example
 | `get_effect`        | Get current running matrix effect.                                        |
 | `set_effect`        | Set matrix effect with configuration.                                     |
 | `apply_theme`       | Apply a theme across matrix tiles using Canvas interpolation.             |
+| `refresh_state`     | Refresh matrix light state from hardware.                                 |
 
-| ATTRIBUTE      | DESCRIPTION                                         |
-| -------------- | --------------------------------------------------- |
-| `device_chain` | Get cached device chain. **TYPE:** \`list[TileInfo] |
-| `tile_count`   | Get number of tiles in the chain. **TYPE:** \`int   |
-| `tile_effect`  | Get cached tile effect. **TYPE:** \`MatrixEffect    |
+| ATTRIBUTE      | DESCRIPTION                                                                                   |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| `state`        | Get matrix light state (guaranteed when using Device.connect()). **TYPE:** `MatrixLightState` |
+| `device_chain` | Get cached device chain. **TYPE:** \`list[TileInfo]                                           |
+| `tile_count`   | Get number of tiles in the chain. **TYPE:** \`int                                             |
+| `tile_effect`  | Get cached tile effect. **TYPE:** \`MatrixEffect                                              |
 
 Source code in `src/lifx/devices/matrix.py`
 
@@ -5064,6 +5758,22 @@ def __init__(self, *args, **kwargs) -> None:
 ```
 
 #### Attributes
+
+##### state
+
+```python
+state: MatrixLightState
+```
+
+Get matrix light state (guaranteed when using Device.connect()).
+
+| RETURNS            | DESCRIPTION                                      |
+| ------------------ | ------------------------------------------------ |
+| `MatrixLightState` | MatrixLightState with current matrix light state |
+
+| RAISES         | DESCRIPTION                             |
+| -------------- | --------------------------------------- |
+| `RuntimeError` | If accessed before state initialization |
 
 ##### device_chain
 
@@ -5158,6 +5868,13 @@ async def get_device_chain(self) -> list[TileInfo]:
         tiles.append(TileInfo.from_protocol(i, protocol_tile))
 
     self._device_chain = tiles
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "chain"):
+        self._state.chain = tiles
+        self._state.tile_count = len(tiles)
+        self._state.last_updated = __import__("time").time()
+
     _LOGGER.debug("Device chain has %d tile(s)", len(tiles))
     return tiles
 ```
@@ -5347,10 +6064,18 @@ async def get64(
     max_colors = device_chain[0].width * device_chain[0].height
 
     # Convert protocol colors to HSBK
-    return [
+    result = [
         HSBK.from_protocol(proto_color)
         for proto_color in response.colors[:max_colors]
     ]
+
+    # Update state if it exists and we fetched all colors from tile 0
+    if self._state is not None and hasattr(self._state, "tile_colors"):
+        if tile_index == 0 and x == 0 and y == 0 and len(result) == max_colors:
+            self._state.tile_colors = result
+            self._state.last_updated = __import__("time").time()
+
+    return result
 ```
 
 ##### set64
@@ -5800,6 +6525,12 @@ async def get_effect(self) -> MatrixEffect:
     )
 
     self._tile_effect = effect
+
+    # Update state if it exists
+    if self._state is not None and hasattr(self._state, "effect"):
+        self._state.effect = effect.effect_type
+        self._state.last_updated = __import__("time").time()
+
     return effect
 ```
 
@@ -5972,7 +6703,7 @@ Source code in `src/lifx/devices/matrix.py`
 ````python
 async def apply_theme(
     self,
-    theme: "Theme",
+    theme: Theme,
     power_on: bool = False,
     duration: float = 0.0,
 ) -> None:
@@ -6046,6 +6777,49 @@ async def apply_theme(
     if power_on and not is_on:
         await self.set_power(True, duration=duration)
 ````
+
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh matrix light state from hardware.
+
+Fetches color, tiles, tile colors, and effect.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh matrix light state from hardware.
+
+    Fetches color, tiles, tile colors, and effect.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    await super().refresh_state()
+
+    # Fetch all matrix light state
+    async with asyncio.TaskGroup() as tg:
+        colors_task = tg.create_task(self.get64())
+        effect_task = tg.create_task(self.get_effect())
+
+    tile_colors = colors_task.result()
+    effect = effect_task.result()
+
+    self._state.tile_colors = tile_colors
+    self._state.effect = effect.effect_type
+```
 
 ## Device Properties
 

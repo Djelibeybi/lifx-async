@@ -520,8 +520,8 @@ def __init__(
     self._matrix_lights = [light for light in devices if type(light) is MatrixLight]
     self._locations_cache: dict[str, DeviceGroup] | None = None
     self._groups_cache: dict[str, DeviceGroup] | None = None
-    self._location_metadata: dict[bytes, LocationGrouping] | None = None
-    self._group_metadata: dict[bytes, GroupGrouping] | None = None
+    self._location_metadata: dict[str, LocationGrouping] | None = None
+    self._group_metadata: dict[str, GroupGrouping] | None = None
 ```
 
 #### Attributes
