@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.4.0 (2025-11-29)
+
+### Features
+
+- **devices**: Add factory pattern with automatic type detection and state management ([`4374248`](https://github.com/Djelibeybi/lifx-async/commit/4374248bb46cb5af1cf303866ad82b6692bb8932))
+
 ## v4.3.9 (2025-11-27)
 
 ### Bug Fixes
