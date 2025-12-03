@@ -172,3 +172,103 @@ class TestMatrixGenerator:
 
         assert len(tiles) == 1
         assert len(tiles[0]) == 256
+
+    def test_multiple_tiles_use_all_theme_colors(self) -> None:
+        """Test that multiple tiles use colors from the entire theme, not just the last.
+
+        Regression test for bug where shuffle_points() and blur_by_distance() were
+        called inside the tile loop, causing points from earlier tiles to be displaced
+        multiple times, resulting in only the last tile's colors being visible.
+        """
+        import random
+
+        # Use fixed seed for reproducibility
+        random.seed(42)
+
+        # Create a 5-tile chain (like a real LIFX Tile setup)
+        coords_and_sizes = [
+            ((0, 0), (8, 8)),
+            ((8, 0), (8, 8)),
+            ((16, 0), (8, 8)),
+            ((24, 0), (8, 8)),
+            ((32, 0), (8, 8)),
+        ]
+        gen = MatrixGenerator(coords_and_sizes)
+
+        # Theme with distinctly different colors (high saturation, different hues)
+        theme = Theme(
+            [Colors.RED, Colors.GREEN, Colors.BLUE, Colors.CYAN, Colors.MAGENTA]
+        )
+
+        tiles = gen.get_theme_colors(theme)
+
+        # Collect unique hue values across all tiles (rounded for float precision)
+        all_hues: set[int] = set()
+        for tile in tiles:
+            for color in tile:
+                # Round hue to nearest 10 degrees to group similar hues
+                rounded_hue = round(color.hue / 10) * 10
+                all_hues.add(rounded_hue)
+
+        # With 5 distinct theme colors, we should see variety across the tiles
+        # If the bug exists, we'd see very few unique hues (colors would converge)
+        # The theme has hues at approximately: 0 (red), 120 (green), 240 (blue),
+        # 180 (cyan), 300 (magenta)
+        # With blending, we expect to see intermediate hues too
+        assert len(all_hues) >= 3, (
+            f"Expected at least 3 distinct hue ranges but got {len(all_hues)}: "
+            f"{sorted(all_hues)}. This suggests colors are converging to a "
+            "single color instead of using the full theme."
+        )
+
+    def test_all_theme_colors_represented_in_output(self) -> None:
+        """Test that all theme colors are represented in the generated output.
+
+        Regression test for bug where shuffle_points() and blur_by_distance() were
+        called inside the tile loop, causing points from earlier tiles to be displaced
+        multiple times. This resulted in only some theme colors appearing in the output.
+        """
+        import random
+
+        from lifx.color import HSBK
+
+        # Use fixed seed for reproducibility
+        random.seed(12345)
+
+        # Create tiles that are far apart spatially
+        coords_and_sizes = [
+            ((0, 0), (8, 8)),
+            ((50, 0), (8, 8)),
+        ]
+        gen = MatrixGenerator(coords_and_sizes)
+
+        # Theme with two distinct, non-wrapping colors (Yellow=60, Cyan=180)
+        # These are 120 degrees apart, so we should see hues spanning that range
+        theme = Theme(
+            [
+                HSBK(hue=60, saturation=1.0, brightness=1.0, kelvin=3500),  # Yellow
+                HSBK(hue=180, saturation=1.0, brightness=1.0, kelvin=3500),  # Cyan
+            ]
+        )
+
+        tiles = gen.get_theme_colors(theme)
+
+        # Collect all hues across all tiles
+        all_hues = [c.hue for tile in tiles for c in tile]
+
+        # With Yellow (60) and Cyan (180), we expect hues to span from ~60 to ~180
+        # If the bug exists, we'd only see hues near one of the colors
+        min_hue = min(all_hues)
+        max_hue = max(all_hues)
+        hue_spread = max_hue - min_hue
+
+        # The spread should be at least 80 degrees (2/3 the distance between colors)
+        # if both theme colors are being represented.
+        # With the bug, we only see ~66 degree spread (62-128), missing cyan.
+        # With the fix, we see spread > 100 degrees as colors approach 60 and 180.
+        assert hue_spread >= 80, (
+            f"Hue spread is only {hue_spread:.1f} degrees "
+            f"(range: {min_hue:.0f}-{max_hue:.0f}). Expected at least 80 degrees "
+            "when theme has Yellow(60) and Cyan(180). "
+            "This suggests only one theme color is being used."
+        )
