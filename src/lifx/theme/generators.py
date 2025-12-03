@@ -165,10 +165,16 @@ class MatrixGenerator:
         shuffled_theme = theme.shuffled()
         shuffled_theme.ensure_color()
 
+        # Add points for all tiles first
         for (left_x, top_y), (width, height) in self.coords_and_sizes:
             canvas.add_points_for_tile((left_x, top_y), shuffled_theme)
-            canvas.shuffle_points()
-            canvas.blur_by_distance()
+
+        # Shuffle and blur ONCE after all points are added
+        # (Previously these were inside the loop, causing earlier tiles' points
+        # to be shuffled/blurred multiple times, displacing them from their
+        # intended positions and losing theme color variety)
+        canvas.shuffle_points()
+        canvas.blur_by_distance()
 
         # Create tile canvas and fill gaps
         tile_canvas = Canvas()

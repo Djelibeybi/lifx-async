@@ -153,6 +153,35 @@ class TestMatrixLightStateManagement:
             assert len(retrieved) == 64
 
     @pytest.mark.asyncio
+    async def test_get_all_tile_colors_fetches_all_tiles(
+        self, emulator_devices
+    ) -> None:
+        """Test get_all_tile_colors() fetches colors from all tiles in chain."""
+        template: MatrixLight = emulator_devices[6]  # d073d5000007
+
+        async with await MatrixLight.connect(
+            serial=template.serial, ip=template.ip, port=template.port
+        ) as matrix_light:
+            assert isinstance(matrix_light, MatrixLight)
+
+            # Get colors for all tiles
+            all_colors = await matrix_light.get_all_tile_colors()
+
+            # Should return a list of color lists (one per tile)
+            assert isinstance(all_colors, list)
+            assert len(all_colors) == matrix_light.tile_count
+
+            # Each tile should have the correct number of colors
+            for tile_colors in all_colors:
+                assert isinstance(tile_colors, list)
+                assert len(tile_colors) == 64  # 8x8 tile
+                assert all(isinstance(c, HSBK) for c in tile_colors)
+
+            # State should be updated with flattened colors
+            expected_total = matrix_light.tile_count * 64
+            assert len(matrix_light.state.tile_colors) == expected_total
+
+    @pytest.mark.asyncio
     async def test_get_effect_updates_state(self, emulator_devices) -> None:
         """Test get_effect() updates state when it exists."""
         template: MatrixLight = emulator_devices[6]  # d073d5000007
