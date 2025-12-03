@@ -7,7 +7,7 @@ import argparse
 import asyncio
 
 from lifx import HSBK, Colors, MatrixLight
-from lifx.protocol.protocol_types import TileEffectSkyType, TileEffectType
+from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
 
 
 async def main(ip: str):
@@ -26,9 +26,9 @@ async def main(ip: str):
 
         # Get current effect state
         print("Getting current effect state...")
-        current_effect = await matrix.get_tile_effect()
+        current_effect = await matrix.get_effect()
         print(f"Current effect: {current_effect.effect_type}")
-        if current_effect.effect_type != TileEffectType.OFF:
+        if current_effect.effect_type != FirmwareEffect.OFF:
             print(f"  Speed: {current_effect.speed}")
             print(f"  Duration: {current_effect.duration}s")
             if current_effect.palette:
@@ -38,8 +38,8 @@ async def main(ip: str):
         # Demonstrate MORPH effect
         print("Starting MORPH effect...")
         print("  (smooth color transitions across tiles)")
-        await matrix.set_tile_effect(
-            effect_type=TileEffectType.MORPH,
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.MORPH,
             speed=5,
             palette=[Colors.RED, Colors.BLUE, Colors.GREEN, Colors.PURPLE],
         )
@@ -49,8 +49,8 @@ async def main(ip: str):
         # Demonstrate FLAME effect
         print("\nStarting FLAME effect...")
         print("  (flickering fire animation)")
-        await matrix.set_tile_effect(
-            effect_type=TileEffectType.FLAME,
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.FLAME,
             speed=3,
             palette=[Colors.ORANGE, Colors.RED, Colors.YELLOW],
         )
@@ -60,8 +60,8 @@ async def main(ip: str):
         # Demonstrate SKY effect with SUNRISE
         print("\nStarting SKY effect with SUNRISE...")
         print("  (sunrise color progression)")
-        await matrix.set_tile_effect(
-            effect_type=TileEffectType.SKY,
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.SKY,
             speed=10,
             sky_type=TileEffectSkyType.SUNRISE,
         )
@@ -71,8 +71,8 @@ async def main(ip: str):
         # Demonstrate SKY effect with CLOUDS
         print("\nStarting SKY effect with CLOUDS...")
         print("  (moving cloud patterns)")
-        await matrix.set_tile_effect(
-            effect_type=TileEffectType.SKY,
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.SKY,
             speed=5,
             sky_type=TileEffectSkyType.CLOUDS,
             cloud_saturation_min=50,
@@ -86,11 +86,11 @@ async def main(ip: str):
         ocean_palette = [
             Colors.CYAN,
             Colors.BLUE,
-            HSBK(hue=210.0, saturation=1.0, brightness=0.4, kelvin=3500),  # deep blue
+            HSBK(hue=210, saturation=1.0, brightness=0.4, kelvin=3500),  # deep blue
             HSBK(36408, 65535, 38550, 3500),  # Ocean blue
         ]
-        await matrix.set_tile_effect(
-            effect_type=TileEffectType.MORPH,
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.MORPH,
             speed=3,
             palette=ocean_palette,
         )
@@ -99,11 +99,11 @@ async def main(ip: str):
 
         # Stop effect and restore
         print("\nStopping effect...")
-        await matrix.set_tile_effect(effect_type=TileEffectType.OFF)
+        await matrix.set_effect(effect_type=FirmwareEffect.OFF)
         await asyncio.sleep(1)
 
         # Verify effect stopped
-        final_effect = await matrix.get_tile_effect()
+        final_effect = await matrix.get_effect()
         print(f"Final effect state: {final_effect.effect_type}")
 
         if power == 0:

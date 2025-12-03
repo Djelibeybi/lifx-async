@@ -14,7 +14,6 @@ Terminology:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from dataclasses import asdict, dataclass
@@ -544,6 +543,57 @@ class MatrixLight(Light):
 
         return result
 
+    async def get_all_tile_colors(self) -> list[list[HSBK]]:
+        """Get colors for all tiles in the chain.
+
+        Fetches colors from each tile in the device chain and returns them
+        as a list of color lists (one per tile). This is the matrix equivalent
+        of MultiZoneLight's get_all_color_zones().
+
+        Always fetches from device. Tiles are queried sequentially to avoid
+        overwhelming the device with concurrent requests.
+
+        Returns:
+            List of color lists, one per tile. Each inner list contains
+            the colors for that tile (typically 64 for 8x8 tiles).
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
+        Example:
+            ```python
+            # Get colors for all tiles
+            all_colors = await matrix.get_all_tile_colors()
+            print(f"Device has {len(all_colors)} tiles")
+            for i, tile_colors in enumerate(all_colors):
+                print(f"Tile {i}: {len(tile_colors)} colors")
+
+            # Flatten to single list if needed
+            flat_colors = [c for tile in all_colors for c in tile]
+            ```
+        """
+        # Get device chain (use cached if available)
+        if self._device_chain is None:
+            device_chain = await self.get_device_chain()
+        else:
+            device_chain = self._device_chain
+
+        # Fetch colors from each tile sequentially
+        all_colors: list[list[HSBK]] = []
+        for tile in device_chain:
+            tile_colors = await self.get64(tile_index=tile.tile_index)
+            all_colors.append(tile_colors)
+
+        # Update state if it exists (flatten for state storage)
+        if self._state is not None and hasattr(self._state, "tile_colors"):
+            flat_colors = [c for tile_colors in all_colors for c in tile_colors]
+            self._state.tile_colors = flat_colors
+            self._state.last_updated = time.time()
+
+        return all_colors
+
     async def set64(
         self,
         tile_index: int,
@@ -993,8 +1043,13 @@ class MatrixLight(Light):
         canvas = Canvas()
         for tile in tiles:
             canvas.add_points_for_tile((int(tile.user_x), int(tile.user_y)), theme)
-            canvas.shuffle_points()
-            canvas.blur_by_distance()
+
+        # Shuffle and blur ONCE after all points are added
+        # (Previously these were inside the loop, causing earlier tiles' points
+        # to be shuffled/blurred multiple times, displacing them from their
+        # intended positions and losing theme color variety)
+        canvas.shuffle_points()
+        canvas.blur_by_distance()
 
         # Create tile canvas and fill in gaps for smooth interpolation
         tile_canvas = Canvas()
@@ -1068,7 +1123,7 @@ class MatrixLight(Light):
     async def refresh_state(self) -> None:
         """Refresh matrix light state from hardware.
 
-        Fetches color, tiles, tile colors, and effect.
+        Fetches color, tiles, tile colors for all tiles, and effect.
 
         Raises:
             RuntimeError: If state has not been initialized
@@ -1077,15 +1132,12 @@ class MatrixLight(Light):
         """
         await super().refresh_state()
 
-        # Fetch all matrix light state
-        async with asyncio.TaskGroup() as tg:
-            colors_task = tg.create_task(self.get64())
-            effect_task = tg.create_task(self.get_effect())
+        # Fetch all matrix light state sequentially to avoid overwhelming device
+        all_tile_colors = await self.get_all_tile_colors()
+        effect = await self.get_effect()
 
-        tile_colors = colors_task.result()
-        effect = effect_task.result()
-
-        self._state.tile_colors = tile_colors
+        # Flatten tile colors for state storage
+        self._state.tile_colors = [c for tile in all_tile_colors for c in tile]
         self._state.effect = effect.effect_type
 
     async def _initialize_state(self) -> MatrixLightState:
@@ -1103,24 +1155,24 @@ class MatrixLight(Light):
         """
         light_state = await super()._initialize_state()
 
-        async with asyncio.TaskGroup() as tg:
-            chain_task = tg.create_task(self.get_device_chain())
-            tile_colors_task = tg.create_task(self.get64())
-            effect_task = tg.create_task(self.get_effect())
-
-        chain = chain_task.result()
+        # Fetch matrix-specific state sequentially to avoid overwhelming device
+        chain = await self.get_device_chain()
         tile_orientations = {
             index: tile.nearest_orientation for index, tile in enumerate(chain)
         }
-        tile_colors = tile_colors_task.result()
-        effect = effect_task.result()
+        # get_all_tile_colors uses cached chain from above
+        all_tile_colors = await self.get_all_tile_colors()
+        effect = await self.get_effect()
+
+        # Flatten tile colors for state storage
+        flat_tile_colors = [c for tile in all_tile_colors for c in tile]
 
         # Create state instance with matrix fields
         self._state = MatrixLightState.from_light_state(
             light_state,
             chain=chain,
             tile_orientations=tile_orientations,
-            tile_colors=tile_colors,
+            tile_colors=flat_tile_colors,
             effect=effect.effect_type,
         )
 
