@@ -5720,18 +5720,19 @@ Example
 | `ip`      | Device IP address            |
 | `port`    | Device port (default: 56700) |
 
-| METHOD              | DESCRIPTION                                                               |
-| ------------------- | ------------------------------------------------------------------------- |
-| `get_device_chain`  | Get device chain details (list of Tile objects).                          |
-| `set_user_position` | Position tiles in the chain (only for devices with has_chain capability). |
-| `get64`             | Get up to 64 zones of color state from a tile.                            |
-| `set64`             | Set up to 64 zones of color on a tile.                                    |
-| `copy_frame_buffer` | Copy frame buffer (for tiles with >64 zones).                             |
-| `set_matrix_colors` | Convenience method to set all colors on a tile.                           |
-| `get_effect`        | Get current running matrix effect.                                        |
-| `set_effect`        | Set matrix effect with configuration.                                     |
-| `apply_theme`       | Apply a theme across matrix tiles using Canvas interpolation.             |
-| `refresh_state`     | Refresh matrix light state from hardware.                                 |
+| METHOD                | DESCRIPTION                                                               |
+| --------------------- | ------------------------------------------------------------------------- |
+| `get_device_chain`    | Get device chain details (list of Tile objects).                          |
+| `set_user_position`   | Position tiles in the chain (only for devices with has_chain capability). |
+| `get64`               | Get up to 64 zones of color state from a tile.                            |
+| `get_all_tile_colors` | Get colors for all tiles in the chain.                                    |
+| `set64`               | Set up to 64 zones of color on a tile.                                    |
+| `copy_frame_buffer`   | Copy frame buffer (for tiles with >64 zones).                             |
+| `set_matrix_colors`   | Convenience method to set all colors on a tile.                           |
+| `get_effect`          | Get current running matrix effect.                                        |
+| `set_effect`          | Set matrix effect with configuration.                                     |
+| `apply_theme`         | Apply a theme across matrix tiles using Canvas interpolation.             |
+| `refresh_state`       | Refresh matrix light state from hardware.                                 |
 
 | ATTRIBUTE      | DESCRIPTION                                                                                   |
 | -------------- | --------------------------------------------------------------------------------------------- |
@@ -6077,6 +6078,97 @@ async def get64(
 
     return result
 ```
+
+##### get_all_tile_colors
+
+```python
+get_all_tile_colors() -> list[list[HSBK]]
+```
+
+Get colors for all tiles in the chain.
+
+Fetches colors from each tile in the device chain and returns them as a list of color lists (one per tile). This is the matrix equivalent of MultiZoneLight's get_all_color_zones().
+
+Always fetches from device. Tiles are queried sequentially to avoid overwhelming the device with concurrent requests.
+
+| RETURNS            | DESCRIPTION                                                 |
+| ------------------ | ----------------------------------------------------------- |
+| `list[list[HSBK]]` | List of color lists, one per tile. Each inner list contains |
+| `list[list[HSBK]]` | the colors for that tile (typically 64 for 8x8 tiles).      |
+
+| RAISES                        | DESCRIPTION                            |
+| ----------------------------- | -------------------------------------- |
+| `LifxDeviceNotFoundError`     | If device is not connected             |
+| `LifxTimeoutError`            | If device does not respond             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command |
+
+Example
+
+```python
+# Get colors for all tiles
+all_colors = await matrix.get_all_tile_colors()
+print(f"Device has {len(all_colors)} tiles")
+for i, tile_colors in enumerate(all_colors):
+    print(f"Tile {i}: {len(tile_colors)} colors")
+
+# Flatten to single list if needed
+flat_colors = [c for tile in all_colors for c in tile]
+```
+
+Source code in `src/lifx/devices/matrix.py`
+
+````python
+async def get_all_tile_colors(self) -> list[list[HSBK]]:
+    """Get colors for all tiles in the chain.
+
+    Fetches colors from each tile in the device chain and returns them
+    as a list of color lists (one per tile). This is the matrix equivalent
+    of MultiZoneLight's get_all_color_zones().
+
+    Always fetches from device. Tiles are queried sequentially to avoid
+    overwhelming the device with concurrent requests.
+
+    Returns:
+        List of color lists, one per tile. Each inner list contains
+        the colors for that tile (typically 64 for 8x8 tiles).
+
+    Raises:
+        LifxDeviceNotFoundError: If device is not connected
+        LifxTimeoutError: If device does not respond
+        LifxUnsupportedCommandError: If device doesn't support this command
+
+    Example:
+        ```python
+        # Get colors for all tiles
+        all_colors = await matrix.get_all_tile_colors()
+        print(f"Device has {len(all_colors)} tiles")
+        for i, tile_colors in enumerate(all_colors):
+            print(f"Tile {i}: {len(tile_colors)} colors")
+
+        # Flatten to single list if needed
+        flat_colors = [c for tile in all_colors for c in tile]
+        ```
+    """
+    # Get device chain (use cached if available)
+    if self._device_chain is None:
+        device_chain = await self.get_device_chain()
+    else:
+        device_chain = self._device_chain
+
+    # Fetch colors from each tile sequentially
+    all_colors: list[list[HSBK]] = []
+    for tile in device_chain:
+        tile_colors = await self.get64(tile_index=tile.tile_index)
+        all_colors.append(tile_colors)
+
+    # Update state if it exists (flatten for state storage)
+    if self._state is not None and hasattr(self._state, "tile_colors"):
+        flat_colors = [c for tile_colors in all_colors for c in tile_colors]
+        self._state.tile_colors = flat_colors
+        self._state.last_updated = time.time()
+
+    return all_colors
+````
 
 ##### set64
 
@@ -6737,8 +6829,13 @@ async def apply_theme(
     canvas = Canvas()
     for tile in tiles:
         canvas.add_points_for_tile((int(tile.user_x), int(tile.user_y)), theme)
-        canvas.shuffle_points()
-        canvas.blur_by_distance()
+
+    # Shuffle and blur ONCE after all points are added
+    # (Previously these were inside the loop, causing earlier tiles' points
+    # to be shuffled/blurred multiple times, displacing them from their
+    # intended positions and losing theme color variety)
+    canvas.shuffle_points()
+    canvas.blur_by_distance()
 
     # Create tile canvas and fill in gaps for smooth interpolation
     tile_canvas = Canvas()
@@ -6786,7 +6883,7 @@ refresh_state() -> None
 
 Refresh matrix light state from hardware.
 
-Fetches color, tiles, tile colors, and effect.
+Fetches color, tiles, tile colors for all tiles, and effect.
 
 | RAISES                    | DESCRIPTION                       |
 | ------------------------- | --------------------------------- |
@@ -6800,7 +6897,7 @@ Source code in `src/lifx/devices/matrix.py`
 async def refresh_state(self) -> None:
     """Refresh matrix light state from hardware.
 
-    Fetches color, tiles, tile colors, and effect.
+    Fetches color, tiles, tile colors for all tiles, and effect.
 
     Raises:
         RuntimeError: If state has not been initialized
@@ -6809,15 +6906,12 @@ async def refresh_state(self) -> None:
     """
     await super().refresh_state()
 
-    # Fetch all matrix light state
-    async with asyncio.TaskGroup() as tg:
-        colors_task = tg.create_task(self.get64())
-        effect_task = tg.create_task(self.get_effect())
+    # Fetch all matrix light state sequentially to avoid overwhelming device
+    all_tile_colors = await self.get_all_tile_colors()
+    effect = await self.get_effect()
 
-    tile_colors = colors_task.result()
-    effect = effect_task.result()
-
-    self._state.tile_colors = tile_colors
+    # Flatten tile colors for state storage
+    self._state.tile_colors = [c for tile in all_tile_colors for c in tile]
     self._state.effect = effect.effect_type
 ```
 
