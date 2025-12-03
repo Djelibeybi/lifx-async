@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.4.1 (2025-12-03)
+
+### Bug Fixes
+
+- **theme**: Prevent color displacement in multi-tile matrix theme application
+  ([`ca936ec`](https://github.com/Djelibeybi/lifx-async/commit/ca936ec8df84fc42803182ae9898d243e017c5a3))
+
+
 ## v4.4.0 (2025-11-29)
 
 ### Features
