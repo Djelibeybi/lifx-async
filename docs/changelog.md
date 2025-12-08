@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.5.0 (2025-12-08)
+
+### Features
+
+- **devices**: Add CeilingLight with independent uplight/downlight component control
+  ([`95fc5a6`](https://github.com/Djelibeybi/lifx-async/commit/95fc5a68c598232f5c710ad5d67f3647ba89d720))
+
+
 ## v4.4.1 (2025-12-03)
 
 ### Bug Fixes
