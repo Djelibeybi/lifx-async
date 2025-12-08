@@ -148,9 +148,9 @@ sudo usermod -a -G netdev $USER  # Linux
 
 ## Next Steps
 
-- [Quick Start Guide](../quickstart/) - Start controlling your lights
-- [API Reference](../../api/) - Complete API documentation
-- [FAQ](../../faq/) - Frequently asked questions
+- [Quick Start Guide](https://djelibeybi.github.io/lifx-async/getting-started/quickstart/index.md) - Start controlling your lights
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
 
 # Quick Start
 
@@ -354,9 +354,9 @@ asyncio.run(main())
 
 ## Next Steps
 
-- [API Reference](../../api/) - Complete API documentation
-- [Architecture](../../architecture/overview/) - How lifx-async works
-- [FAQ](../../faq/) - Frequently asked questions
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - How lifx-async works
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
 
 # Themes Quick Start
 
@@ -447,9 +447,9 @@ await group.apply_theme(custom_theme, power_on=True)
 
 ## Next Steps
 
-- See [Themes API Reference](../../api/themes/) for detailed API documentation
-- See [Device Classes](../../api/devices/) for device-specific `apply_theme()` methods
-- See [Color Utilities](../../api/colors/) for HSBK color representation
+- See [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) for detailed API documentation
+- See [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) for device-specific `apply_theme()` methods
+- See [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md) for HSBK color representation
 
 # Getting Started with Light Effects
 
@@ -857,10 +857,10 @@ await party_mode(group.lights, duration=120)
 
 ## Next Steps
 
-- See [Effects Reference](../../api/effects/) for detailed documentation on all effect parameters
-- See [Custom Effects](../../user-guide/effects-custom/) to learn how to create your own effects
-- See [Effects Architecture](../../architecture/effects-architecture/) to understand how the system works internally
-- See [Troubleshooting](../../user-guide/effects-troubleshooting/) for common issues and solutions
+- See [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) for detailed documentation on all effect parameters
+- See [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) to learn how to create your own effects
+- See [Effects Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) to understand how the system works internally
+- See [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) for common issues and solutions
 # User Guide
 
 # Using Themes: Practical Examples
@@ -1271,10 +1271,10 @@ for theme_name in themes:
 
 ## See Also
 
-- [Themes API Reference](../../api/themes/) - Complete API documentation
-- [Quick Start: Themes](../../getting-started/themes/) - Simple examples
-- [Colors Guide](../../api/colors/) - Working with HSBK colors
-- [Device Classes](../../api/devices/) - Device-specific documentation
+- [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) - Complete API documentation
+- [Quick Start: Themes](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md) - Simple examples
+- [Colors Guide](https://djelibeybi.github.io/lifx-async/api/colors/index.md) - Working with HSBK colors
+- [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) - Device-specific documentation
 
 # Advanced Usage
 
@@ -1751,9 +1751,9 @@ async def with_reuse():
 
 ## Next Steps
 
-- [Troubleshooting Guide](../troubleshooting/) - Common issues and solutions
-- [Protocol Reference](../../api/protocol/) - Low-level protocol details
-- [API Reference](../../api/) - Complete API documentation
+- [Troubleshooting Guide](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md) - Common issues and solutions
+- [Protocol Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Low-level protocol details
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
 
 # Creating Custom Effects
 
@@ -2570,11 +2570,11 @@ class Effect1(LIFXEffect):
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage of built-in effects
-- [Effects Reference](../../api/effects/) - Detailed API documentation
-- [Architecture](../../architecture/effects-architecture/) - How the system works internally
-- [Troubleshooting](../effects-troubleshooting/) - Common issues and solutions
-- [Examples](../../examples/) - Full working examples including `08_custom_effect.py`
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage of built-in effects
+- [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) - Detailed API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works internally
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues and solutions
+- [Examples](https://djelibeybi.github.io/lifx-async/examples/index.md) - Full working examples including `08_custom_effect.py`
 
 # Troubleshooting Guide
 
@@ -2985,9 +2985,9 @@ If you're still experiencing issues:
 
 ## Next Steps
 
-- [Advanced Usage](../advanced-usage/) - Optimization patterns
-- [API Reference](../../api/) - Complete API documentation
-- [FAQ](../../faq/) - Frequently asked questions
+- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md) - Optimization patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
 
 # Effects Troubleshooting
 
@@ -3807,10 +3807,10 @@ When reporting issues, include:
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage patterns
-- [Effects Reference](../../api/effects/) - Detailed API documentation
-- [Custom Effects](../effects-custom/) - Creating your own effects
-- [Architecture](../../architecture/effects-architecture/) - How the system works
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage patterns
+- [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) - Detailed API documentation
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works
 
 # Protocol Deep Dive
 
@@ -4123,9 +4123,9 @@ MIN_DURATION = 0           # Instant
 
 ## Next Steps
 
-- [Connection Management](../advanced-usage/#connection-management) - Connection patterns
-- [API Reference](../../api/protocol/) - Protocol API documentation
-- [Architecture](../../architecture/overview/) - System architecture
+- [Connection Management](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/#connection-management) - Connection patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Protocol API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - System architecture
 # Architecture
 
 # Architecture Overview
@@ -4449,8 +4449,8 @@ await conn.close()
 
 ## Next Steps
 
-- [API Reference](../../api/) - Detailed API documentation
-- [FAQ](../../faq/) - Frequently asked questions
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Detailed API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
 
 # Effects Architecture
 
@@ -5228,10 +5228,10 @@ Effects use existing protocol structures:
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage
-- [Effects Reference](../../api/effects/) - Detailed API documentation
-- [Custom Effects](../../user-guide/effects-custom/) - Creating your own effects
-- [Troubleshooting](../../user-guide/effects-troubleshooting/) - Common issues
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage
+- [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) - Detailed API documentation
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues
 # API Reference
 
 # API Reference
@@ -5279,51 +5279,51 @@ lifx/
 
 Main entry points for most users:
 
-- [`discover()`](high-level/#lifx.api.discover) - Simple device discovery
-- [`find_by_serial()`](high-level/#lifx.api.find_by_serial) - Find device by serial number
-- [`find_by_label()`](high-level/#lifx.api.find_by_label) - Find devices by label (exact or substring)
-- [`find_by_ip()`](high-level/#lifx.api.find_by_ip) - Find device by IP address
-- [`DeviceGroup`](high-level/#lifx.api.DeviceGroup) - Batch operations
+- [`discover()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.discover) - Simple device discovery
+- [`find_by_serial()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_serial) - Find device by serial number
+- [`find_by_label()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_label) - Find devices by label (exact or substring)
+- [`find_by_ip()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_ip) - Find device by IP address
+- [`DeviceGroup`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.DeviceGroup) - Batch operations
 
 ### Device Classes
 
 Control your LIFX devices:
 
-- [`Device`](devices/#lifx.devices.base.Device) - Base device operations
-- [`Light`](devices/#lifx.devices.light.Light) - Color control
-- [`HevLight`](devices/#lifx.devices.hev.HevLight) - Anti-bacterial cleaning cycles
-- [`InfraredLight`](devices/#lifx.devices.infrared.InfraredLight) - Night vision infrared LED
-- [`MultiZoneLight`](devices/#lifx.devices.multizone.MultiZoneLight) - Strips/beams
-- [`MatrixLight`](devices/#lifx.devices.matrix.MatrixLight) - 2D matrix devices (tiles, candle, path)
+- [`Device`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.base.Device) - Base device operations
+- [`Light`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.light.Light) - Color control
+- [`HevLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.hev.HevLight) - Anti-bacterial cleaning cycles
+- [`InfraredLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.infrared.InfraredLight) - Night vision infrared LED
+- [`MultiZoneLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.multizone.MultiZoneLight) - Strips/beams
+- [`MatrixLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.matrix.MatrixLight) - 2D matrix devices (tiles, candle, path)
 
 ### Color Utilities
 
 Work with colors:
 
-- [`HSBK`](colors/#lifx.color.HSBK) - Color representation
-- [`Colors`](colors/#lifx.color.Colors) - Built-in presets
+- [`HSBK`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.HSBK) - Color representation
+- [`Colors`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.Colors) - Built-in presets
 
 ### Network Layer
 
 Low-level network operations:
 
-- [`discover_devices()`](network/#lifx.network.discovery.discover_devices) - Low-level discovery
-- [`DeviceConnection`](network/#lifx.network.connection.DeviceConnection) - Device connections
+- [`discover_devices()`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.discovery.discover_devices) - Low-level discovery
+- [`DeviceConnection`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.connection.DeviceConnection) - Device connections
 
 ### Products Registry
 
 Device capabilities and automatic type detection:
 
-- [`ProductInfo`](protocol/#lifx.products.ProductInfo) - Product information
-- [`ProductCapability`](protocol/#lifx.products.ProductCapability) - Device capabilities
+- [`ProductInfo`](https://djelibeybi.github.io/lifx-async/api/protocol/#lifx.products.ProductInfo) - Product information
+- [`ProductCapability`](https://djelibeybi.github.io/lifx-async/api/protocol/#lifx.products.ProductCapability) - Device capabilities
 
 ### Exceptions
 
 Error handling:
 
-- [`LifxError`](exceptions/#lifx.exceptions.LifxError) - Base exception
-- [`LifxTimeoutError`](exceptions/#lifx.exceptions.LifxTimeoutError) - Timeout errors
-- [`LifxConnectionError`](exceptions/#lifx.exceptions.LifxConnectionError) - Connection errors
+- [`LifxError`](https://djelibeybi.github.io/lifx-async/api/exceptions/#lifx.exceptions.LifxError) - Base exception
+- [`LifxTimeoutError`](https://djelibeybi.github.io/lifx-async/api/exceptions/#lifx.exceptions.LifxTimeoutError) - Timeout errors
+- [`LifxConnectionError`](https://djelibeybi.github.io/lifx-async/api/exceptions/#lifx.exceptions.LifxConnectionError) - Connection errors
 
 ## Usage Patterns
 
@@ -5403,7 +5403,7 @@ ______________________________________________________________________
 
 Simple, batteries-included API for common tasks
 
-[High-Level API](high-level/)
+[High-Level API](https://djelibeybi.github.io/lifx-async/api/high-level/index.md)
 
 - **Device Classes**
 
@@ -5411,7 +5411,7 @@ ______________________________________________________________________
 
 Control LIFX lights, strips, tiles, and matrix devices
 
-[Devices](devices/)
+[Devices](https://djelibeybi.github.io/lifx-async/api/devices/index.md)
 
 - **Color Utilities**
 
@@ -5419,7 +5419,7 @@ ______________________________________________________________________
 
 Work with colors, RGB, and HSBK
 
-[Colors](colors/)
+[Colors](https://djelibeybi.github.io/lifx-async/api/colors/index.md)
 
 - **Network Layer**
 
@@ -5427,7 +5427,7 @@ ______________________________________________________________________
 
 Low-level network operations
 
-[Network](network/)
+[Network](https://djelibeybi.github.io/lifx-async/api/network/index.md)
 
 - **Protocol Layer**
 
@@ -5435,7 +5435,7 @@ ______________________________________________________________________
 
 Auto-generated protocol structures
 
-[Protocol](protocol/)
+[Protocol](https://djelibeybi.github.io/lifx-async/api/protocol/index.md)
 
 - **Exceptions**
 
@@ -5443,7 +5443,7 @@ ______________________________________________________________________
 
 Error handling and exception hierarchy
 
-[Exceptions](exceptions/)
+[Exceptions](https://djelibeybi.github.io/lifx-async/api/exceptions/index.md)
 
 ## Best Practices
 
@@ -5486,8 +5486,8 @@ async def control_light(light: Light) -> str:
 
 ## Further Reading
 
-- [Architecture](../architecture/overview/) - How lifx-async works
-- [FAQ](../faq/) - Frequently asked questions
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - How lifx-async works
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
 
 # High-Level API
 
@@ -8849,16 +8849,16 @@ def inherit_prestate(self, other: LIFXEffect) -> bool:
 
 ### Creating Custom Effects
 
-See the [Custom Effects Guide](../../user-guide/effects-custom/) for detailed instructions on creating your own effects.
+See the [Custom Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) for detailed instructions on creating your own effects.
 
 ______________________________________________________________________
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage and common patterns
-- [Custom Effects](../../user-guide/effects-custom/) - Creating your own effects
-- [Architecture](../../architecture/effects-architecture/) - How the system works
-- [Troubleshooting](../../user-guide/effects-troubleshooting/) - Common issues and solutions
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage and common patterns
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues and solutions
 
 # Color Utilities
 
@@ -15940,12 +15940,14 @@ Get colors for all tiles in the chain.
 
 Fetches colors from each tile in the device chain and returns them as a list of color lists (one per tile). This is the matrix equivalent of MultiZoneLight's get_all_color_zones().
 
+For tiles with >64 zones (e.g., 16x8 Ceiling with 128 zones), makes multiple Get64 requests to fetch all colors.
+
 Always fetches from device. Tiles are queried sequentially to avoid overwhelming the device with concurrent requests.
 
-| RETURNS            | DESCRIPTION                                                 |
-| ------------------ | ----------------------------------------------------------- |
-| `list[list[HSBK]]` | List of color lists, one per tile. Each inner list contains |
-| `list[list[HSBK]]` | the colors for that tile (typically 64 for 8x8 tiles).      |
+| RETURNS            | DESCRIPTION                                                        |
+| ------------------ | ------------------------------------------------------------------ |
+| `list[list[HSBK]]` | List of color lists, one per tile. Each inner list contains        |
+| `list[list[HSBK]]` | all colors for that tile (64 for 8x8 tiles, 128 for 16x8 Ceiling). |
 
 | RAISES                        | DESCRIPTION                            |
 | ----------------------------- | -------------------------------------- |
@@ -15976,12 +15978,15 @@ async def get_all_tile_colors(self) -> list[list[HSBK]]:
     as a list of color lists (one per tile). This is the matrix equivalent
     of MultiZoneLight's get_all_color_zones().
 
+    For tiles with >64 zones (e.g., 16x8 Ceiling with 128 zones), makes
+    multiple Get64 requests to fetch all colors.
+
     Always fetches from device. Tiles are queried sequentially to avoid
     overwhelming the device with concurrent requests.
 
     Returns:
         List of color lists, one per tile. Each inner list contains
-        the colors for that tile (typically 64 for 8x8 tiles).
+        all colors for that tile (64 for 8x8 tiles, 128 for 16x8 Ceiling).
 
     Raises:
         LifxDeviceNotFoundError: If device is not connected
@@ -16009,8 +16014,28 @@ async def get_all_tile_colors(self) -> list[list[HSBK]]:
     # Fetch colors from each tile sequentially
     all_colors: list[list[HSBK]] = []
     for tile in device_chain:
-        tile_colors = await self.get64(tile_index=tile.tile_index)
-        all_colors.append(tile_colors)
+        tile_zone_count = tile.width * tile.height
+
+        if tile_zone_count <= 64:
+            # Single request for tiles with ≤64 zones
+            tile_colors = await self.get64(tile_index=tile.tile_index)
+            all_colors.append(tile_colors)
+        else:
+            # Multiple requests for tiles with >64 zones (e.g., 16x8 Ceiling)
+            # Split into multiple 64-zone requests by row
+            tile_colors = []
+            rows_per_request = 64 // tile.width  # e.g., 64/16 = 4 rows
+
+            for y_offset in range(0, tile.height, rows_per_request):
+                chunk = await self.get64(
+                    tile_index=tile.tile_index,
+                    x=0,
+                    y=y_offset,
+                    width=tile.width,
+                )
+                tile_colors.extend(chunk)
+
+            all_colors.append(tile_colors)
 
     # Update state if it exists (flatten for state storage)
     if self._state is not None and hasattr(self._state, "tile_colors"):
@@ -17304,7 +17329,7 @@ create_device() -> Device | None
 
 Create appropriate device instance based on product capabilities.
 
-Queries the device for its product ID and uses the product registry to instantiate the appropriate device class (Device, Light, HevLight, InfraredLight, MultiZoneLight, or MatrixLight) based on the product capabilities.
+Queries the device for its product ID and uses the product registry to instantiate the appropriate device class (Device, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, or CeilingLight) based on the product capabilities.
 
 This is the single source of truth for device type detection and instantiation across the library.
 
@@ -17335,8 +17360,8 @@ async def create_device(self) -> Device | None:
 
     Queries the device for its product ID and uses the product registry
     to instantiate the appropriate device class (Device, Light, HevLight,
-    InfraredLight, MultiZoneLight, or MatrixLight) based on the product
-    capabilities.
+    InfraredLight, MultiZoneLight, MatrixLight, or CeilingLight) based on
+    the product capabilities.
 
     This is the single source of truth for device type detection and
     instantiation across the library.
@@ -17358,11 +17383,13 @@ async def create_device(self) -> Device | None:
         ```
     """
     from lifx.devices.base import Device
+    from lifx.devices.ceiling import CeilingLight
     from lifx.devices.hev import HevLight
     from lifx.devices.infrared import InfraredLight
     from lifx.devices.light import Light
     from lifx.devices.matrix import MatrixLight
     from lifx.devices.multizone import MultiZoneLight
+    from lifx.products import is_ceiling_product
 
     kwargs = {
         "serial": self.serial,
@@ -17379,6 +17406,12 @@ async def create_device(self) -> Device | None:
         await temp_device._ensure_capabilities()
 
         if temp_device.capabilities:
+            # Check for Ceiling products first (before generic MatrixLight)
+            if temp_device.version and is_ceiling_product(
+                temp_device.version.product
+            ):
+                return CeilingLight(**kwargs)
+
             if temp_device.capabilities.has_matrix:
                 return MatrixLight(**kwargs)
             if temp_device.capabilities.has_multizone:
@@ -23339,7 +23372,7 @@ uv pip install lifx-async
 pip install lifx-async
 ```
 
-See the [Installation Guide](../getting-started/installation/) for more options.
+See the [Installation Guide](https://djelibeybi.github.io/lifx-async/getting-started/installation/index.md) for more options.
 
 ### Why can't discovery find my devices?
 
@@ -23436,7 +23469,7 @@ device = await find_by_serial("d073d5123456")
 
 ### What are the available color presets?
 
-See [`Colors`](../api/colors/#lifx.color.Colors) for the complete list:
+See [`Colors`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.Colors) for the complete list:
 
 ```python
 from lifx import Colors
@@ -23625,7 +23658,7 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 ## Still have questions?
 
-- **Documentation**: Browse the [API Reference](../api/)
+- **Documentation**: Browse the [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md)
 - **Issues**: Report bugs on [GitHub Issues](https://github.com/Djelibeybi/lifx-async/issues)
 - **Discussions**: Ask questions in [GitHub Discussions](https://github.com/Djelibeybi/lifx-async/discussions)
 

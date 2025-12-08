@@ -813,8 +813,8 @@ class Effect1(LIFXEffect):
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage of built-in effects
-- [Effects Reference](../../api/effects/) - Detailed API documentation
-- [Architecture](../../architecture/effects-architecture/) - How the system works internally
-- [Troubleshooting](../effects-troubleshooting/) - Common issues and solutions
-- [Examples](../../examples/) - Full working examples including `08_custom_effect.py`
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage of built-in effects
+- [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) - Detailed API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works internally
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues and solutions
+- [Examples](https://djelibeybi.github.io/lifx-async/examples/index.md) - Full working examples including `08_custom_effect.py`

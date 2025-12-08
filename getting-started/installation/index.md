@@ -128,6 +128,6 @@ sudo usermod -a -G netdev $USER  # Linux
 
 ## Next Steps
 
-- [Quick Start Guide](../quickstart/) - Start controlling your lights
-- [API Reference](../../api/) - Complete API documentation
-- [FAQ](../../faq/) - Frequently asked questions
+- [Quick Start Guide](https://djelibeybi.github.io/lifx-async/getting-started/quickstart/index.md) - Start controlling your lights
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions

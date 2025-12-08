@@ -87,6 +87,6 @@ await group.apply_theme(custom_theme, power_on=True)
 
 ## Next Steps
 
-- See [Themes API Reference](../../api/themes/) for detailed API documentation
-- See [Device Classes](../../api/devices/) for device-specific `apply_theme()` methods
-- See [Color Utilities](../../api/colors/) for HSBK color representation
+- See [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) for detailed API documentation
+- See [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) for device-specific `apply_theme()` methods
+- See [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md) for HSBK color representation

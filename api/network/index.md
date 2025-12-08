@@ -351,7 +351,7 @@ create_device() -> Device | None
 
 Create appropriate device instance based on product capabilities.
 
-Queries the device for its product ID and uses the product registry to instantiate the appropriate device class (Device, Light, HevLight, InfraredLight, MultiZoneLight, or MatrixLight) based on the product capabilities.
+Queries the device for its product ID and uses the product registry to instantiate the appropriate device class (Device, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, or CeilingLight) based on the product capabilities.
 
 This is the single source of truth for device type detection and instantiation across the library.
 
@@ -382,8 +382,8 @@ async def create_device(self) -> Device | None:
 
     Queries the device for its product ID and uses the product registry
     to instantiate the appropriate device class (Device, Light, HevLight,
-    InfraredLight, MultiZoneLight, or MatrixLight) based on the product
-    capabilities.
+    InfraredLight, MultiZoneLight, MatrixLight, or CeilingLight) based on
+    the product capabilities.
 
     This is the single source of truth for device type detection and
     instantiation across the library.
@@ -405,11 +405,13 @@ async def create_device(self) -> Device | None:
         ```
     """
     from lifx.devices.base import Device
+    from lifx.devices.ceiling import CeilingLight
     from lifx.devices.hev import HevLight
     from lifx.devices.infrared import InfraredLight
     from lifx.devices.light import Light
     from lifx.devices.matrix import MatrixLight
     from lifx.devices.multizone import MultiZoneLight
+    from lifx.products import is_ceiling_product
 
     kwargs = {
         "serial": self.serial,
@@ -426,6 +428,12 @@ async def create_device(self) -> Device | None:
         await temp_device._ensure_capabilities()
 
         if temp_device.capabilities:
+            # Check for Ceiling products first (before generic MatrixLight)
+            if temp_device.version and is_ceiling_product(
+                temp_device.version.product
+            ):
+                return CeilingLight(**kwargs)
+
             if temp_device.capabilities.has_matrix:
                 return MatrixLight(**kwargs)
             if temp_device.capabilities.has_multizone:

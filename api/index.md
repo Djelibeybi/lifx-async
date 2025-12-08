@@ -43,51 +43,51 @@ lifx/
 
 Main entry points for most users:
 
-- [`discover()`](high-level/#lifx.api.discover) - Simple device discovery
-- [`find_by_serial()`](high-level/#lifx.api.find_by_serial) - Find device by serial number
-- [`find_by_label()`](high-level/#lifx.api.find_by_label) - Find devices by label (exact or substring)
-- [`find_by_ip()`](high-level/#lifx.api.find_by_ip) - Find device by IP address
-- [`DeviceGroup`](high-level/#lifx.api.DeviceGroup) - Batch operations
+- [`discover()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.discover) - Simple device discovery
+- [`find_by_serial()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_serial) - Find device by serial number
+- [`find_by_label()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_label) - Find devices by label (exact or substring)
+- [`find_by_ip()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_ip) - Find device by IP address
+- [`DeviceGroup`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.DeviceGroup) - Batch operations
 
 ### Device Classes
 
 Control your LIFX devices:
 
-- [`Device`](devices/#lifx.devices.base.Device) - Base device operations
-- [`Light`](devices/#lifx.devices.light.Light) - Color control
-- [`HevLight`](devices/#lifx.devices.hev.HevLight) - Anti-bacterial cleaning cycles
-- [`InfraredLight`](devices/#lifx.devices.infrared.InfraredLight) - Night vision infrared LED
-- [`MultiZoneLight`](devices/#lifx.devices.multizone.MultiZoneLight) - Strips/beams
-- [`MatrixLight`](devices/#lifx.devices.matrix.MatrixLight) - 2D matrix devices (tiles, candle, path)
+- [`Device`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.base.Device) - Base device operations
+- [`Light`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.light.Light) - Color control
+- [`HevLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.hev.HevLight) - Anti-bacterial cleaning cycles
+- [`InfraredLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.infrared.InfraredLight) - Night vision infrared LED
+- [`MultiZoneLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.multizone.MultiZoneLight) - Strips/beams
+- [`MatrixLight`](https://djelibeybi.github.io/lifx-async/api/devices/#lifx.devices.matrix.MatrixLight) - 2D matrix devices (tiles, candle, path)
 
 ### Color Utilities
 
 Work with colors:
 
-- [`HSBK`](colors/#lifx.color.HSBK) - Color representation
-- [`Colors`](colors/#lifx.color.Colors) - Built-in presets
+- [`HSBK`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.HSBK) - Color representation
+- [`Colors`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.Colors) - Built-in presets
 
 ### Network Layer
 
 Low-level network operations:
 
-- [`discover_devices()`](network/#lifx.network.discovery.discover_devices) - Low-level discovery
-- [`DeviceConnection`](network/#lifx.network.connection.DeviceConnection) - Device connections
+- [`discover_devices()`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.discovery.discover_devices) - Low-level discovery
+- [`DeviceConnection`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.connection.DeviceConnection) - Device connections
 
 ### Products Registry
 
 Device capabilities and automatic type detection:
 
-- [`ProductInfo`](protocol/#lifx.products.ProductInfo) - Product information
-- [`ProductCapability`](protocol/#lifx.products.ProductCapability) - Device capabilities
+- [`ProductInfo`](https://djelibeybi.github.io/lifx-async/api/protocol/#lifx.products.ProductInfo) - Product information
+- [`ProductCapability`](https://djelibeybi.github.io/lifx-async/api/protocol/#lifx.products.ProductCapability) - Device capabilities
 
 ### Exceptions
 
 Error handling:
 
-- [`LifxError`](exceptions/#lifx.exceptions.LifxError) - Base exception
-- [`LifxTimeoutError`](exceptions/#lifx.exceptions.LifxTimeoutError) - Timeout errors
-- [`LifxConnectionError`](exceptions/#lifx.exceptions.LifxConnectionError) - Connection errors
+- [`LifxError`](https://djelibeybi.github.io/lifx-async/api/exceptions/#lifx.exceptions.LifxError) - Base exception
+- [`LifxTimeoutError`](https://djelibeybi.github.io/lifx-async/api/exceptions/#lifx.exceptions.LifxTimeoutError) - Timeout errors
+- [`LifxConnectionError`](https://djelibeybi.github.io/lifx-async/api/exceptions/#lifx.exceptions.LifxConnectionError) - Connection errors
 
 ## Usage Patterns
 
@@ -167,7 +167,7 @@ ______________________________________________________________________
 
 Simple, batteries-included API for common tasks
 
-[High-Level API](high-level/)
+[High-Level API](https://djelibeybi.github.io/lifx-async/api/high-level/index.md)
 
 - **Device Classes**
 
@@ -175,7 +175,7 @@ ______________________________________________________________________
 
 Control LIFX lights, strips, tiles, and matrix devices
 
-[Devices](devices/)
+[Devices](https://djelibeybi.github.io/lifx-async/api/devices/index.md)
 
 - **Color Utilities**
 
@@ -183,7 +183,7 @@ ______________________________________________________________________
 
 Work with colors, RGB, and HSBK
 
-[Colors](colors/)
+[Colors](https://djelibeybi.github.io/lifx-async/api/colors/index.md)
 
 - **Network Layer**
 
@@ -191,7 +191,7 @@ ______________________________________________________________________
 
 Low-level network operations
 
-[Network](network/)
+[Network](https://djelibeybi.github.io/lifx-async/api/network/index.md)
 
 - **Protocol Layer**
 
@@ -199,7 +199,7 @@ ______________________________________________________________________
 
 Auto-generated protocol structures
 
-[Protocol](protocol/)
+[Protocol](https://djelibeybi.github.io/lifx-async/api/protocol/index.md)
 
 - **Exceptions**
 
@@ -207,7 +207,7 @@ ______________________________________________________________________
 
 Error handling and exception hierarchy
 
-[Exceptions](exceptions/)
+[Exceptions](https://djelibeybi.github.io/lifx-async/api/exceptions/index.md)
 
 ## Best Practices
 
@@ -250,5 +250,5 @@ async def control_light(light: Light) -> str:
 
 ## Further Reading
 
-- [Architecture](../architecture/overview/) - How lifx-async works
-- [FAQ](../faq/) - Frequently asked questions
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - How lifx-async works
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions

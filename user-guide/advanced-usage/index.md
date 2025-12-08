@@ -473,6 +473,6 @@ async def with_reuse():
 
 ## Next Steps
 
-- [Troubleshooting Guide](../troubleshooting/) - Common issues and solutions
-- [Protocol Reference](../../api/protocol/) - Low-level protocol details
-- [API Reference](../../api/) - Complete API documentation
+- [Troubleshooting Guide](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md) - Common issues and solutions
+- [Protocol Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Low-level protocol details
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation

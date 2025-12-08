@@ -319,5 +319,5 @@ await conn.close()
 
 ## Next Steps
 
-- [API Reference](../../api/) - Detailed API documentation
-- [FAQ](../../faq/) - Frequently asked questions
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Detailed API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions

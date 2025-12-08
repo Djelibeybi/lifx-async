@@ -404,7 +404,7 @@ await party_mode(group.lights, duration=120)
 
 ## Next Steps
 
-- See [Effects Reference](../../api/effects/) for detailed documentation on all effect parameters
-- See [Custom Effects](../../user-guide/effects-custom/) to learn how to create your own effects
-- See [Effects Architecture](../../architecture/effects-architecture/) to understand how the system works internally
-- See [Troubleshooting](../../user-guide/effects-troubleshooting/) for common issues and solutions
+- See [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) for detailed documentation on all effect parameters
+- See [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) to learn how to create your own effects
+- See [Effects Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) to understand how the system works internally
+- See [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) for common issues and solutions

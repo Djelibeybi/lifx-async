@@ -740,13 +740,13 @@ def inherit_prestate(self, other: LIFXEffect) -> bool:
 
 ### Creating Custom Effects
 
-See the [Custom Effects Guide](../../user-guide/effects-custom/) for detailed instructions on creating your own effects.
+See the [Custom Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) for detailed instructions on creating your own effects.
 
 ______________________________________________________________________
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage and common patterns
-- [Custom Effects](../../user-guide/effects-custom/) - Creating your own effects
-- [Architecture](../../architecture/effects-architecture/) - How the system works
-- [Troubleshooting](../../user-guide/effects-troubleshooting/) - Common issues and solutions
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage and common patterns
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues and solutions

@@ -774,7 +774,7 @@ Effects use existing protocol structures:
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage
-- [Effects Reference](../../api/effects/) - Detailed API documentation
-- [Custom Effects](../../user-guide/effects-custom/) - Creating your own effects
-- [Troubleshooting](../../user-guide/effects-troubleshooting/) - Common issues
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage
+- [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) - Detailed API documentation
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues

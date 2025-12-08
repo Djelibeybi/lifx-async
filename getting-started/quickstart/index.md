@@ -200,6 +200,6 @@ asyncio.run(main())
 
 ## Next Steps
 
-- [API Reference](../../api/) - Complete API documentation
-- [Architecture](../../architecture/overview/) - How lifx-async works
-- [FAQ](../../faq/) - Frequently asked questions
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - How lifx-async works
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions

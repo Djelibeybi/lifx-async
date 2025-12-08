@@ -38,7 +38,7 @@ uv pip install lifx-async
 pip install lifx-async
 ```
 
-See the [Installation Guide](../getting-started/installation/) for more options.
+See the [Installation Guide](https://djelibeybi.github.io/lifx-async/getting-started/installation/index.md) for more options.
 
 ### Why can't discovery find my devices?
 
@@ -135,7 +135,7 @@ device = await find_by_serial("d073d5123456")
 
 ### What are the available color presets?
 
-See [`Colors`](../api/colors/#lifx.color.Colors) for the complete list:
+See [`Colors`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.Colors) for the complete list:
 
 ```python
 from lifx import Colors
@@ -324,6 +324,6 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 ## Still have questions?
 
-- **Documentation**: Browse the [API Reference](../api/)
+- **Documentation**: Browse the [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md)
 - **Issues**: Report bugs on [GitHub Issues](https://github.com/Djelibeybi/lifx-async/issues)
 - **Discussions**: Ask questions in [GitHub Discussions](https://github.com/Djelibeybi/lifx-async/discussions)

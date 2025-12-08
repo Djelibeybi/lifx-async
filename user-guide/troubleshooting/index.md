@@ -407,6 +407,6 @@ If you're still experiencing issues:
 
 ## Next Steps
 
-- [Advanced Usage](../advanced-usage/) - Optimization patterns
-- [API Reference](../../api/) - Complete API documentation
-- [FAQ](../../faq/) - Frequently asked questions
+- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md) - Optimization patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions

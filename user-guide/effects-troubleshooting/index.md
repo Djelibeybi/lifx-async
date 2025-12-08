@@ -816,7 +816,7 @@ When reporting issues, include:
 
 ## See Also
 
-- [Getting Started](../../getting-started/effects/) - Basic usage patterns
-- [Effects Reference](../../api/effects/) - Detailed API documentation
-- [Custom Effects](../effects-custom/) - Creating your own effects
-- [Architecture](../../architecture/effects-architecture/) - How the system works
+- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage patterns
+- [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) - Detailed API documentation
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works
