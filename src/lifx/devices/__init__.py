@@ -10,6 +10,7 @@ from lifx.devices.base import (
     FirmwareInfo,
     WifiInfo,
 )
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.hev import HevLight, HevLightState
 from lifx.devices.infrared import InfraredLight, InfraredLightState
 from lifx.devices.light import Light, LightState
@@ -17,6 +18,7 @@ from lifx.devices.matrix import MatrixEffect, MatrixLight, MatrixLightState, Til
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
 
 __all__ = [
+    "CeilingLight",
     "CollectionInfo",
     "Device",
     "DeviceInfo",

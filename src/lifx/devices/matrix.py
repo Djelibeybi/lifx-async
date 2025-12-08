@@ -550,12 +550,15 @@ class MatrixLight(Light):
         as a list of color lists (one per tile). This is the matrix equivalent
         of MultiZoneLight's get_all_color_zones().
 
+        For tiles with >64 zones (e.g., 16x8 Ceiling with 128 zones), makes
+        multiple Get64 requests to fetch all colors.
+
         Always fetches from device. Tiles are queried sequentially to avoid
         overwhelming the device with concurrent requests.
 
         Returns:
             List of color lists, one per tile. Each inner list contains
-            the colors for that tile (typically 64 for 8x8 tiles).
+            all colors for that tile (64 for 8x8 tiles, 128 for 16x8 Ceiling).
 
         Raises:
             LifxDeviceNotFoundError: If device is not connected
@@ -583,8 +586,28 @@ class MatrixLight(Light):
         # Fetch colors from each tile sequentially
         all_colors: list[list[HSBK]] = []
         for tile in device_chain:
-            tile_colors = await self.get64(tile_index=tile.tile_index)
-            all_colors.append(tile_colors)
+            tile_zone_count = tile.width * tile.height
+
+            if tile_zone_count <= 64:
+                # Single request for tiles with ≤64 zones
+                tile_colors = await self.get64(tile_index=tile.tile_index)
+                all_colors.append(tile_colors)
+            else:
+                # Multiple requests for tiles with >64 zones (e.g., 16x8 Ceiling)
+                # Split into multiple 64-zone requests by row
+                tile_colors = []
+                rows_per_request = 64 // tile.width  # e.g., 64/16 = 4 rows
+
+                for y_offset in range(0, tile.height, rows_per_request):
+                    chunk = await self.get64(
+                        tile_index=tile.tile_index,
+                        x=0,
+                        y=y_offset,
+                        width=tile.width,
+                    )
+                    tile_colors.extend(chunk)
+
+                all_colors.append(tile_colors)
 
         # Update state if it exists (flatten for state storage)
         if self._state is not None and hasattr(self._state, "tile_colors"):

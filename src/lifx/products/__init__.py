@@ -9,6 +9,11 @@ products.json specification.
 To update: run `uv run python -m lifx.products.generator`
 """
 
+from lifx.products.quirks import (
+    CeilingComponentLayout,
+    get_ceiling_layout,
+    is_ceiling_product,
+)
 from lifx.products.registry import (
     ProductCapability,
     ProductInfo,
@@ -19,10 +24,13 @@ from lifx.products.registry import (
 )
 
 __all__ = [
+    "CeilingComponentLayout",
     "ProductCapability",
     "ProductInfo",
     "ProductRegistry",
     "TemperatureRange",
+    "get_ceiling_layout",
     "get_product",
     "get_registry",
+    "is_ceiling_product",
 ]
