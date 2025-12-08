@@ -31,6 +31,7 @@ from lifx_emulator.scenarios.models import ScenarioConfig
 from lifx.api import DeviceGroup
 from lifx.devices import HevLight, InfraredLight, Light, MultiZoneLight
 from lifx.devices.base import Device
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
 from lifx.network.connection import DeviceConnection
 
@@ -299,13 +300,13 @@ async def cleanup_device_connections(request, emulator_available):
 def ceiling_device(
     emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
 ):
-    """Create a LIFX Ceiling device (product 201) for SKY effect testing.
+    """Create a LIFX Ceiling device (product 201) for SKY effect and component testing.
 
     The Ceiling device supports SKY effects and has >128 zones (16x8 tile).
     This fixture dynamically adds the device to the running emulator.
 
     Returns:
-        MatrixLight instance for the Ceiling device
+        CeilingLight instance for the Ceiling device
     """
     port, server, scenario_manager = emulator_server
 
@@ -313,6 +314,7 @@ def ceiling_device(
         pytest.skip("Cannot create ceiling device with external emulator")
 
     # Create Ceiling device (product 201 = LIFX Ceiling with 16x8 = 128 zones)
+    # Let the emulator use its internal product configuration
     ceiling = create_device(
         product_id=201,
         serial="d073d5000100",
@@ -320,7 +322,7 @@ def ceiling_device(
     )
     server.add_device(ceiling)
 
-    yield MatrixLight(
+    yield CeilingLight(
         serial="d073d5000100",
         ip="127.0.0.1",
         port=port,
