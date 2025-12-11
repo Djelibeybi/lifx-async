@@ -94,6 +94,19 @@ The `CeilingLight` class extends `MatrixLight` with independent control over upl
       filters:
         - "!^_"
 
+### CeilingLightState
+
+The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specific component information. It is returned by `CeilingLight.state` after connecting to a device.
+
+::: lifx.devices.ceiling.CeilingLightState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
 ## Device Properties
 
 ### MAC Address
