@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.6.0 (2025-12-11)
+
+### Features
+
+- **devices**: Add CeilingLightState dataclass for ceiling component state
+  ([`607f15c`](https://github.com/Djelibeybi/lifx-async/commit/607f15c3ed3508a883523ecee940959806d49400))
+
+
 ## v4.5.1 (2025-12-11)
 
 ### Bug Fixes
