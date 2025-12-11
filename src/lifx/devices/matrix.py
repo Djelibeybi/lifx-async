@@ -354,10 +354,7 @@ class MatrixLight(Light):
     def __init__(self, *args, **kwargs) -> None:
         """Initialize MatrixLight device.
 
-        Args:
-            serial: Device serial number
-            ip: Device IP address
-            port: Device port (default: 56700)
+        See :class:`Light` for parameter documentation.
         """
         super().__init__(*args, **kwargs)
         # Matrix specific properties
