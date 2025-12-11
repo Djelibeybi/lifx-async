@@ -127,6 +127,43 @@ State Properties Require Recent Data
 
 The `uplight_is_on` and `downlight_is_on` properties rely on cached data. Call `get_uplight_color()` or `get_downlight_colors()` first to ensure accurate state.
 
+## Device State
+
+After connecting to a CeilingLight, you can access the complete device state via the `state` property, which returns a `CeilingLightState` dataclass:
+
+```python
+from lifx import CeilingLight, CeilingLightState
+
+async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+    state: CeilingLightState = ceiling.state
+
+    # Access ceiling-specific state
+    print(f"Uplight color: {state.uplight_color}")
+    print(f"Uplight is on: {state.uplight_is_on}")
+    print(f"Downlight zones: {len(state.downlight_colors)}")
+    print(f"Downlight is on: {state.downlight_is_on}")
+
+    # Access inherited state from MatrixLightState/LightState
+    print(f"Device label: {state.label}")
+    print(f"Power: {'on' if state.power else 'off'}")
+    print(f"Model: {state.model}")
+```
+
+### CeilingLightState Attributes
+
+`CeilingLightState` extends `MatrixLightState` with ceiling-specific attributes:
+
+| Attribute          | Type         | Description                                |
+| ------------------ | ------------ | ------------------------------------------ |
+| `uplight_color`    | `HSBK`       | Current color of the uplight component     |
+| `downlight_colors` | `list[HSBK]` | Colors for each downlight zone (63 or 127) |
+| `uplight_is_on`    | `bool`       | True if uplight brightness > 0             |
+| `downlight_is_on`  | `bool`       | True if any downlight zone brightness > 0  |
+| `uplight_zone`     | `int`        | Zone index for uplight (63 or 127)         |
+| `downlight_zones`  | `slice`      | Slice for downlight zones                  |
+
+Plus all attributes inherited from `MatrixLightState`: `chain`, `tile_colors`, `tile_count`, `effect`, and from `LightState`: `color`, `power`, `label`, `model`, `serial`, `mac_address`, `capabilities`, etc.
+
 ## Zone Layout
 
 Access the component zone indices directly:

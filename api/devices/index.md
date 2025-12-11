@@ -504,7 +504,14 @@ connect(
     port: int = LIFX_UDP_PORT,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
-) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
+) -> (
+    Light
+    | HevLight
+    | InfraredLight
+    | MultiZoneLight
+    | MatrixLight
+    | CeilingLight
+)
 ```
 
 Create and return a fully initialized device instance.
@@ -560,7 +567,7 @@ async def connect(
     port: int = LIFX_UDP_PORT,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
-) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
     """Create and return a fully initialized device instance.
 
     This factory method creates the appropriate device type (Light, etc)
@@ -661,7 +668,14 @@ async def connect(
 
         device_class: type[Device] = cls
 
-        if product_info.has_matrix:
+        # Check for ceiling products first (subset of matrix devices)
+        from lifx.products import is_ceiling_product
+
+        if is_ceiling_product(version.product):
+            from lifx.devices.ceiling import CeilingLight
+
+            device_class = CeilingLight
+        elif product_info.has_matrix:
             from lifx.devices.matrix import MatrixLight
 
             device_class = MatrixLight
@@ -6993,6 +7007,7 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
 
 | METHOD                 | DESCRIPTION                                         |
 | ---------------------- | --------------------------------------------------- |
+| `refresh_state`        | Refresh ceiling light state from hardware.          |
 | `from_ip`              | Create CeilingLight from IP address.                |
 | `get_uplight_color`    | Get current uplight component color from device.    |
 | `get_downlight_colors` | Get current downlight component colors from device. |
@@ -7005,6 +7020,7 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
 
 | ATTRIBUTE         | DESCRIPTION                                                         |
 | ----------------- | ------------------------------------------------------------------- |
+| `state`           | Get Ceiling light state. **TYPE:** `CeilingLightState`              |
 | `uplight_zone`    | Zone index of the uplight component. **TYPE:** `int`                |
 | `downlight_zones` | Slice representing the downlight component zones. **TYPE:** `slice` |
 | `uplight_is_on`   | True if uplight component is currently on. **TYPE:** `bool`         |
@@ -7046,6 +7062,22 @@ def __init__(
 ```
 
 #### Attributes
+
+##### state
+
+```python
+state: CeilingLightState
+```
+
+Get Ceiling light state.
+
+| RETURNS             | DESCRIPTION                                       |
+| ------------------- | ------------------------------------------------- |
+| `CeilingLightState` | CeilingLightState with current state information. |
+
+| RAISES         | DESCRIPTION                              |
+| -------------- | ---------------------------------------- |
+| `RuntimeError` | If accessed before state initialization. |
 
 ##### uplight_zone
 
@@ -7116,6 +7148,49 @@ Requires recent data from device. Call get_downlight_colors() or get_power() to 
 | `bool`  | True if downlight component is on, False otherwise |
 
 #### Functions
+
+##### refresh_state
+
+```python
+refresh_state() -> None
+```
+
+Refresh ceiling light state from hardware.
+
+Fetches color, tiles, tile colors, effect, and ceiling component state.
+
+| RAISES                    | DESCRIPTION                       |
+| ------------------------- | --------------------------------- |
+| `RuntimeError`            | If state has not been initialized |
+| `LifxTimeoutError`        | If device does not respond        |
+| `LifxDeviceNotFoundError` | If device cannot be reached       |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def refresh_state(self) -> None:
+    """Refresh ceiling light state from hardware.
+
+    Fetches color, tiles, tile colors, effect, and ceiling component state.
+
+    Raises:
+        RuntimeError: If state has not been initialized
+        LifxTimeoutError: If device does not respond
+        LifxDeviceNotFoundError: If device cannot be reached
+    """
+    await super().refresh_state()
+
+    # Get ceiling component colors
+    uplight_color = await self.get_uplight_color()
+    downlight_colors = await self.get_downlight_colors()
+
+    # Update ceiling-specific state fields
+    state = cast(CeilingLightState, self._state)
+    state.uplight_color = uplight_color
+    state.downlight_colors = downlight_colors
+    state.uplight_is_on = uplight_color.brightness > 0
+    state.downlight_is_on = any(c.brightness > 0 for c in downlight_colors)
+```
 
 ##### from_ip
 
@@ -7702,6 +7777,148 @@ async def turn_downlight_off(
     # Persist if enabled
     if self._state_file:
         self._save_state_to_file()
+```
+
+### CeilingLightState
+
+The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specific component information. It is returned by `CeilingLight.state` after connecting to a device.
+
+#### CeilingLightState
+
+```python
+CeilingLightState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+    color: HSBK,
+    chain: list[TileInfo],
+    tile_orientations: dict[int, str],
+    tile_colors: list[HSBK],
+    tile_count: int,
+    effect: FirmwareEffect,
+    uplight_color: HSBK,
+    downlight_colors: list[HSBK],
+    uplight_is_on: bool,
+    downlight_is_on: bool,
+    uplight_zone: int,
+    downlight_zones: slice,
+)
+```
+
+Bases: `MatrixLightState`
+
+Ceiling light device state with uplight/downlight component control.
+
+Extends MatrixLightState with ceiling-specific component information.
+
+| ATTRIBUTE          | DESCRIPTION                                                                  |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `uplight_color`    | Current HSBK color of the uplight component **TYPE:** `HSBK`                 |
+| `downlight_colors` | List of HSBK colors for each downlight zone **TYPE:** `list[HSBK]`           |
+| `uplight_is_on`    | Whether uplight component is on (brightness > 0) **TYPE:** `bool`            |
+| `downlight_is_on`  | Whether downlight component is on (any zone brightness > 0) **TYPE:** `bool` |
+| `uplight_zone`     | Zone index for the uplight component **TYPE:** `int`                         |
+| `downlight_zones`  | Slice representing downlight component zones **TYPE:** `slice`               |
+
+| METHOD              | DESCRIPTION                                     |
+| ------------------- | ----------------------------------------------- |
+| `from_matrix_state` | Create CeilingLightState from MatrixLightState. |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return CeilingLightState as dict.
+
+##### Functions
+
+###### from_matrix_state
+
+```python
+from_matrix_state(
+    matrix_state: MatrixLightState,
+    uplight_color: HSBK,
+    downlight_colors: list[HSBK],
+    uplight_zone: int,
+    downlight_zones: slice,
+) -> CeilingLightState
+```
+
+Create CeilingLightState from MatrixLightState.
+
+| PARAMETER          | DESCRIPTION                                                    |
+| ------------------ | -------------------------------------------------------------- |
+| `matrix_state`     | Base MatrixLightState to extend **TYPE:** `MatrixLightState`   |
+| `uplight_color`    | Current uplight zone color **TYPE:** `HSBK`                    |
+| `downlight_colors` | Current downlight zone colors **TYPE:** `list[HSBK]`           |
+| `uplight_zone`     | Zone index for uplight component **TYPE:** `int`               |
+| `downlight_zones`  | Slice representing downlight component zones **TYPE:** `slice` |
+
+| RETURNS             | DESCRIPTION                                                     |
+| ------------------- | --------------------------------------------------------------- |
+| `CeilingLightState` | CeilingLightState with all matrix state plus ceiling components |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+@classmethod
+def from_matrix_state(
+    cls,
+    matrix_state: MatrixLightState,
+    uplight_color: HSBK,
+    downlight_colors: list[HSBK],
+    uplight_zone: int,
+    downlight_zones: slice,
+) -> CeilingLightState:
+    """Create CeilingLightState from MatrixLightState.
+
+    Args:
+        matrix_state: Base MatrixLightState to extend
+        uplight_color: Current uplight zone color
+        downlight_colors: Current downlight zone colors
+        uplight_zone: Zone index for uplight component
+        downlight_zones: Slice representing downlight component zones
+
+    Returns:
+        CeilingLightState with all matrix state plus ceiling components
+    """
+    return cls(
+        model=matrix_state.model,
+        label=matrix_state.label,
+        serial=matrix_state.serial,
+        mac_address=matrix_state.mac_address,
+        power=matrix_state.power,
+        capabilities=matrix_state.capabilities,
+        host_firmware=matrix_state.host_firmware,
+        wifi_firmware=matrix_state.wifi_firmware,
+        location=matrix_state.location,
+        group=matrix_state.group,
+        color=matrix_state.color,
+        chain=matrix_state.chain,
+        tile_orientations=matrix_state.tile_orientations,
+        tile_colors=matrix_state.tile_colors,
+        tile_count=matrix_state.tile_count,
+        effect=matrix_state.effect,
+        uplight_color=uplight_color,
+        downlight_colors=downlight_colors,
+        uplight_is_on=uplight_color.brightness > 0,
+        downlight_is_on=any(c.brightness > 0 for c in downlight_colors),
+        uplight_zone=uplight_zone,
+        downlight_zones=downlight_zones,
+        last_updated=time.time(),
+    )
 ```
 
 ## Device Properties
