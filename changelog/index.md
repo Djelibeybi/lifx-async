@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.5.1 (2025-12-11)
+
+### Bug Fixes
+
+- **devices**: Export CeilingLight add add user guide and API documentation ([`10e0089`](https://github.com/Djelibeybi/lifx-async/commit/10e008983ffd8b233dd2427a4a4f64661c8f14bd))
+
 ## v4.5.0 (2025-12-08)
 
 ### Features
