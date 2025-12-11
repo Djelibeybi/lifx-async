@@ -26,7 +26,14 @@ from lifx.protocol import packets
 from lifx.protocol.models import Serial
 
 if TYPE_CHECKING:
-    from lifx.devices import HevLight, InfraredLight, Light, MatrixLight, MultiZoneLight
+    from lifx.devices import (
+        CeilingLight,
+        HevLight,
+        InfraredLight,
+        Light,
+        MatrixLight,
+        MultiZoneLight,
+    )
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -509,7 +516,7 @@ class Device(Generic[StateT]):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
-    ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+    ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
         """Create and return a fully initialized device instance.
 
         This factory method creates the appropriate device type (Light, etc)
@@ -610,7 +617,14 @@ class Device(Generic[StateT]):
 
             device_class: type[Device] = cls
 
-            if product_info.has_matrix:
+            # Check for ceiling products first (subset of matrix devices)
+            from lifx.products import is_ceiling_product
+
+            if is_ceiling_product(version.product):
+                from lifx.devices.ceiling import CeilingLight
+
+                device_class = CeilingLight
+            elif product_info.has_matrix:
                 from lifx.devices.matrix import MatrixLight
 
                 device_class = MatrixLight
