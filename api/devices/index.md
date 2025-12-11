@@ -5714,11 +5714,7 @@ Example
 
 > > > async with await MatrixLight.from_ip("192.168.1.100") as matrix: ... # Get device chain info ... chain = await matrix.get_device_chain() ... print(f"Device has {len(chain)} tile(s)") ... ... # Set colors on first tile (8x8 = 64 zones) ... colors = [HSBK.from_rgb(255, 0, 0)] * 64 ... await matrix.set64(tile_index=0, colors=colors, width=8)
 
-| PARAMETER | DESCRIPTION                  |
-| --------- | ---------------------------- |
-| `serial`  | Device serial number         |
-| `ip`      | Device IP address            |
-| `port`    | Device port (default: 56700) |
+See :class:`Light` for parameter documentation.
 
 | METHOD                | DESCRIPTION                                                               |
 | --------------------- | ------------------------------------------------------------------------- |
@@ -5747,10 +5743,7 @@ Source code in `src/lifx/devices/matrix.py`
 def __init__(self, *args, **kwargs) -> None:
     """Initialize MatrixLight device.
 
-    Args:
-        serial: Device serial number
-        ip: Device IP address
-        port: Device port (default: 56700)
+    See :class:`Light` for parameter documentation.
     """
     super().__init__(*args, **kwargs)
     # Matrix specific properties
@@ -6940,6 +6933,777 @@ async def refresh_state(self) -> None:
     self._state.effect = effect.effect_type
 ```
 
+## Ceiling Light
+
+The `CeilingLight` class extends `MatrixLight` with independent control over uplight and downlight components for LIFX Ceiling fixtures.
+
+### CeilingLight
+
+```python
+CeilingLight(
+    serial: str,
+    ip: str,
+    port: int = 56700,
+    timeout: float = 0.5,
+    max_retries: int = 3,
+    state_file: str | None = None,
+)
+```
+
+Bases: `MatrixLight`
+
+LIFX Ceiling Light with independent uplight and downlight control.
+
+CeilingLight extends MatrixLight to provide semantic control over uplight and downlight components while maintaining full backward compatibility with the MatrixLight API.
+
+The uplight component is the last zone in the matrix, and the downlight component consists of all other zones.
+
+Example
+
+```python
+from lifx.devices import CeilingLight
+from lifx.color import HSBK
+
+async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+    # Independent component control
+    await ceiling.set_downlight_colors(HSBK(hue=0, sat=0, bri=1.0, kelvin=3500))
+    await ceiling.set_uplight_color(HSBK(hue=30, sat=0.2, bri=0.3, kelvin=2700))
+
+    # Turn components on/off
+    await ceiling.turn_downlight_on()
+    await ceiling.turn_uplight_off()
+
+    # Check component state
+    if ceiling.uplight_is_on:
+        print("Uplight is on")
+```
+
+| PARAMETER     | DESCRIPTION                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| `serial`      | Device serial number **TYPE:** `str`                                                                |
+| `ip`          | Device IP address **TYPE:** `str`                                                                   |
+| `port`        | Device UDP port (default: 56700) **TYPE:** `int` **DEFAULT:** `56700`                               |
+| `timeout`     | Overall timeout for network requests in seconds (default: 0.5) **TYPE:** `float` **DEFAULT:** `0.5` |
+| `max_retries` | Maximum number of retry attempts for network requests (default: 3) **TYPE:** `int` **DEFAULT:** `3` |
+| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                    |
+
+| RAISES      | DESCRIPTION                                  |
+| ----------- | -------------------------------------------- |
+| `LifxError` | If device is not a supported Ceiling product |
+
+| METHOD                 | DESCRIPTION                                         |
+| ---------------------- | --------------------------------------------------- |
+| `from_ip`              | Create CeilingLight from IP address.                |
+| `get_uplight_color`    | Get current uplight component color from device.    |
+| `get_downlight_colors` | Get current downlight component colors from device. |
+| `set_uplight_color`    | Set uplight component color.                        |
+| `set_downlight_colors` | Set downlight component colors.                     |
+| `turn_uplight_on`      | Turn uplight component on.                          |
+| `turn_uplight_off`     | Turn uplight component off.                         |
+| `turn_downlight_on`    | Turn downlight component on.                        |
+| `turn_downlight_off`   | Turn downlight component off.                       |
+
+| ATTRIBUTE         | DESCRIPTION                                                         |
+| ----------------- | ------------------------------------------------------------------- |
+| `uplight_zone`    | Zone index of the uplight component. **TYPE:** `int`                |
+| `downlight_zones` | Slice representing the downlight component zones. **TYPE:** `slice` |
+| `uplight_is_on`   | True if uplight component is currently on. **TYPE:** `bool`         |
+| `downlight_is_on` | True if downlight component is currently on. **TYPE:** `bool`       |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+def __init__(
+    self,
+    serial: str,
+    ip: str,
+    port: int = 56700,  # LIFX_UDP_PORT
+    timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
+    max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+    state_file: str | None = None,
+):
+    """Initialize CeilingLight.
+
+    Args:
+        serial: Device serial number
+        ip: Device IP address
+        port: Device UDP port (default: 56700)
+        timeout: Overall timeout for network requests in seconds
+            (default: 0.5)
+        max_retries: Maximum number of retry attempts for network requests
+            (default: 3)
+        state_file: Optional path to JSON file for state persistence
+
+    Raises:
+        LifxError: If device is not a supported Ceiling product
+    """
+    super().__init__(serial, ip, port, timeout, max_retries)
+    self._state_file = state_file
+    self._stored_uplight_state: HSBK | None = None
+    self._stored_downlight_state: list[HSBK] | None = None
+    self._last_uplight_color: HSBK | None = None
+    self._last_downlight_colors: list[HSBK] | None = None
+```
+
+#### Attributes
+
+##### uplight_zone
+
+```python
+uplight_zone: int
+```
+
+Zone index of the uplight component.
+
+| RETURNS | DESCRIPTION                                           |
+| ------- | ----------------------------------------------------- |
+| `int`   | Zone index (63 for standard Ceiling, 127 for Capsule) |
+
+| RAISES      | DESCRIPTION                                                 |
+| ----------- | ----------------------------------------------------------- |
+| `LifxError` | If device version is not available or not a Ceiling product |
+
+##### downlight_zones
+
+```python
+downlight_zones: slice
+```
+
+Slice representing the downlight component zones.
+
+| RETURNS | DESCRIPTION                                                         |
+| ------- | ------------------------------------------------------------------- |
+| `slice` | Slice object (slice(0, 63) for standard, slice(0, 127) for Capsule) |
+
+| RAISES      | DESCRIPTION                                                 |
+| ----------- | ----------------------------------------------------------- |
+| `LifxError` | If device version is not available or not a Ceiling product |
+
+##### uplight_is_on
+
+```python
+uplight_is_on: bool
+```
+
+True if uplight component is currently on.
+
+Calculated as: power_level > 0 AND uplight brightness > 0
+
+Note
+
+Requires recent data from device. Call get_uplight_color() or get_power() to refresh cached values before checking this property.
+
+| RETURNS | DESCRIPTION                                      |
+| ------- | ------------------------------------------------ |
+| `bool`  | True if uplight component is on, False otherwise |
+
+##### downlight_is_on
+
+```python
+downlight_is_on: bool
+```
+
+True if downlight component is currently on.
+
+Calculated as: power_level > 0 AND NOT all downlight zones have brightness == 0
+
+Note
+
+Requires recent data from device. Call get_downlight_colors() or get_power() to refresh cached values before checking this property.
+
+| RETURNS | DESCRIPTION                                        |
+| ------- | -------------------------------------------------- |
+| `bool`  | True if downlight component is on, False otherwise |
+
+#### Functions
+
+##### from_ip
+
+```python
+from_ip(
+    ip: str,
+    port: int = 56700,
+    serial: str | None = None,
+    timeout: float = 0.5,
+    max_retries: int = 3,
+    *,
+    state_file: str | None = None,
+) -> CeilingLight
+```
+
+Create CeilingLight from IP address.
+
+| PARAMETER     | DESCRIPTION                                                                   |
+| ------------- | ----------------------------------------------------------------------------- |
+| `ip`          | Device IP address **TYPE:** `str`                                             |
+| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `56700`      |
+| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                          |
+| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `0.5` |
+| `max_retries` | Maximum number of retries for requests **TYPE:** `int` **DEFAULT:** `3`       |
+| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str              |
+
+| RETURNS        | DESCRIPTION           |
+| -------------- | --------------------- |
+| `CeilingLight` | CeilingLight instance |
+
+| RAISES                    | DESCRIPTION                               |
+| ------------------------- | ----------------------------------------- |
+| `LifxDeviceNotFoundError` | Device not found at IP                    |
+| `LifxTimeoutError`        | Device did not respond                    |
+| `LifxError`               | Device is not a supported Ceiling product |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+@classmethod
+async def from_ip(
+    cls,
+    ip: str,
+    port: int = 56700,  # LIFX_UDP_PORT
+    serial: str | None = None,
+    timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
+    max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+    *,
+    state_file: str | None = None,
+) -> CeilingLight:
+    """Create CeilingLight from IP address.
+
+    Args:
+        ip: Device IP address
+        port: Port number (default LIFX_UDP_PORT)
+        serial: Serial number as 12-digit hex string
+        timeout: Request timeout for this device instance
+        max_retries: Maximum number of retries for requests
+        state_file: Optional path to JSON file for state persistence
+
+    Returns:
+        CeilingLight instance
+
+    Raises:
+        LifxDeviceNotFoundError: Device not found at IP
+        LifxTimeoutError: Device did not respond
+        LifxError: Device is not a supported Ceiling product
+    """
+    # Use parent class factory method
+    device = await super().from_ip(ip, port, serial, timeout, max_retries)
+    # Type cast to CeilingLight and set state_file
+    ceiling = CeilingLight(device.serial, device.ip)
+    ceiling._state_file = state_file
+    ceiling.connection = device.connection
+    return ceiling
+```
+
+##### get_uplight_color
+
+```python
+get_uplight_color() -> HSBK
+```
+
+Get current uplight component color from device.
+
+| RETURNS | DESCRIPTION                |
+| ------- | -------------------------- |
+| `HSBK`  | HSBK color of uplight zone |
+
+| RAISES             | DESCRIPTION            |
+| ------------------ | ---------------------- |
+| `LifxTimeoutError` | Device did not respond |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def get_uplight_color(self) -> HSBK:
+    """Get current uplight component color from device.
+
+    Returns:
+        HSBK color of uplight zone
+
+    Raises:
+        LifxTimeoutError: Device did not respond
+    """
+    # Get all colors from tile
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]  # First tile
+
+    # Extract uplight zone
+    uplight_color = tile_colors[self.uplight_zone]
+
+    # Cache for is_on property
+    self._last_uplight_color = uplight_color
+
+    return uplight_color
+```
+
+##### get_downlight_colors
+
+```python
+get_downlight_colors() -> list[HSBK]
+```
+
+Get current downlight component colors from device.
+
+| RETURNS      | DESCRIPTION                                                   |
+| ------------ | ------------------------------------------------------------- |
+| `list[HSBK]` | List of HSBK colors for each downlight zone (63 or 127 zones) |
+
+| RAISES             | DESCRIPTION            |
+| ------------------ | ---------------------- |
+| `LifxTimeoutError` | Device did not respond |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def get_downlight_colors(self) -> list[HSBK]:
+    """Get current downlight component colors from device.
+
+    Returns:
+        List of HSBK colors for each downlight zone (63 or 127 zones)
+
+    Raises:
+        LifxTimeoutError: Device did not respond
+    """
+    # Get all colors from tile
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]  # First tile
+
+    # Extract downlight zones
+    downlight_colors = tile_colors[self.downlight_zones]
+
+    # Cache for is_on property
+    self._last_downlight_colors = downlight_colors
+
+    return downlight_colors
+```
+
+##### set_uplight_color
+
+```python
+set_uplight_color(color: HSBK, duration: float = 0.0) -> None
+```
+
+Set uplight component color.
+
+| PARAMETER  | DESCRIPTION                                                                       |
+| ---------- | --------------------------------------------------------------------------------- |
+| `color`    | HSBK color to set **TYPE:** `HSBK`                                                |
+| `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0` |
+
+| RAISES             | DESCRIPTION                                             |
+| ------------------ | ------------------------------------------------------- |
+| `ValueError`       | If color.brightness == 0 (use turn_uplight_off instead) |
+| `LifxTimeoutError` | Device did not respond                                  |
+
+Note
+
+Also updates stored state for future restoration.
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def set_uplight_color(self, color: HSBK, duration: float = 0.0) -> None:
+    """Set uplight component color.
+
+    Args:
+        color: HSBK color to set
+        duration: Transition duration in seconds (default 0.0)
+
+    Raises:
+        ValueError: If color.brightness == 0 (use turn_uplight_off instead)
+        LifxTimeoutError: Device did not respond
+
+    Note:
+        Also updates stored state for future restoration.
+    """
+    if color.brightness == 0:
+        raise ValueError(
+            "Cannot set uplight color with brightness=0. "
+            "Use turn_uplight_off() instead."
+        )
+
+    # Get current colors for all zones
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]
+
+    # Update uplight zone
+    tile_colors[self.uplight_zone] = color
+
+    # Set all colors back (duration in milliseconds for set_matrix_colors)
+    await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+
+    # Store state
+    self._stored_uplight_state = color
+    self._last_uplight_color = color
+
+    # Persist if enabled
+    if self._state_file:
+        self._save_state_to_file()
+```
+
+##### set_downlight_colors
+
+```python
+set_downlight_colors(colors: HSBK | list[HSBK], duration: float = 0.0) -> None
+```
+
+Set downlight component colors.
+
+| PARAMETER  | DESCRIPTION                                                                                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `colors`   | Either: - Single HSBK: sets all downlight zones to same color - List\[HSBK\]: sets each zone individually (must match zone count) **TYPE:** \`HSBK |
+| `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                  |
+
+| RAISES             | DESCRIPTION                                                   |
+| ------------------ | ------------------------------------------------------------- |
+| `ValueError`       | If any color.brightness == 0 (use turn_downlight_off instead) |
+| `ValueError`       | If list length doesn't match downlight zone count             |
+| `LifxTimeoutError` | Device did not respond                                        |
+
+Note
+
+Also updates stored state for future restoration.
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def set_downlight_colors(
+    self, colors: HSBK | list[HSBK], duration: float = 0.0
+) -> None:
+    """Set downlight component colors.
+
+    Args:
+        colors: Either:
+            - Single HSBK: sets all downlight zones to same color
+            - List[HSBK]: sets each zone individually (must match zone count)
+        duration: Transition duration in seconds (default 0.0)
+
+    Raises:
+        ValueError: If any color.brightness == 0 (use turn_downlight_off instead)
+        ValueError: If list length doesn't match downlight zone count
+        LifxTimeoutError: Device did not respond
+
+    Note:
+        Also updates stored state for future restoration.
+    """
+    # Validate and normalize colors
+    if isinstance(colors, HSBK):
+        if colors.brightness == 0:
+            raise ValueError(
+                "Cannot set downlight color with brightness=0. "
+                "Use turn_downlight_off() instead."
+            )
+        downlight_colors = [colors] * len(range(*self.downlight_zones.indices(256)))
+    else:
+        if all(c.brightness == 0 for c in colors):
+            raise ValueError(
+                "Cannot set downlight colors with brightness=0. "
+                "Use turn_downlight_off() instead."
+            )
+
+        expected_count = len(range(*self.downlight_zones.indices(256)))
+        if len(colors) != expected_count:
+            raise ValueError(
+                f"Expected {expected_count} colors for downlight, got {len(colors)}"
+            )
+        downlight_colors = colors
+
+    # Get current colors for all zones
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]
+
+    # Update downlight zones
+    tile_colors[self.downlight_zones] = downlight_colors
+
+    # Set all colors back
+    await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+
+    # Store state
+    self._stored_downlight_state = downlight_colors
+    self._last_downlight_colors = downlight_colors
+
+    # Persist if enabled
+    if self._state_file:
+        self._save_state_to_file()
+```
+
+##### turn_uplight_on
+
+```python
+turn_uplight_on(color: HSBK | None = None, duration: float = 0.0) -> None
+```
+
+Turn uplight component on.
+
+| PARAMETER  | DESCRIPTION                                                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `color`    | Optional HSBK color. If provided: - Uses this color immediately - Updates stored state If None, uses brightness determination logic **TYPE:** \`HSBK |
+| `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                    |
+
+| RAISES             | DESCRIPTION              |
+| ------------------ | ------------------------ |
+| `ValueError`       | If color.brightness == 0 |
+| `LifxTimeoutError` | Device did not respond   |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def turn_uplight_on(
+    self, color: HSBK | None = None, duration: float = 0.0
+) -> None:
+    """Turn uplight component on.
+
+    Args:
+        color: Optional HSBK color. If provided:
+            - Uses this color immediately
+            - Updates stored state
+            If None, uses brightness determination logic
+        duration: Transition duration in seconds (default 0.0)
+
+    Raises:
+        ValueError: If color.brightness == 0
+        LifxTimeoutError: Device did not respond
+    """
+    if color is not None:
+        if color.brightness == 0:
+            raise ValueError("Cannot turn on uplight with brightness=0")
+        await self.set_uplight_color(color, duration)
+    else:
+        # Determine color using priority logic
+        determined_color = await self._determine_uplight_brightness()
+        await self.set_uplight_color(determined_color, duration)
+```
+
+##### turn_uplight_off
+
+```python
+turn_uplight_off(color: HSBK | None = None, duration: float = 0.0) -> None
+```
+
+Turn uplight component off.
+
+| PARAMETER  | DESCRIPTION                                                                                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `color`    | Optional HSBK color to store for future turn_on. If provided, stores this color (with brightness=0 on the device). If None, stores current color from device before turning off. **TYPE:** \`HSBK |
+| `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                                                                 |
+
+| RAISES             | DESCRIPTION              |
+| ------------------ | ------------------------ |
+| `ValueError`       | If color.brightness == 0 |
+| `LifxTimeoutError` | Device did not respond   |
+
+Note
+
+Sets uplight zone brightness to 0 on device while preserving H, S, K.
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def turn_uplight_off(
+    self, color: HSBK | None = None, duration: float = 0.0
+) -> None:
+    """Turn uplight component off.
+
+    Args:
+        color: Optional HSBK color to store for future turn_on.
+            If provided, stores this color (with brightness=0 on the device).
+            If None, stores current color from device before turning off.
+        duration: Transition duration in seconds (default 0.0)
+
+    Raises:
+        ValueError: If color.brightness == 0
+        LifxTimeoutError: Device did not respond
+
+    Note:
+        Sets uplight zone brightness to 0 on device while preserving H, S, K.
+    """
+    if color is not None:
+        if color.brightness == 0:
+            raise ValueError(
+                "Provided color cannot have brightness=0. "
+                "Omit the parameter to use current color."
+            )
+        # Store the provided color
+        self._stored_uplight_state = color
+    else:
+        # Get and store current color
+        current_color = await self.get_uplight_color()
+        self._stored_uplight_state = current_color
+
+    # Create color with brightness=0 for device
+    off_color = HSBK(
+        hue=self._stored_uplight_state.hue,
+        saturation=self._stored_uplight_state.saturation,
+        brightness=0.0,
+        kelvin=self._stored_uplight_state.kelvin,
+    )
+
+    # Get all colors and update uplight zone
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]
+    tile_colors[self.uplight_zone] = off_color
+    await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+
+    # Update cache
+    self._last_uplight_color = off_color
+
+    # Persist if enabled
+    if self._state_file:
+        self._save_state_to_file()
+```
+
+##### turn_downlight_on
+
+```python
+turn_downlight_on(
+    colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
+) -> None
+```
+
+Turn downlight component on.
+
+| PARAMETER  | DESCRIPTION                                                                                                                                                                                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `colors`   | Optional colors. Can be: - None: uses brightness determination logic - Single HSBK: sets all downlight zones to same color - List\[HSBK\]: sets each zone individually (must match zone count) If provided, updates stored state. **TYPE:** \`HSBK |
+| `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                                                                                                                  |
+
+| RAISES             | DESCRIPTION                                       |
+| ------------------ | ------------------------------------------------- |
+| `ValueError`       | If any color.brightness == 0                      |
+| `ValueError`       | If list length doesn't match downlight zone count |
+| `LifxTimeoutError` | Device did not respond                            |
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def turn_downlight_on(
+    self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
+) -> None:
+    """Turn downlight component on.
+
+    Args:
+        colors: Optional colors. Can be:
+            - None: uses brightness determination logic
+            - Single HSBK: sets all downlight zones to same color
+            - List[HSBK]: sets each zone individually (must match zone count)
+            If provided, updates stored state.
+        duration: Transition duration in seconds (default 0.0)
+
+    Raises:
+        ValueError: If any color.brightness == 0
+        ValueError: If list length doesn't match downlight zone count
+        LifxTimeoutError: Device did not respond
+    """
+    if colors is not None:
+        await self.set_downlight_colors(colors, duration)
+    else:
+        # Determine colors using priority logic
+        determined_colors = await self._determine_downlight_brightness()
+        await self.set_downlight_colors(determined_colors, duration)
+```
+
+##### turn_downlight_off
+
+```python
+turn_downlight_off(
+    colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
+) -> None
+```
+
+Turn downlight component off.
+
+| PARAMETER  | DESCRIPTION                                                                                                                                                                                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `colors`   | Optional colors to store for future turn_on. Can be: - None: stores current colors from device - Single HSBK: stores this color for all zones - List\[HSBK\]: stores individual colors (must match zone count) If provided, stores these colors (with brightness=0 on device). **TYPE:** \`HSBK |
+| `duration` | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                                                                                                                                                               |
+
+| RAISES             | DESCRIPTION                                       |
+| ------------------ | ------------------------------------------------- |
+| `ValueError`       | If any color.brightness == 0                      |
+| `ValueError`       | If list length doesn't match downlight zone count |
+| `LifxTimeoutError` | Device did not respond                            |
+
+Note
+
+Sets all downlight zone brightness to 0 on device while preserving H, S, K.
+
+Source code in `src/lifx/devices/ceiling.py`
+
+```python
+async def turn_downlight_off(
+    self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
+) -> None:
+    """Turn downlight component off.
+
+    Args:
+        colors: Optional colors to store for future turn_on. Can be:
+            - None: stores current colors from device
+            - Single HSBK: stores this color for all zones
+            - List[HSBK]: stores individual colors (must match zone count)
+            If provided, stores these colors (with brightness=0 on device).
+        duration: Transition duration in seconds (default 0.0)
+
+    Raises:
+        ValueError: If any color.brightness == 0
+        ValueError: If list length doesn't match downlight zone count
+        LifxTimeoutError: Device did not respond
+
+    Note:
+        Sets all downlight zone brightness to 0 on device while preserving H, S, K.
+    """
+    expected_count = len(range(*self.downlight_zones.indices(256)))
+
+    if colors is not None:
+        # Validate and normalize provided colors
+        if isinstance(colors, HSBK):
+            if colors.brightness == 0:
+                raise ValueError(
+                    "Provided color cannot have brightness=0. "
+                    "Omit the parameter to use current colors."
+                )
+            colors_to_store = [colors] * expected_count
+        else:
+            if all(c.brightness == 0 for c in colors):
+                raise ValueError(
+                    "Provided colors cannot have brightness=0. "
+                    "Omit the parameter to use current colors."
+                )
+            if len(colors) != expected_count:
+                raise ValueError(
+                    f"Expected {expected_count} colors for downlight, "
+                    f"got {len(colors)}"
+                )
+            colors_to_store = colors
+
+        self._stored_downlight_state = colors_to_store
+    else:
+        # Get and store current colors
+        current_colors = await self.get_downlight_colors()
+        self._stored_downlight_state = current_colors
+
+    # Create colors with brightness=0 for device
+    off_colors = [
+        HSBK(
+            hue=c.hue,
+            saturation=c.saturation,
+            brightness=0.0,
+            kelvin=c.kelvin,
+        )
+        for c in self._stored_downlight_state
+    ]
+
+    # Get all colors and update downlight zones
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]
+    tile_colors[self.downlight_zones] = off_colors
+    await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+
+    # Update cache
+    self._last_downlight_colors = off_colors
+
+    # Persist if enabled
+    if self._state_file:
+        self._save_state_to_file()
+```
+
 ## Device Properties
 
 ### MAC Address
@@ -7124,3 +7888,34 @@ async def main():
         # Stop the effect
         await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
+
+### Ceiling Light Control
+
+```python
+from lifx import CeilingLight, HSBK
+
+
+async def main():
+    async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+        # Set downlight to warm white
+        await ceiling.set_downlight_colors(
+            HSBK(hue=0, saturation=0, brightness=0.8, kelvin=3000)
+        )
+
+        # Set uplight to a dim ambient glow
+        await ceiling.set_uplight_color(
+            HSBK(hue=30, saturation=0.2, brightness=0.3, kelvin=2700)
+        )
+
+        # Turn uplight off (stores color for later restoration)
+        await ceiling.turn_uplight_off()
+
+        # Turn uplight back on (restores previous color)
+        await ceiling.turn_uplight_on()
+
+        # Check component state
+        if ceiling.downlight_is_on:
+            print("Downlight is currently on")
+```
+
+For detailed CeilingLight usage, see the [Ceiling Lights User Guide](https://djelibeybi.github.io/lifx-async/user-guide/ceiling-lights/index.md).

@@ -26,6 +26,7 @@ Key features:
 ## User Guide
 
 - [Themes](https://djelibeybi.github.io/lifx-async/user-guide/themes/index.md): Working with color themes
+- [Ceiling Lights](https://djelibeybi.github.io/lifx-async/user-guide/ceiling-lights/index.md): Controlling LIFX Ceiling uplight and downlight components
 - [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md): Advanced usage patterns and best practices
 - [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md): Creating custom light effects
 - [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md): Common issues and solutions
