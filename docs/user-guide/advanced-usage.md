@@ -119,6 +119,12 @@ async def use_cached_or_fetch():
 - `MatrixLight.device_chain` - Details of each tile on the chain
 - `MatrixLight.tile_effect` - Either MORPH, FLAME, SKY or OFF
 
+#### CeilingLight properties:
+
+- `CeilingLight.uplight_zone` - Zone index of the uplight component
+- `CeilingLight.downlight_zones` - Slice representing downlight zones
+- `CeilingLight.uplight_is_on` - True if uplight has brightness > 0 (requires recent data)
+- `CeilingLight.downlight_is_on` - True if any downlight zone has brightness > 0 (requires recent data)
 
 **Note**: Volatile state properties (power, color, hev_cycle, zones, tile_colors) have been removed. Always use `get_*()` methods to fetch these values from devices as they change too frequently to benefit from caching.
 
