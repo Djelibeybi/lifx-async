@@ -11,6 +11,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.ceiling import CeilingLight
+from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout
 
 
@@ -903,3 +904,745 @@ class TestCeilingLightIntegration:
 
             uplight = await ceiling_device.get_uplight_color()
             assert uplight.brightness == pytest.approx(0.5, abs=0.05)
+
+    async def test_ceiling_from_ip(self, ceiling_device: CeilingLight) -> None:
+        """Test CeilingLight.from_ip() factory method with emulator."""
+        # Use the port and serial from the fixture's device
+        port = ceiling_device.port
+        serial = ceiling_device.serial
+
+        # Create CeilingLight using from_ip() - must provide serial to target
+        # the correct device in the session-scoped emulator
+        ceiling = await CeilingLight.from_ip(
+            ip="127.0.0.1",
+            port=port,
+            serial=serial,
+            timeout=2.0,
+            max_retries=2,
+        )
+
+        async with ceiling:
+            # Verify it's properly initialized
+            assert isinstance(ceiling, CeilingLight)
+            assert ceiling.serial == serial
+            assert ceiling.ip == "127.0.0.1"
+
+            # Verify component layout (product 201 = 16x8 ceiling)
+            assert ceiling.uplight_zone == 127
+            assert ceiling.downlight_zones == slice(0, 127)
+
+    async def test_ceiling_from_ip_with_state_file(
+        self, ceiling_device: CeilingLight
+    ) -> None:
+        """Test CeilingLight.from_ip() with state_file parameter."""
+        port = ceiling_device.port
+        serial = ceiling_device.serial
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "ceiling_state.json"
+
+            # Create CeilingLight using from_ip() with state_file
+            ceiling = await CeilingLight.from_ip(
+                ip="127.0.0.1",
+                port=port,
+                serial=serial,
+                timeout=2.0,
+                max_retries=2,
+                state_file=str(state_file),
+            )
+
+            async with ceiling:
+                # Verify state_file is set
+                assert ceiling._state_file == str(state_file)
+
+                # Set uplight color (should persist to state file)
+                uplight_color = HSBK(
+                    hue=45, saturation=0.3, brightness=0.6, kelvin=3000
+                )
+                await ceiling.set_uplight_color(uplight_color)
+
+                # Verify state file was created
+                assert state_file.exists()
+
+                # Verify state file contents
+                with state_file.open("r") as f:
+                    data = json.load(f)
+
+                assert ceiling.serial in data
+                assert "uplight" in data[ceiling.serial]
+
+    async def test_ceiling_state_persistence_turn_off(
+        self, ceiling_device: CeilingLight
+    ) -> None:
+        """Test state persistence when turning components off with emulator."""
+        port = ceiling_device.port
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "ceiling_state.json"
+
+            ceiling = CeilingLight(
+                serial="d073d5000100",
+                ip="127.0.0.1",
+                port=port,
+                timeout=2.0,
+                max_retries=2,
+                state_file=str(state_file),
+            )
+
+            async with ceiling:
+                # Set uplight color first
+                uplight_color = HSBK(
+                    hue=60, saturation=0.4, brightness=0.7, kelvin=3200
+                )
+                await ceiling.set_uplight_color(uplight_color)
+
+                # Turn uplight off (should persist stored state)
+                await ceiling.turn_uplight_off()
+
+                # Verify state file has stored color
+                with state_file.open("r") as f:
+                    data = json.load(f)
+
+                uplight_data = data[ceiling.serial]["uplight"]
+                assert uplight_data["hue"] == pytest.approx(60, abs=1)
+                assert uplight_data["brightness"] == pytest.approx(0.7, abs=0.01)
+
+    async def test_ceiling_state_persistence_downlight(
+        self, ceiling_device: CeilingLight
+    ) -> None:
+        """Test downlight state persistence with emulator."""
+        port = ceiling_device.port
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "ceiling_state.json"
+
+            ceiling = CeilingLight(
+                serial="d073d5000100",
+                ip="127.0.0.1",
+                port=port,
+                timeout=2.0,
+                max_retries=2,
+                state_file=str(state_file),
+            )
+
+            async with ceiling:
+                # Set downlight color
+                downlight_color = HSBK(
+                    hue=180, saturation=0.5, brightness=0.8, kelvin=4000
+                )
+                await ceiling.set_downlight_colors(downlight_color)
+
+                # Verify state file has downlight colors
+                with state_file.open("r") as f:
+                    data = json.load(f)
+
+                assert "downlight" in data[ceiling.serial]
+                downlight_data = data[ceiling.serial]["downlight"]
+                assert len(downlight_data) == 127  # Product 201 has 127 downlight zones
+
+                # Turn downlight off (should persist)
+                await ceiling.turn_downlight_off()
+
+                # Verify state still persisted
+                with state_file.open("r") as f:
+                    data = json.load(f)
+
+                assert "downlight" in data[ceiling.serial]
+
+
+class TestCeilingLightErrorHandling:
+    """Tests for error handling paths."""
+
+    def test_uplight_zone_no_version_raises(self) -> None:
+        """Test uplight_zone raises when version not available."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        # No version set (version is None by default)
+
+        with pytest.raises(LifxError, match="Device version not available"):
+            _ = ceiling.uplight_zone
+
+    def test_uplight_zone_invalid_product_raises(self) -> None:
+        """Test uplight_zone raises for non-ceiling product."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 1  # Not a ceiling product
+
+        with pytest.raises(LifxError, match="is not a Ceiling light"):
+            _ = ceiling.uplight_zone
+
+    def test_downlight_zones_no_version_raises(self) -> None:
+        """Test downlight_zones raises when version not available."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        # No version set
+
+        with pytest.raises(LifxError, match="Device version not available"):
+            _ = ceiling.downlight_zones
+
+    def test_downlight_zones_invalid_product_raises(self) -> None:
+        """Test downlight_zones raises for non-ceiling product."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 1  # Not a ceiling product
+
+        with pytest.raises(LifxError, match="is not a Ceiling light"):
+            _ = ceiling.downlight_zones
+
+    def test_uplight_is_on_returns_false_when_state_none(self) -> None:
+        """Test uplight_is_on returns False when _state is None."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = None
+        ceiling._last_uplight_color = HSBK(
+            hue=30, saturation=0.2, brightness=0.5, kelvin=2700
+        )
+
+        assert ceiling.uplight_is_on is False
+
+    def test_downlight_is_on_returns_false_when_state_none(self) -> None:
+        """Test downlight_is_on returns False when _state is None."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = None
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        ceiling._last_downlight_colors = [white] * 63
+
+        assert ceiling.downlight_is_on is False
+
+
+class TestCeilingLightIsStoredStateValid:
+    """Tests for _is_stored_state_valid method."""
+
+    @pytest.fixture
+    def ceiling_176(self) -> CeilingLight:
+        """Create a Ceiling product 176 instance."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    def test_uplight_valid_match(self, ceiling_176: CeilingLight) -> None:
+        """Test uplight stored state matches current (ignoring brightness)."""
+        ceiling_176._stored_uplight_state = HSBK(
+            hue=30, saturation=0.2, brightness=0.8, kelvin=2700
+        )
+        current = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
+
+        assert ceiling_176._is_stored_state_valid("uplight", current) is True
+
+    def test_uplight_no_stored_state(self, ceiling_176: CeilingLight) -> None:
+        """Test uplight returns False when no stored state."""
+        ceiling_176._stored_uplight_state = None
+        current = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
+
+        assert ceiling_176._is_stored_state_valid("uplight", current) is False
+
+    def test_uplight_wrong_type(self, ceiling_176: CeilingLight) -> None:
+        """Test uplight returns False when current is not HSBK."""
+        ceiling_176._stored_uplight_state = HSBK(
+            hue=30, saturation=0.2, brightness=0.8, kelvin=2700
+        )
+        # Pass a list instead of HSBK
+        current = [HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)]
+
+        assert ceiling_176._is_stored_state_valid("uplight", current) is False
+
+    def test_uplight_hue_mismatch(self, ceiling_176: CeilingLight) -> None:
+        """Test uplight returns False when hue doesn't match."""
+        ceiling_176._stored_uplight_state = HSBK(
+            hue=30, saturation=0.2, brightness=0.8, kelvin=2700
+        )
+        current = HSBK(hue=60, saturation=0.2, brightness=0.5, kelvin=2700)
+
+        assert ceiling_176._is_stored_state_valid("uplight", current) is False
+
+    def test_downlight_valid_match(self, ceiling_176: CeilingLight) -> None:
+        """Test downlight stored state matches current (ignoring brightness)."""
+        ceiling_176._stored_downlight_state = [
+            HSBK(hue=i * 5, saturation=0.8, brightness=0.9, kelvin=3500)
+            for i in range(63)
+        ]
+        current = [
+            HSBK(hue=i * 5, saturation=0.8, brightness=0.3, kelvin=3500)
+            for i in range(63)
+        ]
+
+        assert ceiling_176._is_stored_state_valid("downlight", current) is True
+
+    def test_downlight_no_stored_state(self, ceiling_176: CeilingLight) -> None:
+        """Test downlight returns False when no stored state."""
+        ceiling_176._stored_downlight_state = None
+        current = [
+            HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500) for _ in range(63)
+        ]
+
+        assert ceiling_176._is_stored_state_valid("downlight", current) is False
+
+    def test_downlight_wrong_type(self, ceiling_176: CeilingLight) -> None:
+        """Test downlight returns False when current is not list."""
+        ceiling_176._stored_downlight_state = [
+            HSBK(hue=0, saturation=0, brightness=0.9, kelvin=3500) for _ in range(63)
+        ]
+        # Pass HSBK instead of list
+        current = HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
+
+        assert ceiling_176._is_stored_state_valid("downlight", current) is False
+
+    def test_downlight_length_mismatch(self, ceiling_176: CeilingLight) -> None:
+        """Test downlight returns False when lengths don't match."""
+        ceiling_176._stored_downlight_state = [
+            HSBK(hue=0, saturation=0, brightness=0.9, kelvin=3500) for _ in range(63)
+        ]
+        current = [
+            HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
+            for _ in range(10)  # Wrong length
+        ]
+
+        assert ceiling_176._is_stored_state_valid("downlight", current) is False
+
+    def test_downlight_saturation_mismatch(self, ceiling_176: CeilingLight) -> None:
+        """Test downlight returns False when saturation doesn't match."""
+        ceiling_176._stored_downlight_state = [
+            HSBK(hue=0, saturation=0.8, brightness=0.9, kelvin=3500) for _ in range(63)
+        ]
+        current = [
+            HSBK(
+                hue=0, saturation=0.5, brightness=0.5, kelvin=3500
+            )  # Different saturation
+            for _ in range(63)
+        ]
+
+        assert ceiling_176._is_stored_state_valid("downlight", current) is False
+
+    def test_unknown_component_returns_false(self, ceiling_176: CeilingLight) -> None:
+        """Test unknown component name returns False."""
+        current = HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
+
+        assert ceiling_176._is_stored_state_valid("unknown", current) is False
+
+
+class TestCeilingLightStateFileEdgeCases:
+    """Tests for state file edge cases."""
+
+    def test_load_state_no_state_file(self) -> None:
+        """Test _load_state_from_file does nothing when no state file."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state_file = None
+
+        # Should not raise
+        ceiling._load_state_from_file()
+        assert ceiling._stored_uplight_state is None
+        assert ceiling._stored_downlight_state is None
+
+    def test_load_state_file_not_exists(self) -> None:
+        """Test _load_state_from_file handles non-existent file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(Path(tmpdir) / "nonexistent.json"),
+            )
+
+            # Should not raise
+            ceiling._load_state_from_file()
+            assert ceiling._stored_uplight_state is None
+
+    def test_load_state_no_device_state(self) -> None:
+        """Test _load_state_from_file handles file without device state."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            # Write state for a different device
+            with state_file.open("w") as f:
+                json.dump({"different_serial": {"uplight": {}}}, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+
+            ceiling._load_state_from_file()
+            assert ceiling._stored_uplight_state is None
+
+    def test_load_state_invalid_json(self) -> None:
+        """Test _load_state_from_file handles invalid JSON gracefully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            with state_file.open("w") as f:
+                f.write("not valid json {{{")
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+
+            # Should not raise, just log warning
+            ceiling._load_state_from_file()
+            assert ceiling._stored_uplight_state is None
+
+    def test_save_state_no_state_file(self) -> None:
+        """Test _save_state_to_file does nothing when no state file."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state_file = None
+        ceiling._stored_uplight_state = HSBK(
+            hue=30, saturation=0.2, brightness=0.5, kelvin=2700
+        )
+
+        # Should not raise
+        ceiling._save_state_to_file()
+
+    def test_save_state_creates_directory(self) -> None:
+        """Test _save_state_to_file creates parent directory if needed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "subdir" / "nested" / "state.json"
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._stored_uplight_state = HSBK(
+                hue=30, saturation=0.2, brightness=0.5, kelvin=2700
+            )
+
+            ceiling._save_state_to_file()
+
+            assert state_file.exists()
+            with state_file.open("r") as f:
+                data = json.load(f)
+            assert "d073d5010203" in data
+
+    def test_save_state_merges_with_existing(self) -> None:
+        """Test _save_state_to_file merges with existing file data."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            # Pre-populate with another device
+            with state_file.open("w") as f:
+                json.dump(
+                    {
+                        "other_device": {
+                            "uplight": {
+                                "hue": 100,
+                                "saturation": 0.5,
+                                "brightness": 0.5,
+                                "kelvin": 4000,
+                            }
+                        }
+                    },
+                    f,
+                )
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._stored_uplight_state = HSBK(
+                hue=30, saturation=0.2, brightness=0.5, kelvin=2700
+            )
+
+            ceiling._save_state_to_file()
+
+            with state_file.open("r") as f:
+                data = json.load(f)
+
+            # Both devices should be present
+            assert "other_device" in data
+            assert "d073d5010203" in data
+
+    def test_save_state_handles_write_error(self) -> None:
+        """Test _save_state_to_file handles write errors gracefully."""
+        ceiling = CeilingLight(
+            serial="d073d5010203",
+            ip="192.168.1.100",
+            state_file="/nonexistent/path/that/cannot/be/created/state.json",
+        )
+        ceiling._stored_uplight_state = HSBK(
+            hue=30, saturation=0.2, brightness=0.5, kelvin=2700
+        )
+
+        # Should not raise, just log warning
+        ceiling._save_state_to_file()
+
+
+class TestCeilingLightTurnDownlightOffWithList:
+    """Tests for turn_downlight_off with list of colors."""
+
+    @pytest.fixture
+    def ceiling_176(self) -> CeilingLight:
+        """Create a Ceiling product 176 instance with mocked connection."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling.set_matrix_colors = AsyncMock()
+        ceiling._save_state_to_file = MagicMock()
+
+        # Mock get_all_tile_colors
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        default_tile_colors = [white] * 64
+        ceiling.get_all_tile_colors = AsyncMock(return_value=[default_tile_colors])
+
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    async def test_turn_downlight_off_with_list_stores_provided(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turning downlight off with list of colors stores all colors."""
+        provided_colors = [
+            HSBK(hue=i * 5, saturation=0.9, brightness=0.6, kelvin=4500)
+            for i in range(63)
+        ]
+
+        await ceiling_176.turn_downlight_off(provided_colors)
+
+        # Should store provided colors
+        assert ceiling_176._stored_downlight_state is not None
+        assert len(ceiling_176._stored_downlight_state) == 63
+        assert ceiling_176._stored_downlight_state == provided_colors
+
+        # Should set device to brightness=0
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        result_colors = call_args.args[1]
+        assert all(result_colors[i].brightness == 0.0 for i in range(63))
+
+    async def test_turn_downlight_off_list_invalid_length_raises(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_off with wrong number of colors raises ValueError."""
+        invalid_colors = [
+            HSBK(hue=0, saturation=0.9, brightness=0.6, kelvin=4500)
+            for _ in range(10)  # Wrong count
+        ]
+
+        with pytest.raises(ValueError, match="Expected 63 colors"):
+            await ceiling_176.turn_downlight_off(invalid_colors)
+
+    async def test_turn_downlight_off_list_all_zero_brightness_raises(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_off with all zero brightness raises ValueError."""
+        invalid_colors = [
+            HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500) for _ in range(63)
+        ]
+
+        with pytest.raises(ValueError, match="brightness"):
+            await ceiling_176.turn_downlight_off(invalid_colors)
+
+
+class TestCeilingLightBrightnessInference:
+    """Tests for brightness inference edge cases."""
+
+    @pytest.fixture
+    def ceiling_176(self) -> CeilingLight:
+        """Create a Ceiling product 176 instance with mocked connection."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling.set_matrix_colors = AsyncMock()
+        ceiling._save_state_to_file = MagicMock()
+
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    async def test_determine_uplight_brightness_exception_fallback(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test _determine_uplight_brightness falls back to default on exception."""
+        ceiling_176._stored_uplight_state = None
+
+        # First call returns current uplight, second call raises
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
+        call_count = 0
+
+        async def mock_get_all_tile_colors() -> list[list[HSBK]]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # Return current state for get_uplight_color
+                white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+                return [[white] * 63 + [uplight_color]]
+            else:
+                # Raise exception on second call (get_downlight_colors)
+                raise Exception("Network error")
+
+        ceiling_176.get_all_tile_colors = mock_get_all_tile_colors
+
+        result = await ceiling_176._determine_uplight_brightness()
+
+        # Should fall back to default brightness (0.8)
+        assert result.brightness == pytest.approx(0.8, abs=0.01)
+        assert result.hue == pytest.approx(30, abs=1)
+        assert result.kelvin == 2700
+
+    async def test_determine_downlight_brightness_exception_fallback(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test _determine_downlight_brightness falls back to default on exception."""
+        ceiling_176._stored_downlight_state = None
+
+        # Create downlight colors
+        downlight_colors = [
+            HSBK(hue=i * 5, saturation=0.8, brightness=0.0, kelvin=3500)
+            for i in range(63)
+        ]
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
+        call_count = 0
+
+        async def mock_get_all_tile_colors() -> list[list[HSBK]]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # Return current state for get_downlight_colors
+                return [downlight_colors + [uplight_color]]
+            else:
+                # Raise exception on second call (get_uplight_color)
+                raise Exception("Network error")
+
+        ceiling_176.get_all_tile_colors = mock_get_all_tile_colors
+
+        result = await ceiling_176._determine_downlight_brightness()
+
+        # Should fall back to default brightness (0.8) for all zones
+        assert len(result) == 63
+        assert all(c.brightness == pytest.approx(0.8, abs=0.01) for c in result)
+
+    async def test_turn_downlight_on_default_brightness_when_uplight_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_on uses default when uplight is off (brightness=0)."""
+        ceiling_176._stored_downlight_state = None
+
+        # Mock uplight with brightness 0 and downlight with brightness 0
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
+        downlight_colors = [
+            HSBK(hue=i * 5, saturation=0.8, brightness=0.0, kelvin=3500)
+            for i in range(63)
+        ]
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
+
+        await ceiling_176.turn_downlight_on()
+
+        # Should use default brightness (0.8)
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        result_colors = call_args.args[1]
+        assert all(
+            result_colors[i].brightness == pytest.approx(0.8, abs=0.01)
+            for i in range(63)
+        )
+
+
+class TestCeilingLightContextManager:
+    """Tests for async context manager behavior."""
+
+    async def test_aenter_validates_ceiling_product(self) -> None:
+        """Test __aenter__ raises for non-ceiling product."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+
+        # Mock parent __aenter__ to set version
+        async def mock_parent_aenter() -> CeilingLight:
+            ceiling._version = MagicMock()
+            ceiling._version.product = 1  # Not a ceiling product
+            ceiling._state = MagicMock()
+            ceiling._state.power = 65535
+            return ceiling
+
+        # Patch the super().__aenter__ call
+        import lifx.devices.matrix as matrix_module
+
+        original_aenter = matrix_module.MatrixLight.__aenter__
+
+        async def patched_aenter(self: CeilingLight) -> CeilingLight:
+            self._version = MagicMock()
+            self._version.product = 1  # Not a ceiling product
+            self._state = MagicMock()
+            self._state.power = 65535
+            return self
+
+        matrix_module.MatrixLight.__aenter__ = patched_aenter
+
+        try:
+            with pytest.raises(LifxError, match="not a supported Ceiling light"):
+                await ceiling.__aenter__()
+        finally:
+            matrix_module.MatrixLight.__aenter__ = original_aenter
+
+    async def test_aenter_loads_state_file(self) -> None:
+        """Test __aenter__ loads state from file when configured."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            # Pre-populate state file
+            state_data = {
+                "d073d5010203": {
+                    "uplight": {
+                        "hue": 60.0,
+                        "saturation": 0.5,
+                        "brightness": 0.7,
+                        "kelvin": 4000,
+                    }
+                }
+            }
+            with state_file.open("w") as f:
+                json.dump(state_data, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling.connection = AsyncMock()
+
+            # Mock parent __aenter__ to set version
+            import lifx.devices.matrix as matrix_module
+
+            async def patched_aenter(self: CeilingLight) -> CeilingLight:
+                self._version = MagicMock()
+                self._version.product = 176  # Valid ceiling product
+                self._state = MagicMock()
+                self._state.power = 65535
+                return self
+
+            original_aenter = matrix_module.MatrixLight.__aenter__
+            matrix_module.MatrixLight.__aenter__ = patched_aenter
+
+            try:
+                await ceiling.__aenter__()
+
+                # Verify state was loaded
+                assert ceiling._stored_uplight_state is not None
+                assert ceiling._stored_uplight_state.hue == pytest.approx(60, abs=1)
+                assert ceiling._stored_uplight_state.brightness == pytest.approx(
+                    0.7, abs=0.01
+                )
+            finally:
+                matrix_module.MatrixLight.__aenter__ = original_aenter
+
+
+class TestCeilingLightSetDownlightSingleZeroBrightness:
+    """Tests for set_downlight_colors edge cases."""
+
+    @pytest.fixture
+    def ceiling_176(self) -> CeilingLight:
+        """Create a Ceiling product 176 instance with mocked connection."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling.set_matrix_colors = AsyncMock()
+        ceiling._save_state_to_file = MagicMock()
+
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        default_tile_colors = [white] * 64
+        ceiling.get_all_tile_colors = AsyncMock(return_value=[default_tile_colors])
+
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    async def test_set_downlight_single_color_zero_brightness_raises(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test set_downlight_colors with single color brightness=0 raises."""
+        invalid_color = HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)
+
+        with pytest.raises(ValueError, match="brightness"):
+            await ceiling_176.set_downlight_colors(invalid_color)
