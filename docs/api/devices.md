@@ -81,6 +81,19 @@ The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 
       filters:
         - "!^_"
 
+## Ceiling Light
+
+The `CeilingLight` class extends `MatrixLight` with independent control over uplight and downlight components for LIFX Ceiling fixtures.
+
+::: lifx.devices.ceiling.CeilingLight
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
 ## Device Properties
 
 ### MAC Address
@@ -268,3 +281,34 @@ async def main():
         # Stop the effect
         await light.set_effect(effect_type=FirmwareEffect.OFF)
 ```
+
+### Ceiling Light Control
+
+```python
+from lifx import CeilingLight, HSBK
+
+
+async def main():
+    async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+        # Set downlight to warm white
+        await ceiling.set_downlight_colors(
+            HSBK(hue=0, saturation=0, brightness=0.8, kelvin=3000)
+        )
+
+        # Set uplight to a dim ambient glow
+        await ceiling.set_uplight_color(
+            HSBK(hue=30, saturation=0.2, brightness=0.3, kelvin=2700)
+        )
+
+        # Turn uplight off (stores color for later restoration)
+        await ceiling.turn_uplight_off()
+
+        # Turn uplight back on (restores previous color)
+        await ceiling.turn_uplight_on()
+
+        # Check component state
+        if ceiling.downlight_is_on:
+            print("Downlight is currently on")
+```
+
+For detailed CeilingLight usage, see the [Ceiling Lights User Guide](../user-guide/ceiling-lights.md).

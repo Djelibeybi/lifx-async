@@ -130,6 +130,7 @@ plugins:
       - getting-started/effects.md: Light effects and animations
       User Guide:
       - user-guide/themes.md: Working with color themes
+      - user-guide/ceiling-lights.md: Controlling LIFX Ceiling uplight and downlight components
       - user-guide/advanced-usage.md: Advanced usage patterns and best practices
       - user-guide/effects-custom.md: Creating custom light effects
       - user-guide/troubleshooting.md: Common issues and solutions
@@ -199,6 +200,7 @@ nav:
   - Light Effects: getting-started/effects.md
 - User Guide:
   - Themes: user-guide/themes.md
+  - Ceiling Lights: user-guide/ceiling-lights.md
   - Advanced Usage: user-guide/advanced-usage.md
   - Custom Effects: user-guide/effects-custom.md
   - Troubleshooting: user-guide/troubleshooting.md

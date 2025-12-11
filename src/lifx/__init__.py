@@ -16,6 +16,7 @@ from lifx.api import (
 )
 from lifx.color import HSBK, Colors
 from lifx.devices import (
+    CeilingLight,
     Device,
     DeviceInfo,
     DeviceVersion,
@@ -71,6 +72,7 @@ __all__ = [
     "MultiZoneLightState",
     "MatrixLight",
     "MatrixLightState",
+    "CeilingLight",
     # Color
     "HSBK",
     "Colors",
