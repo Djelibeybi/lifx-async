@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from lifx.color import HSBK
-from lifx.devices.matrix import MatrixLight
+from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
 
@@ -32,6 +34,81 @@ if TYPE_CHECKING:
     pass
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class CeilingLightState(MatrixLightState):
+    """Ceiling light device state with uplight/downlight component control.
+
+    Extends MatrixLightState with ceiling-specific component information.
+
+    Attributes:
+        uplight_color: Current HSBK color of the uplight component
+        downlight_colors: List of HSBK colors for each downlight zone
+        uplight_is_on: Whether uplight component is on (brightness > 0)
+        downlight_is_on: Whether downlight component is on (any zone brightness > 0)
+        uplight_zone: Zone index for the uplight component
+        downlight_zones: Slice representing downlight component zones
+    """
+
+    uplight_color: HSBK
+    downlight_colors: list[HSBK]
+    uplight_is_on: bool
+    downlight_is_on: bool
+    uplight_zone: int
+    downlight_zones: slice
+
+    @property
+    def as_dict(self) -> Any:
+        """Return CeilingLightState as dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_matrix_state(
+        cls,
+        matrix_state: MatrixLightState,
+        uplight_color: HSBK,
+        downlight_colors: list[HSBK],
+        uplight_zone: int,
+        downlight_zones: slice,
+    ) -> CeilingLightState:
+        """Create CeilingLightState from MatrixLightState.
+
+        Args:
+            matrix_state: Base MatrixLightState to extend
+            uplight_color: Current uplight zone color
+            downlight_colors: Current downlight zone colors
+            uplight_zone: Zone index for uplight component
+            downlight_zones: Slice representing downlight component zones
+
+        Returns:
+            CeilingLightState with all matrix state plus ceiling components
+        """
+        return cls(
+            model=matrix_state.model,
+            label=matrix_state.label,
+            serial=matrix_state.serial,
+            mac_address=matrix_state.mac_address,
+            power=matrix_state.power,
+            capabilities=matrix_state.capabilities,
+            host_firmware=matrix_state.host_firmware,
+            wifi_firmware=matrix_state.wifi_firmware,
+            location=matrix_state.location,
+            group=matrix_state.group,
+            color=matrix_state.color,
+            chain=matrix_state.chain,
+            tile_orientations=matrix_state.tile_orientations,
+            tile_colors=matrix_state.tile_colors,
+            tile_count=matrix_state.tile_count,
+            effect=matrix_state.effect,
+            uplight_color=uplight_color,
+            downlight_colors=downlight_colors,
+            uplight_is_on=uplight_color.brightness > 0,
+            downlight_is_on=any(c.brightness > 0 for c in downlight_colors),
+            uplight_zone=uplight_zone,
+            downlight_zones=downlight_zones,
+            last_updated=time.time(),
+        )
 
 
 class CeilingLight(MatrixLight):
@@ -111,6 +188,63 @@ class CeilingLight(MatrixLight):
 
         return self
 
+    async def _initialize_state(self) -> CeilingLightState:
+        """Initialize ceiling light state transactionally.
+
+        Extends MatrixLight implementation to add ceiling-specific component state.
+
+        Returns:
+            CeilingLightState instance with all device, light, matrix,
+            and ceiling component information.
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        matrix_state = await super()._initialize_state()
+
+        # Get ceiling component colors
+        uplight_color = await self.get_uplight_color()
+        downlight_colors = await self.get_downlight_colors()
+
+        # Create ceiling state from matrix state
+        ceiling_state = CeilingLightState.from_matrix_state(
+            matrix_state=matrix_state,
+            uplight_color=uplight_color,
+            downlight_colors=downlight_colors,
+            uplight_zone=self.uplight_zone,
+            downlight_zones=self.downlight_zones,
+        )
+
+        # Store in _state - cast is used in state property to access ceiling fields
+        self._state = ceiling_state
+
+        return ceiling_state
+
+    async def refresh_state(self) -> None:
+        """Refresh ceiling light state from hardware.
+
+        Fetches color, tiles, tile colors, effect, and ceiling component state.
+
+        Raises:
+            RuntimeError: If state has not been initialized
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        await super().refresh_state()
+
+        # Get ceiling component colors
+        uplight_color = await self.get_uplight_color()
+        downlight_colors = await self.get_downlight_colors()
+
+        # Update ceiling-specific state fields
+        state = cast(CeilingLightState, self._state)
+        state.uplight_color = uplight_color
+        state.downlight_colors = downlight_colors
+        state.uplight_is_on = uplight_color.brightness > 0
+        state.downlight_is_on = any(c.brightness > 0 for c in downlight_colors)
+
     @classmethod
     async def from_ip(
         cls,
@@ -147,6 +281,20 @@ class CeilingLight(MatrixLight):
         ceiling._state_file = state_file
         ceiling.connection = device.connection
         return ceiling
+
+    @property
+    def state(self) -> CeilingLightState:
+        """Get Ceiling light state.
+
+        Returns:
+            CeilingLightState with current state information.
+
+        Raises:
+            RuntimeError: If accessed before state initialization.
+        """
+        if self._state is None:
+            raise RuntimeError("State not found.")
+        return cast(CeilingLightState, self._state)
 
     @property
     def uplight_zone(self) -> int:
