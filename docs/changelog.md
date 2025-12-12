@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.6.1 (2025-12-12)
+
+### Bug Fixes
+
+- **devices**: Check for power and brightness for Ceiling components
+  ([`bd1b92f`](https://github.com/Djelibeybi/lifx-async/commit/bd1b92fb76c0e239c36dda09cca66035b527965a))
+
+
 ## v4.6.0 (2025-12-11)
 
 ### Features
