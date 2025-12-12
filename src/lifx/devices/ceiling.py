@@ -242,8 +242,12 @@ class CeilingLight(MatrixLight):
         state = cast(CeilingLightState, self._state)
         state.uplight_color = uplight_color
         state.downlight_colors = downlight_colors
-        state.uplight_is_on = uplight_color.brightness > 0
-        state.downlight_is_on = any(c.brightness > 0 for c in downlight_colors)
+        state.uplight_is_on = bool(
+            self.state.power > 0 and uplight_color.brightness > 0
+        )
+        state.downlight_is_on = bool(
+            self.state.power > 0 and any(c.brightness > 0 for c in downlight_colors)
+        )
 
     @classmethod
     async def from_ip(
