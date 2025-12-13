@@ -479,6 +479,49 @@ async def with_reuse():
         # Connection closed once at end
 ```
 
+### Fire-and-Forget Mode for High-Frequency Animations
+
+For animations sending more than 20 updates per second, waiting for device acknowledgement creates unacceptable latency. Use the `fast=True` parameter to enable fire-and-forget mode:
+
+```python
+import asyncio
+from lifx import MultiZoneLight, HSBK
+
+async def rainbow_animation():
+    async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+        zone_count = await light.get_zone_count()
+
+        # Animation loop at ~30 FPS
+        offset = 0
+        while True:
+            # Generate rainbow colors
+            colors = [
+                HSBK(hue=(i * 360 / zone_count + offset) % 360,
+                     saturation=1.0, brightness=1.0, kelvin=3500)
+                for i in range(zone_count)
+            ]
+
+            # Fire-and-forget: no waiting for response
+            await light.set_extended_color_zones(0, colors, fast=True)
+
+            offset = (offset + 5) % 360
+            await asyncio.sleep(0.033)  # ~30 FPS
+```
+
+**When to use `fast=True`:**
+
+- High-frequency animations (>20 updates/second)
+- Real-time visualizations (music sync, games)
+- Smooth color transitions requiring rapid updates
+
+**Trade-offs:**
+
+- No confirmation that the device received or applied the colors
+- No error detection (timeouts, unsupported commands)
+- Best for visual effects where occasional dropped frames are acceptable
+
+**Note:** `MatrixLight.set64()` is already fire-and-forget by default, making it ideal for tile animations without any additional parameters.
+
 ## Next Steps
 
 - [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions

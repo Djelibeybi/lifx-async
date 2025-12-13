@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -428,6 +429,43 @@ class TestMultiZoneLight:
 
         with pytest.raises(ValueError, match="Too many colors"):
             await multizone_light.set_extended_color_zones(0, colors)
+
+    async def test_set_extended_color_zones_fast_mode(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Test setting extended color zones in fast (fire-and-forget) mode."""
+        # Pre-populate zone count to avoid internal get_zone_count() calls
+        multizone_light._zone_count = 82
+
+        # Set up send_packet as AsyncMock for fire-and-forget mode
+        multizone_light.connection.send_packet = AsyncMock()
+
+        # Create list of colors
+        colors = [
+            HSBK(hue=i * 36, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(10)
+        ]
+        await multizone_light.set_extended_color_zones(
+            0, colors, duration=0.5, fast=True
+        )
+
+        # Verify send_packet was called (not request)
+        multizone_light.connection.send_packet.assert_called_once()
+        multizone_light.connection.request.assert_not_called()
+
+        # Get the send_packet call
+        call_args = multizone_light.connection.send_packet.call_args
+
+        # Verify packet has correct values
+        packet = call_args[0][0]
+        assert packet.index == 0
+        assert packet.colors_count == 10
+        assert packet.duration == 500  # 0.5 seconds in ms
+        assert len(packet.colors) == 82  # Padded to 82
+
+        # Verify fire-and-forget flags
+        assert call_args[1]["ack_required"] is False
+        assert call_args[1]["res_required"] is False
 
 
 class TestMultiZoneEffect:
