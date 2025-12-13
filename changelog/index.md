@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.7.0 (2025-12-13)
+
+### Features
+
+- **devices**: Add fast parameter to set_extended_color_zones() ([`0276fca`](https://github.com/Djelibeybi/lifx-async/commit/0276fca9b18e9f78441c843880ef52b4c79dac7b))
+
 ## v4.6.1 (2025-12-12)
 
 ### Bug Fixes
