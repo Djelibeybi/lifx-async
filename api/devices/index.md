@@ -6358,6 +6358,7 @@ copy_frame_buffer(
     source_fb: int = 1,
     target_fb: int = 0,
     duration: float = 0.0,
+    length: int = 1,
 ) -> None
 ```
 
@@ -6365,12 +6366,13 @@ Copy frame buffer (for tiles with >64 zones).
 
 This is used for tiles with more than 64 zones. After setting colors in the temporary buffer (fb=1), copy to the display buffer (fb=0).
 
-| PARAMETER    | DESCRIPTION                                                                          |
-| ------------ | ------------------------------------------------------------------------------------ |
-| `tile_index` | Index of the tile (0-based) **TYPE:** `int`                                          |
-| `source_fb`  | Source frame buffer index (usually 1) **TYPE:** `int` **DEFAULT:** `1`               |
-| `target_fb`  | Target frame buffer index (usually 0) **TYPE:** `int` **DEFAULT:** `0`               |
-| `duration`   | time in seconds to transition if target_fb is 0 **TYPE:** `float` **DEFAULT:** `0.0` |
+| PARAMETER    | DESCRIPTION                                                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `tile_index` | Index of the tile (0-based) **TYPE:** `int`                                                     |
+| `source_fb`  | Source frame buffer index (usually 1) **TYPE:** `int` **DEFAULT:** `1`                          |
+| `target_fb`  | Target frame buffer index (usually 0) **TYPE:** `int` **DEFAULT:** `0`                          |
+| `duration`   | time in seconds to transition if target_fb is 0 **TYPE:** `float` **DEFAULT:** `0.0`            |
+| `length`     | Number of tiles to update starting from tile_index (default 1) **TYPE:** `int` **DEFAULT:** `1` |
 
 Example
 
@@ -6387,6 +6389,10 @@ Example
 > > > ###### 3. Copy buffer 1 to buffer 0 (display)
 > > >
 > > > await matrix.copy_frame_buffer( ... tile_index=0, source_fb=1, target_fb=0, duration=2.0 ... )
+> > >
+> > > ###### For a chain of 5 tiles, update all simultaneously:
+> > >
+> > > await matrix.copy_frame_buffer( ... tile_index=0, source_fb=1, target_fb=0, length=5 ... )
 
 Source code in `src/lifx/devices/matrix.py`
 
@@ -6397,6 +6403,7 @@ async def copy_frame_buffer(
     source_fb: int = 1,
     target_fb: int = 0,
     duration: float = 0.0,
+    length: int = 1,
 ) -> None:
     """Copy frame buffer (for tiles with >64 zones).
 
@@ -6408,6 +6415,7 @@ async def copy_frame_buffer(
         source_fb: Source frame buffer index (usually 1)
         target_fb: Target frame buffer index (usually 0)
         duration: time in seconds to transition if target_fb is 0
+        length: Number of tiles to update starting from tile_index (default 1)
 
     Example:
         >>> # For 16x8 tile (128 zones):
@@ -6437,12 +6445,18 @@ async def copy_frame_buffer(
         >>> await matrix.copy_frame_buffer(
         ...     tile_index=0, source_fb=1, target_fb=0, duration=2.0
         ... )
+
+        >>> # For a chain of 5 tiles, update all simultaneously:
+        >>> await matrix.copy_frame_buffer(
+        ...     tile_index=0, source_fb=1, target_fb=0, length=5
+        ... )
     """
     _LOGGER.debug(
-        "Copying frame buffer %d -> %d for tile %d on %s",
+        "Copying frame buffer %d -> %d for tile %d (length=%d) on %s",
         source_fb,
         target_fb,
         tile_index,
+        length,
         self.label or self.serial,
     )
 
@@ -6459,7 +6473,7 @@ async def copy_frame_buffer(
     await self.connection.send_packet(
         packets.Tile.CopyFrameBuffer(
             tile_index=tile_index,
-            length=1,
+            length=length,
             src_fb_index=source_fb,
             dst_fb_index=target_fb,
             src_x=0,
