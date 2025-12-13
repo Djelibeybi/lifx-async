@@ -3,6 +3,87 @@
 Device classes provide direct control over LIFX devices. All device classes support async context
 managers for automatic resource cleanup.
 
+## State and Info Classes
+
+Device state and information dataclasses returned by device methods.
+
+### DeviceState
+
+Base device state dataclass returned by `Device.state`.
+
+::: lifx.devices.base.DeviceState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### DeviceVersion
+
+Device version information returned by `Device.get_version()`.
+
+::: lifx.devices.base.DeviceVersion
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### DeviceInfo
+
+Device runtime information returned by `Device.get_info()`.
+
+::: lifx.devices.base.DeviceInfo
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### WifiInfo
+
+WiFi module information returned by `Device.get_wifi_info()`.
+
+::: lifx.devices.base.WifiInfo
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### FirmwareInfo
+
+Firmware version information returned by `Device.get_host_firmware()` and `Device.get_wifi_firmware()`.
+
+::: lifx.devices.base.FirmwareInfo
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### CollectionInfo
+
+Location and group collection information returned by `Device.get_location()` and `Device.get_group()`.
+
+::: lifx.devices.base.CollectionInfo
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### DeviceCapabilities
+
+Device capabilities from product registry, available via `Device.capabilities`.
+
+::: lifx.devices.base.DeviceCapabilities
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
 ## Base Device
 
 The `Device` class provides common operations available on all LIFX devices.
@@ -29,6 +110,17 @@ The `Light` class provides color control and effects for standard LIFX lights.
       filters:
         - "!^_"
 
+### LightState
+
+Light device state dataclass returned by `Light.state`.
+
+::: lifx.devices.light.LightState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
 ## HEV Light
 
 The `HevLight` class extends `Light` with anti-bacterial cleaning cycle control for LIFX HEV devices.
@@ -41,6 +133,17 @@ The `HevLight` class extends `Light` with anti-bacterial cleaning cycle control 
       show_if_no_docstring: false
       filters:
         - "!^_"
+
+### HevLightState
+
+HEV light device state dataclass returned by `HevLight.state`.
+
+::: lifx.devices.hev.HevLightState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
 
 ## Infrared Light
 
@@ -55,6 +158,17 @@ The `InfraredLight` class extends `Light` with infrared LED control for night vi
       filters:
         - "!^_"
 
+### InfraredLightState
+
+Infrared light device state dataclass returned by `InfraredLight.state`.
+
+::: lifx.devices.infrared.InfraredLightState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
 ## MultiZone Light
 
 The `MultiZoneLight` class controls LIFX strips and beams with multiple color zones.
@@ -68,6 +182,30 @@ The `MultiZoneLight` class controls LIFX strips and beams with multiple color zo
       filters:
         - "!^_"
 
+### MultiZoneLightState
+
+MultiZone light device state dataclass returned by `MultiZoneLight.state`.
+
+::: lifx.devices.multizone.MultiZoneLightState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### MultiZoneEffect
+
+Configuration dataclass for multizone effects (MOVE). Used with `MultiZoneLight.set_effect()` and returned by `MultiZoneLight.get_effect()`.
+
+::: lifx.devices.multizone.MultiZoneEffect
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
 ## Matrix Light
 
 The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 2D zone control.
@@ -76,6 +214,43 @@ The `MatrixLight` class controls LIFX matrix devices (tiles, candle, path) with 
     options:
       show_root_heading: true
       heading_level: 3
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
+### MatrixLightState
+
+Matrix light device state dataclass returned by `MatrixLight.state`.
+
+::: lifx.devices.matrix.MatrixLightState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### TileInfo
+
+Information dataclass for a single tile in the device chain. Returned as part of `MatrixLightState.chain`.
+
+::: lifx.devices.matrix.TileInfo
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
+### MatrixEffect
+
+Configuration dataclass for matrix effects (MORPH, FLAME, SKY). Used with `MatrixLight.set_effect()` and returned by `MatrixLight.get_effect()`.
+
+::: lifx.devices.matrix.MatrixEffect
+    options:
+      show_root_heading: true
+      heading_level: 4
       members_order: source
       show_if_no_docstring: false
       filters:
