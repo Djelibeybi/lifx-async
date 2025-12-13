@@ -5172,6 +5172,8 @@ set_extended_color_zones(
     colors: list[HSBK],
     duration: float = 0.0,
     apply: MultiZoneApplicationRequest = APPLY,
+    *,
+    fast: bool = False,
 ) -> None
 ```
 
@@ -5179,19 +5181,20 @@ Set colors for multiple zones efficiently (up to 82 zones per call).
 
 This is more efficient than set_color_zones when setting different colors for many zones at once.
 
-| PARAMETER    | DESCRIPTION                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| `zone_index` | Starting zone index **TYPE:** `int`                                                           |
-| `colors`     | List of HSBK colors to set (max 82) **TYPE:** `list[HSBK]`                                    |
-| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`             |
-| `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneApplicationRequest` **DEFAULT:** `APPLY` |
+| PARAMETER    | DESCRIPTION                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `zone_index` | Starting zone index **TYPE:** `int`                                                                                                                       |
+| `colors`     | List of HSBK colors to set (max 82) **TYPE:** `list[HSBK]`                                                                                                |
+| `duration`   | Transition duration in seconds (default 0.0) **TYPE:** `float` **DEFAULT:** `0.0`                                                                         |
+| `apply`      | Application mode (default APPLY) **TYPE:** `MultiZoneApplicationRequest` **DEFAULT:** `APPLY`                                                             |
+| `fast`       | If True, send fire-and-forget without waiting for response. Use for high-frequency animations (>20 updates/second). **TYPE:** `bool` **DEFAULT:** `False` |
 
-| RAISES                        | DESCRIPTION                                         |
-| ----------------------------- | --------------------------------------------------- |
-| `ValueError`                  | If colors list is too long or zone index is invalid |
-| `LifxDeviceNotFoundError`     | If device is not connected                          |
-| `LifxTimeoutError`            | If device does not respond                          |
-| `LifxUnsupportedCommandError` | If device doesn't support this command              |
+| RAISES                        | DESCRIPTION                                                   |
+| ----------------------------- | ------------------------------------------------------------- |
+| `ValueError`                  | If colors list is too long or zone index is invalid           |
+| `LifxDeviceNotFoundError`     | If device is not connected                                    |
+| `LifxTimeoutError`            | If device does not respond (only when fast=False)             |
+| `LifxUnsupportedCommandError` | If device doesn't support this command (only when fast=False) |
 
 Example
 
@@ -5202,6 +5205,11 @@ colors = [
     for i in range(10)
 ]
 await light.set_extended_color_zones(0, colors)
+
+# High-speed animation loop
+for frame in animation_frames:
+    await light.set_extended_color_zones(0, frame, fast=True)
+    await asyncio.sleep(0.033)  # ~30 FPS
 ```
 
 Source code in `src/lifx/devices/multizone.py`
@@ -5213,6 +5221,8 @@ async def set_extended_color_zones(
     colors: list[HSBK],
     duration: float = 0.0,
     apply: ExtendedAppReq = ExtendedAppReq.APPLY,
+    *,
+    fast: bool = False,
 ) -> None:
     """Set colors for multiple zones efficiently (up to 82 zones per call).
 
@@ -5224,12 +5234,15 @@ async def set_extended_color_zones(
         colors: List of HSBK colors to set (max 82)
         duration: Transition duration in seconds (default 0.0)
         apply: Application mode (default APPLY)
+        fast: If True, send fire-and-forget without waiting for response.
+              Use for high-frequency animations (>20 updates/second).
 
     Raises:
         ValueError: If colors list is too long or zone index is invalid
         LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
+        LifxTimeoutError: If device does not respond (only when fast=False)
         LifxUnsupportedCommandError: If device doesn't support this command
+            (only when fast=False)
 
     Example:
         ```python
@@ -5239,6 +5252,11 @@ async def set_extended_color_zones(
             for i in range(10)
         ]
         await light.set_extended_color_zones(0, colors)
+
+        # High-speed animation loop
+        for frame in animation_frames:
+            await light.set_extended_color_zones(0, frame, fast=True)
+            await asyncio.sleep(0.033)  # ~30 FPS
         ```
     """
     if zone_index < 0:
@@ -5246,7 +5264,9 @@ async def set_extended_color_zones(
     if len(colors) > 82:
         raise ValueError(f"Too many colors: {len(colors)} (max 82 per request)")
     if len(colors) == 0:
-        raise ValueError("Colors list cannot be empty")  # Convert to protocol HSBK
+        raise ValueError("Colors list cannot be empty")
+
+    # Convert to protocol HSBK
     protocol_colors = [color.to_protocol() for color in colors]
 
     # Pad to 82 colors if needed
@@ -5256,17 +5276,25 @@ async def set_extended_color_zones(
     # Convert duration to milliseconds
     duration_ms = int(duration * 1000)
 
-    # Send request
-    result = await self.connection.request(
-        packets.MultiZone.SetExtendedColorZones(
-            duration=duration_ms,
-            apply=apply,
-            index=zone_index,
-            colors_count=len(colors),
-            colors=protocol_colors,
-        ),
+    packet = packets.MultiZone.SetExtendedColorZones(
+        duration=duration_ms,
+        apply=apply,
+        index=zone_index,
+        colors_count=len(colors),
+        colors=protocol_colors,
     )
-    self._raise_if_unhandled(result)
+
+    if fast:
+        # Fire-and-forget: no ack, no response, no waiting
+        await self.connection.send_packet(
+            packet,
+            ack_required=False,
+            res_required=False,
+        )
+    else:
+        # Standard: wait for response and check for errors
+        result = await self.connection.request(packet)
+        self._raise_if_unhandled(result)
 
     _LOGGER.debug(
         {
@@ -5287,6 +5315,7 @@ async def set_extended_color_zones(
                 ],
                 "duration": duration_ms,
                 "apply": apply.name,
+                "fast": fast,
             },
         }
     )
