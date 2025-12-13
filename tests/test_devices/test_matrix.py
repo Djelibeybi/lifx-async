@@ -373,6 +373,37 @@ class TestMatrixLight:
             assert copied_colors[0].saturation == 1.0
             assert copied_colors[0].brightness == 1.0
 
+    async def test_copy_frame_buffer_with_length(self, emulator_devices) -> None:
+        """Test copy_frame_buffer() with explicit length parameter."""
+        matrix = emulator_devices[6]
+        async with matrix:
+            chain = await matrix.get_device_chain()
+            tile = chain[0]
+
+            # Set pattern on temp buffer (fb_index=1)
+            blue_colors = [Colors.BLUE] * 64
+            await matrix.set64(
+                tile_index=0,
+                length=1,
+                x=0,
+                y=0,
+                width=tile.width,
+                duration=0,
+                colors=blue_colors,
+                fb_index=1,
+            )
+
+            # Copy with explicit length=1 (same as default behavior)
+            await matrix.copy_frame_buffer(
+                tile_index=0, source_fb=1, target_fb=0, length=1
+            )
+
+            # Verify the copy worked
+            copied_colors = await matrix.get64()
+            assert copied_colors[0].hue == 240  # Blue
+            assert copied_colors[0].saturation == 1.0
+            assert copied_colors[0].brightness == 1.0
+
     async def test_set_effect_without_palette(self, emulator_devices) -> None:
         """Test setting effect without a palette (palette_count=0)."""
         matrix = emulator_devices[6]
