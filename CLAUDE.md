@@ -459,6 +459,22 @@ async with await MultiZoneLight.from_ip("192.168.1.100") as light:
 - `get_extended_color_zones(start, end)`: Direct access to extended multizone protocol (requires extended capability)
 - `get_color_zones(start, end)`: Direct access to standard multizone protocol (works on all multizone devices)
 
+**Fire-and-forget mode for animations:**
+
+For high-frequency animations (>20 updates/second), use the `fast=True` parameter to skip waiting for device acknowledgement:
+
+```python
+# Standard mode (waits for response)
+await light.set_extended_color_zones(0, colors)
+
+# Fast mode for animations (fire-and-forget, no response waiting)
+for frame in animation_frames:
+    await light.set_extended_color_zones(0, frame, fast=True)
+    await asyncio.sleep(0.033)  # ~30 FPS
+```
+
+**Note:** `MatrixLight.set64()` is already fire-and-forget by default.
+
 ### Packet Flow
 
 1. Create packet instance (e.g., `LightSetColor`)
