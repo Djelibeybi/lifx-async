@@ -34,6 +34,32 @@ recommended entry points for most users.
       members_order: source
       show_if_no_docstring: false
 
+## Organizational Groupings
+
+Dataclasses for organizing devices by location or group. Returned by `DeviceGroup.organize_by_location()` and `DeviceGroup.organize_by_group()`.
+
+### LocationGrouping
+
+Location-based device grouping returned by `DeviceGroup.organize_by_location()`.
+
+::: lifx.api.LocationGrouping
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### GroupGrouping
+
+Group-based device grouping returned by `DeviceGroup.organize_by_group()`.
+
+::: lifx.api.GroupGrouping
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
 ## Examples
 
 ### Simple Discovery

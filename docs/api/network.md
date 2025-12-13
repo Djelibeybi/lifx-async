@@ -18,6 +18,17 @@ Functions for discovering LIFX devices on the local network.
       heading_level: 3
       members_order: source
 
+### DiscoveryResponse
+
+Response dataclass from custom discovery broadcasts (using packets other than GetService).
+
+::: lifx.network.discovery.DiscoveryResponse
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
 ## UDP Transport
 
 Low-level UDP transport for sending and receiving LIFX protocol messages.
