@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.7.1 (2025-12-13)
+
+### Bug Fixes
+
+- **devices**: Add length parameter to copy_frame_buffer() ([`6a74690`](https://github.com/Djelibeybi/lifx-async/commit/6a746904665d38545e534829c2c690a61e48da54))
+
 ## v4.7.0 (2025-12-13)
 
 ### Features
