@@ -494,6 +494,32 @@ def __eq__(self, other: object) -> bool:
     return self.serial == other.serial
 ```
 
+### DiscoveryResponse
+
+Response dataclass from custom discovery broadcasts (using packets other than GetService).
+
+#### DiscoveryResponse
+
+```python
+DiscoveryResponse(
+    serial: str,
+    ip: str,
+    port: int,
+    response_time: float,
+    response_payload: dict[str, Any],
+)
+```
+
+Response from a discovery broadcast using a custom packet.
+
+| ATTRIBUTE          | DESCRIPTION                                                               |
+| ------------------ | ------------------------------------------------------------------------- |
+| `serial`           | Device serial number **TYPE:** `str`                                      |
+| `ip`               | Device IP address **TYPE:** `str`                                         |
+| `port`             | Device UDP port **TYPE:** `int`                                           |
+| `response_time`    | Response time in seconds **TYPE:** `float`                                |
+| `response_payload` | Unpacked State packet fields as key/value dict **TYPE:** `dict[str, Any]` |
+
 ## UDP Transport
 
 Low-level UDP transport for sending and receiving LIFX protocol messages.

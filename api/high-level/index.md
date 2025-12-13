@@ -1373,6 +1373,78 @@ def invalidate_metadata_cache(self) -> None:
     self._group_metadata = None
 ````
 
+## Organizational Groupings
+
+Dataclasses for organizing devices by location or group. Returned by `DeviceGroup.organize_by_location()` and `DeviceGroup.organize_by_group()`.
+
+### LocationGrouping
+
+Location-based device grouping returned by `DeviceGroup.organize_by_location()`.
+
+#### LocationGrouping
+
+```python
+LocationGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
+```
+
+Organizational structure for location-based grouping.
+
+| METHOD            | DESCRIPTION                                  |
+| ----------------- | -------------------------------------------- |
+| `to_device_group` | Convert to DeviceGroup for batch operations. |
+
+##### Functions
+
+###### to_device_group
+
+```python
+to_device_group() -> DeviceGroup
+```
+
+Convert to DeviceGroup for batch operations.
+
+Source code in `src/lifx/api.py`
+
+```python
+def to_device_group(self) -> DeviceGroup:
+    """Convert to DeviceGroup for batch operations."""
+    return DeviceGroup(self.devices)
+```
+
+### GroupGrouping
+
+Group-based device grouping returned by `DeviceGroup.organize_by_group()`.
+
+#### GroupGrouping
+
+```python
+GroupGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
+```
+
+Organizational structure for group-based grouping.
+
+| METHOD            | DESCRIPTION                                  |
+| ----------------- | -------------------------------------------- |
+| `to_device_group` | Convert to DeviceGroup for batch operations. |
+
+##### Functions
+
+###### to_device_group
+
+```python
+to_device_group() -> DeviceGroup
+```
+
+Convert to DeviceGroup for batch operations.
+
+Source code in `src/lifx/api.py`
+
+```python
+def to_device_group(self) -> DeviceGroup:
+    """Convert to DeviceGroup for batch operations."""
+    return DeviceGroup(self.devices)
+```
+
 ## Examples
 
 ### Simple Discovery

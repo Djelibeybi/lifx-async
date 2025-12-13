@@ -7244,6 +7244,78 @@ def invalidate_metadata_cache(self) -> None:
     self._group_metadata = None
 ````
 
+## Organizational Groupings
+
+Dataclasses for organizing devices by location or group. Returned by `DeviceGroup.organize_by_location()` and `DeviceGroup.organize_by_group()`.
+
+### LocationGrouping
+
+Location-based device grouping returned by `DeviceGroup.organize_by_location()`.
+
+#### LocationGrouping
+
+```python
+LocationGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
+```
+
+Organizational structure for location-based grouping.
+
+| METHOD            | DESCRIPTION                                  |
+| ----------------- | -------------------------------------------- |
+| `to_device_group` | Convert to DeviceGroup for batch operations. |
+
+##### Functions
+
+###### to_device_group
+
+```python
+to_device_group() -> DeviceGroup
+```
+
+Convert to DeviceGroup for batch operations.
+
+Source code in `src/lifx/api.py`
+
+```python
+def to_device_group(self) -> DeviceGroup:
+    """Convert to DeviceGroup for batch operations."""
+    return DeviceGroup(self.devices)
+```
+
+### GroupGrouping
+
+Group-based device grouping returned by `DeviceGroup.organize_by_group()`.
+
+#### GroupGrouping
+
+```python
+GroupGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
+```
+
+Organizational structure for group-based grouping.
+
+| METHOD            | DESCRIPTION                                  |
+| ----------------- | -------------------------------------------- |
+| `to_device_group` | Convert to DeviceGroup for batch operations. |
+
+##### Functions
+
+###### to_device_group
+
+```python
+to_device_group() -> DeviceGroup
+```
+
+Convert to DeviceGroup for batch operations.
+
+Source code in `src/lifx/api.py`
+
+```python
+def to_device_group(self) -> DeviceGroup:
+    """Convert to DeviceGroup for batch operations."""
+    return DeviceGroup(self.devices)
+```
+
 ## Examples
 
 ### Simple Discovery
@@ -10232,6 +10304,311 @@ When converting from HSBK to RGB:
 # Device Classes
 
 Device classes provide direct control over LIFX devices. All device classes support async context managers for automatic resource cleanup.
+
+## State and Info Classes
+
+Device state and information dataclasses returned by device methods.
+
+### DeviceState
+
+Base device state dataclass returned by `Device.state`.
+
+#### DeviceState
+
+```python
+DeviceState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+)
+```
+
+Base device state.
+
+| ATTRIBUTE       | DESCRIPTION                                                               |
+| --------------- | ------------------------------------------------------------------------- |
+| `model`         | Friendly product name (e.g., "LIFX A19") **TYPE:** `str`                  |
+| `label`         | Device label (user-assigned name) **TYPE:** `str`                         |
+| `serial`        | Device serial number (6 bytes) **TYPE:** `str`                            |
+| `mac_address`   | Device MAC address (formatted string) **TYPE:** `str`                     |
+| `capabilities`  | Device capabilities from product registry **TYPE:** `DeviceCapabilities`  |
+| `power`         | Power level (0 = off, 65535 = on) **TYPE:** `int`                         |
+| `host_firmware` | Host firmware version **TYPE:** `FirmwareInfo`                            |
+| `wifi_firmware` | WiFi firmware version **TYPE:** `FirmwareInfo`                            |
+| `location`      | Location tuple (UUID bytes, label, updated_at) **TYPE:** `CollectionInfo` |
+| `group`         | Group tuple (UUID bytes, label, updated_at) **TYPE:** `CollectionInfo`    |
+| `last_updated`  | Timestamp of last state refresh **TYPE:** `float`                         |
+
+| METHOD     | DESCRIPTION                                 |
+| ---------- | ------------------------------------------- |
+| `is_fresh` | Check if state is fresh (recently updated). |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: dict[
+    str, str | int | float | dict[str, bool | int] | dict[str, str | int]
+]
+```
+
+Return DeviceState as a dictionary.
+
+###### is_on
+
+```python
+is_on: bool
+```
+
+Check if device is powered on.
+
+###### location_name
+
+```python
+location_name: str
+```
+
+Get location label.
+
+###### group_name
+
+```python
+group_name: str
+```
+
+Get group label.
+
+###### age
+
+```python
+age: float
+```
+
+Get age of state in seconds.
+
+##### Functions
+
+###### is_fresh
+
+```python
+is_fresh(max_age: float = 5.0) -> bool
+```
+
+Check if state is fresh (recently updated).
+
+| PARAMETER | DESCRIPTION                                                                |
+| --------- | -------------------------------------------------------------------------- |
+| `max_age` | Maximum age in seconds (default: 5.0) **TYPE:** `float` **DEFAULT:** `5.0` |
+
+| RETURNS | DESCRIPTION                            |
+| ------- | -------------------------------------- |
+| `bool`  | True if state age is less than max_age |
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+def is_fresh(self, max_age: float = 5.0) -> bool:
+    """Check if state is fresh (recently updated).
+
+    Args:
+        max_age: Maximum age in seconds (default: 5.0)
+
+    Returns:
+        True if state age is less than max_age
+    """
+    return self.age < max_age
+```
+
+### DeviceVersion
+
+Device version information returned by `Device.get_version()`.
+
+#### DeviceVersion
+
+```python
+DeviceVersion(vendor: int, product: int)
+```
+
+Device version information.
+
+| ATTRIBUTE | DESCRIPTION                                                   |
+| --------- | ------------------------------------------------------------- |
+| `vendor`  | Vendor ID (typically 1 for LIFX) **TYPE:** `int`              |
+| `product` | Product ID (identifies specific device model) **TYPE:** `int` |
+
+### DeviceInfo
+
+Device runtime information returned by `Device.get_info()`.
+
+#### DeviceInfo
+
+```python
+DeviceInfo(time: int, uptime: int, downtime: int)
+```
+
+Device runtime information.
+
+| ATTRIBUTE  | DESCRIPTION                                                   |
+| ---------- | ------------------------------------------------------------- |
+| `time`     | Current device time (nanoseconds since epoch) **TYPE:** `int` |
+| `uptime`   | Time since last power on (nanoseconds) **TYPE:** `int`        |
+| `downtime` | Time device was powered off (nanoseconds) **TYPE:** `int`     |
+
+### WifiInfo
+
+WiFi module information returned by `Device.get_wifi_info()`.
+
+#### WifiInfo
+
+```python
+WifiInfo(signal: float)
+```
+
+Device WiFi module information.
+
+| ATTRIBUTE | DESCRIPTION                            |
+| --------- | -------------------------------------- |
+| `signal`  | WiFi signal strength **TYPE:** `float` |
+| `rssi`    | WiFi RSSI **TYPE:** `int`              |
+
+| METHOD          | DESCRIPTION                 |
+| --------------- | --------------------------- |
+| `__post_init__` | Calculate RSSI from signal. |
+
+##### Functions
+
+###### __post_init__
+
+```python
+__post_init__() -> None
+```
+
+Calculate RSSI from signal.
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+def __post_init__(self) -> None:
+    """Calculate RSSI from signal."""
+    self.rssi = int(floor(10 * log10(self.signal) + 0.5))
+```
+
+### FirmwareInfo
+
+Firmware version information returned by `Device.get_host_firmware()` and `Device.get_wifi_firmware()`.
+
+#### FirmwareInfo
+
+```python
+FirmwareInfo(build: int, version_major: int, version_minor: int)
+```
+
+Device firmware version information.
+
+| ATTRIBUTE       | DESCRIPTION                              |
+| --------------- | ---------------------------------------- |
+| `build`         | Firmware build timestamp **TYPE:** `int` |
+| `version_major` | Major version number **TYPE:** `int`     |
+| `version_minor` | Minor version number **TYPE:** `int`     |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: dict[str, int]
+```
+
+Return firmware info as dict.
+
+### CollectionInfo
+
+Location and group collection information returned by `Device.get_location()` and `Device.get_group()`.
+
+#### CollectionInfo
+
+```python
+CollectionInfo(uuid: str, label: str, updated_at: int)
+```
+
+Device location and group collection information.
+
+| ATTRIBUTE    | DESCRIPTION                                                         |
+| ------------ | ------------------------------------------------------------------- |
+| `uuid`       | Collection UUID (16 hexadecimal characters) **TYPE:** `str`         |
+| `label`      | Collection label (up to 32 characters) **TYPE:** `str`              |
+| `updated_at` | Timestamp when group was last updated (nanoseconds) **TYPE:** `int` |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: dict[str, str | int]
+```
+
+Return group info as dict.
+
+### DeviceCapabilities
+
+Device capabilities from product registry, available via `Device.capabilities`.
+
+#### DeviceCapabilities
+
+```python
+DeviceCapabilities(
+    has_color: bool,
+    has_multizone: bool,
+    has_chain: bool,
+    has_matrix: bool,
+    has_infrared: bool,
+    has_hev: bool,
+    has_extended_multizone: bool,
+    kelvin_min: int | None,
+    kelvin_max: int | None,
+)
+```
+
+Device capabilities from product registry.
+
+| ATTRIBUTE                | DESCRIPTION                                                         |
+| ------------------------ | ------------------------------------------------------------------- |
+| `has_color`              | Supports color control **TYPE:** `bool`                             |
+| `has_multizone`          | Supports multizone control (strips, beams) **TYPE:** `bool`         |
+| `has_chain`              | Supports chaining (tiles) **TYPE:** `bool`                          |
+| `has_matrix`             | Supports 2D matrix control (tiles, candle, path) **TYPE:** `bool`   |
+| `has_infrared`           | Supports infrared LED **TYPE:** `bool`                              |
+| `has_hev`                | Supports HEV (High Energy Visible) cleaning cycles **TYPE:** `bool` |
+| `has_extended_multizone` | Supports extended multizone protocol **TYPE:** `bool`               |
+| `kelvin_min`             | Minimum color temperature (Kelvin) **TYPE:** \`int                  |
+| `kelvin_max`             | Maximum color temperature (Kelvin) **TYPE:** \`int                  |
+
+##### Attributes
+
+###### has_variable_color_temp
+
+```python
+has_variable_color_temp: bool
+```
+
+Check if device supports variable color temperature.
+
+###### as_dict
+
+```python
+as_dict: dict[str, bool | int]
+```
+
+Return DeviceCapabilities as a dict.
 
 ## Base Device
 
@@ -13833,6 +14210,47 @@ async def refresh_state(self) -> None:
     self._state.last_updated = time.time()
 ```
 
+### LightState
+
+Light device state dataclass returned by `Light.state`.
+
+#### LightState
+
+```python
+LightState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+    color: HSBK,
+)
+```
+
+Bases: `DeviceState`
+
+Light device state with color control.
+
+| ATTRIBUTE | DESCRIPTION                         |
+| --------- | ----------------------------------- |
+| `color`   | Current HSBK color **TYPE:** `HSBK` |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return LightState as a dict.
+
 ## HEV Light
 
 The `HevLight` class extends `Light` with anti-bacterial cleaning cycle control for LIFX HEV devices.
@@ -14409,6 +14827,102 @@ async def refresh_state(self) -> None:
     self._state.hev_result = hev_result
 ```
 
+### HevLightState
+
+HEV light device state dataclass returned by `HevLight.state`.
+
+#### HevLightState
+
+```python
+HevLightState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+    color: HSBK,
+    hev_cycle: HevCycleState,
+    hev_config: HevConfig,
+    hev_result: LightLastHevCycleResult,
+)
+```
+
+Bases: `LightState`
+
+HEV light device state with anti-bacterial capabilities.
+
+| ATTRIBUTE    | DESCRIPTION                                               |
+| ------------ | --------------------------------------------------------- |
+| `hev_cycle`  | Current HEV cycle state **TYPE:** `HevCycleState`         |
+| `hev_config` | Default HEV configuration **TYPE:** `HevConfig`           |
+| `hev_result` | Last HEV cycle result **TYPE:** `LightLastHevCycleResult` |
+
+| METHOD             | DESCRIPTION                           |
+| ------------------ | ------------------------------------- |
+| `from_light_state` | Create HevLightState from LightState. |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return HevLightState as dict.
+
+##### Functions
+
+###### from_light_state
+
+```python
+from_light_state(
+    light_state: LightState,
+    hev_cycle: HevCycleState,
+    hev_config: HevConfig,
+    hev_result: LightLastHevCycleResult,
+) -> HevLightState
+```
+
+Create HevLightState from LightState.
+
+Source code in `src/lifx/devices/hev.py`
+
+```python
+@classmethod
+def from_light_state(
+    cls,
+    light_state: LightState,
+    hev_cycle: HevCycleState,
+    hev_config: HevConfig,
+    hev_result: LightLastHevCycleResult,
+) -> HevLightState:
+    """Create HevLightState from LightState."""
+    return cls(
+        model=light_state.model,
+        label=light_state.label,
+        serial=light_state.serial,
+        mac_address=light_state.mac_address,
+        power=light_state.power,
+        capabilities=light_state.capabilities,
+        host_firmware=light_state.host_firmware,
+        wifi_firmware=light_state.wifi_firmware,
+        location=light_state.location,
+        group=light_state.group,
+        color=light_state.color,
+        hev_config=hev_config,
+        hev_cycle=hev_cycle,
+        hev_result=hev_result,
+        last_updated=time.time(),
+    )
+```
+
 ## Infrared Light
 
 The `InfraredLight` class extends `Light` with infrared LED control for night vision on LIFX A19 + Night Vision devices.
@@ -14701,6 +15215,89 @@ async def refresh_state(self) -> None:
 
     infrared = await self.get_infrared()
     self._state.infrared = infrared
+```
+
+### InfraredLightState
+
+Infrared light device state dataclass returned by `InfraredLight.state`.
+
+#### InfraredLightState
+
+```python
+InfraredLightState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+    color: HSBK,
+    infrared: float,
+)
+```
+
+Bases: `LightState`
+
+Infrared light device state with IR control.
+
+| ATTRIBUTE  | DESCRIPTION                                     |
+| ---------- | ----------------------------------------------- |
+| `infrared` | Infrared brightness (0.0-1.0) **TYPE:** `float` |
+
+| METHOD             | DESCRIPTION                                |
+| ------------------ | ------------------------------------------ |
+| `from_light_state` | Create InfraredLightState from LightState. |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return InfraredLightState as dict.
+
+##### Functions
+
+###### from_light_state
+
+```python
+from_light_state(
+    light_state: LightState, infrared: float
+) -> InfraredLightState
+```
+
+Create InfraredLightState from LightState.
+
+Source code in `src/lifx/devices/infrared.py`
+
+```python
+@classmethod
+def from_light_state(
+    cls, light_state: LightState, infrared: float
+) -> InfraredLightState:
+    """Create InfraredLightState from LightState."""
+    return cls(
+        model=light_state.model,
+        label=light_state.label,
+        serial=light_state.serial,
+        mac_address=light_state.mac_address,
+        power=light_state.power,
+        capabilities=light_state.capabilities,
+        host_firmware=light_state.host_firmware,
+        wifi_firmware=light_state.wifi_firmware,
+        location=light_state.location,
+        group=light_state.group,
+        color=light_state.color,
+        infrared=infrared,
+        last_updated=time.time(),
+    )
 ```
 
 ## MultiZone Light
@@ -15957,6 +16554,136 @@ async def refresh_state(self) -> None:
     self._state.zones = zones
     self._state.effect = effect.effect_type
 ```
+
+### MultiZoneLightState
+
+MultiZone light device state dataclass returned by `MultiZoneLight.state`.
+
+#### MultiZoneLightState
+
+```python
+MultiZoneLightState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+    color: HSBK,
+    zones: list[HSBK],
+    zone_count: int,
+    effect: FirmwareEffect,
+)
+```
+
+Bases: `LightState`
+
+MultiZone light device state with zone-based control.
+
+| ATTRIBUTE    | DESCRIPTION                                                       |
+| ------------ | ----------------------------------------------------------------- |
+| `zones`      | List of HSBK colors for each zone **TYPE:** `list[HSBK]`          |
+| `zone_count` | Total number of zones **TYPE:** `int`                             |
+| `effect`     | Current multizone effect configuration **TYPE:** `FirmwareEffect` |
+
+| METHOD             | DESCRIPTION                              |
+| ------------------ | ---------------------------------------- |
+| `from_light_state` | Create MatrixLightState from LightState. |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return MultiZoneLightState as dict.
+
+##### Functions
+
+###### from_light_state
+
+```python
+from_light_state(
+    light_state: LightState, zones: list[HSBK], effect: FirmwareEffect
+) -> MultiZoneLightState
+```
+
+Create MatrixLightState from LightState.
+
+Source code in `src/lifx/devices/multizone.py`
+
+```python
+@classmethod
+def from_light_state(
+    cls,
+    light_state: LightState,
+    zones: list[HSBK],
+    effect: FirmwareEffect,
+) -> MultiZoneLightState:
+    """Create MatrixLightState from LightState."""
+    return cls(
+        model=light_state.model,
+        label=light_state.label,
+        serial=light_state.serial,
+        mac_address=light_state.mac_address,
+        power=light_state.power,
+        capabilities=light_state.capabilities,
+        host_firmware=light_state.host_firmware,
+        wifi_firmware=light_state.wifi_firmware,
+        location=light_state.location,
+        group=light_state.group,
+        color=light_state.color,
+        zones=zones,
+        zone_count=len(zones),
+        effect=effect,
+        last_updated=time.time(),
+    )
+```
+
+### MultiZoneEffect
+
+Configuration dataclass for multizone effects (MOVE). Used with `MultiZoneLight.set_effect()` and returned by `MultiZoneLight.get_effect()`.
+
+#### MultiZoneEffect
+
+```python
+MultiZoneEffect(
+    effect_type: FirmwareEffect,
+    speed: int,
+    duration: int = 0,
+    parameters: list[int] | None = None,
+)
+```
+
+MultiZone effect configuration.
+
+| ATTRIBUTE     | DESCRIPTION                                                        |
+| ------------- | ------------------------------------------------------------------ |
+| `effect_type` | Type of effect (OFF, MOVE) **TYPE:** `FirmwareEffect`              |
+| `speed`       | Effect speed in milliseconds **TYPE:** `int`                       |
+| `duration`    | Total effect duration (0 for infinite) **TYPE:** `int`             |
+| `parameters`  | Effect-specific parameters (8 uint32 values) **TYPE:** \`list[int] |
+
+##### Attributes
+
+###### direction
+
+```python
+direction: Direction | None
+```
+
+Get direction for MOVE effect.
+
+| RETURNS     | DESCRIPTION |
+| ----------- | ----------- |
+| \`Direction | None\`      |
 
 ## Matrix Light
 
@@ -17220,6 +17947,277 @@ async def refresh_state(self) -> None:
     self._state.tile_colors = [c for tile in all_tile_colors for c in tile]
     self._state.effect = effect.effect_type
 ```
+
+### MatrixLightState
+
+Matrix light device state dataclass returned by `MatrixLight.state`.
+
+#### MatrixLightState
+
+```python
+MatrixLightState(
+    model: str,
+    label: str,
+    serial: str,
+    mac_address: str,
+    capabilities: DeviceCapabilities,
+    power: int,
+    host_firmware: FirmwareInfo,
+    wifi_firmware: FirmwareInfo,
+    location: CollectionInfo,
+    group: CollectionInfo,
+    last_updated: float,
+    color: HSBK,
+    chain: list[TileInfo],
+    tile_orientations: dict[int, str],
+    tile_colors: list[HSBK],
+    tile_count: int,
+    effect: FirmwareEffect,
+)
+```
+
+Bases: `LightState`
+
+Matrix light device state with tile-based control.
+
+| ATTRIBUTE     | DESCRIPTION                                                                |
+| ------------- | -------------------------------------------------------------------------- |
+| `tiles`       | List of tile information for each tile in the chain                        |
+| `tile_colors` | List of HSBK colors for all pixels across all tiles **TYPE:** `list[HSBK]` |
+| `tile_count`  | Total number of tiles in chain **TYPE:** `int`                             |
+| `effect`      | Current matrix effect configuration **TYPE:** `FirmwareEffect`             |
+
+| METHOD             | DESCRIPTION                              |
+| ------------------ | ---------------------------------------- |
+| `from_light_state` | Create MatrixLightState from LightState. |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return MatrixLightState as dict.
+
+##### Functions
+
+###### from_light_state
+
+```python
+from_light_state(
+    light_state: LightState,
+    chain: list[TileInfo],
+    tile_orientations: dict[int, str],
+    tile_colors: list[HSBK],
+    effect: FirmwareEffect,
+) -> MatrixLightState
+```
+
+Create MatrixLightState from LightState.
+
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+@classmethod
+def from_light_state(
+    cls,
+    light_state: LightState,
+    chain: list[TileInfo],
+    tile_orientations: dict[int, str],
+    tile_colors: list[HSBK],
+    effect: FirmwareEffect,
+) -> MatrixLightState:
+    """Create MatrixLightState from LightState."""
+    return cls(
+        model=light_state.model,
+        label=light_state.label,
+        serial=light_state.serial,
+        mac_address=light_state.mac_address,
+        power=light_state.power,
+        capabilities=light_state.capabilities,
+        host_firmware=light_state.host_firmware,
+        wifi_firmware=light_state.wifi_firmware,
+        location=light_state.location,
+        group=light_state.group,
+        color=light_state.color,
+        chain=chain,
+        tile_orientations=tile_orientations,
+        tile_colors=tile_colors,
+        tile_count=len(chain),
+        effect=effect,
+        last_updated=time.time(),
+    )
+```
+
+### TileInfo
+
+Information dataclass for a single tile in the device chain. Returned as part of `MatrixLightState.chain`.
+
+#### TileInfo
+
+```python
+TileInfo(
+    tile_index: int,
+    accel_meas_x: int,
+    accel_meas_y: int,
+    accel_meas_z: int,
+    user_x: float,
+    user_y: float,
+    width: int,
+    height: int,
+    supported_frame_buffers: int,
+    device_version_vendor: int,
+    device_version_product: int,
+    device_version_version: int,
+    firmware_build: int,
+    firmware_version_minor: int,
+    firmware_version_major: int,
+)
+```
+
+Information about a single tile in the device chain.
+
+| ATTRIBUTE                 | DESCRIPTION                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `tile_index`              | Index of this tile in the chain (0-based) **TYPE:** `int` |
+| `accel_meas_x`            | Accelerometer measurement X **TYPE:** `int`               |
+| `accel_meas_y`            | Accelerometer measurement Y **TYPE:** `int`               |
+| `accel_meas_z`            | Accelerometer measurement Z **TYPE:** `int`               |
+| `user_x`                  | User-defined X position **TYPE:** `float`                 |
+| `user_y`                  | User-defined Y position **TYPE:** `float`                 |
+| `width`                   | Tile width in zones **TYPE:** `int`                       |
+| `height`                  | Tile height in zones **TYPE:** `int`                      |
+| `supported_frame_buffers` | frame buffer count **TYPE:** `int`                        |
+| `device_version_vendor`   | Device vendor ID **TYPE:** `int`                          |
+| `device_version_product`  | Device product ID **TYPE:** `int`                         |
+| `device_version_version`  | Device version **TYPE:** `int`                            |
+| `firmware_build`          | Firmware build timestamp **TYPE:** `int`                  |
+| `firmware_version_minor`  | Firmware minor version **TYPE:** `int`                    |
+| `firmware_version_major`  | Firmware major version **TYPE:** `int`                    |
+
+| METHOD          | DESCRIPTION                                    |
+| --------------- | ---------------------------------------------- |
+| `from_protocol` | Create TileInfo from protocol TileStateDevice. |
+
+##### Attributes
+
+###### as_dict
+
+```python
+as_dict: Any
+```
+
+Return TileInfo as dictionary.
+
+###### total_zones
+
+```python
+total_zones: int
+```
+
+Get total number of zones on this tile.
+
+###### requires_frame_buffer
+
+```python
+requires_frame_buffer: bool
+```
+
+Check if tile has more than 64 zones (requires frame buffer strategy).
+
+###### nearest_orientation
+
+```python
+nearest_orientation: str
+```
+
+Determine the orientation of the tile from accelerometer data.
+
+##### Functions
+
+###### from_protocol
+
+```python
+from_protocol(tile_index: int, protocol_tile: TileStateDevice) -> TileInfo
+```
+
+Create TileInfo from protocol TileStateDevice.
+
+| PARAMETER       | DESCRIPTION                                                 |
+| --------------- | ----------------------------------------------------------- |
+| `tile_index`    | Index of this tile in the chain (0-based) **TYPE:** `int`   |
+| `protocol_tile` | Protocol TileStateDevice object **TYPE:** `TileStateDevice` |
+
+| RETURNS    | DESCRIPTION       |
+| ---------- | ----------------- |
+| `TileInfo` | TileInfo instance |
+
+Source code in `src/lifx/devices/matrix.py`
+
+```python
+@classmethod
+def from_protocol(
+    cls, tile_index: int, protocol_tile: LifxProtocolTileDevice
+) -> TileInfo:
+    """Create TileInfo from protocol TileStateDevice.
+
+    Args:
+        tile_index: Index of this tile in the chain (0-based)
+        protocol_tile: Protocol TileStateDevice object
+
+    Returns:
+        TileInfo instance
+    """
+    return cls(
+        tile_index=tile_index,
+        accel_meas_x=protocol_tile.accel_meas.x,
+        accel_meas_y=protocol_tile.accel_meas.y,
+        accel_meas_z=protocol_tile.accel_meas.z,
+        user_x=protocol_tile.user_x,
+        user_y=protocol_tile.user_y,
+        width=protocol_tile.width,
+        height=protocol_tile.height,
+        supported_frame_buffers=protocol_tile.supported_frame_buffers,
+        device_version_vendor=protocol_tile.device_version.vendor,
+        device_version_product=protocol_tile.device_version.product,
+        device_version_version=0,  # Not available in TileStateDevice
+        firmware_build=protocol_tile.firmware.build,
+        firmware_version_minor=protocol_tile.firmware.version_minor,
+        firmware_version_major=protocol_tile.firmware.version_major,
+    )
+```
+
+### MatrixEffect
+
+Configuration dataclass for matrix effects (MORPH, FLAME, SKY). Used with `MatrixLight.set_effect()` and returned by `MatrixLight.get_effect()`.
+
+#### MatrixEffect
+
+```python
+MatrixEffect(
+    effect_type: FirmwareEffect,
+    speed: int,
+    duration: int = 0,
+    palette: list[HSBK] | None = None,
+    sky_type: TileEffectSkyType = SUNRISE,
+    cloud_saturation_min: int = 0,
+    cloud_saturation_max: int = 0,
+)
+```
+
+Matrix effect configuration.
+
+| ATTRIBUTE              | DESCRIPTION                                                             |
+| ---------------------- | ----------------------------------------------------------------------- |
+| `effect_type`          | Type of effect (OFF, MORPH, FLAME, SKY) **TYPE:** `FirmwareEffect`      |
+| `speed`                | Effect speed in milliseconds **TYPE:** `int`                            |
+| `duration`             | Total effect duration in nanoseconds (0 for infinite) **TYPE:** `int`   |
+| `palette`              | Color palette for the effect (max 16 colors) **TYPE:** \`list[HSBK]     |
+| `sky_type`             | Sky effect type (SUNRISE, SUNSET, CLOUDS) **TYPE:** `TileEffectSkyType` |
+| `cloud_saturation_min` | Minimum cloud saturation (0-255, for CLOUDS sky type) **TYPE:** `int`   |
+| `cloud_saturation_max` | Maximum cloud saturation (0-255, for CLOUDS sky type) **TYPE:** `int`   |
 
 ## Ceiling Light
 
@@ -18910,6 +19908,32 @@ def __eq__(self, other: object) -> bool:
         return False
     return self.serial == other.serial
 ```
+
+### DiscoveryResponse
+
+Response dataclass from custom discovery broadcasts (using packets other than GetService).
+
+#### DiscoveryResponse
+
+```python
+DiscoveryResponse(
+    serial: str,
+    ip: str,
+    port: int,
+    response_time: float,
+    response_payload: dict[str, Any],
+)
+```
+
+Response from a discovery broadcast using a custom packet.
+
+| ATTRIBUTE          | DESCRIPTION                                                               |
+| ------------------ | ------------------------------------------------------------------------- |
+| `serial`           | Device serial number **TYPE:** `str`                                      |
+| `ip`               | Device IP address **TYPE:** `str`                                         |
+| `port`             | Device UDP port **TYPE:** `int`                                           |
+| `response_time`    | Response time in seconds **TYPE:** `float`                                |
+| `response_payload` | Unpacked State packet fields as key/value dict **TYPE:** `dict[str, Any]` |
 
 ## UDP Transport
 
