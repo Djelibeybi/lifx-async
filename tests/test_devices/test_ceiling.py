@@ -807,22 +807,48 @@ class TestCeilingLightBackwardCompatibility:
         """Create a Ceiling product 176 instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._save_state_to_file = MagicMock()
+
+        # Mock version for product detection
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
         return ceiling
 
     async def test_set_color_affects_both_components(
         self, ceiling_176: CeilingLight
     ) -> None:
-        """Test inherited set_color affects both uplight and downlight."""
+        """Test set_color calls parent and updates component state tracking."""
         color = HSBK(hue=180, saturation=0.8, brightness=1.0, kelvin=5000)
-
-        # Mock the parent set_color method
-        ceiling_176.set_matrix_colors = AsyncMock()
 
         await ceiling_176.set_color(color)
 
-        # Verify set_color was called (from parent class)
-        # This would set all zones including both components
+        # Verify parent set_color was called (via connection.request)
         assert ceiling_176.connection.request.called
+
+        # Verify uplight state was updated
+        assert ceiling_176._last_uplight_color == color
+        assert ceiling_176._stored_uplight_state == color
+
+        # Verify downlight state was updated (63 zones for product 176)
+        assert ceiling_176._last_downlight_colors == [color] * 63
+        assert ceiling_176._stored_downlight_state == [color] * 63
+
+        # Verify state was NOT persisted (no state_file configured)
+        ceiling_176._save_state_to_file.assert_not_called()
+
+    async def test_set_color_persists_state_when_file_configured(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test set_color persists state when state_file is configured."""
+        color = HSBK(hue=180, saturation=0.8, brightness=1.0, kelvin=5000)
+
+        # Enable state file persistence
+        ceiling_176._state_file = "/tmp/test_state.json"
+
+        await ceiling_176.set_color(color)
+
+        # Verify state was persisted
+        ceiling_176._save_state_to_file.assert_called_once()
 
     async def test_matrixlight_methods_still_work(
         self, ceiling_176: CeilingLight
