@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.7.4 (2025-12-16)
+
+### Performance Improvements
+
+- **devices**: Reduce get_all_tile_colors calls in CeilingLight
+  ([`3936158`](https://github.com/Djelibeybi/lifx-async/commit/39361582856fcde57f30f052b8286f0bbb695f67))
+
+
 ## v4.7.3 (2025-12-16)
 
 ### Bug Fixes
