@@ -18454,9 +18454,15 @@ async def refresh_state(self) -> None:
     """
     await super().refresh_state()
 
-    # Get ceiling component colors
-    uplight_color = await self.get_uplight_color()
-    downlight_colors = await self.get_downlight_colors()
+    # Extract ceiling component colors from already-fetched tile_colors
+    # (parent refresh_state already called get_all_tile_colors)
+    tile_colors = self._state.tile_colors
+    uplight_color = tile_colors[self.uplight_zone]
+    downlight_colors = list(tile_colors[self.downlight_zones])
+
+    # Cache for is_on properties
+    self._last_uplight_color = uplight_color
+    self._last_downlight_colors = downlight_colors
 
     # Update ceiling-specific state fields
     state = cast(CeilingLightState, self._state)
@@ -18786,6 +18792,8 @@ turn_uplight_on(color: HSBK | None = None, duration: float = 0.0) -> None
 
 Turn uplight component on.
 
+If the entire light is off, this will set the color instantly and then turn on the light with the specified duration, so the light fades to the target color instead of flashing to its previous state.
+
 | PARAMETER  | DESCRIPTION                                                                                                                                          |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `color`    | Optional HSBK color. If provided: - Uses this color immediately - Updates stored state If None, uses brightness determination logic **TYPE:** \`HSBK |
@@ -18804,6 +18812,10 @@ async def turn_uplight_on(
 ) -> None:
     """Turn uplight component on.
 
+    If the entire light is off, this will set the color instantly and then
+    turn on the light with the specified duration, so the light fades to
+    the target color instead of flashing to its previous state.
+
     Args:
         color: Optional HSBK color. If provided:
             - Uses this color immediately
@@ -18815,14 +18827,61 @@ async def turn_uplight_on(
         ValueError: If color.brightness == 0
         LifxTimeoutError: Device did not respond
     """
-    if color is not None:
-        if color.brightness == 0:
-            raise ValueError("Cannot turn on uplight with brightness=0")
-        await self.set_uplight_color(color, duration)
+    # Validate provided color early
+    if color is not None and color.brightness == 0:
+        raise ValueError("Cannot turn on uplight with brightness=0")
+
+    # Check if light is off first to determine which path to take
+    if await self.get_power() == 0:
+        # Light is off - single fetch for both determining color and modification
+        all_colors = await self.get_all_tile_colors()
+        tile_colors = all_colors[0]
+
+        # Determine target color (pass pre-fetched colors to avoid extra fetch)
+        if color is not None:
+            target_color = color
+        else:
+            target_color = await self._determine_uplight_brightness(tile_colors)
+
+        # Store current downlight colors BEFORE zeroing them out
+        # This allows turn_downlight_on() to restore them later
+        downlight_colors = tile_colors[self.downlight_zones]
+        self._stored_downlight_state = list(downlight_colors)
+
+        # Set uplight zone to target color
+        tile_colors[self.uplight_zone] = target_color
+
+        # Zero out downlight zones so they stay off when power turns on
+        for i in range(*self.downlight_zones.indices(len(tile_colors))):
+            tile_colors[i] = HSBK(
+                hue=tile_colors[i].hue,
+                saturation=tile_colors[i].saturation,
+                brightness=0.0,
+                kelvin=tile_colors[i].kelvin,
+            )
+
+        # Set all colors instantly (duration=0) while light is off
+        await self.set_matrix_colors(0, tile_colors, duration=0)
+
+        # Update stored state for uplight
+        self._stored_uplight_state = target_color
+        self._last_uplight_color = target_color
+
+        # Turn on with the requested duration - light fades on to target color
+        await super().set_power(True, duration)
+
+        # Persist AFTER device operations complete
+        if self._state_file:
+            self._save_state_to_file()
     else:
-        # Determine color using priority logic
-        determined_color = await self._determine_uplight_brightness()
-        await self.set_uplight_color(determined_color, duration)
+        # Light is already on - determine target color first, then set
+        if color is not None:
+            target_color = color
+        else:
+            target_color = await self._determine_uplight_brightness()
+
+        # set_uplight_color will fetch and modify (single fetch in that method)
+        await self.set_uplight_color(target_color, duration)
 ```
 
 ##### turn_uplight_off
@@ -18868,30 +18927,35 @@ async def turn_uplight_off(
     Note:
         Sets uplight zone brightness to 0 on device while preserving H, S, K.
     """
+    if color is not None and color.brightness == 0:
+        raise ValueError(
+            "Provided color cannot have brightness=0. "
+            "Omit the parameter to use current color."
+        )
+
+    # Fetch current state once and reuse to calculate brightness
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]
+
+    # Determine which color to store
     if color is not None:
-        if color.brightness == 0:
-            raise ValueError(
-                "Provided color cannot have brightness=0. "
-                "Omit the parameter to use current color."
-            )
-        # Store the provided color
-        self._stored_uplight_state = color
+        stored_color = color
     else:
-        # Get and store current color
-        current_color = await self.get_uplight_color()
-        self._stored_uplight_state = current_color
+        stored_color = tile_colors[self.uplight_zone]
+        self._last_uplight_color = stored_color
+
+    # Store for future restoration
+    self._stored_uplight_state = stored_color
 
     # Create color with brightness=0 for device
     off_color = HSBK(
-        hue=self._stored_uplight_state.hue,
-        saturation=self._stored_uplight_state.saturation,
+        hue=stored_color.hue,
+        saturation=stored_color.saturation,
         brightness=0.0,
-        kelvin=self._stored_uplight_state.kelvin,
+        kelvin=stored_color.kelvin,
     )
 
-    # Get all colors and update uplight zone
-    all_colors = await self.get_all_tile_colors()
-    tile_colors = all_colors[0]
+    # Update uplight zone and send immediately
     tile_colors[self.uplight_zone] = off_color
     await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
@@ -18913,6 +18977,8 @@ turn_downlight_on(
 
 Turn downlight component on.
 
+If the entire light is off, this will set the colors instantly and then turn on the light with the specified duration, so the light fades to the target colors instead of flashing to its previous state.
+
 | PARAMETER  | DESCRIPTION                                                                                                                                                                                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `colors`   | Optional colors. Can be: - None: uses brightness determination logic - Single HSBK: sets all downlight zones to same color - List\[HSBK\]: sets each zone individually (must match zone count) If provided, updates stored state. **TYPE:** \`HSBK |
@@ -18932,6 +18998,10 @@ async def turn_downlight_on(
 ) -> None:
     """Turn downlight component on.
 
+    If the entire light is off, this will set the colors instantly and then
+    turn on the light with the specified duration, so the light fades to
+    the target colors instead of flashing to its previous state.
+
     Args:
         colors: Optional colors. Can be:
             - None: uses brightness determination logic
@@ -18945,12 +19015,80 @@ async def turn_downlight_on(
         ValueError: If list length doesn't match downlight zone count
         LifxTimeoutError: Device did not respond
     """
+    # Number of downlight zones equals the uplight zone index
+    # (downlight is zones 0 to uplight_zone-1)
+    downlight_zone_count = self.uplight_zone
+
+    # Validate provided colors early
     if colors is not None:
-        await self.set_downlight_colors(colors, duration)
+        if isinstance(colors, HSBK):
+            if colors.brightness == 0:
+                raise ValueError("Cannot turn on downlight with brightness=0")
+        else:
+            if all(c.brightness == 0 for c in colors):
+                raise ValueError("Cannot turn on downlight with brightness=0")
+            if len(colors) != downlight_zone_count:
+                raise ValueError(
+                    f"Expected {downlight_zone_count} colors for downlight, "
+                    f"got {len(colors)}"
+                )
+
+    # Check if light is off first to determine which path to take
+    if await self.get_power() == 0:
+        # Light is off - single fetch for both determining colors and modification
+        all_colors = await self.get_all_tile_colors()
+        tile_colors = all_colors[0]
+
+        # Determine target colors (pass pre-fetched colors to avoid extra fetch)
+        if colors is not None:
+            if isinstance(colors, HSBK):
+                target_colors = [colors] * downlight_zone_count
+            else:
+                target_colors = list(colors)
+        else:
+            target_colors = await self._determine_downlight_brightness(tile_colors)
+
+        # Store current uplight color BEFORE zeroing it out
+        # This allows turn_uplight_on() to restore it later
+        self._stored_uplight_state = tile_colors[self.uplight_zone]
+
+        # Set downlight zones to target colors
+        tile_colors[self.downlight_zones] = target_colors
+
+        # Zero out uplight zone so it stays off when power turns on
+        uplight_color = tile_colors[self.uplight_zone]
+        tile_colors[self.uplight_zone] = HSBK(
+            hue=uplight_color.hue,
+            saturation=uplight_color.saturation,
+            brightness=0.0,
+            kelvin=uplight_color.kelvin,
+        )
+
+        # Set all colors instantly (duration=0) while light is off
+        await self.set_matrix_colors(0, tile_colors, duration=0)
+
+        # Update stored state for downlight
+        self._stored_downlight_state = target_colors
+        self._last_downlight_colors = target_colors
+
+        # Turn on with the requested duration - light fades on to target colors
+        await super().set_power(True, duration)
+
+        # Persist AFTER device operations complete
+        if self._state_file:
+            self._save_state_to_file()
     else:
-        # Determine colors using priority logic
-        determined_colors = await self._determine_downlight_brightness()
-        await self.set_downlight_colors(determined_colors, duration)
+        # Light is already on - determine target colors first, then set
+        if colors is not None:
+            if isinstance(colors, HSBK):
+                target_colors = [colors] * downlight_zone_count
+            else:
+                target_colors = list(colors)
+        else:
+            target_colors = await self._determine_downlight_brightness()
+
+        # set_downlight_colors will fetch and modify (single fetch in that method)
+        await self.set_downlight_colors(target_colors, duration)
 ```
 
 ##### set_power
@@ -19037,20 +19175,26 @@ async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
     else:
         raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
-    # If turning off, capture current colors for both components
+    # If turning off, capture current colors for both components with single fetch
     if turning_off:
-        # Always capture colors - even if brightness is 0, the hue/sat/kelvin
-        # are still useful for turn_on. Brightness will be determined at
-        # turn-on time using the standard inference logic.
-        self._stored_uplight_state = await self.get_uplight_color()
-        self._stored_downlight_state = await self.get_downlight_colors()
+        # Single fetch to capture both uplight and downlight colors
+        all_colors = await self.get_all_tile_colors()
+        tile_colors = all_colors[0]
 
-        # Persist if enabled
-        if self._state_file:
-            self._save_state_to_file()
+        # Extract and store both component colors
+        self._stored_uplight_state = tile_colors[self.uplight_zone]
+        self._stored_downlight_state = list(tile_colors[self.downlight_zones])
+
+        # Also update cache for is_on properties
+        self._last_uplight_color = self._stored_uplight_state
+        self._last_downlight_colors = self._stored_downlight_state
 
     # Call parent to perform actual power change
     await super().set_power(level, duration)
+
+    # Persist AFTER device operation completes
+    if turning_off and self._state_file:
+        self._save_state_to_file()
 ````
 
 ##### turn_downlight_off
@@ -19104,15 +19248,16 @@ async def turn_downlight_off(
     """
     expected_count = len(range(*self.downlight_zones.indices(256)))
 
+    # Validate provided colors early (before fetching)
+    stored_colors: list[HSBK] | None = None
     if colors is not None:
-        # Validate and normalize provided colors
         if isinstance(colors, HSBK):
             if colors.brightness == 0:
                 raise ValueError(
                     "Provided color cannot have brightness=0. "
                     "Omit the parameter to use current colors."
                 )
-            colors_to_store = [colors] * expected_count
+            stored_colors = [colors] * expected_count
         else:
             if all(c.brightness == 0 for c in colors):
                 raise ValueError(
@@ -19124,13 +19269,19 @@ async def turn_downlight_off(
                     f"Expected {expected_count} colors for downlight, "
                     f"got {len(colors)}"
                 )
-            colors_to_store = colors
+            stored_colors = list(colors)
 
-        self._stored_downlight_state = colors_to_store
-    else:
-        # Get and store current colors
-        current_colors = await self.get_downlight_colors()
-        self._stored_downlight_state = current_colors
+    # Fetch current state once and reuse to calculate brightness
+    all_colors = await self.get_all_tile_colors()
+    tile_colors = all_colors[0]
+
+    # If colors not provided, extract from fetched data
+    if stored_colors is None:
+        stored_colors = list(tile_colors[self.downlight_zones])
+        self._last_downlight_colors = stored_colors
+
+    # Store for future restoration
+    self._stored_downlight_state = stored_colors
 
     # Create colors with brightness=0 for device
     off_colors = [
@@ -19140,12 +19291,10 @@ async def turn_downlight_off(
             brightness=0.0,
             kelvin=c.kelvin,
         )
-        for c in self._stored_downlight_state
+        for c in stored_colors
     ]
 
-    # Get all colors and update downlight zones
-    all_colors = await self.get_all_tile_colors()
-    tile_colors = all_colors[0]
+    # Update downlight zones and send immediately
     tile_colors[self.downlight_zones] = off_colors
     await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
