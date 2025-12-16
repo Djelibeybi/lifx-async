@@ -122,9 +122,11 @@ class TestShufflePoints:
     def test_shuffle_preserves_point_count(self) -> None:
         """Test that shuffle_points preserves number of points."""
         canvas = Canvas()
+        # Use points spaced far apart (10 units) to avoid collision after shuffle.
+        # shuffle_point() moves each point by ±3, so points 7+ apart can't collide.
         canvas[(0, 0)] = Colors.RED
-        canvas[(5, 5)] = Colors.GREEN
-        canvas[(10, 10)] = Colors.BLUE
+        canvas[(10, 10)] = Colors.GREEN
+        canvas[(20, 20)] = Colors.BLUE
 
         original_count = len(canvas.points)
         canvas.shuffle_points()
