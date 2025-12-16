@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.7.5 (2025-12-16)
+
+### Bug Fixes
+
+- **devices**: Override set_color in CeilingLight to track component state ([`0d20563`](https://github.com/Djelibeybi/lifx-async/commit/0d20563c170363229ab17620398283bd85ee7829))
+
 ## v4.7.4 (2025-12-16)
 
 ### Performance Improvements
