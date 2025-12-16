@@ -1444,32 +1444,27 @@ class TestCeilingLightBrightnessInference:
         ceiling._version.product = 176
         return ceiling
 
-    async def test_determine_uplight_brightness_exception_fallback(
+    async def test_determine_uplight_brightness_zero_downlight_fallback(
         self, ceiling_176: CeilingLight
     ) -> None:
-        """Test _determine_uplight_brightness falls back to default on exception."""
+        """Test _determine_uplight_brightness falls back when downlights are off."""
         ceiling_176._stored_uplight_state = None
 
-        # First call returns current uplight, second call raises
+        # All downlights have brightness=0, uplight has target H, S, K
         uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
-        call_count = 0
+        # Downlights all off (brightness=0)
+        off_downlights = [
+            HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500) for _ in range(63)
+        ]
 
         async def mock_get_all_tile_colors() -> list[list[HSBK]]:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                # Return current state for get_uplight_color
-                white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
-                return [[white] * 63 + [uplight_color]]
-            else:
-                # Raise exception on second call (get_downlight_colors)
-                raise Exception("Network error")
+            return [off_downlights + [uplight_color]]
 
         ceiling_176.get_all_tile_colors = mock_get_all_tile_colors
 
         result = await ceiling_176._determine_uplight_brightness()
 
-        # Should fall back to default brightness (0.8)
+        # Should fall back to default brightness (0.8) since downlight avg is 0
         assert result.brightness == pytest.approx(0.8, abs=0.01)
         assert result.hue == pytest.approx(30, abs=1)
         assert result.kelvin == 2700
@@ -1672,15 +1667,17 @@ class TestCeilingLightSetPowerOverride:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test set_power(False) captures uplight color before turning off."""
-        # Setup: uplight is on with a specific color
+        # Setup: uplight is on with a specific color (zone 63)
         uplight_color = HSBK(hue=120, saturation=0.8, brightness=0.75, kelvin=4000)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
 
-        # Downlight is off (brightness=0) but still has hue/sat/kelvin
+        # Downlight is off (brightness=0) but still has hue/sat/kelvin (zones 0-62)
         downlight_off = [
             HSBK(hue=200, saturation=0.5, brightness=0.0, kelvin=3500)
-        ] * 16
-        ceiling_176.get_downlight_colors = AsyncMock(return_value=downlight_off)
+        ] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_off + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         # Mock the parent set_power call
         with patch.object(
@@ -1702,15 +1699,17 @@ class TestCeilingLightSetPowerOverride:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test set_power(False) captures downlight colors before turning off."""
-        # Setup: uplight is off (brightness=0) but still has hue/sat/kelvin
+        # Setup: uplight is off (brightness=0) but still has hue/sat/kelvin (zone 63)
         uplight_off = HSBK(hue=60, saturation=0.3, brightness=0.0, kelvin=3500)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_off)
 
-        # Downlight is on with specific colors
+        # Downlight is on with specific colors (zones 0-62)
         downlight_colors = [
             HSBK(hue=240, saturation=1.0, brightness=0.9, kelvin=3500)
-        ] * 16
-        ceiling_176.get_downlight_colors = AsyncMock(return_value=downlight_colors)
+        ] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_off]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         with patch.object(
             MatrixLight, "set_power", new_callable=AsyncMock
@@ -1727,12 +1726,14 @@ class TestCeilingLightSetPowerOverride:
     ) -> None:
         """Test set_power(False) captures both components when both are on."""
         uplight_color = HSBK(hue=60, saturation=0.5, brightness=1.0, kelvin=5000)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
 
         downlight_colors = [
             HSBK(hue=180, saturation=0.7, brightness=0.8, kelvin=4000)
-        ] * 16
-        ceiling_176.get_downlight_colors = AsyncMock(return_value=downlight_colors)
+        ] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         with patch.object(
             MatrixLight, "set_power", new_callable=AsyncMock
@@ -1747,10 +1748,11 @@ class TestCeilingLightSetPowerOverride:
     async def test_set_power_off_with_duration(self, ceiling_176: CeilingLight) -> None:
         """Test set_power(False) passes duration to parent."""
         uplight_color = HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
-        ceiling_176.get_downlight_colors = AsyncMock(
-            return_value=[HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 16
-        )
+        downlight_colors = [HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         with patch.object(
             MatrixLight, "set_power", new_callable=AsyncMock
@@ -1786,12 +1788,14 @@ class TestCeilingLightSetPowerOverride:
     async def test_set_power_with_integer_off(self, ceiling_176: CeilingLight) -> None:
         """Test set_power(0) captures colors (integer form)."""
         uplight_color = HSBK(hue=300, saturation=0.9, brightness=0.6, kelvin=3000)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
 
         downlight_colors = [
             HSBK(hue=180, saturation=0.5, brightness=0.0, kelvin=3500)
-        ] * 16
-        ceiling_176.get_downlight_colors = AsyncMock(return_value=downlight_colors)
+        ] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         with patch.object(
             MatrixLight, "set_power", new_callable=AsyncMock
@@ -1832,10 +1836,11 @@ class TestCeilingLightSetPowerOverride:
         ceiling_176._state_file = "/tmp/test_state.json"
 
         uplight_color = HSBK(hue=45, saturation=0.3, brightness=0.7, kelvin=4500)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
-        ceiling_176.get_downlight_colors = AsyncMock(
-            return_value=[HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 16
-        )
+        downlight_colors = [HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
             await ceiling_176.set_power(False)
@@ -1850,10 +1855,11 @@ class TestCeilingLightSetPowerOverride:
         ceiling_176._save_state_to_file.reset_mock()
 
         uplight_color = HSBK(hue=45, saturation=0.3, brightness=0.7, kelvin=4500)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
-        ceiling_176.get_downlight_colors = AsyncMock(
-            return_value=[HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 16
-        )
+        downlight_colors = [HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
             await ceiling_176.set_power(False)
@@ -1864,12 +1870,15 @@ class TestCeilingLightSetPowerOverride:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test workflow: set_power(off) -> turn_uplight_on() restores color."""
-        # Initial uplight color before turning off
+        # Initial uplight color before turning off (zone 63)
         uplight_color = HSBK(hue=120, saturation=0.8, brightness=0.75, kelvin=4000)
-        ceiling_176.get_uplight_color = AsyncMock(return_value=uplight_color)
-        ceiling_176.get_downlight_colors = AsyncMock(
-            return_value=[HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 16
-        )
+
+        # Downlight colors (zones 0-62)
+        downlight_colors = [HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 63
+
+        # Build full tile_colors array: 63 downlight zones + 1 uplight zone
+        tile_colors = downlight_colors + [uplight_color]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
 
         # Turn off entire light
         with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
@@ -1881,3 +1890,347 @@ class TestCeilingLightSetPowerOverride:
         # Now _determine_uplight_brightness should return stored color
         # (simulate what turn_uplight_on() would do)
         assert ceiling_176._stored_uplight_state.brightness > 0
+
+
+class TestCeilingLightTurnOnPowerBehavior:
+    """Test turn_uplight_on/turn_downlight_on turn on power if light is off."""
+
+    @pytest.fixture
+    def ceiling_176(self) -> CeilingLight:
+        """Create a Ceiling product 176 (8x8) instance with mocked connection."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling.set_matrix_colors = AsyncMock()
+        ceiling._save_state_to_file = MagicMock()
+
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        default_tile_colors = [white] * 64
+        ceiling.get_all_tile_colors = AsyncMock(return_value=[default_tile_colors])
+
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    async def test_turn_uplight_on_sets_color_instantly_then_powers_on(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When light is off, set color with duration=0, then power on with duration."""
+        # Light is off (power = 0)
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_uplight_on(color, duration=2.5)
+
+            # set_power called with the user's duration to fade on
+            mock_set_power.assert_called_once_with(True, 2.5)
+
+        # set_matrix_colors called with duration=0 (instant) for the color
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        # Duration is in milliseconds in set_matrix_colors
+        duration = call_args.kwargs.get("duration") or call_args[1].get("duration")
+        assert duration == 0
+
+    async def test_turn_uplight_on_skips_power_when_already_on(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When light is on, set_power is NOT called, color uses provided duration."""
+        # Light is already on (power = 65535)
+        ceiling_176.get_power = AsyncMock(return_value=65535)
+        color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_uplight_on(color, duration=1.5)
+
+            # set_power NOT called when light is already on
+            mock_set_power.assert_not_called()
+
+        # set_matrix_colors called with the user's duration (1500ms)
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        duration = call_args.kwargs.get("duration") or call_args[1].get("duration")
+        assert duration == 1500
+
+    async def test_turn_uplight_on_default_duration_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When light is off with no duration, set_power called with 0.0."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_uplight_on(color)
+
+            mock_set_power.assert_called_once_with(True, 0.0)
+
+    async def test_turn_downlight_on_sets_colors_instantly_then_powers_on(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When off, set colors with duration=0, then power on with duration."""
+        # Light is off (power = 0)
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_downlight_on(color, duration=2.5)
+
+            # set_power called with the user's duration to fade on
+            mock_set_power.assert_called_once_with(True, 2.5)
+
+        # set_matrix_colors called with duration=0 (instant) for the colors
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        duration = call_args.kwargs.get("duration") or call_args[1].get("duration")
+        assert duration == 0
+
+    async def test_turn_downlight_on_skips_power_when_already_on(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When light is on, set_power is NOT called, colors use provided duration."""
+        # Light is already on (power = 65535)
+        ceiling_176.get_power = AsyncMock(return_value=65535)
+        color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_downlight_on(color, duration=1.5)
+
+            # set_power NOT called when light is already on
+            mock_set_power.assert_not_called()
+
+        # set_matrix_colors called with the user's duration (1500ms)
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        duration = call_args.kwargs.get("duration") or call_args[1].get("duration")
+        assert duration == 1500
+
+    async def test_turn_downlight_on_default_duration_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When light is off with no duration, set_power called with 0.0."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_downlight_on(color)
+
+            mock_set_power.assert_called_once_with(True, 0.0)
+
+    async def test_turn_uplight_on_without_color_turns_on_power_when_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_uplight_on without explicit color still turns on power when off."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        # Mock _determine_uplight_brightness to return a color
+        determined_color = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        ceiling_176._determine_uplight_brightness = AsyncMock(
+            return_value=determined_color
+        )
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_uplight_on()
+
+            mock_set_power.assert_called_once_with(True, 0.0)
+
+    async def test_turn_downlight_on_without_colors_turns_on_power_when_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_on without colors still turns on power when off."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        # Mock _determine_downlight_brightness to return colors
+        # Product 176 has 64 zones: 1 uplight (index 0) + 63 downlight (indices 1-63)
+        determined_colors = [
+            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        ] * 63
+        ceiling_176._determine_downlight_brightness = AsyncMock(
+            return_value=determined_colors
+        )
+
+        with patch.object(
+            MatrixLight, "set_power", new_callable=AsyncMock
+        ) as mock_set_power:
+            await ceiling_176.turn_downlight_on()
+
+            mock_set_power.assert_called_once_with(True, 0.0)
+
+    async def test_turn_uplight_on_zeros_downlight_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When turning uplight on from off state, downlight zones are zeroed."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        uplight_color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        # Create tile colors with non-zero downlight
+        downlight_color = HSBK(hue=60, saturation=0.5, brightness=0.6, kelvin=4000)
+        tile_colors = [downlight_color] * 63 + [
+            HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)
+        ]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_uplight_on(uplight_color)
+
+        # Verify set_matrix_colors was called
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        sent_colors = call_args[0][1]  # Second positional arg is the colors
+
+        # Uplight zone (63) should have the target color
+        assert sent_colors[63] == uplight_color
+
+        # All downlight zones (0-62) should be zeroed (brightness=0)
+        for i in range(63):
+            assert sent_colors[i].brightness == 0.0
+
+    async def test_turn_uplight_on_stores_downlight_colors_before_zeroing(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When turning uplight on, stores downlight colors for later restoration."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        uplight_color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        # Create tile colors with specific downlight colors
+        downlight_color = HSBK(hue=60, saturation=0.5, brightness=0.6, kelvin=4000)
+        tile_colors = [downlight_color] * 63 + [
+            HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)
+        ]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_uplight_on(uplight_color)
+
+        # Verify downlight colors were stored
+        assert ceiling_176._stored_downlight_state is not None
+        assert len(ceiling_176._stored_downlight_state) == 63
+        assert all(c == downlight_color for c in ceiling_176._stored_downlight_state)
+
+    async def test_turn_downlight_on_zeros_uplight_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When turning downlight on from off state, uplight zone is zeroed."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        downlight_color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        # Create tile colors with non-zero uplight
+        uplight_color = HSBK(hue=60, saturation=0.5, brightness=0.6, kelvin=4000)
+        tile_colors = [HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)] * 63 + [
+            uplight_color
+        ]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_downlight_on(downlight_color)
+
+        # Verify set_matrix_colors was called
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        sent_colors = call_args[0][1]  # Second positional arg is the colors
+
+        # All downlight zones (0-62) should have the target color
+        for i in range(63):
+            assert sent_colors[i] == downlight_color
+
+        # Uplight zone (63) should be zeroed (brightness=0)
+        assert sent_colors[63].brightness == 0.0
+
+    async def test_turn_downlight_on_stores_uplight_color_before_zeroing(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """When turning downlight on, stores uplight color for later restoration."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        downlight_color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        # Create tile colors with specific uplight color
+        uplight_color = HSBK(hue=60, saturation=0.5, brightness=0.6, kelvin=4000)
+        tile_colors = [HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)] * 63 + [
+            uplight_color
+        ]
+        ceiling_176.get_all_tile_colors = AsyncMock(return_value=[tile_colors])
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_downlight_on(downlight_color)
+
+        # Verify uplight color was stored
+        assert ceiling_176._stored_uplight_state == uplight_color
+
+    async def test_turn_downlight_on_uses_default_brightness_after_uplight_on(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Stored brightness=0 colors are skipped; brightness is inferred instead."""
+        # Simulate: device was off, user called turn_uplight_on which stored
+        # downlight colors with brightness=0
+        ceiling_176._stored_downlight_state = [
+            HSBK(hue=60, saturation=0.5, brightness=0.0, kelvin=4000)
+        ] * 63
+
+        # Now light is on (after turn_uplight_on)
+        ceiling_176.get_power = AsyncMock(return_value=65535)
+
+        # Mock get_uplight_color to return the uplight that's now on
+        ceiling_176.get_uplight_color = AsyncMock(
+            return_value=HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+        )
+
+        # Call turn_downlight_on without explicit colors
+        await ceiling_176.turn_downlight_on()
+
+        # Verify set_matrix_colors was called
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        sent_colors = call_args[0][1]
+
+        # All downlight zones should have brightness > 0 (inferred from uplight)
+        for i in range(63):
+            assert sent_colors[i].brightness > 0, f"Zone {i} has brightness=0"
+            # Should preserve H, S, K from stored state
+            assert sent_colors[i].hue == 60
+            assert sent_colors[i].saturation == 0.5
+            assert sent_colors[i].kelvin == 4000
+
+    async def test_turn_uplight_on_uses_default_brightness_after_downlight_on(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Stored brightness=0 color is skipped; brightness is inferred instead."""
+        # Simulate: device was off, user called turn_downlight_on which stored
+        # uplight color with brightness=0
+        ceiling_176._stored_uplight_state = HSBK(
+            hue=60, saturation=0.5, brightness=0.0, kelvin=4000
+        )
+
+        # Now light is on (after turn_downlight_on)
+        ceiling_176.get_power = AsyncMock(return_value=65535)
+
+        # Mock get_downlight_colors to return downlights that are now on
+        ceiling_176.get_downlight_colors = AsyncMock(
+            return_value=[HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)]
+            * 63
+        )
+
+        # Call turn_uplight_on without explicit color
+        await ceiling_176.turn_uplight_on()
+
+        # Verify set_matrix_colors was called
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        sent_colors = call_args[0][1]
+
+        # Uplight zone (63) should have brightness > 0 (inferred from downlight)
+        assert sent_colors[63].brightness > 0, "Uplight has brightness=0"
+        # Should preserve H, S, K from stored state
+        assert sent_colors[63].hue == 60
+        assert sent_colors[63].saturation == 0.5
+        assert sent_colors[63].kelvin == 4000
