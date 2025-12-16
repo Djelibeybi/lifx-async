@@ -466,24 +466,24 @@ await group.set_color(Colors.BLUE)
 | --------- | ----------------------------------------------------- |
 | `devices` | List of Device instances **TYPE:** \`Sequence\[Device |
 
-| METHOD                      | DESCRIPTION                                        |
-| --------------------------- | -------------------------------------------------- |
-| `__aenter__`                | Enter async context manager.                       |
-| `__aexit__`                 | Exit async context manager.                        |
-| `__iter__`                  | Iterate over devices in the group.                 |
-| `__len__`                   | Get number of devices in the group.                |
-| `__getitem__`               | Get device by index.                               |
-| `set_power`                 | Set power state for all devices in the group.      |
-| `set_color`                 | Set color for all Light devices in the group.      |
-| `set_brightness`            | Set brightness for all Light devices in the group. |
-| `pulse`                     | Pulse effect for all Light devices.                |
-| `organize_by_location`      | Organize devices by location label.                |
-| `organize_by_group`         | Organize devices by group label.                   |
-| `filter_by_location`        | Filter devices to a specific location.             |
-| `filter_by_group`           | Filter devices to a specific group.                |
-| `get_unassigned_devices`    | Get devices without location or group assigned.    |
-| `apply_theme`               | Apply a theme to all devices in the group.         |
-| `invalidate_metadata_cache` | Clear all cached location and group metadata.      |
+| METHOD                      | DESCRIPTION                                                  |
+| --------------------------- | ------------------------------------------------------------ |
+| `__aenter__`                | Enter async context manager.                                 |
+| `__aexit__`                 | Exit async context manager and close all device connections. |
+| `__iter__`                  | Iterate over devices in the group.                           |
+| `__len__`                   | Get number of devices in the group.                          |
+| `__getitem__`               | Get device by index.                                         |
+| `set_power`                 | Set power state for all devices in the group.                |
+| `set_color`                 | Set color for all Light devices in the group.                |
+| `set_brightness`            | Set brightness for all Light devices in the group.           |
+| `pulse`                     | Pulse effect for all Light devices.                          |
+| `organize_by_location`      | Organize devices by location label.                          |
+| `organize_by_group`         | Organize devices by group label.                             |
+| `filter_by_location`        | Filter devices to a specific location.                       |
+| `filter_by_group`           | Filter devices to a specific group.                          |
+| `get_unassigned_devices`    | Get devices without location or group assigned.              |
+| `apply_theme`               | Apply a theme to all devices in the group.                   |
+| `invalidate_metadata_cache` | Clear all cached location and group metadata.                |
 
 | ATTRIBUTE          | DESCRIPTION                                                                    |
 | ------------------ | ------------------------------------------------------------------------------ |
@@ -604,7 +604,7 @@ __aexit__(
 ) -> None
 ```
 
-Exit async context manager.
+Exit async context manager and close all device connections.
 
 Source code in `src/lifx/api.py`
 
@@ -615,8 +615,9 @@ async def __aexit__(
     exc_val: BaseException | None,
     exc_tb: TracebackType | None,
 ) -> None:
-    """Exit async context manager."""
-    pass
+    """Exit async context manager and close all device connections."""
+    for device in self._devices:
+        await device.connection.close()
 ```
 
 ##### __iter__
