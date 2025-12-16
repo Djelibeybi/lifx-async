@@ -1,12 +1,63 @@
 """Integration tests for effects system."""
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from lifx.color import HSBK
 from lifx.effects import Conductor, EffectColorloop, EffectPulse
+
+
+async def wait_for_mock_called(
+    mock: MagicMock, timeout: float = 1.0, poll_interval: float = 0.01
+) -> None:
+    """Wait for a mock to be called, with timeout.
+
+    This is more reliable than fixed sleeps on slow CI systems (especially Windows).
+
+    Args:
+        mock: The mock object to check
+        timeout: Maximum time to wait in seconds
+        poll_interval: Time between checks in seconds
+
+    Raises:
+        AssertionError: If mock was not called within timeout
+    """
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        if mock.call_count > 0:
+            return
+        await asyncio.sleep(poll_interval)
+    raise AssertionError(f"Expected mock to be called within {timeout}s")
+
+
+async def wait_for_effect_complete(
+    conductor: Conductor,
+    light: MagicMock,
+    timeout: float = 2.0,
+    poll_interval: float = 0.05,
+) -> None:
+    """Wait for an effect to complete and be removed from registry.
+
+    This is more reliable than fixed sleeps on slow CI systems (especially Windows).
+
+    Args:
+        conductor: The Conductor instance
+        light: The light to check
+        timeout: Maximum time to wait in seconds
+        poll_interval: Time between checks in seconds
+
+    Raises:
+        AssertionError: If effect was not removed within timeout
+    """
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        if conductor.effect(light) is None:
+            return
+        await asyncio.sleep(poll_interval)
+    raise AssertionError(f"Expected effect to complete within {timeout}s")
 
 
 @pytest.fixture
@@ -114,10 +165,9 @@ async def test_pulse_effect_strobe_mode(conductor, mock_light):
     effect = EffectPulse(mode="strobe", cycles=2, period=0.05)
 
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.02)
 
-    # Verify waveform called
-    mock_light.set_waveform.assert_called()
+    # Use polling instead of fixed sleep - more reliable on slow CI systems
+    await wait_for_mock_called(mock_light.set_waveform, timeout=1.0)
 
     await conductor.stop([mock_light])
 
@@ -306,12 +356,9 @@ async def test_effect_completion_restores_state(conductor, mock_light):
 
     await conductor.start(effect, [mock_light])
 
-    # Wait for effect to complete (period * cycles + buffer)
-    # Give extra time for effect completion and cleanup
-    await asyncio.sleep(0.5)
-
-    # Effect should have completed and been removed from running registry
-    assert conductor.effect(mock_light) is None
+    # Use polling instead of fixed sleep - more reliable on slow CI systems
+    # The effect should complete within ~0.1s but we allow up to 2s for CI variability
+    await wait_for_effect_complete(conductor, mock_light, timeout=2.0)
 
 
 @pytest.mark.asyncio

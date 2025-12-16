@@ -169,8 +169,10 @@ class TestDeviceConnection:
 
             # If truly concurrent, total time should be ~0.1s (one sleep duration)
             # If serialized, it would be ~0.2s (two sleep durations)
-            # Allow some overhead, but verify concurrency
-            assert total_time < 0.15, (
+            # Use generous tolerance (0.19s) to account for CI variability
+            # (especially on macOS where timing can be less precise under load)
+            # Anything under 0.2s proves concurrency since serial would be >= 0.2s
+            assert total_time < 0.19, (
                 f"Requests took too long ({total_time}s), suggesting serialization"
             )
 
