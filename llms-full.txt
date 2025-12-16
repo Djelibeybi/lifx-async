@@ -26128,6 +26128,16 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v4.7.2 (2025-12-16)
+
+### Bug Fixes
+
+- **api**: Close device connections in DeviceGroup context manager ([`054bfee`](https://github.com/Djelibeybi/lifx-async/commit/054bfee88e548d38c1e7c49277d3bb334b55adcc))
+
+### Documentation
+
+- **api**: Add dataclass documentation and improve navigation ([`c859c87`](https://github.com/Djelibeybi/lifx-async/commit/c859c8711335bdf5357412ccf4364075ce0df535))
+
 ## v4.7.1 (2025-12-13)
 
 ### Bug Fixes
