@@ -619,6 +619,65 @@ class CeilingLight(MatrixLight):
             determined_colors = await self._determine_downlight_brightness()
             await self.set_downlight_colors(determined_colors, duration)
 
+    async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
+        """Set light power state, capturing component colors before turning off.
+
+        Overrides Light.set_power() to capture the current uplight and downlight
+        colors before turning off the entire light. This allows subsequent calls
+        to turn_uplight_on() or turn_downlight_on() to restore the colors that
+        were active just before the light was turned off.
+
+        The captured colors preserve hue, saturation, and kelvin values even if
+        a component was already off (brightness=0). The brightness will be
+        determined at turn-on time using the standard brightness inference logic.
+
+        Args:
+            level: True/65535 to turn on, False/0 to turn off
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If integer value is not 0 or 65535
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
+        Example:
+            ```python
+            # Turn off entire ceiling light (captures colors for later)
+            await ceiling.set_power(False)
+
+            # Later, turn on just the uplight with its previous color
+            await ceiling.turn_uplight_on()
+
+            # Or turn on just the downlight with its previous colors
+            await ceiling.turn_downlight_on()
+            ```
+        """
+        # Determine if we're turning off
+        if isinstance(level, bool):
+            turning_off = not level
+        elif isinstance(level, int):
+            if level not in (0, 65535):
+                raise ValueError(f"Power level must be 0 or 65535, got {level}")
+            turning_off = level == 0
+        else:
+            raise TypeError(f"Expected bool or int, got {type(level).__name__}")
+
+        # If turning off, capture current colors for both components
+        if turning_off:
+            # Always capture colors - even if brightness is 0, the hue/sat/kelvin
+            # are still useful for turn_on. Brightness will be determined at
+            # turn-on time using the standard inference logic.
+            self._stored_uplight_state = await self.get_uplight_color()
+            self._stored_downlight_state = await self.get_downlight_colors()
+
+            # Persist if enabled
+            if self._state_file:
+                self._save_state_to_file()
+
+        # Call parent to perform actual power change
+        await super().set_power(level, duration)
+
     async def turn_downlight_off(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
     ) -> None:
