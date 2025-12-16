@@ -348,6 +348,22 @@ class CeilingLight(MatrixLight):
         return layout.downlight_zones
 
     @property
+    def downlight_zone_count(self) -> int:
+        """Number of downlight zones.
+
+        Returns:
+            Zone count (63 for standard 8x8, 127 for Capsule 16x8)
+
+        Raises:
+            LifxError: If device version is not available or not a Ceiling product
+        """
+        # downlight_zones is slice(0, N), so stop equals the count
+        stop = self.downlight_zones.stop
+        if stop is None:
+            raise LifxError("Invalid downlight zones configuration")
+        return stop
+
+    @property
     def uplight_is_on(self) -> bool:
         """True if uplight component is currently on.
 
@@ -496,7 +512,7 @@ class CeilingLight(MatrixLight):
                     "Cannot set downlight color with brightness=0. "
                     "Use turn_downlight_off() instead."
                 )
-            downlight_colors = [colors] * len(range(*self.downlight_zones.indices(256)))
+            downlight_colors = [colors] * self.downlight_zone_count
         else:
             if all(c.brightness == 0 for c in colors):
                 raise ValueError(
@@ -504,10 +520,10 @@ class CeilingLight(MatrixLight):
                     "Use turn_downlight_off() instead."
                 )
 
-            expected_count = len(range(*self.downlight_zones.indices(256)))
-            if len(colors) != expected_count:
+            if len(colors) != self.downlight_zone_count:
                 raise ValueError(
-                    f"Expected {expected_count} colors for downlight, got {len(colors)}"
+                    f"Expected {self.downlight_zone_count} colors for downlight, "
+                    f"got {len(colors)}"
                 )
             downlight_colors = colors
 
@@ -684,10 +700,6 @@ class CeilingLight(MatrixLight):
             ValueError: If list length doesn't match downlight zone count
             LifxTimeoutError: Device did not respond
         """
-        # Number of downlight zones equals the uplight zone index
-        # (downlight is zones 0 to uplight_zone-1)
-        downlight_zone_count = self.uplight_zone
-
         # Validate provided colors early
         if colors is not None:
             if isinstance(colors, HSBK):
@@ -696,9 +708,9 @@ class CeilingLight(MatrixLight):
             else:
                 if all(c.brightness == 0 for c in colors):
                     raise ValueError("Cannot turn on downlight with brightness=0")
-                if len(colors) != downlight_zone_count:
+                if len(colors) != self.downlight_zone_count:
                     raise ValueError(
-                        f"Expected {downlight_zone_count} colors for downlight, "
+                        f"Expected {self.downlight_zone_count} colors for downlight, "
                         f"got {len(colors)}"
                     )
 
@@ -711,7 +723,7 @@ class CeilingLight(MatrixLight):
             # Determine target colors (pass pre-fetched colors to avoid extra fetch)
             if colors is not None:
                 if isinstance(colors, HSBK):
-                    target_colors = [colors] * downlight_zone_count
+                    target_colors = [colors] * self.downlight_zone_count
                 else:
                     target_colors = list(colors)
             else:
@@ -750,7 +762,7 @@ class CeilingLight(MatrixLight):
             # Light is already on - determine target colors first, then set
             if colors is not None:
                 if isinstance(colors, HSBK):
-                    target_colors = [colors] * downlight_zone_count
+                    target_colors = [colors] * self.downlight_zone_count
                 else:
                     target_colors = list(colors)
             else:
@@ -824,6 +836,54 @@ class CeilingLight(MatrixLight):
         if turning_off and self._state_file:
             self._save_state_to_file()
 
+    async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
+        """Set light color, updating component state tracking.
+
+        Overrides Light.set_color() to track the color change in the ceiling
+        light's component state. When set_color() is called, all zones (uplight
+        and downlight) are set to the same color. This override ensures that
+        the cached component colors stay in sync so that subsequent component
+        control methods (like turn_uplight_on or turn_downlight_on) use the
+        correct color values.
+
+        Args:
+            color: HSBK color to set for the entire light
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
+        Example:
+            ```python
+            from lifx.color import HSBK
+
+            # Set entire ceiling light to warm white
+            await ceiling.set_color(
+                HSBK(hue=0, saturation=0, brightness=1.0, kelvin=2700)
+            )
+
+            # Later component control will use this color
+            await ceiling.turn_uplight_off()  # Uplight off
+            await ceiling.turn_uplight_on()  # Restores to warm white
+            ```
+        """
+        # Call parent to perform actual color change
+        await super().set_color(color, duration)
+
+        # Update cached component colors - all zones now have the same color
+        self._last_uplight_color = color
+        self._last_downlight_colors = [color] * self.downlight_zone_count
+
+        # Also update stored state for restoration
+        self._stored_uplight_state = color
+        self._stored_downlight_state = [color] * self.downlight_zone_count
+
+        # Persist if enabled
+        if self._state_file:
+            self._save_state_to_file()
+
     async def turn_downlight_off(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
     ) -> None:
@@ -845,8 +905,6 @@ class CeilingLight(MatrixLight):
         Note:
             Sets all downlight zone brightness to 0 on device while preserving H, S, K.
         """
-        expected_count = len(range(*self.downlight_zones.indices(256)))
-
         # Validate provided colors early (before fetching)
         stored_colors: list[HSBK] | None = None
         if colors is not None:
@@ -856,16 +914,16 @@ class CeilingLight(MatrixLight):
                         "Provided color cannot have brightness=0. "
                         "Omit the parameter to use current colors."
                     )
-                stored_colors = [colors] * expected_count
+                stored_colors = [colors] * self.downlight_zone_count
             else:
                 if all(c.brightness == 0 for c in colors):
                     raise ValueError(
                         "Provided colors cannot have brightness=0. "
                         "Omit the parameter to use current colors."
                     )
-                if len(colors) != expected_count:
+                if len(colors) != self.downlight_zone_count:
                     raise ValueError(
-                        f"Expected {expected_count} colors for downlight, "
+                        f"Expected {self.downlight_zone_count} colors for downlight, "
                         f"got {len(colors)}"
                     )
                 stored_colors = list(colors)
