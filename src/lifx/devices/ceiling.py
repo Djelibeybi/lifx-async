@@ -23,15 +23,12 @@ import logging
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from lifx.color import HSBK
 from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
-
-if TYPE_CHECKING:
-    pass
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -126,8 +126,9 @@ class DeviceGroup:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Exit async context manager."""
-        pass
+        """Exit async context manager and close all device connections."""
+        for device in self._devices:
+            await device.connection.close()
 
     def __iter__(
         self,

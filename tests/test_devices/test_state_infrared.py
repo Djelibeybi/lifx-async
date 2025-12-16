@@ -149,6 +149,7 @@ class TestInfraredLightStateManagement:
         assert infrared_light._state is None
         await infrared_light.refresh_state()  # type: ignore
         assert isinstance(infrared_light.state, InfraredLightState)
+        await infrared_light.close()
 
 
 class TestInfraredAcknowledgementBasedStateUpdates:
