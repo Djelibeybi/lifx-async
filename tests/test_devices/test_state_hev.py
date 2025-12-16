@@ -217,6 +217,7 @@ class TestHevLightStateManagement:
         assert hev_light._state is None
         await hev_light.refresh_state()  # type: ignore
         assert isinstance(hev_light.state, HevLightState)
+        await hev_light.close()
 
 
 class TestHevAcknowledgementBasedStateUpdates:
