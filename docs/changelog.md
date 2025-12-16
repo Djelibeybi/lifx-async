@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.7.3 (2025-12-16)
+
+### Bug Fixes
+
+- **devices**: Capture component colors before set_power turns off light
+  ([`a99abee`](https://github.com/Djelibeybi/lifx-async/commit/a99abeeeb4f6cad1e49410204b8e7a567765b3ed))
+
+
 ## v4.7.2 (2025-12-16)
 
 ### Bug Fixes
