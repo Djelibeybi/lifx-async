@@ -39,6 +39,19 @@ STATE_REFRESH_DEBOUNCE_MS: Final[int] = 300
 DEFAULT_MAX_RETRIES: Final[int] = 8
 
 # ============================================================================
+# mDNS Constants
+# ============================================================================
+
+# mDNS multicast address (IPv4)
+MDNS_ADDRESS: Final[str] = "224.0.0.251"
+
+# mDNS port
+MDNS_PORT: Final[int] = 5353
+
+# LIFX mDNS service type
+LIFX_MDNS_SERVICE: Final[str] = "_lifx._udp.local"
+
+# ============================================================================
 # HSBK Min/Max Values
 # ============================================================================
 

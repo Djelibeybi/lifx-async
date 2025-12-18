@@ -24,6 +24,27 @@ async def main():
 asyncio.run(main())
 ```
 
+**Alternative: mDNS Discovery**
+
+For faster discovery with device type detection in a single query:
+
+```python
+import asyncio
+from lifx import discover_mdns
+
+
+async def main():
+    async for device in discover_mdns():
+        async with device:
+            color, power, label = await device.get_color()
+            print(f"{label}: {type(device).__name__}")
+
+
+asyncio.run(main())
+```
+
+mDNS discovery is faster because it gets device type information directly from the mDNS response, eliminating extra network queries.
+
 ### 2. Control a Light
 
 Turn on the first discovered light, then change its color:

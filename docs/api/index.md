@@ -20,9 +20,14 @@ lifx/
 │   └── matrix.py            # MatrixLight (2D matrix devices: tiles, candle, path)
 ├── network/                  # Network layer
 │   ├── connection.py        # Device connections with lazy opening
-│   ├── discovery.py         # Network device discovery
+│   ├── discovery.py         # Network device discovery (UDP broadcast)
 │   ├── message.py           # Message building and parsing
-│   └── transport.py         # UDP transport
+│   ├── transport.py         # UDP transport
+│   └── mdns/                # mDNS/DNS-SD discovery
+│       ├── discovery.py     # mDNS discovery functions
+│       ├── dns.py           # DNS wire format parser
+│       ├── transport.py     # Multicast UDP transport
+│       └── types.py         # LifxServiceRecord dataclass
 ├── products/                 # Product registry
 │   ├── registry.py          # Auto-generated product database
 │   ├── generator.py         # Generator to download/parse products.json
@@ -43,7 +48,8 @@ lifx/
 
 Main entry points for most users:
 
-- [`discover()`](high-level.md#lifx.api.discover) - Simple device discovery
+- [`discover()`](high-level.md#lifx.api.discover) - Device discovery via UDP broadcast
+- [`discover_mdns()`](high-level.md#lifx.api.discover_mdns) - Device discovery via mDNS (faster)
 - [`find_by_serial()`](high-level.md#lifx.api.find_by_serial) - Find device by serial number
 - [`find_by_label()`](high-level.md#lifx.api.find_by_label) - Find devices by label (exact or substring)
 - [`find_by_ip()`](high-level.md#lifx.api.find_by_ip) - Find device by IP address
@@ -71,7 +77,9 @@ Work with colors:
 
 Low-level network operations:
 
-- [`discover_devices()`](network.md#lifx.network.discovery.discover_devices) - Low-level discovery
+- [`discover_devices()`](network.md#lifx.network.discovery.discover_devices) - Low-level UDP discovery
+- [`discover_lifx_services()`](network.md#lifx.network.mdns.discover_lifx_services) - Low-level mDNS discovery
+- [`LifxServiceRecord`](network.md#lifx.network.mdns.LifxServiceRecord) - mDNS service record
 - [`DeviceConnection`](network.md#lifx.network.connection.DeviceConnection) - Device connections
 
 ### Products Registry

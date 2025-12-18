@@ -122,6 +122,11 @@ uv run mkdocs gh-deploy
    - `discovery.py`: Device discovery via broadcast with `DiscoveredDevice` dataclass
    - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
+   - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
+     - `discovery.py`: `discover_lifx_services()` and `discover_devices_mdns()`
+     - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
+     - `transport.py`: `MdnsTransport` class for multicast UDP
+     - `types.py`: `LifxServiceRecord` dataclass
    - Lazy connection opening (auto-opens on first request)
 
 3. **Device Layer** (`src/lifx/devices/`)
@@ -136,7 +141,8 @@ uv run mkdocs gh-deploy
 
 4. **High-Level API** (`src/lifx/api.py`)
 
-   - `discover()`: Async generator yielding devices as they're discovered
+   - `discover()`: Async generator yielding devices via UDP broadcast
+   - `discover_mdns()`: Async generator yielding devices via mDNS (faster, single query)
    - `find_by_serial()`: Find specific device by serial number
    - `find_by_label()`: Async generator yielding devices matching label (exact or substring)
    - `find_by_ip()`: Find device by IP address using targeted broadcast
@@ -616,9 +622,9 @@ The `discover_devices()` function implements DoS protection through:
 
 ## Testing Strategy
 
-- **768 tests total** (comprehensive coverage across all layers)
+- **1075+ tests total** (comprehensive coverage across all layers)
 - **Protocol Layer**: 136 tests (serialization, header, packets, generator validation)
-- **Network Layer**: 86 tests (transport, discovery, connection, message, async generator requests)
+- **Network Layer**: 149 tests (transport, discovery, connection, message, mDNS, async generator requests)
 - **Device Layer**: 157 tests (base, light, hev, infrared, multizone, tile)
 - **API Layer**: 60 tests (discovery, batch operations, organization, themes, error handling)
 - **Utilities**: 329 tests (color conversion, product registry, RGB roundtrip, effects, themes)
@@ -675,7 +681,11 @@ tests/
 │   ├── test_discovery_errors.py     # Discovery error handling tests
 │   ├── test_connection.py       # Connection management tests
 │   ├── test_message.py          # Message building/parsing tests
-│   └── test_concurrent_requests.py  # Concurrent request tests
+│   ├── test_concurrent_requests.py  # Concurrent request tests
+│   └── test_mdns/               # mDNS discovery tests
+│       ├── test_dns.py          # DNS parser tests
+│       ├── test_transport.py    # mDNS transport tests
+│       └── test_discovery.py    # mDNS discovery tests
 ├── test_devices/
 │   ├── test_base.py             # Base device tests
 │   ├── test_light.py            # Light device tests
@@ -791,6 +801,11 @@ Critical constants are defined in `src/lifx/const.py`:
 - `LIFX_VENDOR_PREFIX`: LIFX vendor serial prefix (d0:73:d5) for device fingerprinting
 - `MAX_RESPONSE_TIME`: Maximum response time for local network devices (0.5s)
 - `IDLE_TIMEOUT_MULTIPLIER`: Idle timeout after last response (4.0)
+
+**mDNS Constants:**
+- `MDNS_ADDRESS`: Multicast address for mDNS (224.0.0.251)
+- `MDNS_PORT`: mDNS port (5353)
+- `LIFX_MDNS_SERVICE`: LIFX service type (_lifx._udp.local)
 
 **UUID Namespaces:**
 - `LIFX_LOCATION_NAMESPACE`: UUID namespace for generating location UUIDs
