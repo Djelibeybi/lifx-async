@@ -803,6 +803,59 @@ async def discover(
             yield device
 
 
+async def discover_mdns(
+    timeout: float = DISCOVERY_TIMEOUT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> AsyncGenerator[Light, None]:
+    """Discover LIFX devices via mDNS and yield them as they are found.
+
+    Uses mDNS/DNS-SD discovery with the _lifx._udp.local service type.
+    This method is faster than broadcast discovery as device type information
+    is included in the mDNS TXT records, eliminating the need for additional
+    device queries.
+
+    Note: mDNS discovery requires the mDNS multicast group (224.0.0.251:5353)
+    to be accessible. Some network configurations may block multicast traffic.
+
+    Args:
+        timeout: Discovery timeout in seconds (default 15.0)
+        max_response_time: Max time to wait for responses
+        idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered devices
+        max_retries: max retries per request set on discovered devices
+
+    Yields:
+        Device instances as they are discovered
+
+    Example:
+        ```python
+        # Process devices as they're discovered
+        async for device in discover_mdns():
+            print(f"Found: {device.serial}")
+            async with device:
+                await device.set_power(True)
+
+        # Or collect all devices first
+        devices = []
+        async for device in discover_mdns():
+            devices.append(device)
+        ```
+    """
+    from lifx.network.mdns.discovery import discover_devices_mdns
+
+    async for device in discover_devices_mdns(
+        timeout=timeout,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+        device_timeout=device_timeout,
+        max_retries=max_retries,
+    ):
+        yield device
+
+
 async def find_by_serial(
     serial: str,
     timeout: float = DISCOVERY_TIMEOUT,
@@ -996,6 +1049,7 @@ __all__ = [
     "LocationGrouping",
     "GroupGrouping",
     "discover",
+    "discover_mdns",
     "find_by_serial",
     "find_by_ip",
     "find_by_label",

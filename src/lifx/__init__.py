@@ -10,6 +10,7 @@ from importlib.metadata import version as get_version
 from lifx.api import (
     DeviceGroup,
     discover,
+    discover_mdns,
     find_by_ip,
     find_by_label,
     find_by_serial,
@@ -48,6 +49,7 @@ from lifx.exceptions import (
     LifxUnsupportedCommandError,
 )
 from lifx.network.discovery import DiscoveredDevice, discover_devices
+from lifx.network.mdns import LifxServiceRecord, discover_lifx_services
 from lifx.products import ProductCapability, ProductInfo, ProductRegistry
 from lifx.protocol.protocol_types import (
     Direction,
@@ -100,12 +102,16 @@ __all__ = [
     # High-level API
     "DeviceGroup",
     "discover",
+    "discover_mdns",
     "find_by_serial",
     "find_by_label",
     "find_by_ip",
     # Discovery (low-level)
     "discover_devices",
     "DiscoveredDevice",
+    # mDNS Discovery (low-level)
+    "discover_lifx_services",
+    "LifxServiceRecord",
     # Products
     "ProductInfo",
     "ProductRegistry",
