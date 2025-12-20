@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -330,6 +331,22 @@ class TestLifxServiceRecord:
         with pytest.raises(AttributeError):
             record.serial = "new_serial"  # type: ignore[misc]
 
+    def test_equality_with_non_record(self) -> None:
+        """Test that comparing to non-LifxServiceRecord returns False."""
+        record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="192.168.1.100",
+            port=56700,
+            product_id=27,
+            firmware="4.112",
+        )
+
+        # Comparison with different types should return False
+        assert record != "d073d5123456"
+        assert record != 123
+        assert record != {"serial": "d073d5123456"}
+        assert record != None  # noqa: E711
+
 
 class TestDiscoverLifxServices:
     """Tests for discover_lifx_services function."""
@@ -374,6 +391,239 @@ class TestDiscoverLifxServices:
                 async for record in discover_lifx_services(timeout=0.1):
                     records.append(record)
 
+                assert len(records) == 1
+                assert records[0].serial == "d073d5123456"
+
+    @pytest.mark.asyncio
+    async def test_discover_idle_timeout(self) -> None:
+        """Test that discovery stops on idle timeout."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            call_count = 0
+
+            async def slow_receive(
+                timeout: float = 5.0,
+            ) -> tuple[bytes, tuple[str, int]]:
+                nonlocal call_count
+                call_count += 1
+                # First call succeeds quickly, subsequent calls wait
+                if call_count == 1:
+                    await asyncio.sleep(0.01)
+                    raise Exception("No data")
+                raise Exception("timeout")
+
+            mock_transport.receive.side_effect = slow_receive
+
+            records = []
+            # Use very short idle timeout
+            async for record in discover_lifx_services(
+                timeout=5.0, max_response_time=0.01, idle_timeout_multiplier=1.0
+            ):
+                records.append(record)
+
+            assert len(records) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_overall_timeout(self) -> None:
+        """Test that discovery stops on overall timeout."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            # Keep returning data until timeout
+            txt_data = TxtData(
+                strings=["id=d073d5123456", "p=27"],
+                pairs={"id": "d073d5123456", "p": "27"},
+            )
+            mock_parsed_response = MagicMock()
+            mock_parsed_response.header.is_response = True
+            mock_parsed_response.records = [
+                MagicMock(rtype=12, name="_lifx._udp.local", parsed_data="dev"),
+                MagicMock(rtype=16, parsed_data=txt_data),
+            ]
+
+            call_count = 0
+
+            async def receive_with_delay(
+                timeout: float = 5.0,
+            ) -> tuple[bytes, tuple[str, int]]:
+                nonlocal call_count
+                call_count += 1
+                await asyncio.sleep(0.01)  # Small delay each time
+                return (b"\x00" * 50, ("192.168.1.100", 5353))
+
+            mock_transport.receive.side_effect = receive_with_delay
+
+            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+                mock_parse.return_value = mock_parsed_response
+
+                records = []
+                # Very short overall timeout
+                async for record in discover_lifx_services(timeout=0.05):
+                    records.append(record)
+
+                # Should have discovered at most one device (deduplicated)
+                assert len(records) <= 1
+
+    @pytest.mark.asyncio
+    async def test_discover_skips_non_response(self) -> None:
+        """Test that discovery skips DNS queries (non-responses)."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        mock_query_response = MagicMock()
+        mock_query_response.header.is_response = False  # This is a query, not response
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = [
+                (b"\x00" * 50, ("192.168.1.100", 5353)),
+                Exception("timeout"),
+            ]
+
+            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+                mock_parse.return_value = mock_query_response
+
+                records = []
+                async for record in discover_lifx_services(timeout=0.1):
+                    records.append(record)
+
+                # Should have no records since we skipped the query
+                assert len(records) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_skips_non_lifx_response(self) -> None:
+        """Test that discovery skips non-LIFX mDNS responses."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        # Response without LIFX PTR or TXT records
+        mock_response = MagicMock()
+        mock_response.header.is_response = True
+        mock_response.records = [
+            MagicMock(rtype=1, name="some.other.local", parsed_data="192.168.1.1"),
+        ]
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = [
+                (b"\x00" * 50, ("192.168.1.100", 5353)),
+                Exception("timeout"),
+            ]
+
+            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+                mock_parse.return_value = mock_response
+
+                records = []
+                async for record in discover_lifx_services(timeout=0.1):
+                    records.append(record)
+
+                assert len(records) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_skips_invalid_record(self) -> None:
+        """Test that discovery skips responses that can't be parsed as LIFX records."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        # Response with LIFX PTR but invalid TXT data (missing required fields)
+        txt_data = TxtData(
+            strings=["some=other"],
+            pairs={"some": "other"},  # Missing 'id' and 'p'
+        )
+        mock_response = MagicMock()
+        mock_response.header.is_response = True
+        mock_response.records = [
+            MagicMock(
+                rtype=12, name="_lifx._udp.local", parsed_data="dev._lifx._udp.local"
+            ),
+            MagicMock(rtype=16, parsed_data=txt_data),
+        ]
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = [
+                (b"\x00" * 50, ("192.168.1.100", 5353)),
+                Exception("timeout"),
+            ]
+
+            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+                mock_parse.return_value = mock_response
+
+                records = []
+                async for record in discover_lifx_services(timeout=0.1):
+                    records.append(record)
+
+                # Should be empty because _extract_lifx_info returns None
+                assert len(records) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_handles_parse_error(self) -> None:
+        """Test that discovery handles DNS parsing errors gracefully."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = [
+                (b"\x00" * 50, ("192.168.1.100", 5353)),
+                Exception("timeout"),
+            ]
+
+            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+                # Parsing fails with an exception
+                mock_parse.side_effect = ValueError("Invalid DNS data")
+
+                records = []
+                async for record in discover_lifx_services(timeout=0.1):
+                    records.append(record)
+
+                # Should continue despite parse error
+                assert len(records) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_with_lifx_txt_but_no_ptr(self) -> None:
+        """Test discovery with LIFX TXT record but no PTR record."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        # Response with LIFX TXT but no PTR
+        txt_data = TxtData(
+            strings=["id=d073d5123456", "p=27", "fw=4.112"],
+            pairs={"id": "d073d5123456", "p": "27", "fw": "4.112"},
+        )
+        mock_response = MagicMock()
+        mock_response.header.is_response = True
+        mock_response.records = [
+            MagicMock(rtype=16, name="device.local", parsed_data=txt_data),
+        ]
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = [
+                (b"\x00" * 50, ("192.168.1.100", 5353)),
+                Exception("timeout"),
+            ]
+
+            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+                mock_parse.return_value = mock_response
+
+                records = []
+                async for record in discover_lifx_services(timeout=0.1):
+                    records.append(record)
+
+                # Should still discover via TXT record fallback
                 assert len(records) == 1
                 assert records[0].serial == "d073d5123456"
 
