@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.8.0 (2025-12-20)
+
+### Features
+
+- **network**: Add mDNS/DNS-SD discovery for LIFX devices
+  ([`f25987d`](https://github.com/Djelibeybi/lifx-async/commit/f25987d9357d395209dd7d346787671d85bf1371))
+
+
 ## v4.7.5 (2025-12-16)
 
 ### Bug Fixes
