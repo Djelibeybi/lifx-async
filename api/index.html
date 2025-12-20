@@ -1859,27 +1859,33 @@
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   └── matrix.py            # MatrixLight (2D matrix devices: tiles, candle, path)
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>├── network/                  # Network layer
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   ├── connection.py        # Device connections with lazy opening
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   ├── discovery.py         # Network device discovery
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   ├── discovery.py         # Network device discovery (UDP broadcast)
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   ├── message.py           # Message building and parsing
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   └── transport.py         # UDP transport
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>├── products/                 # Product registry
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   ├── registry.py          # Auto-generated product database
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   ├── generator.py         # Generator to download/parse products.json
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   └── __init__.py          # Public API exports
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>└── protocol/                 # Protocol layer (auto-generated)
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    ├── base.py              # Base packet class
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    ├── generator.py         # Code generator from protocol.yml
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    ├── header.py            # Protocol header (36 bytes)
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    ├── models.py            # Protocol models (Serial, HEV types)
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    ├── packets.py           # Packet definitions
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    ├── protocol_types.py    # Type definitions and enums
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    └── serializer.py        # Binary serialization/deserialization
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   ├── transport.py         # UDP transport
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   └── mdns/                # mDNS/DNS-SD discovery
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│       ├── discovery.py     # mDNS discovery functions
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│       ├── dns.py           # DNS wire format parser
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│       ├── transport.py     # Multicast UDP transport
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│       └── types.py         # LifxServiceRecord dataclass
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>├── products/                 # Product registry
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│   ├── registry.py          # Auto-generated product database
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│   ├── generator.py         # Generator to download/parse products.json
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│   └── __init__.py          # Public API exports
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>└── protocol/                 # Protocol layer (auto-generated)
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    ├── base.py              # Base packet class
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    ├── generator.py         # Code generator from protocol.yml
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    ├── header.py            # Protocol header (36 bytes)
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    ├── models.py            # Protocol models (Serial, HEV types)
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>    ├── packets.py           # Packet definitions
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    ├── protocol_types.py    # Type definitions and enums
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    └── serializer.py        # Binary serialization/deserialization
 </span></code></pre></div>
 <h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
 <h3 id="high-level-api">High-Level API<a class="headerlink" href="#high-level-api" title="Permanent link">&para;</a></h3>
 <p>Main entry points for most users:</p>
 <ul>
-<li><a href="high-level/#lifx.api.discover"><code>discover()</code></a> - Simple device discovery</li>
+<li><a href="high-level/#lifx.api.discover"><code>discover()</code></a> - Device discovery via UDP broadcast</li>
+<li><a href="high-level/#lifx.api.discover_mdns"><code>discover_mdns()</code></a> - Device discovery via mDNS (faster)</li>
 <li><a href="high-level/#lifx.api.find_by_serial"><code>find_by_serial()</code></a> - Find device by serial number</li>
 <li><a href="high-level/#lifx.api.find_by_label"><code>find_by_label()</code></a> - Find devices by label (exact or substring)</li>
 <li><a href="high-level/#lifx.api.find_by_ip"><code>find_by_ip()</code></a> - Find device by IP address</li>
@@ -1904,7 +1910,9 @@
 <h3 id="network-layer">Network Layer<a class="headerlink" href="#network-layer" title="Permanent link">&para;</a></h3>
 <p>Low-level network operations:</p>
 <ul>
-<li><a href="network/#lifx.network.discovery.discover_devices"><code>discover_devices()</code></a> - Low-level discovery</li>
+<li><a href="network/#lifx.network.discovery.discover_devices"><code>discover_devices()</code></a> - Low-level UDP discovery</li>
+<li><a href="network/#lifx.network.mdns.discover_lifx_services"><code>discover_lifx_services()</code></a> - Low-level mDNS discovery</li>
+<li><a href="network/#lifx.network.mdns.LifxServiceRecord"><code>LifxServiceRecord</code></a> - mDNS service record</li>
 <li><a href="network/#lifx.network.connection.DeviceConnection"><code>DeviceConnection</code></a> - Device connections</li>
 </ul>
 <h3 id="products-registry">Products Registry<a class="headerlink" href="#products-registry" title="Permanent link">&para;</a></h3>
@@ -2064,7 +2072,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 18, 2025 09:31:37 UTC">November 18, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="December 18, 2025 20:28:40 UTC">December 18, 2025</span>
   </span>
 
     

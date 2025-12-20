@@ -4,6 +4,7 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 
 ## Table of Contents
 
+- [Discovery Methods](#discovery-methods)
 - [Storing State](#storing-state)
 - [Connection Management](#connection-management)
 - [Concurrency Patterns](#concurrency-patterns)
@@ -11,6 +12,76 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 - [Device Capabilities](#device-capabilities)
 - [Custom Effects](#custom-effects)
 - [Performance Optimization](#performance-optimization)
+
+## Discovery Methods
+
+lifx-async provides two discovery methods with different trade-offs:
+
+### UDP Broadcast Discovery
+
+The traditional discovery method broadcasts to all devices on the network:
+
+```python
+from lifx import discover
+
+async def broadcast_discovery():
+    async for device in discover(timeout=5.0):
+        async with device:
+            color, power, label = await device.get_color()
+            print(f"Found: {label} ({type(device).__name__})")
+```
+
+**Characteristics:**
+
+- Sends 1 broadcast + N queries (one per device for type detection)
+- Works on any local network
+- May miss devices on other subnets
+
+### mDNS Discovery
+
+mDNS discovery uses DNS-SD to find devices with a single multicast query:
+
+```python
+from lifx import discover_mdns
+
+async def mdns_discovery():
+    async for device in discover_mdns(timeout=5.0):
+        async with device:
+            color, power, label = await device.get_color()
+            print(f"Found: {label} ({type(device).__name__})")
+```
+
+**Characteristics:**
+
+- Single network query (device type in TXT record)
+- Faster discovery with immediate type detection
+- Can work across subnets with an mDNS reflector
+- Zero dependencies (uses Python stdlib only)
+
+### Low-Level mDNS API
+
+For raw mDNS data without device instantiation:
+
+```python
+from lifx import discover_lifx_services
+
+async def raw_mdns_discovery():
+    async for record in discover_lifx_services(timeout=5.0):
+        print(f"Serial: {record.serial}")
+        print(f"IP: {record.ip}:{record.port}")
+        print(f"Product ID: {record.product_id}")
+        print(f"Firmware: {record.firmware}")
+```
+
+### Choosing a Discovery Method
+
+| Scenario                      | Recommended Method                |
+| ----------------------------- | --------------------------------- |
+| General use                   | `discover()` or `discover_mdns()` |
+| Fastest discovery             | `discover_mdns()`                 |
+| Cross-subnet (with reflector) | `discover_mdns()`                 |
+| Maximum compatibility         | `discover()`                      |
+| Raw device data               | `discover_lifx_services()`        |
 
 ## Storing State
 

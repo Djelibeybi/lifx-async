@@ -178,6 +178,27 @@ async def main():
 asyncio.run(main())
 ```
 
+**Alternative: mDNS Discovery**
+
+For faster discovery with device type detection in a single query:
+
+```python
+import asyncio
+from lifx import discover_mdns
+
+
+async def main():
+    async for device in discover_mdns():
+        async with device:
+            color, power, label = await device.get_color()
+            print(f"{label}: {type(device).__name__}")
+
+
+asyncio.run(main())
+```
+
+mDNS discovery is faster because it gets device type information directly from the mDNS response, eliminating extra network queries.
+
 ### 2. Control a Light
 
 Turn on the first discovered light, then change its color:
@@ -1612,6 +1633,7 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 
 ## Table of Contents
 
+- [Discovery Methods](#discovery-methods)
 - [Storing State](#storing-state)
 - [Connection Management](#connection-management)
 - [Concurrency Patterns](#concurrency-patterns)
@@ -1619,6 +1641,76 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 - [Device Capabilities](#device-capabilities)
 - [Custom Effects](#custom-effects)
 - [Performance Optimization](#performance-optimization)
+
+## Discovery Methods
+
+lifx-async provides two discovery methods with different trade-offs:
+
+### UDP Broadcast Discovery
+
+The traditional discovery method broadcasts to all devices on the network:
+
+```python
+from lifx import discover
+
+async def broadcast_discovery():
+    async for device in discover(timeout=5.0):
+        async with device:
+            color, power, label = await device.get_color()
+            print(f"Found: {label} ({type(device).__name__})")
+```
+
+**Characteristics:**
+
+- Sends 1 broadcast + N queries (one per device for type detection)
+- Works on any local network
+- May miss devices on other subnets
+
+### mDNS Discovery
+
+mDNS discovery uses DNS-SD to find devices with a single multicast query:
+
+```python
+from lifx import discover_mdns
+
+async def mdns_discovery():
+    async for device in discover_mdns(timeout=5.0):
+        async with device:
+            color, power, label = await device.get_color()
+            print(f"Found: {label} ({type(device).__name__})")
+```
+
+**Characteristics:**
+
+- Single network query (device type in TXT record)
+- Faster discovery with immediate type detection
+- Can work across subnets with an mDNS reflector
+- Zero dependencies (uses Python stdlib only)
+
+### Low-Level mDNS API
+
+For raw mDNS data without device instantiation:
+
+```python
+from lifx import discover_lifx_services
+
+async def raw_mdns_discovery():
+    async for record in discover_lifx_services(timeout=5.0):
+        print(f"Serial: {record.serial}")
+        print(f"IP: {record.ip}:{record.port}")
+        print(f"Product ID: {record.product_id}")
+        print(f"Firmware: {record.firmware}")
+```
+
+### Choosing a Discovery Method
+
+| Scenario                      | Recommended Method                |
+| ----------------------------- | --------------------------------- |
+| General use                   | `discover()` or `discover_mdns()` |
+| Fastest discovery             | `discover_mdns()`                 |
+| Cross-subnet (with reflector) | `discover_mdns()`                 |
+| Maximum compatibility         | `discover()`                      |
+| Raw device data               | `discover_lifx_services()`        |
 
 ## Storing State
 
@@ -5636,9 +5728,14 @@ lifx/
 │   └── matrix.py            # MatrixLight (2D matrix devices: tiles, candle, path)
 ├── network/                  # Network layer
 │   ├── connection.py        # Device connections with lazy opening
-│   ├── discovery.py         # Network device discovery
+│   ├── discovery.py         # Network device discovery (UDP broadcast)
 │   ├── message.py           # Message building and parsing
-│   └── transport.py         # UDP transport
+│   ├── transport.py         # UDP transport
+│   └── mdns/                # mDNS/DNS-SD discovery
+│       ├── discovery.py     # mDNS discovery functions
+│       ├── dns.py           # DNS wire format parser
+│       ├── transport.py     # Multicast UDP transport
+│       └── types.py         # LifxServiceRecord dataclass
 ├── products/                 # Product registry
 │   ├── registry.py          # Auto-generated product database
 │   ├── generator.py         # Generator to download/parse products.json
@@ -5659,7 +5756,8 @@ lifx/
 
 Main entry points for most users:
 
-- [`discover()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.discover) - Simple device discovery
+- [`discover()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.discover) - Device discovery via UDP broadcast
+- [`discover_mdns()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.discover_mdns) - Device discovery via mDNS (faster)
 - [`find_by_serial()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_serial) - Find device by serial number
 - [`find_by_label()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_label) - Find devices by label (exact or substring)
 - [`find_by_ip()`](https://djelibeybi.github.io/lifx-async/api/high-level/#lifx.api.find_by_ip) - Find device by IP address
@@ -5687,7 +5785,9 @@ Work with colors:
 
 Low-level network operations:
 
-- [`discover_devices()`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.discovery.discover_devices) - Low-level discovery
+- [`discover_devices()`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.discovery.discover_devices) - Low-level UDP discovery
+- [`discover_lifx_services()`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.mdns.discover_lifx_services) - Low-level mDNS discovery
+- [`LifxServiceRecord`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.mdns.LifxServiceRecord) - mDNS service record
 - [`DeviceConnection`](https://djelibeybi.github.io/lifx-async/api/network/#lifx.network.connection.DeviceConnection) - Device connections
 
 ### Products Registry
