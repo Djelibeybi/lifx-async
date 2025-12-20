@@ -2,6 +2,7 @@
 
 This module tests:
 - discover() - Async generator for device discovery
+- discover_mdns() - Async generator for mDNS-based discovery
 - find_by_serial() - Find specific device by serial number
 - find_by_ip() - Find device by IP address
 - find_by_label() - Find device by exact label match
@@ -9,9 +10,11 @@ This module tests:
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
-from lifx.api import discover, find_by_ip, find_by_label, find_by_serial
+from lifx.api import discover, discover_mdns, find_by_ip, find_by_label, find_by_serial
 from lifx.devices import Light
 from lifx.network.discovery import discover_devices
 from tests.conftest import get_free_port
@@ -402,3 +405,80 @@ class TestFindByLabel:
                 idle_timeout_multiplier=0.5,
             ):
                 pytest.fail(f"Unexpected yield of {d} from find_by_label()")
+
+
+class TestDiscoverMdns:
+    """Tests for discover_mdns() high-level API function."""
+
+    @pytest.mark.asyncio
+    async def test_discover_mdns_yields_devices(self) -> None:
+        """Test that discover_mdns() yields device instances."""
+        from lifx.network.mdns.types import LifxServiceRecord
+
+        mock_record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="192.168.1.100",
+            port=56700,
+            product_id=27,  # LIFX A19
+            firmware="4.112",
+        )
+
+        async def mock_discover_services(*args, **kwargs):
+            yield mock_record
+
+        with patch(
+            "lifx.network.mdns.discovery.discover_lifx_services",
+            side_effect=mock_discover_services,
+        ):
+            devices = []
+            async for device in discover_mdns(timeout=0.1):
+                devices.append(device)
+
+            assert len(devices) == 1
+            assert isinstance(devices[0], Light)
+            assert devices[0].serial == "d073d5123456"
+
+    @pytest.mark.asyncio
+    async def test_discover_mdns_filters_relay_devices(self) -> None:
+        """Test that discover_mdns() filters out relay-only devices."""
+        from lifx.network.mdns.types import LifxServiceRecord
+
+        mock_record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="192.168.1.100",
+            port=56700,
+            product_id=70,  # LIFX Switch - relay only
+            firmware="4.112",
+        )
+
+        async def mock_discover_services(*args, **kwargs):
+            yield mock_record
+
+        with patch(
+            "lifx.network.mdns.discovery.discover_lifx_services",
+            side_effect=mock_discover_services,
+        ):
+            devices = []
+            async for device in discover_mdns(timeout=0.1):
+                devices.append(device)
+
+            # Relay devices should be filtered out
+            assert len(devices) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_mdns_empty_network(self) -> None:
+        """Test discover_mdns() with no devices."""
+
+        async def mock_discover_services(*args, **kwargs):
+            return
+            yield  # noqa: B901 - makes this an async generator
+
+        with patch(
+            "lifx.network.mdns.discovery.discover_lifx_services",
+            side_effect=mock_discover_services,
+        ):
+            devices = []
+            async for device in discover_mdns(timeout=0.1):
+                devices.append(device)
+
+            assert len(devices) == 0

@@ -118,6 +118,20 @@ class TestParseName:
         with pytest.raises(ValueError, match="Too many"):
             parse_name(data, 0)
 
+    def test_parse_name_compression_pointer_incomplete(self) -> None:
+        """Test that incomplete compression pointer raises ValueError."""
+        # Compression pointer prefix without second byte
+        data = b"\xc0"  # Pointer prefix but missing second byte
+        with pytest.raises(ValueError, match="Compression pointer incomplete"):
+            parse_name(data, 0)
+
+    def test_parse_name_label_extends_beyond_data(self) -> None:
+        """Test that label extending beyond data raises ValueError."""
+        # Label claims length of 10 but data is shorter
+        data = b"\x0atest"  # Length 10 but only "test" follows
+        with pytest.raises(ValueError, match="Label extends beyond data"):
+            parse_name(data, 0)
+
 
 class TestParseTxtRecord:
     """Tests for TXT record parsing."""
@@ -162,6 +176,15 @@ class TestParseTxtRecord:
         result = parse_txt_record(data)
 
         assert result.pairs["foo"] == ""
+
+    def test_parse_truncated_txt_data(self) -> None:
+        """Test parsing TXT with truncated data (length exceeds available bytes)."""
+        # Length says 10 but only 3 bytes follow
+        data = b"\x0afoo"
+        result = parse_txt_record(data)
+
+        # Should handle gracefully by breaking early
+        assert result.strings == []
 
 
 class TestBuildPtrQuery:
@@ -275,6 +298,77 @@ class TestParseDnsResponse:
 
         result = parse_dns_response(bytes(modified))
         assert result.records[0].cache_flush is True
+
+
+class TestParseResourceRecord:
+    """Tests for _parse_resource_record edge cases."""
+
+    def test_resource_record_header_incomplete(self) -> None:
+        """Test parsing resource record with incomplete header."""
+        from lifx.network.mdns.dns import _parse_resource_record
+
+        # Name followed by incomplete header (less than 10 bytes)
+        data = b"\x04test\x05local\x00" + b"\x00\x01"  # Only type, missing rest
+        with pytest.raises(ValueError, match="Resource record header incomplete"):
+            _parse_resource_record(data, 0)
+
+    def test_resource_record_data_incomplete(self) -> None:
+        """Test parsing resource record with incomplete rdata."""
+        from lifx.network.mdns.dns import _parse_resource_record
+
+        # Name + complete header + incomplete rdata
+        name = b"\x04test\x05local\x00"
+        # Type=A, Class=IN, TTL=120, RDLength=10 (but only 4 bytes available)
+        rr_header = struct.pack("!HHIH", 1, 1, 120, 10)
+        rdata = b"\xc0\xa8\x01\x01"  # Only 4 bytes, but rdlength says 10
+
+        data = name + rr_header + rdata
+        with pytest.raises(ValueError, match="Resource record data incomplete"):
+            _parse_resource_record(data, 0)
+
+    def test_aaaa_record_parsing(self) -> None:
+        """Test parsing AAAA (IPv6) record."""
+        from lifx.network.mdns.dns import DNS_TYPE_AAAA, _parse_resource_record
+
+        # Build an AAAA record for ::1 (loopback)
+        name = b"\x04test\x05local\x00"
+        # Type=AAAA (28), Class=IN, TTL=120, RDLength=16
+        rr_header = struct.pack("!HHIH", DNS_TYPE_AAAA, 1, 120, 16)
+        # IPv6 loopback address ::1
+        rdata = b"\x00" * 15 + b"\x01"
+
+        data = name + rr_header + rdata
+        record, offset = _parse_resource_record(data, 0)
+
+        assert record.rtype == DNS_TYPE_AAAA
+        assert record.parsed_data == "::1"
+
+
+class TestParseDnsResponseQuestions:
+    """Tests for parse_dns_response with questions."""
+
+    def test_parse_response_with_questions(self) -> None:
+        """Test parsing DNS response that includes questions."""
+        # Header: ID=0, response, 1 question, 1 answer
+        header = struct.pack("!HHHHHH", 0, 0x8400, 1, 1, 0, 0)
+
+        # Question: test.local PTR IN
+        question = b"\x04test\x05local\x00"
+        question += struct.pack("!HH", DNS_TYPE_PTR, 1)
+
+        # Answer: A record
+        answer_name = b"\x04host\x05local\x00"
+        answer_rr = struct.pack("!HHIH", 1, 1, 120, 4)
+        answer_rdata = bytes([192, 168, 1, 1])
+
+        data = header + question + answer_name + answer_rr + answer_rdata
+        result = parse_dns_response(data)
+
+        # Questions should be skipped, only answers in records
+        assert result.header.qd_count == 1
+        assert result.header.an_count == 1
+        assert len(result.records) == 1
+        assert result.records[0].rtype == 1  # A record
 
 
 class TestDnsResourceRecord:
