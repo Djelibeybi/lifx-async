@@ -16,7 +16,7 @@ from urllib.request import urlopen
 from lifx.const import PRODUCTS_URL
 
 
-def download_products() -> dict[str, Any] | list[dict[str, Any]]:
+def download_products() -> dict[str, Any] | list[dict[str, Any]] | None:
     """Download and parse products.json from LIFX GitHub repository.
 
     Returns:
@@ -27,11 +27,13 @@ def download_products() -> dict[str, Any] | list[dict[str, Any]]:
         json.JSONDecodeError: If parsing fails
     """
     parsed_url = urlparse(PRODUCTS_URL)
-    if parsed_url.scheme == "https" and parsed_url.netloc.startswith(
-        "raw.githubusercontent.com"
+    if (
+        parsed_url.scheme == "https"
+        and parsed_url.netloc == "raw.githubusercontent.com"
+        and parsed_url.path.startswith("/LIFX/")
     ):
-        print(f"Downloading products.json from {PRODUCTS_URL}...")
-        with urlopen(PRODUCTS_URL) as response:  # nosec B310
+        print(f"Downloading products.json from {parsed_url.geturl()}...")
+        with urlopen(parsed_url.geturl()) as response:  # nosec B310
             products_data = response.read()
 
         print("Parsing products specification...")

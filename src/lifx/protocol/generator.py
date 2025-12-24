@@ -1397,7 +1397,7 @@ from lifx.protocol.base import Packet
     return code
 
 
-def download_protocol() -> dict[str, Any]:
+def download_protocol() -> dict[str, Any] | None:
     """Download and parse protocol.yml from LIFX GitHub repository.
 
     Returns:
@@ -1408,11 +1408,13 @@ def download_protocol() -> dict[str, Any]:
         yaml.YAMLError: If parsing fails
     """
     parsed_url = urlparse(PROTOCOL_URL)
-    if parsed_url.scheme == "https" and parsed_url.netloc.startswith(
-        "raw.githubusercontent.com"
+    if (
+        parsed_url.scheme == "https"
+        and parsed_url.netloc == "raw.githubusercontent.com"
+        and parsed_url.path.startswith("/LIFX/")
     ):
-        print(f"Downloading protocol.yml from {PROTOCOL_URL}...")
-        with urlopen(PROTOCOL_URL) as response:  # nosec B310
+        print(f"Downloading protocol.yml from {parsed_url.geturl()}...")
+        with urlopen(parsed_url.geturl()) as response:  # nosec B310
             protocol_data = response.read()
 
         print("Parsing protocol specification...")
