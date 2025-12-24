@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v4.8.1 (2025-12-24)
+
+### Bug Fixes
+
+- Tighten up the URL parsing to be even more specific ([`0222362`](https://github.com/Djelibeybi/lifx-async/commit/0222362ace8d7c8bbbe7d5a50f9fb21b7cb89cd5))
+
 ## v4.8.0 (2025-12-20)
 
 ### Features
