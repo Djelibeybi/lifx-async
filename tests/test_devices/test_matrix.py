@@ -563,7 +563,7 @@ class TestMatrixLight:
         2. Send two set64() messages to fb_index=1 (non-visible buffer)
         3. Send copy_frame_buffer() to copy fb_index=1 -> fb_index=0
         4. Send two get64() messages to retrieve all 128 zones from fb_index=0
-        5. Verify the colors match what we set (blue top half, green bottom half)
+        5. Verify the colors match what we set (blue top half, lime bottom half)
         """
         matrix = ceiling_device
         async with matrix:
@@ -581,9 +581,11 @@ class TestMatrixLight:
                 tile_index=0, colors=white_colors, duration=0
             )
 
-            # Create colors: first 64 zones blue, second 64 zones green
+            # Create colors: first 64 zones blue, second 64 zones lime
+            # Note: Colors.LIME (RGB 0,255,0) has full brightness, while
+            # Colors.GREEN (RGB 0,128,0) follows CSS3 spec with 50% brightness
             blue_colors = [Colors.BLUE] * 64
-            green_colors = [Colors.GREEN] * 64
+            lime_colors = [Colors.LIME] * 64
 
             # Step 1: Set first 64 zones (rows 0-3) to blue in frame buffer 1
             await matrix.set64(
@@ -597,7 +599,7 @@ class TestMatrixLight:
                 fb_index=1,  # Write to non-visible buffer
             )
 
-            # Step 2: Set second 64 zones (rows 4-7) to green in frame buffer 1
+            # Step 2: Set second 64 zones (rows 4-7) to lime in frame buffer 1
             await matrix.set64(
                 tile_index=0,
                 length=1,
@@ -605,7 +607,7 @@ class TestMatrixLight:
                 y=4,  # Start at row 4 (after first 64 zones)
                 width=tile.width,
                 duration=0,
-                colors=green_colors,
+                colors=lime_colors,
                 fb_index=1,  # Write to non-visible buffer
             )
 
@@ -628,7 +630,7 @@ class TestMatrixLight:
             assert first_64_colors[0].saturation > 0.9
             assert first_64_colors[0].brightness > 0.9
 
-            # Verify second 64 zones are green (hue ~120)
+            # Verify second 64 zones are lime (hue ~120)
             assert 110 < second_64_colors[0].hue < 130
             assert second_64_colors[0].saturation > 0.9
             assert second_64_colors[0].brightness > 0.9
