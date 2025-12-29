@@ -10,8 +10,6 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 import pytest
-
-# Import emulator library components
 from lifx_emulator import EmulatedLifxServer
 from lifx_emulator.devices import DeviceManager
 from lifx_emulator.factories import (
@@ -33,7 +31,27 @@ from lifx.devices import HevLight, InfraredLight, Light, MultiZoneLight
 from lifx.devices.base import Device
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
+from lifx.exceptions import LifxConnectionError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add custom command-line options for pytest."""
+    parser.addoption(
+        "--disable-emulator",
+        action="store_true",
+        default=False,
+        help="Disable lifx-emulator tests for this test run",
+    )
+
+
+def pytest_set_filtered_exceptions() -> list[type[Exception]]:
+    """Configure pytest-retry to only retry on network-related exceptions.
+
+    Tests that fail with LifxTimeoutError or LifxConnectionError will be
+    retried automatically, as these are typically transient network issues.
+    """
+    return [LifxTimeoutError, LifxConnectionError]
 
 
 def get_free_port() -> int:
@@ -84,15 +102,20 @@ class EmulatorRunner:
 
 
 @pytest.fixture(scope="session")
-def emulator_available() -> bool:
+def emulator_available(request: pytest.FixtureRequest) -> bool:
     """Check if lifx-emulator-core is available.
 
     The library is always available as it's a direct dependency.
-    This fixture exists for backwards compatibility with test markers.
-    """
-    import sys
+    Emulator tests are enabled on all platforms by default. Use --disable-emulator
+    to disable them if needed.
 
-    if sys.platform != "linux":
+    Args:
+        request: Pytest fixture request for accessing command-line options
+    """
+    # Check command-line flags
+    disable_emulator = request.config.getoption("--disable-emulator", default=False)
+
+    if disable_emulator:
         return False
 
     try:
