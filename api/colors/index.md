@@ -882,6 +882,10 @@ The `Colors` class provides convenient color presets for common colors.
 
 Common color presets for convenience.
 
+Includes all 140 standard HTML/CSS named colors plus white temperature variants and pastel variations.
+
+HTML color reference: https://www.w3.org/TR/css-color-3/#svg-color
+
 ## Examples
 
 ### Creating Colors
