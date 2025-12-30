@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.9.0 (2025-12-30)
+
+### Features
+
+- **api**: Add HTML named colors and kelvin temperature presets
+  ([`b631d43`](https://github.com/Djelibeybi/lifx-async/commit/b631d43f9ba61db5f77e233a6bc0745bb3fed8b8))
+
+
 ## v4.8.1 (2025-12-24)
 
 ### Bug Fixes
