@@ -964,19 +964,19 @@ class Light(Device[LightState]):
         # Fetch semi-static and volatile state in parallel
         # get_color returns color, power, and label in one request
         try:
-            async with asyncio.TaskGroup() as tg:
-                color_task = tg.create_task(self.get_color())
-                host_fw_task = tg.create_task(self.get_host_firmware())
-                wifi_fw_task = tg.create_task(self.get_wifi_firmware())
-                location_task = tg.create_task(self.get_location())
-                group_task = tg.create_task(self.get_group())
-
-            # Extract results
-            color, power, label = color_task.result()
-            host_firmware = host_fw_task.result()
-            wifi_firmware = wifi_fw_task.result()
-            location_info = location_task.result()
-            group_info = group_task.result()
+            (
+                (color, power, label),
+                host_firmware,
+                wifi_firmware,
+                location_info,
+                group_info,
+            ) = await asyncio.gather(
+                self.get_color(),
+                self.get_host_firmware(),
+                self.get_wifi_firmware(),
+                self.get_location(),
+                self.get_group(),
+            )
 
             # Get MAC address (already calculated in get_host_firmware)
             mac_address = await self.get_mac_address()
@@ -1003,7 +1003,7 @@ class Light(Device[LightState]):
 
             return self._state
 
-        except* LifxTimeoutError:
+        except LifxTimeoutError:
             raise LifxTimeoutError(f"Error initializing state for {self.serial}")
-        except* LifxError:
+        except LifxError:
             raise LifxError(f"Error initializing state for {self.serial}")

@@ -255,9 +255,10 @@ class MdnsTransport:
             raise LifxNetworkError("Socket not open")
 
         try:
-            async with asyncio.timeout(timeout):
-                data, addr = await self._protocol.queue.get()
-                return data, addr
+            data, addr = await asyncio.wait_for(
+                self._protocol.queue.get(), timeout=timeout
+            )
+            return data, addr
         except TimeoutError as e:
             raise LifxTimeoutError(f"No mDNS data received within {timeout}s") from e
         except OSError as e:

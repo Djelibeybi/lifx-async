@@ -205,43 +205,9 @@ class UdpTransport:
             raise LifxNetworkError("Socket not open")
 
         try:
-            async with asyncio.timeout(timeout):
-                data, addr = await self._protocol.queue.get()
-
-                # Validate packet size
-                if len(data) > MAX_PACKET_SIZE:
-                    from lifx.exceptions import LifxProtocolError
-
-                    _LOGGER.error(
-                        {
-                            "class": "UdpTransport",
-                            "method": "receive",
-                            "action": "packet_too_large",
-                            "packet_size": len(data),
-                            "max_size": MAX_PACKET_SIZE,
-                        }
-                    )
-                    raise LifxProtocolError(
-                        f"Packet too big: {len(data)} bytes > {MAX_PACKET_SIZE} bytes"
-                    )
-
-                if len(data) < MIN_PACKET_SIZE:
-                    from lifx.exceptions import LifxProtocolError
-
-                    _LOGGER.error(
-                        {
-                            "class": "UdpTransport",
-                            "method": "receive",
-                            "action": "packet_too_small",
-                            "packet_size": len(data),
-                            "min_size": MIN_PACKET_SIZE,
-                        }
-                    )
-                    raise LifxProtocolError(
-                        f"Packet too small: {len(data)} bytes < {MIN_PACKET_SIZE} bytes"
-                    )
-
-                return data, addr
+            data, addr = await asyncio.wait_for(
+                self._protocol.queue.get(), timeout=timeout
+            )
         except TimeoutError as e:
             raise LifxTimeoutError(f"No data received within {timeout}s") from e
         except OSError as e:
@@ -254,6 +220,41 @@ class UdpTransport:
                 }
             )
             raise LifxNetworkError(f"Failed to receive data: {e}") from e
+
+        # Validate packet size
+        if len(data) > MAX_PACKET_SIZE:
+            from lifx.exceptions import LifxProtocolError
+
+            _LOGGER.error(
+                {
+                    "class": "UdpTransport",
+                    "method": "receive",
+                    "action": "packet_too_large",
+                    "packet_size": len(data),
+                    "max_size": MAX_PACKET_SIZE,
+                }
+            )
+            raise LifxProtocolError(
+                f"Packet too big: {len(data)} bytes > {MAX_PACKET_SIZE} bytes"
+            )
+
+        if len(data) < MIN_PACKET_SIZE:
+            from lifx.exceptions import LifxProtocolError
+
+            _LOGGER.error(
+                {
+                    "class": "UdpTransport",
+                    "method": "receive",
+                    "action": "packet_too_small",
+                    "packet_size": len(data),
+                    "min_size": MIN_PACKET_SIZE,
+                }
+            )
+            raise LifxProtocolError(
+                f"Packet too small: {len(data)} bytes < {MIN_PACKET_SIZE} bytes"
+            )
+
+        return data, addr
 
     async def receive_many(
         self, timeout: float = 5.0, max_packets: int | None = None
@@ -273,34 +274,40 @@ class UdpTransport:
         if self._protocol is None:
             raise LifxNetworkError("Socket not open")
 
+        import time
+
         packets: list[tuple[bytes, tuple[str, int]]] = []
+        deadline = time.monotonic() + timeout
 
-        try:
-            async with asyncio.timeout(timeout):
-                while True:
-                    if max_packets is not None and len(packets) >= max_packets:
-                        break
+        while True:
+            if max_packets is not None and len(packets) >= max_packets:
+                break
 
-                    try:
-                        data, addr = await self._protocol.queue.get()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
 
-                        # Validate packet size
-                        if len(data) > MAX_PACKET_SIZE:
-                            # Drop oversized packet to prevent memory exhaustion DoS
-                            continue
+            try:
+                data, addr = await asyncio.wait_for(
+                    self._protocol.queue.get(), timeout=remaining
+                )
 
-                        if len(data) < MIN_PACKET_SIZE:
-                            # Drop undersized packet (header is 36 bytes)
-                            continue
+                # Validate packet size
+                if len(data) > MAX_PACKET_SIZE:
+                    # Drop oversized packet to prevent memory exhaustion DoS
+                    continue
 
-                        packets.append((data, addr))
-                    except OSError:
-                        # Ignore individual receive errors
-                        break
+                if len(data) < MIN_PACKET_SIZE:
+                    # Drop undersized packet (header is 36 bytes)
+                    continue
 
-        except TimeoutError:
-            # Timeout is expected - return what we collected
-            pass
+                packets.append((data, addr))
+            except TimeoutError:
+                # Timeout is expected - return what we collected
+                break
+            except OSError:
+                # Ignore individual receive errors
+                break
 
         return packets
 

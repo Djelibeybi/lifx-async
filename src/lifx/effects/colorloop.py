@@ -353,17 +353,11 @@ class EffectColorloop(LIFXEffect):
             )
 
         # Fetch colors for all lights concurrently
-        colors: list[HSBK] = [None] * len(self.participants)  # type: ignore
+        colors = await asyncio.gather(
+            *(get_color_for_light(light) for light in self.participants)
+        )
 
-        async with asyncio.TaskGroup() as tg:
-            for idx, light in enumerate(self.participants):
-
-                async def fetch_and_store(index: int, device: Light) -> None:
-                    colors[index] = await get_color_for_light(device)
-
-                tg.create_task(fetch_and_store(idx, light))
-
-        return colors
+        return list(colors)
 
     async def from_poweroff_hsbk(self, _light: Light) -> HSBK:
         """Return startup color when light is powered off.

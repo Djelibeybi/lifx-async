@@ -184,17 +184,11 @@ class EffectPulse(LIFXEffect):
                 return await self.fetch_light_color(light)
 
         # Fetch colors for all lights concurrently
-        colors: list[HSBK] = [None] * len(self.participants)  # type: ignore
+        colors = await asyncio.gather(
+            *(get_color_for_light(light) for light in self.participants)
+        )
 
-        async with asyncio.TaskGroup() as tg:
-            for idx, light in enumerate(self.participants):
-
-                async def fetch_and_store(index: int, device: Light) -> None:
-                    colors[index] = await get_color_for_light(device)
-
-                tg.create_task(fetch_and_store(idx, light))
-
-        return colors
+        return list(colors)
 
     async def _apply_waveform(self, light: Light, color: HSBK) -> None:
         """Apply waveform to a single light.

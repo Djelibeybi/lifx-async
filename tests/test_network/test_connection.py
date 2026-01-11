@@ -121,10 +121,11 @@ class TestDeviceConnection:
             execution_order.append(f"end_{request_id}")
 
         # Launch 3 concurrent requests
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(mock_request(1))
-            tg.create_task(mock_request(2))
-            tg.create_task(mock_request(3))
+        await asyncio.gather(
+            mock_request(1),
+            mock_request(2),
+            mock_request(3),
+        )
 
         # All requests should complete
         assert len(execution_order) == 6
@@ -162,9 +163,10 @@ class TestDeviceConnection:
         try:
             # Launch requests on both connections concurrently
             start_time = time.monotonic()
-            async with asyncio.TaskGroup() as tg:
-                tg.create_task(mock_request(conn1, "conn1"))
-                tg.create_task(mock_request(conn2, "conn2"))
+            await asyncio.gather(
+                mock_request(conn1, "conn1"),
+                mock_request(conn2, "conn2"),
+            )
             total_time = time.monotonic() - start_time
 
             # If truly concurrent, total time should be ~0.1s (one sleep duration)

@@ -6,7 +6,11 @@ This module tests error scenarios for batch operations:
 - pulse() - Batch effects with network issues
 - set_brightness() - Batch brightness with timeouts
 - Empty group edge cases
-- Partial failures and error aggregation
+- Partial failures and error propagation
+
+Note: With asyncio.gather() (used for Python 3.10 compatibility), the first
+exception is raised immediately rather than collecting all exceptions into
+an ExceptionGroup like TaskGroup does. Tests reflect this behavior.
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ import pytest
 from lifx.api import DeviceGroup
 from lifx.color import HSBK
 from lifx.devices import Light
+from lifx.exceptions import LifxTimeoutError
 from tests.conftest import get_free_port
 
 
@@ -43,17 +48,10 @@ class TestBatchOperationPartialFailures:
         group = DeviceGroup(real_devices)
 
         try:
-            # Should raise ExceptionGroup because fake device will timeout
-            with pytest.raises(ExceptionGroup) as exc_info:
+            # Should raise LifxTimeoutError because fake device will timeout
+            # (asyncio.gather raises the first exception immediately)
+            with pytest.raises(LifxTimeoutError):
                 await group.set_power(True, duration=0.0)
-
-            # ExceptionGroup should contain at least one timeout error
-            exceptions = exc_info.value.exceptions
-            assert len(exceptions) > 0
-            assert any(
-                "timeout" in str(e).lower() or "Timeout" in type(e).__name__
-                for e in exceptions
-            )
         finally:
             # Clean up fake device connection
             await fake_device.connection.close()
@@ -133,16 +131,9 @@ class TestBatchOperationEdgeCases:
         group = DeviceGroup(light_devices)
 
         try:
-            # Should raise ExceptionGroup with all 3 failing
-            with pytest.raises(ExceptionGroup) as exc_info:
+            # Should raise LifxTimeoutError (first exception from gather)
+            with pytest.raises(LifxTimeoutError):
                 await group.set_power(True, duration=0.0)
-
-            exceptions = exc_info.value.exceptions
-            assert len(exceptions) > 0
-            assert any(
-                "timeout" in str(e).lower() or "Timeout" in type(e).__name__
-                for e in exceptions
-            )
         finally:
             # Clean up fake device connections
             for device in light_devices:
@@ -151,7 +142,12 @@ class TestBatchOperationEdgeCases:
     async def test_batch_operation_mixed_success_failure(
         self, emulator_devices: DeviceGroup
     ):
-        """Test that successful devices complete even when others fail."""
+        """Test that an exception is raised when some devices fail.
+
+        Note: With asyncio.gather, the first exception is raised immediately.
+        Some devices may complete successfully before the exception is raised,
+        but this is not guaranteed due to concurrent execution.
+        """
         # Use one real device from emulator and add fake ones
         real_device = emulator_devices.devices[0]
 
@@ -176,13 +172,9 @@ class TestBatchOperationEdgeCases:
         group = DeviceGroup(light_devices)
 
         try:
-            # Attempt batch operation - should raise ExceptionGroup
-            with pytest.raises(ExceptionGroup):
+            # Attempt batch operation - should raise LifxTimeoutError
+            with pytest.raises(LifxTimeoutError):
                 await group.set_power(True, duration=0.0)
-
-            # Verify that the real device actually changed state
-            is_on = await real_device.get_power()
-            assert is_on  # Real device should be on
         finally:
             # Clean up fake device connections
             await fake_device_1.connection.close()
@@ -193,10 +185,8 @@ class TestBatchOperationEdgeCases:
 class TestBatchOperationErrorDetails:
     """Test detailed error information from batch operations."""
 
-    async def test_exception_group_contains_device_info(
-        self, emulator_devices: DeviceGroup
-    ):
-        """Test that ExceptionGroup contains useful device information."""
+    async def test_exception_contains_device_info(self, emulator_devices: DeviceGroup):
+        """Test that exception contains useful device information."""
         # Use one real device from emulator and add a fake device
         real_device = emulator_devices.devices[0]
 
@@ -214,30 +204,17 @@ class TestBatchOperationErrorDetails:
         group = DeviceGroup(light_devices)
 
         try:
-            # Trigger failure
-            with pytest.raises(ExceptionGroup) as exc_info:
+            # Trigger failure - asyncio.gather raises first exception
+            with pytest.raises(LifxTimeoutError) as exc_info:
                 await group.set_power(True, duration=0.0)
 
-            # ExceptionGroup should be present
-            assert exc_info.value is not None
-
-            # Should have at least one exception
-            exceptions = exc_info.value.exceptions
-            assert len(exceptions) > 0
-
-            # Exceptions should be specific LIFX exception types
-            for exc in exceptions:
-                # Should be a LIFX exception type
-                from lifx.exceptions import (
-                    LifxConnectionError,
-                    LifxProtocolError,
-                    LifxTimeoutError,
-                )
-
-                assert isinstance(
-                    exc,
-                    LifxTimeoutError | LifxConnectionError | LifxProtocolError,
-                ), f"Expected LIFX exception type, got {type(exc).__name__}: {exc}"
+            # Exception should contain useful info
+            exc = exc_info.value
+            assert exc is not None
+            # Exception message should mention timeout or device info
+            assert (
+                "timeout" in str(exc).lower() or "acknowledgement" in str(exc).lower()
+            )
         finally:
             # Clean up the fake device connection
             await fake_device.connection.close()

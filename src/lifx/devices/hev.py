@@ -119,10 +119,11 @@ class HevLight(Light):
     async def _setup(self) -> None:
         """Populate HEV light capabilities, state and metadata."""
         await super()._setup()
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(self.get_hev_config())
-            tg.create_task(self.get_hev_cycle())
-            tg.create_task(self.get_last_hev_result())
+        await asyncio.gather(
+            self.get_hev_config(),
+            self.get_hev_cycle(),
+            self.get_last_hev_result(),
+        )
 
     async def get_hev_cycle(self) -> HevCycleState:
         """Get current HEV cycle state.
@@ -413,12 +414,10 @@ class HevLight(Light):
         await super().refresh_state()
 
         # Fetch all HEV light state
-        async with asyncio.TaskGroup() as tg:
-            hev_cycle_task = tg.create_task(self.get_hev_cycle())
-            hev_result_task = tg.create_task(self.get_last_hev_result())
-
-        hev_cycle = hev_cycle_task.result()
-        hev_result = hev_result_task.result()
+        hev_cycle, hev_result = await asyncio.gather(
+            self.get_hev_cycle(),
+            self.get_last_hev_result(),
+        )
 
         self._state.hev_cycle = hev_cycle
         self._state.hev_result = hev_result
@@ -440,14 +439,11 @@ class HevLight(Light):
 
         # Fetch semi-static and volatile state in parallel
         # get_color returns color, power, and label in one request
-        async with asyncio.TaskGroup() as tg:
-            hev_cycle_task = tg.create_task(self.get_hev_cycle())
-            hev_config_task = tg.create_task(self.get_hev_config())
-            hev_result_task = tg.create_task(self.get_last_hev_result())
-
-        hev_cycle = hev_cycle_task.result()
-        hev_config = hev_config_task.result()
-        hev_result = hev_result_task.result()
+        hev_cycle, hev_config, hev_result = await asyncio.gather(
+            self.get_hev_cycle(),
+            self.get_hev_config(),
+            self.get_last_hev_result(),
+        )
 
         # Create state instance with HEV fields
         self._state = HevLightState.from_light_state(

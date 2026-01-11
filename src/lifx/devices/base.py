@@ -9,7 +9,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from math import floor, log10
-from typing import TYPE_CHECKING, Generic, Self, TypeVar, cast
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -26,6 +26,8 @@ from lifx.protocol import packets
 from lifx.protocol.models import Serial
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from lifx.devices import (
         CeilingLight,
         HevLight,
@@ -681,12 +683,13 @@ class Device(Generic[StateT]):
     async def _setup(self) -> None:
         """Populate device capabilities, state and metadata."""
         await self._ensure_capabilities()
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(self.get_host_firmware())
-            tg.create_task(self.get_wifi_firmware())
-            tg.create_task(self.get_label())
-            tg.create_task(self.get_location())
-            tg.create_task(self.get_group())
+        await asyncio.gather(
+            self.get_host_firmware(),
+            self.get_wifi_firmware(),
+            self.get_label(),
+            self.get_location(),
+            self.get_group(),
+        )
 
     async def get_mac_address(self) -> str:
         """Calculate and return the MAC address for this device."""
@@ -1669,21 +1672,21 @@ class Device(Generic[StateT]):
 
         # Fetch semi-static and volatile state in parallel
         # get_color returns color, power, and label in one request
-        async with asyncio.TaskGroup() as tg:
-            label_task = tg.create_task(self.get_label())
-            power_task = tg.create_task(self.get_power())
-            host_fw_task = tg.create_task(self.get_host_firmware())
-            wifi_fw_task = tg.create_task(self.get_wifi_firmware())
-            location_task = tg.create_task(self.get_location())
-            group_task = tg.create_task(self.get_group())
-
-        # Extract results
-        label = label_task.result()
-        power = power_task.result()
-        host_firmware = host_fw_task.result()
-        wifi_firmware = wifi_fw_task.result()
-        location_info = location_task.result()
-        group_info = group_task.result()
+        (
+            label,
+            power,
+            host_firmware,
+            wifi_firmware,
+            location_info,
+            group_info,
+        ) = await asyncio.gather(
+            self.get_label(),
+            self.get_power(),
+            self.get_host_firmware(),
+            self.get_wifi_firmware(),
+            self.get_location(),
+            self.get_group(),
+        )
 
         # Get MAC address (already calculated in get_host_firmware)
         mac_address = await self.get_mac_address()

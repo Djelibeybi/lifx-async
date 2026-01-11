@@ -198,9 +198,7 @@ class DeviceGroup:
             await group.set_power(True, duration=1.0)
             ```
         """
-        async with asyncio.TaskGroup() as tg:
-            for light in self.lights:
-                tg.create_task(light.set_power(on, duration))
+        await asyncio.gather(*(light.set_power(on, duration) for light in self.lights))
 
     async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
         """Set color for all Light devices in the group.
@@ -218,9 +216,9 @@ class DeviceGroup:
             await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
             ```
         """
-        async with asyncio.TaskGroup() as tg:
-            for light in self.lights:
-                tg.create_task(light.set_color(color, duration))
+        await asyncio.gather(
+            *(light.set_color(color, duration) for light in self.lights)
+        )
 
     async def set_brightness(self, brightness: float, duration: float = 0.0) -> None:
         """Set brightness for all Light devices in the group.
@@ -238,9 +236,9 @@ class DeviceGroup:
             await group.set_brightness(0.5, duration=1.0)
             ```
         """
-        async with asyncio.TaskGroup() as tg:
-            for light in self.lights:
-                tg.create_task(light.set_brightness(brightness, duration))
+        await asyncio.gather(
+            *(light.set_brightness(brightness, duration) for light in self.lights)
+        )
 
     async def pulse(
         self, color: HSBK, period: float = 1.0, cycles: float = 1.0
@@ -261,9 +259,9 @@ class DeviceGroup:
             await group.pulse(Colors.RED, period=1.0, cycles=1.0)
             ```
         """
-        async with asyncio.TaskGroup() as tg:
-            for light in self.lights:
-                tg.create_task(light.pulse(color, period, cycles))
+        await asyncio.gather(
+            *(light.pulse(color, period, cycles) for light in self.lights)
+        )
 
     # Location and Group Organization Methods
 
@@ -280,14 +278,13 @@ class DeviceGroup:
         )
 
         # Fetch all location info concurrently
-        tasks: dict[str, asyncio.Task[CollectionInfo | None]] = {}
-        async with asyncio.TaskGroup() as tg:
-            for device in self._devices:
-                tasks[device.serial] = tg.create_task(device.get_location())
+        location_results = await asyncio.gather(
+            *(device.get_location() for device in self._devices)
+        )
 
-        results: list[tuple[Device, CollectionInfo | None]] = []
-        for device in self._devices:
-            results.append((device, tasks[device.serial].result()))
+        results: list[tuple[Device, CollectionInfo | None]] = list(
+            zip(self._devices, location_results)
+        )
 
         # Group by location UUID
         for device, location_info in results:
@@ -332,15 +329,14 @@ class DeviceGroup:
         # Collect group info from all devices concurrently
         group_data: dict[str, list[tuple[Device, CollectionInfo]]] = defaultdict(list)
 
-        tasks: dict[str, asyncio.Task[CollectionInfo | None]] = {}
-        async with asyncio.TaskGroup() as tg:
-            for device in self._devices:
-                tasks[device.serial] = tg.create_task(device.get_group())
-
         # Fetch all group info concurrently
-        results: list[tuple[Device, CollectionInfo | None]] = []
-        for device in self._devices:
-            results.append((device, tasks[device.serial].result()))
+        group_results = await asyncio.gather(
+            *(device.get_group() for device in self._devices)
+        )
+
+        results: list[tuple[Device, CollectionInfo | None]] = list(
+            zip(self._devices, group_results)
+        )
 
         # Group by group UUID
         for device, group_info in results:
@@ -712,18 +708,20 @@ class DeviceGroup:
             await group.apply_theme(evening, power_on=True, duration=1.0)
             ```
         """
-        async with asyncio.TaskGroup() as tg:
+        await asyncio.gather(
             # Apply theme to all lights
-            for light in self.lights:
-                tg.create_task(light.apply_theme(theme, power_on, duration))
-
+            *(light.apply_theme(theme, power_on, duration) for light in self.lights),
             # Apply theme to all multizone lights
-            for multizone in self.multizone_lights:
-                tg.create_task(multizone.apply_theme(theme, power_on, duration))
-
+            *(
+                multizone.apply_theme(theme, power_on, duration)
+                for multizone in self.multizone_lights
+            ),
             # Apply theme to all matrix light devices
-            for matrix in self.matrix_lights:
-                tg.create_task(matrix.apply_theme(theme, power_on, duration))
+            *(
+                matrix.apply_theme(theme, power_on, duration)
+                for matrix in self.matrix_lights
+            ),
+        )
 
     def invalidate_metadata_cache(self) -> None:
         """Clear all cached location and group metadata.

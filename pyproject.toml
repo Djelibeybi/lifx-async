@@ -3,7 +3,7 @@ name = "lifx-async"
 version = "4.9.0"
 description = "A modern, type-safe, async Python library for controlling LIFX lights"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = []
 license = "UPL-1.0"
 license-files = ["LICENSE"]
@@ -19,6 +19,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Natural Language :: English",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -31,7 +32,7 @@ classifiers = [
 [dependency-groups]
 dev = [
     "hatchling>=1.27.0",
-    "lifx-emulator-core>=3.0.3",
+    "lifx-emulator-core>=3.1.0",
     "mkdocs-git-revision-date-localized-plugin>=1.4.7",
     "mkdocs-llmstxt>=0.4.0",
     "mkdocs-material>=9.6.22",
@@ -44,6 +45,7 @@ dev = [
     "pytest-sugar>=1.1.1",
     "pyyaml>=6.0.3",
     "ruff>=0.14.2",
+    "typing-extensions>=4.15.0",
 ]
 
 [build-system]
@@ -56,7 +58,7 @@ packages = ["src/lifx"]
 [tool.ruff]
 line-length = 88
 indent-width = 4
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.format]
 quote-style = "double"
@@ -72,10 +74,11 @@ ignore = []
 "src/lifx/{protocol,products}/generator.py" = ["E501"]
 "src/lifx/protocol/packets.py" = ["E501"]
 "src/lifx/products/registry.py" = ["E501"]
+"benchmarks/*.py" = ["E501"]
 
 [tool.pyright]
 typeCheckingMode = "standard"
-pythonVersion = "3.11"
+pythonVersion = "3.10"
 include = ["src"]
 exclude = [
     "**/__pycache__",
