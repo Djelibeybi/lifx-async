@@ -969,12 +969,10 @@ class MultiZoneLight(Light):
         """
         await super().refresh_state()
 
-        async with asyncio.TaskGroup() as tg:
-            zones_task = tg.create_task(self.get_all_color_zones())
-            effect_task = tg.create_task(self.get_effect())
-
-        zones = zones_task.result()
-        effect = effect_task.result()
+        zones, effect = await asyncio.gather(
+            self.get_all_color_zones(),
+            self.get_effect(),
+        )
 
         self._state.zones = zones
         self._state.effect = effect.effect_type
@@ -994,12 +992,10 @@ class MultiZoneLight(Light):
         """
         light_state = await super()._initialize_state()
 
-        async with asyncio.TaskGroup() as tg:
-            zones_task = tg.create_task(self.get_all_color_zones())
-            effect_task = tg.create_task(self.get_effect())
-
-        zones = zones_task.result()
-        effect = effect_task.result()
+        zones, effect = await asyncio.gather(
+            self.get_all_color_zones(),
+            self.get_effect(),
+        )
 
         self._state = MultiZoneLightState.from_light_state(
             light_state=light_state, zones=zones, effect=effect.effect_type

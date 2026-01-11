@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
-    from typing import Self
+    from typing_extensions import Self
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
