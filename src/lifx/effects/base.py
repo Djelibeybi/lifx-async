@@ -85,22 +85,26 @@ class LIFXEffect(ABC):
         if self.power_on:
             needs_power_on = False
 
-            async def power_on_if_needed(light: Light) -> None:
-                """Power on a single light if it's currently off."""
-                nonlocal needs_power_on
+            async def power_on_if_needed(light: Light) -> bool:
+                """Power on a single light if it's currently off.
+
+                Returns True if the light was powered on.
+                """
                 is_on = await light.get_power()
                 if not is_on:
-                    needs_power_on = True
                     # Get startup color for this light
                     startup_color = await self.from_poweroff_hsbk(light)
                     # Set color immediately, then power on
                     await light.set_color(startup_color, duration=0)
                     await light.set_power(True, duration=POWER_ON_TRANSITION_DURATION)
+                    return True
+                return False
 
             # Power on all lights concurrently
-            async with asyncio.TaskGroup() as tg:
-                for light in self.participants:
-                    tg.create_task(power_on_if_needed(light))
+            results = await asyncio.gather(
+                *(power_on_if_needed(light) for light in self.participants)
+            )
+            needs_power_on = any(results)
 
             # Wait for power transition to complete if any lights were powered on
             if needs_power_on:

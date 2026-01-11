@@ -154,36 +154,32 @@ class Conductor:
 
             # Capture prestates in parallel for all lights that need it
             if lights_needing_capture:
-                captured: list[tuple[str, PreState]] = [None] * len(  # type: ignore
-                    lights_needing_capture
+
+                async def capture_and_log(device: Light) -> tuple[str, PreState]:
+                    prestate = await self._state_manager.capture_state(device)
+                    _LOGGER.debug(
+                        {
+                            "class": self.__class__.__name__,
+                            "method": "start",
+                            "action": "capture",
+                            "values": {
+                                "serial": device.serial,
+                                "power": prestate.power,
+                                "color": {
+                                    "hue": prestate.color.hue,
+                                    "saturation": prestate.color.saturation,
+                                    "brightness": prestate.color.brightness,
+                                    "kelvin": prestate.color.kelvin,
+                                },
+                                "has_zones": prestate.zone_colors is not None,
+                            },
+                        }
+                    )
+                    return (device.serial, prestate)
+
+                captured = await asyncio.gather(
+                    *(capture_and_log(light) for _, light in lights_needing_capture)
                 )
-
-                async with asyncio.TaskGroup() as tg:
-                    for capture_idx, (_, light) in enumerate(lights_needing_capture):
-
-                        async def capture_and_store(cidx: int, device: Light) -> None:
-                            prestate = await self._state_manager.capture_state(device)
-                            captured[cidx] = (device.serial, prestate)
-                            _LOGGER.debug(
-                                {
-                                    "class": self.__class__.__name__,
-                                    "method": "start",
-                                    "action": "capture",
-                                    "values": {
-                                        "serial": device.serial,
-                                        "power": prestate.power,
-                                        "color": {
-                                            "hue": prestate.color.hue,
-                                            "saturation": prestate.color.saturation,
-                                            "brightness": prestate.color.brightness,
-                                            "kelvin": prestate.color.kelvin,
-                                        },
-                                        "has_zones": prestate.zone_colors is not None,
-                                    },
-                                }
-                            )
-
-                        tg.create_task(capture_and_store(capture_idx, light))
 
                 # Store captured prestates
                 for serial, prestate in captured:
@@ -257,11 +253,12 @@ class Conductor:
         async with self._lock:
             # Restore all lights in parallel
             if lights_to_restore:
-                async with asyncio.TaskGroup() as tg:
-                    for light, prestate in lights_to_restore:
-                        tg.create_task(
-                            self._state_manager.restore_state(light, prestate)
-                        )
+                await asyncio.gather(
+                    *(
+                        self._state_manager.restore_state(light, prestate)
+                        for light, prestate in lights_to_restore
+                    )
+                )
 
             # Remove from running registry after restoration
             for light in lights:
@@ -304,11 +301,12 @@ class Conductor:
 
                 # Restore all lights in parallel
                 if lights_to_restore:
-                    async with asyncio.TaskGroup() as tg:
-                        for light, prestate in lights_to_restore:
-                            tg.create_task(
-                                self._state_manager.restore_state(light, prestate)
-                            )
+                    await asyncio.gather(
+                        *(
+                            self._state_manager.restore_state(light, prestate)
+                            for light, prestate in lights_to_restore
+                        )
+                    )
 
                 # Remove from running registry after restoration
                 for light in participants:
@@ -367,10 +365,9 @@ class Conductor:
         Returns:
             List of lights compatible with the effect
         """
-        # Check all lights in parallel using effect's compatibility check
-        results: list[tuple[Light, bool]] = []
 
-        async def check_and_store(light: Light) -> None:
+        # Check all lights in parallel using effect's compatibility check
+        async def check_compatibility(light: Light) -> tuple[Light, bool]:
             """Check if a single light is compatible with the effect."""
             is_compatible = await effect.is_light_compatible(light)
 
@@ -388,11 +385,11 @@ class Conductor:
                     }
                 )
 
-            results.append((light, is_compatible))
+            return (light, is_compatible)
 
-        async with asyncio.TaskGroup() as tg:
-            for light in participants:
-                tg.create_task(check_and_store(light))
+        results = await asyncio.gather(
+            *(check_compatibility(light) for light in participants)
+        )
 
         # Filter to only compatible lights
         compatible = [light for light, is_compatible in results if is_compatible]
