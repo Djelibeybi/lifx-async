@@ -720,9 +720,7 @@ async def set_power(self, on: bool, duration: float = 0.0) -> None:
         await group.set_power(True, duration=1.0)
         ```
     """
-    async with asyncio.TaskGroup() as tg:
-        for light in self.lights:
-            tg.create_task(light.set_power(on, duration))
+    await asyncio.gather(*(light.set_power(on, duration) for light in self.lights))
 ````
 
 ##### set_color
@@ -767,9 +765,9 @@ async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
         await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
         ```
     """
-    async with asyncio.TaskGroup() as tg:
-        for light in self.lights:
-            tg.create_task(light.set_color(color, duration))
+    await asyncio.gather(
+        *(light.set_color(color, duration) for light in self.lights)
+    )
 ````
 
 ##### set_brightness
@@ -814,9 +812,9 @@ async def set_brightness(self, brightness: float, duration: float = 0.0) -> None
         await group.set_brightness(0.5, duration=1.0)
         ```
     """
-    async with asyncio.TaskGroup() as tg:
-        for light in self.lights:
-            tg.create_task(light.set_brightness(brightness, duration))
+    await asyncio.gather(
+        *(light.set_brightness(brightness, duration) for light in self.lights)
+    )
 ````
 
 ##### pulse
@@ -865,9 +863,9 @@ async def pulse(
         await group.pulse(Colors.RED, period=1.0, cycles=1.0)
         ```
     """
-    async with asyncio.TaskGroup() as tg:
-        for light in self.lights:
-            tg.create_task(light.pulse(color, period, cycles))
+    await asyncio.gather(
+        *(light.pulse(color, period, cycles) for light in self.lights)
+    )
 ````
 
 ##### organize_by_location
@@ -1301,18 +1299,20 @@ async def apply_theme(
         await group.apply_theme(evening, power_on=True, duration=1.0)
         ```
     """
-    async with asyncio.TaskGroup() as tg:
+    await asyncio.gather(
         # Apply theme to all lights
-        for light in self.lights:
-            tg.create_task(light.apply_theme(theme, power_on, duration))
-
+        *(light.apply_theme(theme, power_on, duration) for light in self.lights),
         # Apply theme to all multizone lights
-        for multizone in self.multizone_lights:
-            tg.create_task(multizone.apply_theme(theme, power_on, duration))
-
+        *(
+            multizone.apply_theme(theme, power_on, duration)
+            for multizone in self.multizone_lights
+        ),
         # Apply theme to all matrix light devices
-        for matrix in self.matrix_lights:
-            tg.create_task(matrix.apply_theme(theme, power_on, duration))
+        *(
+            matrix.apply_theme(theme, power_on, duration)
+            for matrix in self.matrix_lights
+        ),
+    )
 ````
 
 ##### invalidate_metadata_cache

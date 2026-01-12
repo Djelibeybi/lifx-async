@@ -4513,12 +4513,10 @@ async def refresh_state(self) -> None:
     await super().refresh_state()
 
     # Fetch all HEV light state
-    async with asyncio.TaskGroup() as tg:
-        hev_cycle_task = tg.create_task(self.get_hev_cycle())
-        hev_result_task = tg.create_task(self.get_last_hev_result())
-
-    hev_cycle = hev_cycle_task.result()
-    hev_result = hev_result_task.result()
+    hev_cycle, hev_result = await asyncio.gather(
+        self.get_hev_cycle(),
+        self.get_last_hev_result(),
+    )
 
     self._state.hev_cycle = hev_cycle
     self._state.hev_result = hev_result
@@ -6241,12 +6239,10 @@ async def refresh_state(self) -> None:
     """
     await super().refresh_state()
 
-    async with asyncio.TaskGroup() as tg:
-        zones_task = tg.create_task(self.get_all_color_zones())
-        effect_task = tg.create_task(self.get_effect())
-
-    zones = zones_task.result()
-    effect = effect_task.result()
+    zones, effect = await asyncio.gather(
+        self.get_all_color_zones(),
+        self.get_effect(),
+    )
 
     self._state.zones = zones
     self._state.effect = effect.effect_type

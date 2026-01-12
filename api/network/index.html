@@ -4340,7 +4340,8 @@ It uses asyncio for async I/O operations.</p>
 <span class="normal"><a href="#__codelineno-0-253">253</a></span>
 <span class="normal"><a href="#__codelineno-0-254">254</a></span>
 <span class="normal"><a href="#__codelineno-0-255">255</a></span>
-<span class="normal"><a href="#__codelineno-0-256">256</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">receive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="normal"><a href="#__codelineno-0-256">256</a></span>
+<span class="normal"><a href="#__codelineno-0-257">257</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">receive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
 </span><span id="__span-0-191"><a id="__codelineno-0-191" name="__codelineno-0-191"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Receive data from socket with size validation.</span>
 </span><span id="__span-0-192"><a id="__codelineno-0-192" name="__codelineno-0-192"></a>
 </span><span id="__span-0-193"><a id="__codelineno-0-193" name="__codelineno-0-193"></a><span class="sd">    Args:</span>
@@ -4358,55 +4359,56 @@ It uses asyncio for async I/O operations.</p>
 </span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a>        <span class="k">raise</span> <span class="n">LifxNetworkError</span><span class="p">(</span><span class="s2">&quot;Socket not open&quot;</span><span class="p">)</span>
 </span><span id="__span-0-206"><a id="__codelineno-0-206" name="__codelineno-0-206"></a>
 </span><span id="__span-0-207"><a id="__codelineno-0-207" name="__codelineno-0-207"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-208"><a id="__codelineno-0-208" name="__codelineno-0-208"></a>        <span class="k">async</span> <span class="k">with</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">):</span>
-</span><span id="__span-0-209"><a id="__codelineno-0-209" name="__codelineno-0-209"></a>            <span class="n">data</span><span class="p">,</span> <span class="n">addr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-</span><span id="__span-0-210"><a id="__codelineno-0-210" name="__codelineno-0-210"></a>
-</span><span id="__span-0-211"><a id="__codelineno-0-211" name="__codelineno-0-211"></a>            <span class="c1"># Validate packet size</span>
-</span><span id="__span-0-212"><a id="__codelineno-0-212" name="__codelineno-0-212"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_PACKET_SIZE</span><span class="p">:</span>
-</span><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a>                <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifxProtocolError</span>
-</span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a>
-</span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a>                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a>                    <span class="p">{</span>
-</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a>                        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
-</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a>                        <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;receive&quot;</span><span class="p">,</span>
-</span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a>                        <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;packet_too_large&quot;</span><span class="p">,</span>
-</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a>                        <span class="s2">&quot;packet_size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
-</span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a>                        <span class="s2">&quot;max_size&quot;</span><span class="p">:</span> <span class="n">MAX_PACKET_SIZE</span><span class="p">,</span>
-</span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>                    <span class="p">}</span>
-</span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a>                <span class="p">)</span>
-</span><span id="__span-0-224"><a id="__codelineno-0-224" name="__codelineno-0-224"></a>                <span class="k">raise</span> <span class="n">LifxProtocolError</span><span class="p">(</span>
-</span><span id="__span-0-225"><a id="__codelineno-0-225" name="__codelineno-0-225"></a>                    <span class="sa">f</span><span class="s2">&quot;Packet too big: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2"> bytes &gt; </span><span class="si">{</span><span class="n">MAX_PACKET_SIZE</span><span class="si">}</span><span class="s2"> bytes&quot;</span>
-</span><span id="__span-0-226"><a id="__codelineno-0-226" name="__codelineno-0-226"></a>                <span class="p">)</span>
+</span><span id="__span-0-208"><a id="__codelineno-0-208" name="__codelineno-0-208"></a>        <span class="n">data</span><span class="p">,</span> <span class="n">addr</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait_for</span><span class="p">(</span>
+</span><span id="__span-0-209"><a id="__codelineno-0-209" name="__codelineno-0-209"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">(),</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span>
+</span><span id="__span-0-210"><a id="__codelineno-0-210" name="__codelineno-0-210"></a>        <span class="p">)</span>
+</span><span id="__span-0-211"><a id="__codelineno-0-211" name="__codelineno-0-211"></a>    <span class="k">except</span> <span class="ne">TimeoutError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-0-212"><a id="__codelineno-0-212" name="__codelineno-0-212"></a>        <span class="k">raise</span> <span class="n">LifxTimeoutError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No data received within </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a>    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+</span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a>            <span class="p">{</span>
+</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
+</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;receive&quot;</span><span class="p">,</span>
+</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;failed&quot;</span><span class="p">,</span>
+</span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a>                <span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span>
+</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a>            <span class="p">}</span>
+</span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a>        <span class="p">)</span>
+</span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>        <span class="k">raise</span> <span class="n">LifxNetworkError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to receive data: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a>
+</span><span id="__span-0-224"><a id="__codelineno-0-224" name="__codelineno-0-224"></a>    <span class="c1"># Validate packet size</span>
+</span><span id="__span-0-225"><a id="__codelineno-0-225" name="__codelineno-0-225"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_PACKET_SIZE</span><span class="p">:</span>
+</span><span id="__span-0-226"><a id="__codelineno-0-226" name="__codelineno-0-226"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifxProtocolError</span>
 </span><span id="__span-0-227"><a id="__codelineno-0-227" name="__codelineno-0-227"></a>
-</span><span id="__span-0-228"><a id="__codelineno-0-228" name="__codelineno-0-228"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">MIN_PACKET_SIZE</span><span class="p">:</span>
-</span><span id="__span-0-229"><a id="__codelineno-0-229" name="__codelineno-0-229"></a>                <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifxProtocolError</span>
-</span><span id="__span-0-230"><a id="__codelineno-0-230" name="__codelineno-0-230"></a>
-</span><span id="__span-0-231"><a id="__codelineno-0-231" name="__codelineno-0-231"></a>                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-</span><span id="__span-0-232"><a id="__codelineno-0-232" name="__codelineno-0-232"></a>                    <span class="p">{</span>
-</span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a>                        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
-</span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a>                        <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;receive&quot;</span><span class="p">,</span>
-</span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a>                        <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;packet_too_small&quot;</span><span class="p">,</span>
-</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a>                        <span class="s2">&quot;packet_size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
-</span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a>                        <span class="s2">&quot;min_size&quot;</span><span class="p">:</span> <span class="n">MIN_PACKET_SIZE</span><span class="p">,</span>
-</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a>                    <span class="p">}</span>
-</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a>                <span class="p">)</span>
-</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a>                <span class="k">raise</span> <span class="n">LifxProtocolError</span><span class="p">(</span>
-</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a>                    <span class="sa">f</span><span class="s2">&quot;Packet too small: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2"> bytes &lt; </span><span class="si">{</span><span class="n">MIN_PACKET_SIZE</span><span class="si">}</span><span class="s2"> bytes&quot;</span>
-</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a>                <span class="p">)</span>
+</span><span id="__span-0-228"><a id="__codelineno-0-228" name="__codelineno-0-228"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+</span><span id="__span-0-229"><a id="__codelineno-0-229" name="__codelineno-0-229"></a>            <span class="p">{</span>
+</span><span id="__span-0-230"><a id="__codelineno-0-230" name="__codelineno-0-230"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
+</span><span id="__span-0-231"><a id="__codelineno-0-231" name="__codelineno-0-231"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;receive&quot;</span><span class="p">,</span>
+</span><span id="__span-0-232"><a id="__codelineno-0-232" name="__codelineno-0-232"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;packet_too_large&quot;</span><span class="p">,</span>
+</span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a>                <span class="s2">&quot;packet_size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
+</span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a>                <span class="s2">&quot;max_size&quot;</span><span class="p">:</span> <span class="n">MAX_PACKET_SIZE</span><span class="p">,</span>
+</span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a>            <span class="p">}</span>
+</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a>        <span class="p">)</span>
+</span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a>        <span class="k">raise</span> <span class="n">LifxProtocolError</span><span class="p">(</span>
+</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a>            <span class="sa">f</span><span class="s2">&quot;Packet too big: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2"> bytes &gt; </span><span class="si">{</span><span class="n">MAX_PACKET_SIZE</span><span class="si">}</span><span class="s2"> bytes&quot;</span>
+</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a>        <span class="p">)</span>
+</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a>
+</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">MIN_PACKET_SIZE</span><span class="p">:</span>
+</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">lifx.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifxProtocolError</span>
 </span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a>
-</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a>            <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">addr</span>
-</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a>    <span class="k">except</span> <span class="ne">TimeoutError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a>        <span class="k">raise</span> <span class="n">LifxTimeoutError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No data received within </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
-</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a>    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a>            <span class="p">{</span>
-</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
-</span><span id="__span-0-251"><a id="__codelineno-0-251" name="__codelineno-0-251"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;receive&quot;</span><span class="p">,</span>
-</span><span id="__span-0-252"><a id="__codelineno-0-252" name="__codelineno-0-252"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;failed&quot;</span><span class="p">,</span>
-</span><span id="__span-0-253"><a id="__codelineno-0-253" name="__codelineno-0-253"></a>                <span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span>
-</span><span id="__span-0-254"><a id="__codelineno-0-254" name="__codelineno-0-254"></a>            <span class="p">}</span>
+</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a>            <span class="p">{</span>
+</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
+</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;receive&quot;</span><span class="p">,</span>
+</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;packet_too_small&quot;</span><span class="p">,</span>
+</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a>                <span class="s2">&quot;packet_size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
+</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a>                <span class="s2">&quot;min_size&quot;</span><span class="p">:</span> <span class="n">MIN_PACKET_SIZE</span><span class="p">,</span>
+</span><span id="__span-0-251"><a id="__codelineno-0-251" name="__codelineno-0-251"></a>            <span class="p">}</span>
+</span><span id="__span-0-252"><a id="__codelineno-0-252" name="__codelineno-0-252"></a>        <span class="p">)</span>
+</span><span id="__span-0-253"><a id="__codelineno-0-253" name="__codelineno-0-253"></a>        <span class="k">raise</span> <span class="n">LifxProtocolError</span><span class="p">(</span>
+</span><span id="__span-0-254"><a id="__codelineno-0-254" name="__codelineno-0-254"></a>            <span class="sa">f</span><span class="s2">&quot;Packet too small: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2"> bytes &lt; </span><span class="si">{</span><span class="n">MIN_PACKET_SIZE</span><span class="si">}</span><span class="s2"> bytes&quot;</span>
 </span><span id="__span-0-255"><a id="__codelineno-0-255" name="__codelineno-0-255"></a>        <span class="p">)</span>
-</span><span id="__span-0-256"><a id="__codelineno-0-256" name="__codelineno-0-256"></a>        <span class="k">raise</span> <span class="n">LifxNetworkError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to receive data: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-256"><a id="__codelineno-0-256" name="__codelineno-0-256"></a>
+</span><span id="__span-0-257"><a id="__codelineno-0-257" name="__codelineno-0-257"></a>    <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">addr</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4537,8 +4539,7 @@ It uses asyncio for async I/O operations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/network/transport.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-258">258</a></span>
-<span class="normal"><a href="#__codelineno-0-259">259</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-259">259</a></span>
 <span class="normal"><a href="#__codelineno-0-260">260</a></span>
 <span class="normal"><a href="#__codelineno-0-261">261</a></span>
 <span class="normal"><a href="#__codelineno-0-262">262</a></span>
@@ -4584,54 +4585,67 @@ It uses asyncio for async I/O operations.</p>
 <span class="normal"><a href="#__codelineno-0-302">302</a></span>
 <span class="normal"><a href="#__codelineno-0-303">303</a></span>
 <span class="normal"><a href="#__codelineno-0-304">304</a></span>
-<span class="normal"><a href="#__codelineno-0-305">305</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-258"><a id="__codelineno-0-258" name="__codelineno-0-258"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">receive_many</span><span class="p">(</span>
-</span><span id="__span-0-259"><a id="__codelineno-0-259" name="__codelineno-0-259"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span> <span class="n">max_packets</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-260"><a id="__codelineno-0-260" name="__codelineno-0-260"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
-</span><span id="__span-0-261"><a id="__codelineno-0-261" name="__codelineno-0-261"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Receive multiple packets within timeout period.</span>
-</span><span id="__span-0-262"><a id="__codelineno-0-262" name="__codelineno-0-262"></a>
-</span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">        timeout: Total timeout in seconds</span>
-</span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a><span class="sd">        max_packets: Maximum number of packets to receive (None for unlimited)</span>
-</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a>
-</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a><span class="sd">        List of (data, address) tuples</span>
-</span><span id="__span-0-269"><a id="__codelineno-0-269" name="__codelineno-0-269"></a>
-</span><span id="__span-0-270"><a id="__codelineno-0-270" name="__codelineno-0-270"></a><span class="sd">    Raises:</span>
-</span><span id="__span-0-271"><a id="__codelineno-0-271" name="__codelineno-0-271"></a><span class="sd">        NetworkError: If socket is not open</span>
-</span><span id="__span-0-272"><a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-273"><a id="__codelineno-0-273" name="__codelineno-0-273"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-274"><a id="__codelineno-0-274" name="__codelineno-0-274"></a>        <span class="k">raise</span> <span class="n">LifxNetworkError</span><span class="p">(</span><span class="s2">&quot;Socket not open&quot;</span><span class="p">)</span>
-</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a>
-</span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a>    <span class="n">packets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a>
-</span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a>        <span class="k">async</span> <span class="k">with</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">):</span>
-</span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a>            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-</span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>                <span class="k">if</span> <span class="n">max_packets</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">packets</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">max_packets</span><span class="p">:</span>
-</span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a>                    <span class="k">break</span>
-</span><span id="__span-0-283"><a id="__codelineno-0-283" name="__codelineno-0-283"></a>
-</span><span id="__span-0-284"><a id="__codelineno-0-284" name="__codelineno-0-284"></a>                <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-285"><a id="__codelineno-0-285" name="__codelineno-0-285"></a>                    <span class="n">data</span><span class="p">,</span> <span class="n">addr</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-</span><span id="__span-0-286"><a id="__codelineno-0-286" name="__codelineno-0-286"></a>
-</span><span id="__span-0-287"><a id="__codelineno-0-287" name="__codelineno-0-287"></a>                    <span class="c1"># Validate packet size</span>
-</span><span id="__span-0-288"><a id="__codelineno-0-288" name="__codelineno-0-288"></a>                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_PACKET_SIZE</span><span class="p">:</span>
-</span><span id="__span-0-289"><a id="__codelineno-0-289" name="__codelineno-0-289"></a>                        <span class="c1"># Drop oversized packet to prevent memory exhaustion DoS</span>
-</span><span id="__span-0-290"><a id="__codelineno-0-290" name="__codelineno-0-290"></a>                        <span class="k">continue</span>
-</span><span id="__span-0-291"><a id="__codelineno-0-291" name="__codelineno-0-291"></a>
-</span><span id="__span-0-292"><a id="__codelineno-0-292" name="__codelineno-0-292"></a>                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">MIN_PACKET_SIZE</span><span class="p">:</span>
-</span><span id="__span-0-293"><a id="__codelineno-0-293" name="__codelineno-0-293"></a>                        <span class="c1"># Drop undersized packet (header is 36 bytes)</span>
-</span><span id="__span-0-294"><a id="__codelineno-0-294" name="__codelineno-0-294"></a>                        <span class="k">continue</span>
-</span><span id="__span-0-295"><a id="__codelineno-0-295" name="__codelineno-0-295"></a>
-</span><span id="__span-0-296"><a id="__codelineno-0-296" name="__codelineno-0-296"></a>                    <span class="n">packets</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">data</span><span class="p">,</span> <span class="n">addr</span><span class="p">))</span>
-</span><span id="__span-0-297"><a id="__codelineno-0-297" name="__codelineno-0-297"></a>                <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
-</span><span id="__span-0-298"><a id="__codelineno-0-298" name="__codelineno-0-298"></a>                    <span class="c1"># Ignore individual receive errors</span>
-</span><span id="__span-0-299"><a id="__codelineno-0-299" name="__codelineno-0-299"></a>                    <span class="k">break</span>
-</span><span id="__span-0-300"><a id="__codelineno-0-300" name="__codelineno-0-300"></a>
-</span><span id="__span-0-301"><a id="__codelineno-0-301" name="__codelineno-0-301"></a>    <span class="k">except</span> <span class="ne">TimeoutError</span><span class="p">:</span>
-</span><span id="__span-0-302"><a id="__codelineno-0-302" name="__codelineno-0-302"></a>        <span class="c1"># Timeout is expected - return what we collected</span>
-</span><span id="__span-0-303"><a id="__codelineno-0-303" name="__codelineno-0-303"></a>        <span class="k">pass</span>
-</span><span id="__span-0-304"><a id="__codelineno-0-304" name="__codelineno-0-304"></a>
-</span><span id="__span-0-305"><a id="__codelineno-0-305" name="__codelineno-0-305"></a>    <span class="k">return</span> <span class="n">packets</span>
+<span class="normal"><a href="#__codelineno-0-305">305</a></span>
+<span class="normal"><a href="#__codelineno-0-306">306</a></span>
+<span class="normal"><a href="#__codelineno-0-307">307</a></span>
+<span class="normal"><a href="#__codelineno-0-308">308</a></span>
+<span class="normal"><a href="#__codelineno-0-309">309</a></span>
+<span class="normal"><a href="#__codelineno-0-310">310</a></span>
+<span class="normal"><a href="#__codelineno-0-311">311</a></span>
+<span class="normal"><a href="#__codelineno-0-312">312</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-259"><a id="__codelineno-0-259" name="__codelineno-0-259"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">receive_many</span><span class="p">(</span>
+</span><span id="__span-0-260"><a id="__codelineno-0-260" name="__codelineno-0-260"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span> <span class="n">max_packets</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-261"><a id="__codelineno-0-261" name="__codelineno-0-261"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+</span><span id="__span-0-262"><a id="__codelineno-0-262" name="__codelineno-0-262"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Receive multiple packets within timeout period.</span>
+</span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a>
+</span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a><span class="sd">        timeout: Total timeout in seconds</span>
+</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">        max_packets: Maximum number of packets to receive (None for unlimited)</span>
+</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a>
+</span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-269"><a id="__codelineno-0-269" name="__codelineno-0-269"></a><span class="sd">        List of (data, address) tuples</span>
+</span><span id="__span-0-270"><a id="__codelineno-0-270" name="__codelineno-0-270"></a>
+</span><span id="__span-0-271"><a id="__codelineno-0-271" name="__codelineno-0-271"></a><span class="sd">    Raises:</span>
+</span><span id="__span-0-272"><a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="sd">        NetworkError: If socket is not open</span>
+</span><span id="__span-0-273"><a id="__codelineno-0-273" name="__codelineno-0-273"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-274"><a id="__codelineno-0-274" name="__codelineno-0-274"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a>        <span class="k">raise</span> <span class="n">LifxNetworkError</span><span class="p">(</span><span class="s2">&quot;Socket not open&quot;</span><span class="p">)</span>
+</span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a>
+</span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a>
+</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a>    <span class="n">packets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a>    <span class="n">deadline</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">+</span> <span class="n">timeout</span>
+</span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>
+</span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a>    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+</span><span id="__span-0-283"><a id="__codelineno-0-283" name="__codelineno-0-283"></a>        <span class="k">if</span> <span class="n">max_packets</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">packets</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">max_packets</span><span class="p">:</span>
+</span><span id="__span-0-284"><a id="__codelineno-0-284" name="__codelineno-0-284"></a>            <span class="k">break</span>
+</span><span id="__span-0-285"><a id="__codelineno-0-285" name="__codelineno-0-285"></a>
+</span><span id="__span-0-286"><a id="__codelineno-0-286" name="__codelineno-0-286"></a>        <span class="n">remaining</span> <span class="o">=</span> <span class="n">deadline</span> <span class="o">-</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+</span><span id="__span-0-287"><a id="__codelineno-0-287" name="__codelineno-0-287"></a>        <span class="k">if</span> <span class="n">remaining</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="__span-0-288"><a id="__codelineno-0-288" name="__codelineno-0-288"></a>            <span class="k">break</span>
+</span><span id="__span-0-289"><a id="__codelineno-0-289" name="__codelineno-0-289"></a>
+</span><span id="__span-0-290"><a id="__codelineno-0-290" name="__codelineno-0-290"></a>        <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-0-291"><a id="__codelineno-0-291" name="__codelineno-0-291"></a>            <span class="n">data</span><span class="p">,</span> <span class="n">addr</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait_for</span><span class="p">(</span>
+</span><span id="__span-0-292"><a id="__codelineno-0-292" name="__codelineno-0-292"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">(),</span> <span class="n">timeout</span><span class="o">=</span><span class="n">remaining</span>
+</span><span id="__span-0-293"><a id="__codelineno-0-293" name="__codelineno-0-293"></a>            <span class="p">)</span>
+</span><span id="__span-0-294"><a id="__codelineno-0-294" name="__codelineno-0-294"></a>
+</span><span id="__span-0-295"><a id="__codelineno-0-295" name="__codelineno-0-295"></a>            <span class="c1"># Validate packet size</span>
+</span><span id="__span-0-296"><a id="__codelineno-0-296" name="__codelineno-0-296"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_PACKET_SIZE</span><span class="p">:</span>
+</span><span id="__span-0-297"><a id="__codelineno-0-297" name="__codelineno-0-297"></a>                <span class="c1"># Drop oversized packet to prevent memory exhaustion DoS</span>
+</span><span id="__span-0-298"><a id="__codelineno-0-298" name="__codelineno-0-298"></a>                <span class="k">continue</span>
+</span><span id="__span-0-299"><a id="__codelineno-0-299" name="__codelineno-0-299"></a>
+</span><span id="__span-0-300"><a id="__codelineno-0-300" name="__codelineno-0-300"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">MIN_PACKET_SIZE</span><span class="p">:</span>
+</span><span id="__span-0-301"><a id="__codelineno-0-301" name="__codelineno-0-301"></a>                <span class="c1"># Drop undersized packet (header is 36 bytes)</span>
+</span><span id="__span-0-302"><a id="__codelineno-0-302" name="__codelineno-0-302"></a>                <span class="k">continue</span>
+</span><span id="__span-0-303"><a id="__codelineno-0-303" name="__codelineno-0-303"></a>
+</span><span id="__span-0-304"><a id="__codelineno-0-304" name="__codelineno-0-304"></a>            <span class="n">packets</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">data</span><span class="p">,</span> <span class="n">addr</span><span class="p">))</span>
+</span><span id="__span-0-305"><a id="__codelineno-0-305" name="__codelineno-0-305"></a>        <span class="k">except</span> <span class="ne">TimeoutError</span><span class="p">:</span>
+</span><span id="__span-0-306"><a id="__codelineno-0-306" name="__codelineno-0-306"></a>            <span class="c1"># Timeout is expected - return what we collected</span>
+</span><span id="__span-0-307"><a id="__codelineno-0-307" name="__codelineno-0-307"></a>            <span class="k">break</span>
+</span><span id="__span-0-308"><a id="__codelineno-0-308" name="__codelineno-0-308"></a>        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+</span><span id="__span-0-309"><a id="__codelineno-0-309" name="__codelineno-0-309"></a>            <span class="c1"># Ignore individual receive errors</span>
+</span><span id="__span-0-310"><a id="__codelineno-0-310" name="__codelineno-0-310"></a>            <span class="k">break</span>
+</span><span id="__span-0-311"><a id="__codelineno-0-311" name="__codelineno-0-311"></a>
+</span><span id="__span-0-312"><a id="__codelineno-0-312" name="__codelineno-0-312"></a>    <span class="k">return</span> <span class="n">packets</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4660,14 +4674,7 @@ It uses asyncio for async I/O operations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/network/transport.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-307">307</a></span>
-<span class="normal"><a href="#__codelineno-0-308">308</a></span>
-<span class="normal"><a href="#__codelineno-0-309">309</a></span>
-<span class="normal"><a href="#__codelineno-0-310">310</a></span>
-<span class="normal"><a href="#__codelineno-0-311">311</a></span>
-<span class="normal"><a href="#__codelineno-0-312">312</a></span>
-<span class="normal"><a href="#__codelineno-0-313">313</a></span>
-<span class="normal"><a href="#__codelineno-0-314">314</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-314">314</a></span>
 <span class="normal"><a href="#__codelineno-0-315">315</a></span>
 <span class="normal"><a href="#__codelineno-0-316">316</a></span>
 <span class="normal"><a href="#__codelineno-0-317">317</a></span>
@@ -4679,26 +4686,33 @@ It uses asyncio for async I/O operations.</p>
 <span class="normal"><a href="#__codelineno-0-323">323</a></span>
 <span class="normal"><a href="#__codelineno-0-324">324</a></span>
 <span class="normal"><a href="#__codelineno-0-325">325</a></span>
-<span class="normal"><a href="#__codelineno-0-326">326</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-307"><a id="__codelineno-0-307" name="__codelineno-0-307"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-308"><a id="__codelineno-0-308" name="__codelineno-0-308"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Close the UDP socket.&quot;&quot;&quot;</span>
-</span><span id="__span-0-309"><a id="__codelineno-0-309" name="__codelineno-0-309"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-310"><a id="__codelineno-0-310" name="__codelineno-0-310"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="__span-0-311"><a id="__codelineno-0-311" name="__codelineno-0-311"></a>            <span class="p">{</span>
-</span><span id="__span-0-312"><a id="__codelineno-0-312" name="__codelineno-0-312"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
-</span><span id="__span-0-313"><a id="__codelineno-0-313" name="__codelineno-0-313"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;close&quot;</span><span class="p">,</span>
-</span><span id="__span-0-314"><a id="__codelineno-0-314" name="__codelineno-0-314"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;closing&quot;</span><span class="p">,</span>
-</span><span id="__span-0-315"><a id="__codelineno-0-315" name="__codelineno-0-315"></a>            <span class="p">}</span>
-</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>        <span class="p">)</span>
-</span><span id="__span-0-317"><a id="__codelineno-0-317" name="__codelineno-0-317"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_transport</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</span><span id="__span-0-318"><a id="__codelineno-0-318" name="__codelineno-0-318"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_transport</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-319"><a id="__codelineno-0-319" name="__codelineno-0-319"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-320"><a id="__codelineno-0-320" name="__codelineno-0-320"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="__span-0-321"><a id="__codelineno-0-321" name="__codelineno-0-321"></a>            <span class="p">{</span>
-</span><span id="__span-0-322"><a id="__codelineno-0-322" name="__codelineno-0-322"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
-</span><span id="__span-0-323"><a id="__codelineno-0-323" name="__codelineno-0-323"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;close&quot;</span><span class="p">,</span>
-</span><span id="__span-0-324"><a id="__codelineno-0-324" name="__codelineno-0-324"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;closed&quot;</span><span class="p">,</span>
-</span><span id="__span-0-325"><a id="__codelineno-0-325" name="__codelineno-0-325"></a>            <span class="p">}</span>
-</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a>        <span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-326">326</a></span>
+<span class="normal"><a href="#__codelineno-0-327">327</a></span>
+<span class="normal"><a href="#__codelineno-0-328">328</a></span>
+<span class="normal"><a href="#__codelineno-0-329">329</a></span>
+<span class="normal"><a href="#__codelineno-0-330">330</a></span>
+<span class="normal"><a href="#__codelineno-0-331">331</a></span>
+<span class="normal"><a href="#__codelineno-0-332">332</a></span>
+<span class="normal"><a href="#__codelineno-0-333">333</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-314"><a id="__codelineno-0-314" name="__codelineno-0-314"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-315"><a id="__codelineno-0-315" name="__codelineno-0-315"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Close the UDP socket.&quot;&quot;&quot;</span>
+</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-317"><a id="__codelineno-0-317" name="__codelineno-0-317"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span id="__span-0-318"><a id="__codelineno-0-318" name="__codelineno-0-318"></a>            <span class="p">{</span>
+</span><span id="__span-0-319"><a id="__codelineno-0-319" name="__codelineno-0-319"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
+</span><span id="__span-0-320"><a id="__codelineno-0-320" name="__codelineno-0-320"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;close&quot;</span><span class="p">,</span>
+</span><span id="__span-0-321"><a id="__codelineno-0-321" name="__codelineno-0-321"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;closing&quot;</span><span class="p">,</span>
+</span><span id="__span-0-322"><a id="__codelineno-0-322" name="__codelineno-0-322"></a>            <span class="p">}</span>
+</span><span id="__span-0-323"><a id="__codelineno-0-323" name="__codelineno-0-323"></a>        <span class="p">)</span>
+</span><span id="__span-0-324"><a id="__codelineno-0-324" name="__codelineno-0-324"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_transport</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span><span id="__span-0-325"><a id="__codelineno-0-325" name="__codelineno-0-325"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_transport</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_protocol</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-327"><a id="__codelineno-0-327" name="__codelineno-0-327"></a>        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span id="__span-0-328"><a id="__codelineno-0-328" name="__codelineno-0-328"></a>            <span class="p">{</span>
+</span><span id="__span-0-329"><a id="__codelineno-0-329" name="__codelineno-0-329"></a>                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;UdpTransport&quot;</span><span class="p">,</span>
+</span><span id="__span-0-330"><a id="__codelineno-0-330" name="__codelineno-0-330"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;close&quot;</span><span class="p">,</span>
+</span><span id="__span-0-331"><a id="__codelineno-0-331" name="__codelineno-0-331"></a>                <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;closed&quot;</span><span class="p">,</span>
+</span><span id="__span-0-332"><a id="__codelineno-0-332" name="__codelineno-0-332"></a>            <span class="p">}</span>
+</span><span id="__span-0-333"><a id="__codelineno-0-333" name="__codelineno-0-333"></a>        <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5210,7 +5224,7 @@ Connection is opened lazily on first request.</p>
   </span>
 
 <a href="#lifx.network.connection.DeviceConnection.__aenter__" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__aenter__</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="typing.Self" href="https://docs.python.org/3/library/typing.html#typing.Self">Self</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__aenter__</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="typing_extensions.Self">Self</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
