@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v5.0.0 (2026-01-12)
+
+### Features
+
+- Add Python 3.10 support ([`7c39131`](https://github.com/Djelibeybi/lifx-async/commit/7c391314305bb856d8bbcd23a5e481b729a5ad04))
+
+### Breaking Changes
+
+- Batch operations now raise first exception immediately (asyncio.gather behavior) instead of collecting all exceptions into an ExceptionGroup (TaskGroup behavior).
+
 ## v4.9.0 (2025-12-30)
 
 ### Features
