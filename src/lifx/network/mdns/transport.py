@@ -13,7 +13,7 @@ import struct
 from asyncio import DatagramTransport
 from typing import TYPE_CHECKING
 
-from lifx.const import MDNS_ADDRESS, MDNS_PORT
+from lifx.const import MDNS_ADDRESS, MDNS_PORT, TIMEOUT_ERRORS
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 
 if TYPE_CHECKING:
@@ -259,7 +259,7 @@ class MdnsTransport:
                 self._protocol.queue.get(), timeout=timeout
             )
             return data, addr
-        except TimeoutError as e:
+        except TIMEOUT_ERRORS as e:
             raise LifxTimeoutError(f"No mDNS data received within {timeout}s") from e
         except OSError as e:
             _LOGGER.debug(
