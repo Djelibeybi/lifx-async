@@ -6,7 +6,12 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from lifx.const import DEFAULT_IP_ADDRESS, MAX_PACKET_SIZE, MIN_PACKET_SIZE
+from lifx.const import (
+    DEFAULT_IP_ADDRESS,
+    MAX_PACKET_SIZE,
+    MIN_PACKET_SIZE,
+    TIMEOUT_ERRORS,
+)
 from lifx.exceptions import LifxNetworkError
 from lifx.exceptions import LifxTimeoutError as LifxTimeoutError
 
@@ -208,7 +213,7 @@ class UdpTransport:
             data, addr = await asyncio.wait_for(
                 self._protocol.queue.get(), timeout=timeout
             )
-        except TimeoutError as e:
+        except TIMEOUT_ERRORS as e:
             raise LifxTimeoutError(f"No data received within {timeout}s") from e
         except OSError as e:
             _LOGGER.error(
@@ -302,7 +307,7 @@ class UdpTransport:
                     continue
 
                 packets.append((data, addr))
-            except TimeoutError:
+            except TIMEOUT_ERRORS:
                 # Timeout is expected - return what we collected
                 break
             except OSError:

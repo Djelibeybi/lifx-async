@@ -1,5 +1,7 @@
 # lifx-async constants
 
+import asyncio
+import sys
 import uuid
 from typing import Final
 
@@ -109,3 +111,19 @@ PROTOCOL_URL: Final[str] = (
 PRODUCTS_URL: Final[str] = (
     "https://raw.githubusercontent.com/LIFX/products/refs/heads/master/products.json"
 )
+
+# ============================================================================
+# Python Version Compatibility
+# ============================================================================
+
+# On Python 3.10, asyncio.wait_for() raises asyncio.TimeoutError which is NOT
+# a subclass of the built-in TimeoutError. In Python 3.11+, they are unified.
+# Use this tuple with `except TIMEOUT_ERRORS:` to catch timeouts from asyncio
+# operations on all supported Python versions.
+if sys.version_info < (3, 11):
+    TIMEOUT_ERRORS: Final[tuple[type[BaseException], ...]] = (
+        TimeoutError,
+        asyncio.TimeoutError,
+    )
+else:
+    TIMEOUT_ERRORS: Final[tuple[type[BaseException], ...]] = (TimeoutError,)

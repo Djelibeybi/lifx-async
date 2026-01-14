@@ -11,7 +11,7 @@ import random
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
-from lifx.const import KELVIN_NEUTRAL
+from lifx.const import KELVIN_NEUTRAL, TIMEOUT_ERRORS
 from lifx.effects.base import LIFXEffect
 
 if TYPE_CHECKING:
@@ -172,7 +172,7 @@ class EffectColorloop(LIFXEffect):
                     self._stop_event.wait(), timeout=iteration_period
                 )
                 break  # Stop event was set
-            except TimeoutError:
+            except TIMEOUT_ERRORS:
                 pass  # Normal - continue to next iteration
 
             iteration += 1
