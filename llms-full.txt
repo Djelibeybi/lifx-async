@@ -26587,6 +26587,12 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.0.1 (2026-01-14)
+
+### Bug Fixes
+
+- Handle asyncio.TimeoutError on Python 3.10 ([`4438bc4`](https://github.com/Djelibeybi/lifx-async/commit/4438bc45f19f477b585c6af8cf8cbaf5e9341d14))
+
 ## v5.0.0 (2026-01-12)
 
 ### Features
