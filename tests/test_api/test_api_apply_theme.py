@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 
 from lifx.api import DeviceGroup
+from lifx.const import TIMEOUT_ERRORS
 from lifx.theme import ThemeLibrary
 
 
@@ -251,7 +252,7 @@ class TestDeviceGroupApplyTheme:
             # (will fail at connection level, but our method works)
             try:
                 await asyncio.wait_for(group.apply_theme(theme), timeout=0.1)
-            except TimeoutError:
+            except TIMEOUT_ERRORS:
                 # Expected - no real devices
                 pass
 

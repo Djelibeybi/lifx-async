@@ -17,6 +17,7 @@ from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
+    TIMEOUT_ERRORS,
 )
 from lifx.exceptions import (
     LifxConnectionError,
@@ -193,7 +194,7 @@ class DeviceConnection:
                 await asyncio.wait_for(
                     self._receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
                 )
-            except TimeoutError:
+            except TIMEOUT_ERRORS:
                 self._receiver_task.cancel()
                 try:
                     await self._receiver_task
@@ -559,7 +560,7 @@ class DeviceConnection:
                             header, payload = await asyncio.wait_for(
                                 response_queue.get(), timeout=remaining_time
                             )
-                        except TimeoutError:
+                        except TIMEOUT_ERRORS:
                             if not has_yielded:
                                 # No response this attempt, retry
                                 raise TimeoutError(
@@ -603,7 +604,7 @@ class DeviceConnection:
 
                         # Continue loop to wait for more responses
 
-                except TimeoutError as e:
+                except TIMEOUT_ERRORS as e:
                     last_error = LifxTimeoutError(str(e))
                     if attempt < max_retries:
                         # Sleep with jitter before retry
@@ -702,7 +703,7 @@ class DeviceConnection:
                     header, _payload = await asyncio.wait_for(
                         response_queue.get(), timeout=current_timeout
                     )
-                except TimeoutError:
+                except TIMEOUT_ERRORS:
                     raise TimeoutError(
                         f"No acknowledgement within {current_timeout:.3f}s "
                         f"(attempt {attempt + 1}/{max_retries + 1})"
@@ -731,7 +732,7 @@ class DeviceConnection:
                 yield True
                 return
 
-            except TimeoutError as e:
+            except TIMEOUT_ERRORS as e:
                 last_error = LifxTimeoutError(str(e))
                 if attempt < max_retries:
                     # Sleep with jitter before retry
