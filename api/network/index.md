@@ -778,7 +778,7 @@ async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
         data, addr = await asyncio.wait_for(
             self._protocol.queue.get(), timeout=timeout
         )
-    except TimeoutError as e:
+    except TIMEOUT_ERRORS as e:
         raise LifxTimeoutError(f"No data received within {timeout}s") from e
     except OSError as e:
         _LOGGER.error(
@@ -899,7 +899,7 @@ async def receive_many(
                 continue
 
             packets.append((data, addr))
-        except TimeoutError:
+        except TIMEOUT_ERRORS:
             # Timeout is expected - return what we collected
             break
         except OSError:
@@ -1261,7 +1261,7 @@ async def close(self) -> None:
             await asyncio.wait_for(
                 self._receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
             )
-        except TimeoutError:
+        except TIMEOUT_ERRORS:
             self._receiver_task.cancel()
             try:
                 await self._receiver_task
