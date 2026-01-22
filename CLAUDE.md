@@ -149,7 +149,17 @@ uv run mkdocs gh-deploy
    - `DeviceGroup`: Batch operations (set_power, set_color, etc.)
    - `LocationGrouping` / `GroupGrouping`: Organizational structures for location/group-based grouping
 
-5. **Utilities**
+5. **Animation Layer** (`src/lifx/animation/`)
+
+   - `animator.py`: High-level `Animator` class with direct UDP sending
+   - `framebuffer.py`: Multi-tile canvas mapping and orientation correction
+   - `packets.py`: Prebaked packet templates (`MatrixPacketGenerator`, `MultiZonePacketGenerator`)
+   - `orientation.py`: Tile orientation remapping with LRU-cached lookup tables
+   - Optimized for high-frequency frame delivery (30+ FPS) for real-time effects
+   - Uses protocol-ready uint16 HSBK values (no conversion overhead)
+   - Multi-tile canvas support using `user_x`/`user_y` tile positions
+
+6. **Utilities**
 
    - `color.py`: `HSBK` class with RGB conversion, `Colors` presets
    - `const.py`: Critical constants (network settings, UUIDs, official URLs)
@@ -480,6 +490,80 @@ for frame in animation_frames:
 ```
 
 **Note:** `MatrixLight.set64()` is already fire-and-forget by default.
+
+### Animation Module (High-Frequency Frame Delivery)
+
+For real-time effects and applications that need to push color data at 30+ FPS, use the animation module:
+
+```python
+from lifx import Animator, MatrixLight
+
+async with await MatrixLight.from_ip("192.168.1.100") as device:
+    # Create animator for matrix device
+    animator = await Animator.for_matrix(device)
+
+# Device connection closed - animator sends via direct UDP
+while running:
+    # Generate HSBK frame (protocol-ready uint16 values)
+    # H/S/B: 0-65535, K: 1500-9000
+    hsbk_frame = [(65535, 65535, 65535, 3500)] * animator.pixel_count
+
+    # send_frame() is synchronous for speed
+    stats = animator.send_frame(hsbk_frame)
+    print(f"Sent {stats.packets_sent} packets")
+
+    await asyncio.sleep(1 / 30)  # 30 FPS
+
+animator.close()
+```
+
+**Key Features:**
+- **Direct UDP**: Bypasses connection layer for maximum throughput
+- **Prebaked packets**: Templates created once, only colors updated per frame
+- **Multi-tile canvas**: Unified coordinate space for multi-tile devices (e.g., 5-tile LIFX Tile)
+- **Tile orientation**: Automatic pixel remapping for rotated tiles
+
+**Multi-Tile Canvas:**
+
+For devices with multiple tiles, the animator creates a unified canvas based on tile positions:
+
+```python
+async with await MatrixLight.from_ip("192.168.1.100") as device:
+    animator = await Animator.for_matrix(device)
+
+# For 5 horizontal tiles: canvas is 40x8 (320 pixels)
+print(f"Canvas: {animator.canvas_width}x{animator.canvas_height}")
+
+# Generate frame for entire canvas (row-major order)
+frame = []
+for y in range(animator.canvas_height):
+    for x in range(animator.canvas_width):
+        hue = int(x / animator.canvas_width * 65535)  # Rainbow across all tiles
+        frame.append((hue, 65535, 65535, 3500))
+
+animator.send_frame(frame)
+```
+
+**HSBK Format (Protocol-Ready):**
+```python
+# (hue, saturation, brightness, kelvin)
+# H/S/B: 0-65535, K: 1500-9000
+red = (0, 65535, 65535, 3500)           # Full red
+blue = (43690, 65535, 65535, 3500)      # Full blue (240/360 * 65535)
+white = (0, 0, 65535, 5500)             # Daylight white
+off = (0, 0, 0, 3500)                   # Off (black)
+```
+
+**For MultiZone devices (strips/beams):**
+```python
+from lifx import Animator, MultiZoneLight
+
+async with await MultiZoneLight.from_ip("192.168.1.100") as device:
+    animator = await Animator.for_multizone(device)
+
+# Same API as matrix
+stats = animator.send_frame(hsbk_frame)
+```
 
 ### Packet Flow
 

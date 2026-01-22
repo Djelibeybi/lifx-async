@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from importlib.metadata import version as get_version
 
+from lifx.animation import Animator, AnimatorStats
 from lifx.api import (
     DeviceGroup,
     discover,
@@ -95,6 +96,9 @@ __all__ = [
     "LIFXEffect",
     "EffectPulse",
     "EffectColorloop",
+    # Animation
+    "Animator",
+    "AnimatorStats",
     # Themes
     "Theme",
     "ThemeLibrary",
