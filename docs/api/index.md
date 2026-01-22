@@ -11,6 +11,12 @@ lifx/
 ├── color.py                  # Color utilities (HSBK, Colors)
 ├── const.py                  # Network constants and URLs
 ├── exceptions.py             # Exception hierarchy
+├── animation/                # Animation module for high-frequency frame delivery
+│   ├── __init__.py          # Public API exports
+│   ├── animator.py          # High-level Animator class with direct UDP
+│   ├── framebuffer.py       # Multi-tile canvas mapping and orientation
+│   ├── packets.py           # Prebaked packet templates
+│   └── orientation.py       # Tile orientation remapping
 ├── devices/                  # Device classes
 │   ├── base.py              # Base Device class
 │   ├── light.py             # Light device (color control)
@@ -72,6 +78,14 @@ Work with colors:
 
 - [`HSBK`](colors.md#lifx.color.HSBK) - Color representation
 - [`Colors`](colors.md#lifx.color.Colors) - Built-in presets
+
+### Animation
+
+High-frequency frame delivery for real-time effects:
+
+- [`Animator`](animation.md#lifx.animation.animator.Animator) - High-level animation interface with direct UDP
+- [`FrameBuffer`](animation.md#lifx.animation.framebuffer.FrameBuffer) - Multi-tile canvas mapping
+- [`PacketTemplate`](animation.md#lifx.animation.packets.PacketTemplate) - Prebaked packet templates
 
 ### Network Layer
 
@@ -194,6 +208,14 @@ async def set_custom_color(light: Light, hue: float) -> None:
   Work with colors, RGB, and HSBK
 
   [:octicons-arrow-right-24: Colors](colors.md)
+
+- :material-animation:{ .lg .middle } __Animation__
+
+  ______________________________________________________________________
+
+  High-frequency frame delivery for real-time effects
+
+  [:octicons-arrow-right-24: Animation](animation.md)
 
 - :material-network:{ .lg .middle } __Network Layer__
 

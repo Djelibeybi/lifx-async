@@ -128,6 +128,7 @@ plugins:
       User Guide:
       - user-guide/themes.md: Working with color themes
       - user-guide/ceiling-lights.md: Controlling LIFX Ceiling uplight and downlight components
+      - user-guide/animation.md: High-frequency animation for real-time effects
       - user-guide/advanced-usage.md: Advanced usage patterns and best practices
       - user-guide/effects-custom.md: Creating custom light effects
       - user-guide/troubleshooting.md: Common issues and solutions
@@ -141,6 +142,7 @@ plugins:
       - api/high-level.md: High-level discovery and batch operations API
       - api/themes.md: Theme system API
       - api/effects.md: Effects API
+      - api/animation.md: Animation module for high-frequency frame delivery
       - api/colors.md: Color utilities and HSBK conversion
       - api/devices.md: Device classes and capabilities
       - api/network.md: Network layer components
@@ -198,6 +200,7 @@ nav:
 - User Guide:
   - Themes: user-guide/themes.md
   - Ceiling Lights: user-guide/ceiling-lights.md
+  - Animation: user-guide/animation.md
   - Advanced Usage: user-guide/advanced-usage.md
   - Custom Effects: user-guide/effects-custom.md
   - Troubleshooting: user-guide/troubleshooting.md
@@ -211,6 +214,7 @@ nav:
   - High-Level API: api/high-level.md
   - Themes: api/themes.md
   - Effects: api/effects.md
+  - Animation: api/animation.md
   - Color Utilities: api/colors.md
   - Device Classes: api/devices.md
   - Network Layer: api/network.md
