@@ -668,16 +668,7 @@ class MatrixLight(Light):
         )
 
         # Convert HSBK colors to protocol format
-        proto_colors = []
-        for color in colors:
-            proto_colors.append(
-                LightHsbk(
-                    hue=int(color.hue / 360 * 65535),
-                    saturation=int(color.saturation * 65535),
-                    brightness=int(color.brightness * 65535),
-                    kelvin=color.kelvin,
-                )
-            )
+        proto_colors = [color.to_protocol() for color in colors]
 
         # Pad to 64 colors if needed
         while len(proto_colors) < 64:
@@ -1004,15 +995,7 @@ class MatrixLight(Light):
 
         if effect.palette is not None:
             palette_count = len(effect.palette)
-            for color in effect.palette:
-                proto_palette.append(
-                    LightHsbk(
-                        hue=int(color.hue / 360 * 65535),
-                        saturation=int(color.saturation * 65535),
-                        brightness=int(color.brightness * 65535),
-                        kelvin=color.kelvin,
-                    )
-                )
+            proto_palette = [color.to_protocol() for color in effect.palette]
 
         # Pad palette to 16 colors (protocol requirement)
         while len(proto_palette) < 16:
