@@ -30,19 +30,6 @@ The LIFX protocol header structure (36 bytes).
       members_order: source
       show_if_no_docstring: false
 
-## Serializer
-
-Binary serialization and deserialization utilities.
-
-::: lifx.protocol.serializer.FieldSerializer
-    options:
-      show_root_heading: true
-      heading_level: 3
-      members_order: source
-      show_if_no_docstring: false
-      filters:
-        - "!^_"
-
 ## Protocol Types
 
 Common protocol type definitions and enums.
@@ -241,7 +228,6 @@ async def main():
 
 ```python
 from lifx.protocol.packets import DeviceSetLabel
-from lifx.protocol.serializer import Serializer
 
 # Create packet
 packet = DeviceSetLabel(label=b"Kitchen Light\0" + b"\0" * 19)
