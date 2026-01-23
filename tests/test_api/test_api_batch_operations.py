@@ -78,6 +78,8 @@ class TestDeviceGroupBatchOperations:
 
         assert len(group) == 0
         assert group.lights == []
+        assert group.hev_lights == []
+        assert group.infrared_lights == []
         assert group.multizone_lights == []
         assert group.matrix_lights == []
 
@@ -94,6 +96,8 @@ class TestDeviceGroupBatchOperations:
 
         # Should have mix of device types
         assert len(group.lights) > 0
+        assert len(group.hev_lights) > 0
+        assert len(group.infrared_lights) > 0
         assert len(group.multizone_lights) > 0
         assert len(group.matrix_lights) > 0
 

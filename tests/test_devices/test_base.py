@@ -151,6 +151,20 @@ class TestDevice:
         packet = call_args[0][0]
         assert packet.level == 0
 
+    async def test_set_reboot(self, device: Device) -> None:
+        """Test rebooting device."""
+
+        # Mock SET operation returns True
+        device.connection.request.return_value = True
+
+        await device.set_reboot()
+
+        # Verify request was called with SetReboot packet
+        device.connection.request.assert_called_once()
+        call_args = device.connection.request.call_args
+        packet = call_args[0][0]
+        assert isinstance(packet, packets.Device.SetReboot)
+
     async def test_get_version(self, device: Device) -> None:
         """Test getting device version."""
 
