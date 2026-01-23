@@ -7361,28 +7361,6 @@ LocationGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
 
 Organizational structure for location-based grouping.
 
-| METHOD            | DESCRIPTION                                  |
-| ----------------- | -------------------------------------------- |
-| `to_device_group` | Convert to DeviceGroup for batch operations. |
-
-##### Functions
-
-###### to_device_group
-
-```python
-to_device_group() -> DeviceGroup
-```
-
-Convert to DeviceGroup for batch operations.
-
-Source code in `src/lifx/api.py`
-
-```python
-def to_device_group(self) -> DeviceGroup:
-    """Convert to DeviceGroup for batch operations."""
-    return DeviceGroup(self.devices)
-```
-
 ### GroupGrouping
 
 Group-based device grouping returned by `DeviceGroup.organize_by_group()`.
@@ -7394,28 +7372,6 @@ GroupGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
 ```
 
 Organizational structure for group-based grouping.
-
-| METHOD            | DESCRIPTION                                  |
-| ----------------- | -------------------------------------------- |
-| `to_device_group` | Convert to DeviceGroup for batch operations. |
-
-##### Functions
-
-###### to_device_group
-
-```python
-to_device_group() -> DeviceGroup
-```
-
-Convert to DeviceGroup for batch operations.
-
-Source code in `src/lifx/api.py`
-
-```python
-def to_device_group(self) -> DeviceGroup:
-    """Convert to DeviceGroup for batch operations."""
-    return DeviceGroup(self.devices)
-```
 
 ## Examples
 
@@ -17383,16 +17339,7 @@ async def set64(
     )
 
     # Convert HSBK colors to protocol format
-    proto_colors = []
-    for color in colors:
-        proto_colors.append(
-            LightHsbk(
-                hue=int(color.hue / 360 * 65535),
-                saturation=int(color.saturation * 65535),
-                brightness=int(color.brightness * 65535),
-                kelvin=color.kelvin,
-            )
-        )
+    proto_colors = [color.to_protocol() for color in colors]
 
     # Pad to 64 colors if needed
     while len(proto_colors) < 64:
@@ -17865,15 +17812,7 @@ async def set_effect(
 
     if effect.palette is not None:
         palette_count = len(effect.palette)
-        for color in effect.palette:
-            proto_palette.append(
-                LightHsbk(
-                    hue=int(color.hue / 360 * 65535),
-                    saturation=int(color.saturation * 65535),
-                    brightness=int(color.brightness * 65535),
-                    kelvin=color.kelvin,
-                )
-            )
+        proto_palette = [color.to_protocol() for color in effect.palette]
 
     # Pad palette to 16 colors (protocol requirement)
     while len(proto_palette) < 16:
@@ -18330,9 +18269,9 @@ The `CeilingLight` class extends `MatrixLight` with independent control over upl
 CeilingLight(
     serial: str,
     ip: str,
-    port: int = 56700,
-    timeout: float = 0.5,
-    max_retries: int = 3,
+    port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     state_file: str | None = None,
 )
 ```
@@ -18365,14 +18304,14 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
         print("Uplight is on")
 ```
 
-| PARAMETER     | DESCRIPTION                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `serial`      | Device serial number **TYPE:** `str`                                                                |
-| `ip`          | Device IP address **TYPE:** `str`                                                                   |
-| `port`        | Device UDP port (default: 56700) **TYPE:** `int` **DEFAULT:** `56700`                               |
-| `timeout`     | Overall timeout for network requests in seconds (default: 0.5) **TYPE:** `float` **DEFAULT:** `0.5` |
-| `max_retries` | Maximum number of retry attempts for network requests (default: 3) **TYPE:** `int` **DEFAULT:** `3` |
-| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                    |
+| PARAMETER     | DESCRIPTION                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `serial`      | Device serial number **TYPE:** `str`                                                                     |
+| `ip`          | Device IP address **TYPE:** `str`                                                                        |
+| `port`        | Device UDP port (default: 56700) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
+| `timeout`     | Overall timeout for network requests in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retry attempts for network requests **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES` |
+| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                         |
 
 | RAISES      | DESCRIPTION                                  |
 | ----------- | -------------------------------------------- |
@@ -18409,9 +18348,9 @@ def __init__(
     self,
     serial: str,
     ip: str,
-    port: int = 56700,  # LIFX_UDP_PORT
-    timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
-    max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+    port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     state_file: str | None = None,
 ):
     """Initialize CeilingLight.
@@ -18421,9 +18360,7 @@ def __init__(
         ip: Device IP address
         port: Device UDP port (default: 56700)
         timeout: Overall timeout for network requests in seconds
-            (default: 0.5)
         max_retries: Maximum number of retry attempts for network requests
-            (default: 3)
         state_file: Optional path to JSON file for state persistence
 
     Raises:
@@ -18599,10 +18536,10 @@ async def refresh_state(self) -> None:
 ```python
 from_ip(
     ip: str,
-    port: int = 56700,
+    port: int = LIFX_UDP_PORT,
     serial: str | None = None,
-    timeout: float = 0.5,
-    max_retries: int = 3,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     *,
     state_file: str | None = None,
 ) -> CeilingLight
@@ -18610,14 +18547,14 @@ from_ip(
 
 Create CeilingLight from IP address.
 
-| PARAMETER     | DESCRIPTION                                                                   |
-| ------------- | ----------------------------------------------------------------------------- |
-| `ip`          | Device IP address **TYPE:** `str`                                             |
-| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `56700`      |
-| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                          |
-| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `0.5` |
-| `max_retries` | Maximum number of retries for requests **TYPE:** `int` **DEFAULT:** `3`       |
-| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str              |
+| PARAMETER     | DESCRIPTION                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `ip`          | Device IP address **TYPE:** `str`                                                                 |
+| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
+| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                                              |
+| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retries for requests **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`         |
+| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                  |
 
 | RETURNS        | DESCRIPTION           |
 | -------------- | --------------------- |
@@ -18636,10 +18573,10 @@ Source code in `src/lifx/devices/ceiling.py`
 async def from_ip(
     cls,
     ip: str,
-    port: int = 56700,  # LIFX_UDP_PORT
+    port: int = LIFX_UDP_PORT,
     serial: str | None = None,
-    timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
-    max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     *,
     state_file: str | None = None,
 ) -> CeilingLight:
@@ -19967,7 +19904,7 @@ async def discover_devices(
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
         # Allocate unique source for this discovery session
-        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+        discovery_source = allocate_source()
 
         # Create discovery message
         discovery_packet = DevicePackets.GetService()
@@ -22120,192 +22057,6 @@ def __repr__(self) -> str:
         f"seq={self.sequence}, tagged={self.tagged}, "
         f"ack={self.ack_required}, res={self.res_required})"
     )
-```
-
-## Serializer
-
-Binary serialization and deserialization utilities.
-
-### FieldSerializer
-
-```python
-FieldSerializer(field_definitions: dict[str, dict[str, str]])
-```
-
-Serializer for structured fields with nested types.
-
-| PARAMETER           | DESCRIPTION                                                                             |
-| ------------------- | --------------------------------------------------------------------------------------- |
-| `field_definitions` | Dict mapping field names to structure definitions **TYPE:** `dict[str, dict[str, str]]` |
-
-| METHOD           | DESCRIPTION                                 |
-| ---------------- | ------------------------------------------- |
-| `pack_field`     | Pack a structured field.                    |
-| `unpack_field`   | Unpack a structured field.                  |
-| `get_field_size` | Get the size in bytes of a field structure. |
-
-Source code in `src/lifx/protocol/serializer.py`
-
-```python
-def __init__(self, field_definitions: dict[str, dict[str, str]]):
-    """Initialize serializer with field definitions.
-
-    Args:
-        field_definitions: Dict mapping field names to structure definitions
-    """
-    self.field_definitions = field_definitions
-```
-
-#### Functions
-
-##### pack_field
-
-```python
-pack_field(field_data: dict[str, Any], field_name: str) -> bytes
-```
-
-Pack a structured field.
-
-| PARAMETER    | DESCRIPTION                                                |
-| ------------ | ---------------------------------------------------------- |
-| `field_data` | Dictionary of field values **TYPE:** `dict[str, Any]`      |
-| `field_name` | Name of the field structure (e.g., "HSBK") **TYPE:** `str` |
-
-| RETURNS | DESCRIPTION  |
-| ------- | ------------ |
-| `bytes` | Packed bytes |
-
-| RAISES       | DESCRIPTION              |
-| ------------ | ------------------------ |
-| `ValueError` | If field_name is unknown |
-
-Source code in `src/lifx/protocol/serializer.py`
-
-```python
-def pack_field(self, field_data: dict[str, Any], field_name: str) -> bytes:
-    """Pack a structured field.
-
-    Args:
-        field_data: Dictionary of field values
-        field_name: Name of the field structure (e.g., "HSBK")
-
-    Returns:
-        Packed bytes
-
-    Raises:
-        ValueError: If field_name is unknown
-    """
-    if field_name not in self.field_definitions:
-        raise ValueError(f"Unknown field: {field_name}")
-
-    field_def = self.field_definitions[field_name]
-    result = b""
-
-    for attr_name, attr_type in field_def.items():
-        if attr_name not in field_data:
-            raise ValueError(f"Missing attribute {attr_name} in {field_name}")
-        result += pack_value(field_data[attr_name], attr_type)
-
-    return result
-```
-
-##### unpack_field
-
-```python
-unpack_field(
-    data: bytes, field_name: str, offset: int = 0
-) -> tuple[dict[str, Any], int]
-```
-
-Unpack a structured field.
-
-| PARAMETER    | DESCRIPTION                                                |
-| ------------ | ---------------------------------------------------------- |
-| `data`       | Bytes to unpack from **TYPE:** `bytes`                     |
-| `field_name` | Name of the field structure **TYPE:** `str`                |
-| `offset`     | Offset to start unpacking **TYPE:** `int` **DEFAULT:** `0` |
-
-| RETURNS                      | DESCRIPTION                       |
-| ---------------------------- | --------------------------------- |
-| `tuple[dict[str, Any], int]` | Tuple of (field_dict, new_offset) |
-
-| RAISES       | DESCRIPTION              |
-| ------------ | ------------------------ |
-| `ValueError` | If field_name is unknown |
-
-Source code in `src/lifx/protocol/serializer.py`
-
-```python
-def unpack_field(
-    self, data: bytes, field_name: str, offset: int = 0
-) -> tuple[dict[str, Any], int]:
-    """Unpack a structured field.
-
-    Args:
-        data: Bytes to unpack from
-        field_name: Name of the field structure
-        offset: Offset to start unpacking
-
-    Returns:
-        Tuple of (field_dict, new_offset)
-
-    Raises:
-        ValueError: If field_name is unknown
-    """
-    if field_name not in self.field_definitions:
-        raise ValueError(f"Unknown field: {field_name}")
-
-    field_def = self.field_definitions[field_name]
-    field_data: dict[str, Any] = {}
-    current_offset = offset
-
-    for attr_name, attr_type in field_def.items():
-        value, current_offset = unpack_value(data, attr_type, current_offset)
-        field_data[attr_name] = value
-
-    return field_data, current_offset
-```
-
-##### get_field_size
-
-```python
-get_field_size(field_name: str) -> int
-```
-
-Get the size in bytes of a field structure.
-
-| PARAMETER    | DESCRIPTION                                 |
-| ------------ | ------------------------------------------- |
-| `field_name` | Name of the field structure **TYPE:** `str` |
-
-| RETURNS | DESCRIPTION   |
-| ------- | ------------- |
-| `int`   | Size in bytes |
-
-| RAISES       | DESCRIPTION              |
-| ------------ | ------------------------ |
-| `ValueError` | If field_name is unknown |
-
-Source code in `src/lifx/protocol/serializer.py`
-
-```python
-def get_field_size(self, field_name: str) -> int:
-    """Get the size in bytes of a field structure.
-
-    Args:
-        field_name: Name of the field structure
-
-    Returns:
-        Size in bytes
-
-    Raises:
-        ValueError: If field_name is unknown
-    """
-    if field_name not in self.field_definitions:
-        raise ValueError(f"Unknown field: {field_name}")
-
-    field_def = self.field_definitions[field_name]
-    return sum(TYPE_SIZES[attr_type] for attr_type in field_def.values())
 ```
 
 ## Protocol Types
@@ -25348,7 +25099,6 @@ async def main():
 
 ```python
 from lifx.protocol.packets import DeviceSetLabel
-from lifx.protocol.serializer import Serializer
 
 # Create packet
 packet = DeviceSetLabel(label=b"Kitchen Light\0" + b"\0" * 19)

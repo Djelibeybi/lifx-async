@@ -1390,28 +1390,6 @@ LocationGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
 
 Organizational structure for location-based grouping.
 
-| METHOD            | DESCRIPTION                                  |
-| ----------------- | -------------------------------------------- |
-| `to_device_group` | Convert to DeviceGroup for batch operations. |
-
-##### Functions
-
-###### to_device_group
-
-```python
-to_device_group() -> DeviceGroup
-```
-
-Convert to DeviceGroup for batch operations.
-
-Source code in `src/lifx/api.py`
-
-```python
-def to_device_group(self) -> DeviceGroup:
-    """Convert to DeviceGroup for batch operations."""
-    return DeviceGroup(self.devices)
-```
-
 ### GroupGrouping
 
 Group-based device grouping returned by `DeviceGroup.organize_by_group()`.
@@ -1423,28 +1401,6 @@ GroupGrouping(uuid: str, label: str, devices: list[Device], updated_at: int)
 ```
 
 Organizational structure for group-based grouping.
-
-| METHOD            | DESCRIPTION                                  |
-| ----------------- | -------------------------------------------- |
-| `to_device_group` | Convert to DeviceGroup for batch operations. |
-
-##### Functions
-
-###### to_device_group
-
-```python
-to_device_group() -> DeviceGroup
-```
-
-Convert to DeviceGroup for batch operations.
-
-Source code in `src/lifx/api.py`
-
-```python
-def to_device_group(self) -> DeviceGroup:
-    """Convert to DeviceGroup for batch operations."""
-    return DeviceGroup(self.devices)
-```
 
 ## Examples
 

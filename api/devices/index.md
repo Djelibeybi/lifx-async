@@ -6975,16 +6975,7 @@ async def set64(
     )
 
     # Convert HSBK colors to protocol format
-    proto_colors = []
-    for color in colors:
-        proto_colors.append(
-            LightHsbk(
-                hue=int(color.hue / 360 * 65535),
-                saturation=int(color.saturation * 65535),
-                brightness=int(color.brightness * 65535),
-                kelvin=color.kelvin,
-            )
-        )
+    proto_colors = [color.to_protocol() for color in colors]
 
     # Pad to 64 colors if needed
     while len(proto_colors) < 64:
@@ -7457,15 +7448,7 @@ async def set_effect(
 
     if effect.palette is not None:
         palette_count = len(effect.palette)
-        for color in effect.palette:
-            proto_palette.append(
-                LightHsbk(
-                    hue=int(color.hue / 360 * 65535),
-                    saturation=int(color.saturation * 65535),
-                    brightness=int(color.brightness * 65535),
-                    kelvin=color.kelvin,
-                )
-            )
+        proto_palette = [color.to_protocol() for color in effect.palette]
 
     # Pad palette to 16 colors (protocol requirement)
     while len(proto_palette) < 16:
@@ -7922,9 +7905,9 @@ The `CeilingLight` class extends `MatrixLight` with independent control over upl
 CeilingLight(
     serial: str,
     ip: str,
-    port: int = 56700,
-    timeout: float = 0.5,
-    max_retries: int = 3,
+    port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     state_file: str | None = None,
 )
 ```
@@ -7957,14 +7940,14 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
         print("Uplight is on")
 ```
 
-| PARAMETER     | DESCRIPTION                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `serial`      | Device serial number **TYPE:** `str`                                                                |
-| `ip`          | Device IP address **TYPE:** `str`                                                                   |
-| `port`        | Device UDP port (default: 56700) **TYPE:** `int` **DEFAULT:** `56700`                               |
-| `timeout`     | Overall timeout for network requests in seconds (default: 0.5) **TYPE:** `float` **DEFAULT:** `0.5` |
-| `max_retries` | Maximum number of retry attempts for network requests (default: 3) **TYPE:** `int` **DEFAULT:** `3` |
-| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                    |
+| PARAMETER     | DESCRIPTION                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `serial`      | Device serial number **TYPE:** `str`                                                                     |
+| `ip`          | Device IP address **TYPE:** `str`                                                                        |
+| `port`        | Device UDP port (default: 56700) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                            |
+| `timeout`     | Overall timeout for network requests in seconds **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retry attempts for network requests **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES` |
+| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                         |
 
 | RAISES      | DESCRIPTION                                  |
 | ----------- | -------------------------------------------- |
@@ -8001,9 +7984,9 @@ def __init__(
     self,
     serial: str,
     ip: str,
-    port: int = 56700,  # LIFX_UDP_PORT
-    timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
-    max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+    port: int = LIFX_UDP_PORT,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     state_file: str | None = None,
 ):
     """Initialize CeilingLight.
@@ -8013,9 +7996,7 @@ def __init__(
         ip: Device IP address
         port: Device UDP port (default: 56700)
         timeout: Overall timeout for network requests in seconds
-            (default: 0.5)
         max_retries: Maximum number of retry attempts for network requests
-            (default: 3)
         state_file: Optional path to JSON file for state persistence
 
     Raises:
@@ -8191,10 +8172,10 @@ async def refresh_state(self) -> None:
 ```python
 from_ip(
     ip: str,
-    port: int = 56700,
+    port: int = LIFX_UDP_PORT,
     serial: str | None = None,
-    timeout: float = 0.5,
-    max_retries: int = 3,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     *,
     state_file: str | None = None,
 ) -> CeilingLight
@@ -8202,14 +8183,14 @@ from_ip(
 
 Create CeilingLight from IP address.
 
-| PARAMETER     | DESCRIPTION                                                                   |
-| ------------- | ----------------------------------------------------------------------------- |
-| `ip`          | Device IP address **TYPE:** `str`                                             |
-| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `56700`      |
-| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                          |
-| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `0.5` |
-| `max_retries` | Maximum number of retries for requests **TYPE:** `int` **DEFAULT:** `3`       |
-| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str              |
+| PARAMETER     | DESCRIPTION                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `ip`          | Device IP address **TYPE:** `str`                                                                 |
+| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
+| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                                              |
+| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retries for requests **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`         |
+| `state_file`  | Optional path to JSON file for state persistence **TYPE:** \`str                                  |
 
 | RETURNS        | DESCRIPTION           |
 | -------------- | --------------------- |
@@ -8228,10 +8209,10 @@ Source code in `src/lifx/devices/ceiling.py`
 async def from_ip(
     cls,
     ip: str,
-    port: int = 56700,  # LIFX_UDP_PORT
+    port: int = LIFX_UDP_PORT,
     serial: str | None = None,
-    timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
-    max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     *,
     state_file: str | None = None,
 ) -> CeilingLight:

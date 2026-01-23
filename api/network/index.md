@@ -101,7 +101,7 @@ async def discover_devices(
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
         # Allocate unique source for this discovery session
-        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+        discovery_source = allocate_source()
 
         # Create discovery message
         discovery_packet = DevicePackets.GetService()
