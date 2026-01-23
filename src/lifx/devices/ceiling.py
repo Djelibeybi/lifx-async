@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from lifx.color import HSBK
+from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
@@ -142,9 +143,9 @@ class CeilingLight(MatrixLight):
         self,
         serial: str,
         ip: str,
-        port: int = 56700,  # LIFX_UDP_PORT
-        timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
-        max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+        port: int = LIFX_UDP_PORT,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
         state_file: str | None = None,
     ):
         """Initialize CeilingLight.
@@ -154,9 +155,7 @@ class CeilingLight(MatrixLight):
             ip: Device IP address
             port: Device UDP port (default: 56700)
             timeout: Overall timeout for network requests in seconds
-                (default: 0.5)
             max_retries: Maximum number of retry attempts for network requests
-                (default: 3)
             state_file: Optional path to JSON file for state persistence
 
         Raises:
@@ -262,10 +261,10 @@ class CeilingLight(MatrixLight):
     async def from_ip(
         cls,
         ip: str,
-        port: int = 56700,  # LIFX_UDP_PORT
+        port: int = LIFX_UDP_PORT,
         serial: str | None = None,
-        timeout: float = 0.5,  # DEFAULT_REQUEST_TIMEOUT
-        max_retries: int = 3,  # DEFAULT_MAX_RETRIES
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
         *,
         state_file: str | None = None,
     ) -> CeilingLight:
