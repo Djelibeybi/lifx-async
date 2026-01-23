@@ -12,11 +12,15 @@ class TestMultiZoneLightStateManagement:
     """Tests for MultiZoneLight state management using emulator."""
 
     @pytest.mark.asyncio
-    async def test_multizone_state_property_before_init_raises(
-        self, emulator_devices
-    ) -> None:
+    async def test_multizone_state_property_before_init_raises(self) -> None:
         """Test accessing state property before initialization raises RuntimeError."""
-        multizone_light: MultiZoneLight = emulator_devices[4]  # d073d5000005
+        # Create a fresh instance that hasn't been connected
+        # (can't use shared fixture as other tests may have already connected it)
+        multizone_light = MultiZoneLight(
+            serial="d073d5000005",
+            ip="127.0.0.1",
+            port=56700,
+        )
 
         # State is None before using Device.connect()
         with pytest.raises(RuntimeError, match="State not found."):
