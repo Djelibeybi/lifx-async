@@ -3,7 +3,6 @@
 import pytest
 
 from lifx.protocol.serializer import (
-    FieldSerializer,
     get_type_size,
     pack_array,
     pack_bytes,
@@ -211,88 +210,6 @@ class TestReserved:
         assert data == b"\x00" * 10
 
 
-class TestFieldSerializer:
-    """Test structured field serialization."""
-
-    def test_pack_field(self) -> None:
-        """Test packing a structured field."""
-        field_defs = {
-            "HSBK": {
-                "hue": "uint16",
-                "saturation": "uint16",
-                "brightness": "uint16",
-                "kelvin": "uint16",
-            }
-        }
-
-        serializer = FieldSerializer(field_defs)
-
-        field_data = {
-            "hue": 0x8000,
-            "saturation": 0xFFFF,
-            "brightness": 0x8000,
-            "kelvin": 3500,
-        }
-
-        packed = serializer.pack_field(field_data, "HSBK")
-        assert len(packed) == 8  # 4 × uint16
-
-    def test_unpack_field(self) -> None:
-        """Test unpacking a structured field."""
-        field_defs = {
-            "HSBK": {
-                "hue": "uint16",
-                "saturation": "uint16",
-                "brightness": "uint16",
-                "kelvin": "uint16",
-            }
-        }
-
-        serializer = FieldSerializer(field_defs)
-
-        # Pack then unpack
-        field_data = {
-            "hue": 0x8000,
-            "saturation": 0xFFFF,
-            "brightness": 0x8000,
-            "kelvin": 3500,
-        }
-
-        packed = serializer.pack_field(field_data, "HSBK")
-        unpacked, offset = serializer.unpack_field(packed, "HSBK", 0)
-
-        assert unpacked == field_data
-        assert offset == 8
-
-    def test_get_field_size(self) -> None:
-        """Test getting field size."""
-        field_defs = {
-            "HSBK": {
-                "hue": "uint16",
-                "saturation": "uint16",
-                "brightness": "uint16",
-                "kelvin": "uint16",
-            }
-        }
-
-        serializer = FieldSerializer(field_defs)
-        size = serializer.get_field_size("HSBK")
-        assert size == 8
-
-    def test_unknown_field_raises(self) -> None:
-        """Test unknown field raises."""
-        serializer = FieldSerializer({})
-
-        with pytest.raises(ValueError, match="Unknown field"):
-            serializer.pack_field({}, "UnknownField")
-
-        with pytest.raises(ValueError, match="Unknown field"):
-            serializer.unpack_field(b"", "UnknownField", 0)
-
-        with pytest.raises(ValueError, match="Unknown field"):
-            serializer.get_field_size("UnknownField")
-
-
 class TestTypeSizes:
     """Test type size helpers."""
 
@@ -453,81 +370,3 @@ class TestArrayEdgeCases:
 
         unpacked, _ = unpack_array(data, "int16", 3, 0)
         assert unpacked == values
-
-
-class TestFieldSerializerEdgeCases:
-    """Test FieldSerializer edge cases."""
-
-    def test_pack_field_missing_attribute_raises(self) -> None:
-        """Test packing field with missing attribute raises."""
-        field_defs = {
-            "TestField": {
-                "attr1": "uint16",
-                "attr2": "uint32",
-            }
-        }
-
-        serializer = FieldSerializer(field_defs)
-
-        # Missing attr2
-        incomplete_data = {"attr1": 100}
-
-        with pytest.raises(ValueError, match="Missing attribute attr2"):
-            serializer.pack_field(incomplete_data, "TestField")
-
-    def test_unpack_field_with_offset(self) -> None:
-        """Test unpacking field with non-zero offset."""
-        field_defs = {
-            "Point": {
-                "x": "uint16",
-                "y": "uint16",
-            }
-        }
-
-        serializer = FieldSerializer(field_defs)
-
-        # Create data with padding before the field
-        field_data = {"x": 100, "y": 200}
-        packed_field = serializer.pack_field(field_data, "Point")
-        padded_data = b"\xff\xff" + packed_field
-
-        unpacked, offset = serializer.unpack_field(padded_data, "Point", 2)
-        assert unpacked == field_data
-        assert offset == 6  # 2 (initial offset) + 4 (field size)
-
-    def test_field_serializer_multiple_fields(self) -> None:
-        """Test FieldSerializer with multiple field definitions."""
-        field_defs = {
-            "HSBK": {
-                "hue": "uint16",
-                "saturation": "uint16",
-                "brightness": "uint16",
-                "kelvin": "uint16",
-            },
-            "Point": {
-                "x": "int32",
-                "y": "int32",
-            },
-        }
-
-        serializer = FieldSerializer(field_defs)
-
-        assert serializer.get_field_size("HSBK") == 8
-        assert serializer.get_field_size("Point") == 8
-
-        # Test both fields work
-        hsbk_data = {"hue": 100, "saturation": 200, "brightness": 300, "kelvin": 400}
-        point_data = {"x": -100, "y": 200}
-
-        hsbk_packed = serializer.pack_field(hsbk_data, "HSBK")
-        point_packed = serializer.pack_field(point_data, "Point")
-
-        assert len(hsbk_packed) == 8
-        assert len(point_packed) == 8
-
-        # Verify roundtrip
-        hsbk_unpacked, _ = serializer.unpack_field(hsbk_packed, "HSBK", 0)
-        point_unpacked, _ = serializer.unpack_field(point_packed, "Point", 0)
-
-        assert hsbk_unpacked == hsbk_data
-        assert point_unpacked == point_data
