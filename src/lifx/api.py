@@ -52,10 +52,6 @@ class LocationGrouping:
     devices: list[Device]
     updated_at: int  # Most recent updated_at from all devices
 
-    def to_device_group(self) -> DeviceGroup:
-        """Convert to DeviceGroup for batch operations."""
-        return DeviceGroup(self.devices)
-
 
 @dataclass
 class GroupGrouping:
@@ -65,10 +61,6 @@ class GroupGrouping:
     label: str
     devices: list[Device]
     updated_at: int
-
-    def to_device_group(self) -> DeviceGroup:
-        """Convert to DeviceGroup for batch operations."""
-        return DeviceGroup(self.devices)
 
 
 class DeviceGroup:
