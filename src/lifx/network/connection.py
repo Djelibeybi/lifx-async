@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-import secrets
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -27,6 +26,7 @@ from lifx.exceptions import (
 )
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
+from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
 
@@ -336,7 +336,7 @@ class DeviceConnection:
         Returns:
             Unique source identifier (range: 2 to 4294967295)
         """
-        return secrets.randbelow(0xFFFFFFFF - 1) + 2
+        return allocate_source()
 
     async def _background_receiver(self) -> None:
         """Background task to receive and route packets.
