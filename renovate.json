@@ -24,6 +24,7 @@
     "dependencies"
   ],
   "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
   "prConcurrentLimit": 5,
   "prCreation": "not-pending",
   "prHourlyLimit": 2,
