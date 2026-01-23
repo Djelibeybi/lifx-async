@@ -226,7 +226,7 @@ class TestRetryTimeoutBudget:
     """
 
     async def test_retry_sleep_excluded_from_timeout_budget(
-        self, emulator_server_with_scenarios
+        self, emulator_server_with_scenarios, monkeypatch
     ):
         """Test that retry sleep time is excluded from timeout budget.
 
@@ -239,6 +239,24 @@ class TestRetryTimeoutBudget:
         """
         import time
 
+        from lifx.network.connection import DeviceConnection
+
+        # Mock the jitter calculation to return predictable values
+        # This removes randomness so we can assert exact timing
+        # Returns max exponential delay: 0.1 * 2^attempt
+        sleep_times: list[float] = []
+
+        def predictable_sleep(attempt: int) -> float:
+            sleep_time = 0.1 * (2**attempt)
+            sleep_times.append(sleep_time)
+            return sleep_time
+
+        monkeypatch.setattr(
+            DeviceConnection,
+            "_calculate_retry_sleep_with_jitter",
+            staticmethod(predictable_sleep),
+        )
+
         # Create a scenario that drops all packets to force retries
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
@@ -249,8 +267,6 @@ class TestRetryTimeoutBudget:
                 }
             },
         )
-
-        from lifx.network.connection import DeviceConnection
 
         # Set up connection with specific timeout and retries
         timeout = 2.0  # 2 second total timeout budget
@@ -284,27 +300,31 @@ class TestRetryTimeoutBudget:
         # Verify the timeout message
         assert "after 4 attempts" in str(exc_info.value)
 
-        # The total elapsed time should be:
-        # - Timeout budget (2.0s)
-        # - Plus sleep time between retries (3 sleeps with exponential backoff)
-        #   Sleep 0: random(0, 0.1 * 2^0) = random(0, 0.1)
-        #   Sleep 1: random(0, 0.1 * 2^1) = random(0, 0.2)
-        #   Sleep 2: random(0, 0.1 * 2^2) = random(0, 0.4)
-        #   Max total sleep: 0.1 + 0.2 + 0.4 = 0.7s
-        # Total expected: 2.0 + 0.7 = 2.7s maximum
+        # Calculate actual total sleep from our mock
+        # 3 sleeps: after attempts 0, 1, 2 (not after final attempt 3)
+        # Sleep 0: 0.1 * 2^0 = 0.1s
+        # Sleep 1: 0.1 * 2^1 = 0.2s
+        # Sleep 2: 0.1 * 2^2 = 0.4s
+        # Total: 0.7s
+        expected_total_sleep = sum(sleep_times)
+        assert len(sleep_times) == 3, "Should have 3 sleeps between 4 attempts"
+        assert expected_total_sleep == pytest.approx(0.7), (
+            "Expected sleep times: 0.1 + 0.2 + 0.4"
+        )
 
         # Allow some tolerance for timing variations
         assert elapsed >= timeout, "Should use at least the timeout budget"
-        assert elapsed < timeout + 1.0, (
-            f"Elapsed {elapsed}s should not exceed timeout + max_sleep (3.0s)"
+        assert elapsed < timeout + expected_total_sleep + 0.5, (
+            f"Elapsed {elapsed}s should not exceed timeout + sleep + tolerance"
         )
 
         # Key assertion: If sleep was counted against timeout budget,
         # the elapsed time would be close to just the timeout (2.0s)
         # because later attempts would fail immediately.
-        # With the fix, we should see elapsed > timeout + some sleep time.
-        assert elapsed > timeout + 0.1, (
-            "Sleep time should be added on top of timeout budget"
+        # With the fix, we should see elapsed > timeout + sleep time.
+        assert elapsed > timeout + expected_total_sleep - 0.1, (
+            f"Sleep time ({expected_total_sleep}s) should be added on top of "
+            f"timeout budget, but elapsed was only {elapsed}s"
         )
 
         await conn.close()
