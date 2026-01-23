@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import secrets
 import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -20,6 +19,7 @@ from lifx.const import (
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
+from lifx.network.utils import allocate_source
 from lifx.protocol.base import Packet
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device as DevicePackets
@@ -219,7 +219,7 @@ async def _discover_with_packet(
 
     async with UdpTransport(port=0, broadcast=True) as transport:
         # Allocate unique source for this discovery session
-        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+        discovery_source = allocate_source()
 
         message = create_message(
             packet=packet,
@@ -470,7 +470,7 @@ async def discover_devices(
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
         # Allocate unique source for this discovery session
-        discovery_source = secrets.randbelow(0xFFFFFFFF - 1) + 2
+        discovery_source = allocate_source()
 
         # Create discovery message
         discovery_packet = DevicePackets.GetService()
