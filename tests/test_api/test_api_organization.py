@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from lifx.api import DeviceGroup
+from lifx.api import DeviceGroup, GroupGrouping, LocationGrouping
 
 
 @pytest.mark.emulator
@@ -231,3 +231,101 @@ class TestOrganizeEdgeCases:
         # Both should succeed
         assert len(by_location) >= 0
         assert len(by_group) >= 0
+
+
+@pytest.mark.emulator
+class TestGroupingToDeviceGroup:
+    """Test to_device_group() conversion methods."""
+
+    async def test_location_grouping_to_device_group(
+        self, emulator_devices: DeviceGroup
+    ):
+        """Test LocationGrouping.to_device_group() conversion."""
+        group = emulator_devices
+
+        # Fetch location metadata (populates _location_metadata)
+        await group.organize_by_location(include_unassigned=True)
+
+        # Access the internal metadata storage
+        location_metadata = group._location_metadata
+
+        # Skip if no locations found
+        if not location_metadata:
+            pytest.skip("No locations found in emulator devices")
+
+        # Get first location grouping from internal metadata
+        location_uuid = list(location_metadata.keys())[0]
+        location_grouping = location_metadata[location_uuid]
+
+        # Verify it's a LocationGrouping
+        assert isinstance(location_grouping, LocationGrouping)
+
+        # Convert to DeviceGroup
+        device_group = location_grouping.to_device_group()
+
+        # Verify conversion
+        assert isinstance(device_group, DeviceGroup)
+        assert len(device_group.devices) == len(location_grouping.devices)
+        assert list(device_group.devices) == location_grouping.devices
+
+    async def test_group_grouping_to_device_group(self, emulator_devices: DeviceGroup):
+        """Test GroupGrouping.to_device_group() conversion."""
+        group = emulator_devices
+
+        # Fetch group metadata (populates _group_metadata)
+        await group.organize_by_group(include_unassigned=True)
+
+        # Access the internal metadata storage
+        group_metadata = group._group_metadata
+
+        # Skip if no groups found
+        if not group_metadata:
+            pytest.skip("No groups found in emulator devices")
+
+        # Get first group grouping from internal metadata
+        group_uuid = list(group_metadata.keys())[0]
+        group_grouping = group_metadata[group_uuid]
+
+        # Verify it's a GroupGrouping
+        assert isinstance(group_grouping, GroupGrouping)
+
+        # Convert to DeviceGroup
+        device_group = group_grouping.to_device_group()
+
+        # Verify conversion
+        assert isinstance(device_group, DeviceGroup)
+        assert len(device_group.devices) == len(group_grouping.devices)
+        assert list(device_group.devices) == group_grouping.devices
+
+    async def test_to_device_group_preserves_device_types(
+        self, emulator_devices: DeviceGroup
+    ):
+        """Test that to_device_group() preserves device type filtering."""
+        group = emulator_devices
+
+        # Fetch location metadata (populates _location_metadata)
+        await group.organize_by_location(include_unassigned=True)
+
+        # Access the internal metadata storage
+        location_metadata = group._location_metadata
+
+        if not location_metadata:
+            pytest.skip("No locations found in emulator devices")
+
+        # Get first location grouping
+        location_uuid = list(location_metadata.keys())[0]
+        location_grouping = location_metadata[location_uuid]
+
+        # Convert to DeviceGroup
+        device_group = location_grouping.to_device_group()
+
+        # DeviceGroup should properly filter by device types
+        # (this tests that the filtering logic works on converted groups)
+        all_lights = device_group.lights
+        assert isinstance(all_lights, list)
+
+        # All items in lights should be Light instances
+        from lifx.devices import Light
+
+        for light in all_lights:
+            assert isinstance(light, Light)
