@@ -208,6 +208,7 @@ jobs:
   release:
     needs:
     - quality
+    - generated-files
     - test
     # Run release if not cancelled AND (manual dispatch OR quality passed with tests passed/skipped)
     if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (needs.quality.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped'))) }}
