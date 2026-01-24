@@ -170,6 +170,10 @@ class FrameBuffer:
         # Calculate total device pixels
         pixel_count = sum(t.width * t.height for t in tiles)
 
+        # Ensure capabilities are loaded
+        if device.capabilities is None:
+            await device._ensure_capabilities()
+
         # Only build canvas mapping for devices with chain capability.
         # The original LIFX Tile is the only matrix device with accelerometer-based
         # orientation detection and multi-tile positioning. Other matrix devices
