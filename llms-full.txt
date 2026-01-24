@@ -28466,6 +28466,21 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.1.0 (2026-01-24)
+
+### Bug Fixes
+
+- **animation**: Load capabilities before checking has_chain ([`69e50b3`](https://github.com/Djelibeybi/lifx-async/commit/69e50b356ed22ad1679a823444db9fa7c19626b7))
+
+### Documentation
+
+- Add DeviceGroup usage example ([`9f85854`](https://github.com/Djelibeybi/lifx-async/commit/9f858543f745140c154128c63006047fccdbd823))
+- Remove reference to deleted FieldSerializer class ([`5db0262`](https://github.com/Djelibeybi/lifx-async/commit/5db0262b593121be2de00bba44d522e11e449845))
+
+### Features
+
+- **animation**: Add high-performance animation module ([`afc8063`](https://github.com/Djelibeybi/lifx-async/commit/afc8063e6d863e118377facab30a7d3035b1ded5))
+
 ## v5.0.1 (2026-01-14)
 
 ### Bug Fixes
