@@ -11,6 +11,12 @@ lifx/
 ├── color.py                  # Color utilities (HSBK, Colors)
 ├── const.py                  # Network constants and URLs
 ├── exceptions.py             # Exception hierarchy
+├── animation/                # Animation module for high-frequency frame delivery
+│   ├── __init__.py          # Public API exports
+│   ├── animator.py          # High-level Animator class with direct UDP
+│   ├── framebuffer.py       # Multi-tile canvas mapping and orientation
+│   ├── packets.py           # Prebaked packet templates
+│   └── orientation.py       # Tile orientation remapping
 ├── devices/                  # Device classes
 │   ├── base.py              # Base Device class
 │   ├── light.py             # Light device (color control)
@@ -72,6 +78,14 @@ Work with colors:
 
 - [`HSBK`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.HSBK) - Color representation
 - [`Colors`](https://djelibeybi.github.io/lifx-async/api/colors/#lifx.color.Colors) - Built-in presets
+
+### Animation
+
+High-frequency frame delivery for real-time effects:
+
+- [`Animator`](https://djelibeybi.github.io/lifx-async/api/animation/#lifx.animation.animator.Animator) - High-level animation interface with direct UDP
+- [`FrameBuffer`](https://djelibeybi.github.io/lifx-async/api/animation/#lifx.animation.framebuffer.FrameBuffer) - Multi-tile canvas mapping
+- [`PacketTemplate`](https://djelibeybi.github.io/lifx-async/api/animation/#lifx.animation.packets.PacketTemplate) - Prebaked packet templates
 
 ### Network Layer
 
@@ -192,6 +206,14 @@ ______________________________________________________________________
 Work with colors, RGB, and HSBK
 
 [Colors](https://djelibeybi.github.io/lifx-async/api/colors/index.md)
+
+- **Animation**
+
+______________________________________________________________________
+
+High-frequency frame delivery for real-time effects
+
+[Animation](https://djelibeybi.github.io/lifx-async/api/animation/index.md)
 
 - **Network Layer**
 

@@ -27,6 +27,7 @@ Key features:
 
 - [Themes](https://djelibeybi.github.io/lifx-async/user-guide/themes/index.md): Working with color themes
 - [Ceiling Lights](https://djelibeybi.github.io/lifx-async/user-guide/ceiling-lights/index.md): Controlling LIFX Ceiling uplight and downlight components
+- [Animation](https://djelibeybi.github.io/lifx-async/user-guide/animation/index.md): High-frequency animation for real-time effects
 - [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md): Advanced usage patterns and best practices
 - [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md): Creating custom light effects
 - [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md): Common issues and solutions
@@ -44,6 +45,7 @@ Key features:
 - [High-Level API](https://djelibeybi.github.io/lifx-async/api/high-level/index.md): High-level discovery and batch operations API
 - [Themes](https://djelibeybi.github.io/lifx-async/api/themes/index.md): Theme system API
 - [Effects](https://djelibeybi.github.io/lifx-async/api/effects/index.md): Effects API
+- [Animation](https://djelibeybi.github.io/lifx-async/api/animation/index.md): Animation module for high-frequency frame delivery
 - [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md): Color utilities and HSBK conversion
 - [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md): Device classes and capabilities
 - [Network Layer](https://djelibeybi.github.io/lifx-async/api/network/index.md): Network layer components
