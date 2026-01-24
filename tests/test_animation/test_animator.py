@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -242,13 +242,27 @@ class TestAnimatorForMultizoneFactory:
             await Animator.for_multizone(device)
 
     @pytest.mark.asyncio
-    async def test_for_multizone_no_capabilities_raises(self) -> None:
-        """Test for_multizone raises error when capabilities is None."""
+    async def test_for_multizone_loads_capabilities_when_none(self) -> None:
+        """Test for_multizone calls _ensure_capabilities when None.
+
+        If capabilities haven't been fetched, we should load them first.
+        Then if device doesn't support extended multizone, raise error.
+        """
         device = MagicMock()
         device.capabilities = None
 
+        # Mock _ensure_capabilities to set capabilities without extended multizone
+        async def set_capabilities() -> None:
+            device.capabilities = MagicMock()
+            device.capabilities.has_extended_multizone = False
+
+        device._ensure_capabilities = AsyncMock(side_effect=set_capabilities)
+
         with pytest.raises(ValueError, match="extended multizone"):
             await Animator.for_multizone(device)
+
+        # Verify _ensure_capabilities was called
+        device._ensure_capabilities.assert_called_once()
 
 
 @pytest.mark.emulator
