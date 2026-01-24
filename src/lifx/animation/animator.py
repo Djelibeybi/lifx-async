@@ -213,6 +213,10 @@ class Animator:
                 await asyncio.sleep(1 / 30)  # 30 FPS
             ```
         """
+        # Ensure capabilities are loaded
+        if device.capabilities is None:
+            await device._ensure_capabilities()
+
         # Check extended multizone capability
         has_extended = bool(
             device.capabilities and device.capabilities.has_extended_multizone

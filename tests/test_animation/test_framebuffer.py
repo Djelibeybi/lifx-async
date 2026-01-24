@@ -137,18 +137,30 @@ class TestFrameBufferClassMethods:
         assert fb.tile_regions is None  # No tile regions for non-chain devices
 
     @pytest.mark.asyncio
-    async def test_for_matrix_no_capabilities(self, mock_tile_upright) -> None:
-        """Test for_matrix when capabilities is None.
+    async def test_for_matrix_loads_capabilities_when_none(
+        self, mock_tile_upright
+    ) -> None:
+        """Test for_matrix calls _ensure_capabilities when None.
 
-        If capabilities haven't been fetched, we should use passthrough mode.
+        If capabilities haven't been fetched, we should load them first.
         """
         device = MagicMock()
         device.device_chain = [mock_tile_upright]
         device.get_device_chain = AsyncMock(return_value=[mock_tile_upright])
         device.capabilities = None
 
+        # Mock _ensure_capabilities to set capabilities without has_chain
+        async def set_capabilities() -> None:
+            device.capabilities = MagicMock()
+            device.capabilities.has_chain = False
+
+        device._ensure_capabilities = AsyncMock(side_effect=set_capabilities)
+
         fb = await FrameBuffer.for_matrix(device)
 
+        # Verify _ensure_capabilities was called
+        device._ensure_capabilities.assert_called_once()
+        # Without has_chain, should use passthrough mode
         assert fb.pixel_count == 64
         assert fb.tile_regions is None
 
