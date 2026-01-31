@@ -110,6 +110,14 @@ class DeviceConnection:
         self._is_open = False
         self._is_opening = False  # Flag to prevent concurrent open() calls
 
+        # Pre-compute serial bytes for fast comparison in background receiver
+        self._is_discovery = serial == "000000000000"
+        if not self._is_discovery:
+            serial_obj = Serial.from_string(serial)
+            self._target_bytes: bytes | None = serial_obj.to_protocol()
+        else:
+            self._target_bytes = None
+
         # Background receiver task infrastructure
         # Key: (source, sequence, serial) → Queue of (header, payload) tuples
         self._pending_requests: dict[
@@ -360,12 +368,19 @@ class DeviceConnection:
                 )
 
                 # Compute correlation key (includes serial for defense-in-depth)
-                # For discovery connections (self.serial == "000000000000"), always use
-                # "000000000000" for correlation regardless of response serial
-                if self.serial == "000000000000":
+                # For discovery connections, always use "000000000000" for correlation
+                # regardless of response serial
+                if self._is_discovery:
                     serial = "000000000000"
                 else:
-                    serial = Serial.from_protocol(header.target).to_string()
+                    # Compare target bytes directly to avoid string conversion
+                    if (
+                        self._target_bytes is not None
+                        and header.target == self._target_bytes
+                    ):
+                        serial = self.serial
+                    else:
+                        serial = Serial.from_protocol(header.target).to_string()
                 key = (header.source, header.sequence, serial)
 
                 # Route to waiting request
@@ -572,11 +587,14 @@ class DeviceConnection:
 
                         # Validate correlation (defense in depth)
                         # For discovery connections, skip serial validation
-                        if self.serial != "000000000000":
-                            response_serial = Serial.from_protocol(
-                                header.target
-                            ).to_string()
-                            if response_serial != self.serial:
+                        if not self._is_discovery:
+                            if (
+                                self._target_bytes is not None
+                                and header.target != self._target_bytes
+                            ):
+                                response_serial = Serial.from_protocol(
+                                    header.target
+                                ).to_string()
                                 raise LifxProtocolError(
                                     f"Response serial mismatch: "
                                     f"expected {self.serial}, got {response_serial}"
@@ -710,16 +728,21 @@ class DeviceConnection:
                     )
 
                 # Validate correlation
+                serial_mismatch = (
+                    self._target_bytes is not None
+                    and header.target != self._target_bytes
+                )
                 if (
                     header.source != request_source
                     or header.sequence != sequence
-                    or Serial.from_protocol(header.target).to_string() != self.serial
+                    or serial_mismatch
                 ):
+                    response_serial = Serial.from_protocol(header.target).to_string()
                     raise LifxProtocolError(
                         f"ACK correlation mismatch: "
                         f"expected ({request_source}, {sequence}, {self.serial}), "
                         f"got ({header.source}, {header.sequence}, "
-                        f"{Serial.from_protocol(header.target).to_string()})"
+                        f"{response_serial})"
                     )
 
                 # Check for StateUnhandled - return False to indicate unsupported

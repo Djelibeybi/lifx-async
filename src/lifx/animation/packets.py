@@ -51,7 +51,7 @@ ACK_REQUIRED = 0
 RES_REQUIRED = 0
 
 
-@dataclass
+@dataclass(slots=True)
 class PacketTemplate:
     """Prebaked packet template for zero-allocation animation.
 
@@ -63,12 +63,14 @@ class PacketTemplate:
         color_offset: Byte offset where color data starts
         color_count: Number of HSBK colors in this packet
         hsbk_start: Starting index in the input HSBK array
+        fmt: Pre-computed struct format string for bulk color packing
     """
 
     data: bytearray
     color_offset: int
     color_count: int
     hsbk_start: int
+    fmt: str
 
 
 def _build_header(
@@ -103,9 +105,8 @@ def _build_header(
     # Frame Address (16 bytes)
     # target (8 bytes) + reserved (6 bytes) + flags (1 byte) + sequence (1 byte)
     target_padded = target + b"\x00\x00" if len(target) == 6 else target
-    target_int = int.from_bytes(target_padded, byteorder="little")
     flags = (RES_REQUIRED & 0b1) | ((ACK_REQUIRED & 0b1) << 1)
-    struct.pack_into("<Q6sBB", header, 8, target_int, b"\x00" * 6, flags, 0)
+    struct.pack_into("<8s6sBB", header, 8, target_padded, b"\x00" * 6, flags, 0)
 
     # Protocol Header (12 bytes)
     struct.pack_into("<QHH", header, 24, 0, pkt_type, 0)
@@ -277,12 +278,14 @@ class MatrixPacketGenerator(PacketGenerator):
             # Combine header + payload
             packet = header + payload
 
+            color_count = min(self._pixels_per_tile, 64)
             templates.append(
                 PacketTemplate(
                     data=packet,
                     color_offset=HEADER_SIZE + self._COLORS_OFFSET_IN_PAYLOAD,
-                    color_count=min(self._pixels_per_tile, 64),
+                    color_count=color_count,
                     hsbk_start=tile_idx * self._pixels_per_tile,
+                    fmt=f"<{'HHHH' * color_count}",
                 )
             )
 
@@ -338,6 +341,7 @@ class MatrixPacketGenerator(PacketGenerator):
                         color_offset=HEADER_SIZE + self._COLORS_OFFSET_IN_PAYLOAD,
                         color_count=color_count,
                         hsbk_start=tile_pixel_start + color_start,
+                        fmt=f"<{'HHHH' * color_count}",
                     )
                 )
 
@@ -369,6 +373,7 @@ class MatrixPacketGenerator(PacketGenerator):
                     color_offset=0,  # No colors
                     color_count=0,
                     hsbk_start=0,
+                    fmt="",
                 )
             )
 
@@ -387,10 +392,13 @@ class MatrixPacketGenerator(PacketGenerator):
             if tmpl.color_count == 0:
                 continue  # Skip CopyFrameBuffer packets
 
-            for i in range(tmpl.color_count):
-                h, s, b, k = hsbk[tmpl.hsbk_start + i]
-                offset = tmpl.color_offset + i * 8
-                struct.pack_into("<HHHH", tmpl.data, offset, h, s, b, k)
+            # Flatten HSBK tuples and pack in one bulk call
+            start = tmpl.hsbk_start
+            end = start + tmpl.color_count
+            flat: list[int] = []
+            for h, s, b, k in hsbk[start:end]:
+                flat.extend((h, s, b, k))
+            struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
 
 
 class MultiZonePacketGenerator(PacketGenerator):
@@ -476,6 +484,7 @@ class MultiZonePacketGenerator(PacketGenerator):
                     color_offset=HEADER_SIZE + self._COLORS_OFFSET_IN_PAYLOAD,
                     color_count=zone_count,
                     hsbk_start=zone_start,
+                    fmt=f"<{'HHHH' * zone_count}",
                 )
             )
 
@@ -491,7 +500,10 @@ class MultiZonePacketGenerator(PacketGenerator):
             hsbk: Protocol-ready HSBK data for all zones
         """
         for tmpl in templates:
-            for i in range(tmpl.color_count):
-                h, s, b, k = hsbk[tmpl.hsbk_start + i]
-                offset = tmpl.color_offset + i * 8
-                struct.pack_into("<HHHH", tmpl.data, offset, h, s, b, k)
+            # Flatten HSBK tuples and pack in one bulk call
+            start = tmpl.hsbk_start
+            end = start + tmpl.color_count
+            flat: list[int] = []
+            for h, s, b, k in hsbk[start:end]:
+                flat.extend((h, s, b, k))
+            struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)

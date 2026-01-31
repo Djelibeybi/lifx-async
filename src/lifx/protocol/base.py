@@ -6,8 +6,42 @@ Provides generic pack/unpack functionality for all packet types.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import asdict, dataclass
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from types import ModuleType
+
+# Lazy-cached module references to avoid circular imports at module load time.
+# These modules import from each other indirectly through packets.py, so we
+# defer the import to first use and cache the result at module level.
+_serializer: ModuleType | None = None
+_protocol_types: ModuleType | None = None
+
+
+def _get_serializer() -> ModuleType:
+    """Get the serializer module, importing on first use."""
+    global _serializer  # noqa: PLW0603
+    if _serializer is None:
+        from lifx.protocol import serializer
+
+        _serializer = serializer
+    return _serializer
+
+
+def _get_protocol_types() -> ModuleType:
+    """Get the protocol_types module, importing on first use."""
+    global _protocol_types  # noqa: PLW0603
+    if _protocol_types is None:
+        from lifx.protocol import protocol_types
+
+        _protocol_types = protocol_types
+    return _protocol_types
+
+
+_ARRAY_PATTERN = re.compile(r"\[(\d+)\](.+)")
+_PASCAL_TO_SNAKE = re.compile(r"(?<!^)(?=[A-Z])")
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +71,7 @@ class Packet:
         Returns:
             Packed bytes ready to send in a LIFX message payload
         """
-        from lifx.protocol import serializer
+        serializer = _get_serializer()
 
         result = b""
 
@@ -154,14 +188,12 @@ class Packet:
     @staticmethod
     def _protocol_to_python_name(name: str) -> str:
         """Convert protocol name (PascalCase) to Python name (snake_case)."""
-        import re
-
-        snake = re.sub(r"(?<!^)(?=[A-Z])", "_", name)
+        snake = _PASCAL_TO_SNAKE.sub("_", name)
         return snake.lower()
 
     def _pack_field_value(self, value: Any, field_type: str, size_bytes: int) -> bytes:
         """Pack a single field value based on its type."""
-        from lifx.protocol import serializer
+        serializer = _get_serializer()
 
         # Parse field type
         base_type, array_count, is_nested = self._parse_field_type(field_type)
@@ -211,25 +243,19 @@ class Packet:
         cls, data: bytes, field_type: str, size_bytes: int, offset: int
     ) -> tuple[Any, int]:
         """Unpack a single field value based on its type."""
-        from lifx.protocol import serializer
-        from lifx.protocol.protocol_types import (
-            DeviceService,
-            FirmwareEffect,
-            LightLastHevCycleResult,
-            LightWaveform,
-            MultiZoneApplicationRequest,
-        )
+        serializer = _get_serializer()
+        protocol_types = _get_protocol_types()
 
         # Parse field type
         base_type, array_count, is_nested = cls._parse_field_type(field_type)
 
         # Check if it's an enum (Button/Relay enums excluded)
         enum_types = {
-            "DeviceService": DeviceService,
-            "LightLastHevCycleResult": LightLastHevCycleResult,
-            "LightWaveform": LightWaveform,
-            "MultiZoneApplicationRequest": MultiZoneApplicationRequest,
-            "FirmwareEffect": FirmwareEffect,
+            "DeviceService": protocol_types.DeviceService,
+            "LightLastHevCycleResult": protocol_types.LightLastHevCycleResult,
+            "LightWaveform": protocol_types.LightWaveform,
+            "MultiZoneApplicationRequest": protocol_types.MultiZoneApplicationRequest,
+            "FirmwareEffect": protocol_types.FirmwareEffect,
         }
         is_enum = is_nested and base_type in enum_types
 
@@ -247,9 +273,7 @@ class Packet:
                     result.append(enum_class(item_raw))
                 return result, current_offset
             elif is_nested:
-                # Array of nested structures - need to import dynamically
-                from lifx.protocol import protocol_types
-
+                # Array of nested structures
                 struct_class = getattr(protocol_types, base_type)
                 result = []
                 current_offset = offset
@@ -276,9 +300,7 @@ class Packet:
             value_raw, new_offset = serializer.unpack_value(data, "uint8", offset)
             return enum_class(value_raw), new_offset
         elif is_nested:
-            # Nested structure - import dynamically
-            from lifx.protocol import protocol_types
-
+            # Nested structure
             struct_class = getattr(protocol_types, base_type)
             # Check if it's a Packet subclass or protocol_types class
             if issubclass(struct_class, cls):
@@ -324,10 +346,8 @@ class Packet:
         Returns:
             Tuple of (base_type, array_count, is_nested)
         """
-        import re
-
         # Check for array: [N]type
-        array_match = re.match(r"\[(\d+)\](.+)", field_type)
+        array_match = _ARRAY_PATTERN.match(field_type)
         if array_match:
             count = int(array_match.group(1))
             inner_type = array_match.group(2)
