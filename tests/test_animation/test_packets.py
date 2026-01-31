@@ -34,11 +34,13 @@ class TestPacketTemplate:
             color_offset=46,
             color_count=64,
             hsbk_start=0,
+            fmt=f"<{'HHHH' * 64}",
         )
         assert tmpl.data is data
         assert tmpl.color_offset == 46
         assert tmpl.color_count == 64
         assert tmpl.hsbk_start == 0
+        assert tmpl.fmt == f"<{'HHHH' * 64}"
 
 
 class TestMatrixPacketGenerator:
@@ -84,7 +86,7 @@ class TestMatrixPacketGenerator:
         templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 32
 
-        with pytest.raises(IndexError):
+        with pytest.raises((IndexError, struct.error)):
             gen.update_colors(templates, hsbk)
 
     def test_update_colors_packed(self) -> None:
@@ -374,7 +376,7 @@ class TestMultiZonePacketGenerator:
         templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 40
 
-        with pytest.raises(IndexError):
+        with pytest.raises((IndexError, struct.error)):
             gen.update_colors(templates, hsbk)
 
     def test_update_colors_packed(self) -> None:
