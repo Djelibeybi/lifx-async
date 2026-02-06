@@ -231,6 +231,50 @@ class TestDeviceConnection:
         assert not conn.is_open
 
 
+class TestSendTargetPrecomputed:
+    """Tests for pre-computed _send_target field."""
+
+    async def test_send_target_precomputed_for_normal_connection(self) -> None:
+        """Test _send_target is pre-computed correctly for normal connections."""
+        from lifx.protocol.models import Serial
+
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        expected = Serial.from_string("d073d5001234").to_protocol()
+        assert conn._send_target == expected
+
+    async def test_send_target_broadcast_for_discovery_connection(self) -> None:
+        """Test _send_target is broadcast (all zeros) for discovery connections."""
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        assert conn._send_target == b"\x00" * 8
+
+    async def test_send_packet_uses_precomputed_target(self) -> None:
+        """Test send_packet() uses _send_target instead of re-parsing serial."""
+        from unittest.mock import AsyncMock
+        from unittest.mock import patch as mock_patch
+
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        await conn.open()
+
+        try:
+            packet = Device.GetLabel()
+
+            with mock_patch(
+                "lifx.network.connection.create_message"
+            ) as mock_create_msg:
+                mock_create_msg.return_value = b"\x00" * 36
+                # Mock transport.send to avoid actual network I/O
+                conn._transport.send = AsyncMock()  # type: ignore[union-attr]
+
+                await conn.send_packet(packet, source=12345, sequence=0)
+
+                # Verify create_message received the pre-computed target
+                mock_create_msg.assert_called_once()
+                _, kwargs = mock_create_msg.call_args
+                assert kwargs["target"] == conn._send_target
+        finally:
+            await conn.close()
+
+
 @pytest.mark.emulator
 class TestAsyncGeneratorStreaming:
     """Test async generator streaming functionality."""

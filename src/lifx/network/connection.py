@@ -118,6 +118,13 @@ class DeviceConnection:
         else:
             self._target_bytes = None
 
+        # Pre-compute target bytes for send_packet() to avoid
+        # re-parsing on every send
+        if self._target_bytes is not None:
+            self._send_target: bytes = self._target_bytes
+        else:
+            self._send_target: bytes = b"\x00" * 8
+
         # Background receiver task infrastructure
         # Key: (source, sequence, serial) → Queue of (header, payload) tuples
         self._pending_requests: dict[
@@ -270,12 +277,11 @@ class DeviceConnection:
         if source is None:
             source = self._allocate_source()
 
-        target = Serial.from_string(self.serial).to_protocol()
         message = create_message(
             packet=packet,
             source=source,
             sequence=sequence,
-            target=target,
+            target=self._send_target,
             ack_required=ack_required,
             res_required=res_required,
         )
@@ -871,6 +877,10 @@ class DeviceConnection:
                 serial = Serial(value=header.target_serial).to_string()
                 if self.serial == "000000000000" and serial != self.serial:
                     self.serial = serial
+                    # Refresh cached fields now that we know the real serial
+                    self._is_discovery = False
+                    self._target_bytes = Serial.from_string(serial).to_protocol()
+                    self._send_target = self._target_bytes
 
                 # Unpack (labels are automatically decoded by Packet.unpack())
                 response_packet = packet_class.unpack(payload)
