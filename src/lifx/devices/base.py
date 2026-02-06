@@ -710,6 +710,40 @@ class Device(Generic[StateT]):
 
         return self._mac_address
 
+    def _process_capabilities(
+        self, version: DeviceVersion, host_firmware: FirmwareInfo
+    ) -> None:
+        """Process device capabilities from already-fetched version and firmware data.
+
+        Looks up product info from version.product, checks extended_multizone firmware
+        requirement, and sets self._capabilities. No-op if capabilities already set.
+
+        Args:
+            version: Device version info (vendor, product)
+            host_firmware: Host firmware info for extended multizone check
+        """
+        if self._capabilities is not None:
+            return
+
+        self._capabilities = get_product(version.product)
+
+        # If device has extended_multizone with minimum firmware requirement, verify it
+        if self._capabilities and self._capabilities.has_extended_multizone:
+            if self._capabilities.min_ext_mz_firmware is not None:
+                firmware_version = (
+                    host_firmware.version_major << 16
+                ) | host_firmware.version_minor
+
+                # If firmware is too old, remove the extended_multizone capability
+                if (
+                    firmware_version < self._capabilities.min_ext_mz_firmware
+                ):  # pragma: no cover
+                    from lifx.products.registry import ProductCapability
+
+                    self._capabilities.capabilities &= (
+                        ~ProductCapability.EXTENDED_MULTIZONE
+                    )
+
     async def _ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
 
@@ -724,25 +758,8 @@ class Device(Generic[StateT]):
 
         # Get device version to determine product ID
         version = await self.get_version()
-        self._capabilities = get_product(version.product)
-
-        # If device has extended_multizone with minimum firmware requirement, verify it
-        if self._capabilities and self._capabilities.has_extended_multizone:
-            if self._capabilities.min_ext_mz_firmware is not None:
-                firmware = await self.get_host_firmware()
-                firmware_version = (
-                    firmware.version_major << 16
-                ) | firmware.version_minor
-
-                # If firmware is too old, remove the extended_multizone capability
-                if (
-                    firmware_version < self._capabilities.min_ext_mz_firmware
-                ):  # pragma: no cover
-                    from lifx.products.registry import ProductCapability
-
-                    self._capabilities.capabilities &= (
-                        ~ProductCapability.EXTENDED_MULTIZONE
-                    )
+        host_firmware = await self.get_host_firmware()
+        self._process_capabilities(version, host_firmware)
 
     @property
     def capabilities(self) -> ProductInfo | None:
@@ -1661,32 +1678,62 @@ class Device(Generic[StateT]):
         This is an all-or-nothing operation - either all state is fetched successfully
         or an exception is raised.
 
+        When capabilities are not pre-loaded, get_version() runs in parallel with the
+        other GET requests to save one network round-trip.
+
         Raises:
             LifxTimeoutError: If device does not respond within timeout
             LifxDeviceNotFoundError: If device cannot be reached
             LifxProtocolError: If responses are invalid
         """
-        # Ensure capabilities are loaded
-        await self._ensure_capabilities()
-        capabilities = self._create_capabilities()
+        if self._capabilities is not None:
+            # Capabilities pre-loaded: skip get_version(), run 6 requests in parallel
+            capabilities = self._create_capabilities()
 
-        # Fetch semi-static and volatile state in parallel
-        # get_color returns color, power, and label in one request
-        (
-            label,
-            power,
-            host_firmware,
-            wifi_firmware,
-            location_info,
-            group_info,
-        ) = await asyncio.gather(
-            self.get_label(),
-            self.get_power(),
-            self.get_host_firmware(),
-            self.get_wifi_firmware(),
-            self.get_location(),
-            self.get_group(),
-        )
+            (
+                label,
+                power,
+                host_firmware,
+                wifi_firmware,
+                location_info,
+                group_info,
+            ) = await asyncio.gather(
+                self.get_label(),
+                self.get_power(),
+                self.get_host_firmware(),
+                self.get_wifi_firmware(),
+                self.get_location(),
+                self.get_group(),
+            )
+        else:
+            # Capabilities not loaded: include get_version() in parallel batch
+            # Schedule get_version() concurrently alongside the 6-arg gather
+            version_task = asyncio.ensure_future(self.get_version())
+            try:
+                (
+                    label,
+                    power,
+                    host_firmware,
+                    wifi_firmware,
+                    location_info,
+                    group_info,
+                ) = await asyncio.gather(
+                    self.get_label(),
+                    self.get_power(),
+                    self.get_host_firmware(),
+                    self.get_wifi_firmware(),
+                    self.get_location(),
+                    self.get_group(),
+                )
+                version = await version_task
+            except Exception:
+                if not version_task.done():
+                    version_task.cancel()
+                # Await to consume cancellation and avoid leaked task warnings
+                await asyncio.gather(version_task, return_exceptions=True)
+                raise
+            self._process_capabilities(version, host_firmware)
+            capabilities = self._create_capabilities()
 
         # Get MAC address (already calculated in get_host_firmware)
         mac_address = await self.get_mac_address()

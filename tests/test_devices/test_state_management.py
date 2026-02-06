@@ -1062,3 +1062,238 @@ class TestStateDataclasses:
             kelvin_max=9000,
         )
         assert caps.has_variable_color_temp is True
+
+
+class TestProcessCapabilities:
+    """Tests for _process_capabilities() synchronous helper."""
+
+    def test_process_capabilities_sets_capabilities(self, mock_product_info):
+        """Test _process_capabilities() sets device capabilities from version."""
+        from lifx.devices.base import DeviceVersion, FirmwareInfo
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+        product_info = mock_product_info(has_color=True)
+
+        version = DeviceVersion(vendor=1, product=32)
+        firmware = FirmwareInfo(build=0, version_major=2, version_minor=80)
+
+        with patch("lifx.devices.base.get_product", return_value=product_info):
+            device._process_capabilities(version, firmware)
+
+        assert device._capabilities is product_info
+
+    def test_process_capabilities_noop_when_already_set(self, mock_product_info):
+        """Test _process_capabilities() is a no-op when capabilities already set."""
+        from lifx.devices.base import DeviceVersion, FirmwareInfo
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+        existing_info = mock_product_info(has_color=True, name="Existing")
+        device._capabilities = existing_info
+
+        version = DeviceVersion(vendor=1, product=99)
+        firmware = FirmwareInfo(build=0, version_major=2, version_minor=80)
+
+        # Should NOT call get_product since capabilities already set
+        with patch("lifx.devices.base.get_product") as mock_get:
+            device._process_capabilities(version, firmware)
+            mock_get.assert_not_called()
+
+        assert device._capabilities is existing_info
+
+    def test_process_capabilities_strips_extended_multizone_for_old_firmware(self):
+        """Test _process_capabilities() strips extended_multizone for old firmware."""
+        from lifx.devices.base import DeviceVersion, FirmwareInfo
+        from lifx.products.registry import (
+            ProductCapability,
+            ProductInfo,
+            TemperatureRange,
+        )
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+
+        # Create product with extended_multizone and a minimum firmware requirement
+        product_info = ProductInfo(
+            pid=32,
+            name="Test Strip",
+            vendor=1,
+            capabilities=ProductCapability.COLOR
+            | ProductCapability.MULTIZONE
+            | ProductCapability.EXTENDED_MULTIZONE,
+            temperature_range=TemperatureRange(min=1500, max=9000),
+            min_ext_mz_firmware=(2 << 16) | 77,  # Requires firmware 2.77+
+        )
+
+        version = DeviceVersion(vendor=1, product=32)
+        # Firmware 2.50 is below the 2.77 requirement
+        firmware = FirmwareInfo(build=0, version_major=2, version_minor=50)
+
+        with patch("lifx.devices.base.get_product", return_value=product_info):
+            device._process_capabilities(version, firmware)
+
+        assert device._capabilities is not None
+        assert not device._capabilities.has_extended_multizone
+
+
+class TestDeviceInitializeStateParallel:
+    """Tests for _initialize_state() parallel get_version() optimization."""
+
+    @pytest.mark.asyncio
+    async def test_device_initialize_state_without_capabilities_includes_get_version(
+        self, mock_product_info, mock_firmware_info
+    ):
+        """Test _initialize_state() includes get_version()
+        when capabilities not loaded."""
+        product_info = mock_product_info(has_color=True)
+        firmware = mock_firmware_info()
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+        mock_conn = MagicMock()
+        mock_conn.request = AsyncMock()
+        device.connection = mock_conn
+
+        # Track which packet types were requested
+        requested_packets: list[type] = []
+
+        async def mock_request(packet):
+            requested_packets.append(type(packet))
+            if isinstance(packet, packets.Device.GetVersion):
+                return packets.Device.StateVersion(vendor=1, product=32)
+            elif isinstance(packet, packets.Device.GetLabel):
+                return packets.Device.StateLabel(label=b"Test")
+            elif isinstance(packet, packets.Device.GetPower):
+                return packets.Device.StatePower(level=65535)
+            elif isinstance(packet, packets.Device.GetHostFirmware):
+                return packets.Device.StateHostFirmware(
+                    build=firmware.build,
+                    version_major=firmware.version_major,
+                    version_minor=firmware.version_minor,
+                )
+            elif isinstance(packet, packets.Device.GetWifiFirmware):
+                return packets.Device.StateWifiFirmware(
+                    build=firmware.build,
+                    version_major=firmware.version_major,
+                    version_minor=firmware.version_minor,
+                )
+            elif isinstance(packet, packets.Device.GetLocation):
+                return packets.Device.StateLocation(
+                    location=b"\x00" * 16,
+                    label=b"Location",
+                    updated_at=int(time.time() * 1e9),
+                )
+            elif isinstance(packet, packets.Device.GetGroup):
+                return packets.Device.StateGroup(
+                    group=b"\x00" * 16,
+                    label=b"Group",
+                    updated_at=int(time.time() * 1e9),
+                )
+
+        mock_conn.request.side_effect = mock_request
+
+        # Capabilities NOT set - should include get_version()
+        assert device._capabilities is None
+
+        with patch("lifx.devices.base.get_product", return_value=product_info):
+            await device._initialize_state()
+
+        # Verify GetVersion was dispatched
+        assert packets.Device.GetVersion in requested_packets
+
+        # Verify state is populated
+        assert device._state is not None
+        assert device._state.label == b"Test"
+        assert device._state.power == 65535
+
+        # Verify capabilities were set
+        assert device._capabilities is product_info
+
+    @pytest.mark.asyncio
+    async def test_device_initialize_state_with_capabilities_skips_get_version(
+        self, mock_product_info, mock_firmware_info
+    ):
+        """Test _initialize_state() skips get_version() when capabilities pre-loaded."""
+        product_info = mock_product_info(has_color=True)
+        firmware = mock_firmware_info()
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+        mock_conn = MagicMock()
+        mock_conn.request = AsyncMock()
+        device.connection = mock_conn
+
+        # Track which packet types were requested
+        requested_packets: list[type] = []
+
+        async def mock_request(packet):
+            requested_packets.append(type(packet))
+            if isinstance(packet, packets.Device.GetLabel):
+                return packets.Device.StateLabel(label=b"Test")
+            elif isinstance(packet, packets.Device.GetPower):
+                return packets.Device.StatePower(level=0)
+            elif isinstance(packet, packets.Device.GetHostFirmware):
+                return packets.Device.StateHostFirmware(
+                    build=firmware.build,
+                    version_major=firmware.version_major,
+                    version_minor=firmware.version_minor,
+                )
+            elif isinstance(packet, packets.Device.GetWifiFirmware):
+                return packets.Device.StateWifiFirmware(
+                    build=firmware.build,
+                    version_major=firmware.version_major,
+                    version_minor=firmware.version_minor,
+                )
+            elif isinstance(packet, packets.Device.GetLocation):
+                return packets.Device.StateLocation(
+                    location=b"\x00" * 16,
+                    label=b"Location",
+                    updated_at=int(time.time() * 1e9),
+                )
+            elif isinstance(packet, packets.Device.GetGroup):
+                return packets.Device.StateGroup(
+                    group=b"\x00" * 16,
+                    label=b"Group",
+                    updated_at=int(time.time() * 1e9),
+                )
+
+        mock_conn.request.side_effect = mock_request
+
+        # Pre-load capabilities
+        device._capabilities = product_info
+
+        await device._initialize_state()
+
+        # Verify GetVersion was NOT dispatched
+        assert packets.Device.GetVersion not in requested_packets
+
+        # Verify state is still populated correctly
+        assert device._state is not None
+        assert device._state.power == 0
+
+    @pytest.mark.asyncio
+    async def test_device_initialize_state_cancels_version_task_on_error(
+        self,
+    ):
+        """Test _initialize_state() cancels version_task if gather
+        raises."""
+        from lifx.exceptions import LifxTimeoutError
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+        mock_conn = MagicMock()
+        mock_conn.request = AsyncMock()
+        device.connection = mock_conn
+
+        call_count = 0
+
+        async def mock_request(packet):
+            nonlocal call_count
+            call_count += 1
+            if isinstance(packet, packets.Device.GetVersion):
+                return packets.Device.StateVersion(vendor=1, product=32)
+            elif isinstance(packet, packets.Device.GetLabel):
+                raise LifxTimeoutError("Timed out")
+            return MagicMock()
+
+        mock_conn.request.side_effect = mock_request
+
+        assert device._capabilities is None
+
+        with pytest.raises(LifxTimeoutError):
+            await device._initialize_state()

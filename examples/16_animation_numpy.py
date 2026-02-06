@@ -57,6 +57,15 @@ def print_animator_info(animator: Animator) -> None:
 
 def percentile_stats(times_ms: list[float]) -> dict[str, float]:
     """Compute summary statistics from a list of times in milliseconds."""
+    if not times_ms:
+        return {
+            "mean": 0.0,
+            "median": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+        }
     times_ms.sort()
     n = len(times_ms)
     return {
@@ -396,28 +405,29 @@ async def run_profile(
     )
     print(f"  Warmup: {warmup} iterations")
 
-    for i in range(total_iterations):
-        t_offset = i * 0.033  # Simulate 30fps timing
+    try:
+        for i in range(total_iterations):
+            t_offset = i * 0.033  # Simulate 30fps timing
 
-        # Time NumPy frame generation
-        t0 = time.perf_counter()
-        hsbk_array = generator.generate_numpy_only(t_offset)
-        t1 = time.perf_counter()
+            # Time NumPy frame generation
+            t0 = time.perf_counter()
+            hsbk_array = generator.generate_numpy_only(t_offset)
+            t1 = time.perf_counter()
 
-        # Time list conversion
-        frame = hsbk_array_to_list(hsbk_array)
-        t2 = time.perf_counter()
+            # Time list conversion
+            frame = hsbk_array_to_list(hsbk_array)
+            t2 = time.perf_counter()
 
-        # Time send_frame
-        animator.send_frame(frame)
-        t3 = time.perf_counter()
+            # Time send_frame
+            animator.send_frame(frame)
+            t3 = time.perf_counter()
 
-        if i >= warmup:
-            gen_times.append((t1 - t0) * 1000)
-            convert_times.append((t2 - t1) * 1000)
-            send_times.append((t3 - t2) * 1000)
-
-    animator.close()
+            if i >= warmup:
+                gen_times.append((t1 - t0) * 1000)
+                convert_times.append((t2 - t1) * 1000)
+                send_times.append((t3 - t2) * 1000)
+    finally:
+        animator.close()
 
     total_times = [g + c + s for g, c, s in zip(gen_times, convert_times, send_times)]
 
@@ -433,10 +443,11 @@ async def run_profile(
     )
     print_stats("Total per-frame", percentile_stats(total_times))
 
-    mean_total = statistics.mean(total_times)
-    if mean_total > 0:
-        throughput = 1000.0 / mean_total
-        print(f"\n  Throughput: {throughput:,.0f} frames/sec")
+    if total_times:
+        mean_total = statistics.mean(total_times)
+        if mean_total > 0:
+            throughput = 1000.0 / mean_total
+            print(f"\n  Throughput: {throughput:,.0f} frames/sec")
 
 
 def run_synthetic_benchmarks() -> None:
