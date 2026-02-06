@@ -10781,7 +10781,11 @@ Prebaked packet template for zero-allocation frame updates.
 
 ```python
 PacketTemplate(
-    data: bytearray, color_offset: int, color_count: int, hsbk_start: int
+    data: bytearray,
+    color_offset: int,
+    color_count: int,
+    hsbk_start: int,
+    fmt: str,
 )
 ```
 
@@ -10789,12 +10793,13 @@ Prebaked packet template for zero-allocation animation.
 
 Contains a complete packet (header + payload) as a mutable bytearray. Only the sequence byte and color data need to be updated per frame.
 
-| ATTRIBUTE      | DESCRIPTION                                                    |
-| -------------- | -------------------------------------------------------------- |
-| `data`         | Complete packet bytes (header + payload) **TYPE:** `bytearray` |
-| `color_offset` | Byte offset where color data starts **TYPE:** `int`            |
-| `color_count`  | Number of HSBK colors in this packet **TYPE:** `int`           |
-| `hsbk_start`   | Starting index in the input HSBK array **TYPE:** `int`         |
+| ATTRIBUTE      | DESCRIPTION                                                              |
+| -------------- | ------------------------------------------------------------------------ |
+| `data`         | Complete packet bytes (header + payload) **TYPE:** `bytearray`           |
+| `color_offset` | Byte offset where color data starts **TYPE:** `int`                      |
+| `color_count`  | Number of HSBK colors in this packet **TYPE:** `int`                     |
+| `hsbk_start`   | Starting index in the input HSBK array **TYPE:** `int`                   |
+| `fmt`          | Pre-computed struct format string for bulk color packing **TYPE:** `str` |
 
 ### MatrixPacketGenerator
 
@@ -10992,10 +10997,13 @@ def update_colors(
         if tmpl.color_count == 0:
             continue  # Skip CopyFrameBuffer packets
 
-        for i in range(tmpl.color_count):
-            h, s, b, k = hsbk[tmpl.hsbk_start + i]
-            offset = tmpl.color_offset + i * 8
-            struct.pack_into("<HHHH", tmpl.data, offset, h, s, b, k)
+        # Flatten HSBK tuples and pack in one bulk call
+        start = tmpl.hsbk_start
+        end = start + tmpl.color_count
+        flat: list[int] = []
+        for h, s, b, k in hsbk[start:end]:
+            flat.extend((h, s, b, k))
+        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
 ```
 
 ### MultiZonePacketGenerator
@@ -11133,6 +11141,7 @@ def create_templates(self, source: int, target: bytes) -> list[PacketTemplate]:
                 color_offset=HEADER_SIZE + self._COLORS_OFFSET_IN_PAYLOAD,
                 color_count=zone_count,
                 hsbk_start=zone_start,
+                fmt=f"<{'HHHH' * zone_count}",
             )
         )
 
@@ -11167,10 +11176,13 @@ def update_colors(
         hsbk: Protocol-ready HSBK data for all zones
     """
     for tmpl in templates:
-        for i in range(tmpl.color_count):
-            h, s, b, k = hsbk[tmpl.hsbk_start + i]
-            offset = tmpl.color_offset + i * 8
-            struct.pack_into("<HHHH", tmpl.data, offset, h, s, b, k)
+        # Flatten HSBK tuples and pack in one bulk call
+        start = tmpl.hsbk_start
+        end = start + tmpl.color_count
+        flat: list[int] = []
+        for h, s, b, k in hsbk[start:end]:
+            flat.extend((h, s, b, k))
+        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
 ```
 
 ## Tile Orientation
@@ -23043,6 +23055,21 @@ def __init__(
     self._is_open = False
     self._is_opening = False  # Flag to prevent concurrent open() calls
 
+    # Pre-compute serial bytes for fast comparison in background receiver
+    self._is_discovery = serial == "000000000000"
+    if not self._is_discovery:
+        serial_obj = Serial.from_string(serial)
+        self._target_bytes: bytes | None = serial_obj.to_protocol()
+    else:
+        self._target_bytes = None
+
+    # Pre-compute target bytes for send_packet() to avoid
+    # re-parsing on every send
+    if self._target_bytes is not None:
+        self._send_target: bytes = self._target_bytes
+    else:
+        self._send_target: bytes = b"\x00" * 8
+
     # Background receiver task infrastructure
     # Key: (source, sequence, serial) → Queue of (header, payload) tuples
     self._pending_requests: dict[
@@ -23281,12 +23308,11 @@ async def send_packet(
     if source is None:
         source = self._allocate_source()
 
-    target = Serial.from_string(self.serial).to_protocol()
     message = create_message(
         packet=packet,
         source=source,
         sequence=sequence,
-        target=target,
+        target=self._send_target,
         ack_required=ack_required,
         res_required=res_required,
     )
@@ -23514,6 +23540,10 @@ async def request_stream(
             serial = Serial(value=header.target_serial).to_string()
             if self.serial == "000000000000" and serial != self.serial:
                 self.serial = serial
+                # Refresh cached fields now that we know the real serial
+                self._is_discovery = False
+                self._target_bytes = Serial.from_string(serial).to_protocol()
+                self._send_target = self._target_bytes
 
             # Unpack (labels are automatically decoded by Packet.unpack())
             response_packet = packet_class.unpack(payload)
@@ -23793,7 +23823,7 @@ def pack(self) -> bytes:
     Returns:
         Packed bytes ready to send in a LIFX message payload
     """
-    from lifx.protocol import serializer
+    serializer = _get_serializer()
 
     result = b""
 
@@ -24072,8 +24102,8 @@ def pack(self) -> bytes:
     flags = (int(self.res_required) & 0b1) | ((int(self.ack_required) & 0b1) << 1)
 
     frame_addr = struct.pack(
-        "<Q6sBB",
-        int.from_bytes(self.target, byteorder="little"),
+        "<8s6sBB",
+        self.target,
         b"\x00" * 6,  # reserved
         flags,
         self.sequence,
@@ -24144,8 +24174,7 @@ def unpack(cls, data: bytes) -> LifxHeader:
         raise ValueError("Addressable bit must be set")
 
     # Unpack Frame Address (16 bytes)
-    target_int, _reserved, flags, sequence = struct.unpack("<Q6sBB", data[8:24])
-    target = target_int.to_bytes(8, byteorder="little")
+    target, _reserved, flags, sequence = struct.unpack("<8s6sBB", data[8:24])
 
     res_required = bool(flags & 0b1)
     ack_required = bool((flags >> 1) & 0b1)

@@ -64,7 +64,7 @@ def pack(self) -> bytes:
     Returns:
         Packed bytes ready to send in a LIFX message payload
     """
-    from lifx.protocol import serializer
+    serializer = _get_serializer()
 
     result = b""
 
@@ -343,8 +343,8 @@ def pack(self) -> bytes:
     flags = (int(self.res_required) & 0b1) | ((int(self.ack_required) & 0b1) << 1)
 
     frame_addr = struct.pack(
-        "<Q6sBB",
-        int.from_bytes(self.target, byteorder="little"),
+        "<8s6sBB",
+        self.target,
         b"\x00" * 6,  # reserved
         flags,
         self.sequence,
@@ -415,8 +415,7 @@ def unpack(cls, data: bytes) -> LifxHeader:
         raise ValueError("Addressable bit must be set")
 
     # Unpack Frame Address (16 bytes)
-    target_int, _reserved, flags, sequence = struct.unpack("<Q6sBB", data[8:24])
-    target = target_int.to_bytes(8, byteorder="little")
+    target, _reserved, flags, sequence = struct.unpack("<8s6sBB", data[8:24])
 
     res_required = bool(flags & 0b1)
     ack_required = bool((flags >> 1) & 0b1)

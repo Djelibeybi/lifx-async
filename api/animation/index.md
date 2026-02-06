@@ -1023,7 +1023,11 @@ Prebaked packet template for zero-allocation frame updates.
 
 ```python
 PacketTemplate(
-    data: bytearray, color_offset: int, color_count: int, hsbk_start: int
+    data: bytearray,
+    color_offset: int,
+    color_count: int,
+    hsbk_start: int,
+    fmt: str,
 )
 ```
 
@@ -1031,12 +1035,13 @@ Prebaked packet template for zero-allocation animation.
 
 Contains a complete packet (header + payload) as a mutable bytearray. Only the sequence byte and color data need to be updated per frame.
 
-| ATTRIBUTE      | DESCRIPTION                                                    |
-| -------------- | -------------------------------------------------------------- |
-| `data`         | Complete packet bytes (header + payload) **TYPE:** `bytearray` |
-| `color_offset` | Byte offset where color data starts **TYPE:** `int`            |
-| `color_count`  | Number of HSBK colors in this packet **TYPE:** `int`           |
-| `hsbk_start`   | Starting index in the input HSBK array **TYPE:** `int`         |
+| ATTRIBUTE      | DESCRIPTION                                                              |
+| -------------- | ------------------------------------------------------------------------ |
+| `data`         | Complete packet bytes (header + payload) **TYPE:** `bytearray`           |
+| `color_offset` | Byte offset where color data starts **TYPE:** `int`                      |
+| `color_count`  | Number of HSBK colors in this packet **TYPE:** `int`                     |
+| `hsbk_start`   | Starting index in the input HSBK array **TYPE:** `int`                   |
+| `fmt`          | Pre-computed struct format string for bulk color packing **TYPE:** `str` |
 
 ### MatrixPacketGenerator
 
@@ -1234,10 +1239,13 @@ def update_colors(
         if tmpl.color_count == 0:
             continue  # Skip CopyFrameBuffer packets
 
-        for i in range(tmpl.color_count):
-            h, s, b, k = hsbk[tmpl.hsbk_start + i]
-            offset = tmpl.color_offset + i * 8
-            struct.pack_into("<HHHH", tmpl.data, offset, h, s, b, k)
+        # Flatten HSBK tuples and pack in one bulk call
+        start = tmpl.hsbk_start
+        end = start + tmpl.color_count
+        flat: list[int] = []
+        for h, s, b, k in hsbk[start:end]:
+            flat.extend((h, s, b, k))
+        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
 ```
 
 ### MultiZonePacketGenerator
@@ -1375,6 +1383,7 @@ def create_templates(self, source: int, target: bytes) -> list[PacketTemplate]:
                 color_offset=HEADER_SIZE + self._COLORS_OFFSET_IN_PAYLOAD,
                 color_count=zone_count,
                 hsbk_start=zone_start,
+                fmt=f"<{'HHHH' * zone_count}",
             )
         )
 
@@ -1409,10 +1418,13 @@ def update_colors(
         hsbk: Protocol-ready HSBK data for all zones
     """
     for tmpl in templates:
-        for i in range(tmpl.color_count):
-            h, s, b, k = hsbk[tmpl.hsbk_start + i]
-            offset = tmpl.color_offset + i * 8
-            struct.pack_into("<HHHH", tmpl.data, offset, h, s, b, k)
+        # Flatten HSBK tuples and pack in one bulk call
+        start = tmpl.hsbk_start
+        end = start + tmpl.color_count
+        flat: list[int] = []
+        for h, s, b, k in hsbk[start:end]:
+            flat.extend((h, s, b, k))
+        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
 ```
 
 ## Tile Orientation
