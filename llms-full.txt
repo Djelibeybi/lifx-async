@@ -28495,6 +28495,13 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.1.1 (2026-02-06)
+
+### Performance Improvements
+
+- Optimize device initialization and packet sending ([`865c4e3`](https://github.com/Djelibeybi/lifx-async/commit/865c4e32f696881a4e0ed2932eb014c4136d0554))
+- Pure-Python optimizations for protocol, network, and animation layers ([`a9a4bd4`](https://github.com/Djelibeybi/lifx-async/commit/a9a4bd40e35095c079339b336d82f1f5d509560a))
+
 ## v5.1.0 (2026-01-24)
 
 ### Bug Fixes
