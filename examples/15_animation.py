@@ -43,6 +43,15 @@ def print_animator_info(animator: Animator) -> None:
 
 def percentile_stats(times_ms: list[float]) -> dict[str, float]:
     """Compute summary statistics from a list of times in milliseconds."""
+    if not times_ms:
+        return {
+            "mean": 0.0,
+            "median": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+        }
     times_ms.sort()
     n = len(times_ms)
     return {
@@ -101,35 +110,36 @@ async def run_profile(
     )
     print(f"  Warmup: {warmup} iterations")
 
-    for i in range(total_iterations):
-        hue_offset = (i * 1000) % 65536
+    try:
+        for i in range(total_iterations):
+            hue_offset = (i * 1000) % 65536
 
-        # Time frame generation
-        t0 = time.perf_counter()
-        if is_matrix:
-            frame = []
-            for y in range(canvas_height):
-                for x in range(canvas_width):
-                    pos = x * cos_wave + y * sin_wave
-                    hue = int((pos / max_pos) * 65535 + hue_offset) % 65536
+            # Time frame generation
+            t0 = time.perf_counter()
+            if is_matrix:
+                frame = []
+                for y in range(canvas_height):
+                    for x in range(canvas_width):
+                        pos = x * cos_wave + y * sin_wave
+                        hue = int((pos / max_pos) * 65535 + hue_offset) % 65536
+                        frame.append((hue, 65535, 65535, 3500))
+            else:
+                frame = []
+                for j in range(pixel_count):
+                    hue_val = int((j / pixel_count) * 65536)
+                    hue = (hue_offset + hue_val) % 65536
                     frame.append((hue, 65535, 65535, 3500))
-        else:
-            frame = []
-            for j in range(pixel_count):
-                hue_val = int((j / pixel_count) * 65536)
-                hue = (hue_offset + hue_val) % 65536
-                frame.append((hue, 65535, 65535, 3500))
-        t1 = time.perf_counter()
+            t1 = time.perf_counter()
 
-        # Time send_frame
-        animator.send_frame(frame)
-        t2 = time.perf_counter()
+            # Time send_frame
+            animator.send_frame(frame)
+            t2 = time.perf_counter()
 
-        if i >= warmup:
-            gen_times.append((t1 - t0) * 1000)
-            send_times.append((t2 - t1) * 1000)
-
-    animator.close()
+            if i >= warmup:
+                gen_times.append((t1 - t0) * 1000)
+                send_times.append((t2 - t1) * 1000)
+    finally:
+        animator.close()
 
     total_times = [g + s for g, s in zip(gen_times, send_times)]
 
@@ -138,10 +148,11 @@ async def run_profile(
     print_stats("send_frame (orient + pack + send)", percentile_stats(send_times))
     print_stats("Total per-frame", percentile_stats(total_times))
 
-    mean_total = statistics.mean(total_times)
-    if mean_total > 0:
-        throughput = 1000.0 / mean_total
-        print(f"\n  Throughput: {throughput:,.0f} frames/sec")
+    if total_times:
+        mean_total = statistics.mean(total_times)
+        if mean_total > 0:
+            throughput = 1000.0 / mean_total
+            print(f"\n  Throughput: {throughput:,.0f} frames/sec")
 
 
 def _bench(label: str, func: object, n: int) -> None:

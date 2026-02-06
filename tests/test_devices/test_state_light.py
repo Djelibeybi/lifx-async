@@ -526,3 +526,143 @@ class TestLightStateManagement:
 
         # State should be updated immediately
         assert light._state.color.saturation == 0.75
+
+
+class TestLightInitializeStateParallel:
+    """Tests for Light._initialize_state() parallel get_version() optimization."""
+
+    @pytest.mark.asyncio
+    async def test_light_initialize_state_without_capabilities_includes_get_version(
+        self, light, mock_product_info
+    ):
+        """Test Light._initialize_state() includes get_version()
+        when capabilities not loaded."""
+        from unittest.mock import patch
+
+        product_info = mock_product_info(has_color=True)
+
+        # Track which packet types were requested
+        requested_packets: list[type] = []
+
+        async def mock_request(packet):
+            requested_packets.append(type(packet))
+            if isinstance(packet, packets.Device.GetVersion):
+                return packets.Device.StateVersion(vendor=1, product=32)
+            elif isinstance(packet, packets.Light.GetColor):
+                return packets.Light.StateColor(
+                    color=LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500),
+                    power=65535,
+                    label="Test Light",
+                )
+            elif isinstance(packet, packets.Device.GetHostFirmware):
+                return packets.Device.StateHostFirmware(
+                    build=0, version_major=2, version_minor=80
+                )
+            elif isinstance(packet, packets.Device.GetWifiFirmware):
+                return packets.Device.StateWifiFirmware(
+                    build=0, version_major=2, version_minor=80
+                )
+            elif isinstance(packet, packets.Device.GetLocation):
+                return packets.Device.StateLocation(
+                    location=b"\x00" * 16,
+                    label="Home",
+                    updated_at=0,
+                )
+            elif isinstance(packet, packets.Device.GetGroup):
+                return packets.Device.StateGroup(
+                    group=b"\x00" * 16,
+                    label="Living Room",
+                    updated_at=0,
+                )
+
+        light.connection.request.side_effect = mock_request
+
+        # Capabilities NOT set
+        assert light._capabilities is None
+
+        with patch("lifx.devices.base.get_product", return_value=product_info):
+            await light._initialize_state()
+
+        # Verify GetVersion was dispatched
+        assert packets.Device.GetVersion in requested_packets
+
+        # Verify state is populated correctly
+        assert light._state is not None
+        assert isinstance(light._state, LightState)
+        assert light._state.label == "Test Light"
+        assert light._state.power == 65535
+        assert isinstance(light._state.color, HSBK)
+
+        # Verify capabilities were set
+        assert light._capabilities is product_info
+
+    @pytest.mark.asyncio
+    async def test_light_initialize_state_with_capabilities_skips_get_version(
+        self, light, mock_product_info
+    ):
+        """Test Light._initialize_state() skips get_version()
+        when capabilities pre-loaded."""
+        product_info = mock_product_info(has_color=True)
+        light._capabilities = product_info
+
+        # Track which packet types were requested
+        requested_packets: list[type] = []
+
+        async def mock_request(packet):
+            requested_packets.append(type(packet))
+            if isinstance(packet, packets.Light.GetColor):
+                return packets.Light.StateColor(
+                    color=LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500),
+                    power=65535,
+                    label="Test",
+                )
+            elif isinstance(packet, packets.Device.GetHostFirmware):
+                return packets.Device.StateHostFirmware(
+                    build=0, version_major=2, version_minor=80
+                )
+            elif isinstance(packet, packets.Device.GetWifiFirmware):
+                return packets.Device.StateWifiFirmware(
+                    build=0, version_major=2, version_minor=80
+                )
+            elif isinstance(packet, packets.Device.GetLocation):
+                return packets.Device.StateLocation(
+                    location=b"\x00" * 16, label="Loc", updated_at=0
+                )
+            elif isinstance(packet, packets.Device.GetGroup):
+                return packets.Device.StateGroup(
+                    group=b"\x00" * 16, label="Grp", updated_at=0
+                )
+
+        light.connection.request.side_effect = mock_request
+
+        await light._initialize_state()
+
+        # Verify GetVersion was NOT dispatched
+        assert packets.Device.GetVersion not in requested_packets
+
+        # Verify state is populated correctly
+        assert light._state is not None
+        assert isinstance(light._state, LightState)
+        assert light._state.label == "Test"
+
+    @pytest.mark.asyncio
+    async def test_light_initialize_state_cancels_version_task_on_error(self, light):
+        """Test Light._initialize_state() cancels version_task if
+        gather raises."""
+        from unittest.mock import MagicMock
+
+        from lifx.exceptions import LifxTimeoutError
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Device.GetVersion):
+                return packets.Device.StateVersion(vendor=1, product=32)
+            elif isinstance(packet, packets.Light.GetColor):
+                raise LifxTimeoutError("Timed out")
+            return MagicMock()
+
+        light.connection.request.side_effect = mock_request
+
+        assert light._capabilities is None
+
+        with pytest.raises(LifxTimeoutError):
+            await light._initialize_state()

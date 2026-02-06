@@ -946,9 +946,8 @@ class Light(Device[LightState]):
         """Initialize light state transactionally.
 
         Extends base implementation to fetch color in addition to base state.
-
-        Args:
-            timeout: Timeout for state initialization
+        When capabilities are not pre-loaded, get_version() runs in parallel with
+        the other GET requests to save one network round-trip.
 
         Raises:
             LifxTimeoutError: If device does not respond within timeout
@@ -957,26 +956,50 @@ class Light(Device[LightState]):
         """
         import time
 
-        # Ensure capabilities are loaded
-        await self._ensure_capabilities()
-        capabilities = self._create_capabilities()
-
-        # Fetch semi-static and volatile state in parallel
-        # get_color returns color, power, and label in one request
         try:
-            (
-                (color, power, label),
-                host_firmware,
-                wifi_firmware,
-                location_info,
-                group_info,
-            ) = await asyncio.gather(
-                self.get_color(),
-                self.get_host_firmware(),
-                self.get_wifi_firmware(),
-                self.get_location(),
-                self.get_group(),
-            )
+            if self._capabilities is not None:
+                # Capabilities pre-loaded: skip get_version()
+                capabilities = self._create_capabilities()
+
+                (
+                    (color, power, label),
+                    host_firmware,
+                    wifi_firmware,
+                    location_info,
+                    group_info,
+                ) = await asyncio.gather(
+                    self.get_color(),
+                    self.get_host_firmware(),
+                    self.get_wifi_firmware(),
+                    self.get_location(),
+                    self.get_group(),
+                )
+            else:
+                # Capabilities not loaded: include get_version() in parallel batch
+                version_task = asyncio.ensure_future(self.get_version())
+                try:
+                    (
+                        (color, power, label),
+                        host_firmware,
+                        wifi_firmware,
+                        location_info,
+                        group_info,
+                    ) = await asyncio.gather(
+                        self.get_color(),
+                        self.get_host_firmware(),
+                        self.get_wifi_firmware(),
+                        self.get_location(),
+                        self.get_group(),
+                    )
+                    version = await version_task
+                except Exception:
+                    if not version_task.done():
+                        version_task.cancel()
+                    # Await to consume cancellation and avoid leaked task warnings
+                    await asyncio.gather(version_task, return_exceptions=True)
+                    raise
+                self._process_capabilities(version, host_firmware)
+                capabilities = self._create_capabilities()
 
             # Get MAC address (already calculated in get_host_firmware)
             mac_address = await self.get_mac_address()
