@@ -36,24 +36,46 @@ Example:
 
 from __future__ import annotations
 
+from lifx.effects.aurora import EffectAurora
 from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.conductor import Conductor
+from lifx.effects.flame import EffectFlame
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.models import PreState, RunningEffect
+from lifx.effects.progress import EffectProgress
 from lifx.effects.pulse import EffectPulse
 from lifx.effects.rainbow import EffectRainbow
+from lifx.effects.registry import (
+    DeviceSupport,
+    DeviceType,
+    EffectInfo,
+    EffectRegistry,
+    get_effect_registry,
+)
 from lifx.effects.state_manager import DeviceStateManager
+from lifx.effects.sunrise import EffectSunrise, EffectSunset, SunOrigin
 
 __all__ = [
     "Conductor",
     "DeviceStateManager",
+    "DeviceSupport",
+    "DeviceType",
+    "EffectAurora",
     "EffectColorloop",
+    "EffectFlame",
+    "EffectInfo",
+    "EffectProgress",
     "EffectPulse",
     "EffectRainbow",
+    "EffectRegistry",
+    "EffectSunrise",
+    "EffectSunset",
     "FrameContext",
     "FrameEffect",
     "LIFXEffect",
     "PreState",
     "RunningEffect",
+    "SunOrigin",
+    "get_effect_registry",
 ]

@@ -133,20 +133,20 @@ async def main():
         epilog="""
 Examples:
   # Find a device by label (substring match)
-  python 10_find_specific_devices.py --label "Living"  # Matches "Living Room"
+  python discovery_find_device.py --label "Living"  # Matches "Living Room"
 
   # Find a device by exact label
-  python 10_find_specific_devices.py --label "Living Room" --exact
+  python discovery_find_device.py --label "Living Room" --exact
 
   # Find a device by serial number
-  python 10_find_specific_devices.py --serial d073d5123456
+  python discovery_find_device.py --serial d073d5123456
 
   # Find a device by IP address
-  python 10_find_specific_devices.py --ip 192.168.1.100
+  python discovery_find_device.py --ip 192.168.1.100
 
   # Serial number formats (both work):
-  python 10_find_specific_devices.py --serial d073d5123456
-  python 10_find_specific_devices.py --serial d0:73:d5:12:34:56
+  python discovery_find_device.py --serial d073d5123456
+  python discovery_find_device.py --serial d0:73:d5:12:34:56
         """,
     )
 

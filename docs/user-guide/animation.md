@@ -305,7 +305,7 @@ def generate_gradient_numpy(width: int, height: int, hue_offset: int) -> list:
 ```
 
 For a complete example including vectorized RGB to HSBK conversion, see
-[examples/16_animation_numpy.py](https://github.com/Djelibeybi/lifx-async/blob/main/examples/16_animation_numpy.py).
+[examples/animation_numpy.py](https://github.com/Djelibeybi/lifx-async/blob/main/examples/animation_numpy.py).
 
 ### Monitor Statistics
 
