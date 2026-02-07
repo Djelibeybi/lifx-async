@@ -11,7 +11,7 @@ from lifx.effects.state_manager import DeviceStateManager
 
 
 @pytest.fixture
-def state_manager():
+def state_manager() -> DeviceStateManager:
     """Create a DeviceStateManager instance."""
     return DeviceStateManager()
 
@@ -25,7 +25,7 @@ def mock_light() -> MagicMock:
 
 
 @pytest.fixture
-def mock_multizone_light():
+def mock_multizone_light() -> MagicMock:
     """Create a mock multizone light device."""
     light = MagicMock(spec=MultiZoneLight)
     light.serial = "d073d5abcdef"
