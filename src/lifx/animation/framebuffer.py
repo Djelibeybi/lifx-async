@@ -298,7 +298,7 @@ class FrameBuffer:
         Single lights have exactly 1 pixel, so this is a trivial passthrough.
 
         Args:
-            device: Light device
+            _device: Light device (unused — single lights always have 1 pixel)
 
         Returns:
             Configured FrameBuffer instance

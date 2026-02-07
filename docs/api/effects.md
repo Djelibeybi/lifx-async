@@ -7,6 +7,13 @@ This reference guide provides comprehensive documentation for all built-in effec
 - [Conductor](#conductor)
 - [EffectPulse](#effectpulse)
 - [EffectColorloop](#effectcolorloop)
+- [EffectRainbow](#effectrainbow)
+- [EffectFlame](#effectflame)
+- [EffectAurora](#effectaurora)
+- [EffectProgress](#effectprogress)
+- [EffectSunrise](#effectsunrise)
+- [EffectSunset](#effectsunset)
+- [EffectRegistry](#effectregistry)
 - [FrameEffect (Base Class)](#frameeffect-base-class)
 - [LIFXEffect (Base Class)](#lifxeffect-base-class)
 
@@ -87,6 +94,61 @@ await conductor.stop([light1, light2])
 
 # Stop all lights in a group
 await conductor.stop(group.lights)
+```
+
+#### `add_lights(effect: LIFXEffect, lights: list[Light]) -> None`
+
+Add lights to a running effect without restarting it. Captures state, creates animators (for FrameEffects), and registers lights as participants. Incompatible or already-running lights are skipped.
+
+**Parameters:**
+
+- `effect` (LIFXEffect): The effect to add lights to (must already be running)
+- `lights` (list[Light]): List of lights to add
+
+**Example:**
+
+```python
+await conductor.add_lights(effect, [new_light])
+```
+
+#### `remove_lights(lights: list[Light], restore_state: bool = True) -> None`
+
+Remove lights from their running effect without stopping other participants. Closes animators, optionally restores state, and deregisters lights. If the last participant is removed, cancels the background task.
+
+**Parameters:**
+
+- `lights` (list[Light]): List of lights to remove
+- `restore_state` (bool): Whether to restore pre-effect state (default `True`)
+
+**Example:**
+
+```python
+# Remove and restore state
+await conductor.remove_lights([light1])
+
+# Remove without restoring
+await conductor.remove_lights([light2], restore_state=False)
+```
+
+#### `get_last_frame(light: Light) -> list[HSBK] | None`
+
+Return the most recent HSBK frame sent to a device. For frame-based effects, returns the list of HSBK colors from the most recent `generate_frame()` call. Returns `None` if no frame-based effect is running on the device.
+
+**Parameters:**
+
+- `light` (Light): The device to query
+
+**Returns:**
+
+- `list[HSBK] | None`: Most recent frame colors, or None
+
+**Example:**
+
+```python
+colors = conductor.get_last_frame(light)
+if colors:
+    avg_brightness = sum(c.brightness for c in colors) / len(colors)
+    print(f"Average brightness: {avg_brightness:.1%}")
 ```
 
 ### State Management
@@ -642,6 +704,448 @@ This prevents the lights from briefly returning to their original state between 
 - Effect startup: <100ms
 - Multiple devices update concurrently
 - No cycle limit - runs until stopped
+
+---
+
+## EffectRainbow
+
+Animated rainbow effect that spreads a full 360-degree rainbow across device pixels and scrolls it over time. Best on multizone strips and matrix lights where per-pixel variation creates a beautiful scrolling rainbow. Runs indefinitely until stopped.
+
+### Class Definition
+
+```python
+from lifx import EffectRainbow
+
+effect = EffectRainbow(
+    power_on=True,
+    period=10.0,
+    brightness=0.8,
+    saturation=1.0,
+    spread=0.0
+)
+```
+
+EffectRainbow is a [FrameEffect](#frameeffect-base-class) that generates per-pixel rainbow colors.
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `power_on` | `bool` | `True` | Power on devices if off |
+| `period` | `float` | `10.0` | Seconds per full rainbow scroll. Must be positive. |
+| `brightness` | `float` | `0.8` | Fixed brightness 0.0-1.0 |
+| `saturation` | `float` | `1.0` | Fixed saturation 0.0-1.0 |
+| `spread` | `float` | `0.0` | Hue degrees offset between devices 0-360 |
+
+### Device Compatibility
+
+- **Color Lights**: Cycles through hue (similar to a simpler colorloop)
+- **Multizone Lights**: Full rainbow spread across all zones, scrolling
+- **Matrix Lights**: Full rainbow spread across all pixels, scrolling
+
+Requires color capability. Monochrome lights are filtered out by `is_light_compatible()`.
+
+### Examples
+
+```python
+# Slow rainbow on a strip
+effect = EffectRainbow(period=20, brightness=0.6)
+await conductor.start(effect, lights)
+
+# Multiple devices offset by 90 degrees
+effect = EffectRainbow(period=10, spread=90)
+await conductor.start(effect, lights)
+
+await asyncio.sleep(60)
+await conductor.stop(lights)
+```
+
+---
+
+## EffectFlame
+
+Fire/candle flicker effect using layered sine waves for organic brightness variation. Produces warm colors from deep red to yellow. On matrix devices, applies vertical brightness falloff so bottom rows glow hotter. Runs indefinitely until stopped.
+
+### Class Definition
+
+```python
+from lifx import EffectFlame
+
+effect = EffectFlame(
+    power_on=True,
+    intensity=0.7,
+    speed=1.0,
+    kelvin_min=1500,
+    kelvin_max=2500,
+    brightness=0.8
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `power_on` | `bool` | `True` | Power on devices if off |
+| `intensity` | `float` | `0.7` | Flicker intensity 0.0-1.0. Higher values create more dramatic variation. |
+| `speed` | `float` | `1.0` | Animation speed multiplier. Must be positive. |
+| `kelvin_min` | `int` | `1500` | Minimum color temperature (>= 1500) |
+| `kelvin_max` | `int` | `2500` | Maximum color temperature (<= 9000, >= kelvin_min) |
+| `brightness` | `float` | `0.8` | Base brightness 0.0-1.0 |
+
+### Device Compatibility
+
+- **Color Lights**: Flickering candle effect (single pixel)
+- **Multizone Lights**: Fire along the strip with per-zone variation
+- **Matrix Lights**: 2D fire with vertical gradient — bottom rows are hotter
+
+Requires color capability.
+
+### Examples
+
+```python
+# Gentle candle on a single bulb
+effect = EffectFlame(intensity=0.5, speed=0.8)
+await conductor.start(effect, lights)
+
+# Intense bonfire on matrix tiles
+effect = EffectFlame(intensity=1.0, speed=2.0, brightness=1.0)
+await conductor.start(effect, [tile_light])
+
+await asyncio.sleep(60)
+await conductor.stop(lights)
+```
+
+---
+
+## EffectAurora
+
+Northern lights simulation with flowing colored bands. Uses palette interpolation and sine waves to create flowing aurora-like patterns. Best on multizone strips and matrix lights. Runs indefinitely until stopped.
+
+### Class Definition
+
+```python
+from lifx import EffectAurora
+
+effect = EffectAurora(
+    power_on=True,
+    speed=1.0,
+    brightness=0.8,
+    palette=None,       # defaults to green/cyan/blue/purple/magenta
+    spread=0.0
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `power_on` | `bool` | `True` | Power on devices if off |
+| `speed` | `float` | `1.0` | Animation speed multiplier. Must be positive. |
+| `brightness` | `float` | `0.8` | Base brightness 0.0-1.0 |
+| `palette` | `list[int] \| None` | `None` | List of hue values (0-360) defining aurora colors. Must have >= 2 entries. Default: `[120, 160, 200, 260, 290]` (green/cyan/blue/purple/magenta). |
+| `spread` | `float` | `0.0` | Hue degrees offset between devices 0-360 |
+
+### Device Compatibility
+
+- **Color Lights**: Slow color drift (underwhelming on single pixel)
+- **Multizone Lights**: Flowing colored bands across the strip
+- **Matrix Lights**: Flowing bands with vertical brightness gradient (brightest in middle rows, like aurora hanging from the sky)
+
+Requires color capability.
+
+### Examples
+
+```python
+# Default aurora
+effect = EffectAurora()
+await conductor.start(effect, lights)
+
+# Custom warm palette (magenta/pink tones)
+effect = EffectAurora(palette=[280, 300, 320, 340])
+await conductor.start(effect, lights)
+
+# Multi-device with spread
+effect = EffectAurora(spread=45, brightness=0.6)
+await conductor.start(effect, lights)
+
+await asyncio.sleep(120)
+await conductor.stop(lights)
+```
+
+---
+
+## EffectProgress
+
+Animated progress bar for multizone lights (strips/beams). Displays a filled/unfilled bar where the filled region has a traveling bright spot. The `position` attribute is mutable — update it at any time and the bar grows/shrinks on the next frame. Runs indefinitely until stopped.
+
+**Multizone only** — requires `has_multizone` capability.
+
+### Class Definition
+
+```python
+from lifx import EffectProgress, HSBK, Colors
+
+effect = EffectProgress(
+    power_on=True,
+    start_value=0.0,
+    end_value=100.0,
+    position=0.0,
+    foreground=Colors.GREEN,
+    background=HSBK(0, 0.0, 0.05, 3500),
+    spot_brightness=1.0,
+    spot_width=0.15,
+    spot_speed=1.0
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `power_on` | `bool` | `True` | Power on devices if off |
+| `start_value` | `float` | `0.0` | Start of value range (must be < end_value) |
+| `end_value` | `float` | `100.0` | End of value range (must be > start_value) |
+| `position` | `float` | `0.0` | Initial progress position (mutable at runtime) |
+| `foreground` | `HSBK \| list[HSBK] \| None` | `Colors.GREEN` | Color or gradient of filled region. Pass a single HSBK for solid, or a list of >= 2 HSBK stops for a gradient. |
+| `background` | `HSBK \| None` | dim neutral | Color of unfilled region |
+| `spot_brightness` | `float` | `1.0` | Peak brightness of traveling spot 0.0-1.0 |
+| `spot_width` | `float` | `0.15` | Spot width as fraction of bar 0.0-1.0 |
+| `spot_speed` | `float` | `1.0` | Spot oscillation speed in cycles/sec. Must be positive. |
+
+### Dynamic Position Update
+
+Since `generate_frame()` reads `self.position` each frame, changes are picked up immediately (asyncio single-threaded safety):
+
+```python
+effect = EffectProgress(foreground=Colors.BLUE, end_value=100)
+await conductor.start(effect, [strip])
+
+# Update from your application
+effect.position = 45.0   # 45% complete
+await asyncio.sleep(5)
+effect.position = 80.0   # 80% complete
+```
+
+### Gradient Foreground
+
+Pass a list of HSBK stops for a gradient that reveals progressively as the bar grows:
+
+```python
+gradient = [
+    HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500),  # blue
+    HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500),  # green
+    HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500),    # red
+]
+effect = EffectProgress(foreground=gradient, end_value=100)
+```
+
+### Device Compatibility
+
+- **Multizone Lights**: Full progress bar with traveling spot
+- **Color Lights / Matrix Lights**: Not supported
+
+---
+
+## EffectSunrise
+
+Sunrise effect that transitions from night to daylight over a configurable duration. Simulates a radial sun expansion from a configurable origin point, progressing through night, dawn, golden hour, morning, and daylight phases.
+
+**Matrix only** — requires `has_matrix` capability (tiles, candles, Ceiling lights).
+
+### Class Definition
+
+```python
+from lifx import EffectSunrise
+
+effect = EffectSunrise(
+    power_on=True,
+    duration=60.0,
+    brightness=1.0,
+    origin="bottom"
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `power_on` | `bool` | `True` | Power on devices if off |
+| `duration` | `float` | `60.0` | Effect duration in seconds. Must be positive. |
+| `brightness` | `float` | `1.0` | Peak brightness at full daylight 0.0-1.0 |
+| `origin` | `SunOrigin` | `"bottom"` | Sun origin point — `"bottom"` for center of bottom row (rectangular tiles) or `"center"` for middle of canvas (round/oval Ceiling lights) |
+
+### Behavior
+
+- **Duration-based**: Completes automatically after `duration` seconds
+- **No state restoration**: Light stays at daylight after completion (the whole point of a sunrise)
+- **Color phases**: Night (deep navy) → Dawn (purple/magenta) → Golden hour (orange/gold) → Morning (yellow) → Daylight (warm white)
+- **Radial wavefront**: Pixels near the origin transition first, creating a sun expanding outward
+
+### Origin Parameter
+
+The `origin` parameter controls where the sun rises from:
+
+- `"bottom"` (default): Center of the bottom row. Ideal for **rectangular tile arrays** where the sun rises from the horizon.
+- `"center"`: Middle of the canvas. Ideal for **round or oval LIFX Ceiling lights** where the sun expands outward from the center.
+
+### Examples
+
+```python
+# 30-minute sunrise for rectangular tiles
+effect = EffectSunrise(duration=1800, brightness=1.0)
+await conductor.start(effect, [tile_light])
+
+# Sunrise from center for Ceiling lights
+effect = EffectSunrise(duration=1800, origin="center")
+await conductor.start(effect, [ceiling_light])
+```
+
+---
+
+## EffectSunset
+
+Sunset effect that transitions from daylight to night over a configurable duration. Reverses the sunrise progression — daylight through golden hour to night. Optionally powers off the light when complete.
+
+**Matrix only** — requires `has_matrix` capability.
+
+### Class Definition
+
+```python
+from lifx import EffectSunset
+
+effect = EffectSunset(
+    power_on=False,
+    duration=60.0,
+    brightness=1.0,
+    power_off=True,
+    origin="bottom"
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `power_on` | `bool` | `False` | Power on devices if off (default False — light should already be on) |
+| `duration` | `float` | `60.0` | Effect duration in seconds. Must be positive. |
+| `brightness` | `float` | `1.0` | Starting brightness at daylight 0.0-1.0 |
+| `power_off` | `bool` | `True` | Power off lights when sunset completes |
+| `origin` | `SunOrigin` | `"bottom"` | Sun origin point — `"bottom"` or `"center"` |
+
+### Behavior
+
+- **Duration-based**: Completes automatically after `duration` seconds
+- **Power off**: When `power_off=True`, all participant lights are powered off after the last frame
+- **State restoration**: Skipped when `power_off=True` (light is off). When `power_off=False`, state is restored normally.
+- **Color phases**: Daylight → Morning → Golden hour → Dusk → Night
+
+### Examples
+
+```python
+# 30-minute sunset that powers off the light
+effect = EffectSunset(duration=1800, power_off=True)
+await conductor.start(effect, [tile_light])
+
+# Sunset from center for Ceiling lights, no power off
+effect = EffectSunset(duration=1800, origin="center", power_off=False)
+await conductor.start(effect, [ceiling_light])
+```
+
+---
+
+## EffectRegistry
+
+Central registry for discovering and querying available effects. Enables consumers like Home Assistant to dynamically find and present available effects based on device type.
+
+### Usage
+
+```python
+from lifx import get_effect_registry, DeviceType, DeviceSupport
+
+registry = get_effect_registry()
+```
+
+### `get_effect_registry() -> EffectRegistry`
+
+Returns the default registry pre-populated with all built-in effects. Lazily initialized on first call.
+
+### EffectRegistry Methods
+
+#### `effects -> list[EffectInfo]`
+
+Property returning all registered effects.
+
+#### `get_effect(name: str) -> EffectInfo | None`
+
+Look up an effect by name.
+
+#### `get_effects_for_device(device: Light) -> list[tuple[EffectInfo, DeviceSupport]]`
+
+Get effects compatible with a specific device instance. Classifies the device automatically and returns RECOMMENDED + COMPATIBLE entries, sorted with RECOMMENDED first.
+
+#### `get_effects_for_device_type(device_type: DeviceType) -> list[tuple[EffectInfo, DeviceSupport]]`
+
+Get effects compatible with a device type category.
+
+### DeviceType Enum
+
+| Value | Description |
+|-------|-------------|
+| `LIGHT` | Single bulb (Light, InfraredLight, HevLight) |
+| `MULTIZONE` | Strip/beam (MultiZoneLight) |
+| `MATRIX` | Tile/candle/ceiling (MatrixLight, CeilingLight) |
+
+### DeviceSupport Enum
+
+| Value | Description |
+|-------|-------------|
+| `RECOMMENDED` | Optimal visual experience for this device type |
+| `COMPATIBLE` | Works, but may not showcase the effect's full potential |
+| `NOT_SUPPORTED` | Filtered out (not useful on this device type) |
+
+### EffectInfo Dataclass
+
+```python
+@dataclass(frozen=True)
+class EffectInfo:
+    name: str                                        # e.g. "flame"
+    effect_class: type[LIFXEffect]                   # e.g. EffectFlame
+    description: str                                 # Human-readable one-liner
+    device_support: dict[DeviceType, DeviceSupport]  # Per-type support
+```
+
+### Built-in Effect Support Matrix
+
+| Effect | Light | MultiZone | Matrix |
+|--------|-------|-----------|--------|
+| pulse | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| colorloop | RECOMMENDED | COMPATIBLE | COMPATIBLE |
+| rainbow | COMPATIBLE | RECOMMENDED | RECOMMENDED |
+| flame | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| aurora | COMPATIBLE | RECOMMENDED | RECOMMENDED |
+| progress | NOT_SUPPORTED | RECOMMENDED | NOT_SUPPORTED |
+| sunrise | NOT_SUPPORTED | NOT_SUPPORTED | RECOMMENDED |
+| sunset | NOT_SUPPORTED | NOT_SUPPORTED | RECOMMENDED |
+
+### Examples
+
+```python
+from lifx import get_effect_registry, DeviceType
+
+registry = get_effect_registry()
+
+# List all effects
+for info in registry.effects:
+    print(f"{info.name}: {info.description}")
+
+# Get effects for multizone strips
+for info, support in registry.get_effects_for_device_type(DeviceType.MULTIZONE):
+    print(f"{info.name} ({support.value})")
+
+# Get effects for a specific device
+for info, support in registry.get_effects_for_device(my_light):
+    print(f"{info.name}: {support.value}")
+```
 
 ---
 

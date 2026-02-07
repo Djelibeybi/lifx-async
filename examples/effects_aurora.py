@@ -1,21 +1,24 @@
-"""Example demonstrating colorloop effect.
+"""Example demonstrating aurora effect.
 
-EffectColorloop continuously rotates through the hue spectrum over time.
-All pixels on a device display the same color. For a per-pixel rainbow
-effect on multizone strips and matrix lights, see 17_rainbow_effect.py.
+EffectAurora simulates the northern lights with flowing colored bands using
+palette interpolation and sine waves. Best on multizone strips and matrix
+lights where per-pixel color variation creates beautiful flowing bands.
+
+Works on all color devices. On single bulbs it produces a slow color drift;
+on strips and matrix lights it creates flowing aurora curtains.
 
 Usage:
     # Discover all lights on the network
-    python 07_colorloop_effect.py
+    python effects_aurora.py
 
     # Target specific devices by IP address
-    python 07_colorloop_effect.py 192.168.1.100 192.168.1.101
+    python effects_aurora.py 192.168.1.100 192.168.1.101
 
     # Target specific devices by serial number
-    python 07_colorloop_effect.py d073d5123456 d073d5abcdef
+    python effects_aurora.py d073d5123456 d073d5abcdef
 
     # Mix IP addresses and serial numbers
-    python 07_colorloop_effect.py 192.168.1.100 d073d5123456
+    python effects_aurora.py 192.168.1.100 d073d5123456
 """
 
 #  Copyright (c) 2026 Avi Miller <me@dje.li>
@@ -25,7 +28,7 @@ import asyncio
 import sys
 
 from lifx import Light, discover, find_by_ip, find_by_serial
-from lifx.effects import Conductor, EffectColorloop
+from lifx.effects import Conductor, EffectAurora
 
 
 async def resolve_devices(targets: list[str]) -> list[Light]:
@@ -78,7 +81,7 @@ async def discover_lights() -> list[Light]:
 
 
 async def main() -> None:
-    """Run colorloop effect examples."""
+    """Run aurora effect examples."""
     targets = sys.argv[1:]
 
     if targets:
@@ -95,31 +98,33 @@ async def main() -> None:
 
     conductor = Conductor()
 
-    # Example 1: Basic colorloop (full rotation in 30 seconds)
-    print("\n1. Colorloop - slow rotation (15 seconds)")
-    effect = EffectColorloop(period=30)
+    # Example 1: Default aurora (green/cyan/blue/purple palette)
+    print("\n1. Default aurora - green/blue/purple (20 seconds)")
+    effect = EffectAurora()
     await conductor.start(effect, lights)
-    await asyncio.sleep(15)
+    await asyncio.sleep(20)
     await conductor.stop(lights)
     print("Stopped. Lights restored to original state.")
 
     await asyncio.sleep(2)
 
-    # Example 2: Fast colorloop with fixed brightness
-    print("\n2. Colorloop - fast rotation with fixed brightness (15 seconds)")
-    effect = EffectColorloop(period=5, brightness=0.7)
+    # Example 2: Custom warm palette (sunset aurora)
+    print("\n2. Warm aurora - magenta/pink/red palette (20 seconds)")
+    effect = EffectAurora(palette=[280, 300, 320, 340, 10])
     await conductor.start(effect, lights)
-    await asyncio.sleep(15)
+    await asyncio.sleep(20)
     await conductor.stop(lights)
     print("Stopped. Lights restored to original state.")
 
     await asyncio.sleep(2)
 
-    # Example 3: Synchronized colorloop - all lights display the same color
-    print("\n3. Synchronized colorloop - all lights change together (15 seconds)")
-    effect = EffectColorloop(period=10, synchronized=True, brightness=0.8)
+    # Example 3: Fast aurora with device spread
+    # Each device's aurora is offset by 'spread' degrees so adjacent
+    # devices display different parts of the palette simultaneously.
+    print("\n3. Fast aurora with 120-degree device spread (20 seconds)")
+    effect = EffectAurora(speed=2.0, brightness=1.0, spread=120.0)
     await conductor.start(effect, lights)
-    await asyncio.sleep(15)
+    await asyncio.sleep(20)
     await conductor.stop(lights)
     print("Stopped. Lights restored to original state.")
 

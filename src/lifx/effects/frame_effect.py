@@ -101,6 +101,7 @@ class FrameEffect(LIFXEffect):
         self._duration = duration
         self._stop_event = asyncio.Event()
         self._animators: list[Animator] = []
+        self._last_frames: dict[str, list[HSBK]] = {}
 
     @property
     def fps(self) -> float:
@@ -156,8 +157,12 @@ class FrameEffect(LIFXEffect):
             if self._duration is not None and elapsed_s >= self._duration:
                 break
 
+            # Snapshot animators and participants for safe iteration
+            animators = list(self._animators)
+            participants = list(self.participants)
+
             # Generate and send frames for each device
-            for idx, animator in enumerate(self._animators):
+            for idx, animator in enumerate(animators):
                 ctx = FrameContext(
                     elapsed_s=elapsed_s,
                     device_index=idx,
@@ -168,6 +173,10 @@ class FrameEffect(LIFXEffect):
 
                 # Generate user-friendly HSBK frame
                 hsbk_frame = self.generate_frame(ctx)
+
+                # Store last frame keyed by device serial
+                if idx < len(participants):
+                    self._last_frames[participants[idx].serial] = hsbk_frame
 
                 # Convert to protocol tuples
                 protocol_frame = [color.as_tuple() for color in hsbk_frame]

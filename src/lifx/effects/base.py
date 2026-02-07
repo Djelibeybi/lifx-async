@@ -69,6 +69,20 @@ class LIFXEffect(ABC):
         """
         raise NotImplementedError("Subclasses must implement name property")
 
+    @property
+    def restore_on_complete(self) -> bool:
+        """Whether the conductor should restore device state on completion.
+
+        When True (default), the conductor restores pre-effect state (power,
+        color, zones) after the effect finishes naturally. Override to return
+        False for effects that intentionally leave devices in a specific state,
+        such as a sunset that powers off lights.
+
+        Returns:
+            True to restore state after effect completes, False to skip
+        """
+        return True
+
     async def async_perform(self, participants: list[Light]) -> None:
         """Perform common setup and play the effect.
 

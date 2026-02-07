@@ -4,8 +4,8 @@ Demonstrates how to use DeviceGroup for batch operations, filtering devices
 by type, and organizing devices by location or group.
 
 Usage:
-    python 05_device_groups.py              # Read-only: displays device info
-    python 05_device_groups.py --demo       # Also runs batch color/brightness demo
+    python control_device_groups.py              # Read-only: displays device info
+    python control_device_groups.py --demo       # Also runs batch color/brightness demo
 """
 
 import argparse
