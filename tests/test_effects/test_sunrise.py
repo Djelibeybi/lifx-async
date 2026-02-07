@@ -273,6 +273,23 @@ class TestSunriseCompatibility:
 
         assert await effect.is_light_compatible(light) is False
 
+    @pytest.mark.asyncio
+    async def test_loads_capabilities_when_none(self) -> None:
+        """Test is_light_compatible loads capabilities when None."""
+        effect = EffectSunrise()
+        light = MagicMock()
+        light.capabilities = None
+
+        async def ensure_caps():
+            caps = MagicMock()
+            caps.has_matrix = True
+            light.capabilities = caps
+
+        light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+
+        assert await effect.is_light_compatible(light) is True
+        light._ensure_capabilities.assert_called_once()
+
 
 class TestSunriseFrameLoop:
     """Tests for EffectSunrise running via FrameEffect frame loop."""
@@ -439,6 +456,49 @@ class TestSunsetGenerateFrame:
         hues = [c.hue for c in colors]
         warm_pixels = sum(1 for h in hues if h <= 60 or h >= 300)
         assert warm_pixels > 0
+
+
+class TestSunsetCompatibility:
+    """Tests for EffectSunset device compatibility."""
+
+    @pytest.mark.asyncio
+    async def test_compatible_with_matrix(self) -> None:
+        """Test is_light_compatible returns True for matrix lights."""
+        effect = EffectSunset()
+        light = MagicMock()
+        capabilities = MagicMock()
+        capabilities.has_matrix = True
+        light.capabilities = capabilities
+
+        assert await effect.is_light_compatible(light) is True
+
+    @pytest.mark.asyncio
+    async def test_incompatible_with_non_matrix(self) -> None:
+        """Test is_light_compatible returns False for non-matrix lights."""
+        effect = EffectSunset()
+        light = MagicMock()
+        capabilities = MagicMock()
+        capabilities.has_matrix = False
+        light.capabilities = capabilities
+
+        assert await effect.is_light_compatible(light) is False
+
+    @pytest.mark.asyncio
+    async def test_loads_capabilities_when_none(self) -> None:
+        """Test is_light_compatible loads capabilities when None."""
+        effect = EffectSunset()
+        light = MagicMock()
+        light.capabilities = None
+
+        async def ensure_caps():
+            caps = MagicMock()
+            caps.has_matrix = True
+            light.capabilities = caps
+
+        light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+
+        assert await effect.is_light_compatible(light) is True
+        light._ensure_capabilities.assert_called_once()
 
 
 class TestSunsetPowerOff:
