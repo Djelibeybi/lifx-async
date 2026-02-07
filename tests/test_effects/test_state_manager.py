@@ -17,7 +17,7 @@ def state_manager():
 
 
 @pytest.fixture
-def mock_light():
+def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
@@ -33,18 +33,18 @@ def mock_multizone_light():
     return light
 
 
-def test_state_manager_initialization(state_manager):
+def test_state_manager_initialization(state_manager) -> None:
     """Test DeviceStateManager initialization."""
     assert isinstance(state_manager, DeviceStateManager)
 
 
-def test_state_manager_repr(state_manager):
+def test_state_manager_repr(state_manager) -> None:
     """Test DeviceStateManager string representation."""
     assert repr(state_manager) == "DeviceStateManager()"
 
 
 @pytest.mark.asyncio
-async def test_capture_state_regular_light(state_manager, mock_light):
+async def test_capture_state_regular_light(state_manager, mock_light) -> None:
     """Test capturing state from a regular light."""
     # Setup mock responses
     mock_light.get_power = AsyncMock(return_value=True)
@@ -62,7 +62,7 @@ async def test_capture_state_regular_light(state_manager, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_capture_state_powered_off_light(state_manager, mock_light):
+async def test_capture_state_powered_off_light(state_manager, mock_light) -> None:
     """Test capturing state from a powered off light."""
     # Setup mock responses for powered off light
     mock_light.get_power = AsyncMock(return_value=0)
@@ -78,7 +78,9 @@ async def test_capture_state_powered_off_light(state_manager, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_capture_state_multizone_extended(state_manager, mock_multizone_light):
+async def test_capture_state_multizone_extended(
+    state_manager, mock_multizone_light
+) -> None:
     """Test capturing state from multizone light with extended support."""
     # Setup mock responses
     mock_multizone_light.get_power = AsyncMock(return_value=True)
@@ -107,7 +109,9 @@ async def test_capture_state_multizone_extended(state_manager, mock_multizone_li
 
 
 @pytest.mark.asyncio
-async def test_capture_state_multizone_standard(state_manager, mock_multizone_light):
+async def test_capture_state_multizone_standard(
+    state_manager, mock_multizone_light
+) -> None:
     """Test capturing state from multizone light without extended support."""
     # Setup mock responses
     mock_multizone_light.get_power = AsyncMock(return_value=True)
@@ -132,7 +136,9 @@ async def test_capture_state_multizone_standard(state_manager, mock_multizone_li
 
 
 @pytest.mark.asyncio
-async def test_capture_state_multizone_failure(state_manager, mock_multizone_light):
+async def test_capture_state_multizone_failure(
+    state_manager, mock_multizone_light
+) -> None:
     """Test capturing state when zone capture fails."""
     # Setup mock responses
     mock_multizone_light.get_power = AsyncMock(return_value=True)
@@ -155,7 +161,7 @@ async def test_capture_state_multizone_failure(state_manager, mock_multizone_lig
 
 
 @pytest.mark.asyncio
-async def test_restore_state_regular_light(state_manager, mock_light):
+async def test_restore_state_regular_light(state_manager, mock_light) -> None:
     """Test restoring state to a regular light."""
     # Setup mock methods
     mock_light.set_color = AsyncMock()
@@ -174,7 +180,7 @@ async def test_restore_state_regular_light(state_manager, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_restore_state_powered_off_light(state_manager, mock_light):
+async def test_restore_state_powered_off_light(state_manager, mock_light) -> None:
     """Test restoring powered off state."""
     # Setup mock methods
     mock_light.set_color = AsyncMock()
@@ -192,7 +198,9 @@ async def test_restore_state_powered_off_light(state_manager, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_restore_state_multizone_extended(state_manager, mock_multizone_light):
+async def test_restore_state_multizone_extended(
+    state_manager, mock_multizone_light
+) -> None:
     """Test restoring state to multizone light with extended support."""
     # Setup mock methods
     mock_multizone_light.set_extended_color_zones = AsyncMock()
@@ -221,7 +229,9 @@ async def test_restore_state_multizone_extended(state_manager, mock_multizone_li
 
 
 @pytest.mark.asyncio
-async def test_restore_state_multizone_standard(state_manager, mock_multizone_light):
+async def test_restore_state_multizone_standard(
+    state_manager, mock_multizone_light
+) -> None:
     """Test restoring state to multizone light without extended support."""
     # Setup mock methods
     mock_multizone_light.set_color_zones = AsyncMock()
@@ -246,7 +256,7 @@ async def test_restore_state_multizone_standard(state_manager, mock_multizone_li
 
 
 @pytest.mark.asyncio
-async def test_restore_color_failure_handling(state_manager, mock_light):
+async def test_restore_color_failure_handling(state_manager, mock_light) -> None:
     """Test restore handles color setting failures gracefully."""
     # Setup mock to fail
     mock_light.set_color = AsyncMock(side_effect=Exception("Network error"))
@@ -264,7 +274,7 @@ async def test_restore_color_failure_handling(state_manager, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_restore_power_failure_handling(state_manager, mock_light):
+async def test_restore_power_failure_handling(state_manager, mock_light) -> None:
     """Test restore handles power setting failures gracefully."""
     # Setup mock to fail on power
     mock_light.set_color = AsyncMock()
@@ -282,7 +292,9 @@ async def test_restore_power_failure_handling(state_manager, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_restore_zones_failure_handling(state_manager, mock_multizone_light):
+async def test_restore_zones_failure_handling(
+    state_manager, mock_multizone_light
+) -> None:
     """Test restore handles zone setting failures gracefully."""
     # Setup mock to fail on zones
     mock_multizone_light.set_extended_color_zones = AsyncMock(
