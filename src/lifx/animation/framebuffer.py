@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from lifx.devices.light import Light
     from lifx.devices.matrix import MatrixLight, TileInfo
     from lifx.devices.multizone import MultiZoneLight
 
@@ -289,6 +290,26 @@ class FrameBuffer:
         zone_count = await device.get_zone_count()
 
         return cls(pixel_count=zone_count)
+
+    @classmethod
+    def for_light(cls, _device: Light) -> FrameBuffer:
+        """Create a FrameBuffer configured for a single Light device.
+
+        Single lights have exactly 1 pixel, so this is a trivial passthrough.
+
+        Args:
+            device: Light device
+
+        Returns:
+            Configured FrameBuffer instance
+
+        Example:
+            ```python
+            fb = FrameBuffer.for_light(light)
+            assert fb.pixel_count == 1
+            ```
+        """
+        return cls(pixel_count=1, canvas_width=1, canvas_height=1)
 
     @property
     def pixel_count(self) -> int:

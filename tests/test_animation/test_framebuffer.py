@@ -378,3 +378,35 @@ class TestFrameBufferMultiTileCanvas:
         assert fb.canvas_size == 320  # 40 * 8
         assert fb.tile_regions is not None
         assert len(fb.tile_regions) == 5
+
+
+class TestFrameBufferForLight:
+    """Tests for FrameBuffer.for_light() factory method."""
+
+    def test_for_light_pixel_count(self) -> None:
+        """Test for_light creates framebuffer with pixel_count=1."""
+        device = MagicMock()
+        fb = FrameBuffer.for_light(device)
+        assert fb.pixel_count == 1
+
+    def test_for_light_canvas_dimensions(self) -> None:
+        """Test for_light creates 1x1 canvas."""
+        device = MagicMock()
+        fb = FrameBuffer.for_light(device)
+        assert fb.canvas_width == 1
+        assert fb.canvas_height == 1
+        assert fb.canvas_size == 1
+
+    def test_for_light_no_tile_regions(self) -> None:
+        """Test for_light has no tile regions (passthrough)."""
+        device = MagicMock()
+        fb = FrameBuffer.for_light(device)
+        assert fb.tile_regions is None
+
+    def test_for_light_apply_passthrough(self) -> None:
+        """Test for_light apply is passthrough for single pixel."""
+        device = MagicMock()
+        fb = FrameBuffer.for_light(device)
+        data: list[tuple[int, int, int, int]] = [(65535, 32768, 16384, 3500)]
+        result = fb.apply(data)
+        assert result == data

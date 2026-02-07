@@ -198,6 +198,7 @@ class MatrixPacketGenerator(PacketGenerator):
         tile_count: int,
         tile_width: int,
         tile_height: int,
+        duration_ms: int = 0,
     ) -> None:
         """Initialize matrix packet generator.
 
@@ -205,10 +206,12 @@ class MatrixPacketGenerator(PacketGenerator):
             tile_count: Number of tiles in the device chain
             tile_width: Width of each tile in pixels
             tile_height: Height of each tile in pixels
+            duration_ms: Transition duration in milliseconds (default 0 for instant)
         """
         self._tile_count = tile_count
         self._tile_width = tile_width
         self._tile_height = tile_height
+        self._duration_ms = duration_ms
         self._pixels_per_tile = tile_width * tile_height
         self._total_pixels = tile_count * self._pixels_per_tile
 
@@ -268,8 +271,8 @@ class MatrixPacketGenerator(PacketGenerator):
             payload[1] = 1  # length
             # TileBufferRect: fb_index=0, x=0, y=0, width=tile_width
             struct.pack_into("<BBBB", payload, 2, 0, 0, 0, self._tile_width)
-            # duration = 0
-            struct.pack_into("<I", payload, 6, 0)
+            # duration
+            struct.pack_into("<I", payload, 6, self._duration_ms)
             # colors filled with black as default
             for i in range(64):
                 offset = self._COLORS_OFFSET_IN_PAYLOAD + i * 8
@@ -326,8 +329,8 @@ class MatrixPacketGenerator(PacketGenerator):
                 payload[1] = 1  # length
                 # TileBufferRect: fb_index=1 (temp), x=0, y=y_offset, width
                 struct.pack_into("<BBBB", payload, 2, 1, 0, y_offset, self._tile_width)
-                # duration = 0
-                struct.pack_into("<I", payload, 6, 0)
+                # duration
+                struct.pack_into("<I", payload, 6, self._duration_ms)
                 # colors filled with black as default
                 for i in range(64):
                     offset = self._COLORS_OFFSET_IN_PAYLOAD + i * 8
@@ -421,13 +424,15 @@ class MultiZonePacketGenerator(PacketGenerator):
     _COLORS_OFFSET_IN_PAYLOAD: ClassVar[int] = 8
     _MAX_ZONES_PER_PACKET: ClassVar[int] = 82
 
-    def __init__(self, zone_count: int) -> None:
+    def __init__(self, zone_count: int, duration_ms: int = 0) -> None:
         """Initialize multizone packet generator.
 
         Args:
             zone_count: Total number of zones on the device
+            duration_ms: Transition duration in milliseconds (default 0 for instant)
         """
         self._zone_count = zone_count
+        self._duration_ms = duration_ms
         self._packets_needed = (
             zone_count + self._MAX_ZONES_PER_PACKET - 1
         ) // self._MAX_ZONES_PER_PACKET
@@ -463,8 +468,8 @@ class MultiZonePacketGenerator(PacketGenerator):
 
             # Build payload
             payload = bytearray(self._PAYLOAD_SIZE)
-            # duration = 0
-            struct.pack_into("<I", payload, 0, 0)
+            # duration
+            struct.pack_into("<I", payload, 0, self._duration_ms)
             # apply = 1 (APPLY)
             payload[4] = 1
             # zone_index
@@ -507,3 +512,79 @@ class MultiZonePacketGenerator(PacketGenerator):
             for h, s, b, k in hsbk[start:end]:
                 flat.extend((h, s, b, k))
             struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
+
+
+class LightPacketGenerator(PacketGenerator):
+    """Packet generator for single Light devices.
+
+    Uses LightSetColor packets (PKT_TYPE=102) for single-pixel color control.
+    Designed for frame-based effects on individual lights.
+
+    LightSetColor Payload Layout (13 bytes):
+        - Offset 0: reserved (uint8)
+        - Offset 1-8: LightHsbk (H, S, B, K as uint16 = 8 bytes)
+        - Offset 9-12: duration (uint32)
+    """
+
+    SET_COLOR_PKT_TYPE: ClassVar[int] = 102
+
+    _PAYLOAD_SIZE: ClassVar[int] = 13
+    _COLOR_OFFSET_IN_PAYLOAD: ClassVar[int] = 1
+
+    def __init__(self, duration_ms: int = 0) -> None:
+        """Initialize light packet generator.
+
+        Args:
+            duration_ms: Transition duration in milliseconds (default 0 for instant)
+        """
+        self._duration_ms = duration_ms
+
+    def pixel_count(self) -> int:
+        """Get total pixel count (always 1 for single lights)."""
+        return 1
+
+    def create_templates(self, source: int, target: bytes) -> list[PacketTemplate]:
+        """Create prebaked packet template for a single light.
+
+        Args:
+            source: Client source ID
+            target: 6-byte device serial
+
+        Returns:
+            List containing a single PacketTemplate
+        """
+        header = _build_header(
+            self.SET_COLOR_PKT_TYPE, source, target, self._PAYLOAD_SIZE
+        )
+
+        payload = bytearray(self._PAYLOAD_SIZE)
+        payload[0] = 0  # reserved
+        # Default color: black
+        struct.pack_into("<HHHH", payload, self._COLOR_OFFSET_IN_PAYLOAD, 0, 0, 0, 3500)
+        # duration
+        struct.pack_into("<I", payload, 9, self._duration_ms)
+
+        packet = header + payload
+
+        return [
+            PacketTemplate(
+                data=packet,
+                color_offset=HEADER_SIZE + self._COLOR_OFFSET_IN_PAYLOAD,
+                color_count=1,
+                hsbk_start=0,
+                fmt="<HHHH",
+            )
+        ]
+
+    def update_colors(
+        self, templates: list[PacketTemplate], hsbk: list[tuple[int, int, int, int]]
+    ) -> None:
+        """Update color data in the prebaked template.
+
+        Args:
+            templates: Prebaked packet templates (single template)
+            hsbk: Protocol-ready HSBK data (single color)
+        """
+        tmpl = templates[0]
+        h, s, b, k = hsbk[0]
+        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, h, s, b, k)

@@ -39,16 +39,21 @@ from __future__ import annotations
 from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.conductor import Conductor
+from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.models import PreState, RunningEffect
 from lifx.effects.pulse import EffectPulse
+from lifx.effects.rainbow import EffectRainbow
 from lifx.effects.state_manager import DeviceStateManager
 
 __all__ = [
     "Conductor",
     "DeviceStateManager",
-    "LIFXEffect",
-    "EffectPulse",
     "EffectColorloop",
+    "EffectPulse",
+    "EffectRainbow",
+    "FrameContext",
+    "FrameEffect",
+    "LIFXEffect",
     "PreState",
     "RunningEffect",
 ]
