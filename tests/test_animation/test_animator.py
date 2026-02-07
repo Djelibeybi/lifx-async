@@ -265,6 +265,64 @@ class TestAnimatorForMultizoneFactory:
         device._ensure_capabilities.assert_called_once()
 
 
+class TestAnimatorForLightFactory:
+    """Tests for Animator.for_light factory method."""
+
+    def test_for_light_creates_animator(self) -> None:
+        """Test for_light creates an animator with correct pixel count."""
+        device = MagicMock()
+        device.ip = "192.168.1.100"
+        device.serial = "d073d5123456"
+
+        animator = Animator.for_light(device)
+
+        assert animator.pixel_count == 1
+        assert animator.canvas_width == 1
+        assert animator.canvas_height == 1
+
+    def test_for_light_sends_single_packet(self) -> None:
+        """Test for_light sends exactly 1 packet per frame."""
+        device = MagicMock()
+        device.ip = "192.168.1.100"
+        device.serial = "d073d5123456"
+
+        animator = Animator.for_light(device)
+        hsbk: list[tuple[int, int, int, int]] = [(65535, 65535, 65535, 3500)]
+
+        with patch.object(socket, "socket") as mock_socket_class:
+            mock_sock = MagicMock()
+            mock_socket_class.return_value = mock_sock
+
+            stats = animator.send_frame(hsbk)
+
+            assert stats.packets_sent == 1
+            mock_sock.sendto.assert_called_once()
+
+    def test_for_light_is_synchronous(self) -> None:
+        """Test for_light factory is synchronous (not async)."""
+        import inspect
+
+        assert not inspect.iscoroutinefunction(Animator.for_light)
+
+    def test_for_light_with_duration(self) -> None:
+        """Test for_light passes duration_ms to packet generator."""
+        device = MagicMock()
+        device.ip = "192.168.1.100"
+        device.serial = "d073d5123456"
+
+        animator = Animator.for_light(device, duration_ms=500)
+
+        # Verify by checking the packet template's duration
+        import struct
+
+        from lifx.animation.packets import HEADER_SIZE
+
+        template = animator._templates[0]
+        payload = bytes(template.data[HEADER_SIZE:])
+        (duration,) = struct.unpack_from("<I", payload, 9)
+        assert duration == 500
+
+
 @pytest.mark.emulator
 class TestAnimatorForMatrixIntegration:
     """Integration tests for Animator.for_matrix with emulator."""

@@ -8,6 +8,7 @@ import pytest
 
 from lifx.animation.packets import (
     HEADER_SIZE,
+    LightPacketGenerator,
     MatrixPacketGenerator,
     MultiZonePacketGenerator,
     PacketTemplate,
@@ -504,3 +505,172 @@ class TestMultiZonePacketGeneratorLargeZones:
         # Second template should have blue
         h2 = struct.unpack_from("<H", get_payload(templates[1]), 8)[0]
         assert h2 == 43690  # Blue
+
+
+class TestLightPacketGenerator:
+    """Tests for LightPacketGenerator (single light)."""
+
+    SET_COLOR_PKT_TYPE = 102
+
+    def test_pixel_count(self) -> None:
+        """Test pixel_count always returns 1."""
+        gen = LightPacketGenerator()
+        assert gen.pixel_count() == 1
+
+    def test_create_templates_single(self) -> None:
+        """Test template creation for single light."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        assert len(templates) == 1
+        assert isinstance(templates[0], PacketTemplate)
+
+    def test_header_packet_type(self) -> None:
+        """Test header contains SetColor packet type (102)."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        (pkt_type,) = struct.unpack_from("<H", templates[0].data, 32)
+        assert pkt_type == self.SET_COLOR_PKT_TYPE
+
+    def test_payload_size(self) -> None:
+        """Test payload has correct size (13 bytes)."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        assert len(payload) == 13
+
+    def test_reserved_byte(self) -> None:
+        """Test first byte of payload is reserved (0)."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        assert payload[0] == 0
+
+    def test_default_duration_zero(self) -> None:
+        """Test default duration is 0 for instant updates."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        (duration,) = struct.unpack_from("<I", payload, 9)
+        assert duration == 0
+
+    def test_custom_duration(self) -> None:
+        """Test custom duration is correctly packed."""
+        gen = LightPacketGenerator(duration_ms=500)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        (duration,) = struct.unpack_from("<I", payload, 9)
+        assert duration == 500
+
+    def test_update_colors(self) -> None:
+        """Test HSBK values are correctly packed into payload."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        hsbk: list[tuple[int, int, int, int]] = [(65535, 32768, 16384, 4000)]
+
+        gen.update_colors(templates, hsbk)
+
+        payload = get_payload(templates[0])
+        h, s, b, k = struct.unpack_from("<HHHH", payload, 1)
+        assert h == 65535
+        assert s == 32768
+        assert b == 16384
+        assert k == 4000
+
+    def test_header_contains_source(self) -> None:
+        """Test prebaked header contains source ID."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        (source,) = struct.unpack_from("<I", templates[0].data, 4)
+        assert source == TEST_SOURCE
+
+    def test_header_contains_target(self) -> None:
+        """Test prebaked header contains target serial."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        target_bytes = templates[0].data[8:14]
+        assert target_bytes == TEST_TARGET
+
+    def test_color_offset(self) -> None:
+        """Test color_offset points to correct position (header + 1 reserved byte)."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        assert templates[0].color_offset == HEADER_SIZE + 1
+
+    def test_color_count(self) -> None:
+        """Test color_count is 1."""
+        gen = LightPacketGenerator()
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        assert templates[0].color_count == 1
+
+
+class TestMatrixPacketGeneratorDuration:
+    """Tests for MatrixPacketGenerator duration_ms parameter."""
+
+    def test_default_duration_zero(self) -> None:
+        """Test default duration is 0."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=8, tile_height=8)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        (duration,) = struct.unpack_from("<I", payload, 6)
+        assert duration == 0
+
+    def test_custom_duration(self) -> None:
+        """Test custom duration is packed into Set64 payload."""
+        gen = MatrixPacketGenerator(
+            tile_count=1, tile_width=8, tile_height=8, duration_ms=100
+        )
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        (duration,) = struct.unpack_from("<I", payload, 6)
+        assert duration == 100
+
+    def test_custom_duration_large_tile(self) -> None:
+        """Test custom duration on large tile Set64 packets."""
+        gen = MatrixPacketGenerator(
+            tile_count=1, tile_width=16, tile_height=8, duration_ms=200
+        )
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        # Set64 packets should have the custom duration
+        (duration1,) = struct.unpack_from("<I", get_payload(templates[0]), 6)
+        (duration2,) = struct.unpack_from("<I", get_payload(templates[1]), 6)
+        assert duration1 == 200
+        assert duration2 == 200
+
+        # CopyFrameBuffer should still have duration=0
+        (copy_duration,) = struct.unpack_from("<I", get_payload(templates[2]), 10)
+        assert copy_duration == 0
+
+
+class TestMultiZonePacketGeneratorDuration:
+    """Tests for MultiZonePacketGenerator duration_ms parameter."""
+
+    def test_default_duration_zero(self) -> None:
+        """Test default duration is 0."""
+        gen = MultiZonePacketGenerator(zone_count=82)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        (duration,) = struct.unpack_from("<I", payload, 0)
+        assert duration == 0
+
+    def test_custom_duration(self) -> None:
+        """Test custom duration is packed into payload."""
+        gen = MultiZonePacketGenerator(zone_count=82, duration_ms=150)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        payload = get_payload(templates[0])
+        (duration,) = struct.unpack_from("<I", payload, 0)
+        assert duration == 150

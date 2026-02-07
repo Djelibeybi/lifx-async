@@ -61,6 +61,7 @@ from lifx.animation.orientation import (
 from lifx.animation.packets import (
     HEADER_SIZE,
     SEQUENCE_OFFSET,
+    LightPacketGenerator,
     MatrixPacketGenerator,
     MultiZonePacketGenerator,
     PacketGenerator,
@@ -80,6 +81,7 @@ __all__ = [
     # Packet generators
     "PacketGenerator",
     "PacketTemplate",
+    "LightPacketGenerator",
     "MatrixPacketGenerator",
     "MultiZonePacketGenerator",
     "HEADER_SIZE",

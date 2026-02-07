@@ -39,7 +39,15 @@ from lifx.devices import (
     TileInfo,
     WifiInfo,
 )
-from lifx.effects import Conductor, EffectColorloop, EffectPulse, LIFXEffect
+from lifx.effects import (
+    Conductor,
+    EffectColorloop,
+    EffectPulse,
+    EffectRainbow,
+    FrameContext,
+    FrameEffect,
+    LIFXEffect,
+)
 from lifx.exceptions import (
     LifxConnectionError,
     LifxDeviceNotFoundError,
@@ -93,9 +101,12 @@ __all__ = [
     "TileInfo",
     # Effects
     "Conductor",
+    "FrameContext",
+    "FrameEffect",
     "LIFXEffect",
-    "EffectPulse",
     "EffectColorloop",
+    "EffectPulse",
+    "EffectRainbow",
     # Animation
     "Animator",
     "AnimatorStats",

@@ -1,34 +1,34 @@
-"""Example demonstrating pulse effects.
+"""Example demonstrating rainbow effect.
 
-This example shows how to use the effects framework to create various
-pulse effects (blink, strobe, breathe, ping).
+EffectRainbow spreads a full 360-degree rainbow across all pixels on a
+device and scrolls it over time. On multizone strips and matrix lights
+this produces a moving rainbow. On single bulbs it cycles through hues
+(similar to colorloop but with fixed brightness/saturation).
+
+For a simpler single-color hue rotation, see 07_colorloop_effect.py.
 
 Usage:
     # Discover all lights on the network
-    python 06_pulse_effect.py
+    python 17_rainbow_effect.py
 
     # Target specific devices by IP address
-    python 06_pulse_effect.py 192.168.1.100 192.168.1.101
+    python 17_rainbow_effect.py 192.168.1.100 192.168.1.101
 
     # Target specific devices by serial number
-    python 06_pulse_effect.py d073d5123456 d073d5abcdef
+    python 17_rainbow_effect.py d073d5123456 d073d5abcdef
 
     # Mix IP addresses and serial numbers
-    python 06_pulse_effect.py 192.168.1.100 d073d5123456
+    python 17_rainbow_effect.py 192.168.1.100 d073d5123456
 """
+
+#  Copyright (c) 2026 Avi Miller <me@dje.li>
+#  Licensed under the Universal Permissive License v 1.0 as shown at https://opensource.org/license/UPL
 
 import asyncio
 import sys
 
-from lifx import (
-    HSBK,
-    Conductor,
-    EffectPulse,
-    Light,
-    discover,
-    find_by_ip,
-    find_by_serial,
-)
+from lifx import Light, discover, find_by_ip, find_by_serial
+from lifx.effects import Conductor, EffectRainbow
 
 
 async def resolve_devices(targets: list[str]) -> list[Light]:
@@ -60,6 +60,7 @@ async def resolve_devices(targets: list[str]) -> list[Light]:
                 " not a Light, skipping"
             )
         else:
+            print(f"Resolved: {device.label} [{device.serial}] -> {device.ip}")
             lights.append(device)
 
     return lights
@@ -80,7 +81,7 @@ async def discover_lights() -> list[Light]:
 
 
 async def main() -> None:
-    """Run pulse effect examples."""
+    """Run rainbow effect examples."""
     targets = sys.argv[1:]
 
     if targets:
@@ -94,41 +95,39 @@ async def main() -> None:
         return
 
     print(f"Found {len(lights)} light(s)")
+
     conductor = Conductor()
 
-    # Example 1: Basic blink effect
-    print("\n1. Basic blink effect (5 cycles)")
-    effect = EffectPulse(mode="blink", cycles=5)
+    # Example 1: Rainbow scrolling every 10 seconds
+    print("\n1. Rainbow effect (15 seconds)")
+    effect = EffectRainbow(period=10)
     await conductor.start(effect, lights)
-    await asyncio.sleep(6)  # Wait for effect to complete
+    await asyncio.sleep(15)
+    await conductor.stop(lights)
+    print("Stopped. Lights restored to original state.")
 
-    # Example 2: Strobe effect with red color for contrast
-    print("\n2. Red strobe effect (15 flashes)")
-    red_strobe = HSBK.from_rgb(255, 0, 0)
-    effect = EffectPulse(mode="strobe", period=0.2, cycles=15, color=red_strobe)
-    await conductor.start(effect, lights)
-    await asyncio.sleep(4)  # 0.2s * 15 cycles + buffer
-
-    # Example 3: Breathe effect with custom color
-    print("\n3. Breathe effect with blue color")
-    blue = HSBK.from_rgb(0, 0, 255)
-    effect = EffectPulse(mode="breathe", period=2.0, cycles=3, color=blue)
-    await conductor.start(effect, lights)
-    await asyncio.sleep(7)  # 2.0s * 3 cycles + buffer
-
-    # Example 4: Ping effect (single pulse)
-    print("\n4. Ping effect (single pulse)")
-    red = HSBK.from_rgb(255, 0, 0)
-    effect = EffectPulse(mode="ping", color=red)
-    await conductor.start(effect, lights)
     await asyncio.sleep(2)
 
-    # Example 5: Slow breathe with warm white
-    print("\n5. Slow warm breathe (3 cycles)")
-    warm = HSBK(hue=40, saturation=0.3, brightness=0.9, kelvin=2500)
-    effect = EffectPulse(mode="breathe", period=3.0, cycles=3, color=warm)
+    # Example 2: Fast rainbow with lower brightness
+    print("\n2. Fast rainbow at 50% brightness (15 seconds)")
+    effect = EffectRainbow(period=3, brightness=0.5)
     await conductor.start(effect, lights)
-    await asyncio.sleep(10)  # 3.0s * 3 cycles + buffer
+    await asyncio.sleep(15)
+    await conductor.stop(lights)
+    print("Stopped. Lights restored to original state.")
+
+    # Example 3: Rainbow with device spread (only with multiple lights)
+    # Each device's rainbow is offset by 'spread' degrees so adjacent
+    # devices display different parts of the spectrum simultaneously.
+    if len(lights) > 1:
+        await asyncio.sleep(2)
+
+        print("\n3. Rainbow with 90-degree device spread (15 seconds)")
+        effect = EffectRainbow(period=10, spread=90)
+        await conductor.start(effect, lights)
+        await asyncio.sleep(15)
+        await conductor.stop(lights)
+        print("Stopped. Lights restored to original state.")
 
     print("\nAll effects completed!")
     print("Lights have been restored to their original state")

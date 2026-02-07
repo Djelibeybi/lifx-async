@@ -11,8 +11,9 @@ import random
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
-from lifx.const import KELVIN_NEUTRAL, TIMEOUT_ERRORS
+from lifx.const import KELVIN_NEUTRAL
 from lifx.effects.base import LIFXEffect
+from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-class EffectColorloop(LIFXEffect):
+class EffectColorloop(FrameEffect):
     """Continuous color rotation effect cycling through hue spectrum.
 
     Perpetually cycles through hues with configurable speed, spread,
@@ -92,8 +93,6 @@ class EffectColorloop(LIFXEffect):
         Raises:
             ValueError: If parameters are out of valid ranges
         """
-        super().__init__(power_on=power_on)
-
         if period <= 0:
             raise ValueError(f"Period must be positive, got {period}")
         if not (0 <= change <= 360):
@@ -114,6 +113,16 @@ class EffectColorloop(LIFXEffect):
         if transition is not None and transition < 0:
             raise ValueError(f"Transition must be non-negative, got {transition}")
 
+        # Calculate FPS from period and change
+        # iterations_per_cycle = 360 / change (how many steps for a full rotation)
+        # fps = iterations_per_cycle / period (steps per second)
+        # Minimum 20 FPS ensures smooth animation on multizone/matrix devices.
+        # For single lights, the firmware interpolates between frames using
+        # duration_ms, so extra frames are harmless.
+        fps = max(20.0, (360.0 / change) / period) if change > 0 else 20.0
+
+        super().__init__(power_on=power_on, fps=fps, duration=None)
+
         self.period = period
         self.change = change
         self.spread = spread
@@ -123,9 +132,9 @@ class EffectColorloop(LIFXEffect):
         self.transition = transition
         self.synchronized = synchronized
 
-        # Runtime state (set during execution)
-        self._running = False
-        self._stop_event = asyncio.Event()
+        # Runtime state (set during async_setup)
+        self._initial_colors: list[HSBK] = []
+        self._direction: int = 1
 
     @property
     def name(self) -> str:
@@ -136,205 +145,124 @@ class EffectColorloop(LIFXEffect):
         """
         return "colorloop"
 
-    async def async_play(self) -> None:
-        """Execute the colorloop effect continuously."""
-        self._running = True
-        self._stop_event.clear()
-
-        # Get initial colors for each light
-        initial_colors = await self._get_initial_colors()
-
-        # Calculate iteration period based on change amount
-        # period is time for full 360° rotation
-        # iteration_period is time for each 'change' degree rotation
-        iterations_per_cycle = 360.0 / self.change if self.change > 0 else 1
-        iteration_period = self.period / iterations_per_cycle
-
-        # Random initial direction for variety
-        direction = random.choice([1, -1])  # nosec
-
-        iteration = 0
-        while self._running and not self._stop_event.is_set():
-            if self.synchronized:
-                # Synchronized mode - all lights same color
-                await self._update_synchronized(
-                    initial_colors, iteration, direction, iteration_period
-                )
-            else:
-                # Spread mode - lights distributed across hue spectrum
-                await self._update_spread(
-                    initial_colors, iteration, direction, iteration_period
-                )
-
-            # Wait for next iteration or stop signal
-            try:
-                await asyncio.wait_for(
-                    self._stop_event.wait(), timeout=iteration_period
-                )
-                break  # Stop event was set
-            except TIMEOUT_ERRORS:
-                pass  # Normal - continue to next iteration
-
-            iteration += 1
-
-        # Effect stopped - conductor will restore state
-
-    async def _update_synchronized(
-        self,
-        initial_colors: list[HSBK],
-        iteration: int,
-        direction: int,
-        iteration_period: float,
-    ) -> None:
-        """Update all lights with synchronized colors.
+    async def async_setup(self, participants: list[Light]) -> None:
+        """Fetch initial colors and pick rotation direction.
 
         Args:
-            initial_colors: Initial colors for each participant
-            iteration: Current iteration number
-            direction: Direction of hue rotation (1 or -1)
-            iteration_period: Time per iteration in seconds
+            participants: List of lights participating in the effect
         """
-        # Calculate shared hue for all lights
-        # Use first light's base hue as reference
-        base_hue = initial_colors[0].hue if initial_colors else 0
-        hue_offset = (iteration * self.change * direction) % 360
-        shared_hue = round((base_hue + hue_offset) % 360)
+        self._initial_colors = await self._get_initial_colors(participants)
+        self._direction = random.choice([1, -1])  # nosec
 
-        # Generate shared saturation (consistent for synchronization)
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        """Generate a frame of colors for one device.
+
+        All pixels on a device receive the same color. For multizone/matrix
+        devices that need per-pixel rainbow effects, use EffectRainbow instead.
+
+        Args:
+            ctx: Frame context with timing and layout info
+
+        Returns:
+            List of HSBK colors (length equals ctx.pixel_count)
+        """
+        if not self._initial_colors:
+            # Fallback if setup hasn't run yet
+            return [
+                HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500)
+            ] * ctx.pixel_count
+
+        # Calculate hue rotation from elapsed time
+        # degrees_rotated = (elapsed / period) * 360 * direction
+        degrees_rotated = (ctx.elapsed_s / self.period) * 360.0 * self._direction
+
+        if self.synchronized:
+            color = self._generate_synchronized_color(degrees_rotated)
+        else:
+            color = self._generate_spread_color(degrees_rotated, ctx.device_index)
+
+        return [color] * ctx.pixel_count
+
+    def _generate_synchronized_color(self, degrees_rotated: float) -> HSBK:
+        """Generate color for synchronized mode.
+
+        All devices get the same color based on the first light's initial hue.
+
+        Args:
+            degrees_rotated: Total degrees of hue rotation
+
+        Returns:
+            HSBK color for this frame
+        """
+        base_hue = self._initial_colors[0].hue if self._initial_colors else 0
+        new_hue = round((base_hue + degrees_rotated) % 360)
+
+        # Consistent saturation for synchronization
         shared_saturation = (self.saturation_min + self.saturation_max) / 2
 
-        # Calculate shared brightness (average of all lights)
+        # Calculate shared brightness
         if self.brightness is not None:
             shared_brightness = self.brightness
         else:
-            # Use average brightness for synchronization
-            shared_brightness = sum(c.brightness for c in initial_colors) / len(
-                initial_colors
+            shared_brightness = sum(c.brightness for c in self._initial_colors) / len(
+                self._initial_colors
             )
 
-        # Calculate shared kelvin (average of all lights)
-        shared_kelvin = int(sum(c.kelvin for c in initial_colors) / len(initial_colors))
+        # Calculate shared kelvin
+        shared_kelvin = int(
+            sum(c.kelvin for c in self._initial_colors) / len(self._initial_colors)
+        )
 
-        # Determine transition time (consistent for synchronization)
-        if self.transition is not None:
-            trans_time = self.transition
-        else:
-            # Use iteration period for smooth transitions
-            trans_time = iteration_period
+        return HSBK(
+            hue=new_hue,
+            saturation=shared_saturation,
+            brightness=shared_brightness,
+            kelvin=shared_kelvin,
+        )
 
-        # Update all devices with same color
-        tasks = []
-        for light in self.participants:
-            # Create color (same for all lights)
-            new_color = HSBK(
-                hue=shared_hue,
-                saturation=shared_saturation,
-                brightness=shared_brightness,
-                kelvin=shared_kelvin,
-            )
+    def _generate_spread_color(self, degrees_rotated: float, device_index: int) -> HSBK:
+        """Generate color for spread mode.
 
-            # Apply color
-            tasks.append(light.set_color(new_color, duration=trans_time))
-
-        # Apply all color changes concurrently
-        try:
-            await asyncio.gather(*tasks)
-        except Exception as e:
-            _LOGGER.error(
-                {
-                    "class": self.__class__.__name__,
-                    "method": "_update_synchronized",
-                    "action": "change",
-                    "error": str(e),
-                    "values": {
-                        "participant_count": len(self.participants),
-                        "iteration": iteration,
-                        "period": self.period,
-                        "change": self.change,
-                    },
-                }
-            )
-
-    async def _update_spread(
-        self,
-        initial_colors: list[HSBK],
-        iteration: int,
-        direction: int,
-        iteration_period: float,
-    ) -> None:
-        """Update all lights with spread colors.
+        Each device gets a hue offset by device_index * spread.
 
         Args:
-            initial_colors: Initial colors for each participant
-            iteration: Current iteration number
-            direction: Direction of hue rotation (1 or -1)
-            iteration_period: Time per iteration in seconds
+            degrees_rotated: Total degrees of hue rotation
+            device_index: Index of this device in participants list
+
+        Returns:
+            HSBK color for this device's frame
         """
-        # Randomize device order each cycle for visual variety
-        device_order = list(enumerate(self.participants))
-        random.shuffle(device_order)  # nosec
+        # Clamp device_index to available initial colors
+        color_index = min(device_index, len(self._initial_colors) - 1)
 
-        # Update all devices
-        tasks = []
-        for idx, (original_idx, light) in enumerate(device_order):
-            # Calculate hue for this device
-            base_hue = initial_colors[original_idx].hue
-            hue_offset = (iteration * self.change * direction) % 360
-            device_spread_offset = (idx * self.spread) % 360
-            new_hue = round((base_hue + hue_offset + device_spread_offset) % 360)
+        base_hue = self._initial_colors[color_index].hue
+        device_spread_offset = (device_index * self.spread) % 360
+        new_hue = round((base_hue + degrees_rotated + device_spread_offset) % 360)
 
-            # Get brightness and saturation
-            if self.brightness is not None:
-                brightness = self.brightness
-            else:
-                brightness = initial_colors[original_idx].brightness
+        # Get brightness
+        if self.brightness is not None:
+            brightness = self.brightness
+        else:
+            brightness = self._initial_colors[color_index].brightness
 
-            # Random saturation within range
-            saturation = random.uniform(self.saturation_min, self.saturation_max)  # nosec
+        # Use consistent saturation for smooth animation
+        saturation = (self.saturation_min + self.saturation_max) / 2
 
-            # Use kelvin from initial color
-            kelvin = initial_colors[original_idx].kelvin
+        # Use kelvin from initial color
+        kelvin = self._initial_colors[color_index].kelvin
 
-            # Create new color
-            new_color = HSBK(
-                hue=new_hue,
-                saturation=saturation,
-                brightness=brightness,
-                kelvin=kelvin,
-            )
+        return HSBK(
+            hue=new_hue,
+            saturation=saturation,
+            brightness=brightness,
+            kelvin=kelvin,
+        )
 
-            # Determine transition time
-            if self.transition is not None:
-                trans_time = self.transition
-            else:
-                # Random transition time (0-2x iteration period)
-                trans_time = random.uniform(0, iteration_period * 2)  # nosec
-
-            # Apply color
-            tasks.append(light.set_color(new_color, duration=trans_time))
-
-        # Apply all color changes concurrently
-        try:
-            await asyncio.gather(*tasks)
-        except Exception as e:
-            _LOGGER.error(
-                {
-                    "class": self.__class__.__name__,
-                    "method": "_update_spread",
-                    "action": "change",
-                    "error": str(e),
-                    "values": {
-                        "participant_count": len(self.participants),
-                        "iteration": iteration,
-                        "period": self.period,
-                        "change": self.change,
-                        "spread": self.spread,
-                    },
-                }
-            )
-
-    async def _get_initial_colors(self) -> list[HSBK]:
+    async def _get_initial_colors(self, participants: list[Light]) -> list[HSBK]:
         """Get initial colors for each participant.
+
+        Args:
+            participants: List of lights to get colors from
 
         Returns:
             List of HSBK colors, one per participant
@@ -354,7 +282,7 @@ class EffectColorloop(LIFXEffect):
 
         # Fetch colors for all lights concurrently
         colors = await asyncio.gather(
-            *(get_color_for_light(light) for light in self.participants)
+            *(get_color_for_light(light) for light in participants)
         )
 
         return list(colors)
@@ -405,15 +333,6 @@ class EffectColorloop(LIFXEffect):
 
         # Check if light has color support
         return light.capabilities.has_color if light.capabilities else False
-
-    def stop(self) -> None:
-        """Signal the colorloop to stop.
-
-        This sets an internal flag that will cause async_play() to exit.
-        Use conductor.stop() instead for proper state restoration.
-        """
-        self._running = False
-        self._stop_event.set()
 
     def __repr__(self) -> str:
         """String representation of colorloop effect."""
