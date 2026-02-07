@@ -6,6 +6,7 @@ simulating sunrise and sunset color transitions on matrix devices.
 
 from __future__ import annotations
 
+import asyncio
 import math
 from typing import TYPE_CHECKING, Literal
 
@@ -373,8 +374,6 @@ class EffectSunset(FrameEffect):
         await super().async_play()
 
         if self.power_off and self.participants:
-            import asyncio
-
             await asyncio.gather(
                 *(light.set_power(False) for light in self.participants)
             )

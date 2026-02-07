@@ -9,7 +9,7 @@ import pytest
 from lifx.color import HSBK
 from lifx.devices.light import Light
 from lifx.effects import Conductor, EffectColorloop, EffectPulse
-from lifx.effects.frame_effect import FrameEffect
+from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 
 async def wait_for_mock_called(
@@ -638,15 +638,15 @@ async def test_conductor_filter_lights_without_capabilities():
 class ConcreteFrameEffectForIntegration(FrameEffect):
     """Concrete FrameEffect for integration testing."""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self.frame_count = 0
 
     @property
     def name(self) -> str:
         return "test_integration_frame"
 
-    def generate_frame(self, ctx):
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
         self.frame_count += 1
         return [
             HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
@@ -660,7 +660,7 @@ class FailingFrameEffect(FrameEffect):
     def name(self) -> str:
         return "failing_frame"
 
-    def generate_frame(self, ctx):
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
         return [
             HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
         ] * ctx.pixel_count

@@ -11,7 +11,7 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.progress import EffectProgress
 
 
-def test_progress_default_parameters():
+def test_progress_default_parameters() -> None:
     """Test EffectProgress with default parameters."""
     effect = EffectProgress()
 
@@ -28,7 +28,7 @@ def test_progress_default_parameters():
     assert effect.duration is None
 
 
-def test_progress_custom_parameters():
+def test_progress_custom_parameters() -> None:
     """Test EffectProgress with custom parameters."""
     fg = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
     bg = HSBK(hue=0, saturation=0.0, brightness=0.1, kelvin=3500)
@@ -53,7 +53,7 @@ def test_progress_custom_parameters():
     assert effect.spot_speed == 2.0
 
 
-def test_progress_invalid_start_end():
+def test_progress_invalid_start_end() -> None:
     """Test EffectProgress with start >= end raises ValueError."""
     with pytest.raises(ValueError, match="start_value.*must be < end_value"):
         EffectProgress(start_value=100, end_value=50)
@@ -62,7 +62,7 @@ def test_progress_invalid_start_end():
         EffectProgress(start_value=50, end_value=50)
 
 
-def test_progress_invalid_position():
+def test_progress_invalid_position() -> None:
     """Test EffectProgress with position out of range raises ValueError."""
     with pytest.raises(ValueError, match="position.*must be between"):
         EffectProgress(start_value=0, end_value=100, position=-1)
@@ -71,7 +71,7 @@ def test_progress_invalid_position():
         EffectProgress(start_value=0, end_value=100, position=101)
 
 
-def test_progress_gradient_foreground():
+def test_progress_gradient_foreground() -> None:
     """Test EffectProgress accepts a gradient (list of HSBK) as foreground."""
     gradient = [
         HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500),
@@ -82,25 +82,25 @@ def test_progress_gradient_foreground():
     assert effect.foreground == gradient
 
 
-def test_progress_gradient_too_few_stops():
+def test_progress_gradient_too_few_stops() -> None:
     """Test EffectProgress rejects gradient with fewer than 2 stops."""
     with pytest.raises(ValueError, match="at least 2 stops"):
         EffectProgress(foreground=[Colors.RED])
 
 
-def test_progress_invalid_spot_brightness():
+def test_progress_invalid_spot_brightness() -> None:
     """Test EffectProgress with invalid spot_brightness raises ValueError."""
     with pytest.raises(ValueError, match="spot_brightness must be 0.0-1.0"):
         EffectProgress(spot_brightness=1.5)
 
 
-def test_progress_invalid_spot_width():
+def test_progress_invalid_spot_width() -> None:
     """Test EffectProgress with invalid spot_width raises ValueError."""
     with pytest.raises(ValueError, match="spot_width must be 0.0-1.0"):
         EffectProgress(spot_width=1.5)
 
 
-def test_progress_invalid_spot_speed():
+def test_progress_invalid_spot_speed() -> None:
     """Test EffectProgress with invalid spot_speed raises ValueError."""
     with pytest.raises(ValueError, match="spot_speed must be positive"):
         EffectProgress(spot_speed=0)
@@ -447,7 +447,7 @@ class TestProgressGradientHueWrapping:
             assert 0 <= color.hue <= 360
 
 
-def test_progress_gradient_repr():
+def test_progress_gradient_repr() -> None:
     """Test repr shows gradient info."""
     gradient = [
         HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500),
@@ -524,7 +524,7 @@ class TestProgressFrameLoop:
         assert animator.send_frame.call_count > 0
 
 
-def test_progress_inherit_prestate():
+def test_progress_inherit_prestate() -> None:
     """Test inherit_prestate returns True for EffectProgress."""
     effect = EffectProgress()
     assert effect.inherit_prestate(EffectProgress()) is True
@@ -532,7 +532,7 @@ def test_progress_inherit_prestate():
 
 
 @pytest.mark.asyncio
-async def test_progress_from_poweroff_hsbk():
+async def test_progress_from_poweroff_hsbk() -> None:
     """Test from_poweroff_hsbk returns the background color."""
     bg = HSBK(hue=0, saturation=0.0, brightness=0.1, kelvin=2700)
     effect = EffectProgress(background=bg)
@@ -543,7 +543,7 @@ async def test_progress_from_poweroff_hsbk():
     assert result == bg
 
 
-def test_progress_repr():
+def test_progress_repr() -> None:
     """Test EffectProgress string representation."""
     effect = EffectProgress(position=42.0, start_value=10, end_value=90)
     repr_str = repr(effect)

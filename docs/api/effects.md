@@ -1180,7 +1180,7 @@ Whether to power on devices during effect.
 
 #### `fps` (float, default: `30.0`)
 
-Frames per second. Must be positive. Higher FPS means smoother animation but more network traffic. The Conductor passes `duration_ms = 1000 / fps` to the Animator so devices smoothly interpolate between frames.
+Frames per second. Must be positive. Higher FPS means smoother animation but more network traffic. The Conductor passes `duration_ms = 1500 / fps` to the Animator so devices smoothly interpolate between frames.
 
 #### `duration` (float | None, default: `None`)
 
