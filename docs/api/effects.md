@@ -7,6 +7,7 @@ This reference guide provides comprehensive documentation for all built-in effec
 - [Conductor](#conductor)
 - [EffectPulse](#effectpulse)
 - [EffectColorloop](#effectcolorloop)
+- [FrameEffect (Base Class)](#frameeffect-base-class)
 - [LIFXEffect (Base Class)](#lifxeffect-base-class)
 
 ## Conductor
@@ -393,9 +394,11 @@ effect = EffectColorloop(
     brightness=None,
     saturation_min=0.8,
     saturation_max=1.0,
-    transition=None
+    synchronized=False
 )
 ```
+
+EffectColorloop is a [FrameEffect](#frameeffect-base-class) that uses the animation module for high-performance direct UDP frame delivery. The Conductor automatically creates Animators for each participant device (Light, MultiZoneLight, or MatrixLight) and drives the frame loop.
 
 ### Parameters
 
@@ -472,17 +475,18 @@ Must be ≥ `saturation_min`
 
 **Note:** Each iteration randomly selects saturation within this range.
 
-#### `transition` (float | None, default: `None`)
+#### `synchronized` (bool, default: `False`)
 
-Color transition time in seconds. If `None`, uses random transition time per device.
-
-**Range:** Non-negative
+If `True`, all lights display the same color simultaneously with consistent transitions. When `False`, lights are spread across the hue spectrum based on the `spread` parameter.
 
 **Examples:**
 
-- `transition=None`: Random transitions (0 to 2x iteration period)
-- `transition=0.5`: Quick 0.5-second transitions
-- `transition=2.0`: Slow 2-second transitions
+- `synchronized=False`: Lights show different colors based on spread (default)
+- `synchronized=True`: All lights change together in unison
+
+#### `transition` (float | None, default: `None`)
+
+**Deprecated.** This parameter is accepted for backward compatibility but has no effect. Frame timing is now handled automatically by the animation module, which calculates smooth firmware-level interpolation between frames based on the effect's FPS.
 
 ### Behavior
 
@@ -503,42 +507,43 @@ await conductor.stop(lights)
 For visual variety, ColorLoop randomizes:
 
 1. **Initial direction**: Forward or backward through hue spectrum
-2. **Device order**: Shuffled each cycle
-3. **Saturation**: Random value between saturation_min and saturation_max
-4. **Transition time**: Random if `transition=None`
+2. **Saturation**: Random value between saturation_min and saturation_max (spread mode only; synchronized mode uses midpoint)
 
 #### Hue Calculation
 
-For each device at each iteration:
+Hue rotation is time-based, computed from elapsed time:
 
 ```python
-new_hue = (base_hue + iteration_offset + device_spread_offset) % 360
+degrees_rotated = (elapsed_s / period) * 360.0 * direction
 
-# Where:
-# - base_hue: Initial hue when effect started
-# - iteration_offset: iteration * change * direction
-# - device_spread_offset: device_index * spread
+# Spread mode (per device):
+new_hue = (base_hue + degrees_rotated + device_index * spread) % 360
+
+# Synchronized mode (all devices):
+new_hue = (base_hue + degrees_rotated) % 360
 ```
+
+The FPS is automatically calculated from `period` and `change`: `fps = max(1.0, (360 / change) / period)`
 
 ### Device Type Behavior
 
+As a FrameEffect, ColorLoop works across all device types via the animation module:
+
 #### Color Lights
 
-Full color cycling with all parameters supported.
+Full color cycling with all parameters supported. Uses `LightPacketGenerator` for direct UDP delivery.
 
 #### Multizone Lights
 
-Entire device cycles as one unit (all zones same color at each iteration).
+Entire device cycles as one unit (all zones set to same color per frame). Uses `MultiZonePacketGenerator`.
 
-#### Tile Devices
+#### Matrix Lights (Tile/Candle/Path)
 
-All tiles cycle together with same color.
+All pixels cycle together with same color per frame. Uses `MatrixPacketGenerator` for multi-tile canvas delivery.
 
 #### Monochrome/White Lights
 
-- Hue changes are ignored (monochrome devices can't display colors)
-- Brightness and saturation parameters are ignored
-- Effect still runs but with no visible changes
+- Filtered out by `is_light_compatible()` — ColorLoop requires color capability
 - **Recommendation**: Don't use ColorLoop on monochrome devices
 
 ### Examples
@@ -567,7 +572,6 @@ effect = EffectColorloop(
     spread=120,         # Wide spread
     brightness=0.8,     # Fixed brightness
     saturation_min=0.9, # High saturation only
-    transition=0.5      # Quick transitions
 )
 await conductor.start(effect, lights)
 await asyncio.sleep(60)
@@ -585,7 +589,6 @@ effect = EffectColorloop(
     brightness=0.4,     # Dim
     saturation_min=0.3, # Low saturation (pastels)
     saturation_max=0.6,
-    transition=3.0      # Very slow transitions
 )
 await conductor.start(effect, lights)
 # Let it run indefinitely
@@ -632,11 +635,108 @@ This prevents the lights from briefly returning to their original state between 
 
 ### Performance Notes
 
-- Iteration period: `period / (360 / change)`
+- Frame interval: `1 / fps` where `fps = max(1.0, (360 / change) / period)`
+- Frame delivery: Direct UDP via animation module (no connection overhead)
+- Smooth transitions: Firmware interpolates between frames using `duration_ms = 1000 / fps`
 - State capture: <1 second per device
 - Effect startup: <100ms
 - Multiple devices update concurrently
 - No cycle limit - runs until stopped
+
+---
+
+## FrameEffect (Base Class)
+
+Abstract base class for frame-generator effects. Extends [LIFXEffect](#lifxeffect-base-class) with a frame loop driven by the animation module. Subclass this to create effects that generate color frames at a fixed FPS.
+
+### Class Definition
+
+```python
+from lifx import FrameEffect, FrameContext, HSBK
+
+class MyEffect(FrameEffect):
+    def __init__(self, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=30.0, duration=None)
+
+    @property
+    def name(self) -> str:
+        return "my_effect"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        # Return pixel_count colors
+        hue = (ctx.elapsed_s * 60) % 360
+        return [HSBK(hue=hue, saturation=1.0, brightness=0.8, kelvin=3500)] * ctx.pixel_count
+```
+
+### Parameters
+
+#### `power_on` (bool, default: `True`)
+
+Whether to power on devices during effect.
+
+#### `fps` (float, default: `30.0`)
+
+Frames per second. Must be positive. Higher FPS means smoother animation but more network traffic. The Conductor passes `duration_ms = 1000 / fps` to the Animator so devices smoothly interpolate between frames.
+
+#### `duration` (float | None, default: `None`)
+
+Effect duration in seconds. If `None`, runs indefinitely until stopped. Must be positive if set.
+
+### FrameContext
+
+Frozen dataclass passed to `generate_frame()` with timing and layout info:
+
+```python
+@dataclass(frozen=True)
+class FrameContext:
+    elapsed_s: float    # Seconds since effect started
+    device_index: int   # Index in participants list
+    pixel_count: int    # Number of pixels (1 for light, N for zones, W*H for matrix)
+    canvas_width: int   # Width (pixel_count for 1D, W for matrix)
+    canvas_height: int  # Height (1 for 1D, H for matrix)
+```
+
+### Methods
+
+#### `generate_frame(ctx: FrameContext) -> list[HSBK]` (abstract)
+
+Generate a frame of colors for one device. Called once per device per frame. **Override this in subclasses.**
+
+**Parameters:**
+
+- `ctx` (FrameContext): Frame context with timing and layout info
+
+**Returns:**
+
+- `list[HSBK]`: Colors matching `ctx.pixel_count`
+
+#### `async_setup(participants: list[Light]) -> None`
+
+Optional hook called before the frame loop starts. Override to perform async setup like fetching initial colors.
+
+#### `async_play() -> None`
+
+Runs the frame loop. **Do not override** — implement `generate_frame()` instead.
+
+#### `stop() -> None`
+
+Signal the frame loop to stop.
+
+#### `close_animators() -> None`
+
+Close all animators and clear the list. Called by the Conductor during cleanup.
+
+### Device Type Support
+
+FrameEffect works across all device types via the animation module:
+
+- **Light**: `Animator.for_light()` — 1 pixel via SetColor packets
+- **MultiZoneLight**: `Animator.for_multizone()` — N pixels via SetExtendedColorZones
+- **MatrixLight**: `Animator.for_matrix()` — W×H pixels via Set64 packets
+
+### Creating Custom FrameEffects
+
+See the [Custom Effects Guide](../user-guide/effects-custom.md#frame-based-effects-frameeffect) for detailed instructions.
 
 ---
 

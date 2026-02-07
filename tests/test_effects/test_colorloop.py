@@ -7,7 +7,9 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
+from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
+from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 
 def test_colorloop_default_parameters():
@@ -151,236 +153,371 @@ def test_colorloop_repr_synchronized():
     assert "synchronized=True" in repr_str
 
 
-@pytest.mark.asyncio
-async def test_colorloop_stop_method():
-    """Test colorloop stop() method."""
-    effect = EffectColorloop(period=0.2, change=30)
+class TestColorloopInheritance:
+    """Tests for EffectColorloop class hierarchy."""
 
-    # Create mock light
-    light = MagicMock()
-    light.serial = "d073d5test789"
-    light.capabilities = MagicMock()
-    light.capabilities.has_color = True
-    light.get_power = AsyncMock(return_value=True)
-    color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-    light.color = (color, 100)
-    light.set_color = AsyncMock()
+    def test_is_frame_effect(self) -> None:
+        """Test EffectColorloop extends FrameEffect."""
+        effect = EffectColorloop()
+        assert isinstance(effect, FrameEffect)
 
-    # Set participants
-    effect.participants = [light]
-    effect._running = True
+    def test_is_lifx_effect(self) -> None:
+        """Test EffectColorloop still extends LIFXEffect."""
+        effect = EffectColorloop()
+        assert isinstance(effect, LIFXEffect)
 
-    # Run async_play in background
-    play_task = asyncio.create_task(effect.async_play())
+    def test_has_fps(self) -> None:
+        """Test EffectColorloop has fps property from FrameEffect."""
+        effect = EffectColorloop(period=60, change=20)
+        assert effect.fps >= 1.0
 
-    # Let it run briefly
-    await asyncio.sleep(0.05)
-
-    # Stop the effect
-    effect.stop()
-
-    # Wait for task to complete
-    await asyncio.wait_for(play_task, timeout=1.0)
-
-    # Verify stop flags are set
-    assert not effect._running
-    assert effect._stop_event.is_set()
+    def test_has_duration_none(self) -> None:
+        """Test EffectColorloop has duration=None (infinite)."""
+        effect = EffectColorloop()
+        assert effect.duration is None
 
 
-@pytest.mark.asyncio
-async def test_colorloop_synchronized_with_fixed_brightness():
-    """Test colorloop synchronized mode with fixed brightness."""
-    effect = EffectColorloop(period=0.2, change=30, synchronized=True, brightness=0.5)
+class TestColorloopFpsCalculation:
+    """Tests for FPS calculation from period/change."""
 
-    # Create mock lights
-    lights = []
-    for i in range(2):
+    def test_default_fps_clamped(self) -> None:
+        """Test default params produce FPS >= 20.0 (minimum for smooth multizone)."""
+        # period=60, change=20 -> (360/20)/60 = 0.3 -> clamped to 20.0
+        effect = EffectColorloop(period=60, change=20)
+        assert effect.fps == 20.0
+
+    def test_fast_fps(self) -> None:
+        """Test fast params produce higher FPS when exceeding minimum."""
+        # period=1, change=20 -> (360/20)/1 = 18.0 -> clamped to 20.0
+        effect = EffectColorloop(period=1, change=20)
+        assert effect.fps == 20.0
+
+        # Very fast: period=0.5, change=5 -> (360/5)/0.5 = 144.0 -> above minimum
+        effect = EffectColorloop(period=0.5, change=5)
+        assert effect.fps == 144.0
+
+    def test_change_zero_fps(self) -> None:
+        """Test change=0 produces 20.0 FPS (minimum)."""
+        effect = EffectColorloop(change=0)
+        assert effect.fps == 20.0
+
+
+class TestColorloopGenerateFrame:
+    """Tests for EffectColorloop.generate_frame()."""
+
+    def test_synchronized_consistent_hue(self) -> None:
+        """Test synchronized mode produces same hue across device indices."""
+        effect = EffectColorloop(period=60, change=20, synchronized=True)
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500),
+            HSBK(hue=180, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx0 = FrameContext(
+            elapsed_s=10.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        ctx1 = FrameContext(
+            elapsed_s=10.0,
+            device_index=1,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors0 = effect.generate_frame(ctx0)
+        colors1 = effect.generate_frame(ctx1)
+
+        # Synchronized mode: both devices should get same hue
+        assert colors0[0].hue == colors1[0].hue
+
+    def test_spread_offset_by_device_index(self) -> None:
+        """Test spread mode offsets hue by device_index * spread."""
+        effect = EffectColorloop(period=60, change=20, spread=30, synchronized=False)
+        effect._initial_colors = [
+            HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500),
+            HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx0 = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        ctx1 = FrameContext(
+            elapsed_s=0.0,
+            device_index=1,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors0 = effect.generate_frame(ctx0)
+        colors1 = effect.generate_frame(ctx1)
+
+        # Device 1 should be offset by spread (30 degrees)
+        assert colors0[0].hue == 0
+        assert colors1[0].hue == 30
+
+    def test_fills_all_pixels(self) -> None:
+        """Test generate_frame returns pixel_count colors."""
+        effect = EffectColorloop(period=60, change=20, synchronized=True)
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=82,
+            canvas_width=82,
+            canvas_height=1,
+        )
+
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 82
+        # All pixels should have the same color
+        assert all(c.hue == colors[0].hue for c in colors)
+
+    def test_fallback_when_no_initial_colors(self) -> None:
+        """Test generate_frame returns fallback when _initial_colors is empty."""
+        effect = EffectColorloop()
+        # Don't set _initial_colors
+
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 1
+        assert colors[0].brightness == 0.8
+
+    def test_synchronized_with_fixed_brightness(self) -> None:
+        """Test synchronized mode uses fixed brightness when specified."""
+        effect = EffectColorloop(
+            period=60, change=20, synchronized=True, brightness=0.5
+        )
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors = effect.generate_frame(ctx)
+        assert colors[0].brightness == 0.5
+
+    def test_spread_with_fixed_brightness(self) -> None:
+        """Test spread mode uses fixed brightness when specified."""
+        effect = EffectColorloop(
+            period=60, change=20, brightness=0.7, synchronized=False
+        )
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.3, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors = effect.generate_frame(ctx)
+        assert colors[0].brightness == 0.7
+
+    def test_spread_with_none_brightness(self) -> None:
+        """Test spread mode preserves initial brightness when brightness=None."""
+        effect = EffectColorloop(
+            period=60, change=20, brightness=None, synchronized=False
+        )
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.6, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors = effect.generate_frame(ctx)
+        assert colors[0].brightness == 0.6
+
+    def test_multi_pixel_all_same_color(self) -> None:
+        """Test multi-pixel devices get same color for all pixels."""
+        effect = EffectColorloop(period=60, change=20, synchronized=False)
+        effect._initial_colors = [
+            HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx = FrameContext(
+            elapsed_s=15.0,
+            device_index=0,
+            pixel_count=16,
+            canvas_width=16,
+            canvas_height=1,
+        )
+
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 16
+        # All pixels should have the same color (colorloop is single-color)
+        assert all(c == colors[0] for c in colors)
+
+    def test_hue_rotates_with_time(self) -> None:
+        """Test hue changes as elapsed_s increases."""
+        effect = EffectColorloop(period=60, change=20, synchronized=True)
+        effect._initial_colors = [
+            HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect._direction = 1
+
+        ctx_t0 = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        ctx_t30 = FrameContext(
+            elapsed_s=30.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+        colors_t0 = effect.generate_frame(ctx_t0)
+        colors_t30 = effect.generate_frame(ctx_t30)
+
+        # After 30s (half period), hue should have rotated 180 degrees
+        assert colors_t0[0].hue == 0
+        assert colors_t30[0].hue == 180
+
+
+class TestColorloopAsyncSetup:
+    """Tests for EffectColorloop.async_setup()."""
+
+    @pytest.mark.asyncio
+    async def test_fetches_initial_colors(self) -> None:
+        """Test async_setup fetches initial colors from participants."""
+        effect = EffectColorloop(period=0.2, change=30)
+
         light = MagicMock()
-        light.serial = f"d073d5sync{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.8, kelvin=3500)
-        light.color = (color, 100)
-        light.set_color = AsyncMock()
-        lights.append(light)
+        light.serial = "d073d5test789"
+        light.get_color = AsyncMock(
+            return_value=(
+                HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500),
+                100,
+                200,
+            )
+        )
 
-    effect.participants = lights
-    effect._running = True
+        effect.participants = [light]
+        await effect.async_setup([light])
 
-    # Run one iteration
-    play_task = asyncio.create_task(effect.async_play())
+        assert len(effect._initial_colors) == 1
+        assert effect._initial_colors[0].hue == 120
 
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
+    @pytest.mark.asyncio
+    async def test_picks_direction(self) -> None:
+        """Test async_setup picks a random direction."""
+        effect = EffectColorloop(period=0.2, change=30)
 
-    # Verify set_color was called
-    assert lights[0].set_color.called
-
-
-@pytest.mark.asyncio
-async def test_colorloop_synchronized_with_fixed_transition():
-    """Test colorloop synchronized mode with fixed transition time."""
-    effect = EffectColorloop(period=0.2, change=30, synchronized=True, transition=0.05)
-
-    # Create mock lights
-    lights = []
-    for i in range(2):
         light = MagicMock()
-        light.serial = f"d073d5trans{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.8, kelvin=3500)
-        light.color = (color, 100)
-        light.set_color = AsyncMock()
-        lights.append(light)
+        light.serial = "d073d5test789"
+        light.get_color = AsyncMock(
+            return_value=(
+                HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500),
+                100,
+                200,
+            )
+        )
 
-    effect.participants = lights
-    effect._running = True
+        effect.participants = [light]
+        await effect.async_setup([light])
 
-    # Run one iteration
-    play_task = asyncio.create_task(effect.async_play())
-
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
-
-    # Verify set_color was called with transition time
-    assert lights[0].set_color.called
+        assert effect._direction in (1, -1)
 
 
-@pytest.mark.asyncio
-async def test_colorloop_synchronized_exception_handling():
-    """Test colorloop synchronized mode handles exceptions gracefully."""
-    effect = EffectColorloop(period=0.2, change=30, synchronized=True)
+class TestColorloopFrameLoop:
+    """Tests for EffectColorloop running via FrameEffect frame loop."""
 
-    # Create mock lights where one fails
-    lights = []
-    for i in range(2):
-        light = MagicMock()
-        light.serial = f"d073d5fail{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.8, kelvin=3500)
-        light.color = (color, 100)
-        if i == 0:
-            light.set_color = AsyncMock(side_effect=Exception("Device offline"))
-        else:
-            light.set_color = AsyncMock()
-        lights.append(light)
+    @pytest.mark.asyncio
+    async def test_stop_method(self) -> None:
+        """Test colorloop stop() method via FrameEffect."""
+        effect = EffectColorloop(period=0.2, change=30)
 
-    effect.participants = lights
-    effect._running = True
+        # Set up initial colors and animators
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+        ]
+        effect._direction = 1
 
-    # Should not raise exception
-    play_task = asyncio.create_task(effect.async_play())
+        animator = MagicMock()
+        animator.pixel_count = 1
+        animator.canvas_width = 1
+        animator.canvas_height = 1
+        animator.send_frame = MagicMock()
+        effect._animators = [animator]
 
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
+        # Run in background
+        play_task = asyncio.create_task(effect.async_play())
+        await asyncio.sleep(0.05)
 
+        effect.stop()
+        await asyncio.wait_for(play_task, timeout=1.0)
 
-@pytest.mark.asyncio
-async def test_colorloop_spread_with_fixed_transition():
-    """Test colorloop spread mode with fixed transition time."""
-    effect = EffectColorloop(period=0.2, change=30, transition=0.05)
+        assert effect._stop_event.is_set()
 
-    # Create mock lights
-    lights = []
-    for i in range(2):
-        light = MagicMock()
-        light.serial = f"d073d5spread{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.8, kelvin=3500)
-        light.color = (color, 100)
-        light.set_color = AsyncMock()
-        lights.append(light)
+    @pytest.mark.asyncio
+    async def test_sends_frames_via_animator(self) -> None:
+        """Test colorloop sends frames through animator.send_frame."""
+        effect = EffectColorloop(period=0.2, change=30)
 
-    effect.participants = lights
-    effect._running = True
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+        ]
+        effect._direction = 1
 
-    # Run one iteration
-    play_task = asyncio.create_task(effect.async_play())
+        animator = MagicMock()
+        animator.pixel_count = 1
+        animator.canvas_width = 1
+        animator.canvas_height = 1
+        animator.send_frame = MagicMock()
+        effect._animators = [animator]
 
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
+        play_task = asyncio.create_task(effect.async_play())
+        await asyncio.sleep(0.1)
+        effect.stop()
+        await asyncio.wait_for(play_task, timeout=1.0)
 
-    # Verify set_color was called
-    assert lights[0].set_color.called
-
-
-@pytest.mark.asyncio
-async def test_colorloop_spread_with_fixed_brightness():
-    """Test colorloop spread mode with fixed brightness.
-
-    This covers line 288 in _update_spread where self.brightness is not None
-    and we use the fixed brightness value.
-    """
-    effect = EffectColorloop(period=0.2, change=30, brightness=0.7, synchronized=False)
-
-    # Create mock lights
-    lights = []
-    for i in range(2):
-        light = MagicMock()
-        light.serial = f"d073d5fixbr{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.5, kelvin=3500)
-        light.color = (color, 100)
-        light.set_color = AsyncMock()
-        lights.append(light)
-
-    effect.participants = lights
-    effect._running = True
-
-    # Run one iteration
-    play_task = asyncio.create_task(effect.async_play())
-
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
-
-    # Verify set_color was called with the fixed brightness
-    assert lights[0].set_color.called
-
-
-@pytest.mark.asyncio
-async def test_colorloop_spread_exception_handling():
-    """Test colorloop spread mode handles exceptions gracefully."""
-    effect = EffectColorloop(period=0.2, change=30)
-
-    # Create mock lights where one fails
-    lights = []
-    for i in range(2):
-        light = MagicMock()
-        light.serial = f"d073d5spread_err{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.8, kelvin=3500)
-        light.color = (color, 100)
-        if i == 0:
-            light.set_color = AsyncMock(side_effect=Exception("Network error"))
-        else:
-            light.set_color = AsyncMock()
-        lights.append(light)
-
-    effect.participants = lights
-    effect._running = True
-
-    # Should not raise exception
-    play_task = asyncio.create_task(effect.async_play())
-
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
+        # Should have sent frames via animator
+        assert animator.send_frame.call_count > 0
 
 
 @pytest.mark.asyncio
@@ -398,55 +535,14 @@ async def test_colorloop_from_poweroff_with_custom_brightness():
 
 
 @pytest.mark.asyncio
-async def test_colorloop_spread_with_brightness_none():
-    """Test colorloop spread mode with brightness=None (uses initial brightness).
-
-    This covers the else branch in _update_spread where self.brightness is None
-    and we use initial_colors brightness instead.
-    """
-    effect = EffectColorloop(period=0.2, change=30, brightness=None)
-
-    # Create mock lights
-    lights = []
-    for i in range(2):
-        light = MagicMock()
-        light.serial = f"d073d5bright{i}"
-        light.capabilities = MagicMock()
-        light.capabilities.has_color = True
-        light.get_power = AsyncMock(return_value=True)
-        # Each light has different brightness
-        color = HSBK(hue=i * 60, saturation=1.0, brightness=0.5 + i * 0.2, kelvin=3500)
-        light.color = (color, 100)
-        light.set_color = AsyncMock()
-        lights.append(light)
-
-    effect.participants = lights
-    effect._running = True
-
-    # Run one iteration
-    play_task = asyncio.create_task(effect.async_play())
-
-    await asyncio.sleep(0.05)
-    effect.stop()
-    await asyncio.wait_for(play_task, timeout=1.0)
-
-    # Verify set_color was called (using initial brightness)
-    assert lights[0].set_color.called
-
-
-@pytest.mark.asyncio
 async def test_colorloop_is_light_compatible_with_none_capabilities():
-    """Test is_light_compatible when light.capabilities is None.
-
-    This covers the branch where capabilities need to be loaded first.
-    """
+    """Test is_light_compatible when light.capabilities is None."""
     effect = EffectColorloop()
 
     light = MagicMock()
     light.capabilities = None
     light._ensure_capabilities = AsyncMock()
 
-    # After ensure_capabilities is called, capabilities should be set
     async def set_capabilities():
         light.capabilities = MagicMock()
         light.capabilities.has_color = True
@@ -455,7 +551,6 @@ async def test_colorloop_is_light_compatible_with_none_capabilities():
 
     result = await effect.is_light_compatible(light)
 
-    # Should have called _ensure_capabilities
     light._ensure_capabilities.assert_called_once()
     assert result is True
 
@@ -468,32 +563,24 @@ async def test_colorloop_is_light_compatible_capabilities_still_none():
     light = MagicMock()
     light.capabilities = None
     light._ensure_capabilities = AsyncMock()
-    # Capabilities remain None after ensure_capabilities
 
     result = await effect.is_light_compatible(light)
 
-    # Should return False when capabilities is None
     assert result is False
 
 
 @pytest.mark.asyncio
 async def test_colorloop_is_light_compatible_capabilities_already_loaded():
-    """Test is_light_compatible when capabilities are already loaded.
-
-    This covers the branch 409->413 where capabilities is not None,
-    so we skip the _ensure_capabilities() call.
-    """
+    """Test is_light_compatible when capabilities are already loaded."""
     effect = EffectColorloop()
 
     light = MagicMock()
-    # Capabilities already loaded (not None)
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
     light._ensure_capabilities = AsyncMock()
 
     result = await effect.is_light_compatible(light)
 
-    # Should NOT call _ensure_capabilities since capabilities is already set
     light._ensure_capabilities.assert_not_called()
     assert result is True
 
@@ -510,39 +597,3 @@ async def test_colorloop_is_light_compatible_no_color_support():
     result = await effect.is_light_compatible(light)
 
     assert result is False
-
-
-@pytest.mark.asyncio
-async def test_colorloop_stop_before_loop_starts():
-    """Test colorloop when stop() is called during initialization.
-
-    This covers the branch where the while loop condition is False at the start
-    because stop_event was set during _get_initial_colors().
-    """
-    effect = EffectColorloop(period=0.2, change=30)
-
-    # Create mock light with slow get_color
-    light = MagicMock()
-    light.serial = "d073d5slow1"
-    light.capabilities = MagicMock()
-    light.capabilities.has_color = True
-    light.get_power = AsyncMock(return_value=True)
-    color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-    light.color = (color, 100)
-    light.set_color = AsyncMock()
-
-    effect.participants = [light]
-
-    # Start the play task
-    play_task = asyncio.create_task(effect.async_play())
-
-    # Stop immediately (before the while loop can run)
-    await asyncio.sleep(0)  # Yield to let play_task start
-    effect.stop()
-
-    # Wait for task to complete
-    await asyncio.wait_for(play_task, timeout=1.0)
-
-    # Verify effect stopped
-    assert not effect._running
-    assert effect._stop_event.is_set()

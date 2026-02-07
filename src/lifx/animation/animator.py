@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.packets import (
     SEQUENCE_OFFSET,
+    LightPacketGenerator,
     MatrixPacketGenerator,
     MultiZonePacketGenerator,
     PacketGenerator,
@@ -44,6 +45,7 @@ from lifx.const import LIFX_UDP_PORT
 from lifx.protocol.models import Serial
 
 if TYPE_CHECKING:
+    from lifx.devices.light import Light
     from lifx.devices.matrix import MatrixLight
     from lifx.devices.multizone import MultiZoneLight
 
@@ -133,6 +135,7 @@ class Animator:
     async def for_matrix(
         cls,
         device: MatrixLight,
+        duration_ms: int = 0,
     ) -> Animator:
         """Create an Animator configured for a MatrixLight device.
 
@@ -142,6 +145,8 @@ class Animator:
 
         Args:
             device: MatrixLight device (must be connected)
+            duration_ms: Transition duration in milliseconds (default 0 for instant).
+                        When non-zero, device smoothly interpolates between frames.
 
         Returns:
             Configured Animator instance
@@ -177,6 +182,7 @@ class Animator:
             tile_count=len(tiles),
             tile_width=tiles[0].width,
             tile_height=tiles[0].height,
+            duration_ms=duration_ms,
         )
 
         return cls(ip, serial, framebuffer, packet_generator)
@@ -185,6 +191,7 @@ class Animator:
     async def for_multizone(
         cls,
         device: MultiZoneLight,
+        duration_ms: int = 0,
     ) -> Animator:
         """Create an Animator configured for a MultiZoneLight device.
 
@@ -195,6 +202,8 @@ class Animator:
         Args:
             device: MultiZoneLight device (must be connected and support
                    extended multizone protocol)
+            duration_ms: Transition duration in milliseconds (default 0 for instant).
+                        When non-zero, device smoothly interpolates between frames.
 
         Returns:
             Configured Animator instance
@@ -238,7 +247,46 @@ class Animator:
         zone_count = await device.get_zone_count()
 
         # Create packet generator
-        packet_generator = MultiZonePacketGenerator(zone_count=zone_count)
+        packet_generator = MultiZonePacketGenerator(
+            zone_count=zone_count, duration_ms=duration_ms
+        )
+
+        return cls(ip, serial, framebuffer, packet_generator)
+
+    @classmethod
+    def for_light(
+        cls,
+        device: Light,
+        duration_ms: int = 0,
+    ) -> Animator:
+        """Create an Animator configured for a single Light device.
+
+        Unlike the matrix/multizone factories, this does not need to be async
+        because single lights don't require any device queries for configuration.
+
+        Args:
+            device: Light device (must have ip and serial set)
+            duration_ms: Transition duration in milliseconds (default 0 for instant).
+                        When non-zero, device smoothly interpolates between frames.
+
+        Returns:
+            Configured Animator instance
+
+        Example:
+            ```python
+            async with await Light.from_ip("192.168.1.100") as device:
+                animator = Animator.for_light(device)
+
+            # Device connection closed, animator still works via UDP
+            while running:
+                stats = animator.send_frame([(65535, 65535, 65535, 3500)])
+                await asyncio.sleep(1 / 30)  # 30 FPS
+            ```
+        """
+        ip = device.ip
+        serial = Serial.from_string(device.serial)
+        framebuffer = FrameBuffer.for_light(device)
+        packet_generator = LightPacketGenerator(duration_ms=duration_ms)
 
         return cls(ip, serial, framebuffer, packet_generator)
 

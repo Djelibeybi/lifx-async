@@ -14,8 +14,10 @@ from lifx.effects.models import PreState, RunningEffect
 from lifx.effects.state_manager import DeviceStateManager
 
 if TYPE_CHECKING:
+    from lifx.animation.animator import Animator
     from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
+    from lifx.effects.frame_effect import FrameEffect
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -185,6 +187,17 @@ class Conductor:
                 for serial, prestate in captured:
                     prestates[serial] = prestate
 
+            # Set up animators for frame-based effects
+            from lifx.effects.frame_effect import FrameEffect
+
+            if isinstance(effect, FrameEffect):
+                # Set participants early so async_setup() can access them
+                # (async_perform() sets this too but runs in a background task)
+                effect.participants = filtered_participants
+                animators = await self._create_animators(effect, filtered_participants)
+                effect._animators = animators
+                await effect.async_setup(filtered_participants)
+
             # Create background task for the effect
             task = asyncio.create_task(
                 self._run_effect_with_cleanup(effect, filtered_participants)
@@ -241,6 +254,18 @@ class Conductor:
                     lights_to_restore.append((light, running.prestate))
                     tasks_to_cancel.add(running.task)
 
+            # Close animators for frame effects (once per effect, not per device)
+            from lifx.effects.frame_effect import FrameEffect
+
+            closed_effects: set[int] = set()
+            for light in lights:
+                running = self._running.get(light.serial)
+                if running and isinstance(running.effect, FrameEffect):
+                    effect_id = id(running.effect)
+                    if effect_id not in closed_effects:
+                        running.effect.close_animators()
+                        closed_effects.add(effect_id)
+
             # Cancel background tasks
             for task in tasks_to_cancel:
                 if not task.done():
@@ -278,6 +303,12 @@ class Conductor:
         try:
             # Run the effect
             await effect.async_perform(participants)
+
+            # Close animators for frame effects
+            from lifx.effects.frame_effect import FrameEffect
+
+            if isinstance(effect, FrameEffect):
+                effect.close_animators()
 
             # Effect completed successfully - restore state
             _LOGGER.debug(
@@ -343,6 +374,12 @@ class Conductor:
                 },
                 exc_info=True,
             )
+            # Close animators for frame effects
+            from lifx.effects.frame_effect import FrameEffect
+
+            if isinstance(effect, FrameEffect):
+                effect.close_animators()
+
             # Clean up by removing from running registry
             async with self._lock:
                 for light in participants:
@@ -395,6 +432,38 @@ class Conductor:
         compatible = [light for light, is_compatible in results if is_compatible]
 
         return compatible
+
+    async def _create_animators(
+        self, effect: FrameEffect, participants: list[Light]
+    ) -> list[Animator]:
+        """Create animators for each participant based on device type.
+
+        Args:
+            effect: The frame effect (used to determine duration_ms from fps)
+            participants: List of lights to create animators for
+
+        Returns:
+            List of Animator instances, one per participant
+        """
+        from lifx.animation.animator import Animator
+        from lifx.devices.matrix import MatrixLight
+        from lifx.devices.multizone import MultiZoneLight
+
+        # Use 1.5x frame interval for duration so transitions overlap.
+        # This prevents micro-gaps from asyncio scheduling jitter.
+        duration_ms = int(1500 / effect.fps)
+        animators: list[Animator] = []
+
+        for light in participants:
+            if isinstance(light, MatrixLight):
+                animator = await Animator.for_matrix(light, duration_ms=duration_ms)
+            elif isinstance(light, MultiZoneLight):
+                animator = await Animator.for_multizone(light, duration_ms=duration_ms)
+            else:
+                animator = Animator.for_light(light, duration_ms=duration_ms)
+            animators.append(animator)
+
+        return animators
 
     def __repr__(self) -> str:
         """String representation of Conductor."""

@@ -5,8 +5,8 @@ This guide shows you how to create your own light effects by subclassing the `LI
 ## Table of Contents
 
 - [Overview](#overview)
-- [Basic Structure](#basic-structure)
-- [Required Methods](#required-methods)
+- [Frame-Based Effects (FrameEffect)](#frame-based-effects-frameeffect)
+- [Imperative Effects (LIFXEffect)](#imperative-effects-lifxeffect)
 - [Optional Methods](#optional-methods)
 - [Common Patterns](#common-patterns)
 - [Complete Examples](#complete-examples)
@@ -14,18 +14,193 @@ This guide shows you how to create your own light effects by subclassing the `LI
 
 ## Overview
 
-Creating a custom effect involves:
+There are two approaches to creating custom effects:
+
+### Frame-Based Effects (Recommended)
+
+Subclass `FrameEffect` and implement `generate_frame()`. This is the recommended approach for most effects — you generate colors per device per frame, and the animation module handles delivery across all device types.
+
+1. Subclass `FrameEffect`
+2. Implement `generate_frame(ctx)` returning a list of HSBK colors
+3. Optionally override `async_setup()` for initialization
+4. Optionally override `from_poweroff_hsbk()` for custom startup colors
+5. Optionally override `inherit_prestate()` for state inheritance optimization
+
+### Imperative Effects
+
+Subclass `LIFXEffect` and implement `async_play()`. Use this when you need direct device control (e.g., firmware waveforms like EffectPulse).
 
 1. Subclass `LIFXEffect`
 2. Implement `async_play()` with your effect logic
 3. Optionally override `from_poweroff_hsbk()` for custom startup colors
 4. Optionally override `inherit_prestate()` for state inheritance optimization
 
-The conductor handles all state management automatically - you just focus on the visual effect.
+The conductor handles all state management automatically — you just focus on the visual effect.
 
-## Basic Structure
+## Frame-Based Effects (FrameEffect)
 
-Every custom effect follows this pattern:
+Frame-based effects generate color frames at a fixed FPS. The animation module handles delivery to any device type — you just return colors.
+
+### Basic Structure
+
+```python
+from lifx import FrameEffect, FrameContext, HSBK
+
+class MyFrameEffect(FrameEffect):
+    """Brief description of what this effect does."""
+
+    def __init__(self, speed: float = 1.0, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=30.0, duration=None)
+        self.speed = speed
+
+    @property
+    def name(self) -> str:
+        return "my_frame_effect"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        """Generate colors for one device."""
+        colors = []
+        for i in range(ctx.pixel_count):
+            hue = (ctx.elapsed_s * self.speed * 60 + i * 10) % 360
+            colors.append(
+                HSBK(hue=hue, saturation=1.0, brightness=0.8, kelvin=3500)
+            )
+        return colors
+```
+
+### FrameContext
+
+Every call to `generate_frame()` receives a `FrameContext` with:
+
+- `elapsed_s`: Seconds since effect started (use for time-based animation)
+- `device_index`: Index in participants list (use for per-device offsets)
+- `pixel_count`: Number of pixels to generate (1 for Light, N for zones, W*H for matrix)
+- `canvas_width`: Width in pixels (for 2D effects on matrix devices)
+- `canvas_height`: Height in pixels (for 2D effects on matrix devices)
+
+### Minimal Example
+
+```python
+from lifx import FrameEffect, FrameContext, HSBK
+
+class SolidColorEffect(FrameEffect):
+    """Set all devices to a single rotating color."""
+
+    def __init__(self, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=10.0, duration=None)
+
+    @property
+    def name(self) -> str:
+        return "solid_color"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        hue = (ctx.elapsed_s * 30) % 360  # 30 degrees/second
+        color = HSBK(hue=hue, saturation=1.0, brightness=0.8, kelvin=3500)
+        return [color] * ctx.pixel_count
+```
+
+Usage:
+
+```python
+conductor = Conductor()
+effect = SolidColorEffect()
+await conductor.start(effect, lights)
+await asyncio.sleep(30)
+await conductor.stop(lights)
+```
+
+### Example: Rainbow Across Pixels
+
+A 2D-aware effect that creates a rainbow across matrix pixels:
+
+```python
+class RainbowEffect(FrameEffect):
+    """Rainbow gradient across all pixels."""
+
+    def __init__(self, speed: float = 30.0, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=20.0, duration=None)
+        self.speed = speed
+
+    @property
+    def name(self) -> str:
+        return "rainbow"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        colors = []
+        for i in range(ctx.pixel_count):
+            # Spread hue across pixels, animate over time
+            hue = (ctx.elapsed_s * self.speed + i * 360 / ctx.pixel_count) % 360
+            colors.append(
+                HSBK(hue=hue, saturation=1.0, brightness=0.8, kelvin=3500)
+            )
+        return colors
+```
+
+This automatically works on:
+
+- **Light**: 1 pixel, solid color that rotates
+- **MultiZoneLight**: N pixels, rainbow across zones
+- **MatrixLight**: W*H pixels, rainbow across tiles
+
+### Optional: async_setup()
+
+Override `async_setup()` for initialization that needs device access:
+
+```python
+class AdaptiveEffect(FrameEffect):
+    """Effect that adapts to current device colors."""
+
+    def __init__(self, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=15.0, duration=None)
+        self._base_hues: list[float] = []
+
+    @property
+    def name(self) -> str:
+        return "adaptive"
+
+    async def async_setup(self, participants: list[Light]) -> None:
+        """Fetch initial colors from all devices."""
+        for light in self.participants:
+            color = await self.fetch_light_color(light)
+            self._base_hues.append(color.hue)
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        base_hue = self._base_hues[ctx.device_index] if self._base_hues else 0
+        hue = (base_hue + ctx.elapsed_s * 20) % 360
+        return [HSBK(hue=hue, saturation=1.0, brightness=0.8, kelvin=3500)] * ctx.pixel_count
+```
+
+### Timed Effects
+
+Use the `duration` parameter for effects that should auto-complete:
+
+```python
+class FlashFrameEffect(FrameEffect):
+    """Flash effect that runs for a set duration."""
+
+    def __init__(self, duration: float = 5.0, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=10.0, duration=duration)
+
+    @property
+    def name(self) -> str:
+        return "flash_frame"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        # Alternate between bright and dim every 0.5 seconds
+        bright = int(ctx.elapsed_s / 0.5) % 2 == 0
+        brightness = 1.0 if bright else 0.1
+        return [HSBK(hue=0, saturation=1.0, brightness=brightness, kelvin=3500)] * ctx.pixel_count
+```
+
+---
+
+## Imperative Effects (LIFXEffect)
+
+For effects that need direct device control (firmware waveforms, custom protocols), subclass `LIFXEffect` and implement `async_play()`.
+
+### Basic Structure
+
+Every custom imperative effect follows this pattern:
 
 ```python
 from lifx import LIFXEffect, Light
@@ -87,11 +262,9 @@ await conductor.start(effect, lights)
 await asyncio.sleep(2)
 ```
 
-## Required Methods
+### Required Method: `async_play()`
 
-### `async_play() -> None`
-
-This is the **only required method** you must implement. This is where your effect logic lives.
+This is the **only required method** for LIFXEffect subclasses. This is where your effect logic lives.
 
 **Important:** This method is `async` - use `await` for all async operations.
 

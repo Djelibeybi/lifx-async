@@ -25,26 +25,22 @@ The Light Effects Framework is built on a layered architecture that separates co
 ┌────────────────▼────────────────────────────────────┐
 │              Effects API Layer                       │
 │   • Conductor (orchestration)                       │
-│   • EffectPulse, EffectColorloop (implementations)  │
+│   • EffectPulse (firmware waveforms via Device)     │
+│   • FrameEffect → EffectColorloop (frame-based)    │
 │   • LIFXEffect (base class)                         │
-└────────────────┬────────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────────┐
-│            Device Layer (lifx.devices)               │
-│   • Light, MultiZoneLight, MatrixLight              │
-│   • Device state methods (get_color, set_color)     │
-└────────────────┬────────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────────┐
-│           Network Layer (lifx.network)               │
-│   • DeviceConnection (UDP transport)                │
-│   • Message building and parsing                    │
-└────────────────┬────────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────────┐
-│          Protocol Layer (lifx.protocol)              │
-│   • Binary serialization/deserialization            │
-│   • Packet definitions (auto-generated)             │
+└──────┬─────────────────────────────┬────────────────┘
+       │ (EffectPulse)               │ (FrameEffect)
+┌──────▼──────────────────┐  ┌───────▼───────────────────┐
+│  Device Layer            │  │  Animation Layer           │
+│  (lifx.devices)          │  │  (lifx.animation)          │
+│  • set_waveform()        │  │  • Animator (direct UDP)   │
+│  • set_color()           │  │  • PacketGenerator         │
+└──────┬──────────────────┘  │  • FrameBuffer              │
+       │                      └───────┬───────────────────┘
+       │                              │
+┌──────▼──────────────────────────────▼───────────────┐
+│           Network / Protocol Layers                  │
+│   • UDP transport, binary serialization             │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -64,11 +60,13 @@ The Light Effects Framework is built on a layered architecture that separates co
 src/lifx/effects/
 ├── __init__.py              # Public API exports
 ├── base.py                  # LIFXEffect abstract base class
+├── frame_effect.py          # FrameEffect base class + FrameContext
 ├── conductor.py             # Conductor orchestrator
 ├── pulse.py                 # EffectPulse implementation
-├── colorloop.py             # EffectColorloop implementation
+├── colorloop.py             # EffectColorloop (FrameEffect) implementation
 ├── models.py                # PreState, RunningEffect dataclasses
-└── utils.py                 # Shared utilities (future)
+├── state_manager.py         # DeviceStateManager for state capture/restore
+└── const.py                 # Effect constants
 ```
 
 ### Component Responsibilities
@@ -125,21 +123,50 @@ class LIFXEffect(ABC):
         ...
 ```
 
+#### FrameEffect Base Class (`frame_effect.py`)
+
+**Purpose:** Abstract base for effects that generate color frames at a fixed FPS.
+
+**Responsibilities:**
+
+- Define frame generation interface (abstract `generate_frame()` method)
+- Run frame loop with timing control (fps, duration, stop_event)
+- Create `FrameContext` per device per frame with timing and layout info
+- Convert user-friendly HSBK colors to protocol tuples
+- Dispatch frames via Animators (set by Conductor)
+- Provide `async_setup()` hook for pre-loop initialization
+
+**Key Data:**
+
+```python
+class FrameEffect(LIFXEffect):
+    _fps: float                    # Frames per second
+    _duration: float | None        # Run time limit (None = infinite)
+    _stop_event: asyncio.Event     # Stop signal
+    _animators: list[Animator]     # Set by Conductor before play
+```
+
+**Relationship to LIFXEffect:** `FrameEffect` extends `LIFXEffect` and implements `async_play()` as a frame loop. Subclasses implement `generate_frame()` instead.
+
 #### Effect Implementations
 
 **EffectPulse (`pulse.py`):**
 
-- Implements pulse/blink/breathe effects
+- Extends `LIFXEffect` directly
+- Implements pulse/blink/breathe effects via firmware waveforms
 - Five modes with different timing and waveforms
 - Intelligent color selection based on mode
 - Auto-completion after configured cycles
 
 **EffectColorloop (`colorloop.py`):**
 
-- Implements continuous hue rotation
-- Randomized direction, device order, saturation
+- Extends `FrameEffect` (not LIFXEffect directly)
+- Implements continuous hue rotation via frame generation
+- Time-based hue calculation with configurable FPS
+- Randomized direction and saturation
 - Runs indefinitely until stopped
 - Supports state inheritance for seamless transitions
+- Works across all device types (Light, MultiZoneLight, MatrixLight)
 
 #### Data Models (`models.py`)
 
@@ -212,7 +239,33 @@ For each light:
 - **Multizone Devices:** Uses extended messages if supported, falls back to standard messages
 - **Powered-off Devices:** All state is still captured (including zone colors that may be inaccurate)
 
-### 3. Power-On (Optional)
+### 3. Animator Creation (FrameEffect Only)
+
+For `FrameEffect` subclasses, the Conductor creates Animators before the frame loop:
+
+```python
+if isinstance(effect, FrameEffect):
+    animators = await self._create_animators(effect, participants)
+    effect._animators = animators
+    await effect.async_setup(participants)
+```
+
+**What happens:**
+
+```
+For each participant:
+  1. Detect device type (MatrixLight, MultiZoneLight, Light)
+  2. Create appropriate Animator factory:
+     - MatrixLight → Animator.for_matrix(device, duration_ms)
+     - MultiZoneLight → Animator.for_multizone(device, duration_ms)
+     - Light → Animator.for_light(device, duration_ms)
+  3. duration_ms = int(1000 / effect.fps) for smooth interpolation
+  4. Call effect.async_setup(participants) for pre-loop initialization
+```
+
+**Note:** Animators use direct UDP — no device connection needed after creation.
+
+### 4. Power-On (Optional)
 
 If `effect.power_on == True`, devices are powered on:
 
@@ -238,7 +291,7 @@ For each powered-off light:
 
 **Timing:** 0.3 seconds per powered-off device
 
-### 4. Effect Execution
+### 5. Effect Execution
 
 Effect logic runs via `async_play()`:
 
@@ -248,18 +301,15 @@ await effect.async_play()
 
 **What happens:**
 
-- Subclass-specific effect logic executes
-- Can access `self.participants` and `self.conductor`
-- Can issue commands to devices
-- Pulse effects: Send waveform, wait for completion
-- ColorLoop effects: Continuous loop until stopped
+- **LIFXEffect subclasses:** Custom effect logic using device methods (e.g., `set_waveform()`)
+- **FrameEffect subclasses:** Frame loop calling `generate_frame()` per device per frame, dispatching via Animators
 
 **Timing:**
 
 - EffectPulse: `period * cycles` seconds
-- EffectColorloop: Runs indefinitely
+- EffectColorloop: Runs indefinitely at calculated FPS
 
-### 5. State Restoration
+### 6. State Restoration & Cleanup
 
 Conductor restores devices to pre-effect state:
 
@@ -687,48 +737,61 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - Pulse → Pulse: Could enable but currently disabled
 - Different types: Should not inherit (different visual intent)
 
-### Why No Tile-Specific Logic (Yet)?
+### Why FrameEffect Pattern?
 
-**Decision:** Tiles treated like single-color lights for now.
+**Decision:** Separate frame generation from frame delivery via `FrameEffect` + animation module.
 
 **Rationale:**
 
-1. **MVP Scope:** Phase 1 focuses on core framework
-2. **Complexity:** Tile effects require 2D coordinate system
-3. **Future Enhancement:** Architecture supports adding tile-specific effects later
-4. **Current Usefulness:** Effects still work on tiles (just not tile-aware)
+1. **Device Agnostic:** Effects work across all device types (Light, MultiZoneLight, MatrixLight) without device-specific code
+2. **Clean Separation:** Effect authors implement `generate_frame()` returning HSBK colors; animation module handles packet construction, tile mapping, and UDP delivery
+3. **Spatial Awareness:** `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` — enabling 2D effects (fire, rain) on matrix devices
+4. **Performance:** Direct UDP via prebaked packet templates, no connection overhead
+5. **Smooth Transitions:** `duration_ms` parameter tells firmware to interpolate between frames
 
-**Future Work:** Tile-specific effects would use `MatrixLight.set_matrix_colors()` and apply per-tile logic similar to theme support.
+**Alternative Considered:** Keep all effects using device methods (`set_color()`, `set_color_zones()`)
+
+**Rejected because:** Required device-specific branching in every effect, couldn't leverage the animation module's performance, and made spatial effects impractical.
 
 ## Integration Points
 
 ### With Device Layer
 
-Effects use standard device methods:
+**LIFXEffect subclasses** (e.g., EffectPulse) use standard device methods:
 
-- `get_power()`, `set_power()`
-- `get_color()`, `set_color()`
-- `set_waveform()` (EffectPulse)
-- `get_color_zones()`, `set_color_zones()` (MultiZoneLight)
-- `get_extended_color_zones()`, `set_extended_color_zones()` (MultiZoneLight)
+- `get_power()`, `set_power()` (state capture/restore, power-on)
+- `get_color()`, `set_color()` (state capture/restore)
+- `set_waveform()` (EffectPulse firmware waveforms)
+- `get_color_zones()`, `set_color_zones()` (MultiZoneLight state)
+- `get_extended_color_zones()`, `set_extended_color_zones()` (MultiZoneLight state)
 
-No special device modifications needed.
+### With Animation Layer
+
+**FrameEffect subclasses** (e.g., EffectColorloop) use the animation module for frame delivery:
+
+- `Animator.for_light()` — single-light SetColor packets
+- `Animator.for_multizone()` — multi-zone SetExtendedColorZones packets
+- `Animator.for_matrix()` — multi-tile Set64 packets with canvas mapping
+- `animator.send_frame()` — synchronous frame dispatch (no async overhead)
+- `duration_ms` parameter — firmware-level interpolation between frames
+
+The Conductor creates and manages Animator lifecycle (creation in `start()`, cleanup in `stop()`).
 
 ### With Network Layer
 
-Effects rely on existing lazy connection and concurrent request support:
+State capture/restore relies on existing lazy connection and concurrent request support:
 
 - Lazy connections open on first request and are reused
 - Requests are serialized via lock to prevent response mixing
-- No effect-specific network code needed
+- FrameEffect frame delivery bypasses connections (direct UDP via Animator)
 
 ### With Protocol Layer
 
 Effects use existing protocol structures:
 
-- `HSBK` for color representation
-- `LightWaveform` enum for waveform types
-- `MultiZoneApplicationRequest` for zone apply logic
+- `HSBK` for color representation + `HSBK.as_tuple()` for protocol conversion
+- `LightWaveform` enum for waveform types (EffectPulse)
+- `MultiZoneApplicationRequest` for zone apply logic (state restore)
 - Auto-generated packet classes
 
 ## Performance Characteristics
@@ -756,8 +819,8 @@ Effects use existing protocol structures:
 
 #### Effect Execution
 
-- Pulse: 1 waveform packet per device
-- ColorLoop: 1 color packet per device per iteration
+- Pulse: 1 waveform packet per device (via device connection)
+- FrameEffect (e.g., ColorLoop): 1 frame per device per FPS tick (via direct UDP Animator)
 
 #### State Restoration
 
