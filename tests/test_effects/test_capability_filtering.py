@@ -68,7 +68,7 @@ def white_light():
     return light
 
 
-async def test_colorloop_filters_non_color_lights(color_light, white_light):
+async def test_colorloop_filters_non_color_lights(color_light, white_light) -> None:
     """Test that colorloop filters out non-color lights."""
     conductor = Conductor()
     effect = EffectColorloop(period=60, change=20)
@@ -85,7 +85,7 @@ async def test_colorloop_filters_non_color_lights(color_light, white_light):
     await conductor.stop([color_light])
 
 
-async def test_pulse_does_not_filter_lights(color_light, white_light):
+async def test_pulse_does_not_filter_lights(color_light, white_light) -> None:
     """Test that pulse effect doesn't filter lights (no color requirement)."""
     conductor = Conductor()
     effect = EffectPulse(mode="breathe", cycles=1, period=1.0)
@@ -102,7 +102,7 @@ async def test_pulse_does_not_filter_lights(color_light, white_light):
     await conductor.stop(participants)
 
 
-async def test_colorloop_with_all_white_lights_warning(white_light, caplog):
+async def test_colorloop_with_all_white_lights_warning(white_light, caplog) -> None:
     """Test that colorloop with only white lights logs warning and doesn't run."""
     conductor = Conductor()
     effect = EffectColorloop(period=60, change=20)
@@ -122,7 +122,7 @@ async def test_colorloop_with_all_white_lights_warning(white_light, caplog):
     )
 
 
-async def test_colorloop_with_all_color_lights(color_light):
+async def test_colorloop_with_all_color_lights(color_light) -> None:
     """Test that colorloop with all color lights runs normally."""
     conductor = Conductor()
     effect = EffectColorloop(period=60, change=20)
@@ -159,7 +159,7 @@ async def test_colorloop_with_all_color_lights(color_light):
     await conductor.stop(participants)
 
 
-async def test_colorloop_with_light_without_cached_capabilities():
+async def test_colorloop_with_light_without_cached_capabilities() -> None:
     """Test colorloop compatibility check when light capabilities need to be loaded."""
     conductor = Conductor()
     effect = EffectColorloop(period=60, change=20)
@@ -174,7 +174,7 @@ async def test_colorloop_with_light_without_cached_capabilities():
     light.capabilities = None
 
     # Mock _ensure_capabilities to set capabilities
-    async def ensure_caps():
+    async def ensure_caps() -> None:
         caps = MagicMock()
         caps.has_color = True
         light.capabilities = caps

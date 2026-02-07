@@ -30,33 +30,33 @@ def effect():
 
 
 @pytest.fixture
-def mock_light():
+def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
     return light
 
 
-def test_effect_initialization(effect):
+def test_effect_initialization(effect) -> None:
     """Test effect initialization."""
     assert effect.power_on is True
     assert effect.conductor is None
     assert effect.participants == []
 
 
-def test_effect_initialization_power_off():
+def test_effect_initialization_power_off() -> None:
     """Test effect initialization with power_on=False."""
     effect = ConcreteEffect(power_on=False)
     assert effect.power_on is False
 
 
-def test_inherit_prestate_default(effect):
+def test_inherit_prestate_default(effect) -> None:
     """Test default inherit_prestate returns False."""
     other_effect = ConcreteEffect()
     assert effect.inherit_prestate(other_effect) is False
 
 
-def test_effect_repr(effect):
+def test_effect_repr(effect) -> None:
     """Test effect string representation."""
     repr_str = repr(effect)
     assert "ConcreteEffect" in repr_str
@@ -64,7 +64,7 @@ def test_effect_repr(effect):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_from_device(effect, mock_light):
+async def test_fetch_light_color_from_device(effect, mock_light) -> None:
     """Test fetching color from device."""
     # Setup device color
     device_color = HSBK(hue=240, saturation=0.9, brightness=0.7, kelvin=4000)
@@ -79,7 +79,7 @@ async def test_fetch_light_color_from_device(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_brightness_boost(effect, mock_light):
+async def test_fetch_light_color_brightness_boost(effect, mock_light) -> None:
     """Test brightness boost when color is too dim."""
     # Setup dim color from device
     dim_color = HSBK(hue=180, saturation=1.0, brightness=0.05, kelvin=3500)
@@ -96,7 +96,7 @@ async def test_fetch_light_color_brightness_boost(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_custom_fallback(effect, mock_light):
+async def test_fetch_light_color_custom_fallback(effect, mock_light) -> None:
     """Test brightness boost with custom fallback brightness."""
     # Setup dim color from device
     dim_color = HSBK(hue=90, saturation=0.8, brightness=0.02, kelvin=2700)
@@ -112,7 +112,7 @@ async def test_fetch_light_color_custom_fallback(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_custom_min_threshold(effect, mock_light):
+async def test_fetch_light_color_custom_min_threshold(effect, mock_light) -> None:
     """Test custom minimum brightness threshold."""
     # Setup color just below custom threshold from device
     color = HSBK(hue=45, saturation=0.7, brightness=0.15, kelvin=3000)
@@ -128,7 +128,7 @@ async def test_fetch_light_color_custom_min_threshold(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_exception_handling(effect, mock_light):
+async def test_fetch_light_color_exception_handling(effect, mock_light) -> None:
     """Test fallback when color fetch raises exception."""
     # Setup mock to raise exception
     mock_light.get_color = AsyncMock(side_effect=Exception("Network error"))
@@ -146,7 +146,9 @@ async def test_fetch_light_color_exception_handling(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_fetch_light_color_exception_with_custom_brightness(effect, mock_light):
+async def test_fetch_light_color_exception_with_custom_brightness(
+    effect, mock_light
+) -> None:
     """Test fallback with custom brightness when exception occurs."""
     # Setup mock to raise exception
     mock_light.get_color = AsyncMock(side_effect=Exception("Timeout"))
@@ -158,7 +160,7 @@ async def test_fetch_light_color_exception_with_custom_brightness(effect, mock_l
     assert result.brightness == 0.3
 
 
-def test_get_fallback_color_default(effect):
+def test_get_fallback_color_default(effect) -> None:
     """Test _get_fallback_color with default brightness."""
     result = effect._get_fallback_color()
 
@@ -170,7 +172,7 @@ def test_get_fallback_color_default(effect):
     assert result.kelvin == KELVIN_NEUTRAL
 
 
-def test_get_fallback_color_custom_brightness(effect):
+def test_get_fallback_color_custom_brightness(effect) -> None:
     """Test _get_fallback_color with custom brightness."""
     result = effect._get_fallback_color(brightness=0.4)
 
@@ -178,7 +180,7 @@ def test_get_fallback_color_custom_brightness(effect):
     assert result.brightness == 0.4
 
 
-def test_get_fallback_color_randomness(effect):
+def test_get_fallback_color_randomness(effect) -> None:
     """Test that fallback color has random hue."""
     # Generate multiple fallback colors
     colors = [effect._get_fallback_color() for _ in range(10)]
@@ -189,7 +191,7 @@ def test_get_fallback_color_randomness(effect):
 
 
 @pytest.mark.asyncio
-async def test_from_poweroff_hsbk_returns_random(effect, mock_light):
+async def test_from_poweroff_hsbk_returns_random(effect, mock_light) -> None:
     """Test from_poweroff_hsbk returns random hue with zero brightness."""
     result = await effect.from_poweroff_hsbk(mock_light)
 
@@ -202,7 +204,7 @@ async def test_from_poweroff_hsbk_returns_random(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_async_perform_sets_participants(effect, mock_light):
+async def test_async_perform_sets_participants(effect, mock_light) -> None:
     """Test async_perform sets participants."""
     # Setup required async methods
     mock_light.get_power = AsyncMock(return_value=True)
@@ -217,7 +219,7 @@ async def test_async_perform_sets_participants(effect, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_async_perform_without_power_on(mock_light):
+async def test_async_perform_without_power_on(mock_light) -> None:
     """Test async_perform without powering on lights."""
     effect = ConcreteEffect(power_on=False)
     mock_light.get_power = AsyncMock(return_value=True)
@@ -229,7 +231,7 @@ async def test_async_perform_without_power_on(mock_light):
 
 
 @pytest.mark.asyncio
-async def test_async_perform_powers_on_if_off(mock_light):
+async def test_async_perform_powers_on_if_off(mock_light) -> None:
     """Test async_perform powers on lights that are off."""
     effect = ConcreteEffect(power_on=True)
     mock_light.get_power = AsyncMock(return_value=False)
@@ -245,7 +247,7 @@ async def test_async_perform_powers_on_if_off(mock_light):
 
 
 @pytest.mark.asyncio
-async def test_async_perform_skips_already_on_lights(mock_light):
+async def test_async_perform_skips_already_on_lights(mock_light) -> None:
     """Test async_perform skips lights that are already on."""
     effect = ConcreteEffect(power_on=True)
     mock_light.get_power = AsyncMock(return_value=True)
@@ -259,7 +261,9 @@ async def test_async_perform_skips_already_on_lights(mock_light):
 
 
 @pytest.mark.asyncio
-async def test_is_light_compatible_default_no_color_required(effect, mock_light):
+async def test_is_light_compatible_default_no_color_required(
+    effect, mock_light
+) -> None:
     """Test is_light_compatible when effect doesn't require color."""
     # Effect doesn't require color, all lights are compatible
     is_compatible = await effect.is_light_compatible(mock_light)
@@ -267,7 +271,7 @@ async def test_is_light_compatible_default_no_color_required(effect, mock_light)
 
 
 @pytest.mark.asyncio
-async def test_is_light_compatible_color_required_with_color_support():
+async def test_is_light_compatible_color_required_with_color_support() -> None:
     """Test is_light_compatible when effect requires color and light supports it."""
 
     class ColorEffect(ConcreteEffect):
@@ -290,7 +294,7 @@ async def test_is_light_compatible_color_required_with_color_support():
 
 
 @pytest.mark.asyncio
-async def test_is_light_compatible_color_required_without_color_support():
+async def test_is_light_compatible_color_required_without_color_support() -> None:
     """Test is_light_compatible when effect requires color."""
 
     class ColorEffect(ConcreteEffect):
@@ -313,7 +317,7 @@ async def test_is_light_compatible_color_required_without_color_support():
 
 
 @pytest.mark.asyncio
-async def test_is_light_compatible_loads_capabilities():
+async def test_is_light_compatible_loads_capabilities() -> None:
     """Test is_light_compatible loads capabilities if not cached."""
 
     class ColorEffect(ConcreteEffect):
@@ -346,7 +350,7 @@ async def test_is_light_compatible_loads_capabilities():
 
 
 @pytest.mark.asyncio
-async def test_is_light_compatible_custom_implementation():
+async def test_is_light_compatible_custom_implementation() -> None:
     """Test custom is_light_compatible implementation."""
 
     class CustomEffect(ConcreteEffect):

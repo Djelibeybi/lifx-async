@@ -11,7 +11,7 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.rainbow import EffectRainbow
 
 
-def test_rainbow_default_parameters():
+def test_rainbow_default_parameters() -> None:
     """Test EffectRainbow with default parameters."""
     effect = EffectRainbow()
 
@@ -25,7 +25,7 @@ def test_rainbow_default_parameters():
     assert effect.duration is None
 
 
-def test_rainbow_custom_parameters():
+def test_rainbow_custom_parameters() -> None:
     """Test EffectRainbow with custom parameters."""
     effect = EffectRainbow(period=5, brightness=0.6, saturation=0.9, spread=45)
 
@@ -35,25 +35,25 @@ def test_rainbow_custom_parameters():
     assert effect.spread == 45
 
 
-def test_rainbow_invalid_period():
+def test_rainbow_invalid_period() -> None:
     """Test EffectRainbow with invalid period raises ValueError."""
     with pytest.raises(ValueError, match="Period must be positive"):
         EffectRainbow(period=0)
 
 
-def test_rainbow_invalid_brightness():
+def test_rainbow_invalid_brightness() -> None:
     """Test EffectRainbow with invalid brightness raises ValueError."""
     with pytest.raises(ValueError, match="Brightness must be 0.0-1.0"):
         EffectRainbow(brightness=1.5)
 
 
-def test_rainbow_invalid_saturation():
+def test_rainbow_invalid_saturation() -> None:
     """Test EffectRainbow with invalid saturation raises ValueError."""
     with pytest.raises(ValueError, match="Saturation must be 0.0-1.0"):
         EffectRainbow(saturation=-0.1)
 
 
-def test_rainbow_invalid_spread():
+def test_rainbow_invalid_spread() -> None:
     """Test EffectRainbow with invalid spread raises ValueError."""
     with pytest.raises(ValueError, match="Spread must be 0-360"):
         EffectRainbow(spread=400)
@@ -238,7 +238,7 @@ class TestRainbowFrameLoop:
 
 
 @pytest.mark.asyncio
-async def test_rainbow_from_poweroff():
+async def test_rainbow_from_poweroff() -> None:
     """Test from_poweroff_hsbk returns configured brightness."""
     effect = EffectRainbow(brightness=0.6, saturation=0.9)
 
@@ -251,7 +251,7 @@ async def test_rainbow_from_poweroff():
     assert result.kelvin == KELVIN_NEUTRAL
 
 
-def test_rainbow_repr():
+def test_rainbow_repr() -> None:
     """Test EffectRainbow string representation."""
     effect = EffectRainbow(period=5, brightness=0.7, spread=45)
     repr_str = repr(effect)

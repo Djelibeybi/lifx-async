@@ -12,7 +12,7 @@ from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 
-def test_colorloop_default_parameters():
+def test_colorloop_default_parameters() -> None:
     """Test EffectColorloop with default parameters."""
     effect = EffectColorloop()
 
@@ -28,7 +28,7 @@ def test_colorloop_default_parameters():
     assert effect.power_on is True
 
 
-def test_colorloop_custom_parameters():
+def test_colorloop_custom_parameters() -> None:
     """Test EffectColorloop with custom parameters."""
     effect = EffectColorloop(
         period=30, change=15, spread=45, brightness=0.7, saturation_min=0.9
@@ -41,62 +41,62 @@ def test_colorloop_custom_parameters():
     assert effect.saturation_min == 0.9
 
 
-def test_colorloop_with_transition():
+def test_colorloop_with_transition() -> None:
     """Test EffectColorloop with custom transition time."""
     effect = EffectColorloop(transition=2.5)
 
     assert effect.transition == 2.5
 
 
-def test_colorloop_invalid_period():
+def test_colorloop_invalid_period() -> None:
     """Test EffectColorloop with invalid period raises ValueError."""
     with pytest.raises(ValueError, match="Period must be positive"):
         EffectColorloop(period=0)
 
 
-def test_colorloop_invalid_change():
+def test_colorloop_invalid_change() -> None:
     """Test EffectColorloop with invalid change raises ValueError."""
     with pytest.raises(ValueError, match="Change must be 0-360"):
         EffectColorloop(change=400)
 
 
-def test_colorloop_invalid_spread():
+def test_colorloop_invalid_spread() -> None:
     """Test EffectColorloop with invalid spread raises ValueError."""
     with pytest.raises(ValueError, match="Spread must be 0-360"):
         EffectColorloop(spread=400)
 
 
-def test_colorloop_invalid_brightness():
+def test_colorloop_invalid_brightness() -> None:
     """Test EffectColorloop with invalid brightness raises ValueError."""
     with pytest.raises(ValueError, match="Brightness must be 0.0-1.0"):
         EffectColorloop(brightness=1.5)
 
 
-def test_colorloop_invalid_saturation_min():
+def test_colorloop_invalid_saturation_min() -> None:
     """Test EffectColorloop with invalid saturation_min raises ValueError."""
     with pytest.raises(ValueError, match="Saturation_min must be 0.0-1.0"):
         EffectColorloop(saturation_min=1.5)
 
 
-def test_colorloop_invalid_saturation_max():
+def test_colorloop_invalid_saturation_max() -> None:
     """Test EffectColorloop with invalid saturation_max raises ValueError."""
     with pytest.raises(ValueError, match="Saturation_max must be 0.0-1.0"):
         EffectColorloop(saturation_max=1.5)
 
 
-def test_colorloop_saturation_min_greater_than_max():
+def test_colorloop_saturation_min_greater_than_max() -> None:
     """Test EffectColorloop with saturation_min > saturation_max raises ValueError."""
     with pytest.raises(ValueError, match="Saturation_min .* must be <="):
         EffectColorloop(saturation_min=0.9, saturation_max=0.5)
 
 
-def test_colorloop_invalid_transition():
+def test_colorloop_invalid_transition() -> None:
     """Test EffectColorloop with invalid transition raises ValueError."""
     with pytest.raises(ValueError, match="Transition must be non-negative"):
         EffectColorloop(transition=-1.0)
 
 
-def test_colorloop_synchronized_mode():
+def test_colorloop_synchronized_mode() -> None:
     """Test EffectColorloop with synchronized=True."""
     effect = EffectColorloop(synchronized=True)
 
@@ -105,7 +105,7 @@ def test_colorloop_synchronized_mode():
     assert effect.change == 20
 
 
-def test_colorloop_synchronized_with_custom_params():
+def test_colorloop_synchronized_with_custom_params() -> None:
     """Test EffectColorloop with synchronized mode and custom parameters."""
     effect = EffectColorloop(
         period=30, change=15, brightness=0.8, synchronized=True, transition=2.0
@@ -118,7 +118,7 @@ def test_colorloop_synchronized_with_custom_params():
     assert effect.transition == 2.0
 
 
-def test_colorloop_inherit_prestate():
+def test_colorloop_inherit_prestate() -> None:
     """Test EffectColorloop inherit_prestate method."""
     effect1 = EffectColorloop()
     effect2 = EffectColorloop()
@@ -131,7 +131,7 @@ def test_colorloop_inherit_prestate():
     assert effect1.inherit_prestate(other_effect) is False  # type: ignore
 
 
-def test_colorloop_repr():
+def test_colorloop_repr() -> None:
     """Test EffectColorloop string representation."""
     effect = EffectColorloop(period=30, change=15, spread=45, brightness=0.7)
     repr_str = repr(effect)
@@ -144,7 +144,7 @@ def test_colorloop_repr():
     assert "synchronized=False" in repr_str
 
 
-def test_colorloop_repr_synchronized():
+def test_colorloop_repr_synchronized() -> None:
     """Test EffectColorloop string representation with synchronized mode."""
     effect = EffectColorloop(synchronized=True)
     repr_str = repr(effect)
@@ -521,7 +521,7 @@ class TestColorloopFrameLoop:
 
 
 @pytest.mark.asyncio
-async def test_colorloop_from_poweroff_with_custom_brightness():
+async def test_colorloop_from_poweroff_with_custom_brightness() -> None:
     """Test from_poweroff_hsbk with custom brightness specified."""
     effect = EffectColorloop(brightness=0.6)
 
@@ -535,7 +535,7 @@ async def test_colorloop_from_poweroff_with_custom_brightness():
 
 
 @pytest.mark.asyncio
-async def test_colorloop_is_light_compatible_with_none_capabilities():
+async def test_colorloop_is_light_compatible_with_none_capabilities() -> None:
     """Test is_light_compatible when light.capabilities is None."""
     effect = EffectColorloop()
 
@@ -556,7 +556,7 @@ async def test_colorloop_is_light_compatible_with_none_capabilities():
 
 
 @pytest.mark.asyncio
-async def test_colorloop_is_light_compatible_capabilities_still_none():
+async def test_colorloop_is_light_compatible_capabilities_still_none() -> None:
     """Test is_light_compatible when capabilities remain None after loading."""
     effect = EffectColorloop()
 
@@ -570,7 +570,7 @@ async def test_colorloop_is_light_compatible_capabilities_still_none():
 
 
 @pytest.mark.asyncio
-async def test_colorloop_is_light_compatible_capabilities_already_loaded():
+async def test_colorloop_is_light_compatible_capabilities_already_loaded() -> None:
     """Test is_light_compatible when capabilities are already loaded."""
     effect = EffectColorloop()
 
@@ -586,7 +586,7 @@ async def test_colorloop_is_light_compatible_capabilities_already_loaded():
 
 
 @pytest.mark.asyncio
-async def test_colorloop_is_light_compatible_no_color_support():
+async def test_colorloop_is_light_compatible_no_color_support() -> None:
     """Test is_light_compatible when light doesn't support color."""
     effect = EffectColorloop()
 

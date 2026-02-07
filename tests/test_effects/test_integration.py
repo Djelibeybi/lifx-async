@@ -63,13 +63,13 @@ async def wait_for_effect_complete(
 
 
 @pytest.fixture
-def conductor():
+def conductor() -> Conductor:
     """Create a Conductor instance."""
     return Conductor()
 
 
 @pytest.fixture
-def mock_light():
+def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
@@ -109,7 +109,7 @@ def mock_white_light():
 
 
 @pytest.mark.asyncio
-async def test_conductor_start_stop_pulse(conductor, mock_light):
+async def test_conductor_start_stop_pulse(conductor, mock_light) -> None:
     """Test starting and stopping a pulse effect."""
     effect = EffectPulse(mode="blink", cycles=1, period=0.1)
 
@@ -129,7 +129,7 @@ async def test_conductor_start_stop_pulse(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_pulse_effect_execution(conductor, mock_light):
+async def test_pulse_effect_execution(conductor, mock_light) -> None:
     """Test pulse effect executes and calls set_waveform."""
     effect = EffectPulse(mode="blink", cycles=1, period=0.1)
 
@@ -145,7 +145,7 @@ async def test_pulse_effect_execution(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_pulse_effect_with_color(conductor, mock_light):
+async def test_pulse_effect_with_color(conductor, mock_light) -> None:
     """Test pulse effect with explicit color."""
     custom_color = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=4000)
     effect = EffectPulse(mode="blink", cycles=1, period=0.1, color=custom_color)
@@ -162,7 +162,7 @@ async def test_pulse_effect_with_color(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_pulse_effect_strobe_mode(conductor, mock_light):
+async def test_pulse_effect_strobe_mode(conductor, mock_light) -> None:
     """Test pulse effect in strobe mode."""
     effect = EffectPulse(mode="strobe", cycles=2, period=0.05)
 
@@ -175,7 +175,7 @@ async def test_pulse_effect_strobe_mode(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_pulse_effect_breathe_mode(conductor, mock_light):
+async def test_pulse_effect_breathe_mode(conductor, mock_light) -> None:
     """Test pulse effect in breathe mode."""
     effect = EffectPulse(mode="breathe", cycles=1, period=0.1)
 
@@ -189,7 +189,7 @@ async def test_pulse_effect_breathe_mode(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_colorloop_effect_execution(conductor, mock_light):
+async def test_colorloop_effect_execution(conductor, mock_light) -> None:
     """Test colorloop effect executes and sends frames via animator."""
     effect = EffectColorloop(period=0.2, change=30)
 
@@ -216,7 +216,7 @@ async def test_colorloop_effect_execution(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_colorloop_synchronized_mode(conductor, mock_light):
+async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     """Test colorloop in synchronized mode sends frames for all lights."""
     # Create two mock lights
     light1 = mock_light
@@ -263,7 +263,7 @@ async def test_colorloop_synchronized_mode(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_colorloop_with_brightness(conductor, mock_light):
+async def test_colorloop_with_brightness(conductor, mock_light) -> None:
     """Test colorloop with fixed brightness sends frames."""
     effect = EffectColorloop(period=0.2, change=30, brightness=0.5)
 
@@ -288,7 +288,9 @@ async def test_colorloop_with_brightness(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_colorloop_filters_white_lights(conductor, mock_light, mock_white_light):
+async def test_colorloop_filters_white_lights(
+    conductor, mock_light, mock_white_light
+) -> None:
     """Test colorloop filters out non-color lights."""
     effect = EffectColorloop(period=0.2, change=30)
 
@@ -339,7 +341,7 @@ async def test_pulse_does_not_filter_white_lights(
 
 
 @pytest.mark.asyncio
-async def test_effect_with_powered_off_light(conductor, mock_light):
+async def test_effect_with_powered_off_light(conductor, mock_light) -> None:
     """Test effect powers on light that is off."""
     # Light starts powered off
     mock_light.get_power = AsyncMock(return_value=False)
@@ -356,7 +358,7 @@ async def test_effect_with_powered_off_light(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_effect_without_power_on(conductor):
+async def test_effect_without_power_on(conductor) -> None:
     """Test effect with power_on=False doesn't power on lights."""
     # Create a fresh mock light that is powered off
     light = MagicMock()
@@ -387,7 +389,7 @@ async def test_effect_without_power_on(conductor):
 
 
 @pytest.mark.asyncio
-async def test_consecutive_effects_inherit_prestate(conductor, mock_light):
+async def test_consecutive_effects_inherit_prestate(conductor, mock_light) -> None:
     """Test consecutive colorloop effects inherit prestate."""
     effect1 = EffectColorloop(period=0.2, change=30)
     effect2 = EffectColorloop(period=0.3, change=45)
@@ -419,7 +421,7 @@ async def test_consecutive_effects_inherit_prestate(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_effect_completion_restores_state(conductor, mock_light):
+async def test_effect_completion_restores_state(conductor, mock_light) -> None:
     """Test effect automatically restores state on completion."""
     # Very short effect that will complete quickly
     effect = EffectPulse(mode="blink", cycles=1, period=0.05)
@@ -432,14 +434,14 @@ async def test_effect_completion_restores_state(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_conductor_repr(conductor):
+async def test_conductor_repr(conductor) -> None:
     """Test Conductor string representation."""
     assert "Conductor" in repr(conductor)
     assert "running_effects=0" in repr(conductor)
 
 
 @pytest.mark.asyncio
-async def test_multiple_lights_parallel(conductor, mock_light):
+async def test_multiple_lights_parallel(conductor, mock_light) -> None:
     """Test effect runs on multiple lights in parallel."""
     # Create multiple mock lights
     lights = []
@@ -471,7 +473,7 @@ async def test_multiple_lights_parallel(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_conductor_exception_during_effect():
+async def test_conductor_exception_during_effect() -> None:
     """Test conductor handles exception during effect execution."""
     conductor = Conductor()
 
@@ -513,7 +515,7 @@ async def test_conductor_exception_during_effect():
 
 
 @pytest.mark.asyncio
-async def test_conductor_exception_during_async_perform():
+async def test_conductor_exception_during_async_perform() -> None:
     """Test conductor handles exception raised during async_perform."""
     from lifx.effects.base import LIFXEffect
 
@@ -554,7 +556,7 @@ async def test_conductor_exception_during_async_perform():
 
 
 @pytest.mark.asyncio
-async def test_conductor_stop_with_active_effects():
+async def test_conductor_stop_with_active_effects() -> None:
     """Test stopping conductor with actively running effects."""
     conductor = Conductor()
 
@@ -595,7 +597,7 @@ async def test_conductor_stop_with_active_effects():
 
 
 @pytest.mark.asyncio
-async def test_conductor_filter_lights_without_capabilities():
+async def test_conductor_filter_lights_without_capabilities() -> None:
     """Test conductor filters lights that need capability check."""
     conductor = Conductor()
 
@@ -670,7 +672,9 @@ class FailingFrameEffect(FrameEffect):
 
 
 @pytest.mark.asyncio
-async def test_conductor_creates_animators_for_frame_effect(conductor, mock_light):
+async def test_conductor_creates_animators_for_frame_effect(
+    conductor, mock_light
+) -> None:
     """Test Conductor creates animators for FrameEffect."""
     effect = ConcreteFrameEffectForIntegration(fps=30.0, duration=0.1)
 
@@ -695,7 +699,7 @@ async def test_conductor_creates_animators_for_frame_effect(conductor, mock_ligh
 
 
 @pytest.mark.asyncio
-async def test_conductor_closes_animators_on_stop(conductor, mock_light):
+async def test_conductor_closes_animators_on_stop(conductor, mock_light) -> None:
     """Test Conductor closes animators when stopping a FrameEffect."""
     effect = ConcreteFrameEffectForIntegration(fps=30.0, duration=None)
 
@@ -721,7 +725,7 @@ async def test_conductor_closes_animators_on_stop(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_conductor_closes_animators_on_completion(conductor, mock_light):
+async def test_conductor_closes_animators_on_completion(conductor, mock_light) -> None:
     """Test Conductor closes animators when FrameEffect completes naturally."""
     effect = ConcreteFrameEffectForIntegration(fps=30.0, duration=0.05)
 
@@ -746,7 +750,7 @@ async def test_conductor_closes_animators_on_completion(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_conductor_closes_animators_on_error(conductor, mock_light):
+async def test_conductor_closes_animators_on_error(conductor, mock_light) -> None:
     """Test Conductor closes animators when FrameEffect raises an error."""
     effect = FailingFrameEffect(fps=30.0, duration=None)
 
@@ -774,7 +778,7 @@ async def test_conductor_closes_animators_on_error(conductor, mock_light):
 
 
 @pytest.mark.asyncio
-async def test_conductor_frame_effect_with_multiple_device_types():
+async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     """Test Conductor creates appropriate animators for different device types."""
     from lifx.animation.animator import Animator
     from lifx.devices.matrix import MatrixLight
@@ -883,7 +887,9 @@ async def test_conductor_frame_effect_with_multiple_device_types():
 
 
 @pytest.mark.asyncio
-async def test_conductor_frame_effect_coexists_with_lifx_effect(conductor, mock_light):
+async def test_conductor_frame_effect_coexists_with_lifx_effect(
+    conductor, mock_light
+) -> None:
     """Test FrameEffect and LIFXEffect can coexist on different lights."""
     # Light 1 runs a FrameEffect
     light1 = mock_light

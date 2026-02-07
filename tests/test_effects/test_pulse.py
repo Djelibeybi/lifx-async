@@ -10,7 +10,7 @@ from lifx.effects.pulse import EffectPulse
 from lifx.protocol.protocol_types import LightWaveform
 
 
-def test_pulse_default_mode():
+def test_pulse_default_mode() -> None:
     """Test EffectPulse with default mode (blink)."""
     effect = EffectPulse()
 
@@ -23,7 +23,7 @@ def test_pulse_default_mode():
     assert effect.power_on is True
 
 
-def test_pulse_strobe_mode():
+def test_pulse_strobe_mode() -> None:
     """Test EffectPulse with strobe mode."""
     effect = EffectPulse(mode="strobe")
 
@@ -33,7 +33,7 @@ def test_pulse_strobe_mode():
     assert effect.waveform == LightWaveform.PULSE
 
 
-def test_pulse_breathe_mode():
+def test_pulse_breathe_mode() -> None:
     """Test EffectPulse with breathe mode."""
     effect = EffectPulse(mode="breathe")
 
@@ -43,7 +43,7 @@ def test_pulse_breathe_mode():
     assert effect.waveform == LightWaveform.SINE
 
 
-def test_pulse_ping_mode():
+def test_pulse_ping_mode() -> None:
     """Test EffectPulse with ping mode."""
     effect = EffectPulse(mode="ping")
 
@@ -54,7 +54,7 @@ def test_pulse_ping_mode():
     assert effect.skew_ratio == pytest.approx(0.9283, rel=1e-4)
 
 
-def test_pulse_solid_mode():
+def test_pulse_solid_mode() -> None:
     """Test EffectPulse with solid mode."""
     effect = EffectPulse(mode="solid")
 
@@ -62,7 +62,7 @@ def test_pulse_solid_mode():
     assert effect.skew_ratio == 0.0  # Minimum skew for minimal variation
 
 
-def test_pulse_custom_parameters():
+def test_pulse_custom_parameters() -> None:
     """Test EffectPulse with custom parameters."""
     effect = EffectPulse(mode="blink", period=2.0, cycles=5)
 
@@ -70,7 +70,7 @@ def test_pulse_custom_parameters():
     assert effect.cycles == 5
 
 
-def test_pulse_with_color():
+def test_pulse_with_color() -> None:
     """Test EffectPulse with custom color."""
     color = HSBK.from_rgb(255, 0, 0)
     effect = EffectPulse(mode="blink", color=color)
@@ -78,25 +78,25 @@ def test_pulse_with_color():
     assert effect.color == color
 
 
-def test_pulse_invalid_mode():
+def test_pulse_invalid_mode() -> None:
     """Test EffectPulse with invalid mode raises ValueError."""
     with pytest.raises(ValueError, match="Invalid mode"):
         EffectPulse(mode="invalid")
 
 
-def test_pulse_invalid_period():
+def test_pulse_invalid_period() -> None:
     """Test EffectPulse with invalid period raises ValueError."""
     with pytest.raises(ValueError, match="Period must be positive"):
         EffectPulse(period=0)
 
 
-def test_pulse_invalid_cycles():
+def test_pulse_invalid_cycles() -> None:
     """Test EffectPulse with invalid cycles raises ValueError."""
     with pytest.raises(ValueError, match="Cycles must be 1 or higher"):
         EffectPulse(cycles=0)
 
 
-def test_pulse_repr():
+def test_pulse_repr() -> None:
     """Test EffectPulse string representation."""
     effect = EffectPulse(mode="blink", period=1.5, cycles=3)
     repr_str = repr(effect)
@@ -108,7 +108,7 @@ def test_pulse_repr():
 
 
 @pytest.mark.asyncio
-async def test_pulse_exception_during_waveform():
+async def test_pulse_exception_during_waveform() -> None:
     """Test pulse handles exception during set_waveform."""
     effect = EffectPulse(mode="blink", cycles=1, period=0.1)
 
@@ -132,7 +132,7 @@ async def test_pulse_exception_during_waveform():
 
 
 @pytest.mark.asyncio
-async def test_pulse_from_poweroff_with_custom_color():
+async def test_pulse_from_poweroff_with_custom_color() -> None:
     """Test from_poweroff_hsbk with custom color specified."""
     custom_color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=4000)
     effect = EffectPulse(mode="blink", color=custom_color)
@@ -148,7 +148,7 @@ async def test_pulse_from_poweroff_with_custom_color():
 
 
 @pytest.mark.asyncio
-async def test_pulse_from_poweroff_strobe_mode():
+async def test_pulse_from_poweroff_strobe_mode() -> None:
     """Test from_poweroff_hsbk with strobe mode returns cold white."""
     effect = EffectPulse(mode="strobe")
 

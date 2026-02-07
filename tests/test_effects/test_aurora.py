@@ -343,7 +343,7 @@ async def test_aurora_is_light_compatible_none_capabilities() -> None:
     light = MagicMock()
     light.capabilities = None
 
-    async def ensure_caps():
+    async def ensure_caps() -> None:
         caps = MagicMock()
         caps.has_color = True
         light.capabilities = caps

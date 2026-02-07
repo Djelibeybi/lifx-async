@@ -280,7 +280,7 @@ class TestSunriseCompatibility:
         light = MagicMock()
         light.capabilities = None
 
-        async def ensure_caps():
+        async def ensure_caps() -> None:
             caps = MagicMock()
             caps.has_matrix = True
             light.capabilities = caps
@@ -490,7 +490,7 @@ class TestSunsetCompatibility:
         light = MagicMock()
         light.capabilities = None
 
-        async def ensure_caps():
+        async def ensure_caps() -> None:
             caps = MagicMock()
             caps.has_matrix = True
             light.capabilities = caps
