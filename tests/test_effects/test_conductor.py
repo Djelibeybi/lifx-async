@@ -62,25 +62,25 @@ class _SimpleFrameEffect(FrameEffect):
 
 
 @pytest.fixture
-def conductor():
+def conductor() -> Conductor:
     """Create a Conductor instance."""
     return Conductor()
 
 
 @pytest.fixture
-def light1():
+def light1() -> MagicMock:
     """Create first mock light."""
     return _make_color_light("d073d5000001", "192.168.1.100")
 
 
 @pytest.fixture
-def light2():
+def light2() -> MagicMock:
     """Create second mock light."""
     return _make_color_light("d073d5000002", "192.168.1.101")
 
 
 @pytest.fixture
-def light3():
+def light3() -> MagicMock:
     """Create third mock light."""
     return _make_color_light("d073d5000003", "192.168.1.102")
 

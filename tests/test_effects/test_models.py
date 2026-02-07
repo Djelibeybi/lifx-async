@@ -25,7 +25,7 @@ async def dummy_coroutine() -> None:
     await asyncio.sleep(0)
 
 
-def test_prestate_creation():
+def test_prestate_creation() -> None:
     """Test creating a PreState instance."""
     color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
     prestate = PreState(power=True, color=color, zone_colors=None)
@@ -35,7 +35,7 @@ def test_prestate_creation():
     assert prestate.zone_colors is None
 
 
-def test_prestate_with_zones():
+def test_prestate_with_zones() -> None:
     """Test creating a PreState with zone colors."""
     color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
     zone_colors = [
@@ -51,7 +51,7 @@ def test_prestate_with_zones():
     assert len(prestate.zone_colors) == 3
 
 
-def test_prestate_repr():
+def test_prestate_repr() -> None:
     """Test PreState string representation."""
     color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
     prestate = PreState(power=True, color=color, zone_colors=None)
@@ -62,7 +62,7 @@ def test_prestate_repr():
     assert "no_zones" in repr_str
 
 
-async def test_running_effect_creation():
+async def test_running_effect_creation() -> None:
     """Test creating a RunningEffect instance."""
     color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
     prestate = PreState(power=True, color=color, zone_colors=None)
@@ -78,7 +78,7 @@ async def test_running_effect_creation():
     await task
 
 
-async def test_running_effect_repr():
+async def test_running_effect_repr() -> None:
     """Test RunningEffect string representation."""
     color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
     prestate = PreState(power=True, color=color, zone_colors=None)

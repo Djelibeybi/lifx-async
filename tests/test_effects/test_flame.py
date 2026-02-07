@@ -10,7 +10,7 @@ from lifx.effects.flame import EffectFlame
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 
-def test_flame_default_parameters():
+def test_flame_default_parameters() -> None:
     """Test EffectFlame with default parameters."""
     effect = EffectFlame()
 
@@ -25,7 +25,7 @@ def test_flame_default_parameters():
     assert effect.duration is None
 
 
-def test_flame_custom_parameters():
+def test_flame_custom_parameters() -> None:
     """Test EffectFlame with custom parameters."""
     effect = EffectFlame(
         intensity=0.5,
@@ -44,7 +44,7 @@ def test_flame_custom_parameters():
     assert effect.power_on is False
 
 
-def test_flame_invalid_intensity():
+def test_flame_invalid_intensity() -> None:
     """Test EffectFlame with invalid intensity raises ValueError."""
     with pytest.raises(ValueError, match="Intensity must be 0.0-1.0"):
         EffectFlame(intensity=1.5)
@@ -53,7 +53,7 @@ def test_flame_invalid_intensity():
         EffectFlame(intensity=-0.1)
 
 
-def test_flame_invalid_speed():
+def test_flame_invalid_speed() -> None:
     """Test EffectFlame with invalid speed raises ValueError."""
     with pytest.raises(ValueError, match="Speed must be positive"):
         EffectFlame(speed=0)
@@ -62,25 +62,25 @@ def test_flame_invalid_speed():
         EffectFlame(speed=-1.0)
 
 
-def test_flame_invalid_kelvin_min():
+def test_flame_invalid_kelvin_min() -> None:
     """Test EffectFlame with invalid kelvin_min raises ValueError."""
     with pytest.raises(ValueError, match="kelvin_min must be >="):
         EffectFlame(kelvin_min=1000)
 
 
-def test_flame_invalid_kelvin_max():
+def test_flame_invalid_kelvin_max() -> None:
     """Test EffectFlame with invalid kelvin_max raises ValueError."""
     with pytest.raises(ValueError, match="kelvin_max must be <="):
         EffectFlame(kelvin_max=10000)
 
 
-def test_flame_invalid_kelvin_range():
+def test_flame_invalid_kelvin_range() -> None:
     """Test EffectFlame with kelvin_min > kelvin_max raises ValueError."""
     with pytest.raises(ValueError, match="kelvin_min.*must be <= kelvin_max"):
         EffectFlame(kelvin_min=3000, kelvin_max=2000)
 
 
-def test_flame_invalid_brightness():
+def test_flame_invalid_brightness() -> None:
     """Test EffectFlame with invalid brightness raises ValueError."""
     with pytest.raises(ValueError, match="Brightness must be 0.0-1.0"):
         EffectFlame(brightness=1.5)
@@ -301,7 +301,7 @@ class TestFlameFrameLoop:
 
 
 @pytest.mark.asyncio
-async def test_flame_from_poweroff():
+async def test_flame_from_poweroff() -> None:
     """Test from_poweroff_hsbk returns warm amber at zero brightness."""
     effect = EffectFlame()
     light = MagicMock()
@@ -314,7 +314,7 @@ async def test_flame_from_poweroff():
 
 
 @pytest.mark.asyncio
-async def test_flame_is_light_compatible_with_color():
+async def test_flame_is_light_compatible_with_color() -> None:
     """Test is_light_compatible returns True for color lights."""
     effect = EffectFlame()
     light = MagicMock()
@@ -326,7 +326,7 @@ async def test_flame_is_light_compatible_with_color():
 
 
 @pytest.mark.asyncio
-async def test_flame_is_light_compatible_without_color():
+async def test_flame_is_light_compatible_without_color() -> None:
     """Test is_light_compatible returns False for non-color lights."""
     effect = EffectFlame()
     light = MagicMock()
@@ -338,13 +338,13 @@ async def test_flame_is_light_compatible_without_color():
 
 
 @pytest.mark.asyncio
-async def test_flame_is_light_compatible_none_capabilities():
+async def test_flame_is_light_compatible_none_capabilities() -> None:
     """Test is_light_compatible loads capabilities when None."""
     effect = EffectFlame()
     light = MagicMock()
     light.capabilities = None
 
-    async def ensure_caps():
+    async def ensure_caps() -> None:
         caps = MagicMock()
         caps.has_color = True
         light.capabilities = caps
@@ -355,14 +355,14 @@ async def test_flame_is_light_compatible_none_capabilities():
     light._ensure_capabilities.assert_called_once()
 
 
-def test_flame_inherit_prestate():
+def test_flame_inherit_prestate() -> None:
     """Test inherit_prestate returns True for EffectFlame."""
     effect = EffectFlame()
     assert effect.inherit_prestate(EffectFlame()) is True
     assert effect.inherit_prestate(MagicMock()) is False
 
 
-def test_flame_repr():
+def test_flame_repr() -> None:
     """Test EffectFlame string representation."""
     effect = EffectFlame(intensity=0.5, speed=2.0, kelvin_min=1800, kelvin_max=3000)
     repr_str = repr(effect)
