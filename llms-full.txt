@@ -29752,6 +29752,20 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.2.0 (2026-02-07)
+
+### Bug Fixes
+
+- Address CodeRabbit review feedback ([`487f4ab`](https://github.com/Djelibeybi/lifx-async/commit/487f4abaa83f5d1a72e0ad50d27c08311bfd78cd))
+
+### Documentation
+
+- Fix duration_ms formula (1000 -> 1500/fps) in effects API docs ([`487f4ab`](https://github.com/Djelibeybi/lifx-async/commit/487f4abaa83f5d1a72e0ad50d27c08311bfd78cd))
+
+### Features
+
+- Add new effects, effect registry, and rename examples ([`2f8192d`](https://github.com/Djelibeybi/lifx-async/commit/2f8192d68c79670042b7a59dd2c63c9720806943))
+
 ## v5.1.1 (2026-02-06)
 
 ### Performance Improvements
