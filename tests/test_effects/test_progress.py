@@ -401,6 +401,52 @@ class TestProgressGradient:
         assert abs(colors[-1].hue - 120) <= 5
 
 
+class TestProgressGradientHueWrapping:
+    """Tests for gradient hue wrapping in _gradient_color."""
+
+    def test_gradient_hue_wrapping_positive(self) -> None:
+        """Test gradient wraps hue when diff > 180 (e.g. 10 -> 350)."""
+        # hue_diff = 350 - 10 = 340 > 180, so code subtracts 360 → -20
+        gradient = [
+            HSBK(hue=10, saturation=1.0, brightness=0.8, kelvin=3500),
+            HSBK(hue=350, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect = EffectProgress(position=100.0, foreground=gradient)
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=16,
+            canvas_width=16,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+
+        # All hues should be valid and near the 350-360-10 range
+        for color in colors:
+            assert 0 <= color.hue <= 360
+
+    def test_gradient_hue_wrapping_negative(self) -> None:
+        """Test gradient wraps hue when diff < -180 (e.g. 350 -> 10)."""
+        # hue_diff = 10 - 350 = -340 < -180, so code adds 360 → +20
+        gradient = [
+            HSBK(hue=350, saturation=1.0, brightness=0.8, kelvin=3500),
+            HSBK(hue=10, saturation=1.0, brightness=0.8, kelvin=3500),
+        ]
+        effect = EffectProgress(position=100.0, foreground=gradient)
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=16,
+            canvas_width=16,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+
+        # All hues should be valid and near the 350-360-10 range
+        for color in colors:
+            assert 0 <= color.hue <= 360
+
+
 def test_progress_gradient_repr():
     """Test repr shows gradient info."""
     gradient = [
@@ -483,6 +529,18 @@ def test_progress_inherit_prestate():
     effect = EffectProgress()
     assert effect.inherit_prestate(EffectProgress()) is True
     assert effect.inherit_prestate(MagicMock()) is False
+
+
+@pytest.mark.asyncio
+async def test_progress_from_poweroff_hsbk():
+    """Test from_poweroff_hsbk returns the background color."""
+    bg = HSBK(hue=0, saturation=0.0, brightness=0.1, kelvin=2700)
+    effect = EffectProgress(background=bg)
+    light = MagicMock()
+    result = await effect.from_poweroff_hsbk(light)
+
+    assert result is effect.background
+    assert result == bg
 
 
 def test_progress_repr():

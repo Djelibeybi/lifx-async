@@ -6,9 +6,10 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.light import Light
+from lifx.effects.base import LIFXEffect
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
-from lifx.effects.models import PreState
+from lifx.effects.models import PreState, RunningEffect
 
 
 def _make_color_light(serial: str, ip: str = "192.168.1.100") -> MagicMock:
@@ -586,3 +587,69 @@ async def test_get_last_frame_after_stop_returns_none(conductor, light1):
 
     # After stop, the running entry is removed
     assert conductor.get_last_frame(light1) is None
+
+
+class _SimpleNonFrameEffect(LIFXEffect):
+    """Minimal non-frame effect for testing."""
+
+    def __init__(self) -> None:
+        super().__init__(power_on=True)
+
+    @property
+    def name(self) -> str:
+        return "test_non_frame"
+
+    async def async_play(self) -> None:
+        pass
+
+    async def is_light_compatible(self, light: Light) -> bool:
+        return True
+
+
+async def test_get_last_frame_non_frame_effect(conductor, light1):
+    """get_last_frame returns None when effect is not a FrameEffect."""
+    effect = _SimpleNonFrameEffect()
+
+    # Register a running effect manually (bypassing start to avoid real setup)
+    prestate = PreState(
+        power=True,
+        color=HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500),
+    )
+    import asyncio
+
+    task = asyncio.create_task(asyncio.sleep(10))
+    conductor._running[light1.serial] = RunningEffect(
+        effect=effect, prestate=prestate, task=task
+    )
+
+    result = conductor.get_last_frame(light1)
+    assert result is None
+
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    del conductor._running[light1.serial]
+
+
+async def test_add_lights_no_task_found(conductor, light1):
+    """add_lights logs warning and returns when effect has no running task."""
+    effect = _SimpleFrameEffect()
+
+    # Effect is not running anywhere — no task in _running
+    await conductor.add_lights(effect, [light1])
+
+    # Light should NOT have been added
+    assert light1.serial not in conductor._running
+
+
+async def test_remove_lights_not_running(conductor, light1):
+    """remove_lights is a no-op for lights that aren't running."""
+    # light1 is not in _running
+    assert light1.serial not in conductor._running
+
+    # Should not raise — just skips the light
+    await conductor.remove_lights([light1])
+
+    assert light1.serial not in conductor._running

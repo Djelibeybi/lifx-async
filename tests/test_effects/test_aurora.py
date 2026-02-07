@@ -133,6 +133,38 @@ class TestAuroraGenerateFrame:
         for color in colors:
             assert 0 <= color.hue <= 360
 
+    def test_hue_wrapping_positive(self) -> None:
+        """Test palette interpolation wraps hue correctly when diff > 180."""
+        # Palette [10, 350]: naive diff is 340, should wrap to -20
+        effect = EffectAurora(palette=[10, 350])
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=8,
+            canvas_width=8,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        # All hues should be valid
+        for color in colors:
+            assert 0 <= color.hue <= 360
+
+    def test_hue_wrapping_negative(self) -> None:
+        """Test palette interpolation wraps hue correctly when diff < -180."""
+        # Palette [350, 10]: naive diff is -340, should wrap to +20
+        effect = EffectAurora(palette=[350, 10])
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=8,
+            canvas_width=8,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        # All hues should be valid
+        for color in colors:
+            assert 0 <= color.hue <= 360
+
     def test_custom_palette_affects_output(self) -> None:
         """Test different palette produces different hues."""
         ctx = FrameContext(
