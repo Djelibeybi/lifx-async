@@ -341,7 +341,7 @@ If restoring many zones times out, state may be incomplete.
 
 - EffectPulse applies uniformly (not per-zone)
 - `FrameEffect` subclasses can generate individual zone colors
-- Zone colors properly restored after effect
+- Zones are properly restored after effect
 
 **Models:** LIFX Z, LIFX Beam
 
