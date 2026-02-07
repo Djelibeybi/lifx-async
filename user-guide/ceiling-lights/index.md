@@ -324,6 +324,55 @@ async def evening_mode(ip: str):
         )
 ```
 
+## Sunrise and Sunset Effects
+
+LIFX Ceiling lights have a round or oval shape, making them ideal candidates for the sunrise and sunset effects with the `origin="center"` setting. This makes the sun expand outward from the center of the light rather than rising from the bottom edge.
+
+```python
+from lifx import CeilingLight
+from lifx.effects import Conductor, EffectSunrise, EffectSunset
+
+async def wake_up_light(ip: str):
+    """Simulate a sunrise on a Ceiling light."""
+    async with await CeilingLight.from_ip(ip) as ceiling:
+        conductor = Conductor()
+
+        # 30-minute sunrise expanding from the center
+        effect = EffectSunrise(
+            duration=1800,
+            brightness=1.0,
+            origin="center"
+        )
+        await conductor.start(effect, [ceiling])
+        # Effect completes automatically — light stays at daylight
+
+
+async def goodnight_light(ip: str):
+    """Simulate a sunset on a Ceiling light, then power off."""
+    async with await CeilingLight.from_ip(ip) as ceiling:
+        conductor = Conductor()
+
+        # 30-minute sunset contracting to center, then off
+        effect = EffectSunset(
+            power_on=True,
+            duration=1800,
+            brightness=1.0,
+            power_off=True,
+            origin="center"
+        )
+        await conductor.start(effect, [ceiling])
+        # Effect completes automatically — light powers off
+```
+
+The `origin` parameter accepts two values:
+
+- `"bottom"` (default): Center of the bottom row — designed for rectangular tile arrays
+- `"center"`: Middle of the canvas — designed for round/oval Ceiling lights
+
+Choosing the right origin
+
+For **LIFX Ceiling** and **LIFX Ceiling Capsule** devices, always use `origin="center"` for the most natural-looking sunrise and sunset transitions.
+
 ## API Reference
 
 See [CeilingLight API Reference](https://djelibeybi.github.io/lifx-async/api/devices/#ceiling-light) for complete method documentation.

@@ -155,6 +155,7 @@ Use the `for_matrix()` or `for_multizone()` class methods for automatic configur
 | --------------- | ---------------------------------------------------------- |
 | `for_matrix`    | Create an Animator configured for a MatrixLight device.    |
 | `for_multizone` | Create an Animator configured for a MultiZoneLight device. |
+| `for_light`     | Create an Animator configured for a single Light device.   |
 | `send_frame`    | Send a frame to the device via direct UDP.                 |
 | `close`         | Close the UDP socket.                                      |
 
@@ -234,16 +235,17 @@ Get height of the logical canvas in pixels.
 ##### for_matrix
 
 ```python
-for_matrix(device: MatrixLight) -> Animator
+for_matrix(device: MatrixLight, duration_ms: int = 0) -> Animator
 ```
 
 Create an Animator configured for a MatrixLight device.
 
 Queries the device for tile information, then returns an animator that sends frames via direct UDP (no device connection needed after creation).
 
-| PARAMETER | DESCRIPTION                                                    |
-| --------- | -------------------------------------------------------------- |
-| `device`  | MatrixLight device (must be connected) **TYPE:** `MatrixLight` |
+| PARAMETER     | DESCRIPTION                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `device`      | MatrixLight device (must be connected) **TYPE:** `MatrixLight`                                                                                            |
+| `duration_ms` | Transition duration in milliseconds (default 0 for instant). When non-zero, device smoothly interpolates between frames. **TYPE:** `int` **DEFAULT:** `0` |
 
 | RETURNS    | DESCRIPTION                  |
 | ---------- | ---------------------------- |
@@ -268,6 +270,7 @@ Source code in `src/lifx/animation/animator.py`
 async def for_matrix(
     cls,
     device: MatrixLight,
+    duration_ms: int = 0,
 ) -> Animator:
     """Create an Animator configured for a MatrixLight device.
 
@@ -277,6 +280,8 @@ async def for_matrix(
 
     Args:
         device: MatrixLight device (must be connected)
+        duration_ms: Transition duration in milliseconds (default 0 for instant).
+                    When non-zero, device smoothly interpolates between frames.
 
     Returns:
         Configured Animator instance
@@ -312,6 +317,7 @@ async def for_matrix(
         tile_count=len(tiles),
         tile_width=tiles[0].width,
         tile_height=tiles[0].height,
+        duration_ms=duration_ms,
     )
 
     return cls(ip, serial, framebuffer, packet_generator)
@@ -320,16 +326,17 @@ async def for_matrix(
 ##### for_multizone
 
 ```python
-for_multizone(device: MultiZoneLight) -> Animator
+for_multizone(device: MultiZoneLight, duration_ms: int = 0) -> Animator
 ```
 
 Create an Animator configured for a MultiZoneLight device.
 
 Only devices with extended multizone capability are supported. Queries the device for zone count, then returns an animator that sends frames via direct UDP.
 
-| PARAMETER | DESCRIPTION                                                                                                  |
-| --------- | ------------------------------------------------------------------------------------------------------------ |
-| `device`  | MultiZoneLight device (must be connected and support extended multizone protocol) **TYPE:** `MultiZoneLight` |
+| PARAMETER     | DESCRIPTION                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `device`      | MultiZoneLight device (must be connected and support extended multizone protocol) **TYPE:** `MultiZoneLight`                                              |
+| `duration_ms` | Transition duration in milliseconds (default 0 for instant). When non-zero, device smoothly interpolates between frames. **TYPE:** `int` **DEFAULT:** `0` |
 
 | RETURNS    | DESCRIPTION                  |
 | ---------- | ---------------------------- |
@@ -358,6 +365,7 @@ Source code in `src/lifx/animation/animator.py`
 async def for_multizone(
     cls,
     device: MultiZoneLight,
+    duration_ms: int = 0,
 ) -> Animator:
     """Create an Animator configured for a MultiZoneLight device.
 
@@ -368,6 +376,8 @@ async def for_multizone(
     Args:
         device: MultiZoneLight device (must be connected and support
                extended multizone protocol)
+        duration_ms: Transition duration in milliseconds (default 0 for instant).
+                    When non-zero, device smoothly interpolates between frames.
 
     Returns:
         Configured Animator instance
@@ -411,7 +421,81 @@ async def for_multizone(
     zone_count = await device.get_zone_count()
 
     # Create packet generator
-    packet_generator = MultiZonePacketGenerator(zone_count=zone_count)
+    packet_generator = MultiZonePacketGenerator(
+        zone_count=zone_count, duration_ms=duration_ms
+    )
+
+    return cls(ip, serial, framebuffer, packet_generator)
+````
+
+##### for_light
+
+```python
+for_light(device: Light, duration_ms: int = 0) -> Animator
+```
+
+Create an Animator configured for a single Light device.
+
+Unlike the matrix/multizone factories, this does not need to be async because single lights don't require any device queries for configuration.
+
+| PARAMETER     | DESCRIPTION                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `device`      | Light device (must have ip and serial set) **TYPE:** `Light`                                                                                              |
+| `duration_ms` | Transition duration in milliseconds (default 0 for instant). When non-zero, device smoothly interpolates between frames. **TYPE:** `int` **DEFAULT:** `0` |
+
+| RETURNS    | DESCRIPTION                  |
+| ---------- | ---------------------------- |
+| `Animator` | Configured Animator instance |
+
+Example
+
+```python
+async with await Light.from_ip("192.168.1.100") as device:
+    animator = Animator.for_light(device)
+
+# Device connection closed, animator still works via UDP
+while running:
+    stats = animator.send_frame([(65535, 65535, 65535, 3500)])
+    await asyncio.sleep(1 / 30)  # 30 FPS
+```
+
+Source code in `src/lifx/animation/animator.py`
+
+````python
+@classmethod
+def for_light(
+    cls,
+    device: Light,
+    duration_ms: int = 0,
+) -> Animator:
+    """Create an Animator configured for a single Light device.
+
+    Unlike the matrix/multizone factories, this does not need to be async
+    because single lights don't require any device queries for configuration.
+
+    Args:
+        device: Light device (must have ip and serial set)
+        duration_ms: Transition duration in milliseconds (default 0 for instant).
+                    When non-zero, device smoothly interpolates between frames.
+
+    Returns:
+        Configured Animator instance
+
+    Example:
+        ```python
+        async with await Light.from_ip("192.168.1.100") as device:
+            animator = Animator.for_light(device)
+
+        # Device connection closed, animator still works via UDP
+        while running:
+            stats = animator.send_frame([(65535, 65535, 65535, 3500)])
+            await asyncio.sleep(1 / 30)  # 30 FPS
+        ```
+    """
+    ip = device.ip
+    serial = Serial.from_string(device.serial)
+    framebuffer = FrameBuffer.for_light(device)
+    packet_generator = LightPacketGenerator(duration_ms=duration_ms)
 
     return cls(ip, serial, framebuffer, packet_generator)
 ````
@@ -589,6 +673,7 @@ device_data = fb.apply(canvas)
 | --------------- | ------------------------------------------------------------ |
 | `for_matrix`    | Create a FrameBuffer configured for a MatrixLight device.    |
 | `for_multizone` | Create a FrameBuffer configured for a MultiZoneLight device. |
+| `for_light`     | Create a FrameBuffer configured for a single Light device.   |
 | `apply`         | Apply orientation mapping to frame data.                     |
 
 Source code in `src/lifx/animation/framebuffer.py`
@@ -815,6 +900,55 @@ async def for_multizone(
     zone_count = await device.get_zone_count()
 
     return cls(pixel_count=zone_count)
+````
+
+##### for_light
+
+```python
+for_light(_device: Light) -> FrameBuffer
+```
+
+Create a FrameBuffer configured for a single Light device.
+
+Single lights have exactly 1 pixel, so this is a trivial passthrough.
+
+| PARAMETER | DESCRIPTION                                                                 |
+| --------- | --------------------------------------------------------------------------- |
+| `_device` | Light device (unused — single lights always have 1 pixel) **TYPE:** `Light` |
+
+| RETURNS       | DESCRIPTION                     |
+| ------------- | ------------------------------- |
+| `FrameBuffer` | Configured FrameBuffer instance |
+
+Example
+
+```python
+fb = FrameBuffer.for_light(light)
+assert fb.pixel_count == 1
+```
+
+Source code in `src/lifx/animation/framebuffer.py`
+
+````python
+@classmethod
+def for_light(cls, _device: Light) -> FrameBuffer:
+    """Create a FrameBuffer configured for a single Light device.
+
+    Single lights have exactly 1 pixel, so this is a trivial passthrough.
+
+    Args:
+        _device: Light device (unused — single lights always have 1 pixel)
+
+    Returns:
+        Configured FrameBuffer instance
+
+    Example:
+        ```python
+        fb = FrameBuffer.for_light(light)
+        assert fb.pixel_count == 1
+        ```
+    """
+    return cls(pixel_count=1, canvas_width=1, canvas_height=1)
 ````
 
 ##### apply
@@ -1050,7 +1184,9 @@ Generates Set64 packets for MatrixLight devices.
 #### MatrixPacketGenerator
 
 ```python
-MatrixPacketGenerator(tile_count: int, tile_width: int, tile_height: int)
+MatrixPacketGenerator(
+    tile_count: int, tile_width: int, tile_height: int, duration_ms: int = 0
+)
 ```
 
 Bases: `PacketGenerator`
@@ -1087,11 +1223,12 @@ CopyFrameBuffer Payload Layout (15 bytes):
 - Offset 10-13: duration (uint32)
 - Offset 14: reserved (uint8)
 
-| PARAMETER     | DESCRIPTION                                         |
-| ------------- | --------------------------------------------------- |
-| `tile_count`  | Number of tiles in the device chain **TYPE:** `int` |
-| `tile_width`  | Width of each tile in pixels **TYPE:** `int`        |
-| `tile_height` | Height of each tile in pixels **TYPE:** `int`       |
+| PARAMETER     | DESCRIPTION                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| `tile_count`  | Number of tiles in the device chain **TYPE:** `int`                                          |
+| `tile_width`  | Width of each tile in pixels **TYPE:** `int`                                                 |
+| `tile_height` | Height of each tile in pixels **TYPE:** `int`                                                |
+| `duration_ms` | Transition duration in milliseconds (default 0 for instant) **TYPE:** `int` **DEFAULT:** `0` |
 
 | METHOD             | DESCRIPTION                                     |
 | ------------------ | ----------------------------------------------- |
@@ -1112,6 +1249,7 @@ def __init__(
     tile_count: int,
     tile_width: int,
     tile_height: int,
+    duration_ms: int = 0,
 ) -> None:
     """Initialize matrix packet generator.
 
@@ -1119,10 +1257,12 @@ def __init__(
         tile_count: Number of tiles in the device chain
         tile_width: Width of each tile in pixels
         tile_height: Height of each tile in pixels
+        duration_ms: Transition duration in milliseconds (default 0 for instant)
     """
     self._tile_count = tile_count
     self._tile_width = tile_width
     self._tile_height = tile_height
+    self._duration_ms = duration_ms
     self._pixels_per_tile = tile_width * tile_height
     self._total_pixels = tile_count * self._pixels_per_tile
 
@@ -1255,7 +1395,7 @@ Generates SetExtendedColorZones packets for MultiZoneLight devices.
 #### MultiZonePacketGenerator
 
 ```python
-MultiZonePacketGenerator(zone_count: int)
+MultiZonePacketGenerator(zone_count: int, duration_ms: int = 0)
 ```
 
 Bases: `PacketGenerator`
@@ -1272,9 +1412,10 @@ SetExtendedColorZones Payload Layout (664 bytes):
 - Offset 7: colors_count (uint8)
 - Offset 8-663: colors (82 x HSBK, each 8 bytes)
 
-| PARAMETER    | DESCRIPTION                                         |
-| ------------ | --------------------------------------------------- |
-| `zone_count` | Total number of zones on the device **TYPE:** `int` |
+| PARAMETER     | DESCRIPTION                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| `zone_count`  | Total number of zones on the device **TYPE:** `int`                                          |
+| `duration_ms` | Transition duration in milliseconds (default 0 for instant) **TYPE:** `int` **DEFAULT:** `0` |
 
 | METHOD             | DESCRIPTION                                     |
 | ------------------ | ----------------------------------------------- |
@@ -1285,13 +1426,15 @@ SetExtendedColorZones Payload Layout (664 bytes):
 Source code in `src/lifx/animation/packets.py`
 
 ```python
-def __init__(self, zone_count: int) -> None:
+def __init__(self, zone_count: int, duration_ms: int = 0) -> None:
     """Initialize multizone packet generator.
 
     Args:
         zone_count: Total number of zones on the device
+        duration_ms: Transition duration in milliseconds (default 0 for instant)
     """
     self._zone_count = zone_count
+    self._duration_ms = duration_ms
     self._packets_needed = (
         zone_count + self._MAX_ZONES_PER_PACKET - 1
     ) // self._MAX_ZONES_PER_PACKET
@@ -1362,8 +1505,8 @@ def create_templates(self, source: int, target: bytes) -> list[PacketTemplate]:
 
         # Build payload
         payload = bytearray(self._PAYLOAD_SIZE)
-        # duration = 0
-        struct.pack_into("<I", payload, 0, 0)
+        # duration
+        struct.pack_into("<I", payload, 0, self._duration_ms)
         # apply = 1 (APPLY)
         payload[4] = 1
         # zone_index

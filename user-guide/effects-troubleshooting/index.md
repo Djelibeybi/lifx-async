@@ -329,20 +329,19 @@ ______________________________________________________________________
 
 ### Multizone Lights
 
-**Full Support** with some considerations.
+**Full Support** via animation module.
 
 **Works Well:**
 
-- EffectPulse: All zones pulse together
-- EffectColorloop: Entire device cycles color
+- EffectPulse: All zones pulse together (firmware waveform)
+- EffectColorloop: Entire device cycles color (via `MultiZonePacketGenerator`)
+- Custom `FrameEffect`: Per-zone control via `generate_frame()` with `pixel_count = zone_count`
 
 **Special Considerations:**
 
-- Effects apply to entire device, not individual zones
-- Zone colors properly restored after effect
-- Extended multizone messages used when available
-
-**Potential Enhancement:** Future versions could support per-zone effects.
+- EffectPulse applies uniformly (not per-zone)
+- `FrameEffect` subclasses can generate individual zone colors
+- Zones are properly restored after effect
 
 **Models:** LIFX Z, LIFX Beam
 
@@ -350,16 +349,19 @@ ______________________________________________________________________
 
 ### Matrix Lights (Tile/Candle/Path)
 
-**Full Support** (treated as single unit).
+**Full Support** via animation module.
 
 **Works Well:**
 
-- EffectPulse: All tiles/zones pulse together
-- EffectColorloop: All tiles/zones cycle color together
+- EffectPulse: All tiles pulse together (firmware waveform)
+- EffectColorloop: All pixels cycle color together (via `MatrixPacketGenerator`)
+- Custom `FrameEffect`: Per-pixel control via `generate_frame()` with `pixel_count = W * H`
 
-**Limitation:** Current implementation doesn't use per-tile control. All tiles show same color.
+**Special Considerations:**
 
-**Potential Enhancement:** Future versions could support per-tile effects (similar to theme support).
+- `FrameContext` provides `canvas_width` and `canvas_height` for 2D-aware effects
+- Multi-tile canvas mapping is automatic (tile orientation correction included)
+- EffectPulse applies uniformly (not per-pixel)
 
 **Models:** LIFX Tile, LIFX Candle, LIFX Path
 
@@ -712,40 +714,35 @@ async def async_play(self) -> None:
 
 ______________________________________________________________________
 
-### Tile Per-Tile Effects
+### Per-Pixel Effects on Matrix and Multizone Devices
 
-Current implementation treats tiles as a single unit.
+`FrameEffect` subclasses have full per-pixel control via the animation module. The `FrameContext` provides `pixel_count`, `canvas_width`, and `canvas_height`, and `generate_frame()` returns individual colors for each pixel.
 
-**Limitation:** Can't apply different effects to individual tiles within a tile chain.
+**Matrix devices:** `generate_frame()` receives `pixel_count = W * H` (e.g., 64 for a single 8x8 tile, 320 for 5 tiles). Pixels are in row-major order across the canvas.
 
-**Workaround:** Use theme support for per-tile colors, or wait for future enhancement.
+**Multizone devices:** `generate_frame()` receives `pixel_count = N` (number of zones). Each color maps to one zone.
 
-**Potential Future:** Per-tile effect logic could be added using `MatrixLight.set_matrix_colors()`.
-
-______________________________________________________________________
-
-### Multizone Per-Zone Effects
-
-Current implementation treats multizone device as a single unit.
-
-**Limitation:** Can't pulse individual zones or create zone-specific effects.
-
-**Workaround:** Manually use `set_color_zones()` in custom effects.
-
-**Example:**
+**Example: Per-pixel rainbow using FrameEffect:**
 
 ```python
-from lifx import MultiZoneLight
+from lifx import FrameEffect, FrameContext, HSBK
 
-async def async_play(self) -> None:
-    for light in self.participants:
-        if isinstance(light, MultiZoneLight):
-            # Control individual zones
-            zone_count = await light.get_zone_count()
-            for i in range(zone_count):
-                color = self._get_zone_color(i)
-                await light.set_color_zones(i, i, color)
+class PixelRainbow(FrameEffect):
+    """Rainbow across all pixels on any device type."""
+
+    @property
+    def name(self) -> str:
+        return "pixel_rainbow"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        colors = []
+        for i in range(ctx.pixel_count):
+            hue = (ctx.elapsed_s * 30 + i * 360 / ctx.pixel_count) % 360
+            colors.append(HSBK(hue=hue, saturation=1.0, brightness=0.8, kelvin=3500))
+        return colors
 ```
+
+**Note:** `EffectPulse` still treats all device types as single units (applies firmware waveforms uniformly). For per-pixel pulse effects, use a `FrameEffect` instead.
 
 ______________________________________________________________________
 

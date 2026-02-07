@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1346,21 +1346,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tile-per-tile-effects" class="md-nav__link">
+  <a href="#per-pixel-effects-on-matrix-and-multizone-devices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tile Per-Tile Effects
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multizone-per-zone-effects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multizone Per-Zone Effects
+        Per-Pixel Effects on Matrix and Multizone Devices
       
     </span>
   </a>
@@ -2491,21 +2480,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tile-per-tile-effects" class="md-nav__link">
+  <a href="#per-pixel-effects-on-matrix-and-multizone-devices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tile Per-Tile Effects
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multizone-per-zone-effects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multizone Per-Zone Effects
+        Per-Pixel Effects on Matrix and Multizone Devices
       
     </span>
   </a>
@@ -2881,30 +2859,35 @@
 <p><strong>Models:</strong> LIFX White, LIFX Mini White, LIFX Downlight</p>
 <hr />
 <h3 id="multizone-lights">Multizone Lights<a class="headerlink" href="#multizone-lights" title="Permanent link">&para;</a></h3>
-<p><strong>Full Support</strong> with some considerations.</p>
+<p><strong>Full Support</strong> via animation module.</p>
 <p><strong>Works Well:</strong></p>
 <ul>
-<li>EffectPulse: All zones pulse together</li>
-<li>EffectColorloop: Entire device cycles color</li>
+<li>EffectPulse: All zones pulse together (firmware waveform)</li>
+<li>EffectColorloop: Entire device cycles color (via <code>MultiZonePacketGenerator</code>)</li>
+<li>Custom <code>FrameEffect</code>: Per-zone control via <code>generate_frame()</code> with <code>pixel_count = zone_count</code></li>
 </ul>
 <p><strong>Special Considerations:</strong></p>
 <ul>
-<li>Effects apply to entire device, not individual zones</li>
-<li>Zone colors properly restored after effect</li>
-<li>Extended multizone messages used when available</li>
+<li>EffectPulse applies uniformly (not per-zone)</li>
+<li><code>FrameEffect</code> subclasses can generate individual zone colors</li>
+<li>Zones are properly restored after effect</li>
 </ul>
-<p><strong>Potential Enhancement:</strong> Future versions could support per-zone effects.</p>
 <p><strong>Models:</strong> LIFX Z, LIFX Beam</p>
 <hr />
 <h3 id="matrix-lights-tilecandlepath">Matrix Lights (Tile/Candle/Path)<a class="headerlink" href="#matrix-lights-tilecandlepath" title="Permanent link">&para;</a></h3>
-<p><strong>Full Support</strong> (treated as single unit).</p>
+<p><strong>Full Support</strong> via animation module.</p>
 <p><strong>Works Well:</strong></p>
 <ul>
-<li>EffectPulse: All tiles/zones pulse together</li>
-<li>EffectColorloop: All tiles/zones cycle color together</li>
+<li>EffectPulse: All tiles pulse together (firmware waveform)</li>
+<li>EffectColorloop: All pixels cycle color together (via <code>MatrixPacketGenerator</code>)</li>
+<li>Custom <code>FrameEffect</code>: Per-pixel control via <code>generate_frame()</code> with <code>pixel_count = W * H</code></li>
 </ul>
-<p><strong>Limitation:</strong> Current implementation doesn't use per-tile control. All tiles show same color.</p>
-<p><strong>Potential Enhancement:</strong> Future versions could support per-tile effects (similar to theme support).</p>
+<p><strong>Special Considerations:</strong></p>
+<ul>
+<li><code>FrameContext</code> provides <code>canvas_width</code> and <code>canvas_height</code> for 2D-aware effects</li>
+<li>Multi-tile canvas mapping is automatic (tile orientation correction included)</li>
+<li>EffectPulse applies uniformly (not per-pixel)</li>
+</ul>
 <p><strong>Models:</strong> LIFX Tile, LIFX Candle, LIFX Path</p>
 <hr />
 <h3 id="hev-lights">HEV Lights<a class="headerlink" href="#hev-lights" title="Permanent link">&para;</a></h3>
@@ -3165,28 +3148,28 @@
 </span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.05</span><span class="p">)</span>  <span class="c1"># 20/sec max</span>
 </span></code></pre></div>
 <hr />
-<h3 id="tile-per-tile-effects">Tile Per-Tile Effects<a class="headerlink" href="#tile-per-tile-effects" title="Permanent link">&para;</a></h3>
-<p>Current implementation treats tiles as a single unit.</p>
-<p><strong>Limitation:</strong> Can't apply different effects to individual tiles within a tile chain.</p>
-<p><strong>Workaround:</strong> Use theme support for per-tile colors, or wait for future enhancement.</p>
-<p><strong>Potential Future:</strong> Per-tile effect logic could be added using <code>MatrixLight.set_matrix_colors()</code>.</p>
-<hr />
-<h3 id="multizone-per-zone-effects">Multizone Per-Zone Effects<a class="headerlink" href="#multizone-per-zone-effects" title="Permanent link">&para;</a></h3>
-<p>Current implementation treats multizone device as a single unit.</p>
-<p><strong>Limitation:</strong> Can't pulse individual zones or create zone-specific effects.</p>
-<p><strong>Workaround:</strong> Manually use <code>set_color_zones()</code> in custom effects.</p>
-<p><strong>Example:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiZoneLight</span>
+<h3 id="per-pixel-effects-on-matrix-and-multizone-devices">Per-Pixel Effects on Matrix and Multizone Devices<a class="headerlink" href="#per-pixel-effects-on-matrix-and-multizone-devices" title="Permanent link">&para;</a></h3>
+<p><code>FrameEffect</code> subclasses have full per-pixel control via the animation module. The <code>FrameContext</code> provides <code>pixel_count</code>, <code>canvas_width</code>, and <code>canvas_height</code>, and <code>generate_frame()</code> returns individual colors for each pixel.</p>
+<p><strong>Matrix devices:</strong> <code>generate_frame()</code> receives <code>pixel_count = W * H</code> (e.g., 64 for a single 8x8 tile, 320 for 5 tiles). Pixels are in row-major order across the canvas.</p>
+<p><strong>Multizone devices:</strong> <code>generate_frame()</code> receives <code>pixel_count = N</code> (number of zones). Each color maps to one zone.</p>
+<p><strong>Example: Per-pixel rainbow using FrameEffect:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrameEffect</span><span class="p">,</span> <span class="n">FrameContext</span><span class="p">,</span> <span class="n">HSBK</span>
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>
-</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_play</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>    <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span><span class="p">:</span>
-</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">light</span><span class="p">,</span> <span class="n">MultiZoneLight</span><span class="p">):</span>
-</span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>            <span class="c1"># Control individual zones</span>
-</span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a>            <span class="n">zone_count</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_zone_count</span><span class="p">()</span>
-</span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a>            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">zone_count</span><span class="p">):</span>
-</span><span id="__span-36-9"><a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a>                <span class="n">color</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_zone_color</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
-</span><span id="__span-36-10"><a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color_zones</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">color</span><span class="p">)</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">PixelRainbow</span><span class="p">(</span><span class="n">FrameEffect</span><span class="p">):</span>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Rainbow across all pixels on any device type.&quot;&quot;&quot;</span>
+</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>
+</span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>    <span class="nd">@property</span>
+</span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a>        <span class="k">return</span> <span class="s2">&quot;pixel_rainbow&quot;</span>
+</span><span id="__span-36-9"><a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a>
+</span><span id="__span-36-10"><a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">FrameContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]:</span>
+</span><span id="__span-36-11"><a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a>        <span class="n">colors</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-36-12"><a id="__codelineno-36-12" name="__codelineno-36-12" href="#__codelineno-36-12"></a>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">pixel_count</span><span class="p">):</span>
+</span><span id="__span-36-13"><a id="__codelineno-36-13" name="__codelineno-36-13" href="#__codelineno-36-13"></a>            <span class="n">hue</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">elapsed_s</span> <span class="o">*</span> <span class="mi">30</span> <span class="o">+</span> <span class="n">i</span> <span class="o">*</span> <span class="mi">360</span> <span class="o">/</span> <span class="n">ctx</span><span class="o">.</span><span class="n">pixel_count</span><span class="p">)</span> <span class="o">%</span> <span class="mi">360</span>
+</span><span id="__span-36-14"><a id="__codelineno-36-14" name="__codelineno-36-14" href="#__codelineno-36-14"></a>            <span class="n">colors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">HSBK</span><span class="p">(</span><span class="n">hue</span><span class="o">=</span><span class="n">hue</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">kelvin</span><span class="o">=</span><span class="mi">3500</span><span class="p">))</span>
+</span><span id="__span-36-15"><a id="__codelineno-36-15" name="__codelineno-36-15" href="#__codelineno-36-15"></a>        <span class="k">return</span> <span class="n">colors</span>
 </span></code></pre></div>
+<p><strong>Note:</strong> <code>EffectPulse</code> still treats all device types as single units (applies firmware waveforms uniformly). For per-pixel pulse effects, use a <code>FrameEffect</code> instead.</p>
 <hr />
 <h3 id="buttonrelayswitch-devices">Button/Relay/Switch Devices<a class="headerlink" href="#buttonrelayswitch-devices" title="Permanent link">&para;</a></h3>
 <p>The effects framework <strong>only supports lighting devices</strong>.</p>
@@ -3270,7 +3253,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 18, 2025 09:31:37 UTC">November 18, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 7, 2026 11:04:00 UTC">February 7, 2026</span>
   </span>
 
     
@@ -3368,10 +3351,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

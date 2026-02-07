@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -745,6 +745,61 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rainbow-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rainbow Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flame-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flame Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aurora-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aurora Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#progress-bar-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress Bar Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sunrise-and-sunset-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sunrise and Sunset Effects
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -861,6 +916,39 @@
     <span class="md-ellipsis">
       
         Checking Running Effects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#effect-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Effect Registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-light-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Light Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-frame-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring Frame Data
       
     </span>
   </a>
@@ -2003,6 +2091,61 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rainbow-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rainbow Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flame-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flame Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aurora-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aurora Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#progress-bar-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress Bar Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sunrise-and-sunset-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sunrise and Sunset Effects
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2119,6 +2262,39 @@
     <span class="md-ellipsis">
       
         Checking Running Effects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#effect-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Effect Registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-light-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Light Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-frame-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring Frame Data
       
     </span>
   </a>
@@ -2326,7 +2502,8 @@
 <p>The effects framework consists of three main components:</p>
 <ul>
 <li><strong>Conductor</strong>: Central orchestrator that manages effect lifecycle and state</li>
-<li><strong>Effects</strong>: Pre-built effect classes (EffectPulse, EffectColorloop) and base class for custom effects</li>
+<li><strong>Effects</strong>: Pre-built effect classes (Pulse, ColorLoop, Rainbow, Flame, Aurora, Progress, Sunrise/Sunset) and base class for custom effects</li>
+<li><strong>Effect Registry</strong>: Central discovery mechanism for querying available effects by device type</li>
 <li><strong>State Management</strong>: Automatic capture and restoration of device state before and after effects</li>
 </ul>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
@@ -2407,6 +2584,94 @@
 </span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>
 </span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
 </span></code></pre></div>
+<h3 id="rainbow-effect">Rainbow Effect<a class="headerlink" href="#rainbow-effect" title="Permanent link">&para;</a></h3>
+<p>The <code>EffectRainbow</code> spreads a full 360-degree rainbow across device pixels and scrolls it over time. Best on multizone strips and matrix lights:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">Conductor</span><span class="p">,</span> <span class="n">EffectRainbow</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">:</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No lights found&quot;</span><span class="p">)</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="k">return</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="c1"># Rainbow that scrolls every 10 seconds</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectRainbow</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+</span></code></pre></div>
+<h3 id="flame-effect">Flame Effect<a class="headerlink" href="#flame-effect" title="Permanent link">&para;</a></h3>
+<p>The <code>EffectFlame</code> creates a warm fire/candle flicker using layered sine waves. On matrix devices, bottom rows glow hotter:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">EffectFlame</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Default candle flicker</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectFlame</span><span class="p">()</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Intense fast fire with wide temperature range</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectFlame</span><span class="p">(</span><span class="n">intensity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">speed</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="aurora-effect">Aurora Effect<a class="headerlink" href="#aurora-effect" title="Permanent link">&para;</a></h3>
+<p>The <code>EffectAurora</code> simulates northern lights with flowing colored bands. Best on multizone strips and matrix lights:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">EffectAurora</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Default aurora (green/cyan/blue/purple)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectAurora</span><span class="p">()</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Custom warm palette</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectAurora</span><span class="p">(</span><span class="n">palette</span><span class="o">=</span><span class="p">[</span><span class="mi">280</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">320</span><span class="p">,</span> <span class="mi">340</span><span class="p">],</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.6</span><span class="p">)</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="progress-bar-effect">Progress Bar Effect<a class="headerlink" href="#progress-bar-effect" title="Permanent link">&para;</a></h3>
+<p>The <code>EffectProgress</code> creates an animated progress bar on multizone lights (strips/beams). The filled region has a traveling bright spot, and you update the position at any time:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">EffectProgress</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectProgress</span><span class="p">(</span><span class="n">end_value</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">strip_light</span><span class="p">])</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># Update progress from your application logic</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="mi">10</span><span class="p">):</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">effect</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">([</span><span class="n">strip_light</span><span class="p">])</span>
+</span></code></pre></div>
+<h3 id="sunrise-and-sunset-effects">Sunrise and Sunset Effects<a class="headerlink" href="#sunrise-and-sunset-effects" title="Permanent link">&para;</a></h3>
+<p><code>EffectSunrise</code> and <code>EffectSunset</code> are duration-based effects for matrix devices (tiles, candles, Ceiling lights) that simulate natural light transitions:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">EffectSunrise</span><span class="p">,</span> <span class="n">EffectSunset</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># 30-minute sunrise from bottom edge (rectangular tiles)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectSunrise</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="mi">1800</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">matrix_light</span><span class="p">])</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Sunrise from center (round/oval Ceiling lights)</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectSunrise</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="mi">1800</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">ceiling_light</span><span class="p">])</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="c1"># Sunset that powers off when done</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectSunset</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="mi">1800</span><span class="p">,</span> <span class="n">power_off</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">matrix_light</span><span class="p">])</span>
+</span></code></pre></div>
+<p>Sunrise and sunset effects complete automatically after their duration — no need to call <code>conductor.stop()</code>. Sunrise leaves the light at full daylight. Sunset can optionally power off the light.</p>
 <h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
 <h3 id="conductor">Conductor<a class="headerlink" href="#conductor" title="Permanent link">&para;</a></h3>
 <p>The <code>Conductor</code> is the central orchestrator that:</p>
@@ -2427,228 +2692,269 @@
 </ol>
 <p>This happens completely automatically - you don't need to manage state yourself.</p>
 <h3 id="effect-completion">Effect Completion<a class="headerlink" href="#effect-completion" title="Permanent link">&para;</a></h3>
-<p>There are two ways effects complete:</p>
+<p>Effects complete in different ways:</p>
 <ol>
-<li><strong>Automatic</strong> - Pulse effects complete after their cycles finish</li>
-<li><strong>Manual</strong> - ColorLoop effects run continuously until <code>conductor.stop()</code> is called</li>
+<li><strong>Cycle-based</strong> — Pulse effects complete after their configured cycles finish</li>
+<li><strong>Duration-based</strong> — Sunrise and sunset effects complete after their duration expires</li>
+<li><strong>Manual</strong> — Continuous effects (ColorLoop, Rainbow, Flame, Aurora, Progress) run until <code>conductor.stop()</code> is called</li>
 </ol>
 <h2 id="common-patterns">Common Patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="using-specific-lights">Using Specific Lights<a class="headerlink" href="#using-specific-lights" title="Permanent link">&para;</a></h3>
 <p>You can apply effects to specific lights instead of all discovered devices:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Get lights by label</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">bedroom_lights</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">light</span> <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="k">if</span> <span class="s2">&quot;Bedroom&quot;</span> <span class="ow">in</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">]</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="c1"># Apply effect only to bedroom lights</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">bedroom_lights</span><span class="p">)</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># Get lights by label</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="n">bedroom_lights</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>    <span class="n">light</span> <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="k">if</span> <span class="s2">&quot;Bedroom&quot;</span> <span class="ow">in</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="p">]</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="c1"># Apply effect only to bedroom lights</span>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">bedroom_lights</span><span class="p">)</span>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="sequential-effects">Sequential Effects<a class="headerlink" href="#sequential-effects" title="Permanent link">&para;</a></h3>
 <p>You can run multiple effects one after another:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># First effect: blink</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">effect1</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># Second effect: breathe</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">effect2</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># First effect: blink</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">effect1</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># Second effect: breathe</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">effect2</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Note: The conductor automatically restores state between effects, so each effect starts with the original device state.</p>
 <h3 id="concurrent-effects-on-different-devices">Concurrent Effects on Different Devices<a class="headerlink" href="#concurrent-effects-on-different-devices" title="Permanent link">&para;</a></h3>
 <p>You can run different effects on different groups of lights simultaneously:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Split lights into two groups</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">group1</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">]</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">group2</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">:]</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Start both effects concurrently</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">effect1</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">)</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">effect2</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">group1</span><span class="p">)</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">group2</span><span class="p">)</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="c1"># Let them run</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="c1"># Stop all</span>
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Split lights into two groups</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">group1</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">]</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">group2</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">:]</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Start both effects concurrently</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="n">effect1</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">)</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="n">effect2</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">group1</span><span class="p">)</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">group2</span><span class="p">)</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="c1"># Let them run</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="c1"># Stop all</span>
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="custom-colors">Custom Colors<a class="headerlink" href="#custom-colors" title="Permanent link">&para;</a></h3>
 <p>Both pulse and colorloop effects support custom colors:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">HSBK</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Create custom color</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">red</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">blue</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Pulse with custom color</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">red</span><span class="p">)</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">HSBK</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Create custom color</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">red</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">blue</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Pulse with custom color</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">red</span><span class="p">)</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="checking-running-effects">Checking Running Effects<a class="headerlink" href="#checking-running-effects" title="Permanent link">&para;</a></h3>
 <p>You can check what effect is currently running on a device:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Check what&#39;s running</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">current</span> <span class="o">=</span> <span class="n">conductor</span><span class="o">.</span><span class="n">effect</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="k">if</span> <span class="n">current</span><span class="p">:</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">: idle&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Check what&#39;s running</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">:</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">current</span> <span class="o">=</span> <span class="n">conductor</span><span class="o">.</span><span class="n">effect</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="k">if</span> <span class="n">current</span><span class="p">:</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">: idle&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="effect-registry">Effect Registry<a class="headerlink" href="#effect-registry" title="Permanent link">&para;</a></h3>
+<p>The <code>EffectRegistry</code> lets you discover available effects and filter by device type — useful for building UIs or integrations like Home Assistant:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_effect_registry</span><span class="p">,</span> <span class="n">DeviceType</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">get_effect_registry</span><span class="p">()</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1"># List all built-in effects</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="k">for</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">effects</span><span class="p">:</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="c1"># Get effects recommended for multizone strips</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="k">for</span> <span class="n">info</span><span class="p">,</span> <span class="n">support</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">get_effects_for_device_type</span><span class="p">(</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">MULTIZONE</span><span class="p">):</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">support</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="c1"># Filter by actual device instance</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="k">for</span> <span class="n">info</span><span class="p">,</span> <span class="n">support</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">get_effects_for_device</span><span class="p">(</span><span class="n">my_light</span><span class="p">):</span>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">support</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="dynamic-light-management">Dynamic Light Management<a class="headerlink" href="#dynamic-light-management" title="Permanent link">&para;</a></h3>
+<p>You can add or remove lights from a running effect without restarting it:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Start effect on initial lights</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectRainbow</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># Later, add a new light to the running effect</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">add_lights</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">light3</span><span class="p">])</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="c1"># Remove a light (restores its state by default)</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">remove_lights</span><span class="p">([</span><span class="n">light2</span><span class="p">])</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="c1"># Remove without restoring state</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">remove_lights</span><span class="p">([</span><span class="n">light1</span><span class="p">],</span> <span class="n">restore_state</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="monitoring-frame-data">Monitoring Frame Data<a class="headerlink" href="#monitoring-frame-data" title="Permanent link">&para;</a></h3>
+<p>For frame-based effects, you can read the most recent HSBK values sent to a device:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">colors</span> <span class="o">=</span> <span class="n">conductor</span><span class="o">.</span><span class="n">get_last_frame</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">if</span> <span class="n">colors</span><span class="p">:</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="n">avg_brightness</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">brightness</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">colors</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average brightness: </span><span class="si">{</span><span class="n">avg_brightness</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <h3 id="1-use-a-single-conductor">1. Use a Single Conductor<a class="headerlink" href="#1-use-a-single-conductor" title="Permanent link">&para;</a></h3>
 <p>Create one conductor instance and reuse it throughout your application:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Good</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># Not recommended - creates unnecessary overhead</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">conductor1</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="k">await</span> <span class="n">conductor1</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">conductor2</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="k">await</span> <span class="n">conductor2</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Good</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="c1"># Not recommended - creates unnecessary overhead</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="n">conductor1</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="k">await</span> <span class="n">conductor1</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="n">conductor2</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="k">await</span> <span class="n">conductor2</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="2-always-wait-for-completion">2. Always Wait for Completion<a class="headerlink" href="#2-always-wait-for-completion" title="Permanent link">&para;</a></h3>
 <p>For pulse effects, wait for the effect duration before starting another:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Wait for effect to complete</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span>  <span class="c1"># cycles * period + buffer</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="c1"># Wait for effect to complete</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span>  <span class="c1"># cycles * period + buffer</span>
 </span></code></pre></div>
 <h3 id="3-stop-colorloop-effects-explicitly">3. Stop ColorLoop Effects Explicitly<a class="headerlink" href="#3-stop-colorloop-effects-explicitly" title="Permanent link">&para;</a></h3>
 <p>ColorLoop effects run indefinitely, so always call <code>conductor.stop()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Must explicitly stop</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Must explicitly stop</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="4-handle-discovery-failures">4. Handle Discovery Failures<a class="headerlink" href="#4-handle-discovery-failures" title="Permanent link">&para;</a></h3>
 <p>Always check if lights were found before attempting effects:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No lights found on network&quot;</span><span class="p">)</span>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="k">return</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="c1"># Safe to use effects</span>
-</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="c1"># ...</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">:</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No lights found on network&quot;</span><span class="p">)</span>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    <span class="k">return</span>
+</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>
+</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="c1"># Safe to use effects</span>
+</span><span id="__span-19-13"><a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-19-14"><a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="c1"># ...</span>
 </span></code></pre></div>
 <h3 id="5-use-devicegroup-for-organization">5. Use DeviceGroup for Organization<a class="headerlink" href="#5-use-devicegroup-for-organization" title="Permanent link">&para;</a></h3>
 <p>The DeviceGroup provides convenient access to device collections:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># Discover devices</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="c1"># Discover devices</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="complete-examples">Complete Examples<a class="headerlink" href="#complete-examples" title="Permanent link">&para;</a></h2>
 <h3 id="notification-effect">Notification Effect<a class="headerlink" href="#notification-effect" title="Permanent link">&para;</a></h3>
 <p>Use effects to create a notification system:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">notify</span><span class="p">(</span><span class="n">lights</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;info&#39;</span><span class="p">):</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Flash lights to indicate a notification.&quot;&quot;&quot;</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;info&#39;</span><span class="p">:</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="c1"># Blue breathe</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="n">color</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="k">elif</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;warning&#39;</span><span class="p">:</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>        <span class="c1"># Orange blink</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>        <span class="n">color</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">165</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="k">elif</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span>
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>        <span class="c1"># Red strobe</span>
-</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>        <span class="n">color</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;strobe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
-</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>
-</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>    <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># Wait for completion</span>
-</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>
-</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="c1"># Usage</span>
-</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
-</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>
-</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
-</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
-</span><span id="__span-13-28"><a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>
-</span><span id="__span-13-29"><a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a><span class="k">await</span> <span class="n">notify</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">notify</span><span class="p">(</span><span class="n">lights</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;info&#39;</span><span class="p">):</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Flash lights to indicate a notification.&quot;&quot;&quot;</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;info&#39;</span><span class="p">:</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>        <span class="c1"># Blue breathe</span>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>        <span class="n">color</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;breathe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>    <span class="k">elif</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;warning&#39;</span><span class="p">:</span>
+</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>        <span class="c1"># Orange blink</span>
+</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>        <span class="n">color</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">165</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+</span><span id="__span-21-13"><a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>    <span class="k">elif</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span>
+</span><span id="__span-21-14"><a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>        <span class="c1"># Red strobe</span>
+</span><span id="__span-21-15"><a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>        <span class="n">color</span> <span class="o">=</span> <span class="n">HSBK</span><span class="o">.</span><span class="n">from_rgb</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-21-16"><a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;strobe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+</span><span id="__span-21-17"><a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>
+</span><span id="__span-21-18"><a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>    <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-21-19"><a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># Wait for completion</span>
+</span><span id="__span-21-20"><a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a>
+</span><span id="__span-21-21"><a id="__codelineno-21-21" name="__codelineno-21-21" href="#__codelineno-21-21"></a><span class="c1"># Usage</span>
+</span><span id="__span-21-22"><a id="__codelineno-21-22" name="__codelineno-21-22" href="#__codelineno-21-22"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
+</span><span id="__span-21-23"><a id="__codelineno-21-23" name="__codelineno-21-23" href="#__codelineno-21-23"></a>
+</span><span id="__span-21-24"><a id="__codelineno-21-24" name="__codelineno-21-24" href="#__codelineno-21-24"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-21-25"><a id="__codelineno-21-25" name="__codelineno-21-25" href="#__codelineno-21-25"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-21-26"><a id="__codelineno-21-26" name="__codelineno-21-26" href="#__codelineno-21-26"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-21-27"><a id="__codelineno-21-27" name="__codelineno-21-27" href="#__codelineno-21-27"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
+</span><span id="__span-21-28"><a id="__codelineno-21-28" name="__codelineno-21-28" href="#__codelineno-21-28"></a>
+</span><span id="__span-21-29"><a id="__codelineno-21-29" name="__codelineno-21-29" href="#__codelineno-21-29"></a><span class="k">await</span> <span class="n">notify</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;warning&#39;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="party-mode">Party Mode<a class="headerlink" href="#party-mode" title="Permanent link">&para;</a></h3>
 <p>Cycle through different effects:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">party_mode</span><span class="p">(</span><span class="n">lights</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">):</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Run various effects for a party.&quot;&quot;&quot;</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">end_time</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="n">duration</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">effects</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>        <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">change</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">spread</span><span class="o">=</span><span class="mi">60</span><span class="p">),</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>        <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;strobe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">20</span><span class="p">),</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>        <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">change</span><span class="o">=</span><span class="mi">45</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">),</span>
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>    <span class="p">]</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>
-</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>    <span class="n">effect_idx</span> <span class="o">=</span> <span class="mi">0</span>
-</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>    <span class="k">while</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">end_time</span><span class="p">:</span>
-</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">effects</span><span class="p">[</span><span class="n">effect_idx</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">effects</span><span class="p">)]</span>
-</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>
-</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">EffectColorloop</span><span class="p">):</span>
-</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>            <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
-</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a>            <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-14-21"><a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a>            <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a>            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-</span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a>
-</span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a>        <span class="n">effect_idx</span> <span class="o">+=</span> <span class="mi">1</span>
-</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a>
-</span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a>    <span class="c1"># Ensure everything is stopped and restored</span>
-</span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a>    <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a>
-</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a><span class="c1"># Usage</span>
-</span><span id="__span-14-30"><a id="__codelineno-14-30" name="__codelineno-14-30" href="#__codelineno-14-30"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
-</span><span id="__span-14-31"><a id="__codelineno-14-31" name="__codelineno-14-31" href="#__codelineno-14-31"></a>
-</span><span id="__span-14-32"><a id="__codelineno-14-32" name="__codelineno-14-32" href="#__codelineno-14-32"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-14-33"><a id="__codelineno-14-33" name="__codelineno-14-33" href="#__codelineno-14-33"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
-</span><span id="__span-14-34"><a id="__codelineno-14-34" name="__codelineno-14-34" href="#__codelineno-14-34"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-</span><span id="__span-14-35"><a id="__codelineno-14-35" name="__codelineno-14-35" href="#__codelineno-14-35"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
-</span><span id="__span-14-36"><a id="__codelineno-14-36" name="__codelineno-14-36" href="#__codelineno-14-36"></a>
-</span><span id="__span-14-37"><a id="__codelineno-14-37" name="__codelineno-14-37" href="#__codelineno-14-37"></a><span class="k">await</span> <span class="n">party_mode</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">party_mode</span><span class="p">(</span><span class="n">lights</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">):</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Run various effects for a party.&quot;&quot;&quot;</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="n">conductor</span> <span class="o">=</span> <span class="n">Conductor</span><span class="p">()</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="n">end_time</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="n">duration</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">effects</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>        <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">change</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">spread</span><span class="o">=</span><span class="mi">60</span><span class="p">),</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>        <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;strobe&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">20</span><span class="p">),</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>        <span class="n">EffectColorloop</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">change</span><span class="o">=</span><span class="mi">45</span><span class="p">,</span> <span class="n">brightness</span><span class="o">=</span><span class="mf">0.8</span><span class="p">),</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>    <span class="p">]</span>
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>    <span class="n">effect_idx</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a>    <span class="k">while</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">end_time</span><span class="p">:</span>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>        <span class="n">effect</span> <span class="o">=</span> <span class="n">effects</span><span class="p">[</span><span class="n">effect_idx</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">effects</span><span class="p">)]</span>
+</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a>
+</span><span id="__span-22-16"><a id="__codelineno-22-16" name="__codelineno-22-16" href="#__codelineno-22-16"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">EffectColorloop</span><span class="p">):</span>
+</span><span id="__span-22-17"><a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a>            <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-22-18"><a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a>            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-22-19"><a id="__codelineno-22-19" name="__codelineno-22-19" href="#__codelineno-22-19"></a>            <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-22-20"><a id="__codelineno-22-20" name="__codelineno-22-20" href="#__codelineno-22-20"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-22-21"><a id="__codelineno-22-21" name="__codelineno-22-21" href="#__codelineno-22-21"></a>            <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-22-22"><a id="__codelineno-22-22" name="__codelineno-22-22" href="#__codelineno-22-22"></a>            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-22-23"><a id="__codelineno-22-23" name="__codelineno-22-23" href="#__codelineno-22-23"></a>
+</span><span id="__span-22-24"><a id="__codelineno-22-24" name="__codelineno-22-24" href="#__codelineno-22-24"></a>        <span class="n">effect_idx</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span id="__span-22-25"><a id="__codelineno-22-25" name="__codelineno-22-25" href="#__codelineno-22-25"></a>
+</span><span id="__span-22-26"><a id="__codelineno-22-26" name="__codelineno-22-26" href="#__codelineno-22-26"></a>    <span class="c1"># Ensure everything is stopped and restored</span>
+</span><span id="__span-22-27"><a id="__codelineno-22-27" name="__codelineno-22-27" href="#__codelineno-22-27"></a>    <span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-22-28"><a id="__codelineno-22-28" name="__codelineno-22-28" href="#__codelineno-22-28"></a>
+</span><span id="__span-22-29"><a id="__codelineno-22-29" name="__codelineno-22-29" href="#__codelineno-22-29"></a><span class="c1"># Usage</span>
+</span><span id="__span-22-30"><a id="__codelineno-22-30" name="__codelineno-22-30" href="#__codelineno-22-30"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">DeviceGroup</span>
+</span><span id="__span-22-31"><a id="__codelineno-22-31" name="__codelineno-22-31" href="#__codelineno-22-31"></a>
+</span><span id="__span-22-32"><a id="__codelineno-22-32" name="__codelineno-22-32" href="#__codelineno-22-32"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-22-33"><a id="__codelineno-22-33" name="__codelineno-22-33" href="#__codelineno-22-33"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-22-34"><a id="__codelineno-22-34" name="__codelineno-22-34" href="#__codelineno-22-34"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-22-35"><a id="__codelineno-22-35" name="__codelineno-22-35" href="#__codelineno-22-35"></a><span class="n">group</span> <span class="o">=</span> <span class="n">DeviceGroup</span><span class="p">(</span><span class="n">devices</span><span class="p">)</span>
+</span><span id="__span-22-36"><a id="__codelineno-22-36" name="__codelineno-22-36" href="#__codelineno-22-36"></a>
+</span><span id="__span-22-37"><a id="__codelineno-22-37" name="__codelineno-22-37" href="#__codelineno-22-37"></a><span class="k">await</span> <span class="n">party_mode</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">lights</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2679,7 +2985,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 16, 2025 23:45:40 UTC">November 16, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 7, 2026 10:35:20 UTC">February 7, 2026</span>
   </span>
 
     
@@ -2777,10 +3083,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

@@ -7,7 +7,8 @@ The Light Effects Framework provides a comprehensive system for creating and man
 The effects framework consists of three main components:
 
 - **Conductor**: Central orchestrator that manages effect lifecycle and state
-- **Effects**: Pre-built effect classes (EffectPulse, EffectColorloop) and base class for custom effects
+- **Effects**: Pre-built effect classes (Pulse, ColorLoop, Rainbow, Flame, Aurora, Progress, Sunrise/Sunset) and base class for custom effects
+- **Effect Registry**: Central discovery mechanism for querying available effects by device type
 - **State Management**: Automatic capture and restoration of device state before and after effects
 
 ## Installation
@@ -101,6 +102,115 @@ async def main():
 asyncio.run(main())
 ```
 
+### Rainbow Effect
+
+The `EffectRainbow` spreads a full 360-degree rainbow across device pixels and scrolls it over time. Best on multizone strips and matrix lights:
+
+```python
+import asyncio
+from lifx import discover, DeviceGroup
+from lifx.effects import Conductor, EffectRainbow
+
+async def main():
+    devices = []
+    async for device in discover():
+        devices.append(device)
+    group = DeviceGroup(devices)
+
+    if not group.lights:
+        print("No lights found")
+        return
+
+    conductor = Conductor()
+
+    # Rainbow that scrolls every 10 seconds
+    effect = EffectRainbow(period=10, brightness=0.8)
+    await conductor.start(effect, group.lights)
+
+    await asyncio.sleep(30)
+    await conductor.stop(group.lights)
+
+asyncio.run(main())
+```
+
+### Flame Effect
+
+The `EffectFlame` creates a warm fire/candle flicker using layered sine waves. On matrix devices, bottom rows glow hotter:
+
+```python
+from lifx.effects import EffectFlame
+
+# Default candle flicker
+effect = EffectFlame()
+await conductor.start(effect, lights)
+
+# Intense fast fire with wide temperature range
+effect = EffectFlame(intensity=1.0, speed=2.0, brightness=1.0)
+await conductor.start(effect, lights)
+
+await asyncio.sleep(30)
+await conductor.stop(lights)
+```
+
+### Aurora Effect
+
+The `EffectAurora` simulates northern lights with flowing colored bands. Best on multizone strips and matrix lights:
+
+```python
+from lifx.effects import EffectAurora
+
+# Default aurora (green/cyan/blue/purple)
+effect = EffectAurora()
+await conductor.start(effect, lights)
+
+# Custom warm palette
+effect = EffectAurora(palette=[280, 300, 320, 340], brightness=0.6)
+await conductor.start(effect, lights)
+
+await asyncio.sleep(60)
+await conductor.stop(lights)
+```
+
+### Progress Bar Effect
+
+The `EffectProgress` creates an animated progress bar on multizone lights (strips/beams). The filled region has a traveling bright spot, and you update the position at any time:
+
+```python
+from lifx.effects import EffectProgress
+
+effect = EffectProgress(end_value=100)
+await conductor.start(effect, [strip_light])
+
+# Update progress from your application logic
+for i in range(0, 101, 10):
+    effect.position = float(i)
+    await asyncio.sleep(2)
+
+await conductor.stop([strip_light])
+```
+
+### Sunrise and Sunset Effects
+
+`EffectSunrise` and `EffectSunset` are duration-based effects for matrix devices (tiles, candles, Ceiling lights) that simulate natural light transitions:
+
+```python
+from lifx.effects import EffectSunrise, EffectSunset
+
+# 30-minute sunrise from bottom edge (rectangular tiles)
+effect = EffectSunrise(duration=1800, brightness=1.0)
+await conductor.start(effect, [matrix_light])
+
+# Sunrise from center (round/oval Ceiling lights)
+effect = EffectSunrise(duration=1800, brightness=1.0, origin="center")
+await conductor.start(effect, [ceiling_light])
+
+# Sunset that powers off when done
+effect = EffectSunset(duration=1800, power_off=True)
+await conductor.start(effect, [matrix_light])
+```
+
+Sunrise and sunset effects complete automatically after their duration — no need to call `conductor.stop()`. Sunrise leaves the light at full daylight. Sunset can optionally power off the light.
+
 ## Key Concepts
 
 ### Conductor
@@ -127,10 +237,11 @@ This happens completely automatically - you don't need to manage state yourself.
 
 ### Effect Completion
 
-There are two ways effects complete:
+Effects complete in different ways:
 
-1. **Automatic** - Pulse effects complete after their cycles finish
-1. **Manual** - ColorLoop effects run continuously until `conductor.stop()` is called
+1. **Cycle-based** — Pulse effects complete after their configured cycles finish
+1. **Duration-based** — Sunrise and sunset effects complete after their duration expires
+1. **Manual** — Continuous effects (ColorLoop, Rainbow, Flame, Aurora, Progress) run until `conductor.stop()` is called
 
 ## Common Patterns
 
@@ -238,6 +349,58 @@ for light in group.lights:
         print(f"{light.label}: {type(current).__name__}")
     else:
         print(f"{light.label}: idle")
+```
+
+### Effect Registry
+
+The `EffectRegistry` lets you discover available effects and filter by device type — useful for building UIs or integrations like Home Assistant:
+
+```python
+from lifx import get_effect_registry, DeviceType
+
+registry = get_effect_registry()
+
+# List all built-in effects
+for info in registry.effects:
+    print(f"{info.name}: {info.description}")
+
+# Get effects recommended for multizone strips
+for info, support in registry.get_effects_for_device_type(DeviceType.MULTIZONE):
+    print(f"{info.name} ({support.value})")
+
+# Filter by actual device instance
+for info, support in registry.get_effects_for_device(my_light):
+    print(f"{info.name}: {support.value}")
+```
+
+### Dynamic Light Management
+
+You can add or remove lights from a running effect without restarting it:
+
+```python
+# Start effect on initial lights
+effect = EffectRainbow(period=10)
+await conductor.start(effect, [light1, light2])
+
+# Later, add a new light to the running effect
+await conductor.add_lights(effect, [light3])
+
+# Remove a light (restores its state by default)
+await conductor.remove_lights([light2])
+
+# Remove without restoring state
+await conductor.remove_lights([light1], restore_state=False)
+```
+
+### Monitoring Frame Data
+
+For frame-based effects, you can read the most recent HSBK values sent to a device:
+
+```python
+colors = conductor.get_last_frame(light)
+if colors:
+    avg_brightness = sum(c.brightness for c in colors) / len(colors)
+    print(f"Average brightness: {avg_brightness:.1%}")
 ```
 
 ## Best Practices

@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1224,10 +1224,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-power-on-optional" class="md-nav__link">
+  <a href="#3-animator-creation-frameeffect-only" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Power-On (Optional)
+        3. Animator Creation (FrameEffect Only)
       
     </span>
   </a>
@@ -1235,10 +1235,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-effect-execution" class="md-nav__link">
+  <a href="#4-power-on-optional" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Effect Execution
+        4. Power-On (Optional)
       
     </span>
   </a>
@@ -1246,10 +1246,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-state-restoration" class="md-nav__link">
+  <a href="#5-effect-execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. State Restoration
+        5. Effect Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-state-restoration-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. State Restoration &amp; Cleanup
       
     </span>
   </a>
@@ -1501,10 +1512,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#why-no-tile-specific-logic-yet" class="md-nav__link">
+  <a href="#why-frameeffect-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why No Tile-Specific Logic (Yet)?
+        Why FrameEffect Pattern?
       
     </span>
   </a>
@@ -1533,6 +1544,17 @@
     <span class="md-ellipsis">
       
         With Device Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-animation-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With Animation Layer
       
     </span>
   </a>
@@ -2282,10 +2304,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-power-on-optional" class="md-nav__link">
+  <a href="#3-animator-creation-frameeffect-only" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Power-On (Optional)
+        3. Animator Creation (FrameEffect Only)
       
     </span>
   </a>
@@ -2293,10 +2315,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-effect-execution" class="md-nav__link">
+  <a href="#4-power-on-optional" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Effect Execution
+        4. Power-On (Optional)
       
     </span>
   </a>
@@ -2304,10 +2326,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-state-restoration" class="md-nav__link">
+  <a href="#5-effect-execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. State Restoration
+        5. Effect Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-state-restoration-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. State Restoration &amp; Cleanup
       
     </span>
   </a>
@@ -2559,10 +2592,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#why-no-tile-specific-logic-yet" class="md-nav__link">
+  <a href="#why-frameeffect-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why No Tile-Specific Logic (Yet)?
+        Why FrameEffect Pattern?
       
     </span>
   </a>
@@ -2591,6 +2624,17 @@
     <span class="md-ellipsis">
       
         With Device Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-animation-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With Animation Layer
       
     </span>
   </a>
@@ -2785,28 +2829,26 @@
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                 │
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>┌────────────────▼────────────────────────────────────┐
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│              Effects API Layer                       │
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   • Conductor (orchestration)                       │
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   • EffectPulse, EffectColorloop (implementations)  │
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   • LIFXEffect (base class)                         │
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>└────────────────┬────────────────────────────────────┘
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                 │
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>┌────────────────▼────────────────────────────────────┐
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│            Device Layer (lifx.devices)               │
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   • Light, MultiZoneLight, MatrixLight              │
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   • Device state methods (get_color, set_color)     │
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>└────────────────┬────────────────────────────────────┘
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                 │
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>┌────────────────▼────────────────────────────────────┐
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│           Network Layer (lifx.network)               │
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   • DeviceConnection (UDP transport)                │
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   • Message building and parsing                    │
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>└────────────────┬────────────────────────────────────┘
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                 │
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>┌────────────────▼────────────────────────────────────┐
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│          Protocol Layer (lifx.protocol)              │
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│   • Binary serialization/deserialization            │
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│   • Packet definitions (auto-generated)             │
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>└─────────────────────────────────────────────────────┘
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   • Conductor (orchestration + dynamic lights)      │
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   • EffectPulse (firmware waveforms via Device)     │
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   • FrameEffect → Colorloop, Rainbow, Flame,       │
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│     Aurora, Progress, Sunrise/Sunset (frame-based)  │
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│   • EffectRegistry (discovery + filtering)          │
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   • LIFXEffect (base class)                         │
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>└──────┬─────────────────────────────┬────────────────┘
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>       │ (EffectPulse)               │ (FrameEffect)
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>┌──────▼──────────────────┐  ┌───────▼───────────────────┐
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│  Device Layer            │  │  Animation Layer           │
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│  (lifx.devices)          │  │  (lifx.animation)          │
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│  • set_waveform()        │  │  • Animator (direct UDP)   │
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│  • set_color()           │  │  • PacketGenerator         │
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>└──────┬──────────────────┘  │  • FrameBuffer              │
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>       │                      └───────┬───────────────────┘
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>       │                              │
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>┌──────▼──────────────────────────────▼───────────────┐
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│           Network / Protocol Layers                  │
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│   • UDP transport, binary serialization             │
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>└─────────────────────────────────────────────────────┘
 </span></code></pre></div>
 <h3 id="key-principles">Key Principles<a class="headerlink" href="#key-principles" title="Permanent link">&para;</a></h3>
 <ol>
@@ -2821,11 +2863,19 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>src/lifx/effects/
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── __init__.py              # Public API exports
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── base.py                  # LIFXEffect abstract base class
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── conductor.py             # Conductor orchestrator
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── pulse.py                 # EffectPulse implementation
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── colorloop.py             # EffectColorloop implementation
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── models.py                # PreState, RunningEffect dataclasses
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── utils.py                 # Shared utilities (future)
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── frame_effect.py          # FrameEffect base class + FrameContext
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── conductor.py             # Conductor orchestrator
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── pulse.py                 # EffectPulse implementation
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── colorloop.py             # EffectColorloop (FrameEffect) implementation
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>├── rainbow.py               # EffectRainbow (FrameEffect) implementation
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>├── flame.py                 # EffectFlame (FrameEffect) implementation
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>├── aurora.py                # EffectAurora (FrameEffect) implementation
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>├── progress.py              # EffectProgress (FrameEffect, multizone only)
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>├── sunrise.py               # EffectSunrise + EffectSunset (FrameEffect, matrix only)
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>├── registry.py              # EffectRegistry, DeviceType, DeviceSupport, EffectInfo
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>├── models.py                # PreState, RunningEffect dataclasses
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>├── state_manager.py         # DeviceStateManager for state capture/restore
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>└── const.py                 # Effect constants
 </span></code></pre></div>
 <h3 id="component-responsibilities">Component Responsibilities<a class="headerlink" href="#component-responsibilities" title="Permanent link">&para;</a></h3>
 <h4 id="conductor-conductorpy">Conductor (<code>conductor.py</code>)<a class="headerlink" href="#conductor-conductorpy" title="Permanent link">&para;</a></h4>
@@ -2870,42 +2920,115 @@
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">inherit_prestate</span><span class="p">(</span><span class="n">other</span><span class="p">):</span>            <span class="c1"># State inheritance (override)</span>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="o">...</span>
 </span></code></pre></div>
+<h4 id="frameeffect-base-class-frame_effectpy">FrameEffect Base Class (<code>frame_effect.py</code>)<a class="headerlink" href="#frameeffect-base-class-frame_effectpy" title="Permanent link">&para;</a></h4>
+<p><strong>Purpose:</strong> Abstract base for effects that generate color frames at a fixed FPS.</p>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Define frame generation interface (abstract <code>generate_frame()</code> method)</li>
+<li>Run frame loop with timing control (fps, duration, stop_event)</li>
+<li>Create <code>FrameContext</code> per device per frame with timing and layout info</li>
+<li>Convert user-friendly HSBK colors to protocol tuples</li>
+<li>Dispatch frames via Animators (set by Conductor)</li>
+<li>Provide <code>async_setup()</code> hook for pre-loop initialization</li>
+</ul>
+<p><strong>Key Data:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FrameEffect</span><span class="p">(</span><span class="n">LIFXEffect</span><span class="p">):</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">_fps</span><span class="p">:</span> <span class="nb">float</span>                    <span class="c1"># Frames per second</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">_duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span>        <span class="c1"># Run time limit (None = infinite)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">_stop_event</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span>     <span class="c1"># Stop signal</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">_animators</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Animator</span><span class="p">]</span>     <span class="c1"># Set by Conductor before play</span>
+</span></code></pre></div>
+<p><strong>Relationship to LIFXEffect:</strong> <code>FrameEffect</code> extends <code>LIFXEffect</code> and implements <code>async_play()</code> as a frame loop. Subclasses implement <code>generate_frame()</code> instead.</p>
 <h4 id="effect-implementations">Effect Implementations<a class="headerlink" href="#effect-implementations" title="Permanent link">&para;</a></h4>
 <p><strong>EffectPulse (<code>pulse.py</code>):</strong></p>
 <ul>
-<li>Implements pulse/blink/breathe effects</li>
+<li>Extends <code>LIFXEffect</code> directly</li>
+<li>Implements pulse/blink/breathe effects via firmware waveforms</li>
 <li>Five modes with different timing and waveforms</li>
 <li>Intelligent color selection based on mode</li>
 <li>Auto-completion after configured cycles</li>
 </ul>
 <p><strong>EffectColorloop (<code>colorloop.py</code>):</strong></p>
 <ul>
-<li>Implements continuous hue rotation</li>
-<li>Randomized direction, device order, saturation</li>
+<li>Extends <code>FrameEffect</code> (not LIFXEffect directly)</li>
+<li>Implements continuous hue rotation via frame generation</li>
+<li>Time-based hue calculation with configurable FPS</li>
+<li>Randomized direction and saturation</li>
 <li>Runs indefinitely until stopped</li>
 <li>Supports state inheritance for seamless transitions</li>
+<li>Works across all device types (Light, MultiZoneLight, MatrixLight)</li>
+</ul>
+<p><strong>EffectRainbow (<code>rainbow.py</code>):</strong></p>
+<ul>
+<li>Extends <code>FrameEffect</code></li>
+<li>Spreads full 360-degree rainbow across all pixels, scrolling over time</li>
+<li>Configurable period, brightness, saturation, and inter-device spread</li>
+<li>Best on multizone strips and matrix lights</li>
+</ul>
+<p><strong>EffectFlame (<code>flame.py</code>):</strong></p>
+<ul>
+<li>Extends <code>FrameEffect</code></li>
+<li>Layered sine waves produce organic flicker (no random state)</li>
+<li>Warm color range: hue 0-40, high saturation, configurable kelvin range</li>
+<li>Matrix enhancement: vertical brightness falloff (bottom rows hotter)</li>
+<li>Works on all color device types</li>
+</ul>
+<p><strong>EffectAurora (<code>aurora.py</code>):</strong></p>
+<ul>
+<li>Extends <code>FrameEffect</code></li>
+<li>Palette interpolation with shortest-path hue wrapping</li>
+<li>Sine wave brightness modulation creates flowing "curtain" bands</li>
+<li>Matrix enhancement: vertical gradient (brightest in middle rows)</li>
+<li>Configurable palette, speed, brightness, and inter-device spread</li>
+</ul>
+<p><strong>EffectProgress (<code>progress.py</code>):</strong></p>
+<ul>
+<li>Extends <code>FrameEffect</code></li>
+<li>Animated progress bar with traveling bright spot</li>
+<li>Mutable <code>position</code> attribute for real-time updates</li>
+<li>Supports single color or gradient foreground</li>
+<li>Multizone only (<code>has_multizone</code> required)</li>
+</ul>
+<p><strong>EffectSunrise + EffectSunset (<code>sunrise.py</code>):</strong></p>
+<ul>
+<li>Both extend <code>FrameEffect</code></li>
+<li>Duration-based (finite) — complete automatically</li>
+<li>Shared <code>_sun_frame()</code> helper: radial model centered at configurable origin</li>
+<li>Five color phases: night → dawn → golden hour → morning → daylight</li>
+<li><code>origin</code> parameter: <code>"bottom"</code> (rectangular tiles) or <code>"center"</code> (Ceiling lights)</li>
+<li>Sunrise: <code>restore_on_complete=False</code> (stays at daylight)</li>
+<li>Sunset: optionally powers off lights after last frame</li>
+<li>Matrix only (<code>has_matrix</code> required)</li>
+</ul>
+<p><strong>EffectRegistry (<code>registry.py</code>):</strong></p>
+<ul>
+<li>Central discovery mechanism for effect compatibility</li>
+<li><code>DeviceType</code> enum: LIGHT, MULTIZONE, MATRIX</li>
+<li><code>DeviceSupport</code> enum: RECOMMENDED, COMPATIBLE, NOT_SUPPORTED</li>
+<li><code>EffectInfo</code> frozen dataclass with name, class, description, support map</li>
+<li><code>get_effect_registry()</code> returns lazily-initialized default registry with all built-in effects</li>
 </ul>
 <h4 id="data-models-modelspy">Data Models (<code>models.py</code>)<a class="headerlink" href="#data-models-modelspy" title="Permanent link">&para;</a></h4>
 <p><strong>PreState:</strong></p>
 <p>Stores device state before effect:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@dataclass</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">PreState</span><span class="p">:</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">power</span><span class="p">:</span> <span class="nb">bool</span>                     <span class="c1"># Power state (on/off)</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">color</span><span class="p">:</span> <span class="n">HSBK</span>                     <span class="c1"># Current color</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">zone_colors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>  <span class="c1"># Multizone colors (if applicable)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">PreState</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">power</span><span class="p">:</span> <span class="nb">bool</span>                     <span class="c1"># Power state (on/off)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">color</span><span class="p">:</span> <span class="n">HSBK</span>                     <span class="c1"># Current color</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">zone_colors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>  <span class="c1"># Multizone colors (if applicable)</span>
 </span></code></pre></div>
 <p><strong>RunningEffect:</strong></p>
 <p>Associates effect with its pre-state:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@dataclass</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">RunningEffect</span><span class="p">:</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">effect</span><span class="p">:</span> <span class="n">LIFXEffect</span>    <span class="c1"># Effect instance</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">prestate</span><span class="p">:</span> <span class="n">PreState</span>    <span class="c1"># Captured state</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">RunningEffect</span><span class="p">:</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">effect</span><span class="p">:</span> <span class="n">LIFXEffect</span>    <span class="c1"># Effect instance</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">prestate</span><span class="p">:</span> <span class="n">PreState</span>    <span class="c1"># Captured state</span>
 </span></code></pre></div>
 <h2 id="effect-lifecycle">Effect Lifecycle<a class="headerlink" href="#effect-lifecycle" title="Permanent link">&para;</a></h2>
 <p>The effect lifecycle consists of five distinct phases:</p>
 <h3 id="1-initialization">1. Initialization<a class="headerlink" href="#1-initialization" title="Permanent link">&para;</a></h3>
 <p>User creates effect instance with desired parameters:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">effect</span> <span class="o">=</span> <span class="n">EffectPulse</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;blink&#39;</span><span class="p">,</span> <span class="n">cycles</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>What happens:</strong></p>
 <ul>
@@ -2915,16 +3038,16 @@
 </ul>
 <h3 id="2-state-capture">2. State Capture<a class="headerlink" href="#2-state-capture" title="Permanent link">&para;</a></h3>
 <p>Conductor starts effect and captures current device state:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="p">[</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
 </span></code></pre></div>
 <p><strong>What happens:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>For each light:
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  1. Check if prestate can be inherited from running effect
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  2. If not, capture new prestate:
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>     a. Get power state (get_power)
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>     b. Get current color (get_color)
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>     c. Get zone colors if multizone (get_color_zones or get_extended_color_zones)
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  3. Store in RunningEffect and register in conductor._running
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>For each light:
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  1. Check if prestate can be inherited from running effect
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  2. If not, capture new prestate:
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>     a. Get power state (get_power)
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>     b. Get current color (get_color)
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>     c. Get zone colors if multizone (get_color_zones or get_extended_color_zones)
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>  3. Store in RunningEffect and register in conductor._running
 </span></code></pre></div>
 <p><strong>Timing:</strong> &lt;1 second per device (mostly network I/O)</p>
 <p><strong>Special Cases:</strong></p>
@@ -2933,56 +3056,71 @@
 <li><strong>Multizone Devices:</strong> Uses extended messages if supported, falls back to standard messages</li>
 <li><strong>Powered-off Devices:</strong> All state is still captured (including zone colors that may be inaccurate)</li>
 </ul>
-<h3 id="3-power-on-optional">3. Power-On (Optional)<a class="headerlink" href="#3-power-on-optional" title="Permanent link">&para;</a></h3>
-<p>If <code>effect.power_on == True</code>, devices are powered on:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_perform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participants</span><span class="p">):</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">power_on</span><span class="p">:</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span><span class="p">:</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>            <span class="n">power_level</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>            <span class="k">if</span> <span class="n">power_level</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>                <span class="n">startup_color</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_poweroff_hsbk</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">startup_color</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+<h3 id="3-animator-creation-frameeffect-only">3. Animator Creation (FrameEffect Only)<a class="headerlink" href="#3-animator-creation-frameeffect-only" title="Permanent link">&para;</a></h3>
+<p>For <code>FrameEffect</code> subclasses, the Conductor creates Animators before the frame loop:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">FrameEffect</span><span class="p">):</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">animators</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_animators</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">participants</span><span class="p">)</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">effect</span><span class="o">.</span><span class="n">_animators</span> <span class="o">=</span> <span class="n">animators</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="k">await</span> <span class="n">effect</span><span class="o">.</span><span class="n">async_setup</span><span class="p">(</span><span class="n">participants</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>What happens:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>For each powered-off light:
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  1. Get startup color from from_poweroff_hsbk()
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  2. Set color immediately (duration=0)
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  3. Power on with 0.3s fade (duration=0.3)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>For each participant:
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  1. Detect device type (MatrixLight, MultiZoneLight, Light)
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  2. Create appropriate Animator factory:
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>     - MatrixLight → Animator.for_matrix(device, duration_ms)
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>     - MultiZoneLight → Animator.for_multizone(device, duration_ms)
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>     - Light → Animator.for_light(device, duration_ms)
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>  3. duration_ms = int(1000 / effect.fps) for smooth interpolation
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>  4. Call effect.async_setup(participants) for pre-loop initialization
+</span></code></pre></div>
+<p><strong>Note:</strong> Animators use direct UDP — no device connection needed after creation.</p>
+<h3 id="4-power-on-optional">4. Power-On (Optional)<a class="headerlink" href="#4-power-on-optional" title="Permanent link">&para;</a></h3>
+<p>If <code>effect.power_on == True</code>, devices are powered on:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_perform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participants</span><span class="p">):</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">power_on</span><span class="p">:</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span><span class="p">:</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>            <span class="n">power_level</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>            <span class="k">if</span> <span class="n">power_level</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>                <span class="n">startup_color</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_poweroff_hsbk</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">startup_color</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>What happens:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>For each powered-off light:
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  1. Get startup color from from_poweroff_hsbk()
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  2. Set color immediately (duration=0)
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  3. Power on with 0.3s fade (duration=0.3)
 </span></code></pre></div>
 <p><strong>Timing:</strong> 0.3 seconds per powered-off device</p>
-<h3 id="4-effect-execution">4. Effect Execution<a class="headerlink" href="#4-effect-execution" title="Permanent link">&para;</a></h3>
+<h3 id="5-effect-execution">5. Effect Execution<a class="headerlink" href="#5-effect-execution" title="Permanent link">&para;</a></h3>
 <p>Effect logic runs via <code>async_play()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">await</span> <span class="n">effect</span><span class="o">.</span><span class="n">async_play</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">await</span> <span class="n">effect</span><span class="o">.</span><span class="n">async_play</span><span class="p">()</span>
 </span></code></pre></div>
 <p><strong>What happens:</strong></p>
 <ul>
-<li>Subclass-specific effect logic executes</li>
-<li>Can access <code>self.participants</code> and <code>self.conductor</code></li>
-<li>Can issue commands to devices</li>
-<li>Pulse effects: Send waveform, wait for completion</li>
-<li>ColorLoop effects: Continuous loop until stopped</li>
+<li><strong>LIFXEffect subclasses:</strong> Custom effect logic using device methods (e.g., <code>set_waveform()</code>)</li>
+<li><strong>FrameEffect subclasses:</strong> Frame loop calling <code>generate_frame()</code> per device per frame, dispatching via Animators</li>
 </ul>
 <p><strong>Timing:</strong></p>
 <ul>
 <li>EffectPulse: <code>period * cycles</code> seconds</li>
-<li>EffectColorloop: Runs indefinitely</li>
+<li>EffectColorloop: Runs indefinitely at calculated FPS</li>
 </ul>
-<h3 id="5-state-restoration">5. State Restoration<a class="headerlink" href="#5-state-restoration" title="Permanent link">&para;</a></h3>
+<h3 id="6-state-restoration-cleanup">6. State Restoration &amp; Cleanup<a class="headerlink" href="#6-state-restoration-cleanup" title="Permanent link">&para;</a></h3>
 <p>Conductor restores devices to pre-effect state:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">([</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">stop</span><span class="p">([</span><span class="n">light1</span><span class="p">,</span> <span class="n">light2</span><span class="p">])</span>
 </span></code></pre></div>
 <p><strong>What happens:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>For each light:
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  1. Restore multizone colors (if applicable):
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>     - Use extended messages if supported
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>     - Use standard messages with apply=NO_APPLY, then apply=APPLY
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>     - Wait 0.3s for device processing
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  2. Restore color:
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>     - set_color(prestate.color, duration=0)
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>     - Wait 0.3s
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>  3. Restore power:
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>     - set_power(prestate.power, duration=0)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>For each light:
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  1. Restore multizone colors (if applicable):
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>     - Use extended messages if supported
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>     - Use standard messages with apply=NO_APPLY, then apply=APPLY
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>     - Wait 0.3s for device processing
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  2. Restore color:
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>     - set_color(prestate.color, duration=0)
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>     - Wait 0.3s
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>  3. Restore power:
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>     - set_power(prestate.power, duration=0)
 </span></code></pre></div>
 <p><strong>Timing:</strong> 0.6-1.0 seconds per device (includes delays)</p>
 <p><strong>Special Cases:</strong></p>
@@ -2994,19 +3132,19 @@
 <h2 id="state-management">State Management<a class="headerlink" href="#state-management" title="Permanent link">&para;</a></h2>
 <h3 id="state-storage">State Storage<a class="headerlink" href="#state-storage" title="Permanent link">&para;</a></h3>
 <p>The conductor maintains a registry of running effects:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">_running</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RunningEffect</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">_running</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RunningEffect</span><span class="p">]</span>
 </span></code></pre></div>
 <p><strong>Key:</strong> Device serial number (12-digit hex string)
 <strong>Value:</strong> <code>RunningEffect</code> containing effect instance and captured <code>PreState</code></p>
 <h3 id="state-capture-details">State Capture Details<a class="headerlink" href="#state-capture-details" title="Permanent link">&para;</a></h3>
 <h4 id="power-state">Power State<a class="headerlink" href="#power-state" title="Permanent link">&para;</a></h4>
 <p>Integer power level captured via <code>get_power()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">power_level</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>  <span class="c1"># Returns int (0 or 65535)</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">is_on</span> <span class="o">=</span> <span class="n">power_level</span> <span class="o">&gt;</span> <span class="mi">0</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">power_level</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_power</span><span class="p">()</span>  <span class="c1"># Returns int (0 or 65535)</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">is_on</span> <span class="o">=</span> <span class="n">power_level</span> <span class="o">&gt;</span> <span class="mi">0</span>
 </span></code></pre></div>
 <h4 id="color-state">Color State<a class="headerlink" href="#color-state" title="Permanent link">&para;</a></h4>
 <p>HSBK color captured via <code>get_color()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>  <span class="c1"># power is int (0 or 65535)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">color</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color</span><span class="p">()</span>  <span class="c1"># power is int (0 or 65535)</span>
 </span></code></pre></div>
 <p>Returns:</p>
 <ul>
@@ -3016,10 +3154,10 @@
 </ul>
 <h4 id="multizone-state">Multizone State<a class="headerlink" href="#multizone-state" title="Permanent link">&para;</a></h4>
 <p>For <code>MultiZoneLight</code> devices, zone colors are captured:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">light</span><span class="p">,</span> <span class="n">MultiZoneLight</span><span class="p">):</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="c1"># Get all zones using the convenience method</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="c1"># Automatically uses the best method based on capabilities</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">zone_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_all_color_zones</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">light</span><span class="p">,</span> <span class="n">MultiZoneLight</span><span class="p">):</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="c1"># Get all zones using the convenience method</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="c1"># Automatically uses the best method based on capabilities</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">zone_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_all_color_zones</span><span class="p">()</span>
 </span></code></pre></div>
 <p><strong>Extended Multizone:</strong></p>
 <ul>
@@ -3037,25 +3175,25 @@
 <h4 id="multizone-restoration">Multizone Restoration<a class="headerlink" href="#multizone-restoration" title="Permanent link">&para;</a></h4>
 <p>Zones are restored <strong>before</strong> color and power:</p>
 <p><strong>Extended Multizone:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_extended_color_zones</span><span class="p">(</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="n">zone_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">colors</span><span class="o">=</span><span class="n">zone_colors</span><span class="p">,</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">duration</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">MultiZoneExtendedApplicationRequest</span><span class="o">.</span><span class="n">APPLY</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_extended_color_zones</span><span class="p">(</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="n">zone_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="n">colors</span><span class="o">=</span><span class="n">zone_colors</span><span class="p">,</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">duration</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">MultiZoneExtendedApplicationRequest</span><span class="o">.</span><span class="n">APPLY</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Single message restores all zones.</p>
 <p><strong>Standard Multizone:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">zone_colors</span><span class="p">):</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="n">is_last</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">zone_colors</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">apply</span> <span class="o">=</span> <span class="n">APPLY</span> <span class="k">if</span> <span class="n">is_last</span> <span class="k">else</span> <span class="n">NO_APPLY</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color_zones</span><span class="p">(</span>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>        <span class="n">start</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>        <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>        <span class="n">duration</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>        <span class="n">apply</span><span class="o">=</span><span class="n">apply</span>
-</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    <span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">zone_colors</span><span class="p">):</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="n">is_last</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">zone_colors</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="n">apply</span> <span class="o">=</span> <span class="n">APPLY</span> <span class="k">if</span> <span class="n">is_last</span> <span class="k">else</span> <span class="n">NO_APPLY</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color_zones</span><span class="p">(</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>        <span class="n">start</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>        <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>        <span class="n">duration</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>        <span class="n">apply</span><span class="o">=</span><span class="n">apply</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>Multiple messages with <code>apply</code> logic:</p>
 <ul>
@@ -3065,29 +3203,29 @@
 <p>This ensures atomic update visible only when all zones are set.</p>
 <h4 id="timing-delays">Timing Delays<a class="headerlink" href="#timing-delays" title="Permanent link">&para;</a></h4>
 <p>Critical 0.3-second delays ensure device processing:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># After multizone restoration</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)</span>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># After color restoration</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="c1"># No delay after power (last operation)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># After multizone restoration</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># After color restoration</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># No delay after power (last operation)</span>
 </span></code></pre></div>
 <p>Without these delays, subsequent operations may arrive before device finishes processing, causing state corruption.</p>
 <h3 id="prestate-inheritance">Prestate Inheritance<a class="headerlink" href="#prestate-inheritance" title="Permanent link">&para;</a></h3>
 <p>Optimization that skips state capture/restore for compatible consecutive effects:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">inherit_prestate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">LIFXEffect</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if can skip restoration.&quot;&quot;&quot;</span>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">EffectColorloop</span><span class="p">)</span>  <span class="c1"># Example</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">inherit_prestate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">LIFXEffect</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if can skip restoration.&quot;&quot;&quot;</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">EffectColorloop</span><span class="p">)</span>  <span class="c1"># Example</span>
 </span></code></pre></div>
 <p><strong>When used:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">current_running</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">serial</span><span class="p">)</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="k">if</span> <span class="n">current_running</span> <span class="ow">and</span> <span class="n">effect</span><span class="o">.</span><span class="n">inherit_prestate</span><span class="p">(</span><span class="n">current_running</span><span class="o">.</span><span class="n">effect</span><span class="p">):</span>
-</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="c1"># Reuse existing prestate</span>
-</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="n">prestate</span> <span class="o">=</span> <span class="n">current_running</span><span class="o">.</span><span class="n">prestate</span>
-</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="k">else</span><span class="p">:</span>
-</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="c1"># Capture new prestate</span>
-</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">prestate</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_capture_prestate</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">current_running</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">serial</span><span class="p">)</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="k">if</span> <span class="n">current_running</span> <span class="ow">and</span> <span class="n">effect</span><span class="o">.</span><span class="n">inherit_prestate</span><span class="p">(</span><span class="n">current_running</span><span class="o">.</span><span class="n">effect</span><span class="p">):</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="c1"># Reuse existing prestate</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">prestate</span> <span class="o">=</span> <span class="n">current_running</span><span class="o">.</span><span class="n">prestate</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="k">else</span><span class="p">:</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>    <span class="c1"># Capture new prestate</span>
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>    <span class="n">prestate</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_capture_prestate</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Benefits:</strong></p>
 <ul>
@@ -3097,21 +3235,27 @@
 </ul>
 <p><strong>Used by:</strong></p>
 <ul>
-<li><code>EffectColorloop.inherit_prestate()</code> → Returns <code>True</code> for other <code>EffectColorloop</code> instances</li>
+<li><code>EffectColorloop.inherit_prestate()</code> → <code>True</code> for other <code>EffectColorloop</code></li>
+<li><code>EffectRainbow.inherit_prestate()</code> → <code>True</code> for other <code>EffectRainbow</code></li>
+<li><code>EffectFlame.inherit_prestate()</code> → <code>True</code> for other <code>EffectFlame</code></li>
+<li><code>EffectAurora.inherit_prestate()</code> → <code>True</code> for other <code>EffectAurora</code></li>
+<li><code>EffectProgress.inherit_prestate()</code> → <code>True</code> for other <code>EffectProgress</code></li>
+<li><code>EffectSunrise.inherit_prestate()</code> → <code>True</code> for other <code>EffectSunrise</code></li>
+<li><code>EffectSunset.inherit_prestate()</code> → <code>True</code> for other <code>EffectSunset</code></li>
 <li><code>EffectPulse</code> doesn't use it (returns <code>False</code>)</li>
 </ul>
 <h2 id="concurrency-model">Concurrency Model<a class="headerlink" href="#concurrency-model" title="Permanent link">&para;</a></h2>
 <h3 id="thread-safety">Thread Safety<a class="headerlink" href="#thread-safety" title="Permanent link">&para;</a></h3>
 <p>The conductor uses an <code>asyncio.Lock()</code> for thread-safe state management:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">effect</span><span class="p">,</span> <span class="n">participants</span><span class="p">):</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>        <span class="c1"># Critical section: state capture and registration</span>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">participants</span><span class="p">:</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>            <span class="n">prestate</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_capture_prestate</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">[</span><span class="n">light</span><span class="o">.</span><span class="n">serial</span><span class="p">]</span> <span class="o">=</span> <span class="n">RunningEffect</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">prestate</span><span class="p">)</span>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>
-</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    <span class="c1"># Effect execution happens outside lock (concurrent)</span>
-</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>    <span class="k">await</span> <span class="n">effect</span><span class="o">.</span><span class="n">async_perform</span><span class="p">(</span><span class="n">participants</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">effect</span><span class="p">,</span> <span class="n">participants</span><span class="p">):</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>        <span class="c1"># Critical section: state capture and registration</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">participants</span><span class="p">:</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>            <span class="n">prestate</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_capture_prestate</span><span class="p">(</span><span class="n">light</span><span class="p">)</span>
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">[</span><span class="n">light</span><span class="o">.</span><span class="n">serial</span><span class="p">]</span> <span class="o">=</span> <span class="n">RunningEffect</span><span class="p">(</span><span class="n">effect</span><span class="p">,</span> <span class="n">prestate</span><span class="p">)</span>
+</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>
+</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>    <span class="c1"># Effect execution happens outside lock (concurrent)</span>
+</span><span id="__span-26-9"><a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>    <span class="k">await</span> <span class="n">effect</span><span class="o">.</span><span class="n">async_perform</span><span class="p">(</span><span class="n">participants</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Why lock is needed:</strong></p>
 <ul>
@@ -3127,12 +3271,12 @@
 </ul>
 <h3 id="concurrent-device-operations">Concurrent Device Operations<a class="headerlink" href="#concurrent-device-operations" title="Permanent link">&para;</a></h3>
 <p>Effects use <code>asyncio.gather()</code> for concurrent device operations:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Apply waveform to all devices concurrently</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">light</span><span class="o">.</span><span class="n">set_waveform</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">cycles</span><span class="p">,</span> <span class="n">waveform</span><span class="p">)</span>
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>    <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span>
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="p">]</span>
-</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="n">tasks</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Apply waveform to all devices concurrently</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>    <span class="n">light</span><span class="o">.</span><span class="n">set_waveform</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">cycles</span><span class="p">,</span> <span class="n">waveform</span><span class="p">)</span>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>    <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">participants</span>
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="p">]</span>
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="n">tasks</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Benefits:</strong></p>
 <ul>
@@ -3142,12 +3286,12 @@
 </ul>
 <h3 id="background-response-dispatcher">Background Response Dispatcher<a class="headerlink" href="#background-response-dispatcher" title="Permanent link">&para;</a></h3>
 <p>Each <code>DeviceConnection</code> has a background receiver task that routes responses:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># In DeviceConnection</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_response_receiver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">:</span>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>        <span class="n">packet</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_receive_packet</span><span class="p">()</span>
-</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>        <span class="c1"># Route by sequence number to waiting coroutine</span>
-</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_pending</span><span class="p">[</span><span class="n">seq_num</span><span class="p">]</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># In DeviceConnection</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_response_receiver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">:</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>        <span class="n">packet</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_receive_packet</span><span class="p">()</span>
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>        <span class="c1"># Route by sequence number to waiting coroutine</span>
+</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_pending</span><span class="p">[</span><span class="n">seq_num</span><span class="p">]</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Implications for effects:</strong></p>
 <ul>
@@ -3157,40 +3301,40 @@
 </ul>
 <h3 id="effect-concurrency-patterns">Effect Concurrency Patterns<a class="headerlink" href="#effect-concurrency-patterns" title="Permanent link">&para;</a></h3>
 <h4 id="pattern-1-sequential-effects-on-same-devices">Pattern 1: Sequential Effects on Same Devices<a class="headerlink" href="#pattern-1-sequential-effects-on-same-devices" title="Permanent link">&para;</a></h4>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Effect 1 completes before Effect 2 starts</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">duration1</span><span class="p">)</span>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>  <span class="c1"># Captures new state</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Effect 1 completes before Effect 2 starts</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">duration1</span><span class="p">)</span>
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>  <span class="c1"># Captures new state</span>
 </span></code></pre></div>
 <p>State is automatically restored between effects.</p>
 <h4 id="pattern-2-concurrent-effects-on-different-devices">Pattern 2: Concurrent Effects on Different Devices<a class="headerlink" href="#pattern-2-concurrent-effects-on-different-devices" title="Permanent link">&para;</a></h4>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Different devices, completely independent</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">group1</span><span class="p">)</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">group2</span><span class="p">)</span>
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Both run concurrently</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1"># Different devices, completely independent</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">group1</span><span class="p">)</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">group2</span><span class="p">)</span>
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="c1"># Both run concurrently</span>
 </span></code></pre></div>
 <p>No locking needed - different devices, different state.</p>
 <h4 id="pattern-3-replacing-running-effect">Pattern 3: Replacing Running Effect<a class="headerlink" href="#pattern-3-replacing-running-effect" title="Permanent link">&para;</a></h4>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Start effect1</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>
-</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="c1"># Replace with effect2</span>
-</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>  <span class="c1"># Prestate may be inherited</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="c1"># Start effect1</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect1</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>
+</span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="c1"># Replace with effect2</span>
+</span><span id="__span-31-6"><a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="k">await</span> <span class="n">conductor</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">effect2</span><span class="p">,</span> <span class="n">lights</span><span class="p">)</span>  <span class="c1"># Prestate may be inherited</span>
 </span></code></pre></div>
 <p>If <code>effect2.inherit_prestate(effect1)</code> returns <code>True</code>, no restoration happens.</p>
 <h2 id="device-type-handling">Device Type Handling<a class="headerlink" href="#device-type-handling" title="Permanent link">&para;</a></h2>
 <h3 id="device-capabilities-detection">Device Capabilities Detection<a class="headerlink" href="#device-capabilities-detection" title="Permanent link">&para;</a></h3>
 <p>The effects framework adapts to device capabilities automatically:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Check if multizone</span>
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">light</span><span class="p">,</span> <span class="n">MultiZoneLight</span><span class="p">):</span>
-</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>    <span class="c1"># Capture zone colors</span>
-</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>    <span class="n">zone_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color_zones</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-</span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>
-</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="c1"># Check if extended multizone supported</span>
-</span><span id="__span-29-7"><a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="k">if</span> <span class="n">light</span><span class="o">.</span><span class="n">capabilities</span> <span class="ow">and</span> <span class="n">light</span><span class="o">.</span><span class="n">capabilities</span><span class="o">.</span><span class="n">has_extended_multizone</span><span class="p">:</span>
-</span><span id="__span-29-8"><a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a>    <span class="c1"># Use efficient extended messages</span>
-</span><span id="__span-29-9"><a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_extended_color_zones</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Check if multizone</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">light</span><span class="p">,</span> <span class="n">MultiZoneLight</span><span class="p">):</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>    <span class="c1"># Capture zone colors</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>    <span class="n">zone_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">get_color_zones</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>
+</span><span id="__span-32-6"><a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a><span class="c1"># Check if extended multizone supported</span>
+</span><span id="__span-32-7"><a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="k">if</span> <span class="n">light</span><span class="o">.</span><span class="n">capabilities</span> <span class="ow">and</span> <span class="n">light</span><span class="o">.</span><span class="n">capabilities</span><span class="o">.</span><span class="n">has_extended_multizone</span><span class="p">:</span>
+</span><span id="__span-32-8"><a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>    <span class="c1"># Use efficient extended messages</span>
+</span><span id="__span-32-9"><a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_extended_color_zones</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="device-specific-behavior">Device-Specific Behavior<a class="headerlink" href="#device-specific-behavior" title="Permanent link">&para;</a></h3>
 <h4 id="color-lights-light">Color Lights (<code>Light</code>)<a class="headerlink" href="#color-lights-light" title="Permanent link">&para;</a></h4>
@@ -3208,8 +3352,9 @@
 </ul>
 <h4 id="matrix-lights-matrixlight">Matrix Lights (<code>MatrixLight</code>)<a class="headerlink" href="#matrix-lights-matrixlight" title="Permanent link">&para;</a></h4>
 <ul>
-<li><strong>Current Implementation:</strong> Treated like color lights (no matrix-specific logic yet)</li>
-<li><strong>Future Enhancement:</strong> Could apply effects to individual tiles using device chain</li>
+<li><strong>FrameEffect support:</strong> Full 2D canvas via <code>FrameContext.canvas_width</code> / <code>canvas_height</code></li>
+<li><strong>Spatial effects:</strong> Flame (vertical gradient), Aurora (vertical brightness), Sunrise/Sunset (radial wavefront)</li>
+<li><strong>Canvas mapping:</strong> Multi-tile devices get a unified canvas based on tile positions</li>
 </ul>
 <h4 id="hev-lights-hevlight">HEV Lights (<code>HevLight</code>)<a class="headerlink" href="#hev-lights-hevlight" title="Permanent link">&para;</a></h4>
 <ul>
@@ -3296,40 +3441,51 @@
 <li>Pulse → Pulse: Could enable but currently disabled</li>
 <li>Different types: Should not inherit (different visual intent)</li>
 </ul>
-<h3 id="why-no-tile-specific-logic-yet">Why No Tile-Specific Logic (Yet)?<a class="headerlink" href="#why-no-tile-specific-logic-yet" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> Tiles treated like single-color lights for now.</p>
+<h3 id="why-frameeffect-pattern">Why FrameEffect Pattern?<a class="headerlink" href="#why-frameeffect-pattern" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> Separate frame generation from frame delivery via <code>FrameEffect</code> + animation module.</p>
 <p><strong>Rationale:</strong></p>
 <ol>
-<li><strong>MVP Scope:</strong> Phase 1 focuses on core framework</li>
-<li><strong>Complexity:</strong> Tile effects require 2D coordinate system</li>
-<li><strong>Future Enhancement:</strong> Architecture supports adding tile-specific effects later</li>
-<li><strong>Current Usefulness:</strong> Effects still work on tiles (just not tile-aware)</li>
+<li><strong>Device Agnostic:</strong> Effects work across all device types (Light, MultiZoneLight, MatrixLight) without device-specific code</li>
+<li><strong>Clean Separation:</strong> Effect authors implement <code>generate_frame()</code> returning HSBK colors; animation module handles packet construction, tile mapping, and UDP delivery</li>
+<li><strong>Spatial Awareness:</strong> <code>FrameContext</code> provides <code>pixel_count</code>, <code>canvas_width</code>, <code>canvas_height</code> — enabling 2D effects (fire, rain) on matrix devices</li>
+<li><strong>Performance:</strong> Direct UDP via prebaked packet templates, no connection overhead</li>
+<li><strong>Smooth Transitions:</strong> <code>duration_ms</code> parameter tells firmware to interpolate between frames</li>
 </ol>
-<p><strong>Future Work:</strong> Tile-specific effects would use <code>MatrixLight.set_matrix_colors()</code> and apply per-tile logic similar to theme support.</p>
+<p><strong>Alternative Considered:</strong> Keep all effects using device methods (<code>set_color()</code>, <code>set_color_zones()</code>)</p>
+<p><strong>Rejected because:</strong> Required device-specific branching in every effect, couldn't leverage the animation module's performance, and made spatial effects impractical.</p>
 <h2 id="integration-points">Integration Points<a class="headerlink" href="#integration-points" title="Permanent link">&para;</a></h2>
 <h3 id="with-device-layer">With Device Layer<a class="headerlink" href="#with-device-layer" title="Permanent link">&para;</a></h3>
-<p>Effects use standard device methods:</p>
+<p><strong>LIFXEffect subclasses</strong> (e.g., EffectPulse) use standard device methods:</p>
 <ul>
-<li><code>get_power()</code>, <code>set_power()</code></li>
-<li><code>get_color()</code>, <code>set_color()</code></li>
-<li><code>set_waveform()</code> (EffectPulse)</li>
-<li><code>get_color_zones()</code>, <code>set_color_zones()</code> (MultiZoneLight)</li>
-<li><code>get_extended_color_zones()</code>, <code>set_extended_color_zones()</code> (MultiZoneLight)</li>
+<li><code>get_power()</code>, <code>set_power()</code> (state capture/restore, power-on)</li>
+<li><code>get_color()</code>, <code>set_color()</code> (state capture/restore)</li>
+<li><code>set_waveform()</code> (EffectPulse firmware waveforms)</li>
+<li><code>get_color_zones()</code>, <code>set_color_zones()</code> (MultiZoneLight state)</li>
+<li><code>get_extended_color_zones()</code>, <code>set_extended_color_zones()</code> (MultiZoneLight state)</li>
 </ul>
-<p>No special device modifications needed.</p>
+<h3 id="with-animation-layer">With Animation Layer<a class="headerlink" href="#with-animation-layer" title="Permanent link">&para;</a></h3>
+<p><strong>FrameEffect subclasses</strong> (e.g., EffectColorloop) use the animation module for frame delivery:</p>
+<ul>
+<li><code>Animator.for_light()</code> — single-light SetColor packets</li>
+<li><code>Animator.for_multizone()</code> — multi-zone SetExtendedColorZones packets</li>
+<li><code>Animator.for_matrix()</code> — multi-tile Set64 packets with canvas mapping</li>
+<li><code>animator.send_frame()</code> — synchronous frame dispatch (no async overhead)</li>
+<li><code>duration_ms</code> parameter — firmware-level interpolation between frames</li>
+</ul>
+<p>The Conductor creates and manages Animator lifecycle (creation in <code>start()</code>, cleanup in <code>stop()</code>).</p>
 <h3 id="with-network-layer">With Network Layer<a class="headerlink" href="#with-network-layer" title="Permanent link">&para;</a></h3>
-<p>Effects rely on existing lazy connection and concurrent request support:</p>
+<p>State capture/restore relies on existing lazy connection and concurrent request support:</p>
 <ul>
 <li>Lazy connections open on first request and are reused</li>
 <li>Requests are serialized via lock to prevent response mixing</li>
-<li>No effect-specific network code needed</li>
+<li>FrameEffect frame delivery bypasses connections (direct UDP via Animator)</li>
 </ul>
 <h3 id="with-protocol-layer">With Protocol Layer<a class="headerlink" href="#with-protocol-layer" title="Permanent link">&para;</a></h3>
 <p>Effects use existing protocol structures:</p>
 <ul>
-<li><code>HSBK</code> for color representation</li>
-<li><code>LightWaveform</code> enum for waveform types</li>
-<li><code>MultiZoneApplicationRequest</code> for zone apply logic</li>
+<li><code>HSBK</code> for color representation + <code>HSBK.as_tuple()</code> for protocol conversion</li>
+<li><code>LightWaveform</code> enum for waveform types (EffectPulse)</li>
+<li><code>MultiZoneApplicationRequest</code> for zone apply logic (state restore)</li>
 <li>Auto-generated packet classes</li>
 </ul>
 <h2 id="performance-characteristics">Performance Characteristics<a class="headerlink" href="#performance-characteristics" title="Permanent link">&para;</a></h2>
@@ -3355,8 +3511,8 @@
 </ul>
 <h4 id="effect-execution">Effect Execution<a class="headerlink" href="#effect-execution" title="Permanent link">&para;</a></h4>
 <ul>
-<li>Pulse: 1 waveform packet per device</li>
-<li>ColorLoop: 1 color packet per device per iteration</li>
+<li>Pulse: 1 waveform packet per device (via device connection)</li>
+<li>FrameEffect (e.g., ColorLoop): 1 frame per device per FPS tick (via direct UDP Animator)</li>
 </ul>
 <h4 id="state-restoration">State Restoration<a class="headerlink" href="#state-restoration" title="Permanent link">&para;</a></h4>
 <ul>
@@ -3401,7 +3557,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 18, 2025 09:31:37 UTC">November 18, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 7, 2026 10:35:20 UTC">February 7, 2026</span>
   </span>
 
     
@@ -3499,10 +3655,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
