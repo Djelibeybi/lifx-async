@@ -10,6 +10,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from lifx.color import HSBK
 from lifx.effects.models import PreState, RunningEffect
 from lifx.effects.state_manager import DeviceStateManager
 
@@ -75,6 +76,39 @@ class Conductor:
         """
         running = self._running.get(light.serial)
         return running.effect if running else None
+
+    def get_last_frame(self, light: Light) -> list[HSBK] | None:
+        """Return the most recent HSBK frame sent to a device, or None.
+
+        For frame-based effects, returns the list of HSBK colors from the
+        most recent call to generate_frame() for this device. Returns None
+        if no effect is running on the device, the effect is not frame-based,
+        or no frame has been generated yet.
+
+        Args:
+            light: The device to query
+
+        Returns:
+            List of HSBK colors from the last frame, or None
+
+        Example:
+            ```python
+            frame = conductor.get_last_frame(light)
+            if frame:
+                avg_brightness = sum(c.brightness for c in frame) / len(frame)
+                print(f"Average brightness: {avg_brightness:.1%}")
+            ```
+        """
+        running = self._running.get(light.serial)
+        if not running:
+            return None
+
+        from lifx.effects.frame_effect import FrameEffect
+
+        effect = running.effect
+        if isinstance(effect, FrameEffect):
+            return effect._last_frames.get(light.serial)
+        return None
 
     async def start(
         self,
@@ -291,6 +325,192 @@ class Conductor:
                 if serial in self._running:
                     del self._running[serial]
 
+    async def add_lights(self, effect: LIFXEffect, lights: list[Light]) -> None:
+        """Add lights to a running effect without restarting it.
+
+        Captures state, creates animators (for FrameEffects), and registers
+        lights as participants of the already-running effect. Lights that
+        are already running this effect or are incompatible are skipped.
+
+        Args:
+            effect: The effect to add lights to (must already be running)
+            lights: List of lights to add
+
+        Example:
+            ```python
+            # Add a new light to an already-running effect
+            await conductor.add_lights(effect, [new_light])
+            ```
+        """
+        # Filter compatible lights
+        compatible = await self._filter_compatible_lights(effect, lights)
+        if not compatible:
+            return
+
+        async with self._lock:
+            # Skip lights already running this effect
+            new_lights: list[Light] = []
+            for light in compatible:
+                running = self._running.get(light.serial)
+                if running and running.effect is effect:
+                    continue
+                new_lights.append(light)
+
+            if not new_lights:
+                return
+
+            # Find the task reference from existing participants
+            task: asyncio.Task[None] | None = None
+            for running in self._running.values():
+                if running.effect is effect:
+                    task = running.task
+                    break
+
+            if task is None:
+                _LOGGER.warning(
+                    {
+                        "class": self.__class__.__name__,
+                        "method": "add_lights",
+                        "action": "no_task",
+                        "values": {
+                            "effect": type(effect).__name__,
+                            "lights": len(new_lights),
+                        },
+                    }
+                )
+                return
+
+            # Capture prestates in parallel
+            captured = await asyncio.gather(
+                *(self._state_manager.capture_state(light) for light in new_lights)
+            )
+            prestates = dict(zip([light.serial for light in new_lights], captured))
+
+            # Create animators for frame-based effects
+            from lifx.effects.frame_effect import FrameEffect
+
+            if isinstance(effect, FrameEffect):
+                new_animators = await self._create_animators(effect, new_lights)
+                effect._animators.extend(new_animators)
+
+            # Add to participants
+            effect.participants.extend(new_lights)
+
+            # Register in running map
+            for light in new_lights:
+                self._running[light.serial] = RunningEffect(
+                    effect=effect,
+                    prestate=prestates[light.serial],
+                    task=task,
+                )
+
+            _LOGGER.debug(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "add_lights",
+                    "action": "added",
+                    "values": {
+                        "effect": type(effect).__name__,
+                        "added_count": len(new_lights),
+                    },
+                }
+            )
+
+    async def remove_lights(
+        self, lights: list[Light], restore_state: bool = True
+    ) -> None:
+        """Remove lights from their running effect without stopping others.
+
+        Closes animators, optionally restores state, and deregisters lights.
+        If the last participant is removed, cancels the background task.
+
+        Args:
+            lights: List of lights to remove
+            restore_state: Whether to restore pre-effect state (default True)
+
+        Example:
+            ```python
+            # Remove a light and restore its state
+            await conductor.remove_lights([light1])
+
+            # Remove without restoring state
+            await conductor.remove_lights([light2], restore_state=False)
+            ```
+        """
+        from lifx.effects.frame_effect import FrameEffect
+
+        tasks_to_cancel: set[asyncio.Task[None]] = set()
+        lights_to_restore: list[tuple[Light, PreState]] = []
+
+        async with self._lock:
+            for light in lights:
+                serial = light.serial
+                running = self._running.get(serial)
+                if not running:
+                    continue
+
+                effect = running.effect
+
+                # Remove animator for frame effects
+                if isinstance(effect, FrameEffect):
+                    # Find index by matching serial in participants
+                    for idx, participant in enumerate(effect.participants):
+                        if participant.serial == serial:
+                            if idx < len(effect._animators):
+                                effect._animators[idx].close()
+                                effect._animators.pop(idx)
+                            break
+
+                # Remove from participants
+                effect.participants = [
+                    p for p in effect.participants if p.serial != serial
+                ]
+
+                # Track for restoration
+                if restore_state:
+                    lights_to_restore.append((light, running.prestate))
+
+                # Check if this was the last participant
+                remaining = sum(
+                    1
+                    for r in self._running.values()
+                    if r.task is running.task and r.effect is effect
+                )
+                # Count will include current light (not yet removed from _running)
+                if remaining <= 1:
+                    tasks_to_cancel.add(running.task)
+
+                del self._running[serial]
+
+                _LOGGER.debug(
+                    {
+                        "class": self.__class__.__name__,
+                        "method": "remove_lights",
+                        "action": "removed",
+                        "values": {
+                            "serial": serial,
+                            "effect": type(effect).__name__,
+                            "restore_state": restore_state,
+                        },
+                    }
+                )
+
+        # Cancel orphaned tasks (outside lock)
+        for task in tasks_to_cancel:
+            if not task.done():
+                task.cancel()
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+
+        # Restore state (outside lock)
+        if lights_to_restore:
+            await asyncio.gather(
+                *(
+                    self._state_manager.restore_state(light, prestate)
+                    for light, prestate in lights_to_restore
+                )
+            )
+
     async def _run_effect_with_cleanup(
         self, effect: LIFXEffect, participants: list[Light]
     ) -> None:
@@ -323,23 +543,25 @@ class Conductor:
                 }
             )
             async with self._lock:
-                lights_to_restore: list[tuple[Light, PreState]] = []
-                for light in participants:
-                    serial = light.serial
-                    running = self._running.get(serial)
-                    if running:
-                        lights_to_restore.append((light, running.prestate))
+                # Only restore state if the effect wants it
+                if effect.restore_on_complete:
+                    lights_to_restore: list[tuple[Light, PreState]] = []
+                    for light in participants:
+                        serial = light.serial
+                        running = self._running.get(serial)
+                        if running:
+                            lights_to_restore.append((light, running.prestate))
 
-                # Restore all lights in parallel
-                if lights_to_restore:
-                    await asyncio.gather(
-                        *(
-                            self._state_manager.restore_state(light, prestate)
-                            for light, prestate in lights_to_restore
+                    # Restore all lights in parallel
+                    if lights_to_restore:
+                        await asyncio.gather(
+                            *(
+                                self._state_manager.restore_state(light, prestate)
+                                for light, prestate in lights_to_restore
+                            )
                         )
-                    )
 
-                # Remove from running registry after restoration
+                # Remove from running registry
                 for light in participants:
                     serial = light.serial
                     if serial in self._running:

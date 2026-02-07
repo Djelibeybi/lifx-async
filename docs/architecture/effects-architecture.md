@@ -24,9 +24,11 @@ The Light Effects Framework is built on a layered architecture that separates co
                  │
 ┌────────────────▼────────────────────────────────────┐
 │              Effects API Layer                       │
-│   • Conductor (orchestration)                       │
+│   • Conductor (orchestration + dynamic lights)      │
 │   • EffectPulse (firmware waveforms via Device)     │
-│   • FrameEffect → EffectColorloop (frame-based)    │
+│   • FrameEffect → Colorloop, Rainbow, Flame,       │
+│     Aurora, Progress, Sunrise/Sunset (frame-based)  │
+│   • EffectRegistry (discovery + filtering)          │
 │   • LIFXEffect (base class)                         │
 └──────┬─────────────────────────────┬────────────────┘
        │ (EffectPulse)               │ (FrameEffect)
@@ -64,6 +66,12 @@ src/lifx/effects/
 ├── conductor.py             # Conductor orchestrator
 ├── pulse.py                 # EffectPulse implementation
 ├── colorloop.py             # EffectColorloop (FrameEffect) implementation
+├── rainbow.py               # EffectRainbow (FrameEffect) implementation
+├── flame.py                 # EffectFlame (FrameEffect) implementation
+├── aurora.py                # EffectAurora (FrameEffect) implementation
+├── progress.py              # EffectProgress (FrameEffect, multizone only)
+├── sunrise.py               # EffectSunrise + EffectSunset (FrameEffect, matrix only)
+├── registry.py              # EffectRegistry, DeviceType, DeviceSupport, EffectInfo
 ├── models.py                # PreState, RunningEffect dataclasses
 ├── state_manager.py         # DeviceStateManager for state capture/restore
 └── const.py                 # Effect constants
@@ -167,6 +175,56 @@ class FrameEffect(LIFXEffect):
 - Runs indefinitely until stopped
 - Supports state inheritance for seamless transitions
 - Works across all device types (Light, MultiZoneLight, MatrixLight)
+
+**EffectRainbow (`rainbow.py`):**
+
+- Extends `FrameEffect`
+- Spreads full 360-degree rainbow across all pixels, scrolling over time
+- Configurable period, brightness, saturation, and inter-device spread
+- Best on multizone strips and matrix lights
+
+**EffectFlame (`flame.py`):**
+
+- Extends `FrameEffect`
+- Layered sine waves produce organic flicker (no random state)
+- Warm color range: hue 0-40, high saturation, configurable kelvin range
+- Matrix enhancement: vertical brightness falloff (bottom rows hotter)
+- Works on all color device types
+
+**EffectAurora (`aurora.py`):**
+
+- Extends `FrameEffect`
+- Palette interpolation with shortest-path hue wrapping
+- Sine wave brightness modulation creates flowing "curtain" bands
+- Matrix enhancement: vertical gradient (brightest in middle rows)
+- Configurable palette, speed, brightness, and inter-device spread
+
+**EffectProgress (`progress.py`):**
+
+- Extends `FrameEffect`
+- Animated progress bar with traveling bright spot
+- Mutable `position` attribute for real-time updates
+- Supports single color or gradient foreground
+- Multizone only (`has_multizone` required)
+
+**EffectSunrise + EffectSunset (`sunrise.py`):**
+
+- Both extend `FrameEffect`
+- Duration-based (finite) — complete automatically
+- Shared `_sun_frame()` helper: radial model centered at configurable origin
+- Five color phases: night → dawn → golden hour → morning → daylight
+- `origin` parameter: `"bottom"` (rectangular tiles) or `"center"` (Ceiling lights)
+- Sunrise: `restore_on_complete=False` (stays at daylight)
+- Sunset: optionally powers off lights after last frame
+- Matrix only (`has_matrix` required)
+
+**EffectRegistry (`registry.py`):**
+
+- Central discovery mechanism for effect compatibility
+- `DeviceType` enum: LIGHT, MULTIZONE, MATRIX
+- `DeviceSupport` enum: RECOMMENDED, COMPATIBLE, NOT_SUPPORTED
+- `EffectInfo` frozen dataclass with name, class, description, support map
+- `get_effect_registry()` returns lazily-initialized default registry with all built-in effects
 
 #### Data Models (`models.py`)
 
@@ -488,7 +546,13 @@ else:
 
 **Used by:**
 
-- `EffectColorloop.inherit_prestate()` → Returns `True` for other `EffectColorloop` instances
+- `EffectColorloop.inherit_prestate()` → `True` for other `EffectColorloop`
+- `EffectRainbow.inherit_prestate()` → `True` for other `EffectRainbow`
+- `EffectFlame.inherit_prestate()` → `True` for other `EffectFlame`
+- `EffectAurora.inherit_prestate()` → `True` for other `EffectAurora`
+- `EffectProgress.inherit_prestate()` → `True` for other `EffectProgress`
+- `EffectSunrise.inherit_prestate()` → `True` for other `EffectSunrise`
+- `EffectSunset.inherit_prestate()` → `True` for other `EffectSunset`
 - `EffectPulse` doesn't use it (returns `False`)
 
 ## Concurrency Model
@@ -631,8 +695,9 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 
 #### Matrix Lights (`MatrixLight`)
 
-- **Current Implementation:** Treated like color lights (no matrix-specific logic yet)
-- **Future Enhancement:** Could apply effects to individual tiles using device chain
+- **FrameEffect support:** Full 2D canvas via `FrameContext.canvas_width` / `canvas_height`
+- **Spatial effects:** Flame (vertical gradient), Aurora (vertical brightness), Sunrise/Sunset (radial wavefront)
+- **Canvas mapping:** Multi-tile devices get a unified canvas based on tile positions
 
 #### HEV Lights (`HevLight`)
 

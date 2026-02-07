@@ -761,20 +761,20 @@ Effects:
 
 Examples:
   # Run with auto-selected effect
-  python 16_animation_numpy.py --serial d073d5123456
+  python animation_numpy.py --serial d073d5123456
 
   # Run plasma effect for 30 seconds at 60 FPS
-  python 16_animation_numpy.py --serial d073d5123456 --effect plasma \\
+  python animation_numpy.py --serial d073d5123456 --effect plasma \\
     --duration 30 --fps 60
 
   # Specify IP for faster connection
-  python 16_animation_numpy.py --serial d073d5123456 --ip 192.168.1.100
+  python animation_numpy.py --serial d073d5123456 --ip 192.168.1.100
 
   # Run synthetic benchmarks only (no device needed)
-  python 16_animation_numpy.py --profile
+  python animation_numpy.py --profile
 
   # Profile animation loop against a device + synthetic benchmarks
-  python 16_animation_numpy.py --serial d073d5123456 --ip 192.168.1.100 --profile
+  python animation_numpy.py --serial d073d5123456 --ip 192.168.1.100 --profile
         """,
     )
     parser.add_argument(

@@ -564,23 +564,23 @@ if __name__ == "__main__":
         epilog="""
 Examples:
   # Find device by serial and run animation
-  python 15_animation.py --serial d073d5123456
+  python animation_basic.py --serial d073d5123456
 
   # Specify IP address for faster connection
-  python 15_animation.py --serial d073d5123456 --ip 192.168.1.100
+  python animation_basic.py --serial d073d5123456 --ip 192.168.1.100
 
   # Run animation for 30 seconds at 60 FPS
-  python 15_animation.py --serial d073d5123456 --duration 30 --fps 60
+  python animation_basic.py --serial d073d5123456 --duration 30 --fps 60
 
   # Run synthetic benchmarks only (no device needed)
-  python 15_animation.py --profile
+  python animation_basic.py --profile
 
   # Profile animation loop against a device + synthetic benchmarks
-  python 15_animation.py --serial d073d5123456 --ip 192.168.1.100 --profile
+  python animation_basic.py --serial d073d5123456 --ip 192.168.1.100 --profile
 
   # Serial number formats (both work):
-  python 15_animation.py --serial d073d5123456
-  python 15_animation.py --serial d0:73:d5:12:34:56
+  python animation_basic.py --serial d073d5123456
+  python animation_basic.py --serial d0:73:d5:12:34:56
         """,
     )
     parser.add_argument(

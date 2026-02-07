@@ -990,4 +990,4 @@ class Effect1(LIFXEffect):
 - [Effects Reference](../api/effects.md) - Detailed API documentation
 - [Architecture](../architecture/effects-architecture.md) - How the system works internally
 - [Troubleshooting](effects-troubleshooting.md) - Common issues and solutions
-- [Examples](../../examples/) - Full working examples including `08_custom_effect.py`
+- [Examples](../../examples/) - Full working examples including `effects_custom.py`

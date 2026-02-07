@@ -1,24 +1,25 @@
-"""Example demonstrating rainbow effect.
+"""Example demonstrating flame effect.
 
-EffectRainbow spreads a full 360-degree rainbow across all pixels on a
-device and scrolls it over time. On multizone strips and matrix lights
-this produces a moving rainbow. On single bulbs it cycles through hues
-(similar to colorloop but with fixed brightness/saturation).
+EffectFlame creates a fire/candle flicker using layered sine waves for organic
+brightness variation. Warm colors range from deep red to yellow. On matrix
+lights, a vertical brightness gradient makes the bottom rows hotter.
 
-For a simpler single-color hue rotation, see 07_colorloop_effect.py.
+Works on all color devices — single bulbs flicker like candles, strips look
+like a fire along a wall, and matrix lights get a 2D fire with vertical
+gradient.
 
 Usage:
     # Discover all lights on the network
-    python 17_rainbow_effect.py
+    python effects_flame.py
 
     # Target specific devices by IP address
-    python 17_rainbow_effect.py 192.168.1.100 192.168.1.101
+    python effects_flame.py 192.168.1.100 192.168.1.101
 
     # Target specific devices by serial number
-    python 17_rainbow_effect.py d073d5123456 d073d5abcdef
+    python effects_flame.py d073d5123456 d073d5abcdef
 
     # Mix IP addresses and serial numbers
-    python 17_rainbow_effect.py 192.168.1.100 d073d5123456
+    python effects_flame.py 192.168.1.100 d073d5123456
 """
 
 #  Copyright (c) 2026 Avi Miller <me@dje.li>
@@ -28,7 +29,7 @@ import asyncio
 import sys
 
 from lifx import Light, discover, find_by_ip, find_by_serial
-from lifx.effects import Conductor, EffectRainbow
+from lifx.effects import Conductor, EffectFlame
 
 
 async def resolve_devices(targets: list[str]) -> list[Light]:
@@ -81,7 +82,7 @@ async def discover_lights() -> list[Light]:
 
 
 async def main() -> None:
-    """Run rainbow effect examples."""
+    """Run flame effect examples."""
     targets = sys.argv[1:]
 
     if targets:
@@ -98,9 +99,9 @@ async def main() -> None:
 
     conductor = Conductor()
 
-    # Example 1: Rainbow scrolling every 10 seconds
-    print("\n1. Rainbow effect (15 seconds)")
-    effect = EffectRainbow(period=10)
+    # Example 1: Default candle flicker
+    print("\n1. Candle flicker - default settings (15 seconds)")
+    effect = EffectFlame()
     await conductor.start(effect, lights)
     await asyncio.sleep(15)
     await conductor.stop(lights)
@@ -108,26 +109,29 @@ async def main() -> None:
 
     await asyncio.sleep(2)
 
-    # Example 2: Fast rainbow with lower brightness
-    print("\n2. Fast rainbow at 50% brightness (15 seconds)")
-    effect = EffectRainbow(period=3, brightness=0.5)
+    # Example 2: Intense fast fire
+    print("\n2. Intense fire - high intensity and speed (15 seconds)")
+    effect = EffectFlame(intensity=1.0, speed=2.0, brightness=1.0)
     await conductor.start(effect, lights)
     await asyncio.sleep(15)
     await conductor.stop(lights)
     print("Stopped. Lights restored to original state.")
 
-    # Example 3: Rainbow with device spread (only with multiple lights)
-    # Each device's rainbow is offset by 'spread' degrees so adjacent
-    # devices display different parts of the spectrum simultaneously.
-    if len(lights) > 1:
-        await asyncio.sleep(2)
+    await asyncio.sleep(2)
 
-        print("\n3. Rainbow with 90-degree device spread (15 seconds)")
-        effect = EffectRainbow(period=10, spread=90)
-        await conductor.start(effect, lights)
-        await asyncio.sleep(15)
-        await conductor.stop(lights)
-        print("Stopped. Lights restored to original state.")
+    # Example 3: Gentle low ember glow
+    print("\n3. Low ember glow - low intensity, narrow kelvin range (15 seconds)")
+    effect = EffectFlame(
+        intensity=0.3,
+        speed=0.5,
+        brightness=0.4,
+        kelvin_min=1500,
+        kelvin_max=1800,
+    )
+    await conductor.start(effect, lights)
+    await asyncio.sleep(15)
+    await conductor.stop(lights)
+    print("Stopped. Lights restored to original state.")
 
     print("\nAll effects completed!")
     print("Lights have been restored to their original state")

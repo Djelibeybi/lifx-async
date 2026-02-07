@@ -9,7 +9,7 @@ using mDNS/DNS-SD instead of UDP broadcast. mDNS discovery has several advantage
 - Can work across subnets with an mDNS reflector
 
 Usage:
-    uv run python examples/14_mdns_discovery.py
+    uv run python examples/discovery_mdns.py
 """
 
 from __future__ import annotations
