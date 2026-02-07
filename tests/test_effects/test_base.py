@@ -24,7 +24,7 @@ class ConcreteEffect(LIFXEffect):
 
 
 @pytest.fixture
-def effect():
+def effect() -> ConcreteEffect:
     """Create a concrete effect instance for testing."""
     return ConcreteEffect(power_on=True)
 

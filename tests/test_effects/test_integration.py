@@ -89,7 +89,7 @@ def mock_light() -> MagicMock:
 
 
 @pytest.fixture
-def mock_white_light():
+def mock_white_light() -> MagicMock:
     """Create a mock white light (no color support)."""
     light = MagicMock()
     light.serial = "d073d5abcdef"

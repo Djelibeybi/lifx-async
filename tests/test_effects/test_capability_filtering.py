@@ -11,7 +11,7 @@ from lifx.effects.pulse import EffectPulse
 
 
 @pytest.fixture
-def color_light():
+def color_light() -> MagicMock:
     """Create a mock color light."""
     light = MagicMock(spec=Light)
     light.serial = "d073d5000001"
@@ -40,7 +40,7 @@ def color_light():
 
 
 @pytest.fixture
-def white_light():
+def white_light() -> MagicMock:
     """Create a mock white-only light (no color capability)."""
     light = MagicMock(spec=Light)
     light.serial = "d073d5000002"
