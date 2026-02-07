@@ -104,7 +104,7 @@ async def _start_effect_with_mock_animators(
         await conductor.start(effect, lights)
 
 
-async def test_add_lights_to_running_effect(conductor, light1, light2):
+async def test_add_lights_to_running_effect(conductor, light1, light2) -> None:
     """Test adding a light to a running effect registers it."""
     effect = _SimpleFrameEffect()
 
@@ -138,7 +138,7 @@ async def test_add_lights_to_running_effect(conductor, light1, light2):
     await conductor.stop([light1, light2])
 
 
-async def test_add_lights_captures_prestate(conductor, light1, light2):
+async def test_add_lights_captures_prestate(conductor, light1, light2) -> None:
     """Test that add_lights captures prestate for the new light."""
     effect = _SimpleFrameEffect()
 
@@ -173,7 +173,7 @@ async def test_add_lights_captures_prestate(conductor, light1, light2):
     await conductor.stop([light1, light2])
 
 
-async def test_add_lights_creates_animator(conductor, light1, light2):
+async def test_add_lights_creates_animator(conductor, light1, light2) -> None:
     """Test that add_lights creates and appends an animator."""
     effect = _SimpleFrameEffect()
 
@@ -208,7 +208,7 @@ async def test_add_lights_creates_animator(conductor, light1, light2):
     await conductor.stop([light1, light2])
 
 
-async def test_add_lights_skips_already_running(conductor, light1):
+async def test_add_lights_skips_already_running(conductor, light1) -> None:
     """Test that adding an already-running light is a no-op."""
     effect = _SimpleFrameEffect()
 
@@ -234,7 +234,7 @@ async def test_add_lights_skips_already_running(conductor, light1):
     await conductor.stop([light1])
 
 
-async def test_add_lights_filters_incompatible(conductor, light1):
+async def test_add_lights_filters_incompatible(conductor, light1) -> None:
     """Test that incompatible lights are not added."""
     effect = _SimpleFrameEffect()
 
@@ -261,7 +261,7 @@ async def test_add_lights_filters_incompatible(conductor, light1):
     await conductor.stop([light1])
 
 
-async def test_remove_lights_restores_state(conductor, light1, light2):
+async def test_remove_lights_restores_state(conductor, light1, light2) -> None:
     """Test that remove_lights restores prestate."""
     effect = _SimpleFrameEffect()
 
@@ -295,7 +295,7 @@ async def test_remove_lights_restores_state(conductor, light1, light2):
     await conductor.stop([light1])
 
 
-async def test_remove_lights_closes_animator(conductor, light1, light2):
+async def test_remove_lights_closes_animator(conductor, light1, light2) -> None:
     """Test that remove_lights closes and removes the animator."""
     effect = _SimpleFrameEffect()
 
@@ -330,7 +330,7 @@ async def test_remove_lights_closes_animator(conductor, light1, light2):
     await conductor.stop([light1])
 
 
-async def test_remove_lights_no_restore(conductor, light1, light2):
+async def test_remove_lights_no_restore(conductor, light1, light2) -> None:
     """Test remove_lights with restore_state=False skips restoration."""
     effect = _SimpleFrameEffect()
 
@@ -364,7 +364,7 @@ async def test_remove_lights_no_restore(conductor, light1, light2):
     await conductor.stop([light1])
 
 
-async def test_remove_last_light_cancels_task(conductor, light1):
+async def test_remove_last_light_cancels_task(conductor, light1) -> None:
     """Test removing the last participant cancels the background task."""
     effect = _SimpleFrameEffect()
 
@@ -389,7 +389,9 @@ async def test_remove_last_light_cancels_task(conductor, light1):
     assert light1.serial not in conductor._running
 
 
-async def test_remove_lights_keeps_other_participants(conductor, light1, light2):
+async def test_remove_lights_keeps_other_participants(
+    conductor, light1, light2
+) -> None:
     """Test that removing one light doesn't affect others."""
     effect = _SimpleFrameEffect()
 
@@ -424,7 +426,7 @@ async def test_remove_lights_keeps_other_participants(conductor, light1, light2)
     await conductor.stop([light2])
 
 
-async def test_add_then_remove_roundtrip(conductor, light1, light2):
+async def test_add_then_remove_roundtrip(conductor, light1, light2) -> None:
     """Test adding a light and then removing it leaves clean state."""
     effect = _SimpleFrameEffect()
 
@@ -470,12 +472,12 @@ async def test_add_then_remove_roundtrip(conductor, light1, light2):
 # --- get_last_frame tests ---
 
 
-async def test_get_last_frame_no_running_effect(conductor, light1):
+async def test_get_last_frame_no_running_effect(conductor, light1) -> None:
     """get_last_frame returns None when no effect is running."""
     assert conductor.get_last_frame(light1) is None
 
 
-async def test_get_last_frame_returns_stored_frame(conductor, light1):
+async def test_get_last_frame_returns_stored_frame(conductor, light1) -> None:
     """get_last_frame returns the frame stored by the frame loop."""
     effect = _SimpleFrameEffect()
 
@@ -502,7 +504,9 @@ async def test_get_last_frame_returns_stored_frame(conductor, light1):
     await conductor.stop([light1])
 
 
-async def test_get_last_frame_returns_none_before_first_frame(conductor, light1):
+async def test_get_last_frame_returns_none_before_first_frame(
+    conductor, light1
+) -> None:
     """get_last_frame returns None if no frame has been generated yet."""
     effect = _SimpleFrameEffect()
 
@@ -524,7 +528,7 @@ async def test_get_last_frame_returns_none_before_first_frame(conductor, light1)
     await conductor.stop([light1])
 
 
-async def test_get_last_frame_per_device(conductor, light1, light2):
+async def test_get_last_frame_per_device(conductor, light1, light2) -> None:
     """get_last_frame returns the correct frame per device."""
     effect = _SimpleFrameEffect()
 
@@ -562,7 +566,7 @@ async def test_get_last_frame_per_device(conductor, light1, light2):
     await conductor.stop([light1, light2])
 
 
-async def test_get_last_frame_after_stop_returns_none(conductor, light1):
+async def test_get_last_frame_after_stop_returns_none(conductor, light1) -> None:
     """get_last_frame returns None after the effect is stopped."""
     effect = _SimpleFrameEffect()
 
@@ -606,7 +610,7 @@ class _SimpleNonFrameEffect(LIFXEffect):
         return True
 
 
-async def test_get_last_frame_non_frame_effect(conductor, light1):
+async def test_get_last_frame_non_frame_effect(conductor, light1) -> None:
     """get_last_frame returns None when effect is not a FrameEffect."""
     effect = _SimpleNonFrameEffect()
 
@@ -633,7 +637,7 @@ async def test_get_last_frame_non_frame_effect(conductor, light1):
     del conductor._running[light1.serial]
 
 
-async def test_add_lights_no_task_found(conductor, light1):
+async def test_add_lights_no_task_found(conductor, light1) -> None:
     """add_lights logs warning and returns when effect has no running task."""
     effect = _SimpleFrameEffect()
 
@@ -644,7 +648,7 @@ async def test_add_lights_no_task_found(conductor, light1):
     assert light1.serial not in conductor._running
 
 
-async def test_remove_lights_not_running(conductor, light1):
+async def test_remove_lights_not_running(conductor, light1) -> None:
     """remove_lights is a no-op for lights that aren't running."""
     # light1 is not in _running
     assert light1.serial not in conductor._running

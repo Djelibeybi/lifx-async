@@ -15,7 +15,7 @@ from lifx.effects.sunrise import EffectSunrise, EffectSunset
 # ============================================================================
 
 
-def test_sunrise_default_parameters():
+def test_sunrise_default_parameters() -> None:
     """Test EffectSunrise with default parameters."""
     effect = EffectSunrise()
 
@@ -27,7 +27,7 @@ def test_sunrise_default_parameters():
     assert effect.fps == 20.0
 
 
-def test_sunrise_custom_parameters():
+def test_sunrise_custom_parameters() -> None:
     """Test EffectSunrise with custom parameters."""
     effect = EffectSunrise(
         duration=120, brightness=0.8, power_on=False, origin="center"
@@ -39,7 +39,7 @@ def test_sunrise_custom_parameters():
     assert effect.origin == "center"
 
 
-def test_sunrise_invalid_duration():
+def test_sunrise_invalid_duration() -> None:
     """Test EffectSunrise with invalid duration raises ValueError."""
     with pytest.raises(ValueError, match="Duration must be positive"):
         EffectSunrise(duration=0)
@@ -48,13 +48,13 @@ def test_sunrise_invalid_duration():
         EffectSunrise(duration=-1)
 
 
-def test_sunrise_invalid_brightness():
+def test_sunrise_invalid_brightness() -> None:
     """Test EffectSunrise with invalid brightness raises ValueError."""
     with pytest.raises(ValueError, match="Brightness must be 0.0-1.0"):
         EffectSunrise(brightness=1.5)
 
 
-def test_sunrise_invalid_origin():
+def test_sunrise_invalid_origin() -> None:
     """Test EffectSunrise with invalid origin raises ValueError."""
     with pytest.raises(ValueError, match="Origin must be 'bottom' or 'center'"):
         EffectSunrise(origin="top")  # type: ignore[arg-type]
@@ -312,7 +312,7 @@ class TestSunriseFrameLoop:
 
 
 @pytest.mark.asyncio
-async def test_sunrise_from_poweroff():
+async def test_sunrise_from_poweroff() -> None:
     """Test from_poweroff_hsbk returns deep navy."""
     effect = EffectSunrise()
     light = MagicMock()
@@ -323,20 +323,20 @@ async def test_sunrise_from_poweroff():
     assert result.brightness == 0.0
 
 
-def test_sunrise_inherit_prestate():
+def test_sunrise_inherit_prestate() -> None:
     """Test inherit_prestate returns True for EffectSunrise."""
     effect = EffectSunrise()
     assert effect.inherit_prestate(EffectSunrise()) is True
     assert effect.inherit_prestate(MagicMock()) is False
 
 
-def test_sunrise_restore_on_complete_is_false():
+def test_sunrise_restore_on_complete_is_false() -> None:
     """Test sunrise skips state restoration on completion."""
     effect = EffectSunrise()
     assert effect.restore_on_complete is False
 
 
-def test_sunrise_repr():
+def test_sunrise_repr() -> None:
     """Test EffectSunrise string representation."""
     effect = EffectSunrise(duration=120, brightness=0.8)
     repr_str = repr(effect)
@@ -347,7 +347,7 @@ def test_sunrise_repr():
     assert "origin='bottom'" in repr_str
 
 
-def test_sunrise_repr_center_origin():
+def test_sunrise_repr_center_origin() -> None:
     """Test EffectSunrise repr with center origin."""
     effect = EffectSunrise(duration=60, origin="center")
     repr_str = repr(effect)
@@ -360,7 +360,7 @@ def test_sunrise_repr_center_origin():
 # ============================================================================
 
 
-def test_sunset_default_parameters():
+def test_sunset_default_parameters() -> None:
     """Test EffectSunset with default parameters."""
     effect = EffectSunset()
 
@@ -373,7 +373,7 @@ def test_sunset_default_parameters():
     assert effect.fps == 20.0
 
 
-def test_sunset_custom_parameters():
+def test_sunset_custom_parameters() -> None:
     """Test EffectSunset with custom parameters."""
     effect = EffectSunset(
         power_on=True,
@@ -390,19 +390,19 @@ def test_sunset_custom_parameters():
     assert effect.origin == "center"
 
 
-def test_sunset_invalid_duration():
+def test_sunset_invalid_duration() -> None:
     """Test EffectSunset with invalid duration raises ValueError."""
     with pytest.raises(ValueError, match="Duration must be positive"):
         EffectSunset(duration=0)
 
 
-def test_sunset_invalid_brightness():
+def test_sunset_invalid_brightness() -> None:
     """Test EffectSunset with invalid brightness raises ValueError."""
     with pytest.raises(ValueError, match="Brightness must be 0.0-1.0"):
         EffectSunset(brightness=1.5)
 
 
-def test_sunset_invalid_origin():
+def test_sunset_invalid_origin() -> None:
     """Test EffectSunset with invalid origin raises ValueError."""
     with pytest.raises(ValueError, match="Origin must be 'bottom' or 'center'"):
         EffectSunset(origin="left")  # type: ignore[arg-type]
@@ -549,7 +549,7 @@ class TestSunsetPowerOff:
 
 
 @pytest.mark.asyncio
-async def test_sunset_from_poweroff():
+async def test_sunset_from_poweroff() -> None:
     """Test from_poweroff_hsbk returns warm daylight."""
     effect = EffectSunset(brightness=0.8)
     light = MagicMock()
@@ -561,19 +561,19 @@ async def test_sunset_from_poweroff():
     assert result.kelvin == KELVIN_COOL
 
 
-def test_sunset_restore_on_complete_with_power_off():
+def test_sunset_restore_on_complete_with_power_off() -> None:
     """Test sunset skips state restoration when power_off=True."""
     effect = EffectSunset(power_off=True)
     assert effect.restore_on_complete is False
 
 
-def test_sunset_restore_on_complete_without_power_off():
+def test_sunset_restore_on_complete_without_power_off() -> None:
     """Test sunset restores state when power_off=False."""
     effect = EffectSunset(power_off=False)
     assert effect.restore_on_complete is True
 
 
-def test_sunset_inherit_prestate():
+def test_sunset_inherit_prestate() -> None:
     """Test inherit_prestate returns True for EffectSunset."""
     effect = EffectSunset()
     assert effect.inherit_prestate(EffectSunset()) is True
@@ -581,7 +581,7 @@ def test_sunset_inherit_prestate():
     assert effect.inherit_prestate(MagicMock()) is False
 
 
-def test_sunset_repr():
+def test_sunset_repr() -> None:
     """Test EffectSunset string representation."""
     effect = EffectSunset(duration=120, brightness=0.8, power_off=False)
     repr_str = repr(effect)
@@ -593,7 +593,7 @@ def test_sunset_repr():
     assert "origin='bottom'" in repr_str
 
 
-def test_sunset_repr_center_origin():
+def test_sunset_repr_center_origin() -> None:
     """Test EffectSunset repr with center origin."""
     effect = EffectSunset(duration=60, origin="center")
     repr_str = repr(effect)

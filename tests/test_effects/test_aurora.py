@@ -11,7 +11,7 @@ from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 
-def test_aurora_default_parameters():
+def test_aurora_default_parameters() -> None:
     """Test EffectAurora with default parameters."""
     effect = EffectAurora()
 
@@ -24,7 +24,7 @@ def test_aurora_default_parameters():
     assert effect.duration is None
 
 
-def test_aurora_custom_parameters():
+def test_aurora_custom_parameters() -> None:
     """Test EffectAurora with custom parameters."""
     effect = EffectAurora(
         speed=2.0,
@@ -40,7 +40,7 @@ def test_aurora_custom_parameters():
     assert effect.power_on is False
 
 
-def test_aurora_invalid_speed():
+def test_aurora_invalid_speed() -> None:
     """Test EffectAurora with invalid speed raises ValueError."""
     with pytest.raises(ValueError, match="Speed must be positive"):
         EffectAurora(speed=0)
@@ -49,25 +49,25 @@ def test_aurora_invalid_speed():
         EffectAurora(speed=-1.0)
 
 
-def test_aurora_invalid_brightness():
+def test_aurora_invalid_brightness() -> None:
     """Test EffectAurora with invalid brightness raises ValueError."""
     with pytest.raises(ValueError, match="Brightness must be 0.0-1.0"):
         EffectAurora(brightness=1.5)
 
 
-def test_aurora_invalid_palette_too_short():
+def test_aurora_invalid_palette_too_short() -> None:
     """Test EffectAurora with too-short palette raises ValueError."""
     with pytest.raises(ValueError, match="Palette must have at least 2"):
         EffectAurora(palette=[120])
 
 
-def test_aurora_invalid_palette_hue():
+def test_aurora_invalid_palette_hue() -> None:
     """Test EffectAurora with out-of-range palette hue raises ValueError."""
     with pytest.raises(ValueError, match="Palette hue values must be 0-360"):
         EffectAurora(palette=[120, 400])
 
 
-def test_aurora_invalid_spread():
+def test_aurora_invalid_spread() -> None:
     """Test EffectAurora with invalid spread raises ValueError."""
     with pytest.raises(ValueError, match="Spread must be 0-360"):
         EffectAurora(spread=400)
@@ -300,7 +300,7 @@ class TestAuroraFrameLoop:
 
 
 @pytest.mark.asyncio
-async def test_aurora_from_poweroff():
+async def test_aurora_from_poweroff() -> None:
     """Test from_poweroff_hsbk returns green aurora color."""
     effect = EffectAurora()
     light = MagicMock()
@@ -313,7 +313,7 @@ async def test_aurora_from_poweroff():
 
 
 @pytest.mark.asyncio
-async def test_aurora_is_light_compatible_with_color():
+async def test_aurora_is_light_compatible_with_color() -> None:
     """Test is_light_compatible returns True for color lights."""
     effect = EffectAurora()
     light = MagicMock()
@@ -325,7 +325,7 @@ async def test_aurora_is_light_compatible_with_color():
 
 
 @pytest.mark.asyncio
-async def test_aurora_is_light_compatible_without_color():
+async def test_aurora_is_light_compatible_without_color() -> None:
     """Test is_light_compatible returns False for non-color lights."""
     effect = EffectAurora()
     light = MagicMock()
@@ -337,7 +337,7 @@ async def test_aurora_is_light_compatible_without_color():
 
 
 @pytest.mark.asyncio
-async def test_aurora_is_light_compatible_none_capabilities():
+async def test_aurora_is_light_compatible_none_capabilities() -> None:
     """Test is_light_compatible loads capabilities when None."""
     effect = EffectAurora()
     light = MagicMock()
@@ -354,14 +354,14 @@ async def test_aurora_is_light_compatible_none_capabilities():
     light._ensure_capabilities.assert_called_once()
 
 
-def test_aurora_inherit_prestate():
+def test_aurora_inherit_prestate() -> None:
     """Test inherit_prestate returns True for EffectAurora."""
     effect = EffectAurora()
     assert effect.inherit_prestate(EffectAurora()) is True
     assert effect.inherit_prestate(MagicMock()) is False
 
 
-def test_aurora_repr():
+def test_aurora_repr() -> None:
     """Test EffectAurora string representation."""
     effect = EffectAurora(speed=2.0, brightness=0.7, spread=45)
     repr_str = repr(effect)
