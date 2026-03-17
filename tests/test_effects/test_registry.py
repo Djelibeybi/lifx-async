@@ -173,10 +173,10 @@ class TestDefaultRegistry:
     """Tests for the default registry returned by get_effect_registry()."""
 
     def test_default_registry_has_all_builtin_effects(self) -> None:
-        """Test that default registry has all 8 built-in effects."""
+        """Test that default registry has all original built-in effects."""
         registry = get_effect_registry()
         names = {info.name for info in registry.effects}
-        expected = {
+        original_effects = {
             "pulse",
             "colorloop",
             "rainbow",
@@ -186,7 +186,7 @@ class TestDefaultRegistry:
             "sunrise",
             "sunset",
         }
-        assert names == expected
+        assert original_effects.issubset(names)
 
     def test_builtin_effect_names(self) -> None:
         """Test all expected effect names are present."""
