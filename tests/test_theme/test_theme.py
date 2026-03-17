@@ -6,6 +6,7 @@ import pytest
 
 from lifx.color import HSBK, Colors
 from lifx.theme import Theme
+from lifx.theme.library import ThemeLibrary
 
 
 class TestThemeCreation:
@@ -225,3 +226,53 @@ class TestThemeRepresentation:
 
         assert "Theme" in repr_str
         assert "3 colors" in repr_str
+
+
+class TestPaletteThemes:
+    """Tests for palette themes ported from pkivolowitz/lifx."""
+
+    PALETTE_NAMES = [
+        "fire",
+        "water",
+        "forest",
+        "earth",
+        "neon",
+        "aurora_borealis",
+        "tropical",
+        "arctic",
+        "galaxy",
+        "deep_sea",
+        "coral_reef",
+        "desert",
+        "vaporwave",
+        "cyberpunk",
+        "cherry_blossom",
+    ]
+
+    @pytest.mark.parametrize("name", PALETTE_NAMES)
+    def test_palette_theme_exists(self, name: str) -> None:
+        """Each palette theme should be retrievable."""
+        theme = ThemeLibrary.get(name)
+        assert theme is not None
+
+    @pytest.mark.parametrize("name", PALETTE_NAMES)
+    def test_palette_theme_has_colors(self, name: str) -> None:
+        """Each palette theme should have at least 3 colors."""
+        theme = ThemeLibrary.get(name)
+        assert len(theme) >= 3
+
+    @pytest.mark.parametrize("name", PALETTE_NAMES)
+    def test_palette_theme_colors_are_valid_hsbk(self, name: str) -> None:
+        """Each color in a palette theme should be a valid HSBK."""
+        theme = ThemeLibrary.get(name)
+        for color in theme:
+            assert isinstance(color, HSBK)
+            assert 0 <= color.hue <= 360
+            assert 0.0 <= color.saturation <= 1.0
+            assert 0.0 <= color.brightness <= 1.0
+            assert 1500 <= color.kelvin <= 9000
+
+    def test_palette_names_dont_collide_with_existing(self) -> None:
+        """Palette names should not collide with existing themes."""
+        all_names = ThemeLibrary.list()
+        assert len(all_names) == len(set(all_names))

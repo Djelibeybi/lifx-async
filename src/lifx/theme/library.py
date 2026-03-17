@@ -325,6 +325,83 @@ class ThemeLibrary:
             HSBK(hue=281, saturation=1.0, brightness=0.4295, kelvin=3500),
             HSBK(hue=139, saturation=1.0, brightness=0.6442, kelvin=3500),
         ],
+        # Palette themes ported from pkivolowitz/lifx
+        # Each palette is (hue_a, hue_b, hue_c, saturation) converted to 3 HSBK colors
+        "fire": [
+            HSBK(hue=0, saturation=0.95, brightness=1.0, kelvin=3500),
+            HSBK(hue=30, saturation=0.95, brightness=1.0, kelvin=3500),
+            HSBK(hue=55, saturation=0.95, brightness=1.0, kelvin=3500),
+        ],
+        "water": [
+            HSBK(hue=220, saturation=0.85, brightness=1.0, kelvin=3500),
+            HSBK(hue=185, saturation=0.85, brightness=1.0, kelvin=3500),
+            HSBK(hue=165, saturation=0.85, brightness=1.0, kelvin=3500),
+        ],
+        "forest": [
+            HSBK(hue=130, saturation=0.72, brightness=1.0, kelvin=3500),
+            HSBK(hue=95, saturation=0.72, brightness=1.0, kelvin=3500),
+            HSBK(hue=28, saturation=0.72, brightness=1.0, kelvin=3500),
+        ],
+        "earth": [
+            HSBK(hue=35, saturation=0.70, brightness=1.0, kelvin=3500),
+            HSBK(hue=18, saturation=0.70, brightness=1.0, kelvin=3500),
+            HSBK(hue=130, saturation=0.70, brightness=1.0, kelvin=3500),
+        ],
+        "neon": [
+            HSBK(hue=310, saturation=1.0, brightness=1.0, kelvin=3500),
+            HSBK(hue=183, saturation=1.0, brightness=1.0, kelvin=3500),
+            HSBK(hue=90, saturation=1.0, brightness=1.0, kelvin=3500),
+        ],
+        "aurora_borealis": [
+            HSBK(hue=145, saturation=0.85, brightness=1.0, kelvin=3500),
+            HSBK(hue=178, saturation=0.85, brightness=1.0, kelvin=3500),
+            HSBK(hue=268, saturation=0.85, brightness=1.0, kelvin=3500),
+        ],
+        "tropical": [
+            HSBK(hue=175, saturation=0.90, brightness=1.0, kelvin=3500),
+            HSBK(hue=15, saturation=0.90, brightness=1.0, kelvin=3500),
+            HSBK(hue=55, saturation=0.90, brightness=1.0, kelvin=3500),
+        ],
+        "arctic": [
+            HSBK(hue=200, saturation=0.20, brightness=1.0, kelvin=3500),
+            HSBK(hue=210, saturation=0.20, brightness=1.0, kelvin=3500),
+            HSBK(hue=215, saturation=0.20, brightness=1.0, kelvin=3500),
+        ],
+        "galaxy": [
+            HSBK(hue=268, saturation=0.78, brightness=1.0, kelvin=3500),
+            HSBK(hue=235, saturation=0.78, brightness=1.0, kelvin=3500),
+            HSBK(hue=215, saturation=0.78, brightness=1.0, kelvin=3500),
+        ],
+        "deep_sea": [
+            HSBK(hue=232, saturation=0.90, brightness=1.0, kelvin=3500),
+            HSBK(hue=172, saturation=0.90, brightness=1.0, kelvin=3500),
+            HSBK(hue=262, saturation=0.90, brightness=1.0, kelvin=3500),
+        ],
+        "coral_reef": [
+            HSBK(hue=18, saturation=0.88, brightness=1.0, kelvin=3500),
+            HSBK(hue=175, saturation=0.88, brightness=1.0, kelvin=3500),
+            HSBK(hue=230, saturation=0.88, brightness=1.0, kelvin=3500),
+        ],
+        "desert": [
+            HSBK(hue=45, saturation=0.68, brightness=1.0, kelvin=3500),
+            HSBK(hue=18, saturation=0.68, brightness=1.0, kelvin=3500),
+            HSBK(hue=28, saturation=0.68, brightness=1.0, kelvin=3500),
+        ],
+        "vaporwave": [
+            HSBK(hue=310, saturation=0.95, brightness=1.0, kelvin=3500),
+            HSBK(hue=270, saturation=0.95, brightness=1.0, kelvin=3500),
+            HSBK(hue=185, saturation=0.95, brightness=1.0, kelvin=3500),
+        ],
+        "cyberpunk": [
+            HSBK(hue=130, saturation=1.0, brightness=1.0, kelvin=3500),
+            HSBK(hue=225, saturation=1.0, brightness=1.0, kelvin=3500),
+            HSBK(hue=300, saturation=1.0, brightness=1.0, kelvin=3500),
+        ],
+        "cherry_blossom": [
+            HSBK(hue=348, saturation=0.38, brightness=1.0, kelvin=3500),
+            HSBK(hue=15, saturation=0.38, brightness=1.0, kelvin=3500),
+            HSBK(hue=290, saturation=0.38, brightness=1.0, kelvin=3500),
+        ],
     }
 
     @classmethod
