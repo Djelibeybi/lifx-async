@@ -180,6 +180,7 @@ def _build_default_registry() -> EffectRegistry:
     """Build and populate the default registry with built-in effects."""
     from lifx.effects.aurora import EffectAurora
     from lifx.effects.colorloop import EffectColorloop
+    from lifx.effects.cylon import EffectCylon
     from lifx.effects.flame import EffectFlame
     from lifx.effects.progress import EffectProgress
     from lifx.effects.pulse import EffectPulse
@@ -236,6 +237,19 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="cylon",
+            effect_class=EffectCylon,
+            description="Larson scanner — a bright eye sweeps back and forth",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
             },
         )
     )

@@ -40,6 +40,7 @@ from lifx.effects.aurora import EffectAurora
 from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.conductor import Conductor
+from lifx.effects.cylon import EffectCylon
 from lifx.effects.flame import EffectFlame
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.models import PreState, RunningEffect
@@ -63,6 +64,7 @@ __all__ = [
     "DeviceType",
     "EffectAurora",
     "EffectColorloop",
+    "EffectCylon",
     "EffectFlame",
     "EffectInfo",
     "EffectProgress",
