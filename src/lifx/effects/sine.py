@@ -175,6 +175,7 @@ class EffectSine(FrameEffect):
 
         # Optional second color for gradient along the wave crest.
         use_gradient = self.hue2 is not None
+        end_color = base_color
         if use_gradient:
             end_color = HSBK(
                 hue=self.hue2,  # type: ignore[arg-type]
