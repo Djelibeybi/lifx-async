@@ -181,11 +181,28 @@ def _build_default_registry() -> EffectRegistry:
     from lifx.effects.aurora import EffectAurora
     from lifx.effects.colorloop import EffectColorloop
     from lifx.effects.cylon import EffectCylon
+    from lifx.effects.double_slit import EffectDoubleSlit
+    from lifx.effects.embers import EffectEmbers
+    from lifx.effects.fireworks import EffectFireworks
     from lifx.effects.flame import EffectFlame
+    from lifx.effects.jacobs_ladder import EffectJacobsLadder
+    from lifx.effects.newtons_cradle import EffectNewtonsCradle
+    from lifx.effects.pendulum_wave import EffectPendulumWave
+    from lifx.effects.plasma import EffectPlasma
+    from lifx.effects.plasma2d import EffectPlasma2D
     from lifx.effects.progress import EffectProgress
     from lifx.effects.pulse import EffectPulse
     from lifx.effects.rainbow import EffectRainbow
+    from lifx.effects.ripple import EffectRipple
+    from lifx.effects.rule30 import EffectRule30
+    from lifx.effects.rule_trio import EffectRuleTrio
+    from lifx.effects.sine import EffectSine
+    from lifx.effects.sonar import EffectSonar
+    from lifx.effects.spectrum_sweep import EffectSpectrumSweep
+    from lifx.effects.spin import EffectSpin
     from lifx.effects.sunrise import EffectSunrise, EffectSunset
+    from lifx.effects.twinkle import EffectTwinkle
+    from lifx.effects.wave import EffectWave
 
     registry = EffectRegistry()
 
@@ -298,6 +315,227 @@ def _build_default_registry() -> EffectRegistry:
             name="sunset",
             effect_class=EffectSunset,
             description="Sunset color transition from daylight to night",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="wave",
+            effect_class=EffectWave,
+            description="Smooth color wave sweeping across zones",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="sine",
+            effect_class=EffectSine,
+            description="Sinusoidal color wave oscillating across zones",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="spectrum_sweep",
+            effect_class=EffectSpectrumSweep,
+            description="Full spectrum hue sweep across zones",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="pendulum_wave",
+            effect_class=EffectPendulumWave,
+            description="Pendulum wave with phase-shifted oscillators",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="double_slit",
+            effect_class=EffectDoubleSlit,
+            description="Double-slit interference pattern simulation",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="twinkle",
+            effect_class=EffectTwinkle,
+            description="Random twinkling sparkle effect",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.COMPATIBLE,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="spin",
+            effect_class=EffectSpin,
+            description="Rotating color pattern spinning around zones",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="rule30",
+            effect_class=EffectRule30,
+            description="Cellular automaton Rule 30 pattern generator",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="rule_trio",
+            effect_class=EffectRuleTrio,
+            description="Three-state cellular automaton pattern generator",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="embers",
+            effect_class=EffectEmbers,
+            description="Glowing embers fading in and out",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="fireworks",
+            effect_class=EffectFireworks,
+            description="Fireworks bursts with expanding trails",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="plasma",
+            effect_class=EffectPlasma,
+            description="1D plasma effect with sinusoidal color blending",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="ripple",
+            effect_class=EffectRipple,
+            description="Expanding ripple waves from random origins",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="jacobs_ladder",
+            effect_class=EffectJacobsLadder,
+            description="Electric arc climbing upward like a Jacob's ladder",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="newtons_cradle",
+            effect_class=EffectNewtonsCradle,
+            description="Newton's cradle momentum transfer simulation",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="sonar",
+            effect_class=EffectSonar,
+            description="Sonar ping sweeping outward from one end",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
+                DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="plasma2d",
+            effect_class=EffectPlasma2D,
+            description="2D plasma effect with flowing color patterns",
             device_support={
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.NOT_SUPPORTED,
