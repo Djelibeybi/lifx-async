@@ -529,11 +529,12 @@ class HSBK:
 
         Args:
             other: Target color to interpolate towards.
-            blend: Blend factor from 0.0 (self) to 1.0 (other).
+            blend: Blend factor from 0.0 (self) to 1.0 (other), clamped to range.
 
         Returns:
             New HSBK instance with interpolated values. Kelvin is preserved from self.
         """
+        blend = max(0.0, min(1.0, blend))
         diff = other._hue - self._hue
         if diff > 180:
             diff -= 360
@@ -557,11 +558,12 @@ class HSBK:
 
         Args:
             other: Target color to interpolate towards.
-            blend: Blend factor from 0.0 (self) to 1.0 (other).
+            blend: Blend factor from 0.0 (self) to 1.0 (other), clamped to range.
 
         Returns:
             New HSBK instance with interpolated values. Kelvin is preserved from self.
         """
+        blend = max(0.0, min(1.0, blend))
         r1, g1, b1 = colorsys.hsv_to_rgb(
             self._hue / 360.0, self._saturation, self._brightness
         )
