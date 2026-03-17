@@ -65,7 +65,7 @@ class TestThemeLibraryList:
         themes = ThemeLibrary.list()
 
         assert isinstance(themes, list)
-        assert len(themes) == 42  # Should have 42 themes
+        assert len(themes) == 57  # Should have 42 themes
         assert themes == sorted(themes)  # Should be sorted
 
     def test_list_contains_well_known_themes(self) -> None:
@@ -88,7 +88,7 @@ class TestThemeLibraryList:
         """Test that we have the expected number of themes."""
         themes = ThemeLibrary.list()
         # We should have exactly 42 themes
-        assert len(themes) == 42
+        assert len(themes) == 57
 
 
 class TestThemeLibraryGetByCategory:
