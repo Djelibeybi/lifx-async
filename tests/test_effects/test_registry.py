@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from lifx.devices.light import Light
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.pulse import EffectPulse
@@ -316,3 +318,37 @@ class TestDeviceClassification:
         names = [info.name for info, _ in results]
         assert "rainbow" in names
         assert "pulse" in names
+
+
+PORTED_EFFECTS = [
+    "cylon",
+    "wave",
+    "sine",
+    "spectrum_sweep",
+    "pendulum_wave",
+    "double_slit",
+    "twinkle",
+    "spin",
+    "rule30",
+    "rule_trio",
+    "embers",
+    "fireworks",
+    "plasma",
+    "ripple",
+    "jacobs_ladder",
+    "newtons_cradle",
+    "sonar",
+    "plasma2d",
+]
+
+
+class TestPortedEffectsRegistered:
+    """Tests that all 18 ported effects are registered."""
+
+    @pytest.mark.parametrize("name", PORTED_EFFECTS)
+    def test_ported_effect_registered(self, name: str) -> None:
+        """Each ported effect should be registered."""
+        registry = get_effect_registry()
+        info = registry.get_effect(name)
+        assert info is not None, f"Effect '{name}' not registered"
+        assert info.name == name
