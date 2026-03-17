@@ -23,7 +23,11 @@ The Oklab math pipeline (sRGB <-> linear <-> LMS <-> Oklab) lives as private mod
 
 ### Palettes — New entries in `ThemeLibrary`
 
-The pkivolowitz palette presets (aurora, forest, ocean, fire, sunset, van_gogh, monet, klimt, etc.) are added as new themes in `ThemeLibrary._THEMES` in `src/lifx/theme/library.py`. Effects that accept a palette parameter use `Theme` objects.
+The pkivolowitz palette presets are added as new themes in `ThemeLibrary._THEMES` in `src/lifx/theme/library.py`. Effects that accept a palette parameter use `Theme` objects.
+
+New theme names must not collide with existing ThemeLibrary entries. Verify names against `ThemeLibrary.list()` before adding. Where a collision exists (e.g., the source has an "aurora" palette but ThemeLibrary already has themes), use a disambiguated name (e.g., `aurora_borealis`) or skip if the existing theme is close enough.
+
+The source project's palettes are 3-color tuples with a shared saturation. When porting, convert each palette color to a full `HSBK` with the palette's saturation and a default brightness/kelvin. The `Theme` is simply a `list[HSBK]` — effects cycle through the colors in order. Effects like Spin that need exactly 3 colors should document this requirement and take the first 3 from the theme.
 
 ```python
 class EffectSpin(FrameEffect):
@@ -59,7 +63,7 @@ class EffectSpin(FrameEffect):
 #### 4. Spectrum Sweep
 - **File:** `src/lifx/effects/spectrum_sweep.py`
 - **Source:** `effects/spectrum_sweep.py`
-- **Algorithm:** Three 120-degree-apart sine waves sweep a traveling rainbow, blended via Oklab
+- **Algorithm:** Three 120-degree-apart sine waves sweep a traveling rainbow. Improvement over source: uses Oklab interpolation for smoother color transitions (source uses raw hue mapping).
 - **Params:** `speed`, `waves`, `brightness`
 - **Device Support:** LIGHT=COMPATIBLE, MULTIZONE=RECOMMENDED, MATRIX=NOT_SUPPORTED
 
@@ -84,7 +88,7 @@ class EffectSpin(FrameEffect):
 - **Source:** `effects/twinkle.py`
 - **Algorithm:** Per-pixel independent sparkle timers. Random trigger, quadratic brightness decay.
 - **Params:** `speed`, `density`, `hue`, `saturation`, `brightness`, `background_hue`, `background_brightness`
-- **Device Support:** LIGHT=RECOMMENDED, MULTIZONE=RECOMMENDED, MATRIX=RECOMMENDED
+- **Device Support:** LIGHT=RECOMMENDED, MULTIZONE=RECOMMENDED, MATRIX=COMPATIBLE
 
 #### 8. Spin (Color Migration)
 - **File:** `src/lifx/effects/spin.py`
@@ -171,7 +175,7 @@ class EffectSpin(FrameEffect):
 #### 18. Plasma2D
 - **File:** `src/lifx/effects/plasma2d.py`
 - **Source:** `effects/plasma2d.py`
-- **Algorithm:** 2D plasma using layered sine functions across x,y grid, mapped through Oklab color space.
+- **Algorithm:** 2D plasma using layered sine functions across x,y grid, mapped through Oklab color space. Grid dimensions come from `ctx.canvas_width` and `ctx.canvas_height` (no separate width/height params needed).
 - **Params:** `speed`, `scale`, `hue1`, `hue2`, `brightness`
 - **Device Support:** LIGHT=NOT_SUPPORTED, MULTIZONE=NOT_SUPPORTED, MATRIX=RECOMMENDED
 
@@ -204,13 +208,33 @@ class EffectCylon(FrameEffect):
         ...
 ```
 
+### Common Method Implementations
+
+**`from_poweroff_hsbk`**: Each effect returns a dim version of its dominant color. For example, Cylon returns a dim version of its `hue` parameter; Embers returns dim red; Fireworks returns black (the effect starts from darkness). This provides a smooth power-on fade into the effect.
+
+**`is_light_compatible`**: All effects require `has_color` capability. Effects marked NOT_SUPPORTED for a device type should still be filtered via the registry; `is_light_compatible` serves as a runtime fallback check.
+
+**`inherit_prestate`**: Effects of the same class can inherit each other's prestate (same pattern as `EffectFlame`).
+
+### Parameter Conventions
+
+- **`kelvin`**: All effects accept a `kelvin` parameter (default 3500) for color temperature. Not listed explicitly in every effect's param list above but included in all constructors.
+- **Naming**: Source parameter names are made more Pythonic and descriptive (e.g., `bg` becomes `background_brightness`, `sat1` becomes `saturation1`). The source field names are implementation details, not a contract.
+- **Ranges**: Parameters use lifx-async conventions: hue 0-360 (int), saturation/brightness 0.0-1.0 (float), kelvin 1500-9000 (int). Source uint16 values are converted.
+
 ### zones_per_bulb Support
 
 Effects supporting `zones_per_bulb` accept it as a constructor parameter (default 1). Inside `generate_frame`, they compute `bulb_count = ctx.pixel_count // zones_per_bulb` and render to logical bulbs, then expand to fill physical zones.
 
+The following effects support `zones_per_bulb`: Cylon, Wave, Sine, Spin, Embers, Plasma, Jacob's Ladder, Sonar, Pendulum Wave, Double Slit, Newton's Cradle, Spectrum Sweep, Rule 30, Rule Trio. Effects where every pixel is independently addressed (Twinkle, Ripple, Fireworks) do not need it.
+
 ### Stateful Effects
 
 Stateful effects (Sonar, Embers, Fireworks, Plasma, Ripple, Jacob's Ladder, Rule 30, Rule Trio) store state as instance attributes. State is initialized in `__init__` or lazily on first `generate_frame` call. Frame-to-frame delta is computed from `ctx.elapsed_s`.
+
+### Additive Blending (Fireworks)
+
+Fireworks uses additive RGB blending internally for physically correct light mixing of overlapping bursts. The implementation converts HSBK to RGB via `HSBK.to_rgb()`, performs additive blending with clamping, then converts back via `HSBK.from_rgb()`. Minor rounding from the RGB round-trip is acceptable for this visual effect.
 
 ### Registry Integration
 
