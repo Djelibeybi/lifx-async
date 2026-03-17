@@ -39,6 +39,137 @@ from lifx.const import (
 )
 from lifx.protocol.protocol_types import LightHsbk
 
+# ---------------------------------------------------------------------------
+# sRGB gamma (IEC 61966-2-1)
+# ---------------------------------------------------------------------------
+
+_SRGB_LINEAR_THRESHOLD: float = 0.04045
+_SRGB_LINEAR_SCALE: float = 12.92
+_SRGB_GAMMA: float = 2.4
+_SRGB_OFFSET: float = 0.055
+_SRGB_DIVISOR: float = 1.055
+
+
+def _srgb_to_linear(c: float) -> float:
+    """Remove sRGB gamma curve from a single channel.
+
+    Args:
+        c: sRGB channel value in [0.0, 1.0].
+
+    Returns:
+        Linear-light value in [0.0, 1.0].
+    """
+    if c <= _SRGB_LINEAR_THRESHOLD:
+        return c / _SRGB_LINEAR_SCALE
+    return ((c + _SRGB_OFFSET) / _SRGB_DIVISOR) ** _SRGB_GAMMA
+
+
+def _linear_to_srgb(c: float) -> float:
+    """Apply sRGB gamma curve to a single channel.
+
+    Args:
+        c: Linear-light value in [0.0, 1.0].
+
+    Returns:
+        sRGB channel value in [0.0, 1.0].
+    """
+    if c <= 0.0031308:
+        return c * _SRGB_LINEAR_SCALE
+    return _SRGB_DIVISOR * (c ** (1.0 / _SRGB_GAMMA)) - _SRGB_OFFSET
+
+
+# ---------------------------------------------------------------------------
+# sRGB <-> Oklab (Bjorn Ottosson, 2020)
+# ---------------------------------------------------------------------------
+
+# sRGB linear -> LMS cone responses (M1).
+_OK_M1: list[list[float]] = [
+    [0.4122214708, 0.5363325363, 0.0514459929],
+    [0.2119034982, 0.6806995451, 0.1073969566],
+    [0.0883024619, 0.2817188376, 0.6299787005],
+]
+
+# LMS cube root -> Oklab (M2).
+_OK_M2: list[list[float]] = [
+    [0.2104542553, 0.7936177850, -0.0040720468],
+    [1.9779984951, -2.4285922050, 0.4505937099],
+    [0.0259040371, 0.7827717662, -0.8086757660],
+]
+
+# Oklab -> LMS cube root (M2 inverse).
+_OK_M2_INV: list[list[float]] = [
+    [1.0000000000, 0.3963377774, 0.2158037573],
+    [1.0000000000, -0.1055613458, -0.0638541728],
+    [1.0000000000, -0.0894841775, -1.2914855480],
+]
+
+# LMS -> sRGB linear (M1 inverse).
+_OK_M1_INV: list[list[float]] = [
+    [4.0767416621, -3.3077115913, 0.2309699292],
+    [-1.2684380046, 2.6097574011, -0.3413193965],
+    [-0.0041960863, -0.7034186147, 1.7076147010],
+]
+
+_ONE_THIRD: float = 1.0 / 3.0
+
+
+def _srgb_to_oklab(r: float, g: float, b: float) -> tuple[float, float, float]:
+    """Convert sRGB to Oklab.
+
+    Args:
+        r, g, b: sRGB channels in [0.0, 1.0].
+
+    Returns:
+        Tuple of (L, a, b) in Oklab space. L is 0-1.
+    """
+    rl = _srgb_to_linear(r)
+    gl = _srgb_to_linear(g)
+    bl = _srgb_to_linear(b)
+
+    lms_l = _OK_M1[0][0] * rl + _OK_M1[0][1] * gl + _OK_M1[0][2] * bl
+    m = _OK_M1[1][0] * rl + _OK_M1[1][1] * gl + _OK_M1[1][2] * bl
+    s = _OK_M1[2][0] * rl + _OK_M1[2][1] * gl + _OK_M1[2][2] * bl
+
+    l_ = math.copysign(abs(lms_l) ** _ONE_THIRD, lms_l) if lms_l != 0.0 else 0.0
+    m_ = math.copysign(abs(m) ** _ONE_THIRD, m) if m != 0.0 else 0.0
+    s_ = math.copysign(abs(s) ** _ONE_THIRD, s) if s != 0.0 else 0.0
+
+    ok_l = _OK_M2[0][0] * l_ + _OK_M2[0][1] * m_ + _OK_M2[0][2] * s_
+    ok_a = _OK_M2[1][0] * l_ + _OK_M2[1][1] * m_ + _OK_M2[1][2] * s_
+    ok_b = _OK_M2[2][0] * l_ + _OK_M2[2][1] * m_ + _OK_M2[2][2] * s_
+
+    return (ok_l, ok_a, ok_b)
+
+
+def _oklab_to_srgb(ok_l: float, ok_a: float, ok_b: float) -> tuple[float, float, float]:
+    """Convert Oklab to sRGB.
+
+    Args:
+        ok_l: Lightness (0-1).
+        ok_a: Green-red axis.
+        ok_b: Blue-yellow axis.
+
+    Returns:
+        Tuple of (r, g, b) each in [0.0, 1.0], clamped to gamut.
+    """
+    l_ = _OK_M2_INV[0][0] * ok_l + _OK_M2_INV[0][1] * ok_a + _OK_M2_INV[0][2] * ok_b
+    m_ = _OK_M2_INV[1][0] * ok_l + _OK_M2_INV[1][1] * ok_a + _OK_M2_INV[1][2] * ok_b
+    s_ = _OK_M2_INV[2][0] * ok_l + _OK_M2_INV[2][1] * ok_a + _OK_M2_INV[2][2] * ok_b
+
+    lms_l = l_ * l_ * l_
+    m = m_ * m_ * m_
+    s = s_ * s_ * s_
+
+    rl = _OK_M1_INV[0][0] * lms_l + _OK_M1_INV[0][1] * m + _OK_M1_INV[0][2] * s
+    gl = _OK_M1_INV[1][0] * lms_l + _OK_M1_INV[1][1] * m + _OK_M1_INV[1][2] * s
+    bl = _OK_M1_INV[2][0] * lms_l + _OK_M1_INV[2][1] * m + _OK_M1_INV[2][2] * s
+
+    rl = max(0.0, min(1.0, rl))
+    gl = max(0.0, min(1.0, gl))
+    bl = max(0.0, min(1.0, bl))
+
+    return (_linear_to_srgb(rl), _linear_to_srgb(gl), _linear_to_srgb(bl))
+
 
 def validate_hue(value: int) -> None:
     """Validate hue value is in range 0-360 degrees.
@@ -391,6 +522,64 @@ class HSBK:
             saturation=self.saturation,
             brightness=self.brightness,
             kelvin=kelvin,
+        )
+
+    def lerp_hsb(self, other: HSBK, blend: float) -> HSBK:
+        """Interpolate to another color via shortest-path HSB blending.
+
+        Args:
+            other: Target color to interpolate towards.
+            blend: Blend factor from 0.0 (self) to 1.0 (other).
+
+        Returns:
+            New HSBK instance with interpolated values. Kelvin is preserved from self.
+        """
+        diff = other._hue - self._hue
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        hue = round(self._hue + diff * blend) % 360
+        sat = self._saturation + (other._saturation - self._saturation) * blend
+        bri = self._brightness + (other._brightness - self._brightness) * blend
+        return HSBK(
+            hue=hue,
+            saturation=round(sat, 2),
+            brightness=round(bri, 2),
+            kelvin=self._kelvin,
+        )
+
+    def lerp_oklab(self, other: HSBK, blend: float) -> HSBK:
+        """Interpolate to another color through Oklab perceptual color space.
+
+        Oklab produces perceptually uniform transitions without brightness
+        dips or muddy intermediates that occur with naive HSB blending.
+
+        Args:
+            other: Target color to interpolate towards.
+            blend: Blend factor from 0.0 (self) to 1.0 (other).
+
+        Returns:
+            New HSBK instance with interpolated values. Kelvin is preserved from self.
+        """
+        r1, g1, b1 = colorsys.hsv_to_rgb(
+            self._hue / 360.0, self._saturation, self._brightness
+        )
+        r2, g2, b2 = colorsys.hsv_to_rgb(
+            other._hue / 360.0, other._saturation, other._brightness
+        )
+        l1, a1, ob1 = _srgb_to_oklab(r1, g1, b1)
+        l2, a2, ob2 = _srgb_to_oklab(r2, g2, b2)
+        l_interp = l1 + (l2 - l1) * blend
+        a_interp = a1 + (a2 - a1) * blend
+        ob_interp = ob1 + (ob2 - ob1) * blend
+        r, g, b = _oklab_to_srgb(l_interp, a_interp, ob_interp)
+        h, s, v = colorsys.rgb_to_hsv(r, g, b)
+        return HSBK(
+            hue=round(h * 360) % 360,
+            saturation=round(s, 2),
+            brightness=round(v, 2),
+            kelvin=self._kelvin,
         )
 
     def clone(self) -> HSBK:

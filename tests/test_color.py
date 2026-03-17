@@ -384,3 +384,98 @@ class TestHSBKThemeMethods:
         """Test averaging empty list raises error."""
         with pytest.raises(ValueError, match="Cannot average an empty list"):
             HSBK.average([])
+
+
+class TestHSBKLerpHsb:
+    """Tests for HSBK.lerp_hsb shortest-path HSB interpolation."""
+
+    def test_blend_zero_returns_self(self) -> None:
+        """Blend=0.0 should return the start color."""
+        c1 = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=3500)
+        c2 = HSBK(hue=240, saturation=0.4, brightness=1.0, kelvin=5000)
+        result = c1.lerp_hsb(c2, 0.0)
+        assert result.hue == c1.hue
+        assert result.saturation == c1.saturation
+        assert result.brightness == c1.brightness
+        assert result.kelvin == c1.kelvin
+
+    def test_blend_one_returns_other(self) -> None:
+        """Blend=1.0 should return the end color (with kelvin from self)."""
+        c1 = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=3500)
+        c2 = HSBK(hue=240, saturation=0.4, brightness=1.0, kelvin=5000)
+        result = c1.lerp_hsb(c2, 1.0)
+        assert result.hue == c2.hue
+        assert result.saturation == c2.saturation
+        assert result.brightness == c2.brightness
+        assert result.kelvin == c1.kelvin  # kelvin preserved from self
+
+    def test_midpoint_blends_saturation_and_brightness(self) -> None:
+        """Midpoint should average saturation and brightness linearly."""
+        c1 = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+        c2 = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        result = c1.lerp_hsb(c2, 0.5)
+        assert result.saturation == pytest.approx(0.5, abs=0.02)
+        assert result.brightness == pytest.approx(0.5, abs=0.02)
+
+    def test_shortest_path_hue_wrapping(self) -> None:
+        """Hue interpolation 350->10 midpoint should go through 0, not 180."""
+        c1 = HSBK(hue=350, saturation=1.0, brightness=1.0, kelvin=3500)
+        c2 = HSBK(hue=10, saturation=1.0, brightness=1.0, kelvin=3500)
+        result = c1.lerp_hsb(c2, 0.5)
+        assert result.hue == pytest.approx(0, abs=1) or result.hue == pytest.approx(
+            360, abs=1
+        )
+
+    def test_preserves_kelvin_from_self(self) -> None:
+        """Kelvin should always come from self, not other."""
+        c1 = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=2500)
+        c2 = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=6500)
+        result = c1.lerp_hsb(c2, 0.5)
+        assert result.kelvin == 2500
+
+
+class TestHSBKLerpOklab:
+    """Tests for HSBK.lerp_oklab perceptual Oklab interpolation."""
+
+    def test_blend_zero_returns_self(self) -> None:
+        """Blend=0.0 should return a color close to self (within rounding tolerance)."""
+        c1 = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=3500)
+        c2 = HSBK(hue=240, saturation=0.4, brightness=1.0, kelvin=5000)
+        result = c1.lerp_oklab(c2, 0.0)
+        assert result.hue == pytest.approx(c1.hue, abs=1)
+        assert result.saturation == pytest.approx(c1.saturation, abs=0.02)
+        assert result.brightness == pytest.approx(c1.brightness, abs=0.02)
+        assert result.kelvin == c1.kelvin
+
+    def test_blend_one_returns_other(self) -> None:
+        """Blend=1.0 should return a color close to other (with kelvin from self)."""
+        c1 = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=3500)
+        c2 = HSBK(hue=240, saturation=0.4, brightness=1.0, kelvin=5000)
+        result = c1.lerp_oklab(c2, 1.0)
+        assert result.hue == pytest.approx(c2.hue, abs=1)
+        assert result.saturation == pytest.approx(c2.saturation, abs=0.02)
+        assert result.brightness == pytest.approx(c2.brightness, abs=0.02)
+        assert result.kelvin == c1.kelvin  # kelvin preserved from self
+
+    def test_midpoint_maintains_brightness(self) -> None:
+        """Oklab midpoint of two full-brightness colors should not dip below 0.5."""
+        c1 = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        c2 = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+        result = c1.lerp_oklab(c2, 0.5)
+        assert result.brightness >= 0.5
+
+    def test_preserves_kelvin_from_self(self) -> None:
+        """Kelvin should always come from self, not other."""
+        c1 = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=2500)
+        c2 = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=6500)
+        result = c1.lerp_oklab(c2, 0.5)
+        assert result.kelvin == 2500
+
+    def test_black_to_color_interpolation(self) -> None:
+        """Interpolation from black to a color should work without errors."""
+        black = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        result = black.lerp_oklab(red, 0.5)
+        # Should produce a valid color with some brightness
+        assert result.brightness > 0.0
+        assert result.kelvin == 3500
