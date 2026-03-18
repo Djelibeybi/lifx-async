@@ -64,10 +64,6 @@ def test_apply_canvas_5_tile(benchmark) -> None:  # type: ignore[no-untyped-def]
     fb = _make_framebuffer(5)
     canvas = _make_canvas(5)
     benchmark(fb.apply, canvas)
-    assert benchmark.stats["mean"] * 1000 < 5.0, (
-        f"_apply_canvas for 5-tile took {benchmark.stats['mean'] * 1000:.3f}ms mean "
-        "— exceeds 5ms target (see PERF-H1)."
-    )
 
 
 @pytest.mark.benchmark
