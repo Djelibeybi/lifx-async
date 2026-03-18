@@ -92,6 +92,38 @@ class TestDiscoveryWithEmulatorErrors:
         # Should not yield any devices
         assert count == 0
 
+    @pytest.mark.asyncio
+    async def test_discovery_idle_timeout_branch(self) -> None:
+        """Test discovery exits via idle timeout when idle_timeout is zero."""
+        # With idle_timeout=0.0, the idle check triggers immediately
+        # on the first iteration (any elapsed time > 0.0)
+        count = 0
+        async for disc in discover_devices(
+            timeout=1.0,
+            broadcast_address="255.255.255.255",
+            port=65432,
+            max_response_time=0.0,
+            idle_timeout_multiplier=0.0,
+        ):
+            count += 1
+
+        assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_discovery_overall_timeout_branch(self) -> None:
+        """Test discovery exits via overall timeout when timeout is near-zero."""
+        # idle_timeout is large (default 2.0s) so idle check is False,
+        # but overall timeout is tiny so overall check triggers first
+        count = 0
+        async for disc in discover_devices(
+            timeout=0.000001,
+            broadcast_address="255.255.255.255",
+            port=65432,
+        ):
+            count += 1
+
+        assert count == 0
+
 
 @pytest.mark.emulator
 class TestDiscoveryDeduplication:
