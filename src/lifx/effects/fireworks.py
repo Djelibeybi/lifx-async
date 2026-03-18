@@ -119,78 +119,6 @@ class _Rocket:
 
 
 # ---------------------------------------------------------------------------
-# HSB <-> RGB helpers for additive compositing
-# ---------------------------------------------------------------------------
-
-_HUE_SEXTANTS: int = 6
-
-
-def _hsb_to_rgb(h_deg: float, s: float, b: float) -> tuple[float, float, float]:
-    """Convert HSB (hue degrees, sat 0-1, bri 0-1) to RGB 0-1.
-
-    Uses the standard sextant algorithm.
-
-    Args:
-        h_deg: Hue in degrees (0-360).
-        s: Saturation (0.0-1.0).
-        b: Brightness (0.0-1.0).
-
-    Returns:
-        Tuple of (r, g, b) each in 0.0-1.0.
-    """
-    h = (h_deg / 360.0) * _HUE_SEXTANTS
-    c = b * s
-    x = c * (1.0 - abs(h % 2.0 - 1.0))
-    m = b - c
-
-    sextant = int(h) % _HUE_SEXTANTS
-    if sextant == 0:
-        return (c + m, x + m, m)
-    elif sextant == 1:
-        return (x + m, c + m, m)
-    elif sextant == 2:
-        return (m, c + m, x + m)
-    elif sextant == 3:
-        return (m, x + m, c + m)
-    elif sextant == 4:
-        return (x + m, m, c + m)
-    else:
-        return (c + m, m, x + m)
-
-
-def _rgb_to_hsb(r: float, g: float, b: float) -> tuple[float, float, float]:
-    """Convert RGB (0-1) to HSB (hue degrees, sat 0-1, bri 0-1).
-
-    Args:
-        r: Red (0.0-1.0).
-        g: Green (0.0-1.0).
-        b: Blue (0.0-1.0).
-
-    Returns:
-        Tuple of (hue_degrees, saturation, brightness).
-    """
-    max_c = max(r, g, b)
-    min_c = min(r, g, b)
-    delta = max_c - min_c
-
-    bri = max_c
-
-    if delta == 0.0:
-        return (0.0, 0.0, bri)
-
-    sat = delta / max_c
-
-    if max_c == r:
-        hue = 60.0 * (((g - b) / delta) % 6.0)
-    elif max_c == g:
-        hue = 60.0 * (((b - r) / delta) + 2.0)
-    else:
-        hue = 60.0 * (((r - g) / delta) + 4.0)
-
-    return (hue % 360.0, sat, bri)
-
-
-# ---------------------------------------------------------------------------
 # Effect
 # ---------------------------------------------------------------------------
 
@@ -481,9 +409,12 @@ class EffectFireworks(FrameEffect):
             ):
                 if b_01 <= 0.0:
                     continue
-                # Scale by effect brightness
+                # Scale by effect brightness and convert to RGB
                 b_scaled = b_01 * self.brightness
-                r, g, bl = _hsb_to_rgb(h_deg, s_01, b_scaled)
+                color = HSBK(
+                    hue=h_deg, saturation=s_01, brightness=b_scaled, kelvin=self.kelvin
+                )
+                r, g, bl = color.to_rgb()
                 zone_r[z] += r
                 zone_g[z] += g
                 zone_b[z] += bl
@@ -500,14 +431,8 @@ class EffectFireworks(FrameEffect):
                     HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=self.kelvin)
                 )
             else:
-                h_deg, s_01, b_01 = _rgb_to_hsb(r_val, g_val, b_val)
                 colors.append(
-                    HSBK(
-                        hue=round(h_deg) % 360,
-                        saturation=round(s_01, 2),
-                        brightness=round(min(1.0, b_01), 2),
-                        kelvin=self.kelvin,
-                    )
+                    HSBK.from_rgb(r_val, g_val, b_val).with_kelvin(self.kelvin)
                 )
 
         return colors
