@@ -571,6 +571,8 @@ In addition to the effects above, lifx-async includes 18 effects adapted from [p
 
 ### Cylon
 
+![Cylon effect](../assets/effects/cylon_zpb3.gif)
+
 Larson scanner — a bright eye sweeps back and forth with a fading trail. Classic Knight Rider look.
 
 ```python
@@ -592,6 +594,8 @@ await conductor.stop(lights)
 
 ### Wave
 
+![Wave effect](../assets/effects/wave_zpb3.gif)
+
 Standing wave — zones vibrate between two colors with stationary nodes. Adjacent segments swing in opposite directions.
 
 ```python
@@ -609,6 +613,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed` (oscillation period), `nodes` (stationary points), `hue1`/`hue2`, `drift` (spatial drift degrees/s)
 
 ### Sine
+
+![Sine effect](../assets/effects/sine_zpb3.gif)
 
 Smooth ease-wave — bright humps roll along the strip using cubic smoothstep. Optional two-color gradient.
 
@@ -628,6 +634,8 @@ await conductor.start(effect, lights)
 
 ### Spectrum Sweep
 
+![Spectrum Sweep effect](../assets/effects/spectrum_sweep_zpb3.gif)
+
 Three sine waves 120° out of phase sweep through zones like a spectrum analyzer. Red, green, and blue channels blend via Oklab interpolation.
 
 ```python
@@ -640,6 +648,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed` (sweep period), `waves` (number of wave periods across strip)
 
 ### Spin
+
+![Spin effect](../assets/effects/spin_zpb3.gif)
 
 Rotates theme colors through zones with smooth Oklab interpolation and per-zone hue shimmer.
 
@@ -654,6 +664,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed` (rotation period), `bulb_offset` (per-zone hue shift for shimmer)
 
 ### Twinkle
+
+![Twinkle effect](../assets/effects/twinkle.gif)
 
 Random pixels sparkle and fade like Christmas lights. Each spark has a fast flash and slow quadratic decay tail.
 
@@ -673,6 +685,8 @@ await conductor.start(effect, lights)
 
 ### Embers
 
+![Embers effect](../assets/effects/embers_zpb3.gif)
+
 Fire simulation via 1D heat diffusion — heat injected at the bottom, diffuses upward with cooling and turbulence.
 
 ```python
@@ -685,6 +699,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `intensity` (heat injection probability), `cooling`, `turbulence`
 
 ### Plasma
+
+![Plasma effect](../assets/effects/plasma_zpb3.gif)
 
 Plasma ball — bright core pulsing at center with electric tendrils crackling outward. Tendrils random-walk and fork.
 
@@ -704,6 +720,8 @@ await conductor.start(effect, lights)
 
 ### Pendulum Wave
 
+![Pendulum Wave effect](../assets/effects/pendulum_wave_zpb3.gif)
+
 Pendulums with linearly varying periods drift in and out of phase, creating traveling waves, standing waves, and chaos before realigning.
 
 ```python
@@ -717,6 +735,8 @@ await conductor.start(effect, lights)
 
 ### Double Slit
 
+![Double Slit effect](../assets/effects/double_slit_zpb3.gif)
+
 Young's double slit interference — two coherent wave sources create constructive/destructive interference fringes that shift as wavelength breathes.
 
 ```python
@@ -729,6 +749,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed`, `wavelength`, `separation`, `breathe` (wavelength modulation period; 0 = off)
 
 ### Rule 30
+
+![Rule 30 effect](../assets/effects/rule30_zpb3.gif)
 
 Wolfram's Rule 30 cellular automaton — generates chaotic/pseudo-random patterns. Configurable seed modes: center, random, or all.
 
@@ -748,6 +770,8 @@ await conductor.start(effect, lights)
 
 ### Rule Trio
 
+![Rule Trio effect](../assets/effects/rule_trio_zpb3.gif)
+
 Three independent cellular automata running at irrational speed ratios, blended via Oklab. Produces evolving color interference patterns.
 
 ```python
@@ -760,6 +784,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `rule_a`/`rule_b`/`rule_c`, `speed`, `drift_b`/`drift_c` (speed multipliers)
 
 ### Fireworks
+
+![Fireworks effect](../assets/effects/fireworks.gif)
 
 Rockets launch from both ends, ascend with easing, and burst into expanding gaussian halos. Color evolves from white through chemical colors to orange.
 
@@ -774,6 +800,8 @@ await conductor.start(effect, lights)
 
 ### Ripple
 
+![Ripple effect](../assets/effects/ripple.gif)
+
 Ripple tank — raindrops hit a water surface, launching wavefronts that propagate, reflect, and interfere. Displacement maps to color via Oklab.
 
 ```python
@@ -786,6 +814,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed`, `damping`, `drop_rate`, `hue1`/`hue2`
 
 ### Jacob's Ladder
+
+![Jacob's Ladder effect](../assets/effects/jacobs_ladder_zpb3.gif)
 
 Electric arcs drift along the strip with flickering, crackling spikes, and electrode glows. Inspired by Frankenstein lab props.
 
@@ -800,6 +830,8 @@ await conductor.start(effect, lights)
 
 ### Newton's Cradle
 
+![Newton's Cradle effect](../assets/effects/newtons_cradle_zpb3.gif)
+
 Newton's cradle momentum transfer — steel balls swing alternately with Phong sphere shading and specular highlights.
 
 ```python
@@ -813,6 +845,8 @@ await conductor.start(effect, lights)
 
 ### Sonar
 
+![Sonar effect](../assets/effects/sonar_zpb3.gif)
+
 Sonar/radar pulses bounce off drifting obstacles. Wavefronts emit from sources, reflect off obstacles, and decay with tails.
 
 ```python
@@ -825,6 +859,8 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed` (wavefront speed), `pulse_interval`, `obstacle_speed`, `decay`
 
 ### Plasma 2D
+
+![Plasma 2D effect](../assets/effects/plasma2d.gif)
 
 2D plasma effect — four sine waves (horizontal, vertical, diagonal, radial) create flowing interference color patterns. Matrix devices only.
 
