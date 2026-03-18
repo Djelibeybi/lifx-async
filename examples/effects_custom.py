@@ -78,7 +78,7 @@ class WaveEffect(LIFXEffect):
         # Define wave colors
         colors = [
             HSBK.from_rgb(1.0, 0.0, 0.0),  # Red
-            HSBK.from_rgb(1.0, 0.4980392157, 0.0),  # Orange
+            HSBK.from_rgb(1.0, 0.5, 0.0),  # Orange
             HSBK.from_rgb(1.0, 1.0, 0.0),  # Yellow
             HSBK.from_rgb(0.0, 1.0, 0.0),  # Green
             HSBK.from_rgb(0.0, 0.0, 1.0),  # Blue
