@@ -51,8 +51,8 @@ Update all docstrings, effect code, and remaining tests that reference the old i
 
 ### Verification
 
-- [x]Full test suite passes
-- [x]`ruff check` and `ruff format` pass
+- [x] Full test suite passes
+- [x] `ruff check` and `ruff format` pass
 
 ## Phase 4: Fireworks Consolidation
 
