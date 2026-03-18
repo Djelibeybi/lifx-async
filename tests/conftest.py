@@ -45,6 +45,31 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+# Give emulator tests more time on slow CI runners (especially Windows)
+_EMULATOR_TIMEOUT = 120
+
+_EMULATOR_FIXTURES = frozenset(
+    {
+        "emulator_port",
+        "emulator_server",
+        "emulator_devices",
+        "ceiling_device",
+        "switch_device",
+    }
+)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Apply a longer timeout to emulator tests."""
+    for item in items:
+        uses_emulator = item.get_closest_marker("emulator") is not None or (
+            hasattr(item, "fixturenames")
+            and _EMULATOR_FIXTURES & set(item.fixturenames)
+        )
+        if uses_emulator and item.get_closest_marker("timeout") is None:
+            item.add_marker(pytest.mark.timeout(_EMULATOR_TIMEOUT))
+
+
 def pytest_set_filtered_exceptions() -> list[type[Exception]]:
     """Configure pytest-retry to only retry on network-related exceptions.
 
