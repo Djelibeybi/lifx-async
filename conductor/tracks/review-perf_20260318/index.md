@@ -22,4 +22,3 @@ Optimize the animation hot path: pre-compute FrameBuffer canvas LUT at init, eli
 
 - [Back to Tracks](../../tracks.md)
 - [Product Context](../../product.md)
-- [Review Final Report](../../../.full-review/05-final-report.md)
