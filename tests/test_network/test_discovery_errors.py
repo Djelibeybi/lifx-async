@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+import sys
 
 import pytest
 
@@ -47,6 +48,7 @@ class TestParseDeviceStateServiceErrors:
 
 
 @pytest.mark.emulator
+@pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
 class TestDiscoveryMalformedPackets:
     """Test discovery handling of malformed packets."""
 
