@@ -32,7 +32,7 @@
         "id": "433e56e330e06fdf3774bc5f6e6e00db2404d81e",
         "time": "2026-03-19T00:48:59+11:00",
         "author_time": "2026-03-19T00:48:59+11:00",
-        "dirty": true,
+        "dirty": false,
         "project": "lifx-async",
         "branch": "full-review"
     },
