@@ -193,10 +193,10 @@ class EffectRipple(FrameEffect):
         if self._sim_time >= self._next_drop_t:
             if self._n_cells > 2:
                 # Drop lands at a random interior position.
-                pos = random.randint(1, self._n_cells - 2)  # nosec
+                pos = random.randint(1, self._n_cells - 2)
                 self._displacement[pos] += _DROP_IMPULSE
             # Schedule next drop (Poisson process).
-            self._next_drop_t = self._sim_time + random.expovariate(self.drop_rate)  # nosec
+            self._next_drop_t = self._sim_time + random.expovariate(self.drop_rate)
 
     def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
         """Generate a frame of the ripple tank.
