@@ -38,6 +38,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
 
+# Pre-compiled struct for per-pixel HSBK writes in hot path
+_HSBK_STRUCT = struct.Struct("<HHHH")
+
 # Header constants
 HEADER_SIZE = 36
 SEQUENCE_OFFSET = 23  # Offset of sequence byte in header
@@ -409,7 +412,7 @@ class MatrixPacketGenerator(PacketGenerator):
             for h, s, b, k in hsbk[
                 tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count
             ]:
-                struct.pack_into("<HHHH", data, offset, h, s, b, k)
+                _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
                 offset += 8
 
 
@@ -528,7 +531,7 @@ class MultiZonePacketGenerator(PacketGenerator):
             for h, s, b, k in hsbk[
                 tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count
             ]:
-                struct.pack_into("<HHHH", data, offset, h, s, b, k)
+                _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
                 offset += 8
 
 
