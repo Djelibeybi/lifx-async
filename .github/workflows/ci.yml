@@ -107,8 +107,6 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    # Only run tests on pull requests (skip on main branch pushes since tests already passed in PR)
-    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -212,8 +210,8 @@ jobs:
     - quality
     - generated-files
     - test
-    # Run release if not cancelled AND (manual dispatch OR quality passed with tests passed/skipped)
-    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (needs.quality.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped'))) }}
+    # Run release if not cancelled AND (manual dispatch OR all required checks passed)
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (needs.quality.result == 'success' && needs.test.result == 'success' && needs.generated-files.result == 'success')) }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -338,7 +336,7 @@ jobs:
         path: dist
 
     - name: Publish package distributions to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
       with:
         packages-dir: dist
         print-hash: true
