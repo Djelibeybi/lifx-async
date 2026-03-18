@@ -7,9 +7,9 @@ repository.
 
 A modern, type-safe, async Python library for controlling LIFX smart devices over the local network.
 Built with Python's built-in `asyncio` for async/await patterns and features auto-generated protocol
-structures from a YAML specification.
+structures from a YAML specification. Published on PyPI as `lifx-async` (`pip install lifx-async`).
 
-**Python Versions**: 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI)
+**Python Versions**: 3.10, 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI)
 **Runtime Dependencies**: Zero - completely dependency-free!
 **Async Framework**: Python's built-in `asyncio` (no external async library required)
 **Test Isolation**: lifx-emulator-core runs embedded in-process for fast, cross-platform testing
@@ -137,6 +137,7 @@ uv run mkdocs gh-deploy
    - `infrared.py`: `InfraredLight` class (Light with infrared LED control for night vision)
    - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
    - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
+   - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
    - State caching with configurable TTL to reduce network traffic
 
 4. **High-Level API** (`src/lifx/api.py`)
@@ -159,7 +160,23 @@ uv run mkdocs gh-deploy
    - Uses protocol-ready uint16 HSBK values (no conversion overhead)
    - Multi-tile canvas support using `user_x`/`user_y` tile positions
 
-6. **Utilities**
+6. **Effects Layer** (`src/lifx/effects/`)
+
+   - 30+ built-in effects (aurora, flame, plasma, rainbow, twinkle, etc.)
+   - `base.py`: Base effect class with frame generation interface
+   - `registry.py`: Effect registry for discovering available effects by name
+   - `state_manager.py`: Effect state management for running effects on devices
+   - `models.py`: Shared effect models and configuration types
+   - Effects generate HSBK frames consumed by the Animation Layer
+
+7. **Theme Layer** (`src/lifx/theme/`)
+
+   - `theme.py`: Theme definitions (named color palettes)
+   - `library.py`: Built-in theme library
+   - `generators.py`: Theme-based color generators for effects
+   - `canvas.py`: Canvas abstraction for applying themes to device layouts
+
+8. **Utilities**
 
    - `color.py`: `HSBK` class with RGB conversion, `Colors` presets
    - `const.py`: Critical constants (network settings, UUIDs, official URLs)
@@ -173,43 +190,22 @@ uv run mkdocs gh-deploy
 
 Different LIFX device types support different features:
 
-| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature |
-|-------------|-------|-----------|--------|----------|-----|----------------------|
-| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   |
-| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   |
-| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   |
-| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   |
-| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   |
-| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   |
+| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature | Ceiling Components |
+|-------------|-------|-----------|--------|----------|-----|----------------------|--------------------|
+| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   | ❌                 |
+| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   | ❌                 |
+| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   | ❌                 |
+| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   | ❌                 |
+| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   | ❌                 |
+| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   | ❌                 |
+| CeilingLight | ✅   | ❌        | ✅     | ❌       | ❌  | ✅                   | ✅                 |
 
 **Device Detection**: The `products` registry automatically detects device capabilities based on
 product ID and instantiates the appropriate device class.
 
 ### Exception Hierarchy
 
-All exceptions inherit from `LifxError` (src/lifx/exceptions.py):
-
-```
-LifxError (base exception)
-├── LifxDeviceNotFoundError     # Device cannot be found or reached
-├── LifxTimeoutError             # Operation timed out
-├── LifxProtocolError            # Protocol parsing/validation error
-├── LifxConnectionError          # Connection error
-├── LifxNetworkError             # Network-level error
-└── LifxUnsupportedCommandError  # Device doesn't support the command (StateUnhandled response)
-```
-
-**Usage**:
-```python
-from lifx.exceptions import LifxTimeoutError, LifxDeviceNotFoundError
-
-try:
-    await light.set_color(color)
-except LifxTimeoutError:
-    print("Device did not respond in time")
-except LifxDeviceNotFoundError:
-    print("Device is offline or unreachable")
-```
+All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceNotFoundError`, `LifxTimeoutError`, `LifxProtocolError`, `LifxConnectionError`, `LifxNetworkError`, `LifxUnsupportedCommandError`.
 
 ### Key Design Patterns
 
@@ -222,479 +218,33 @@ except LifxDeviceNotFoundError:
 
 ### State Caching
 
-**Current Behavior**:
-- Selected properties cache static/semi-static values to reduce network requests
-- Cached properties: `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
-- Volatile state (power, color, hev_cycle, zones, tile_colors, ambient_light_level) is **not** cached - always use `get_*()` methods to fetch fresh data
-- Use `get_*()` methods to fetch fresh data from devices for any property
-- No automatic expiration - application controls when to refresh
-- Use `get_color()` to retrieve color, power, and label values as two of the three are volatile and it returns all three in a single request/response pair.
-
-**Example**:
-```python
-async with device:
-    # get_color() is the most efficient way of getting color and power in a single request/response pair
-    color, power, label = await device.get_color()
-
-    # Access cached label (semi-static)
-    cached_label = device.label  # Returns str | None
-
-    # For volatile state like power/color, always call get_*() methods
-    power_level = await device.get_power()  # Returns int (0 or 65535)
-    is_on = power_level > 0
-```
-
-**Note**: Volatile state properties (`power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level`) were removed as they change too frequently to benefit from caching. Always fetch these values using `get_*()` methods.
+- Cached (semi-static): `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
+- **Never cached** (volatile): `power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level` — always use `get_*()` methods
+- `get_color()` returns `(color, power, label)` in a single request/response pair — most efficient way to get color + power
+- No automatic expiration — application controls when to refresh
 
 ## Common Patterns
 
-### Targeted Device Discovery
-
-The high-level API provides efficient methods to find specific devices without discovering all devices on the network:
-
-#### Find by Label
-
-`find_by_label()` uses a protocol trick by broadcasting `GetLabel` instead of `GetService`, returning all device labels in one pass. This is more efficient than querying each device individually.
-
-```python
-from lifx import find_by_label
-
-# Find all devices with "Living" in the label (substring match, default)
-async for device in find_by_label("Living"):  # May match "Living Room", "Living Area", etc.
-    await device.set_power(True)
-
-# Find device by exact label match (returns at most one device)
-async for device in find_by_label("Living Room", exact_match=True):
-    await device.set_power(True)
-    break  # exact_match returns at most one device
-```
-
-**Parameters:**
-- `label`: Device label to search for (case-insensitive)
-- `exact_match`: If `True`, match label exactly and yield at most one device; if `False` (default), match substring and yield all matching devices
-- Returns: `AsyncGenerator[Device, None]`
-
-#### Find by IP Address
-
-`find_by_ip()` uses a protocol trick by sending `GetService` directly to a specific IP address instead of broadcasting, making it faster and more targeted.
-
-```python
-from lifx import find_by_ip
-
-# Find device at specific IP address
-device = await find_by_ip("192.168.1.100")
-if device:
-    async with device:
-        await device.set_power(True)
-```
-
-**Parameters:**
-- `ip`: IP address to search
-- Returns: `Device | None`
-
-#### Find by Serial Number
-
-`find_by_serial()` discovers devices and filters by serial number.
-
-```python
-from lifx import find_by_serial
-
-# Find device by serial (accepts with or without colons)
-device = await find_by_serial("d073d5123456")
-# or
-device = await find_by_serial("d0:73:d5:12:34:56")
-
-if device:
-    async with device:
-        await device.set_power(True)
-```
-
-**Parameters:**
-- `serial`: 12-digit hex serial number (with or without colons, case-insensitive)
-- Returns: `Device | None`
-
-### Device Serial Number Handling
-
-Devices accept serial numbers as 12-digit hex strings:
-
-- Preferred format: `'d073d5123456'` (12 hex digits, no separators)
-- Also accepts (for compatibility): `'d0:73:d5:12:34:56'` (hex with colons)
-
-**Important**: The LIFX serial number is often the same as the device's MAC address, but can differ
-(particularly the least significant byte may be off by one).
-
-Serial handling (`src/lifx/protocol/models.py`):
-
-The `Serial` dataclass provides a type-safe way to work with LIFX serial numbers:
-
-```python
-from lifx.protocol.models import Serial
-
-# Create from string (accepts hex with or without separators)
-serial = Serial.from_string("d073d5123456")
-serial = Serial.from_string("d0:73:d5:12:34:56")  # Also works
-
-# Convert between formats
-protocol_bytes = serial.to_protocol()  # 8 bytes with padding
-serial_string = serial.to_string()     # "d073d5123456"
-serial_bytes = serial.value            # 6 bytes
-
-# Create from protocol format (8 bytes)
-serial = Serial.from_protocol(protocol_bytes)
-```
-
-### MAC Address Calculation
-
-The `mac_address` property on `Device` provides the device's MAC address, calculated from the serial
-number and host firmware version. The calculation is automatically performed when `get_host_firmware()`
-is called or when using the device as a context manager.
-
-**Calculation Logic** (based on host firmware major version):
-- **Version 2 or 4**: MAC address matches the serial
-- **Version 3**: MAC address is serial with LSB + 1 (with wraparound from 0xFF to 0x00)
-- **Unknown versions**: Defaults to serial
-
-**Format**: MAC address is returned in colon-separated lowercase hex format (e.g., `d0:73:d5:01:02:03`)
-to visually distinguish it from the serial number format.
-
-```python
-from lifx.devices import Device
-
-async with await Device.from_ip("192.168.1.100") as device:
-    # MAC address is automatically calculated during device setup
-    if device.mac_address:
-        print(f"MAC: {device.mac_address}")  # e.g., "d0:73:d5:01:02:04"
-
-    # Returns None before host_firmware is fetched
-    assert device.mac_address is not None
-```
-
-### Color Representation
-
-The `HSBK` class (in `color.py`) provides user-friendly color handling:
-
-- Hue: 0-360 degrees (float)
-- Saturation: 0.0-1.0 (float)
-- Brightness: 0.0-1.0 (float)
-- Kelvin: 1500-9000 (int)
-
-Conversion methods:
-
-- `HSBK.from_rgb(r, g, b)`: Create from RGB (0.0-1.0)
-- `hsbk.to_rgb()`: Convert to RGB tuple (0.0-1.0)
-- Protocol uses uint16 (0-65535) internally
-
-### HEV Light Control (Anti-Bacterial Cleaning)
-
-HevLight devices support HEV (High Energy Visible) cleaning cycles:
-
-```python
-from lifx.devices import HevLight
-
-async with await HevLight.from_ip("192.168.1.100") as light:
-    # Start a 2-hour cleaning cycle
-    await light.set_hev_cycle(enable=True, duration_seconds=7200)
-
-    # Check cycle status
-    state = await light.get_hev_cycle()
-    if state.is_running:
-        print(f"Cleaning: {state.remaining_s}s remaining")
-
-    # Configure default settings
-    await light.set_hev_config(indication=True, duration_seconds=7200)
-```
-
-### Infrared Light Control (Night Vision)
-
-InfraredLight devices support infrared LED control:
-
-```python
-from lifx.devices import InfraredLight
-
-async with await InfraredLight.from_ip("192.168.1.100") as light:
-    # Set infrared brightness to 50%
-    await light.set_infrared(0.5)
-
-    # Get current infrared brightness
-    brightness = await light.get_infrared()
-    print(f"IR brightness: {brightness * 100}%")
-```
-
-### Ambient Light Sensor (Light Level Detection)
-
-Light devices with ambient light sensors can measure the current ambient light level in lux:
-
-```python
-from lifx.devices import Light
-
-async with await Light.from_ip("192.168.1.100") as light:
-    # Turn light off for accurate reading
-    await light.set_power(False)
-
-    # Get ambient light level in lux
-    lux = await light.get_ambient_light_level()
-    if lux > 0:
-        print(f"Ambient light: {lux} lux")
-    else:
-        print("No ambient light sensor or completely dark")
-```
-
-**Notes:**
-- This is a volatile property and is never cached - always fetched fresh from the device
-- Devices without ambient light sensors return 0.0 (not an error)
-- For accurate readings, the light should be off - otherwise the light's own illumination interferes with the sensor
-- A reading of 0.0 could mean either no sensor or complete darkness
-
-### MultiZone Light Control (Strips and Beams)
-
-MultiZoneLight devices support zone-based color control:
-
-```python
-from lifx.devices import MultiZoneLight
-from lifx.color import HSBK
-
-async with await MultiZoneLight.from_ip("192.168.1.100") as light:
-    # Get all zone colors using the convenience method
-    # Automatically uses the best method based on device capabilities
-    colors = await light.get_all_color_zones()
-    print(f"Device has {len(colors)} zones")
-
-    # Get specific zone range using extended method (requires extended capability)
-    first_ten = await light.get_extended_color_zones(start=0, end=9)
-
-    # Get specific zone range using standard method
-    first_ten = await light.get_color_zones(start=0, end=9)
-
-    # Set all zones to red
-    zone_count = await light.get_zone_count()
-    await light.set_color_zones(0, zone_count - 1, HSBK.from_rgb(1.0, 0.0, 0.0))
-```
-
-**Note on methods:**
-- `get_all_color_zones()`: Convenience method with no parameters that automatically uses the best method (extended or standard) based on device capabilities
-- `get_extended_color_zones(start, end)`: Direct access to extended multizone protocol (requires extended capability)
-- `get_color_zones(start, end)`: Direct access to standard multizone protocol (works on all multizone devices)
-
-**Fire-and-forget mode for animations:**
-
-For high-frequency animations (>20 updates/second), use the `fast=True` parameter to skip waiting for device acknowledgement:
-
-```python
-# Standard mode (waits for response)
-await light.set_extended_color_zones(0, colors)
-
-# Fast mode for animations (fire-and-forget, no response waiting)
-for frame in animation_frames:
-    await light.set_extended_color_zones(0, frame, fast=True)
-    await asyncio.sleep(0.033)  # ~30 FPS
-```
-
-**Note:** `MatrixLight.set64()` is already fire-and-forget by default.
-
-### Animation Module (High-Frequency Frame Delivery)
-
-For real-time effects and applications that need to push color data at 30+ FPS, use the animation module:
-
-```python
-from lifx import Animator, MatrixLight
-
-async with await MatrixLight.from_ip("192.168.1.100") as device:
-    # Create animator for matrix device
-    animator = await Animator.for_matrix(device)
-
-# Device connection closed - animator sends via direct UDP
-while running:
-    # Generate HSBK frame (protocol-ready uint16 values)
-    # H/S/B: 0-65535, K: 1500-9000
-    hsbk_frame = [(65535, 65535, 65535, 3500)] * animator.pixel_count
-
-    # send_frame() is synchronous for speed
-    stats = animator.send_frame(hsbk_frame)
-    print(f"Sent {stats.packets_sent} packets")
-
-    await asyncio.sleep(1 / 30)  # 30 FPS
-
-animator.close()
-```
-
-**Key Features:**
-- **Direct UDP**: Bypasses connection layer for maximum throughput
-- **Prebaked packets**: Templates created once, only colors updated per frame
-- **Multi-tile canvas**: Unified coordinate space for multi-tile devices (e.g., 5-tile LIFX Tile)
-- **Tile orientation**: Automatic pixel remapping for rotated tiles
-
-**Multi-Tile Canvas:**
-
-For devices with multiple tiles, the animator creates a unified canvas based on tile positions:
-
-```python
-async with await MatrixLight.from_ip("192.168.1.100") as device:
-    animator = await Animator.for_matrix(device)
-
-# For 5 horizontal tiles: canvas is 40x8 (320 pixels)
-print(f"Canvas: {animator.canvas_width}x{animator.canvas_height}")
-
-# Generate frame for entire canvas (row-major order)
-frame = []
-for y in range(animator.canvas_height):
-    for x in range(animator.canvas_width):
-        hue = int(x / animator.canvas_width * 65535)  # Rainbow across all tiles
-        frame.append((hue, 65535, 65535, 3500))
-
-animator.send_frame(frame)
-```
-
-**HSBK Format (Protocol-Ready):**
-```python
-# (hue, saturation, brightness, kelvin)
-# H/S/B: 0-65535, K: 1500-9000
-red = (0, 65535, 65535, 3500)           # Full red
-blue = (43690, 65535, 65535, 3500)      # Full blue (240/360 * 65535)
-white = (0, 0, 65535, 5500)             # Daylight white
-off = (0, 0, 0, 3500)                   # Off (black)
-```
-
-**For MultiZone devices (strips/beams):**
-```python
-from lifx import Animator, MultiZoneLight
-
-async with await MultiZoneLight.from_ip("192.168.1.100") as device:
-    animator = await Animator.for_multizone(device)
-
-# Same API as matrix
-stats = animator.send_frame(hsbk_frame)
-```
-
-### Packet Flow
-
-1. Create packet instance (e.g., `LightSetColor`)
-2. Send via `DeviceConnection.request()`
-3. Response is automatically unpacked
+> **Full API docs, usage examples, and device-specific guides are available at
+> https://djelibeybi.github.io/lifx-async/ and via context7 (`/djelibeybi/lifx-async`, 549 snippets).**
+> The following covers only non-obvious gotchas not in the docs.
+
+### Key Gotchas
+
+- **Serial vs MAC**: Serial number often matches MAC address but can differ (LSB may be off by one depending on firmware version). MAC calculation logic is in `devices/base.py`.
+- **HSBK dual formats**: User-facing `HSBK` uses float (hue 0-360, sat/bright 0.0-1.0, kelvin 1500-9000). Protocol/animation layer uses raw uint16 (0-65535 for H/S/B). Don't mix them.
+- **`get_color()` returns a triple**: `(color, power, label)` — most efficient single-request way to get color + power state
+- **Ambient light sensor**: Returns 0.0 for both "no sensor" and "complete darkness". Light must be off for accurate readings.
+- **High-frequency updates**: Use the Animation Layer (`src/lifx/animation/`) for performance-critical frame delivery rather than calling device methods directly.
+- **Packet flow**: Create packet → `DeviceConnection.request()` → response auto-unpacked
 
 ### Concurrency Considerations
 
-**Request/Response Pattern:**
-
-The library uses async generators for all request/response communication:
-
-**Single Response (Most Common):**
-```python
-# Get single response with convenience wrapper
-label_state = await device.connection.request(GetLabel())
-
-# Or explicitly with generator
-async for state in device.connection.request_stream(GetLabel()):
-    process(state)
-    break  # Exit after first response
-```
-
-**Multiple Responses:**
-```python
-# Stream responses until timeout
-async for zone_state in device.connection.request_stream(
-    GetExtendedColorZones(), timeout=2.0
-):
-    colors.extend(zone_state.colors)
-    if len(colors) >= expected:
-        break  # Early exit when done
-```
-
-**Benefits:**
-- Immediate exit for single-response requests (no wasted timeout)
-- Natural streaming for multi-response protocols
-- Memory efficient (no buffering all responses)
-- Consistent with discovery pattern
-
-**Concurrent request patterns:**
-
-1. **Sequential operations on a single connection** (default):
-
-   ```python
-   async with DeviceConnection(serial, ip) as conn:
-       # Requests are serialized via _request_lock to prevent response mixing
-       await conn.request(packet1)
-       await conn.request(packet2)
-   ```
-
-2. **Concurrent operations on different devices** (fully parallel):
-
-   ```python
-   # Different devices = different connections = maximum parallelism
-   async with asyncio.TaskGroup() as tg:
-       tg.create_task(device1.set_power(True))
-       tg.create_task(device2.set_power(True))
-   ```
-
-**How it works:**
-
-- Each connection has one UDP socket with a unique local port
-- Requests are serialized via `_request_lock` to prevent response mixing on the same connection
-- Each request uses `request_stream()` async generator to yield responses as they arrive
-- Single-response requests break immediately after first response
-- Multi-response requests stream until timeout or early exit condition
-
-**Request Serialization:**
-
-The library uses an asyncio.Lock (`_request_lock`) to serialize requests on the same connection:
-
-1. **Why serialization?** Without a background receiver task, concurrent requests on the same UDP socket could receive each other's responses. The lock ensures only one request is active per connection.
-
-2. **How it works:**
-   ```python
-   async with self._request_lock:
-       # Send request
-       await self.send_packet(request)
-       # Receive and yield responses
-       async for header, payload in self._receive_responses(timeout):
-           yield header, payload
-   ```
-
-3. **Concurrent device operations:** Different devices have different connections with their own locks, so operations on multiple devices execute in parallel.
-
-**Sequence Number Allocation:**
-
-The library uses atomic sequence number allocation for robust request handling:
-
-- Each request atomically allocates a unique sequence number (0-255)
-- The sequence counter wraps around at 256 (uint8 protocol limit)
-- Ensures response correlation with the request
-
-```python
-# In MessageBuilder
-def next_sequence(self) -> int:
-    """Atomically allocate and return the next sequence number."""
-    seq = self._sequence
-    self._sequence = (self._sequence + 1) % 256
-    return seq
-```
-
-**Performance characteristics:**
-
-- Single-response requests exit immediately (no wasted timeout)
-- Multi-response requests stream efficiently with early exit
-- Concurrent requests to different devices benefit from full parallelism
-- Minimal memory overhead (no buffering responses)
-
-**Rate Limiting:**
-
-The library **intentionally does not implement rate limiting** to keep the core library simple and
-flexible. According to the LIFX protocol specification, devices can handle approximately 20 messages
-per second. Application developers should implement their own rate limiting if needed, especially when:
-- Sending many concurrent requests to a single device
-- Broadcasting commands to many devices
-- Implementing high-frequency polling or monitoring
-
-Example rate limiting pattern:
-```python
-import asyncio
-
-async def rate_limited_requests(requests, rate_limit=20):
-    """Send requests with rate limiting."""
-    delay = 1.0 / rate_limit  # e.g., 50ms for 20/sec
-    for request in requests:
-        await request()
-        await asyncio.sleep(delay)
-```
+- Requests on a single connection are serialized via `_request_lock` (asyncio.Lock) to prevent response mixing on the same UDP socket
+- Different devices have different connections, so operations on multiple devices execute in parallel via `asyncio.TaskGroup`
+- Request/response uses async generators: single-response requests break after first response, multi-response requests stream until timeout or early exit
+- Sequence numbers (0-255, uint8) are atomically allocated per request for response correlation
+- **No rate limiting** built in — devices handle ~20 msg/sec; application developers should implement their own if needed
 
 **Discovery DoS Protection:**
 
@@ -706,15 +256,15 @@ The `discover_devices()` function implements DoS protection through:
 
 ## Testing Strategy
 
-- **1075+ tests total** (comprehensive coverage across all layers)
-- **Protocol Layer**: 136 tests (serialization, header, packets, generator validation)
-- **Network Layer**: 149 tests (transport, discovery, connection, message, mDNS, async generator requests)
-- **Device Layer**: 157 tests (base, light, hev, infrared, multizone, tile)
-- **API Layer**: 60 tests (discovery, batch operations, organization, themes, error handling)
-- **Utilities**: 329 tests (color conversion, product registry, RGB roundtrip, effects, themes)
-
-Test files mirror source structure: `tests/test_devices/test_light.py` tests
-`src/lifx/devices/light.py`
+- **2425+ tests total** (comprehensive coverage across all layers)
+- **Protocol Layer**: 159 tests (serialization, header, packets, generator validation)
+- **Network Layer**: 183 tests (transport, discovery, connection, message, mDNS, async generator requests)
+- **Device Layer**: 375 tests (base, light, ceiling, hev, infrared, multizone, matrix, state management, MAC address)
+- **API Layer**: 63 tests (discovery, batch operations, organization, themes, error handling)
+- **Effects Layer**: 1249 tests (30+ built-in effects, registry, state manager, integration, capability filtering)
+- **Theme Layer**: 146 tests (themes, canvas, generators, library, apply_theme)
+- **Animation Layer**: 123 tests (animator, framebuffer, packets, orientation)
+- **Utilities**: 127 tests (color conversion, product registry, RGB roundtrip)
 
 ### Integration Tests with lifx-emulator-core
 
@@ -732,7 +282,7 @@ uv sync  # Installs lifx-emulator-core automatically
 **Running Integration Tests**:
 - Tests marked with `@pytest.mark.emulator` use the embedded emulator
 - If emulator is not available, these tests are automatically skipped
-- **Works on all Python versions (3.11+)**
+- **Works on all supported Python versions (3.10+)**
 
 **External Emulator Management**:
 
@@ -751,40 +301,24 @@ This is useful when:
 - Running the emulator with custom configuration or device setup
 - Debugging emulator behavior separately from the test suite
 
-**Key Test Files:**
+**Key Test Directories:**
+
+Test files mirror source structure: `tests/test_devices/test_light.py` tests `src/lifx/devices/light.py`
+
 ```
 tests/
-├── test_protocol/
-│   ├── test_header.py           # Protocol header tests
-│   ├── test_serializer.py       # Binary serialization tests
-│   ├── test_generated.py        # Generated packet tests
-│   └── test_generator.py        # Generator validation tests
-├── test_network/
-│   ├── test_transport.py        # UDP transport tests
-│   ├── test_discovery_devices.py    # Device discovery tests
-│   ├── test_discovery_errors.py     # Discovery error handling tests
-│   ├── test_connection.py       # Connection management tests
-│   ├── test_message.py          # Message building/parsing tests
-│   ├── test_concurrent_requests.py  # Concurrent request tests
-│   └── test_mdns/               # mDNS discovery tests
-│       ├── test_dns.py          # DNS parser tests
-│       ├── test_transport.py    # mDNS transport tests
-│       └── test_discovery.py    # mDNS discovery tests
-├── test_devices/
-│   ├── test_base.py             # Base device tests
-│   ├── test_light.py            # Light device tests
-│   ├── test_hev.py              # HEV light tests
-│   ├── test_infrared.py         # Infrared light tests
-│   ├── test_multizone.py        # MultiZone light tests
-│   └── test_matrix.py           # Matrix light tests
-├── test_api/
-│   ├── test_api_discovery.py    # High-level discovery tests
-│   ├── test_api_batch_operations.py  # Batch operation tests
-│   ├── test_api_batch_errors.py      # Error handling tests
-│   └── test_api_organization.py      # Location/group organization tests
-├── test_color.py                # Color utilities tests
-├── test_products.py             # Product registry tests
-└── test_utils.py                # General utility tests
+├── test_protocol/          # Protocol header, serializer, generated packets, generator
+├── test_network/           # Transport, discovery, connection, message, concurrent requests
+│   └── test_mdns/          # mDNS DNS parser, transport, discovery
+├── test_devices/           # Base, light, ceiling, hev, infrared, multizone, matrix
+│   └── test_state_*.py     # State management tests per device type
+├── test_api/               # Discovery, batch operations, errors, organization, themes
+├── test_effects/           # Individual effect tests + registry, integration, capability filtering
+├── test_theme/             # Theme, canvas, generators, library
+├── test_animation/         # Animator, framebuffer, packets, orientation
+├── test_color.py           # Color utilities and RGB roundtrip
+├── test_products/          # Product registry
+└── test_utils.py           # General utilities
 ```
 
 ## Protocol Specification
@@ -827,81 +361,21 @@ Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 
 ## Products Registry
 
-The products registry provides device capability detection and automatic device class selection:
-
 - **Source**: https://github.com/LIFX/products/blob/master/products.json
-- **Auto-generated**: `src/lifx/products/registry.py` is generated from products.json
-- **Update command**: `uv run python -m lifx.products.generator`
-- **Usage**: Import from `lifx.products` module
+- **Auto-generated**: `src/lifx/products/registry.py` — update with `uv run python -m lifx.products.generator`
+- **Key functions**: `get_product(product_id)` → `ProductInfo`, `get_device_class_name(product_id)` → class name string
 
-**Key Functions:**
-```python
-from lifx.products import get_product, get_device_class_name
-
-# Get product info by product ID
-product_info = get_product(product_id=27)  # Returns ProductInfo
-
-# Get appropriate device class name
-class_name = get_device_class_name(product_id=27)  # Returns "Light", "MultiZoneLight", etc.
-```
-
-**Automatic Device Type Detection:**
-
-The discovery system uses device capabilities to automatically instantiate the correct device class.
-Device type detection is performed by `DiscoveredDevice.create_device()`, which is the single source
-of truth for device instantiation across the library.
-
-The detection uses capability-based logic in the following priority order:
-1. Matrix capability → `MatrixLight`
-2. Multizone capability → `MultiZoneLight`
-3. Infrared capability → `InfraredLight`
-4. HEV capability → `HevLight`
-5. Color capability → `Light`
-6. Relay/Button-only devices → `None` (filtered out)
-
-```python
-# High-level API - automatically creates appropriate device types
-async for device in discover():
-    # Each device is the correct type based on its capabilities
-    print(f"{device.label}: {type(device).__name__}")
-
-# Low-level API - manual device type detection
-from lifx.network.discovery import discover_devices
-
-async for disc in discover_devices():
-    device = await disc.create_device()  # Returns appropriate device class or None
-    if device:
-        print(f"Created {type(device).__name__}")
-```
-
-## Constants Module
-
-Critical constants are defined in `src/lifx/const.py`:
-
-**Network Constants:**
-- `LIFX_UDP_PORT`: LIFX UDP port (56700)
-- `MAX_PACKET_SIZE`: Maximum packet size (1024 bytes) to prevent DoS
-- `MIN_PACKET_SIZE`: Minimum packet size (36 bytes = header)
-- `LIFX_VENDOR_PREFIX`: LIFX vendor serial prefix (d0:73:d5) for device fingerprinting
-- `MAX_RESPONSE_TIME`: Maximum response time for local network devices (0.5s)
-- `IDLE_TIMEOUT_MULTIPLIER`: Idle timeout after last response (4.0)
-
-**mDNS Constants:**
-- `MDNS_ADDRESS`: Multicast address for mDNS (224.0.0.251)
-- `MDNS_PORT`: mDNS port (5353)
-- `LIFX_MDNS_SERVICE`: LIFX service type (_lifx._udp.local)
-
-**UUID Namespaces:**
-- `LIFX_LOCATION_NAMESPACE`: UUID namespace for generating location UUIDs
-- `LIFX_GROUP_NAMESPACE`: UUID namespace for generating group UUIDs
-
-**Official Repository URLs:**
-- `PROTOCOL_URL`: Official LIFX protocol.yml URL
-- `PRODUCTS_URL`: Official LIFX products.json URL
+**Device Type Detection** (`DiscoveredDevice.create_device()` is the single source of truth):
+1. Ceiling product ID → `CeilingLight`
+2. Matrix capability → `MatrixLight`
+3. Multizone → `MultiZoneLight`
+4. Infrared → `InfraredLight`
+5. HEV → `HevLight`
+6. Color → `Light`
+7. Relay/Button-only → `None` (filtered out)
 
 ## Known Limitations
 
 - Button/Relay/Switch devices are explicitly out of scope (library focuses on lighting devices)
-- Not yet published to PyPI
 - Never update docs/changelog.md manually as it is auto-generated during the release process by the CI/CD workflow.
 - If a field is user-visible, it must never be bytes. This means things like serial, label, location and group must always be converted to a string prior to storing it anywhere a user would be able to access it. Conversion to and from bytes should happen either as close to sending or receiving the packet as possible.
