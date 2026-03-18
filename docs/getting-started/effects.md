@@ -565,6 +565,303 @@ group = DeviceGroup(devices)
 await party_mode(group.lights, duration=120)
 ```
 
+## More Effects
+
+In addition to the effects above, lifx-async includes 18 effects adapted from [pkivolowitz/lifx](https://github.com/pkivolowitz/lifx) by Perry Kivolowitz. They use the same Conductor and FrameEffect infrastructure and run indefinitely until stopped.
+
+### Cylon
+
+Larson scanner — a bright eye sweeps back and forth with a fading trail. Classic Knight Rider look.
+
+```python
+from lifx.effects import EffectCylon
+
+# Default scanner
+effect = EffectCylon()
+await conductor.start(effect, lights)
+
+# Faster red scanner with wider eye
+effect = EffectCylon(speed=1.0, width=5, hue=0, trail=0.7)
+await conductor.start(effect, lights)
+
+await asyncio.sleep(30)
+await conductor.stop(lights)
+```
+
+**Key parameters:** `speed` (seconds per sweep), `width` (eye width in bulbs), `hue`, `trail` (decay factor 0-1)
+
+### Wave
+
+Standing wave — zones vibrate between two colors with stationary nodes. Adjacent segments swing in opposite directions.
+
+```python
+from lifx.effects import EffectWave
+
+# Two-node standing wave
+effect = EffectWave(nodes=2, hue1=0, hue2=240)
+await conductor.start(effect, lights)
+
+# Drifting wave (not purely standing)
+effect = EffectWave(nodes=3, drift=10.0, speed=6.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (oscillation period), `nodes` (stationary points), `hue1`/`hue2`, `drift` (spatial drift degrees/s)
+
+### Sine
+
+Smooth ease-wave — bright humps roll along the strip using cubic smoothstep. Optional two-color gradient.
+
+```python
+from lifx.effects import EffectSine
+
+# Blue wave
+effect = EffectSine(hue=200, wavelength=0.5, speed=4.0)
+await conductor.start(effect, lights)
+
+# Two-color gradient wave
+effect = EffectSine(hue=0, hue2=240, wavelength=0.3)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed`, `wavelength` (fraction of strip), `hue`, `hue2` (optional gradient), `floor` (min brightness)
+
+### Spectrum Sweep
+
+Three sine waves 120° out of phase sweep through zones like a spectrum analyzer. Red, green, and blue channels blend via Oklab interpolation.
+
+```python
+from lifx.effects import EffectSpectrumSweep
+
+effect = EffectSpectrumSweep(speed=6.0, waves=1.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (sweep period), `waves` (number of wave periods across strip)
+
+### Spin
+
+Rotates theme colors through zones with smooth Oklab interpolation and per-zone hue shimmer.
+
+```python
+from lifx.effects import EffectSpin
+
+# Default spin with built-in theme
+effect = EffectSpin(speed=10.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (rotation period), `bulb_offset` (per-zone hue shift for shimmer)
+
+### Twinkle
+
+Random pixels sparkle and fade like Christmas lights. Each spark has a fast flash and slow quadratic decay tail.
+
+```python
+from lifx.effects import EffectTwinkle
+
+# White sparkles on dark background
+effect = EffectTwinkle(density=0.05, speed=1.0)
+await conductor.start(effect, lights)
+
+# Colored sparkles
+effect = EffectTwinkle(hue=120, saturation=1.0, density=0.1)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (fade duration), `density` (sparkle probability per frame), `hue`, `saturation`
+
+### Embers
+
+Fire simulation via 1D heat diffusion — heat injected at the bottom, diffuses upward with cooling and turbulence.
+
+```python
+from lifx.effects import EffectEmbers
+
+effect = EffectEmbers(intensity=0.5, cooling=0.15, turbulence=0.3)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `intensity` (heat injection probability), `cooling`, `turbulence`
+
+### Plasma
+
+Plasma ball — bright core pulsing at center with electric tendrils crackling outward. Tendrils random-walk and fork.
+
+```python
+from lifx.effects import EffectPlasma
+
+# Default violet plasma
+effect = EffectPlasma()
+await conductor.start(effect, lights)
+
+# Green plasma with frequent tendrils
+effect = EffectPlasma(hue=120, tendril_rate=1.0, hue_spread=30.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (core pulse period), `tendril_rate`, `hue`, `hue_spread`
+
+### Pendulum Wave
+
+Pendulums with linearly varying periods drift in and out of phase, creating traveling waves, standing waves, and chaos before realigning.
+
+```python
+from lifx.effects import EffectPendulumWave
+
+effect = EffectPendulumWave(speed=30.0, cycles=8, hue1=0, hue2=240)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (realignment cycle), `cycles` (oscillations per cycle), `hue1`/`hue2`
+
+### Double Slit
+
+Young's double slit interference — two coherent wave sources create constructive/destructive interference fringes that shift as wavelength breathes.
+
+```python
+from lifx.effects import EffectDoubleSlit
+
+effect = EffectDoubleSlit(wavelength=0.3, separation=0.2, breathe=8.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed`, `wavelength`, `separation`, `breathe` (wavelength modulation period; 0 = off)
+
+### Rule 30
+
+Wolfram's Rule 30 cellular automaton — generates chaotic/pseudo-random patterns. Configurable seed modes: center, random, or all.
+
+```python
+from lifx.effects import EffectRule30
+
+# Classic Rule 30
+effect = EffectRule30(rule=30, speed=5.0, seed="center")
+await conductor.start(effect, lights)
+
+# Rule 110 (Turing-complete!)
+effect = EffectRule30(rule=110, hue=0, seed="random")
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `rule` (Wolfram rule 0-255), `speed` (generations/s), `seed` ("center"/"random"/"all"), `hue`
+
+### Rule Trio
+
+Three independent cellular automata running at irrational speed ratios, blended via Oklab. Produces evolving color interference patterns.
+
+```python
+from lifx.effects import EffectRuleTrio
+
+effect = EffectRuleTrio(rule_a=30, rule_b=90, rule_c=110, speed=5.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `rule_a`/`rule_b`/`rule_c`, `speed`, `drift_b`/`drift_c` (speed multipliers)
+
+### Fireworks
+
+Rockets launch from both ends, ascend with easing, and burst into expanding gaussian halos. Color evolves from white through chemical colors to orange.
+
+```python
+from lifx.effects import EffectFireworks
+
+effect = EffectFireworks(max_rockets=3, launch_rate=0.5, burst_spread=5.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `max_rockets`, `launch_rate`, `ascent_speed`, `burst_spread`, `burst_duration`
+
+### Ripple
+
+Ripple tank — raindrops hit a water surface, launching wavefronts that propagate, reflect, and interfere. Displacement maps to color via Oklab.
+
+```python
+from lifx.effects import EffectRipple
+
+effect = EffectRipple(speed=1.0, damping=0.98, drop_rate=0.3)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed`, `damping`, `drop_rate`, `hue1`/`hue2`
+
+### Jacob's Ladder
+
+Electric arcs drift along the strip with flickering, crackling spikes, and electrode glows. Inspired by Frankenstein lab props.
+
+```python
+from lifx.effects import EffectJacobsLadder
+
+effect = EffectJacobsLadder(speed=0.5, arcs=2, gap=5)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (arc drift speed), `arcs` (simultaneous arc pairs), `gap` (electrode spacing)
+
+### Newton's Cradle
+
+Newton's cradle momentum transfer — steel balls swing alternately with Phong sphere shading and specular highlights.
+
+```python
+from lifx.effects import EffectNewtonsCradle
+
+effect = EffectNewtonsCradle(num_balls=5, speed=2.0)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `num_balls`, `speed` (cycle period), `shininess` (Phong exponent), `hue`, `saturation`
+
+### Sonar
+
+Sonar/radar pulses bounce off drifting obstacles. Wavefronts emit from sources, reflect off obstacles, and decay with tails.
+
+```python
+from lifx.effects import EffectSonar
+
+effect = EffectSonar(speed=8.0, pulse_interval=2.0, obstacle_speed=0.5)
+await conductor.start(effect, lights)
+```
+
+**Key parameters:** `speed` (wavefront speed), `pulse_interval`, `obstacle_speed`, `decay`
+
+### Plasma 2D
+
+2D plasma effect — four sine waves (horizontal, vertical, diagonal, radial) create flowing interference color patterns. Matrix devices only.
+
+```python
+from lifx.effects import EffectPlasma2D
+
+effect = EffectPlasma2D(speed=1.0, scale=1.0, hue1=270, hue2=180)
+await conductor.start(effect, [matrix_light])
+```
+
+**Key parameters:** `speed` (animation speed), `scale` (spatial scale), `hue1`/`hue2`
+
+### Device Compatibility Reference
+
+| Effect | Light | MultiZone | Matrix |
+|--------|-------|-----------|--------|
+| cylon | COMPATIBLE | RECOMMENDED | — |
+| wave | COMPATIBLE | RECOMMENDED | — |
+| sine | COMPATIBLE | RECOMMENDED | — |
+| spectrum_sweep | COMPATIBLE | RECOMMENDED | — |
+| spin | COMPATIBLE | RECOMMENDED | — |
+| twinkle | RECOMMENDED | RECOMMENDED | COMPATIBLE |
+| embers | COMPATIBLE | RECOMMENDED | — |
+| plasma | COMPATIBLE | RECOMMENDED | — |
+| pendulum_wave | — | RECOMMENDED | — |
+| double_slit | — | RECOMMENDED | — |
+| rule30 | — | RECOMMENDED | — |
+| rule_trio | — | RECOMMENDED | — |
+| fireworks | — | RECOMMENDED | — |
+| ripple | — | RECOMMENDED | — |
+| jacobs_ladder | — | RECOMMENDED | — |
+| newtons_cradle | — | RECOMMENDED | — |
+| sonar | — | RECOMMENDED | — |
+| plasma2d | — | — | RECOMMENDED |
+
+All ported effects run indefinitely until stopped via `conductor.stop()`.
+
 ## Next Steps
 
 - See [Effects Reference](../api/effects.md) for detailed documentation on all effect parameters
