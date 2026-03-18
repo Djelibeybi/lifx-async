@@ -32,7 +32,7 @@ Key features:
 - [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md): Creating custom light effects
 - [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md): Common issues and solutions
 - [Effects Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md): Effects-specific troubleshooting
-- [Protocol Deep Dive](https://djelibeybi.github.io/lifx-async/user-guide/protocol-deep-dive/index.md): Understanding the LIFX protocol
+- [Protocol Deep Dive](https://djelibeybi.github.io/lifx-async/architecture/protocol-deep-dive/index.md): Understanding the LIFX protocol
 
 ## Architecture
 

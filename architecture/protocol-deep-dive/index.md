@@ -309,6 +309,6 @@ MIN_DURATION = 0           # Instant
 
 ## Next Steps
 
-- [Connection Management](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/#connection-management) - Connection patterns
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Protocol API documentation
-- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - System architecture
+- [Connection Management](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/#connection-management) — Connection patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) — Protocol API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) — System architecture

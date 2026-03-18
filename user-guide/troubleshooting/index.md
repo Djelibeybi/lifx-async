@@ -407,6 +407,7 @@ If you're still experiencing issues:
 
 ## Next Steps
 
-- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md) - Optimization patterns
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
-- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
+- [Effects Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) — Issues specific to the effects framework
+- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md) — Optimization patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) — Complete API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) — Frequently asked questions

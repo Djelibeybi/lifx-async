@@ -406,7 +406,7 @@ for theme_name in themes:
 
 ## See Also
 
-- [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) - Complete API documentation
-- [Quick Start: Themes](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md) - Simple examples
-- [Colors Guide](https://djelibeybi.github.io/lifx-async/api/colors/index.md) - Working with HSBK colors
-- [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) - Device-specific documentation
+- [Themes Quick Start](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md) — Get started in 30 seconds
+- [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) — Complete API documentation
+- [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md) — HSBK color representation and RGB conversion
+- [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) — Device-specific `apply_theme()` methods

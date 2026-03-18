@@ -22,7 +22,7 @@ Key features:
 
 ## System Requirements
 
-- **Python**: 3.11 or higher
+- **Python**: 3.10 or higher
 - **Network**: Local network access to LIFX devices
 - **OS**: Linux, macOS, Windows
 
@@ -63,7 +63,7 @@ For the latest development version:
 
 ```bash
 git clone https://github.com/Djelibeybi/lifx-async.git
-cd lifx
+cd lifx-async
 
 # Using uv (recommended)
 uv pip install -e .
@@ -78,7 +78,7 @@ To install with development tools (recommended for contributors):
 
 ```bash
 git clone https://github.com/Djelibeybi/lifx-async.git
-cd lifx
+cd lifx-async
 
 # Using uv (recommended)
 uv sync
@@ -105,11 +105,10 @@ from lifx import discover
 
 
 async def main():
-    async with discover(timeout=3.0) as group:
-        print(f"Found {len(group)} devices")
-        for device in group:
+    async for device in discover(timeout=3.0):
+        async with device:
             label = await device.get_label()
-            print(f"  - {label}")
+            print(f"Found: {label}")
 
 
 asyncio.run(main())
@@ -148,9 +147,9 @@ sudo usermod -a -G netdev $USER  # Linux
 
 ## Next Steps
 
-- [Quick Start Guide](https://djelibeybi.github.io/lifx-async/getting-started/quickstart/index.md) - Start controlling your lights
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
-- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
+- **Next: [Quick Start Guide](https://djelibeybi.github.io/lifx-async/getting-started/quickstart/index.md)** — Start controlling your lights
+- [Themes Quick Start](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md) — Apply color palettes
+- [Light Effects](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) — Run visual effects
 
 # Quick Start
 
@@ -275,7 +274,7 @@ from lifx import find_by_label, find_by_ip, find_by_serial, Colors
 async def main():
     # Find by label (substring match)
     async for device in find_by_label("Bedroom"):  # Matches "Bedroom", "Master Bedroom", etc.
-        await device.set_color(Colors.WARM_WHITE)
+        await device.set_color(Colors.WARM)
 
     # Find by exact label
     async for device in find_by_label("Master Bedroom", exact_match=True):
@@ -309,8 +308,8 @@ Colors.GREEN
 Colors.BLUE
 
 # White variants
-Colors.WARM_WHITE
-Colors.COOL_WHITE
+Colors.WARM
+Colors.COOL
 Colors.DAYLIGHT
 
 # Pastels
@@ -344,8 +343,8 @@ async def main():
         # Pulse effect
         await light.pulse(Colors.RED, period=1.0, cycles=5)
 
-        # Breathe effect (infinite)
-        await light.breathe(Colors.BLUE, period=2.0, cycles=0)
+        # Breathe effect (10 cycles)
+        await light.breathe(Colors.BLUE, period=2.0, cycles=10)
 
 
 asyncio.run(main())
@@ -375,13 +374,14 @@ asyncio.run(main())
 
 ## Next Steps
 
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
-- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - How lifx-async works
-- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
+- **Next: [Themes Quick Start](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md)** — Apply color palettes to your lights
+- **Next: [Light Effects](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md)** — Run visual effects on your lights
+- [High-Level API](https://djelibeybi.github.io/lifx-async/api/high-level/index.md) — `discover()`, `find_by_serial()`, `DeviceGroup` reference
+- [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md) — HSBK, RGB conversion, built-in presets
 
 # Themes Quick Start
 
-Themes allow you to apply professionally-curated color palettes to your LIFX devices with a single command.
+Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library includes 42 built-in themes across seasonal, holiday, mood, ambient, and functional categories.
 
 ## Apply a Theme
 
@@ -393,11 +393,9 @@ async for device in discover():
     devices.append(device)
 group = DeviceGroup(devices)
 
-# Get a theme by name
+# Get a theme by name and apply it
 theme = ThemeLibrary.get("evening")
-
-# Apply to all devices
-await group.apply_theme(theme)
+await group.apply_theme(theme, power_on=True, duration=1.5)
 ```
 
 ## List Available Themes
@@ -411,97 +409,20 @@ print(themes)
 
 # Get themes by category
 seasonal = ThemeLibrary.get_by_category("seasonal")
-holidays = ThemeLibrary.get_by_category("holiday")
 moods = ThemeLibrary.get_by_category("mood")
-```
-
-## Theme Categories
-
-The library includes 42 official LIFX app themes:
-
-- **Seasonal** (3): spring, autumn, winter
-- **Holiday** (9): christmas, halloween, hanukkah, kwanzaa, shamrock, thanksgiving, calaveras, pumpkin, santa
-- **Mood** (16): peaceful, serene, relaxing, mellow, gentle, soothing, blissful, cheerful, romantic, romance, love, energizing, exciting, epic, intense, powerful
-- **Ambient** (6): dream, fantasy, spacey, stardust, zombie, party
-- **Functional** (3): focusing, evening, bias_lighting
-- **Atmosphere** (3): hygge, tranquil, sports
-
-## Common Options
-
-```python
-from lifx import discover, DeviceGroup, ThemeLibrary
-
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-theme = ThemeLibrary.get("christmas")
-
-# Apply with options
-await group.apply_theme(
-    theme,
-    power_on=True,      # Turn on lights before applying
-    duration=1.5        # Transition duration in seconds
-)
-```
-
-## Create a Custom Theme
-
-```python
-from lifx import HSBK, Theme, discover
-
-# Create custom theme with specific colors
-custom_theme = Theme([
-    HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),      # Red
-    HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500),    # Green
-    HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500),    # Blue
-])
-
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-await group.apply_theme(custom_theme, power_on=True)
 ```
 
 ## Next Steps
 
-- See [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) for detailed API documentation
-- See [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) for device-specific `apply_theme()` methods
-- See [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md) for HSBK color representation
+- **[Themes Guide](https://djelibeybi.github.io/lifx-async/user-guide/themes/index.md)** — Practical examples: time-based lighting, holiday decorations, custom themes, room coordination
+- **[Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md)** — Complete API documentation
+- **[Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md)** — HSBK color representation
 
-# Getting Started with Light Effects
+# Light Effects
 
-The Light Effects Framework provides a comprehensive system for creating and managing visual effects on LIFX devices. This guide will help you get started with the built-in effects and show you common patterns for using the effects system.
+lifx-async includes 25+ built-in light effects — from simple pulse and color loops to complex animations like aurora, flame, fireworks, and cellular automata. The effects framework handles state management automatically: it captures your lights' current state, runs the effect, and restores everything when done.
 
-## Overview
-
-The effects framework consists of three main components:
-
-- **Conductor**: Central orchestrator that manages effect lifecycle and state
-- **Effects**: Pre-built effect classes (Pulse, ColorLoop, Rainbow, Flame, Aurora, Progress, Sunrise/Sunset) and base class for custom effects
-- **Effect Registry**: Central discovery mechanism for querying available effects by device type
-- **State Management**: Automatic capture and restoration of device state before and after effects
-
-## Installation
-
-The effects framework is included with lifx-async 1.3.0+. No additional installation is required:
-
-```bash
-# Using uv (recommended)
-uv pip install lifx-async
-
-# Or using pip
-pip install lifx-async
-```
-
-## Basic Usage
-
-### Your First Pulse Effect
-
-The simplest way to use the effects framework is with the `EffectPulse` class:
+## Quick Example
 
 ```python
 import asyncio
@@ -509,7 +430,6 @@ from lifx import discover, DeviceGroup
 from lifx.effects import Conductor, EffectPulse
 
 async def main():
-    # Discover lights on your network
     devices = []
     async for device in discover():
         devices.append(device)
@@ -522,826 +442,48 @@ async def main():
     # Create a conductor to manage effects
     conductor = Conductor()
 
-    # Create a blink effect
+    # Blink all lights 5 times
     effect = EffectPulse(mode='blink', cycles=5)
-
-    # Start the effect on all lights
     await conductor.start(effect, group.lights)
 
-    # Wait for effect to complete (5 cycles * 1 second)
+    # Wait for effect to complete
     await asyncio.sleep(6)
-
-    print("Effect complete - lights restored to original state")
-
-asyncio.run(main())
-```
-
-### Your First ColorLoop Effect
-
-The `EffectColorloop` creates a continuous rainbow effect:
-
-```python
-import asyncio
-from lifx import discover, DeviceGroup
-from lifx.effects import Conductor, EffectColorloop
-
-async def main():
-    devices = []
-    async for device in discover():
-        devices.append(device)
-    group = DeviceGroup(devices)
-
-    if not group.lights:
-        print("No lights found")
-        return
-
-    conductor = Conductor()
-
-        # Create a rainbow effect
-        effect = EffectColorloop(
-            period=30,      # 30 seconds per full cycle
-            change=20,      # Change hue by 20 degrees each step
-            spread=60       # Spread colors across devices
-        )
-
-        # Start the effect
-        await conductor.start(effect, group.lights)
-
-        # Let it run for 2 minutes
-        await asyncio.sleep(120)
-
-        # Stop and restore lights to original state
-        await conductor.stop(group.lights)
+    print("Done - lights restored to original state")
 
 asyncio.run(main())
 ```
 
-### Rainbow Effect
+## How It Works
 
-The `EffectRainbow` spreads a full 360-degree rainbow across device pixels and scrolls it over time. Best on multizone strips and matrix lights:
-
-```python
-import asyncio
-from lifx import discover, DeviceGroup
-from lifx.effects import Conductor, EffectRainbow
-
-async def main():
-    devices = []
-    async for device in discover():
-        devices.append(device)
-    group = DeviceGroup(devices)
-
-    if not group.lights:
-        print("No lights found")
-        return
-
-    conductor = Conductor()
-
-    # Rainbow that scrolls every 10 seconds
-    effect = EffectRainbow(period=10, brightness=0.8)
-    await conductor.start(effect, group.lights)
-
-    await asyncio.sleep(30)
-    await conductor.stop(group.lights)
-
-asyncio.run(main())
-```
-
-### Flame Effect
-
-The `EffectFlame` creates a warm fire/candle flicker using layered sine waves. On matrix devices, bottom rows glow hotter:
-
-```python
-from lifx.effects import EffectFlame
-
-# Default candle flicker
-effect = EffectFlame()
-await conductor.start(effect, lights)
-
-# Intense fast fire with wide temperature range
-effect = EffectFlame(intensity=1.0, speed=2.0, brightness=1.0)
-await conductor.start(effect, lights)
-
-await asyncio.sleep(30)
-await conductor.stop(lights)
-```
-
-### Aurora Effect
-
-The `EffectAurora` simulates northern lights with flowing colored bands. Best on multizone strips and matrix lights:
-
-```python
-from lifx.effects import EffectAurora
-
-# Default aurora (green/cyan/blue/purple)
-effect = EffectAurora()
-await conductor.start(effect, lights)
-
-# Custom warm palette
-effect = EffectAurora(palette=[280, 300, 320, 340], brightness=0.6)
-await conductor.start(effect, lights)
-
-await asyncio.sleep(60)
-await conductor.stop(lights)
-```
-
-### Progress Bar Effect
-
-The `EffectProgress` creates an animated progress bar on multizone lights (strips/beams). The filled region has a traveling bright spot, and you update the position at any time:
-
-```python
-from lifx.effects import EffectProgress
-
-effect = EffectProgress(end_value=100)
-await conductor.start(effect, [strip_light])
-
-# Update progress from your application logic
-for i in range(0, 101, 10):
-    effect.position = float(i)
-    await asyncio.sleep(2)
-
-await conductor.stop([strip_light])
-```
-
-### Sunrise and Sunset Effects
-
-`EffectSunrise` and `EffectSunset` are duration-based effects for matrix devices (tiles, candles, Ceiling lights) that simulate natural light transitions:
-
-```python
-from lifx.effects import EffectSunrise, EffectSunset
-
-# 30-minute sunrise from bottom edge (rectangular tiles)
-effect = EffectSunrise(duration=1800, brightness=1.0)
-await conductor.start(effect, [matrix_light])
-
-# Sunrise from center (round/oval Ceiling lights)
-effect = EffectSunrise(duration=1800, brightness=1.0, origin="center")
-await conductor.start(effect, [ceiling_light])
-
-# Sunset that powers off when done
-effect = EffectSunset(duration=1800, power_off=True)
-await conductor.start(effect, [matrix_light])
-```
-
-Sunrise and sunset effects complete automatically after their duration — no need to call `conductor.stop()`. Sunrise leaves the light at full daylight. Sunset can optionally power off the light.
-
-## Key Concepts
-
-### Conductor
-
-The `Conductor` is the central orchestrator that:
-
-- Captures device state before effects run
-- Powers on devices if needed
-- Executes effects
-- Restores devices to original state when done
-
-You typically create one conductor instance and reuse it for multiple effects.
-
-### Effect State Management
-
-The effects framework automatically:
-
-1. **Captures** current state (power, color, zones) before effect starts
-1. **Powers on** devices if they're off (configurable)
-1. **Executes** the effect
-1. **Restores** all devices to their pre-effect state
-
-This happens completely automatically - you don't need to manage state yourself.
-
-### Effect Completion
+1. Create a **Conductor** — the central orchestrator for all effects
+1. Create an **Effect** instance with your desired parameters
+1. Call `conductor.start(effect, lights)` to run it
+1. The conductor captures state, runs the effect, and restores state when done
 
 Effects complete in different ways:
 
-1. **Cycle-based** — Pulse effects complete after their configured cycles finish
-1. **Duration-based** — Sunrise and sunset effects complete after their duration expires
-1. **Manual** — Continuous effects (ColorLoop, Rainbow, Flame, Aurora, Progress) run until `conductor.stop()` is called
-
-## Common Patterns
-
-### Using Specific Lights
-
-You can apply effects to specific lights instead of all discovered devices:
-
-```python
-from lifx import discover, DeviceGroup
-
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-conductor = Conductor()
-
-# Get lights by label
-bedroom_lights = [
-    light for light in group.lights
-    if "Bedroom" in await light.get_label()
-]
-
-# Apply effect only to bedroom lights
-effect = EffectPulse(mode='breathe', cycles=3)
-await conductor.start(effect, bedroom_lights)
-await asyncio.sleep(4)
-```
-
-### Sequential Effects
-
-You can run multiple effects one after another:
-
-```python
-conductor = Conductor()
-
-# First effect: blink
-effect1 = EffectPulse(mode='blink', cycles=3)
-await conductor.start(effect1, group.lights)
-await asyncio.sleep(4)
-
-# Second effect: breathe
-effect2 = EffectPulse(mode='breathe', cycles=2)
-await conductor.start(effect2, group.lights)
-await asyncio.sleep(5)
-```
-
-Note: The conductor automatically restores state between effects, so each effect starts with the original device state.
-
-### Concurrent Effects on Different Devices
-
-You can run different effects on different groups of lights simultaneously:
-
-```python
-conductor = Conductor()
-
-# Split lights into two groups
-group1 = group.lights[:len(group.lights)//2]
-group2 = group.lights[len(group.lights)//2:]
-
-# Start both effects concurrently
-effect1 = EffectPulse(mode='blink')
-effect2 = EffectColorloop(period=20)
-
-await conductor.start(effect1, group1)
-await conductor.start(effect2, group2)
-
-# Let them run
-await asyncio.sleep(30)
-
-# Stop all
-await conductor.stop(group.lights)
-```
-
-### Custom Colors
-
-Both pulse and colorloop effects support custom colors:
-
-```python
-from lifx import HSBK
-
-# Create custom color
-red = HSBK.from_rgb(1.0, 0.0, 0.0)
-blue = HSBK.from_rgb(0.0, 0.0, 1.0)
-
-# Pulse with custom color
-effect = EffectPulse(mode='breathe', cycles=5, color=red)
-await conductor.start(effect, group.lights)
-await asyncio.sleep(6)
-```
-
-### Checking Running Effects
-
-You can check what effect is currently running on a device:
-
-```python
-conductor = Conductor()
-effect = EffectColorloop(period=30)
-await conductor.start(effect, group.lights)
-
-# Check what's running
-for light in group.lights:
-    current = conductor.effect(light)
-    if current:
-        print(f"{light.label}: {type(current).__name__}")
-    else:
-        print(f"{light.label}: idle")
-```
-
-### Effect Registry
-
-The `EffectRegistry` lets you discover available effects and filter by device type — useful for building UIs or integrations like Home Assistant:
-
-```python
-from lifx import get_effect_registry, DeviceType
-
-registry = get_effect_registry()
-
-# List all built-in effects
-for info in registry.effects:
-    print(f"{info.name}: {info.description}")
-
-# Get effects recommended for multizone strips
-for info, support in registry.get_effects_for_device_type(DeviceType.MULTIZONE):
-    print(f"{info.name} ({support.value})")
-
-# Filter by actual device instance
-for info, support in registry.get_effects_for_device(my_light):
-    print(f"{info.name}: {support.value}")
-```
-
-### Dynamic Light Management
-
-You can add or remove lights from a running effect without restarting it:
-
-```python
-# Start effect on initial lights
-effect = EffectRainbow(period=10)
-await conductor.start(effect, [light1, light2])
-
-# Later, add a new light to the running effect
-await conductor.add_lights(effect, [light3])
-
-# Remove a light (restores its state by default)
-await conductor.remove_lights([light2])
-
-# Remove without restoring state
-await conductor.remove_lights([light1], restore_state=False)
-```
-
-### Monitoring Frame Data
-
-For frame-based effects, you can read the most recent HSBK values sent to a device:
-
-```python
-colors = conductor.get_last_frame(light)
-if colors:
-    avg_brightness = sum(c.brightness for c in colors) / len(colors)
-    print(f"Average brightness: {avg_brightness:.1%}")
-```
-
-## Best Practices
-
-### 1. Use a Single Conductor
-
-Create one conductor instance and reuse it throughout your application:
-
-```python
-# Good
-conductor = Conductor()
-await conductor.start(effect1, lights)
-await conductor.start(effect2, lights)
-
-# Not recommended - creates unnecessary overhead
-conductor1 = Conductor()
-await conductor1.start(effect1, lights)
-conductor2 = Conductor()
-await conductor2.start(effect2, lights)
-```
-
-### 2. Always Wait for Completion
-
-For pulse effects, wait for the effect duration before starting another:
-
-```python
-effect = EffectPulse(mode='blink', period=1.0, cycles=5)
-await conductor.start(effect, lights)
-# Wait for effect to complete
-await asyncio.sleep(5 * 1.0 + 0.5)  # cycles * period + buffer
-```
-
-### 3. Stop ColorLoop Effects Explicitly
-
-ColorLoop effects run indefinitely, so always call `conductor.stop()`:
-
-```python
-effect = EffectColorloop(period=30)
-await conductor.start(effect, lights)
-await asyncio.sleep(60)
-# Must explicitly stop
-await conductor.stop(lights)
-```
-
-### 4. Handle Discovery Failures
-
-Always check if lights were found before attempting effects:
-
-```python
-from lifx import discover, DeviceGroup
-
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-if not group.lights:
-    print("No lights found on network")
-    return
-
-# Safe to use effects
-conductor = Conductor()
-# ...
-```
-
-### 5. Use DeviceGroup for Organization
-
-The DeviceGroup provides convenient access to device collections:
-
-```python
-from lifx import discover, DeviceGroup
-
-# Discover devices
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-conductor = Conductor()
-await conductor.start(effect, group.lights)
-```
-
-## Complete Examples
-
-### Notification Effect
-
-Use effects to create a notification system:
-
-```python
-async def notify(lights: list, level: str = 'info'):
-    """Flash lights to indicate a notification."""
-    conductor = Conductor()
-
-    if level == 'info':
-        # Blue breathe
-        color = HSBK.from_rgb(0.0, 0.0, 1.0)
-        effect = EffectPulse(mode='breathe', cycles=2, color=color)
-    elif level == 'warning':
-        # Orange blink
-        color = HSBK.from_rgb(1.0, 0.65, 0.0)
-        effect = EffectPulse(mode='blink', cycles=3, color=color)
-    elif level == 'error':
-        # Red strobe
-        color = HSBK.from_rgb(1.0, 0.0, 0.0)
-        effect = EffectPulse(mode='strobe', cycles=10, color=color)
-
-    await conductor.start(effect, lights)
-    await asyncio.sleep(4)  # Wait for completion
-
-# Usage
-from lifx import discover, DeviceGroup
-
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-await notify(group.lights, level='warning')
-```
-
-### Party Mode
-
-Cycle through different effects:
-
-```python
-async def party_mode(lights: list, duration: int = 60):
-    """Run various effects for a party."""
-    conductor = Conductor()
-    end_time = asyncio.get_event_loop().time() + duration
-
-    effects = [
-        EffectColorloop(period=20, change=30, spread=60),
-        EffectPulse(mode='strobe', cycles=20),
-        EffectColorloop(period=15, change=45, brightness=0.8),
-    ]
-
-    effect_idx = 0
-    while asyncio.get_event_loop().time() < end_time:
-        effect = effects[effect_idx % len(effects)]
-
-        if isinstance(effect, EffectColorloop):
-            await conductor.start(effect, lights)
-            await asyncio.sleep(20)
-            await conductor.stop(lights)
-        else:
-            await conductor.start(effect, lights)
-            await asyncio.sleep(3)
-
-        effect_idx += 1
-
-    # Ensure everything is stopped and restored
-    await conductor.stop(lights)
-
-# Usage
-from lifx import discover, DeviceGroup
-
-devices = []
-async for device in discover():
-    devices.append(device)
-group = DeviceGroup(devices)
-
-await party_mode(group.lights, duration=120)
-```
-
-## More Effects
-
-In addition to the effects above, lifx-async includes 18 effects adapted from [pkivolowitz/lifx](https://github.com/pkivolowitz/lifx) by Perry Kivolowitz. They use the same Conductor and FrameEffect infrastructure and run indefinitely until stopped.
-
-### Cylon
-
-Larson scanner — a bright eye sweeps back and forth with a fading trail. Classic Knight Rider look.
-
-```python
-from lifx.effects import EffectCylon
-
-# Default scanner
-effect = EffectCylon()
-await conductor.start(effect, lights)
-
-# Faster red scanner with wider eye
-effect = EffectCylon(speed=1.0, width=5, hue=0, trail=0.7)
-await conductor.start(effect, lights)
-
-await asyncio.sleep(30)
-await conductor.stop(lights)
-```
-
-**Key parameters:** `speed` (seconds per sweep), `width` (eye width in bulbs), `hue`, `trail` (decay factor 0-1)
-
-### Wave
-
-Standing wave — zones vibrate between two colors with stationary nodes. Adjacent segments swing in opposite directions.
-
-```python
-from lifx.effects import EffectWave
-
-# Two-node standing wave
-effect = EffectWave(nodes=2, hue1=0, hue2=240)
-await conductor.start(effect, lights)
-
-# Drifting wave (not purely standing)
-effect = EffectWave(nodes=3, drift=10.0, speed=6.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (oscillation period), `nodes` (stationary points), `hue1`/`hue2`, `drift` (spatial drift degrees/s)
-
-### Sine
-
-Smooth ease-wave — bright humps roll along the strip using cubic smoothstep. Optional two-color gradient.
-
-```python
-from lifx.effects import EffectSine
-
-# Blue wave
-effect = EffectSine(hue=200, wavelength=0.5, speed=4.0)
-await conductor.start(effect, lights)
-
-# Two-color gradient wave
-effect = EffectSine(hue=0, hue2=240, wavelength=0.3)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed`, `wavelength` (fraction of strip), `hue`, `hue2` (optional gradient), `floor` (min brightness)
-
-### Spectrum Sweep
-
-Three sine waves 120° out of phase sweep through zones like a spectrum analyzer. Red, green, and blue channels blend via Oklab interpolation.
-
-```python
-from lifx.effects import EffectSpectrumSweep
-
-effect = EffectSpectrumSweep(speed=6.0, waves=1.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (sweep period), `waves` (number of wave periods across strip)
-
-### Spin
-
-Rotates theme colors through zones with smooth Oklab interpolation and per-zone hue shimmer.
-
-```python
-from lifx.effects import EffectSpin
-
-# Default spin with built-in theme
-effect = EffectSpin(speed=10.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (rotation period), `bulb_offset` (per-zone hue shift for shimmer)
-
-### Twinkle
-
-Random pixels sparkle and fade like Christmas lights. Each spark has a fast flash and slow quadratic decay tail.
-
-```python
-from lifx.effects import EffectTwinkle
-
-# White sparkles on dark background
-effect = EffectTwinkle(density=0.05, speed=1.0)
-await conductor.start(effect, lights)
-
-# Colored sparkles
-effect = EffectTwinkle(hue=120, saturation=1.0, density=0.1)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (fade duration), `density` (sparkle probability per frame), `hue`, `saturation`
-
-### Embers
-
-Fire simulation via 1D heat diffusion — heat injected at the bottom, diffuses upward with cooling and turbulence.
-
-```python
-from lifx.effects import EffectEmbers
-
-effect = EffectEmbers(intensity=0.5, cooling=0.15, turbulence=0.3)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `intensity` (heat injection probability), `cooling`, `turbulence`
-
-### Plasma
-
-Plasma ball — bright core pulsing at center with electric tendrils crackling outward. Tendrils random-walk and fork.
-
-```python
-from lifx.effects import EffectPlasma
-
-# Default violet plasma
-effect = EffectPlasma()
-await conductor.start(effect, lights)
-
-# Green plasma with frequent tendrils
-effect = EffectPlasma(hue=120, tendril_rate=1.0, hue_spread=30.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (core pulse period), `tendril_rate`, `hue`, `hue_spread`
-
-### Pendulum Wave
-
-Pendulums with linearly varying periods drift in and out of phase, creating traveling waves, standing waves, and chaos before realigning.
-
-```python
-from lifx.effects import EffectPendulumWave
-
-effect = EffectPendulumWave(speed=30.0, cycles=8, hue1=0, hue2=240)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (realignment cycle), `cycles` (oscillations per cycle), `hue1`/`hue2`
-
-### Double Slit
-
-Young's double slit interference — two coherent wave sources create constructive/destructive interference fringes that shift as wavelength breathes.
-
-```python
-from lifx.effects import EffectDoubleSlit
-
-effect = EffectDoubleSlit(wavelength=0.3, separation=0.2, breathe=8.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed`, `wavelength`, `separation`, `breathe` (wavelength modulation period; 0 = off)
-
-### Rule 30
-
-Wolfram's Rule 30 cellular automaton — generates chaotic/pseudo-random patterns. Configurable seed modes: center, random, or all.
-
-```python
-from lifx.effects import EffectRule30
-
-# Classic Rule 30
-effect = EffectRule30(rule=30, speed=5.0, seed="center")
-await conductor.start(effect, lights)
-
-# Rule 110 (Turing-complete!)
-effect = EffectRule30(rule=110, hue=0, seed="random")
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `rule` (Wolfram rule 0-255), `speed` (generations/s), `seed` ("center"/"random"/"all"), `hue`
-
-### Rule Trio
-
-Three independent cellular automata running at irrational speed ratios, blended via Oklab. Produces evolving color interference patterns.
-
-```python
-from lifx.effects import EffectRuleTrio
-
-effect = EffectRuleTrio(rule_a=30, rule_b=90, rule_c=110, speed=5.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `rule_a`/`rule_b`/`rule_c`, `speed`, `drift_b`/`drift_c` (speed multipliers)
-
-### Fireworks
-
-Rockets launch from both ends, ascend with easing, and burst into expanding gaussian halos. Color evolves from white through chemical colors to orange.
-
-```python
-from lifx.effects import EffectFireworks
-
-effect = EffectFireworks(max_rockets=3, launch_rate=0.5, burst_spread=5.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `max_rockets`, `launch_rate`, `ascent_speed`, `burst_spread`, `burst_duration`
-
-### Ripple
-
-Ripple tank — raindrops hit a water surface, launching wavefronts that propagate, reflect, and interfere. Displacement maps to color via Oklab.
-
-```python
-from lifx.effects import EffectRipple
-
-effect = EffectRipple(speed=1.0, damping=0.98, drop_rate=0.3)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed`, `damping`, `drop_rate`, `hue1`/`hue2`
-
-### Jacob's Ladder
-
-Electric arcs drift along the strip with flickering, crackling spikes, and electrode glows. Inspired by Frankenstein lab props.
-
-```python
-from lifx.effects import EffectJacobsLadder
-
-effect = EffectJacobsLadder(speed=0.5, arcs=2, gap=5)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (arc drift speed), `arcs` (simultaneous arc pairs), `gap` (electrode spacing)
-
-### Newton's Cradle
-
-Newton's cradle momentum transfer — steel balls swing alternately with Phong sphere shading and specular highlights.
-
-```python
-from lifx.effects import EffectNewtonsCradle
-
-effect = EffectNewtonsCradle(num_balls=5, speed=2.0)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `num_balls`, `speed` (cycle period), `shininess` (Phong exponent), `hue`, `saturation`
-
-### Sonar
-
-Sonar/radar pulses bounce off drifting obstacles. Wavefronts emit from sources, reflect off obstacles, and decay with tails.
-
-```python
-from lifx.effects import EffectSonar
-
-effect = EffectSonar(speed=8.0, pulse_interval=2.0, obstacle_speed=0.5)
-await conductor.start(effect, lights)
-```
-
-**Key parameters:** `speed` (wavefront speed), `pulse_interval`, `obstacle_speed`, `decay`
-
-### Plasma 2D
-
-2D plasma effect — four sine waves (horizontal, vertical, diagonal, radial) create flowing interference color patterns. Matrix devices only.
-
-```python
-from lifx.effects import EffectPlasma2D
-
-effect = EffectPlasma2D(speed=1.0, scale=1.0, hue1=270, hue2=180)
-await conductor.start(effect, [matrix_light])
-```
-
-**Key parameters:** `speed` (animation speed), `scale` (spatial scale), `hue1`/`hue2`
-
-### Device Compatibility Reference
-
-| Effect         | Light       | MultiZone   | Matrix      |
-| -------------- | ----------- | ----------- | ----------- |
-| cylon          | COMPATIBLE  | RECOMMENDED | —           |
-| wave           | COMPATIBLE  | RECOMMENDED | —           |
-| sine           | COMPATIBLE  | RECOMMENDED | —           |
-| spectrum_sweep | COMPATIBLE  | RECOMMENDED | —           |
-| spin           | COMPATIBLE  | RECOMMENDED | —           |
-| twinkle        | RECOMMENDED | RECOMMENDED | COMPATIBLE  |
-| embers         | COMPATIBLE  | RECOMMENDED | —           |
-| plasma         | COMPATIBLE  | RECOMMENDED | —           |
-| pendulum_wave  | —           | RECOMMENDED | —           |
-| double_slit    | —           | RECOMMENDED | —           |
-| rule30         | —           | RECOMMENDED | —           |
-| rule_trio      | —           | RECOMMENDED | —           |
-| fireworks      | —           | RECOMMENDED | —           |
-| ripple         | —           | RECOMMENDED | —           |
-| jacobs_ladder  | —           | RECOMMENDED | —           |
-| newtons_cradle | —           | RECOMMENDED | —           |
-| sonar          | —           | RECOMMENDED | —           |
-| plasma2d       | —           | —           | RECOMMENDED |
-
-All ported effects run indefinitely until stopped via `conductor.stop()`.
+- **Cycle-based** (Pulse) — completes after configured cycles
+- **Duration-based** (Sunrise, Sunset) — completes after a set duration
+- **Continuous** (ColorLoop, Rainbow, Flame, Aurora) — runs until `conductor.stop()` is called
+
+## Built-in Effects
+
+| Category       | Effects                                                         |
+| -------------- | --------------------------------------------------------------- |
+| **Basic**      | Pulse (blink/breathe/strobe), ColorLoop, Rainbow                |
+| **Ambient**    | Flame, Aurora, Twinkle, Embers, Sunrise, Sunset                 |
+| **Physics**    | Wave, Sine, Pendulum Wave, Double Slit, Ripple, Newton's Cradle |
+| **Generative** | Rule 30, Rule Trio, Plasma, Plasma 2D, Spectrum Sweep           |
+| **Visual**     | Cylon, Spin, Fireworks, Jacob's Ladder, Sonar, Progress         |
+
+See the [Effects Gallery](https://djelibeybi.github.io/lifx-async/user-guide/effects-gallery/index.md) for animated previews of every effect.
 
 ## Next Steps
 
-- See [Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md) for detailed documentation on all effect parameters
-- See [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) to learn how to create your own effects
-- See [Effects Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) to understand how the system works internally
-- See [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) for common issues and solutions
+- **[Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects/index.md)** — Full usage guide with all effects, patterns, and best practices
+- **[Effects Gallery](https://djelibeybi.github.io/lifx-async/user-guide/effects-gallery/index.md)** — Animated GIF previews of every effect
+- **[Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md)** — Create your own effects
+- **[Effects Reference](https://djelibeybi.github.io/lifx-async/api/effects/index.md)** — Complete API documentation
 # User Guide
 
 # Using Themes: Practical Examples
@@ -1752,10 +894,10 @@ for theme_name in themes:
 
 ## See Also
 
-- [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) - Complete API documentation
-- [Quick Start: Themes](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md) - Simple examples
-- [Colors Guide](https://djelibeybi.github.io/lifx-async/api/colors/index.md) - Working with HSBK colors
-- [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) - Device-specific documentation
+- [Themes Quick Start](https://djelibeybi.github.io/lifx-async/getting-started/themes/index.md) — Get started in 30 seconds
+- [Themes API Reference](https://djelibeybi.github.io/lifx-async/api/themes/index.md) — Complete API documentation
+- [Color Utilities](https://djelibeybi.github.io/lifx-async/api/colors/index.md) — HSBK color representation and RGB conversion
+- [Device Classes](https://djelibeybi.github.io/lifx-async/api/devices/index.md) — Device-specific `apply_theme()` methods
 
 # Ceiling Lights
 
@@ -2501,6 +1643,10 @@ print(f"Avg packets/frame: {total_packets / frame_count:.1f}")
 1. Use generator patterns for very long animations
 1. Clear references after use
 
+## See Also
+
+- [Animation API Reference](https://djelibeybi.github.io/lifx-async/api/animation/index.md) — Class reference, packet generators, and performance characteristics
+
 # Advanced Usage
 
 This guide covers advanced lifx patterns and techniques for building robust LIFX integrations.
@@ -3097,9 +2243,10 @@ async def rainbow_animation():
 
 ## Next Steps
 
-- [Troubleshooting Guide](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md) - Common issues and solutions
-- [Protocol Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Low-level protocol details
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [Troubleshooting Guide](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md) — Common issues and solutions
+- [Network Layer API](https://djelibeybi.github.io/lifx-async/api/network/index.md) — Low-level discovery, connection, and transport reference
+- [Protocol Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) — Protocol layer and packet structures
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) — Complete API documentation
 
 # Creating Custom Effects
 
@@ -4504,9 +3651,10 @@ If you're still experiencing issues:
 
 ## Next Steps
 
-- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md) - Optimization patterns
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
-- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) - Frequently asked questions
+- [Effects Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) — Issues specific to the effects framework
+- [Advanced Usage](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/index.md) — Optimization patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) — Complete API documentation
+- [FAQ](https://djelibeybi.github.io/lifx-async/faq/index.md) — Frequently asked questions
 
 # Effects Troubleshooting
 
@@ -5639,9 +4787,9 @@ MIN_DURATION = 0           # Instant
 
 ## Next Steps
 
-- [Connection Management](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/#connection-management) - Connection patterns
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Protocol API documentation
-- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) - System architecture
+- [Connection Management](https://djelibeybi.github.io/lifx-async/user-guide/advanced-usage/#connection-management) — Connection patterns
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) — Protocol API documentation
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/overview/index.md) — System architecture
 # Architecture
 
 # Architecture Overview
@@ -5652,30 +4800,51 @@ lifx-async is built as a layered architecture with clear separation of concerns.
 
 ```
 graph TB
-    subgraph "Layer 4: High-Level API"
-        API[api.py<br/>discover, find_lights, etc.]
+    subgraph "Layer 8: High-Level API"
+        API[api.py<br/>discover, find_by_label, etc.]
         DeviceGroup[DeviceGroup<br/>Batch operations]
     end
 
-    subgraph "Layer 3: Device Layer"
+    subgraph "Layer 7: Theme Layer"
+        Theme[Theme<br/>Named color palettes]
+        ThemeGen[Generators<br/>Theme-based colors]
+    end
+
+    subgraph "Layer 6: Effects Layer"
+        Effects[30+ Effects<br/>aurora, flame, plasma, etc.]
+        Registry[Registry<br/>Effect discovery]
+    end
+
+    subgraph "Layer 5: Animation Layer"
+        Animator[Animator<br/>Direct UDP sending]
+        FrameBuffer[FrameBuffer<br/>Multi-tile canvas]
+    end
+
+    subgraph "Layer 4: Device Layer"
         Device[Device<br/>Base class]
         Light[Light<br/>Color control]
         Hev[HevLight<br />HEV support]
         Infrared[InfraredLight<br />Infrared support]
         MultiZone[MultiZoneLight<br/>Linear/1D zones]
         Matrix[MatrixLight<br/>Matrix/2D zones]
+        Ceiling[CeilingLight<br/>Up/downlight control]
     end
 
-    subgraph "Layer 2: Network Layer"
-        Discovery[Discovery<br/>UDP broadcast]
+    subgraph "Layer 3: Network Layer"
+        Discovery[Discovery<br/>UDP broadcast + mDNS]
         Connection[Connection<br/>Lazy opening]
         Transport[Transport<br/>UDP sockets]
     end
 
-    subgraph "Layer 1: Protocol Layer"
+    subgraph "Layer 2: Protocol Layer"
         Generator[Generator<br/>YAML → Python]
         Types[Protocol Types<br/>Enums, HSBK, etc.]
         Packets[Packets<br/>Message classes]
+    end
+
+    subgraph "Layer 1: Utilities"
+        Color[HSBK / Colors<br/>Color conversion]
+        Products[Products Registry<br/>Device capabilities]
     end
 
     subgraph "External"
@@ -5685,17 +4854,22 @@ graph TB
 
     API --> DeviceGroup
     DeviceGroup --> Light
-    DeviceGroup --> Hev
-    DeviceGroup --> Infrared
-    DeviceGroup --> MultiZone
     DeviceGroup --> Matrix
+    DeviceGroup --> MultiZone
     API --> Discovery
+    Theme --> ThemeGen
+    ThemeGen --> Color
+    Effects --> Animator
+    Effects --> Theme
+    Animator --> FrameBuffer
+    Animator --> Transport
     Device --> Connection
     Light --> Device
     Hev --> Light
     Infrared --> Light
     MultiZone --> Light
     Matrix --> Light
+    Ceiling --> Matrix
     Connection --> Transport
     Connection --> Packets
     Discovery --> Transport
@@ -5709,6 +4883,9 @@ graph TB
     style Device fill:#e1f0ff
     style Connection fill:#fff4e1
     style Generator fill:#ffe1f0
+    style Animator fill:#f0e1ff
+    style Effects fill:#ffe1e1
+    style Theme fill:#e1fff0
 ```
 
 ## Layer Responsibilities
@@ -5798,14 +4975,60 @@ async with Light(serial, ip) as light:
     await light.pulse(Colors.RED, period=1.0, cycles=5)
 ```
 
-### Layer 4: High-Level API
+### Layer 5: Animation Layer
+
+**Purpose**: High-frequency frame delivery for real-time effects (30+ FPS)
+
+- **Direct UDP**: Bypasses request/response for low-latency frame delivery
+- **Multi-Tile Canvas**: Maps tiles using `user_x`/`user_y` positions
+- **Orientation Correction**: LRU-cached tile rotation lookup tables
+- **Protocol-Ready Values**: Uses uint16 HSBK directly (no conversion overhead)
+
+**Key Files**:
+
+- `animation/animator.py` - High-level `Animator` class
+- `animation/framebuffer.py` - Multi-tile canvas mapping
+- `animation/packets.py` - Prebaked packet templates
+- `animation/orientation.py` - Tile orientation remapping
+
+### Layer 6: Effects Layer
+
+**Purpose**: 30+ built-in visual effects
+
+- **Effect Library**: aurora, flame, plasma, rainbow, twinkle, etc.
+- **Registry**: Discover effects by name
+- **State Management**: Run effects on devices
+- **Frame Generation**: Effects produce HSBK frames consumed by the Animation Layer
+
+**Key Files**:
+
+- `effects/base.py` - Base effect class
+- `effects/registry.py` - Effect discovery
+- `effects/state_manager.py` - Effect lifecycle
+
+### Layer 7: Theme Layer
+
+**Purpose**: Named color palettes for effects
+
+- **Theme Definitions**: Named color palettes
+- **Theme Library**: Built-in themes
+- **Color Generators**: Theme-based color generation for effects
+- **Canvas Abstraction**: Apply themes to device layouts
+
+**Key Files**:
+
+- `theme/theme.py` - Theme definitions
+- `theme/library.py` - Built-in themes
+- `theme/generators.py` - Theme-based color generators
+
+### Layer 8: High-Level API
 
 **Purpose**: Simple, batteries-included API
 
-- **Simplified Discovery**: One-line device discovery
-- **Batch Operations**: Control multiple devices
+- **Simplified Discovery**: One-line device discovery via UDP or mDNS
+- **Batch Operations**: Control multiple devices with `DeviceGroup`
 - **Direct Connection**: Connect by IP without discovery
-- **Filtered Discovery**: Find devices by label or serial
+- **Filtered Discovery**: Find devices by label, serial, or IP
 
 **Key Files**:
 
@@ -5946,11 +5169,11 @@ uv run python -m lifx.protocol.generator
 
 ## Concurrency Model
 
-Each connection serializes requests to prevent response mixing:
+Each connection uses a background receiver task that routes responses to the correct pending request:
 
 ```python
 conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
-# Requests are serialized on the same connection
+# Multiple concurrent requests are supported
 result1 = await conn.request(packet1)
 result2 = await conn.request(packet2)
 await conn.close()
@@ -5958,9 +5181,11 @@ await conn.close()
 
 **How it works**:
 
-- Requests are serialized via `_request_lock` on same connection
-- Responses matched to requests by sequence number
-- Async generator streaming for efficient multi-response protocols
+- A background receiver task continuously reads from the UDP socket
+- Each request registers a per-request `asyncio.Queue` keyed by `(source, sequence, serial)`
+- The receiver routes incoming packets to the matching queue
+- Sequence numbers (0-255, uint8) are atomically allocated for response correlation
+- Different devices have different connections, so multi-device operations run in parallel
 - Single UDP socket per connection
 
 ## Next Steps
@@ -7128,11 +6353,10 @@ Error handling and exception hierarchy
 async with await Light.from_ip("192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 
-# ❌ Bad - manual cleanup required
-light = Light("d073d5123456", "192.168.1.100")
-await light.connect()
+# ❌ Bad - no context manager, no state initialization
+light = Light(serial="d073d5123456", ip="192.168.1.100")
 await light.set_color(Colors.BLUE)
-await light.disconnect()
+await light.connection.close()
 ```
 
 ### Handle Exceptions
@@ -8613,7 +7837,7 @@ async def main():
 
     # Find device with exact label match
     async for device in find_by_label("Living Room", exact_match=True):
-        await device.set_color(Colors.WARM_WHITE)
+        await device.set_color(Colors.WARM)
         break  # exact_match returns at most one device
 ```
 
@@ -9811,6 +9035,8 @@ def get_theme(name: str) -> Theme:
 - hygge, tranquil, sports
 
 # Effects Reference
+
+> **Looking for usage examples?** See the [Light Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects/index.md) for tutorials, common patterns, and best practices. This page covers the API surface only.
 
 This reference guide provides comprehensive documentation for all effect classes in the Light Effects Framework.
 
@@ -14432,113 +13658,18 @@ ______________________________________________________________________
 
 ## See Also
 
-- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage and common patterns
-- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
-- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works
-- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues and solutions
+- [Light Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects/index.md) — Usage examples, common patterns, and best practices
+- [Effects Gallery](https://djelibeybi.github.io/lifx-async/user-guide/effects-gallery/index.md) — Animated previews of all effects
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) — Creating your own effects
+- [Effect API Changes](https://djelibeybi.github.io/lifx-async/migration/effect-api-changes/index.md) — Migration guide for breaking changes
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) — How the system works
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) — Common issues and solutions
 
-# Animation Module
+# Animation API Reference
 
-The animation module provides efficient high-frequency frame delivery for LIFX devices, optimized for real-time effects and applications that need to push color data at 30+ FPS.
+> **Looking for usage examples?** See the [Animation Guide](https://djelibeybi.github.io/lifx-async/user-guide/animation/index.md) for tutorials, multi-tile canvas usage, HSBK format details, and troubleshooting. This page covers the API surface only.
 
-## Overview
-
-The animation system uses a streamlined architecture optimized for speed:
-
-```text
-Application Frame -> FrameBuffer -> PacketGenerator -> Direct UDP
-                     (canvas map)   (prebaked packets)  (fire-and-forget)
-```
-
-Key features:
-
-- **Direct UDP**: Bypasses connection layer for maximum throughput
-- **Prebaked packets**: Templates created once, only colors updated per frame
-- **Multi-tile canvas**: Unified coordinate space for multi-tile devices
-- **Tile orientation**: Automatic pixel remapping for rotated tiles
-- **Synchronous sending**: `send_frame()` is synchronous for minimum overhead
-
-## Quick Start
-
-```python
-import asyncio
-from lifx import Animator, MatrixLight
-
-async def main():
-    async with await MatrixLight.from_ip("192.168.1.100") as device:
-        # Create animator for matrix device
-        animator = await Animator.for_matrix(device)
-
-    # Device connection closed - animator sends via direct UDP
-    try:
-        while True:
-            # Generate HSBK frame (protocol-ready uint16 values)
-            # H/S/B: 0-65535, K: 1500-9000
-            hsbk_frame = [(65535, 65535, 65535, 3500)] * animator.pixel_count
-
-            # send_frame() is synchronous for speed
-            stats = animator.send_frame(hsbk_frame)
-            print(f"Sent {stats.packets_sent} packets in {stats.total_time_ms:.2f}ms")
-
-            await asyncio.sleep(1 / 30)  # 30 FPS
-    finally:
-        animator.close()
-```
-
-## Multi-Tile Canvas
-
-For devices with multiple tiles (like the original 5-tile LIFX Tile), the animator creates a unified canvas based on tile positions (`user_x`, `user_y`). Animations span all tiles as one continuous image.
-
-```python
-async with await MatrixLight.from_ip("192.168.1.100") as device:
-    animator = await Animator.for_matrix(device)
-
-# Check canvas dimensions
-print(f"Canvas: {animator.canvas_width}x{animator.canvas_height}")
-# For 5 horizontal tiles: "Canvas: 40x8"
-
-# Generate frame for entire canvas (row-major order)
-frame = []
-for y in range(animator.canvas_height):
-    for x in range(animator.canvas_width):
-        hue = int(x / animator.canvas_width * 65535)  # Gradient across all tiles
-        frame.append((hue, 65535, 65535, 3500))
-
-animator.send_frame(frame)
-```
-
-## HSBK Format
-
-All color data uses protocol-ready uint16 values:
-
-| Component  | Range     | Description           |
-| ---------- | --------- | --------------------- |
-| Hue        | 0-65535   | Maps to 0-360 degrees |
-| Saturation | 0-65535   | Maps to 0.0-1.0       |
-| Brightness | 0-65535   | Maps to 0.0-1.0       |
-| Kelvin     | 1500-9000 | Color temperature     |
-
-This design pushes conversion work to the caller (e.g. using NumPy) for better performance. The `lifx-async` library remains dependency-free.
-
-```python
-# Red at full brightness
-red = (0, 65535, 65535, 3500)
-
-# 50% brightness warm white
-warm_white = (0, 0, 32768, 2700)
-
-# Convert from user-friendly values
-def to_protocol_hsbk(
-    hue: float, sat: float, bright: float, kelvin: int
-) -> tuple[int, int, int, int]:
-    """Convert user-friendly values to protocol format."""
-    return (
-        int(hue / 360 * 65535),
-        int(sat * 65535),
-        int(bright * 65535),
-        kelvin,
-    )
-```
+The animation module provides efficient high-frequency frame delivery for LIFX devices, optimized for real-time effects at 30+ FPS.
 
 ## Animator
 
@@ -16231,99 +15362,6 @@ def build_orientation_lut(
     return tuple(lut)
 ```
 
-## Examples
-
-### Matrix Animation (Single Tile)
-
-```python
-import asyncio
-from lifx import Animator, MatrixLight
-
-async def rainbow_animation():
-    async with await MatrixLight.from_ip("192.168.1.100") as device:
-        animator = await Animator.for_matrix(device)
-
-    hue_offset = 0
-    try:
-        while True:
-            # Generate rainbow gradient
-            frame = []
-            for i in range(animator.pixel_count):
-                hue = (hue_offset + i * 1000) % 65536
-                frame.append((hue, 65535, 32768, 3500))
-
-            stats = animator.send_frame(frame)
-            print(f"Sent {stats.packets_sent} packets")
-
-            hue_offset = (hue_offset + 500) % 65536
-            await asyncio.sleep(1 / 30)  # 30 FPS
-    finally:
-        animator.close()
-```
-
-### Multi-Tile Animation (LIFX Tile with 5 tiles)
-
-```python
-import asyncio
-import math
-from lifx import Animator, MatrixLight
-
-async def multi_tile_wave():
-    async with await MatrixLight.from_ip("192.168.1.100") as device:
-        animator = await Animator.for_matrix(device)
-
-    # Canvas spans all tiles (e.g., 40x8 for 5 horizontal tiles)
-    width = animator.canvas_width
-    height = animator.canvas_height
-    print(f"Canvas: {width}x{height}")
-
-    hue_offset = 0
-    try:
-        while True:
-            frame = []
-            for y in range(height):
-                for x in range(width):
-                    # Wave that flows across all tiles
-                    pos = x + y * 0.5  # Diagonal wave
-                    hue = int((pos / width) * 65535 + hue_offset) % 65536
-                    frame.append((hue, 65535, 65535, 3500))
-
-            animator.send_frame(frame)
-            hue_offset = (hue_offset + 1000) % 65536
-            await asyncio.sleep(1 / 30)
-    finally:
-        animator.close()
-```
-
-### MultiZone Animation
-
-```python
-import asyncio
-from lifx import Animator, MultiZoneLight
-
-async def chase_animation():
-    async with await MultiZoneLight.from_ip("192.168.1.100") as device:
-        animator = await Animator.for_multizone(device)
-
-    position = 0
-    try:
-        while True:
-            # Generate chase pattern
-            frame = []
-            for i in range(animator.pixel_count):
-                if i == position:
-                    frame.append((0, 65535, 65535, 3500))  # Red
-                else:
-                    frame.append((0, 0, 0, 3500))  # Off
-
-            animator.send_frame(frame)
-
-            position = (position + 1) % animator.pixel_count
-            await asyncio.sleep(1 / 20)  # 20 FPS
-    finally:
-        animator.close()
-```
-
 ## Performance Characteristics
 
 ### Direct UDP Delivery
@@ -16344,16 +15382,6 @@ Packets are constructed once at initialization:
 - Zero object allocation in the hot path
 - Sequence number wraps at 256 (uint8)
 
-### Multi-Tile Canvas Mapping
-
-For devices with multiple tiles:
-
-- Tile positions read from device (`user_x`, `user_y`)
-- Canvas bounds calculated from all tile positions
-- Input frame interpreted as 2D row-major canvas
-- Each tile extracts its region based on position
-- Orientation correction applied per-tile
-
 ### Typical Performance
 
 | Device Type          | Pixels | Packets/Frame | Send Time |
@@ -16362,6 +15390,10 @@ For devices with multiple tiles:
 | 5-tile chain         | 320    | 5             | \<1ms     |
 | Large Ceiling (16x8) | 128    | 3             | \<1ms     |
 | MultiZone (82 zones) | 82     | 1             | \<0.5ms   |
+
+## See Also
+
+- [Animation Guide](https://djelibeybi.github.io/lifx-async/user-guide/animation/index.md) — Usage guide with examples, multi-tile canvas, and troubleshooting
 
 # Color Utilities
 
@@ -17417,8 +16449,8 @@ The `Colors` class provides these preset colors:
 - `Colors.BLUE` - Blue
 - `Colors.PURPLE` - Purple
 - `Colors.PINK` - Pink
-- `Colors.WARM_WHITE` - Warm white (2500K)
-- `Colors.COOL_WHITE` - Cool white (6500K)
+- `Colors.WARM` - Warm white (2500K)
+- `Colors.COOL` - Cool white (6500K)
 
 ## Color Conversion Notes
 
@@ -17811,28 +16843,28 @@ async with device:
 | ------------ | --------------------------- |
 | `ValueError` | If any parameter is invalid |
 
-| METHOD                | DESCRIPTION                                             |
-| --------------------- | ------------------------------------------------------- |
-| `from_ip`             | Create and return an instance for the given IP address. |
-| `connect`             | Create and return a fully initialized device instance.  |
-| `get_mac_address`     | Calculate and return the MAC address for this device.   |
-| `ensure_capabilities` | Ensure device capabilities are populated.               |
-| `get_label`           | Get device label/name.                                  |
-| `set_label`           | Set device label/name.                                  |
-| `get_power`           | Get device power state.                                 |
-| `set_power`           | Set device power state.                                 |
-| `get_version`         | Get device version information.                         |
-| `get_info`            | Get device runtime information.                         |
-| `get_wifi_info`       | Get device WiFi module information.                     |
-| `get_host_firmware`   | Get device host (WiFi module) firmware information.     |
-| `get_wifi_firmware`   | Get device WiFi module firmware information.            |
-| `get_location`        | Get device location information.                        |
-| `set_location`        | Set device location information.                        |
-| `get_group`           | Get device group information.                           |
-| `set_group`           | Set device group information.                           |
-| `set_reboot`          | Reboot the device.                                      |
-| `close`               | Close device connection and cleanup resources.          |
-| `refresh_state`       | Refresh device state from hardware.                     |
+| METHOD                | DESCRIPTION                                                      |
+| --------------------- | ---------------------------------------------------------------- |
+| `from_ip`             | Create and return an instance for the given IP address.          |
+| `connect`             | Create a device instance with the correct type for the given IP. |
+| `get_mac_address`     | Calculate and return the MAC address for this device.            |
+| `ensure_capabilities` | Ensure device capabilities are populated.                        |
+| `get_label`           | Get device label/name.                                           |
+| `set_label`           | Set device label/name.                                           |
+| `get_power`           | Get device power state.                                          |
+| `set_power`           | Set device power state.                                          |
+| `get_version`         | Get device version information.                                  |
+| `get_info`            | Get device runtime information.                                  |
+| `get_wifi_info`       | Get device WiFi module information.                              |
+| `get_host_firmware`   | Get device host (WiFi module) firmware information.              |
+| `get_wifi_firmware`   | Get device WiFi module firmware information.                     |
+| `get_location`        | Get device location information.                                 |
+| `set_location`        | Set device location information.                                 |
+| `get_group`           | Get device group information.                                    |
+| `set_group`           | Set device group information.                                    |
+| `set_reboot`          | Reboot the device.                                               |
+| `close`               | Close device connection and cleanup resources.                   |
+| `refresh_state`       | Refresh device state from hardware.                              |
 
 | ATTRIBUTE       | DESCRIPTION                                                     |
 | --------------- | --------------------------------------------------------------- |
@@ -18156,12 +17188,13 @@ Create and return an instance for the given IP address.
 
 This is a convenience class method for connecting to a known device by IP address. The returned instance can be used as a context manager.
 
-| PARAMETER | DESCRIPTION                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------- |
-| `ip`      | IP address of the device **TYPE:** `str`                                                          |
-| `port`    | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
-| `serial`  | Serial number as 12-digit hex string **TYPE:** \`str                                              |
-| `timeout` | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| PARAMETER     | DESCRIPTION                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `ip`          | IP address of the device **TYPE:** `str`                                                          |
+| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
+| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                                              |
+| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retry attempts **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`               |
 
 | RETURNS | DESCRIPTION                                             |
 | ------- | ------------------------------------------------------- |
@@ -18196,6 +17229,7 @@ async def from_ip(
         port: Port number (default LIFX_UDP_PORT)
         serial: Serial number as 12-digit hex string
         timeout: Request timeout for this device instance
+        max_retries: Maximum number of retry attempts
 
     Returns:
         Device instance ready to use with async context manager
@@ -18261,11 +17295,11 @@ connect(
 )
 ```
 
-Create and return a fully initialized device instance.
+Create a device instance with the correct type for the given IP.
 
-This factory method creates the appropriate device type (Light, etc) based on the device's capabilities and initializes its state. The returned device MUST be used with an async context manager.
+This factory method queries the device to determine its product type and returns the appropriate subclass (Light, MatrixLight, etc.).
 
-The returned device subclass has guaranteed initialized state - the state property will never be None for devices created via this method.
+State is NOT initialized on return. Use `async with` to enter the context manager, which calls `__aenter__()` → `_initialize_state()` and guarantees that `device.state` is non-None.
 
 | PARAMETER     | DESCRIPTION                                                                                                           |
 | ------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -18292,7 +17326,7 @@ Example
 # Connect by IP (serial auto-detected)
 device = await Device.connect(ip="192.168.1.100")
 async with device:
-    # device.state is guaranteed to be initialized
+    # State is initialized here by __aenter__()
     print(f"{device.state.model}: {device.state.label}")
     if device.state.is_on:
         print("Device is on")
@@ -18315,14 +17349,14 @@ async def connect(
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
-    """Create and return a fully initialized device instance.
+    """Create a device instance with the correct type for the given IP.
 
-    This factory method creates the appropriate device type (Light, etc)
-    based on the device's capabilities and initializes its state. The returned
-    device MUST be used with an async context manager.
+    This factory method queries the device to determine its product type
+    and returns the appropriate subclass (Light, MatrixLight, etc.).
 
-    The returned device subclass has guaranteed initialized state - the state
-    property will never be None for devices created via this method.
+    State is NOT initialized on return. Use ``async with`` to enter the
+    context manager, which calls ``__aenter__()`` → ``_initialize_state()``
+    and guarantees that ``device.state`` is non-None.
 
     Args:
         ip: IP address of the device
@@ -18333,8 +17367,8 @@ async def connect(
         max_retries: Maximum number of retry attempts
 
     Returns:
-        Fully initialized device instance (Light, MultiZoneLight, MatrixLight, etc.)
-        with complete state loaded and guaranteed non-None state property.
+        Device instance of the correct subclass, ready to use with
+        ``async with`` for state initialization and automatic cleanup.
 
     Raises:
         LifxDeviceNotFoundError: If device cannot be found or contacted
@@ -18346,7 +17380,7 @@ async def connect(
         # Connect by IP (serial auto-detected)
         device = await Device.connect(ip="192.168.1.100")
         async with device:
-            # device.state is guaranteed to be initialized
+            # State is initialized here by __aenter__()
             print(f"{device.state.model}: {device.state.label}")
             if device.state.is_on:
                 print("Device is on")
@@ -28703,6 +27737,8 @@ The library **intentionally does not implement rate limiting** to keep the core 
 
 The protocol layer contains auto-generated structures from the official LIFX protocol specification. These classes handle binary serialization and deserialization of LIFX messages.
 
+> For a detailed walkthrough of the protocol's packet structure, message flow, and code generation process, see the [Protocol Deep Dive](https://djelibeybi.github.io/lifx-async/architecture/protocol-deep-dive/index.md).
+
 !!! warning "Auto-Generated Code" Files in the protocol layer are automatically generated from `protocol.yml`. Never edit these files directly. To update the protocol, download the latest `protocol.yml` from the [LIFX public-protocol repository](https://github.com/LIFX/public-protocol) and run `uv run python -m lifx.protocol.generator`.
 
 ## Base Packet
@@ -32538,17 +31574,23 @@ Bases: `LifxError`
 
 Raised when there's a connection error.
 
+Raised when an operation is attempted on a connection that is not open. Use the `async with` context manager to ensure connections are opened and closed correctly.
+
 ### LifxTimeoutError
 
 Bases: `LifxError`
 
 Raised when an operation times out.
 
+Raised by the network transport layer when no data is received within the timeout period, and by the connection layer when a request receives no matching response before the deadline.
+
 ### LifxDeviceNotFoundError
 
 Bases: `LifxError`
 
 Raised when a device cannot be found or reached.
+
+Raised by `Device.from_ip()` and `Device.connect()` when the target device does not respond or has an unknown product ID.
 
 ## Protocol Exceptions
 
@@ -32558,6 +31600,8 @@ Bases: `LifxError`
 
 Raised when there's an error with protocol parsing or validation.
 
+Raised when a packet lacks the required `PKT_TYPE` attribute, when header deserialization fails, or when a response packet type does not match the expected type.
+
 ## Network Exceptions
 
 ### LifxNetworkError
@@ -32565,6 +31609,8 @@ Raised when there's an error with protocol parsing or validation.
 Bases: `LifxError`
 
 Raised when there's a network-level error.
+
+Raised when the UDP or mDNS socket cannot be opened, when sending or receiving data fails at the OS level, or when the socket is not open.
 
 ## Command Exceptions
 
@@ -32574,18 +31620,20 @@ Bases: `LifxError`
 
 Raised when a device doesn't support the requested command.
 
+Raised when a device returns a `StateUnhandled` response indicating the packet type is not supported, or when calling a method that requires a capability the device does not have.
+
 ## Examples
 
 ### Basic Exception Handling
 
 ```python
-from lifx import discover, LifxError, LifxTimeoutError
+from lifx import discover, Colors, LifxError, LifxTimeoutError
 
 
 async def main():
     try:
-        async with discover(timeout=5.0) as group:
-            await group.set_color(Colors.BLUE)
+        async for device in discover(timeout=5.0):
+            await device.set_color(Colors.BLUE)
     except LifxTimeoutError:
         print("Discovery timed out - no devices found")
     except LifxError as e:
@@ -32611,14 +31659,13 @@ async def main():
 ### Catching All LIFX Exceptions
 
 ```python
-from lifx import find_lights, LifxError
+from lifx import discover, LifxError
 
 
 async def safe_control():
     try:
-        async with find_lights() as lights:
-            for light in lights:
-                await light.set_brightness(0.8)
+        async for device in discover():
+            await device.set_brightness(0.8)
     except LifxError as e:
         # Catches all LIFX-specific exceptions
         print(f"LIFX operation failed: {e}")
@@ -32628,17 +31675,20 @@ async def safe_control():
 ### Timeout Handling
 
 ```python
-from lifx import DeviceConnection, LifxTimeoutError
-from lifx.protocol.packets import LightGet, LightState
+from lifx.network.connection import DeviceConnection
+from lifx.exceptions import LifxTimeoutError
+from lifx.protocol import packets
 
 
 async def main():
     try:
-        async with DeviceConnection(serial, ip, timeout=2.0) as conn:
-            response = await conn.request_response(LightGet(), LightState)
+        conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100", timeout=2.0)
+        response = await conn.request(packets.Light.Get())
     except LifxTimeoutError:
         print("Device did not respond in time")
         # Device may be offline or unreachable
+    finally:
+        await conn.close()
 ```
 
 ### Protocol Error Handling
@@ -32658,18 +31708,17 @@ async def main():
 ### Unsupported Command Handling
 
 ```python
-from lifx import find_lights, LifxUnsupportedCommandError
+from lifx import discover, LifxUnsupportedCommandError
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            try:
-                # Some devices may not support all features
-                await light.set_infrared(0.5)
-            except LifxUnsupportedCommandError:
-                print(f"{light.label} doesn't support this command")
-                continue
+    async for device in discover():
+        try:
+            # Some devices may not support all features
+            await device.set_infrared(0.5)
+        except LifxUnsupportedCommandError:
+            print(f"{device.serial} doesn't support this command")
+            continue
 ```
 
 ### Device Not Found Handling
@@ -32721,14 +31770,13 @@ except LifxError:
     print("Error occurred but connection was closed properly")
 
 # ❌ Bad - connection may leak on exception
-light = Light(serial, ip)
-await light.connect()
+light = Light(serial="d073d5123456", ip="192.168.1.100")
 try:
     await light.set_color(Colors.BLUE)
 except LifxError:
-    pass  # Connection not closed!
+    pass  # Connection not properly managed!
 finally:
-    await light.disconnect()
+    await light.connection.close()
 ```
 
 ### Log Exceptions for Debugging
@@ -32755,18 +31803,17 @@ async def main():
 ### Graceful Degradation
 
 ```python
-from lifx import find_lights, LifxError
+from lifx import discover, Colors, LifxError
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            try:
-                await light.set_color(Colors.BLUE)
-            except LifxError as e:
-                # Continue with other lights even if one fails
-                print(f"Failed to control {light.label}: {e}")
-                continue
+    async for device in discover():
+        try:
+            await device.set_color(Colors.BLUE)
+        except LifxError as e:
+            # Continue with other devices even if one fails
+            print(f"Failed to control {device.serial}: {e}")
+            continue
 ```
 
 ## Common Error Scenarios
@@ -32790,9 +31837,11 @@ Causes:
 
 ```python
 # May raise: LifxTimeoutError or LifxDeviceNotFoundError
-async with discover(timeout=3.0) as group:
-    if not group.devices:
-        print("No devices found")
+devices = []
+async for device in discover(timeout=3.0):
+    devices.append(device)
+if not devices:
+    print("No devices found")
 ```
 
 Causes:
@@ -32806,8 +31855,8 @@ Causes:
 
 ```python
 # Raises: LifxConnectionError
-async with DeviceConnection(serial, ip) as conn:
-    await conn.send_packet(packet)
+conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+response = await conn.request(packet)
 ```
 
 Causes:
@@ -33133,7 +32182,7 @@ No! lifx-async communicates directly with devices over your local network. No cl
 
 ### What Python versions are supported?
 
-Python 3.11 or higher is required.
+Python 3.10 or higher is required.
 
 ## Installation & Setup
 
@@ -33233,7 +32282,10 @@ await asyncio.gather(
 By label:
 
 ```python
-lights = await find_lights(label_contains="Bedroom")
+from lifx import find_by_label
+
+async for device in find_by_label("Bedroom"):
+    print(f"Found: {device.serial}")
 ```
 
 By serial number:
@@ -33253,7 +32305,7 @@ from lifx import Colors
 Colors.RED, Colors.GREEN, Colors.BLUE
 
 # White variants
-Colors.WARM_WHITE, Colors.COOL_WHITE, Colors.DAYLIGHT
+Colors.WARM, Colors.COOL, Colors.DAYLIGHT
 
 # Pastels
 Colors.PASTEL_BLUE, Colors.PASTEL_PINK
@@ -33279,8 +32331,8 @@ Yes! Use the `pulse()` or `breathe()` methods:
 # Pulse red 5 times
 await light.pulse(Colors.RED, period=1.0, cycles=5)
 
-# Breathe blue infinitely
-await light.breathe(Colors.BLUE, period=2.0, cycles=0)
+# Breathe blue 10 times
+await light.breathe(Colors.BLUE, period=2.0, cycles=10)
 ```
 
 ## Performance
@@ -33370,7 +32422,7 @@ await light.set_color(Colors.BLUE, duration=2.0)
 
 lifx-async is fully type-hinted. If you get type errors:
 
-1. Ensure you're using Python 3.11+
+1. Ensure you're using Python 3.10+
 1. Update your type checker (Pyright, mypy)
 1. Check you're using correct types
 

@@ -6,30 +6,51 @@ lifx-async is built as a layered architecture with clear separation of concerns.
 
 ```
 graph TB
-    subgraph "Layer 4: High-Level API"
-        API[api.py<br/>discover, find_lights, etc.]
+    subgraph "Layer 8: High-Level API"
+        API[api.py<br/>discover, find_by_label, etc.]
         DeviceGroup[DeviceGroup<br/>Batch operations]
     end
 
-    subgraph "Layer 3: Device Layer"
+    subgraph "Layer 7: Theme Layer"
+        Theme[Theme<br/>Named color palettes]
+        ThemeGen[Generators<br/>Theme-based colors]
+    end
+
+    subgraph "Layer 6: Effects Layer"
+        Effects[30+ Effects<br/>aurora, flame, plasma, etc.]
+        Registry[Registry<br/>Effect discovery]
+    end
+
+    subgraph "Layer 5: Animation Layer"
+        Animator[Animator<br/>Direct UDP sending]
+        FrameBuffer[FrameBuffer<br/>Multi-tile canvas]
+    end
+
+    subgraph "Layer 4: Device Layer"
         Device[Device<br/>Base class]
         Light[Light<br/>Color control]
         Hev[HevLight<br />HEV support]
         Infrared[InfraredLight<br />Infrared support]
         MultiZone[MultiZoneLight<br/>Linear/1D zones]
         Matrix[MatrixLight<br/>Matrix/2D zones]
+        Ceiling[CeilingLight<br/>Up/downlight control]
     end
 
-    subgraph "Layer 2: Network Layer"
-        Discovery[Discovery<br/>UDP broadcast]
+    subgraph "Layer 3: Network Layer"
+        Discovery[Discovery<br/>UDP broadcast + mDNS]
         Connection[Connection<br/>Lazy opening]
         Transport[Transport<br/>UDP sockets]
     end
 
-    subgraph "Layer 1: Protocol Layer"
+    subgraph "Layer 2: Protocol Layer"
         Generator[Generator<br/>YAML → Python]
         Types[Protocol Types<br/>Enums, HSBK, etc.]
         Packets[Packets<br/>Message classes]
+    end
+
+    subgraph "Layer 1: Utilities"
+        Color[HSBK / Colors<br/>Color conversion]
+        Products[Products Registry<br/>Device capabilities]
     end
 
     subgraph "External"
@@ -39,17 +60,22 @@ graph TB
 
     API --> DeviceGroup
     DeviceGroup --> Light
-    DeviceGroup --> Hev
-    DeviceGroup --> Infrared
-    DeviceGroup --> MultiZone
     DeviceGroup --> Matrix
+    DeviceGroup --> MultiZone
     API --> Discovery
+    Theme --> ThemeGen
+    ThemeGen --> Color
+    Effects --> Animator
+    Effects --> Theme
+    Animator --> FrameBuffer
+    Animator --> Transport
     Device --> Connection
     Light --> Device
     Hev --> Light
     Infrared --> Light
     MultiZone --> Light
     Matrix --> Light
+    Ceiling --> Matrix
     Connection --> Transport
     Connection --> Packets
     Discovery --> Transport
@@ -63,6 +89,9 @@ graph TB
     style Device fill:#e1f0ff
     style Connection fill:#fff4e1
     style Generator fill:#ffe1f0
+    style Animator fill:#f0e1ff
+    style Effects fill:#ffe1e1
+    style Theme fill:#e1fff0
 ```
 
 ## Layer Responsibilities
@@ -152,14 +181,60 @@ async with Light(serial, ip) as light:
     await light.pulse(Colors.RED, period=1.0, cycles=5)
 ```
 
-### Layer 4: High-Level API
+### Layer 5: Animation Layer
+
+**Purpose**: High-frequency frame delivery for real-time effects (30+ FPS)
+
+- **Direct UDP**: Bypasses request/response for low-latency frame delivery
+- **Multi-Tile Canvas**: Maps tiles using `user_x`/`user_y` positions
+- **Orientation Correction**: LRU-cached tile rotation lookup tables
+- **Protocol-Ready Values**: Uses uint16 HSBK directly (no conversion overhead)
+
+**Key Files**:
+
+- `animation/animator.py` - High-level `Animator` class
+- `animation/framebuffer.py` - Multi-tile canvas mapping
+- `animation/packets.py` - Prebaked packet templates
+- `animation/orientation.py` - Tile orientation remapping
+
+### Layer 6: Effects Layer
+
+**Purpose**: 30+ built-in visual effects
+
+- **Effect Library**: aurora, flame, plasma, rainbow, twinkle, etc.
+- **Registry**: Discover effects by name
+- **State Management**: Run effects on devices
+- **Frame Generation**: Effects produce HSBK frames consumed by the Animation Layer
+
+**Key Files**:
+
+- `effects/base.py` - Base effect class
+- `effects/registry.py` - Effect discovery
+- `effects/state_manager.py` - Effect lifecycle
+
+### Layer 7: Theme Layer
+
+**Purpose**: Named color palettes for effects
+
+- **Theme Definitions**: Named color palettes
+- **Theme Library**: Built-in themes
+- **Color Generators**: Theme-based color generation for effects
+- **Canvas Abstraction**: Apply themes to device layouts
+
+**Key Files**:
+
+- `theme/theme.py` - Theme definitions
+- `theme/library.py` - Built-in themes
+- `theme/generators.py` - Theme-based color generators
+
+### Layer 8: High-Level API
 
 **Purpose**: Simple, batteries-included API
 
-- **Simplified Discovery**: One-line device discovery
-- **Batch Operations**: Control multiple devices
+- **Simplified Discovery**: One-line device discovery via UDP or mDNS
+- **Batch Operations**: Control multiple devices with `DeviceGroup`
 - **Direct Connection**: Connect by IP without discovery
-- **Filtered Discovery**: Find devices by label or serial
+- **Filtered Discovery**: Find devices by label, serial, or IP
 
 **Key Files**:
 
@@ -300,11 +375,11 @@ uv run python -m lifx.protocol.generator
 
 ## Concurrency Model
 
-Each connection serializes requests to prevent response mixing:
+Each connection uses a background receiver task that routes responses to the correct pending request:
 
 ```python
 conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
-# Requests are serialized on the same connection
+# Multiple concurrent requests are supported
 result1 = await conn.request(packet1)
 result2 = await conn.request(packet2)
 await conn.close()
@@ -312,9 +387,11 @@ await conn.close()
 
 **How it works**:
 
-- Requests are serialized via `_request_lock` on same connection
-- Responses matched to requests by sequence number
-- Async generator streaming for efficient multi-response protocols
+- A background receiver task continuously reads from the UDP socket
+- Each request registers a per-request `asyncio.Queue` keyed by `(source, sequence, serial)`
+- The receiver routes incoming packets to the matching queue
+- Sequence numbers (0-255, uint8) are atomically allocated for response correlation
+- Different devices have different connections, so multi-device operations run in parallel
 - Single UDP socket per connection
 
 ## Next Steps

@@ -274,7 +274,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../user-guide/themes/" class="md-tabs__link">
+        <a href="../../user-guide/effects/" class="md-tabs__link">
           
   
   
@@ -489,8 +489,6 @@
       
         
       
-        
-      
     
     
     
@@ -648,34 +646,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/effects-gallery/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Effects Gallery
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -691,6 +661,8 @@
   
     
     
+      
+        
       
         
       
@@ -760,14 +732,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/themes/" class="md-nav__link">
+      <a href="../../user-guide/effects/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Themes
+    Light Effects
   
 
     
@@ -788,14 +760,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/ceiling-lights/" class="md-nav__link">
+      <a href="../../user-guide/effects-gallery/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Ceiling Lights
+    Effects Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Themes
   
 
     
@@ -844,14 +872,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
+      <a href="../../user-guide/ceiling-lights/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Advanced Usage
+    Ceiling Lights
   
 
     
@@ -872,14 +900,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Custom Effects
+    Advanced Usage
   
 
     
@@ -949,34 +977,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/protocol-deep-dive/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Protocol Deep Dive
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -992,6 +992,8 @@
   
     
     
+      
+        
       
         
       
@@ -1085,6 +1087,34 @@
     
   
     Effects System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/protocol-deep-dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Deep Dive
   
 
     
@@ -2610,6 +2640,9 @@
 
 
         <p>Raised when there's a connection error.</p>
+<p>Raised when an operation is attempted on a connection that is not open.
+Use the <code>async with</code> context manager to ensure connections are opened
+and closed correctly.</p>
 
 
 
@@ -2646,6 +2679,9 @@
 
 
         <p>Raised when an operation times out.</p>
+<p>Raised by the network transport layer when no data is received within the
+timeout period, and by the connection layer when a request receives no
+matching response before the deadline.</p>
 
 
 
@@ -2682,6 +2718,8 @@
 
 
         <p>Raised when a device cannot be found or reached.</p>
+<p>Raised by <code>Device.from_ip()</code> and <code>Device.connect()</code> when the target
+device does not respond or has an unknown product ID.</p>
 
 
 
@@ -2719,6 +2757,9 @@
 
 
         <p>Raised when there's an error with protocol parsing or validation.</p>
+<p>Raised when a packet lacks the required <code>PKT_TYPE</code> attribute, when
+header deserialization fails, or when a response packet type does not
+match the expected type.</p>
 
 
 
@@ -2756,6 +2797,8 @@
 
 
         <p>Raised when there's a network-level error.</p>
+<p>Raised when the UDP or mDNS socket cannot be opened, when sending or
+receiving data fails at the OS level, or when the socket is not open.</p>
 
 
 
@@ -2793,6 +2836,9 @@
 
 
         <p>Raised when a device doesn't support the requested command.</p>
+<p>Raised when a device returns a <code>StateUnhandled</code> response indicating
+the packet type is not supported, or when calling a method that requires
+a capability the device does not have.</p>
 
 
 
@@ -2811,13 +2857,13 @@
 
 </div><h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <h3 id="basic-exception-handling">Basic Exception Handling<a class="headerlink" href="#basic-exception-handling" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">LifxError</span><span class="p">,</span> <span class="n">LifxTimeoutError</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">Colors</span><span class="p">,</span> <span class="n">LifxError</span><span class="p">,</span> <span class="n">LifxTimeoutError</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="k">async</span> <span class="k">with</span> <span class="n">discover</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span> <span class="k">as</span> <span class="n">group</span><span class="p">:</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>            <span class="k">await</span> <span class="n">group</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">):</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>            <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">except</span> <span class="n">LifxTimeoutError</span><span class="p">:</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Discovery timed out - no devices found&quot;</span><span class="p">)</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">except</span> <span class="n">LifxError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
@@ -2837,31 +2883,33 @@
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Device doesn&#39;t support this operation: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="catching-all-lifx-exceptions">Catching All LIFX Exceptions<a class="headerlink" href="#catching-all-lifx-exceptions" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_lights</span><span class="p">,</span> <span class="n">LifxError</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">LifxError</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">safe_control</span><span class="p">():</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="k">async</span> <span class="k">with</span> <span class="n">find_lights</span><span class="p">()</span> <span class="k">as</span> <span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>            <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.8</span><span class="p">)</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">except</span> <span class="n">LifxError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="c1"># Catches all LIFX-specific exceptions</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;LIFX operation failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="c1"># Log, retry, or handle gracefully</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>            <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_brightness</span><span class="p">(</span><span class="mf">0.8</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">except</span> <span class="n">LifxError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="c1"># Catches all LIFX-specific exceptions</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;LIFX operation failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="c1"># Log, retry, or handle gracefully</span>
 </span></code></pre></div>
 <h3 id="timeout-handling">Timeout Handling<a class="headerlink" href="#timeout-handling" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceConnection</span><span class="p">,</span> <span class="n">LifxTimeoutError</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.protocol.packets</span><span class="w"> </span><span class="kn">import</span> <span class="n">LightGet</span><span class="p">,</span> <span class="n">LightState</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.network.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceConnection</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifxTimeoutError</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx.protocol</span><span class="w"> </span><span class="kn">import</span> <span class="n">packets</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="k">async</span> <span class="k">with</span> <span class="n">DeviceConnection</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>            <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">request_response</span><span class="p">(</span><span class="n">LightGet</span><span class="p">(),</span> <span class="n">LightState</span><span class="p">)</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="k">except</span> <span class="n">LifxTimeoutError</span><span class="p">:</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Device did not respond in time&quot;</span><span class="p">)</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="c1"># Device may be offline or unreachable</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">conn</span> <span class="o">=</span> <span class="n">DeviceConnection</span><span class="p">(</span><span class="n">serial</span><span class="o">=</span><span class="s2">&quot;d073d5123456&quot;</span><span class="p">,</span> <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">packets</span><span class="o">.</span><span class="n">Light</span><span class="o">.</span><span class="n">Get</span><span class="p">())</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="k">except</span> <span class="n">LifxTimeoutError</span><span class="p">:</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Device did not respond in time&quot;</span><span class="p">)</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="c1"># Device may be offline or unreachable</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </span></code></pre></div>
 <h3 id="protocol-error-handling">Protocol Error Handling<a class="headerlink" href="#protocol-error-handling" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Light</span><span class="p">,</span> <span class="n">LifxProtocolError</span>
@@ -2875,18 +2923,17 @@
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Protocol-level error occurred&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="unsupported-command-handling">Unsupported Command Handling<a class="headerlink" href="#unsupported-command-handling" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_lights</span><span class="p">,</span> <span class="n">LifxUnsupportedCommandError</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">LifxUnsupportedCommandError</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">find_lights</span><span class="p">()</span> <span class="k">as</span> <span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>            <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>                <span class="c1"># Some devices may not support all features</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_infrared</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>            <span class="k">except</span> <span class="n">LifxUnsupportedCommandError</span><span class="p">:</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2"> doesn&#39;t support this command&quot;</span><span class="p">)</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>                <span class="k">continue</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>            <span class="c1"># Some devices may not support all features</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>            <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_infrared</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="k">except</span> <span class="n">LifxUnsupportedCommandError</span><span class="p">:</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">device</span><span class="o">.</span><span class="n">serial</span><span class="si">}</span><span class="s2"> doesn&#39;t support this command&quot;</span><span class="p">)</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>            <span class="k">continue</span>
 </span></code></pre></div>
 <h3 id="device-not-found-handling">Device Not Found Handling<a class="headerlink" href="#device-not-found-handling" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_by_serial</span><span class="p">,</span> <span class="n">LifxDeviceNotFoundError</span>
@@ -2928,14 +2975,13 @@
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error occurred but connection was closed properly&quot;</span><span class="p">)</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># ❌ Bad - connection may leak on exception</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">light</span> <span class="o">=</span> <span class="n">Light</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="n">ip</span><span class="p">)</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="k">except</span> <span class="n">LifxError</span><span class="p">:</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="k">pass</span>  <span class="c1"># Connection not closed!</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="k">finally</span><span class="p">:</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">light</span> <span class="o">=</span> <span class="n">Light</span><span class="p">(</span><span class="n">serial</span><span class="o">=</span><span class="s2">&quot;d073d5123456&quot;</span><span class="p">,</span> <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="k">except</span> <span class="n">LifxError</span><span class="p">:</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="k">pass</span>  <span class="c1"># Connection not properly managed!</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </span></code></pre></div>
 <h3 id="log-exceptions-for-debugging">Log Exceptions for Debugging<a class="headerlink" href="#log-exceptions-for-debugging" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
@@ -2956,18 +3002,17 @@
 </span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>        <span class="c1"># Logs full traceback for debugging</span>
 </span></code></pre></div>
 <h3 id="graceful-degradation">Graceful Degradation<a class="headerlink" href="#graceful-degradation" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_lights</span><span class="p">,</span> <span class="n">LifxError</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lifx</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover</span><span class="p">,</span> <span class="n">Colors</span><span class="p">,</span> <span class="n">LifxError</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">find_lights</span><span class="p">()</span> <span class="k">as</span> <span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>        <span class="k">for</span> <span class="n">light</span> <span class="ow">in</span> <span class="n">lights</span><span class="p">:</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>            <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>                <span class="k">await</span> <span class="n">light</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>            <span class="k">except</span> <span class="n">LifxError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>                <span class="c1"># Continue with other lights even if one fails</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to control </span><span class="si">{</span><span class="n">light</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>                <span class="k">continue</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">():</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>        <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>            <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>        <span class="k">except</span> <span class="n">LifxError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>            <span class="c1"># Continue with other devices even if one fails</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to control </span><span class="si">{</span><span class="n">device</span><span class="o">.</span><span class="n">serial</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>            <span class="k">continue</span>
 </span></code></pre></div>
 <h2 id="common-error-scenarios">Common Error Scenarios<a class="headerlink" href="#common-error-scenarios" title="Permanent link">&para;</a></h2>
 <h3 id="device-not-responding">Device Not Responding<a class="headerlink" href="#device-not-responding" title="Permanent link">&para;</a></h3>
@@ -2984,9 +3029,11 @@
 </ul>
 <h3 id="device-not-found-during-discovery">Device Not Found During Discovery<a class="headerlink" href="#device-not-found-during-discovery" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># May raise: LifxTimeoutError or LifxDeviceNotFoundError</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">async</span> <span class="k">with</span> <span class="n">discover</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">3.0</span><span class="p">)</span> <span class="k">as</span> <span class="n">group</span><span class="p">:</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">group</span><span class="o">.</span><span class="n">devices</span><span class="p">:</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No devices found&quot;</span><span class="p">)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">devices</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">discover</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">3.0</span><span class="p">):</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">devices</span><span class="p">:</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No devices found&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Causes:</p>
 <ul>
@@ -2997,8 +3044,8 @@
 </ul>
 <h3 id="connection-failed">Connection Failed<a class="headerlink" href="#connection-failed" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Raises: LifxConnectionError</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">async</span> <span class="k">with</span> <span class="n">DeviceConnection</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="n">ip</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_packet</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">conn</span> <span class="o">=</span> <span class="n">DeviceConnection</span><span class="p">(</span><span class="n">serial</span><span class="o">=</span><span class="s2">&quot;d073d5123456&quot;</span><span class="p">,</span> <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">)</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Causes:</p>
 <ul>
@@ -3051,7 +3098,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 16, 2025 23:45:40 UTC">November 16, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 18, 2026 18:02:23 UTC">March 18, 2026</span>
   </span>
 
     

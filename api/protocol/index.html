@@ -274,7 +274,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../user-guide/themes/" class="md-tabs__link">
+        <a href="../../user-guide/effects/" class="md-tabs__link">
           
   
   
@@ -489,8 +489,6 @@
       
         
       
-        
-      
     
     
     
@@ -648,34 +646,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/effects-gallery/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Effects Gallery
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -691,6 +661,8 @@
   
     
     
+      
+        
       
         
       
@@ -760,14 +732,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/themes/" class="md-nav__link">
+      <a href="../../user-guide/effects/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Themes
+    Light Effects
   
 
     
@@ -788,14 +760,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/ceiling-lights/" class="md-nav__link">
+      <a href="../../user-guide/effects-gallery/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Ceiling Lights
+    Effects Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Themes
   
 
     
@@ -844,14 +872,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
+      <a href="../../user-guide/ceiling-lights/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Advanced Usage
+    Ceiling Lights
   
 
     
@@ -872,14 +900,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Custom Effects
+    Advanced Usage
   
 
     
@@ -949,34 +977,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/protocol-deep-dive/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Protocol Deep Dive
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -992,6 +992,8 @@
   
     
     
+      
+        
       
         
       
@@ -1085,6 +1087,34 @@
     
   
     Effects System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/protocol-deep-dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Deep Dive
   
 
     
@@ -2643,6 +2673,9 @@
 <h1 id="protocol-layer">Protocol Layer<a class="headerlink" href="#protocol-layer" title="Permanent link">&para;</a></h1>
 <p>The protocol layer contains auto-generated structures from the official LIFX protocol specification.
 These classes handle binary serialization and deserialization of LIFX messages.</p>
+<blockquote>
+<p>For a detailed walkthrough of the protocol's packet structure, message flow, and code generation process, see the <a href="../../architecture/protocol-deep-dive/">Protocol Deep Dive</a>.</p>
+</blockquote>
 <p>!!! warning "Auto-Generated Code" Files in the protocol layer are automatically generated from
 <code>protocol.yml</code>. Never edit these files directly. To update the protocol, download the latest
 <code>protocol.yml</code> from the <a href="https://github.com/LIFX/public-protocol">LIFX public-protocol repository</a>
@@ -13229,7 +13262,7 @@ SetExtendedColorZones packets.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 23, 2026 18:33:46 UTC">January 23, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 18, 2026 18:27:05 UTC">March 18, 2026</span>
   </span>
 
     

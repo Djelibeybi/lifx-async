@@ -594,6 +594,7 @@ async def rainbow_animation():
 
 ## Next Steps
 
-- [Troubleshooting Guide](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md) - Common issues and solutions
-- [Protocol Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) - Low-level protocol details
-- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) - Complete API documentation
+- [Troubleshooting Guide](https://djelibeybi.github.io/lifx-async/user-guide/troubleshooting/index.md) — Common issues and solutions
+- [Network Layer API](https://djelibeybi.github.io/lifx-async/api/network/index.md) — Low-level discovery, connection, and transport reference
+- [Protocol Reference](https://djelibeybi.github.io/lifx-async/api/protocol/index.md) — Protocol layer and packet structures
+- [API Reference](https://djelibeybi.github.io/lifx-async/api/index.md) — Complete API documentation

@@ -1,5 +1,7 @@
 # Effects Reference
 
+> **Looking for usage examples?** See the [Light Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects/index.md) for tutorials, common patterns, and best practices. This page covers the API surface only.
+
 This reference guide provides comprehensive documentation for all effect classes in the Light Effects Framework.
 
 ## Table of Contents
@@ -4620,7 +4622,9 @@ ______________________________________________________________________
 
 ## See Also
 
-- [Getting Started](https://djelibeybi.github.io/lifx-async/getting-started/effects/index.md) - Basic usage and common patterns
-- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) - Creating your own effects
-- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) - How the system works
-- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) - Common issues and solutions
+- [Light Effects Guide](https://djelibeybi.github.io/lifx-async/user-guide/effects/index.md) — Usage examples, common patterns, and best practices
+- [Effects Gallery](https://djelibeybi.github.io/lifx-async/user-guide/effects-gallery/index.md) — Animated previews of all effects
+- [Custom Effects](https://djelibeybi.github.io/lifx-async/user-guide/effects-custom/index.md) — Creating your own effects
+- [Effect API Changes](https://djelibeybi.github.io/lifx-async/migration/effect-api-changes/index.md) — Migration guide for breaking changes
+- [Architecture](https://djelibeybi.github.io/lifx-async/architecture/effects-architecture/index.md) — How the system works
+- [Troubleshooting](https://djelibeybi.github.io/lifx-async/user-guide/effects-troubleshooting/index.md) — Common issues and solutions

@@ -370,28 +370,28 @@ async with device:
 | ------------ | --------------------------- |
 | `ValueError` | If any parameter is invalid |
 
-| METHOD                | DESCRIPTION                                             |
-| --------------------- | ------------------------------------------------------- |
-| `from_ip`             | Create and return an instance for the given IP address. |
-| `connect`             | Create and return a fully initialized device instance.  |
-| `get_mac_address`     | Calculate and return the MAC address for this device.   |
-| `ensure_capabilities` | Ensure device capabilities are populated.               |
-| `get_label`           | Get device label/name.                                  |
-| `set_label`           | Set device label/name.                                  |
-| `get_power`           | Get device power state.                                 |
-| `set_power`           | Set device power state.                                 |
-| `get_version`         | Get device version information.                         |
-| `get_info`            | Get device runtime information.                         |
-| `get_wifi_info`       | Get device WiFi module information.                     |
-| `get_host_firmware`   | Get device host (WiFi module) firmware information.     |
-| `get_wifi_firmware`   | Get device WiFi module firmware information.            |
-| `get_location`        | Get device location information.                        |
-| `set_location`        | Set device location information.                        |
-| `get_group`           | Get device group information.                           |
-| `set_group`           | Set device group information.                           |
-| `set_reboot`          | Reboot the device.                                      |
-| `close`               | Close device connection and cleanup resources.          |
-| `refresh_state`       | Refresh device state from hardware.                     |
+| METHOD                | DESCRIPTION                                                      |
+| --------------------- | ---------------------------------------------------------------- |
+| `from_ip`             | Create and return an instance for the given IP address.          |
+| `connect`             | Create a device instance with the correct type for the given IP. |
+| `get_mac_address`     | Calculate and return the MAC address for this device.            |
+| `ensure_capabilities` | Ensure device capabilities are populated.                        |
+| `get_label`           | Get device label/name.                                           |
+| `set_label`           | Set device label/name.                                           |
+| `get_power`           | Get device power state.                                          |
+| `set_power`           | Set device power state.                                          |
+| `get_version`         | Get device version information.                                  |
+| `get_info`            | Get device runtime information.                                  |
+| `get_wifi_info`       | Get device WiFi module information.                              |
+| `get_host_firmware`   | Get device host (WiFi module) firmware information.              |
+| `get_wifi_firmware`   | Get device WiFi module firmware information.                     |
+| `get_location`        | Get device location information.                                 |
+| `set_location`        | Set device location information.                                 |
+| `get_group`           | Get device group information.                                    |
+| `set_group`           | Set device group information.                                    |
+| `set_reboot`          | Reboot the device.                                               |
+| `close`               | Close device connection and cleanup resources.                   |
+| `refresh_state`       | Refresh device state from hardware.                              |
 
 | ATTRIBUTE       | DESCRIPTION                                                     |
 | --------------- | --------------------------------------------------------------- |
@@ -715,12 +715,13 @@ Create and return an instance for the given IP address.
 
 This is a convenience class method for connecting to a known device by IP address. The returned instance can be used as a context manager.
 
-| PARAMETER | DESCRIPTION                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------- |
-| `ip`      | IP address of the device **TYPE:** `str`                                                          |
-| `port`    | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
-| `serial`  | Serial number as 12-digit hex string **TYPE:** \`str                                              |
-| `timeout` | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| PARAMETER     | DESCRIPTION                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `ip`          | IP address of the device **TYPE:** `str`                                                          |
+| `port`        | Port number (default LIFX_UDP_PORT) **TYPE:** `int` **DEFAULT:** `LIFX_UDP_PORT`                  |
+| `serial`      | Serial number as 12-digit hex string **TYPE:** \`str                                              |
+| `timeout`     | Request timeout for this device instance **TYPE:** `float` **DEFAULT:** `DEFAULT_REQUEST_TIMEOUT` |
+| `max_retries` | Maximum number of retry attempts **TYPE:** `int` **DEFAULT:** `DEFAULT_MAX_RETRIES`               |
 
 | RETURNS | DESCRIPTION                                             |
 | ------- | ------------------------------------------------------- |
@@ -755,6 +756,7 @@ async def from_ip(
         port: Port number (default LIFX_UDP_PORT)
         serial: Serial number as 12-digit hex string
         timeout: Request timeout for this device instance
+        max_retries: Maximum number of retry attempts
 
     Returns:
         Device instance ready to use with async context manager
@@ -820,11 +822,11 @@ connect(
 )
 ```
 
-Create and return a fully initialized device instance.
+Create a device instance with the correct type for the given IP.
 
-This factory method creates the appropriate device type (Light, etc) based on the device's capabilities and initializes its state. The returned device MUST be used with an async context manager.
+This factory method queries the device to determine its product type and returns the appropriate subclass (Light, MatrixLight, etc.).
 
-The returned device subclass has guaranteed initialized state - the state property will never be None for devices created via this method.
+State is NOT initialized on return. Use `async with` to enter the context manager, which calls `__aenter__()` → `_initialize_state()` and guarantees that `device.state` is non-None.
 
 | PARAMETER     | DESCRIPTION                                                                                                           |
 | ------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -851,7 +853,7 @@ Example
 # Connect by IP (serial auto-detected)
 device = await Device.connect(ip="192.168.1.100")
 async with device:
-    # device.state is guaranteed to be initialized
+    # State is initialized here by __aenter__()
     print(f"{device.state.model}: {device.state.label}")
     if device.state.is_on:
         print("Device is on")
@@ -874,14 +876,14 @@ async def connect(
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
-    """Create and return a fully initialized device instance.
+    """Create a device instance with the correct type for the given IP.
 
-    This factory method creates the appropriate device type (Light, etc)
-    based on the device's capabilities and initializes its state. The returned
-    device MUST be used with an async context manager.
+    This factory method queries the device to determine its product type
+    and returns the appropriate subclass (Light, MatrixLight, etc.).
 
-    The returned device subclass has guaranteed initialized state - the state
-    property will never be None for devices created via this method.
+    State is NOT initialized on return. Use ``async with`` to enter the
+    context manager, which calls ``__aenter__()`` → ``_initialize_state()``
+    and guarantees that ``device.state`` is non-None.
 
     Args:
         ip: IP address of the device
@@ -892,8 +894,8 @@ async def connect(
         max_retries: Maximum number of retry attempts
 
     Returns:
-        Fully initialized device instance (Light, MultiZoneLight, MatrixLight, etc.)
-        with complete state loaded and guaranteed non-None state property.
+        Device instance of the correct subclass, ready to use with
+        ``async with`` for state initialization and automatic cleanup.
 
     Raises:
         LifxDeviceNotFoundError: If device cannot be found or contacted
@@ -905,7 +907,7 @@ async def connect(
         # Connect by IP (serial auto-detected)
         device = await Device.connect(ip="192.168.1.100")
         async with device:
-            # device.state is guaranteed to be initialized
+            # State is initialized here by __aenter__()
             print(f"{device.state.model}: {device.state.label}")
             if device.state.is_on:
                 print("Device is on")

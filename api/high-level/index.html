@@ -274,7 +274,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../user-guide/themes/" class="md-tabs__link">
+        <a href="../../user-guide/effects/" class="md-tabs__link">
           
   
   
@@ -489,8 +489,6 @@
       
         
       
-        
-      
     
     
     
@@ -648,34 +646,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/effects-gallery/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Effects Gallery
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -691,6 +661,8 @@
   
     
     
+      
+        
       
         
       
@@ -760,14 +732,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/themes/" class="md-nav__link">
+      <a href="../../user-guide/effects/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Themes
+    Light Effects
   
 
     
@@ -788,14 +760,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/ceiling-lights/" class="md-nav__link">
+      <a href="../../user-guide/effects-gallery/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Ceiling Lights
+    Effects Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Themes
   
 
     
@@ -844,14 +872,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
+      <a href="../../user-guide/ceiling-lights/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Advanced Usage
+    Ceiling Lights
   
 
     
@@ -872,14 +900,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/effects-custom/" class="md-nav__link">
+      <a href="../../user-guide/advanced-usage/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Custom Effects
+    Advanced Usage
   
 
     
@@ -949,34 +977,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user-guide/protocol-deep-dive/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Protocol Deep Dive
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -992,6 +992,8 @@
   
     
     
+      
+        
       
         
       
@@ -1085,6 +1087,34 @@
     
   
     Effects System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/protocol-deep-dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Deep Dive
   
 
     
@@ -2657,8 +2687,7 @@ recommended entry points for most users.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/api.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-849">849</a></span>
-<span class="normal"><a href="#__codelineno-0-850">850</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-850">850</a></span>
 <span class="normal"><a href="#__codelineno-0-851">851</a></span>
 <span class="normal"><a href="#__codelineno-0-852">852</a></span>
 <span class="normal"><a href="#__codelineno-0-853">853</a></span>
@@ -2707,57 +2736,58 @@ recommended entry points for most users.</p>
 <span class="normal"><a href="#__codelineno-0-896">896</a></span>
 <span class="normal"><a href="#__codelineno-0-897">897</a></span>
 <span class="normal"><a href="#__codelineno-0-898">898</a></span>
-<span class="normal"><a href="#__codelineno-0-899">899</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-849"><a id="__codelineno-0-849" name="__codelineno-0-849"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_serial</span><span class="p">(</span>
-</span><span id="__span-0-850"><a id="__codelineno-0-850" name="__codelineno-0-850"></a>    <span class="n">serial</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span id="__span-0-851"><a id="__codelineno-0-851" name="__codelineno-0-851"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
-</span><span id="__span-0-852"><a id="__codelineno-0-852" name="__codelineno-0-852"></a>    <span class="n">broadcast_address</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;255.255.255.255&quot;</span><span class="p">,</span>
-</span><span id="__span-0-853"><a id="__codelineno-0-853" name="__codelineno-0-853"></a>    <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">LIFX_UDP_PORT</span><span class="p">,</span>
-</span><span id="__span-0-854"><a id="__codelineno-0-854" name="__codelineno-0-854"></a>    <span class="n">max_response_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_RESPONSE_TIME</span><span class="p">,</span>
-</span><span id="__span-0-855"><a id="__codelineno-0-855" name="__codelineno-0-855"></a>    <span class="n">idle_timeout_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">IDLE_TIMEOUT_MULTIPLIER</span><span class="p">,</span>
-</span><span id="__span-0-856"><a id="__codelineno-0-856" name="__codelineno-0-856"></a>    <span class="n">device_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REQUEST_TIMEOUT</span><span class="p">,</span>
-</span><span id="__span-0-857"><a id="__codelineno-0-857" name="__codelineno-0-857"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_RETRIES</span><span class="p">,</span>
-</span><span id="__span-0-858"><a id="__codelineno-0-858" name="__codelineno-0-858"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Device</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-859"><a id="__codelineno-0-859" name="__codelineno-0-859"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Find a specific device by serial number.</span>
-</span><span id="__span-0-860"><a id="__codelineno-0-860" name="__codelineno-0-860"></a>
-</span><span id="__span-0-861"><a id="__codelineno-0-861" name="__codelineno-0-861"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-862"><a id="__codelineno-0-862" name="__codelineno-0-862"></a><span class="sd">        serial: Serial number as hex string (with or without separators)</span>
-</span><span id="__span-0-863"><a id="__codelineno-0-863" name="__codelineno-0-863"></a><span class="sd">        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)</span>
-</span><span id="__span-0-864"><a id="__codelineno-0-864" name="__codelineno-0-864"></a><span class="sd">        broadcast_address: Broadcast address to use (default &quot;255.255.255.255&quot;)</span>
-</span><span id="__span-0-865"><a id="__codelineno-0-865" name="__codelineno-0-865"></a><span class="sd">        port: Port to use (default LIFX_UDP_PORT)</span>
-</span><span id="__span-0-866"><a id="__codelineno-0-866" name="__codelineno-0-866"></a><span class="sd">        max_response_time: Max time to wait for responses</span>
-</span><span id="__span-0-867"><a id="__codelineno-0-867" name="__codelineno-0-867"></a><span class="sd">        idle_timeout_multiplier: Idle timeout multiplier</span>
-</span><span id="__span-0-868"><a id="__codelineno-0-868" name="__codelineno-0-868"></a><span class="sd">        device_timeout: request timeout set on discovered device</span>
-</span><span id="__span-0-869"><a id="__codelineno-0-869" name="__codelineno-0-869"></a><span class="sd">        max_retries: max retries per request set on discovered device</span>
-</span><span id="__span-0-870"><a id="__codelineno-0-870" name="__codelineno-0-870"></a>
-</span><span id="__span-0-871"><a id="__codelineno-0-871" name="__codelineno-0-871"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-872"><a id="__codelineno-0-872" name="__codelineno-0-872"></a><span class="sd">        Device instance if found, None otherwise</span>
-</span><span id="__span-0-873"><a id="__codelineno-0-873" name="__codelineno-0-873"></a>
-</span><span id="__span-0-874"><a id="__codelineno-0-874" name="__codelineno-0-874"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-875"><a id="__codelineno-0-875" name="__codelineno-0-875"></a><span class="sd">        ```python</span>
-</span><span id="__span-0-876"><a id="__codelineno-0-876" name="__codelineno-0-876"></a><span class="sd">        # Find by serial number</span>
-</span><span id="__span-0-877"><a id="__codelineno-0-877" name="__codelineno-0-877"></a><span class="sd">        device = await find_by_serial(&quot;d073d5123456&quot;)</span>
-</span><span id="__span-0-878"><a id="__codelineno-0-878" name="__codelineno-0-878"></a><span class="sd">        if device:</span>
-</span><span id="__span-0-879"><a id="__codelineno-0-879" name="__codelineno-0-879"></a><span class="sd">            async with device:</span>
-</span><span id="__span-0-880"><a id="__codelineno-0-880" name="__codelineno-0-880"></a><span class="sd">                await device.set_power(True)</span>
-</span><span id="__span-0-881"><a id="__codelineno-0-881" name="__codelineno-0-881"></a><span class="sd">        ```</span>
-</span><span id="__span-0-882"><a id="__codelineno-0-882" name="__codelineno-0-882"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-883"><a id="__codelineno-0-883" name="__codelineno-0-883"></a>    <span class="c1"># Normalize serial to string format (12-digit hex, no separators)</span>
-</span><span id="__span-0-884"><a id="__codelineno-0-884" name="__codelineno-0-884"></a>    <span class="n">serial_str</span> <span class="o">=</span> <span class="n">serial</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-</span><span id="__span-0-885"><a id="__codelineno-0-885" name="__codelineno-0-885"></a>
-</span><span id="__span-0-886"><a id="__codelineno-0-886" name="__codelineno-0-886"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">disc</span> <span class="ow">in</span> <span class="n">discover_devices</span><span class="p">(</span>
-</span><span id="__span-0-887"><a id="__codelineno-0-887" name="__codelineno-0-887"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
-</span><span id="__span-0-888"><a id="__codelineno-0-888" name="__codelineno-0-888"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="n">broadcast_address</span><span class="p">,</span>
-</span><span id="__span-0-889"><a id="__codelineno-0-889" name="__codelineno-0-889"></a>        <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
-</span><span id="__span-0-890"><a id="__codelineno-0-890" name="__codelineno-0-890"></a>        <span class="n">max_response_time</span><span class="o">=</span><span class="n">max_response_time</span><span class="p">,</span>
-</span><span id="__span-0-891"><a id="__codelineno-0-891" name="__codelineno-0-891"></a>        <span class="n">idle_timeout_multiplier</span><span class="o">=</span><span class="n">idle_timeout_multiplier</span><span class="p">,</span>
-</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a>        <span class="n">device_timeout</span><span class="o">=</span><span class="n">device_timeout</span><span class="p">,</span>
-</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a>        <span class="n">max_retries</span><span class="o">=</span><span class="n">max_retries</span><span class="p">,</span>
-</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a>    <span class="p">):</span>
-</span><span id="__span-0-895"><a id="__codelineno-0-895" name="__codelineno-0-895"></a>        <span class="k">if</span> <span class="n">disc</span><span class="o">.</span><span class="n">serial</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">serial_str</span><span class="p">:</span>
-</span><span id="__span-0-896"><a id="__codelineno-0-896" name="__codelineno-0-896"></a>            <span class="c1"># Detect device type and return appropriate class</span>
-</span><span id="__span-0-897"><a id="__codelineno-0-897" name="__codelineno-0-897"></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">disc</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
-</span><span id="__span-0-898"><a id="__codelineno-0-898" name="__codelineno-0-898"></a>
-</span><span id="__span-0-899"><a id="__codelineno-0-899" name="__codelineno-0-899"></a>    <span class="k">return</span> <span class="kc">None</span>
+<span class="normal"><a href="#__codelineno-0-899">899</a></span>
+<span class="normal"><a href="#__codelineno-0-900">900</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-850"><a id="__codelineno-0-850" name="__codelineno-0-850"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_serial</span><span class="p">(</span>
+</span><span id="__span-0-851"><a id="__codelineno-0-851" name="__codelineno-0-851"></a>    <span class="n">serial</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-0-852"><a id="__codelineno-0-852" name="__codelineno-0-852"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
+</span><span id="__span-0-853"><a id="__codelineno-0-853" name="__codelineno-0-853"></a>    <span class="n">broadcast_address</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;255.255.255.255&quot;</span><span class="p">,</span>
+</span><span id="__span-0-854"><a id="__codelineno-0-854" name="__codelineno-0-854"></a>    <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">LIFX_UDP_PORT</span><span class="p">,</span>
+</span><span id="__span-0-855"><a id="__codelineno-0-855" name="__codelineno-0-855"></a>    <span class="n">max_response_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_RESPONSE_TIME</span><span class="p">,</span>
+</span><span id="__span-0-856"><a id="__codelineno-0-856" name="__codelineno-0-856"></a>    <span class="n">idle_timeout_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">IDLE_TIMEOUT_MULTIPLIER</span><span class="p">,</span>
+</span><span id="__span-0-857"><a id="__codelineno-0-857" name="__codelineno-0-857"></a>    <span class="n">device_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REQUEST_TIMEOUT</span><span class="p">,</span>
+</span><span id="__span-0-858"><a id="__codelineno-0-858" name="__codelineno-0-858"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_RETRIES</span><span class="p">,</span>
+</span><span id="__span-0-859"><a id="__codelineno-0-859" name="__codelineno-0-859"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Device</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-860"><a id="__codelineno-0-860" name="__codelineno-0-860"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Find a specific device by serial number.</span>
+</span><span id="__span-0-861"><a id="__codelineno-0-861" name="__codelineno-0-861"></a>
+</span><span id="__span-0-862"><a id="__codelineno-0-862" name="__codelineno-0-862"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-863"><a id="__codelineno-0-863" name="__codelineno-0-863"></a><span class="sd">        serial: Serial number as hex string (with or without separators)</span>
+</span><span id="__span-0-864"><a id="__codelineno-0-864" name="__codelineno-0-864"></a><span class="sd">        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)</span>
+</span><span id="__span-0-865"><a id="__codelineno-0-865" name="__codelineno-0-865"></a><span class="sd">        broadcast_address: Broadcast address to use (default &quot;255.255.255.255&quot;)</span>
+</span><span id="__span-0-866"><a id="__codelineno-0-866" name="__codelineno-0-866"></a><span class="sd">        port: Port to use (default LIFX_UDP_PORT)</span>
+</span><span id="__span-0-867"><a id="__codelineno-0-867" name="__codelineno-0-867"></a><span class="sd">        max_response_time: Max time to wait for responses</span>
+</span><span id="__span-0-868"><a id="__codelineno-0-868" name="__codelineno-0-868"></a><span class="sd">        idle_timeout_multiplier: Idle timeout multiplier</span>
+</span><span id="__span-0-869"><a id="__codelineno-0-869" name="__codelineno-0-869"></a><span class="sd">        device_timeout: request timeout set on discovered device</span>
+</span><span id="__span-0-870"><a id="__codelineno-0-870" name="__codelineno-0-870"></a><span class="sd">        max_retries: max retries per request set on discovered device</span>
+</span><span id="__span-0-871"><a id="__codelineno-0-871" name="__codelineno-0-871"></a>
+</span><span id="__span-0-872"><a id="__codelineno-0-872" name="__codelineno-0-872"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-873"><a id="__codelineno-0-873" name="__codelineno-0-873"></a><span class="sd">        Device instance if found, None otherwise</span>
+</span><span id="__span-0-874"><a id="__codelineno-0-874" name="__codelineno-0-874"></a>
+</span><span id="__span-0-875"><a id="__codelineno-0-875" name="__codelineno-0-875"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-876"><a id="__codelineno-0-876" name="__codelineno-0-876"></a><span class="sd">        ```python</span>
+</span><span id="__span-0-877"><a id="__codelineno-0-877" name="__codelineno-0-877"></a><span class="sd">        # Find by serial number</span>
+</span><span id="__span-0-878"><a id="__codelineno-0-878" name="__codelineno-0-878"></a><span class="sd">        device = await find_by_serial(&quot;d073d5123456&quot;)</span>
+</span><span id="__span-0-879"><a id="__codelineno-0-879" name="__codelineno-0-879"></a><span class="sd">        if device:</span>
+</span><span id="__span-0-880"><a id="__codelineno-0-880" name="__codelineno-0-880"></a><span class="sd">            async with device:</span>
+</span><span id="__span-0-881"><a id="__codelineno-0-881" name="__codelineno-0-881"></a><span class="sd">                await device.set_power(True)</span>
+</span><span id="__span-0-882"><a id="__codelineno-0-882" name="__codelineno-0-882"></a><span class="sd">        ```</span>
+</span><span id="__span-0-883"><a id="__codelineno-0-883" name="__codelineno-0-883"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-884"><a id="__codelineno-0-884" name="__codelineno-0-884"></a>    <span class="c1"># Normalize serial to string format (12-digit hex, no separators)</span>
+</span><span id="__span-0-885"><a id="__codelineno-0-885" name="__codelineno-0-885"></a>    <span class="n">serial_str</span> <span class="o">=</span> <span class="n">serial</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+</span><span id="__span-0-886"><a id="__codelineno-0-886" name="__codelineno-0-886"></a>
+</span><span id="__span-0-887"><a id="__codelineno-0-887" name="__codelineno-0-887"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">disc</span> <span class="ow">in</span> <span class="n">discover_devices</span><span class="p">(</span>
+</span><span id="__span-0-888"><a id="__codelineno-0-888" name="__codelineno-0-888"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+</span><span id="__span-0-889"><a id="__codelineno-0-889" name="__codelineno-0-889"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="n">broadcast_address</span><span class="p">,</span>
+</span><span id="__span-0-890"><a id="__codelineno-0-890" name="__codelineno-0-890"></a>        <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
+</span><span id="__span-0-891"><a id="__codelineno-0-891" name="__codelineno-0-891"></a>        <span class="n">max_response_time</span><span class="o">=</span><span class="n">max_response_time</span><span class="p">,</span>
+</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a>        <span class="n">idle_timeout_multiplier</span><span class="o">=</span><span class="n">idle_timeout_multiplier</span><span class="p">,</span>
+</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a>        <span class="n">device_timeout</span><span class="o">=</span><span class="n">device_timeout</span><span class="p">,</span>
+</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a>        <span class="n">max_retries</span><span class="o">=</span><span class="n">max_retries</span><span class="p">,</span>
+</span><span id="__span-0-895"><a id="__codelineno-0-895" name="__codelineno-0-895"></a>    <span class="p">):</span>
+</span><span id="__span-0-896"><a id="__codelineno-0-896" name="__codelineno-0-896"></a>        <span class="k">if</span> <span class="n">disc</span><span class="o">.</span><span class="n">serial</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">serial_str</span><span class="p">:</span>
+</span><span id="__span-0-897"><a id="__codelineno-0-897" name="__codelineno-0-897"></a>            <span class="c1"># Detect device type and return appropriate class</span>
+</span><span id="__span-0-898"><a id="__codelineno-0-898" name="__codelineno-0-898"></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">disc</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
+</span><span id="__span-0-899"><a id="__codelineno-0-899" name="__codelineno-0-899"></a>
+</span><span id="__span-0-900"><a id="__codelineno-0-900" name="__codelineno-0-900"></a>    <span class="k">return</span> <span class="kc">None</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3028,8 +3058,7 @@ efficient than querying each device individually.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/api.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-954"> 954</a></span>
-<span class="normal"><a href="#__codelineno-0-955"> 955</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-955"> 955</a></span>
 <span class="normal"><a href="#__codelineno-0-956"> 956</a></span>
 <span class="normal"><a href="#__codelineno-0-957"> 957</a></span>
 <span class="normal"><a href="#__codelineno-0-958"> 958</a></span>
@@ -3108,87 +3137,88 @@ efficient than querying each device individually.</p>
 <span class="normal"><a href="#__codelineno-0-1031">1031</a></span>
 <span class="normal"><a href="#__codelineno-0-1032">1032</a></span>
 <span class="normal"><a href="#__codelineno-0-1033">1033</a></span>
-<span class="normal"><a href="#__codelineno-0-1034">1034</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_label</span><span class="p">(</span>
-</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a>    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a>    <span class="n">exact_match</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
-</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>    <span class="n">broadcast_address</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;255.255.255.255&quot;</span><span class="p">,</span>
-</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>    <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">LIFX_UDP_PORT</span><span class="p">,</span>
-</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>    <span class="n">max_response_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_RESPONSE_TIME</span><span class="p">,</span>
-</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a>    <span class="n">idle_timeout_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">IDLE_TIMEOUT_MULTIPLIER</span><span class="p">,</span>
-</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>    <span class="n">device_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REQUEST_TIMEOUT</span><span class="p">,</span>
-</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_RETRIES</span><span class="p">,</span>
-</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AsyncGenerator</span><span class="p">[</span><span class="n">Device</span><span class="p">]:</span>
-</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Find LIFX devices by label (name).</span>
-</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>
-</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a><span class="sd">    Uses a protocol trick by broadcasting GetLabel instead of GetService,</span>
-</span><span id="__span-0-968"><a id="__codelineno-0-968" name="__codelineno-0-968"></a><span class="sd">    which returns all device labels in StateLabel responses. This is more</span>
-</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a><span class="sd">    efficient than querying each device individually.</span>
-</span><span id="__span-0-970"><a id="__codelineno-0-970" name="__codelineno-0-970"></a>
-</span><span id="__span-0-971"><a id="__codelineno-0-971" name="__codelineno-0-971"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-972"><a id="__codelineno-0-972" name="__codelineno-0-972"></a><span class="sd">        label: Device label to search for (case-insensitive)</span>
-</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a><span class="sd">        exact_match: If True, match label exactly and yield at most one device;</span>
-</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a><span class="sd">                     if False, match substring and yield all matching devices</span>
-</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a><span class="sd">                     (default False)</span>
-</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a><span class="sd">        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)</span>
-</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a><span class="sd">        broadcast_address: Broadcast address to use (default &quot;255.255.255.255&quot;)</span>
-</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a><span class="sd">        port: Port to use (default LIFX_UDP_PORT)</span>
-</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a><span class="sd">        max_response_time: Max time to wait for responses</span>
-</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a><span class="sd">        idle_timeout_multiplier: Idle timeout multiplier</span>
-</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a><span class="sd">        device_timeout: request timeout set on discovered device(s)</span>
-</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a><span class="sd">        max_retries: max retries per request set on discovered device(s)</span>
-</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>
-</span><span id="__span-0-984"><a id="__codelineno-0-984" name="__codelineno-0-984"></a><span class="sd">    Yields:</span>
-</span><span id="__span-0-985"><a id="__codelineno-0-985" name="__codelineno-0-985"></a><span class="sd">        Matching Device instance(s)</span>
-</span><span id="__span-0-986"><a id="__codelineno-0-986" name="__codelineno-0-986"></a>
-</span><span id="__span-0-987"><a id="__codelineno-0-987" name="__codelineno-0-987"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-988"><a id="__codelineno-0-988" name="__codelineno-0-988"></a><span class="sd">        ```python</span>
-</span><span id="__span-0-989"><a id="__codelineno-0-989" name="__codelineno-0-989"></a><span class="sd">        # Find all devices with &quot;Living&quot; in the label</span>
-</span><span id="__span-0-990"><a id="__codelineno-0-990" name="__codelineno-0-990"></a><span class="sd">        async for device in find_by_label(&quot;Living&quot;):</span>
-</span><span id="__span-0-991"><a id="__codelineno-0-991" name="__codelineno-0-991"></a><span class="sd">            async with device:</span>
-</span><span id="__span-0-992"><a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">                await device.set_power(True)</span>
-</span><span id="__span-0-993"><a id="__codelineno-0-993" name="__codelineno-0-993"></a>
-</span><span id="__span-0-994"><a id="__codelineno-0-994" name="__codelineno-0-994"></a><span class="sd">        # Find device by exact label match (yields at most one)</span>
-</span><span id="__span-0-995"><a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">        async for device in find_by_label(&quot;Living Room&quot;, exact_match=True):</span>
-</span><span id="__span-0-996"><a id="__codelineno-0-996" name="__codelineno-0-996"></a><span class="sd">            async with device:</span>
-</span><span id="__span-0-997"><a id="__codelineno-0-997" name="__codelineno-0-997"></a><span class="sd">                await device.set_power(True)</span>
-</span><span id="__span-0-998"><a id="__codelineno-0-998" name="__codelineno-0-998"></a><span class="sd">            break  # exact_match yields at most one device</span>
-</span><span id="__span-0-999"><a id="__codelineno-0-999" name="__codelineno-0-999"></a><span class="sd">        ```</span>
-</span><span id="__span-0-1000"><a id="__codelineno-0-1000" name="__codelineno-0-1000"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1001"><a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">resp</span> <span class="ow">in</span> <span class="n">_discover_with_packet</span><span class="p">(</span>
-</span><span id="__span-0-1002"><a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>        <span class="n">packets</span><span class="o">.</span><span class="n">Device</span><span class="o">.</span><span class="n">GetLabel</span><span class="p">(),</span>
-</span><span id="__span-0-1003"><a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
-</span><span id="__span-0-1004"><a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="n">broadcast_address</span><span class="p">,</span>
-</span><span id="__span-0-1005"><a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>        <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
-</span><span id="__span-0-1006"><a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>        <span class="n">max_response_time</span><span class="o">=</span><span class="n">max_response_time</span><span class="p">,</span>
-</span><span id="__span-0-1007"><a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>        <span class="n">idle_timeout_multiplier</span><span class="o">=</span><span class="n">idle_timeout_multiplier</span><span class="p">,</span>
-</span><span id="__span-0-1008"><a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>    <span class="p">):</span>
-</span><span id="__span-0-1009"><a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>        <span class="n">device_label</span> <span class="o">=</span> <span class="n">resp</span><span class="o">.</span><span class="n">response_payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;label&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1010"><a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>        <span class="n">matched</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="__span-0-1011"><a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>
-</span><span id="__span-0-1012"><a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>        <span class="k">if</span> <span class="n">exact_match</span><span class="p">:</span>
-</span><span id="__span-0-1013"><a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>            <span class="c1"># Exact match - return first match only</span>
-</span><span id="__span-0-1014"><a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>            <span class="k">if</span> <span class="n">device_label</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">label</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
-</span><span id="__span-0-1015"><a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>                <span class="n">matched</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-0-1016"><a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-1017"><a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>            <span class="c1"># Substring match - return all matches</span>
-</span><span id="__span-0-1018"><a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>            <span class="k">if</span> <span class="n">label</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">device_label</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
-</span><span id="__span-0-1019"><a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>                <span class="n">matched</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-0-1020"><a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>
-</span><span id="__span-0-1021"><a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>        <span class="k">if</span> <span class="n">matched</span><span class="p">:</span>
-</span><span id="__span-0-1022"><a id="__codelineno-0-1022" name="__codelineno-0-1022"></a>            <span class="c1"># Create DiscoveredDevice from response</span>
-</span><span id="__span-0-1023"><a id="__codelineno-0-1023" name="__codelineno-0-1023"></a>            <span class="n">disc</span> <span class="o">=</span> <span class="n">DiscoveredDevice</span><span class="p">(</span>
-</span><span id="__span-0-1024"><a id="__codelineno-0-1024" name="__codelineno-0-1024"></a>                <span class="n">serial</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
-</span><span id="__span-0-1025"><a id="__codelineno-0-1025" name="__codelineno-0-1025"></a>                <span class="n">ip</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span>
-</span><span id="__span-0-1026"><a id="__codelineno-0-1026" name="__codelineno-0-1026"></a>                <span class="n">port</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
-</span><span id="__span-0-1027"><a id="__codelineno-0-1027" name="__codelineno-0-1027"></a>                <span class="n">response_time</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">response_time</span><span class="p">,</span>
-</span><span id="__span-0-1028"><a id="__codelineno-0-1028" name="__codelineno-0-1028"></a>                <span class="n">timeout</span><span class="o">=</span><span class="n">device_timeout</span><span class="p">,</span>
-</span><span id="__span-0-1029"><a id="__codelineno-0-1029" name="__codelineno-0-1029"></a>                <span class="n">max_retries</span><span class="o">=</span><span class="n">max_retries</span><span class="p">,</span>
-</span><span id="__span-0-1030"><a id="__codelineno-0-1030" name="__codelineno-0-1030"></a>            <span class="p">)</span>
-</span><span id="__span-0-1031"><a id="__codelineno-0-1031" name="__codelineno-0-1031"></a>
-</span><span id="__span-0-1032"><a id="__codelineno-0-1032" name="__codelineno-0-1032"></a>            <span class="n">device</span> <span class="o">=</span> <span class="k">await</span> <span class="n">disc</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
-</span><span id="__span-0-1033"><a id="__codelineno-0-1033" name="__codelineno-0-1033"></a>            <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1034"><a id="__codelineno-0-1034" name="__codelineno-0-1034"></a>                <span class="k">yield</span> <span class="n">device</span>
+<span class="normal"><a href="#__codelineno-0-1034">1034</a></span>
+<span class="normal"><a href="#__codelineno-0-1035">1035</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_label</span><span class="p">(</span>
+</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a>    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>    <span class="n">exact_match</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
+</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>    <span class="n">broadcast_address</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;255.255.255.255&quot;</span><span class="p">,</span>
+</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>    <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">LIFX_UDP_PORT</span><span class="p">,</span>
+</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a>    <span class="n">max_response_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_RESPONSE_TIME</span><span class="p">,</span>
+</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>    <span class="n">idle_timeout_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">IDLE_TIMEOUT_MULTIPLIER</span><span class="p">,</span>
+</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>    <span class="n">device_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REQUEST_TIMEOUT</span><span class="p">,</span>
+</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_RETRIES</span><span class="p">,</span>
+</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AsyncGenerator</span><span class="p">[</span><span class="n">Device</span><span class="p">]:</span>
+</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Find LIFX devices by label (name).</span>
+</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>
+</span><span id="__span-0-968"><a id="__codelineno-0-968" name="__codelineno-0-968"></a><span class="sd">    Uses a protocol trick by broadcasting GetLabel instead of GetService,</span>
+</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a><span class="sd">    which returns all device labels in StateLabel responses. This is more</span>
+</span><span id="__span-0-970"><a id="__codelineno-0-970" name="__codelineno-0-970"></a><span class="sd">    efficient than querying each device individually.</span>
+</span><span id="__span-0-971"><a id="__codelineno-0-971" name="__codelineno-0-971"></a>
+</span><span id="__span-0-972"><a id="__codelineno-0-972" name="__codelineno-0-972"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a><span class="sd">        label: Device label to search for (case-insensitive)</span>
+</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a><span class="sd">        exact_match: If True, match label exactly and yield at most one device;</span>
+</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a><span class="sd">                     if False, match substring and yield all matching devices</span>
+</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a><span class="sd">                     (default False)</span>
+</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a><span class="sd">        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)</span>
+</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a><span class="sd">        broadcast_address: Broadcast address to use (default &quot;255.255.255.255&quot;)</span>
+</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a><span class="sd">        port: Port to use (default LIFX_UDP_PORT)</span>
+</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a><span class="sd">        max_response_time: Max time to wait for responses</span>
+</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a><span class="sd">        idle_timeout_multiplier: Idle timeout multiplier</span>
+</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a><span class="sd">        device_timeout: request timeout set on discovered device(s)</span>
+</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a><span class="sd">        max_retries: max retries per request set on discovered device(s)</span>
+</span><span id="__span-0-984"><a id="__codelineno-0-984" name="__codelineno-0-984"></a>
+</span><span id="__span-0-985"><a id="__codelineno-0-985" name="__codelineno-0-985"></a><span class="sd">    Yields:</span>
+</span><span id="__span-0-986"><a id="__codelineno-0-986" name="__codelineno-0-986"></a><span class="sd">        Matching Device instance(s)</span>
+</span><span id="__span-0-987"><a id="__codelineno-0-987" name="__codelineno-0-987"></a>
+</span><span id="__span-0-988"><a id="__codelineno-0-988" name="__codelineno-0-988"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-989"><a id="__codelineno-0-989" name="__codelineno-0-989"></a><span class="sd">        ```python</span>
+</span><span id="__span-0-990"><a id="__codelineno-0-990" name="__codelineno-0-990"></a><span class="sd">        # Find all devices with &quot;Living&quot; in the label</span>
+</span><span id="__span-0-991"><a id="__codelineno-0-991" name="__codelineno-0-991"></a><span class="sd">        async for device in find_by_label(&quot;Living&quot;):</span>
+</span><span id="__span-0-992"><a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">            async with device:</span>
+</span><span id="__span-0-993"><a id="__codelineno-0-993" name="__codelineno-0-993"></a><span class="sd">                await device.set_power(True)</span>
+</span><span id="__span-0-994"><a id="__codelineno-0-994" name="__codelineno-0-994"></a>
+</span><span id="__span-0-995"><a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">        # Find device by exact label match (yields at most one)</span>
+</span><span id="__span-0-996"><a id="__codelineno-0-996" name="__codelineno-0-996"></a><span class="sd">        async for device in find_by_label(&quot;Living Room&quot;, exact_match=True):</span>
+</span><span id="__span-0-997"><a id="__codelineno-0-997" name="__codelineno-0-997"></a><span class="sd">            async with device:</span>
+</span><span id="__span-0-998"><a id="__codelineno-0-998" name="__codelineno-0-998"></a><span class="sd">                await device.set_power(True)</span>
+</span><span id="__span-0-999"><a id="__codelineno-0-999" name="__codelineno-0-999"></a><span class="sd">            break  # exact_match yields at most one device</span>
+</span><span id="__span-0-1000"><a id="__codelineno-0-1000" name="__codelineno-0-1000"></a><span class="sd">        ```</span>
+</span><span id="__span-0-1001"><a id="__codelineno-0-1001" name="__codelineno-0-1001"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1002"><a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">resp</span> <span class="ow">in</span> <span class="n">_discover_with_packet</span><span class="p">(</span>
+</span><span id="__span-0-1003"><a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>        <span class="n">packets</span><span class="o">.</span><span class="n">Device</span><span class="o">.</span><span class="n">GetLabel</span><span class="p">(),</span>
+</span><span id="__span-0-1004"><a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+</span><span id="__span-0-1005"><a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="n">broadcast_address</span><span class="p">,</span>
+</span><span id="__span-0-1006"><a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>        <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
+</span><span id="__span-0-1007"><a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>        <span class="n">max_response_time</span><span class="o">=</span><span class="n">max_response_time</span><span class="p">,</span>
+</span><span id="__span-0-1008"><a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>        <span class="n">idle_timeout_multiplier</span><span class="o">=</span><span class="n">idle_timeout_multiplier</span><span class="p">,</span>
+</span><span id="__span-0-1009"><a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>    <span class="p">):</span>
+</span><span id="__span-0-1010"><a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>        <span class="n">device_label</span> <span class="o">=</span> <span class="n">resp</span><span class="o">.</span><span class="n">response_payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;label&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1011"><a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>        <span class="n">matched</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-1012"><a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>
+</span><span id="__span-0-1013"><a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>        <span class="k">if</span> <span class="n">exact_match</span><span class="p">:</span>
+</span><span id="__span-0-1014"><a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>            <span class="c1"># Exact match - return first match only</span>
+</span><span id="__span-0-1015"><a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>            <span class="k">if</span> <span class="n">device_label</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">label</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+</span><span id="__span-0-1016"><a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>                <span class="n">matched</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-0-1017"><a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-0-1018"><a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>            <span class="c1"># Substring match - return all matches</span>
+</span><span id="__span-0-1019"><a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>            <span class="k">if</span> <span class="n">label</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">device_label</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+</span><span id="__span-0-1020"><a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>                <span class="n">matched</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-0-1021"><a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>
+</span><span id="__span-0-1022"><a id="__codelineno-0-1022" name="__codelineno-0-1022"></a>        <span class="k">if</span> <span class="n">matched</span><span class="p">:</span>
+</span><span id="__span-0-1023"><a id="__codelineno-0-1023" name="__codelineno-0-1023"></a>            <span class="c1"># Create DiscoveredDevice from response</span>
+</span><span id="__span-0-1024"><a id="__codelineno-0-1024" name="__codelineno-0-1024"></a>            <span class="n">disc</span> <span class="o">=</span> <span class="n">DiscoveredDevice</span><span class="p">(</span>
+</span><span id="__span-0-1025"><a id="__codelineno-0-1025" name="__codelineno-0-1025"></a>                <span class="n">serial</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
+</span><span id="__span-0-1026"><a id="__codelineno-0-1026" name="__codelineno-0-1026"></a>                <span class="n">ip</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span>
+</span><span id="__span-0-1027"><a id="__codelineno-0-1027" name="__codelineno-0-1027"></a>                <span class="n">port</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+</span><span id="__span-0-1028"><a id="__codelineno-0-1028" name="__codelineno-0-1028"></a>                <span class="n">response_time</span><span class="o">=</span><span class="n">resp</span><span class="o">.</span><span class="n">response_time</span><span class="p">,</span>
+</span><span id="__span-0-1029"><a id="__codelineno-0-1029" name="__codelineno-0-1029"></a>                <span class="n">timeout</span><span class="o">=</span><span class="n">device_timeout</span><span class="p">,</span>
+</span><span id="__span-0-1030"><a id="__codelineno-0-1030" name="__codelineno-0-1030"></a>                <span class="n">max_retries</span><span class="o">=</span><span class="n">max_retries</span><span class="p">,</span>
+</span><span id="__span-0-1031"><a id="__codelineno-0-1031" name="__codelineno-0-1031"></a>            <span class="p">)</span>
+</span><span id="__span-0-1032"><a id="__codelineno-0-1032" name="__codelineno-0-1032"></a>
+</span><span id="__span-0-1033"><a id="__codelineno-0-1033" name="__codelineno-0-1033"></a>            <span class="n">device</span> <span class="o">=</span> <span class="k">await</span> <span class="n">disc</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
+</span><span id="__span-0-1034"><a id="__codelineno-0-1034" name="__codelineno-0-1034"></a>            <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1035"><a id="__codelineno-0-1035" name="__codelineno-0-1035"></a>                <span class="k">yield</span> <span class="n">device</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3410,8 +3440,7 @@ than broadcasting to all devices and filtering.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/api.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-902">902</a></span>
-<span class="normal"><a href="#__codelineno-0-903">903</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-903">903</a></span>
 <span class="normal"><a href="#__codelineno-0-904">904</a></span>
 <span class="normal"><a href="#__codelineno-0-905">905</a></span>
 <span class="normal"><a href="#__codelineno-0-906">906</a></span>
@@ -3459,56 +3488,57 @@ than broadcasting to all devices and filtering.</p>
 <span class="normal"><a href="#__codelineno-0-948">948</a></span>
 <span class="normal"><a href="#__codelineno-0-949">949</a></span>
 <span class="normal"><a href="#__codelineno-0-950">950</a></span>
-<span class="normal"><a href="#__codelineno-0-951">951</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-902"><a id="__codelineno-0-902" name="__codelineno-0-902"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_ip</span><span class="p">(</span>
-</span><span id="__span-0-903"><a id="__codelineno-0-903" name="__codelineno-0-903"></a>    <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span id="__span-0-904"><a id="__codelineno-0-904" name="__codelineno-0-904"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
-</span><span id="__span-0-905"><a id="__codelineno-0-905" name="__codelineno-0-905"></a>    <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">LIFX_UDP_PORT</span><span class="p">,</span>
-</span><span id="__span-0-906"><a id="__codelineno-0-906" name="__codelineno-0-906"></a>    <span class="n">max_response_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_RESPONSE_TIME</span><span class="p">,</span>
-</span><span id="__span-0-907"><a id="__codelineno-0-907" name="__codelineno-0-907"></a>    <span class="n">idle_timeout_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">IDLE_TIMEOUT_MULTIPLIER</span><span class="p">,</span>
-</span><span id="__span-0-908"><a id="__codelineno-0-908" name="__codelineno-0-908"></a>    <span class="n">device_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REQUEST_TIMEOUT</span><span class="p">,</span>
-</span><span id="__span-0-909"><a id="__codelineno-0-909" name="__codelineno-0-909"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_RETRIES</span><span class="p">,</span>
-</span><span id="__span-0-910"><a id="__codelineno-0-910" name="__codelineno-0-910"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Device</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-911"><a id="__codelineno-0-911" name="__codelineno-0-911"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Find a LIFX device by IP address.</span>
-</span><span id="__span-0-912"><a id="__codelineno-0-912" name="__codelineno-0-912"></a>
-</span><span id="__span-0-913"><a id="__codelineno-0-913" name="__codelineno-0-913"></a><span class="sd">    Uses a targeted discovery by sending the broadcast to the specific IP address,</span>
-</span><span id="__span-0-914"><a id="__codelineno-0-914" name="__codelineno-0-914"></a><span class="sd">    which means only that device will respond (if it exists). This is more efficient</span>
-</span><span id="__span-0-915"><a id="__codelineno-0-915" name="__codelineno-0-915"></a><span class="sd">    than broadcasting to all devices and filtering.</span>
-</span><span id="__span-0-916"><a id="__codelineno-0-916" name="__codelineno-0-916"></a>
-</span><span id="__span-0-917"><a id="__codelineno-0-917" name="__codelineno-0-917"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-918"><a id="__codelineno-0-918" name="__codelineno-0-918"></a><span class="sd">        ip: Target device IP address</span>
-</span><span id="__span-0-919"><a id="__codelineno-0-919" name="__codelineno-0-919"></a><span class="sd">        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)</span>
-</span><span id="__span-0-920"><a id="__codelineno-0-920" name="__codelineno-0-920"></a><span class="sd">        port: Port to use (default LIFX_UDP_PORT)</span>
-</span><span id="__span-0-921"><a id="__codelineno-0-921" name="__codelineno-0-921"></a><span class="sd">        max_response_time: Max time to wait for responses</span>
-</span><span id="__span-0-922"><a id="__codelineno-0-922" name="__codelineno-0-922"></a><span class="sd">        idle_timeout_multiplier: Idle timeout multiplier</span>
-</span><span id="__span-0-923"><a id="__codelineno-0-923" name="__codelineno-0-923"></a><span class="sd">        device_timeout: request timeout set on discovered device</span>
-</span><span id="__span-0-924"><a id="__codelineno-0-924" name="__codelineno-0-924"></a><span class="sd">        max_retries: max retries per request set on discovered device</span>
-</span><span id="__span-0-925"><a id="__codelineno-0-925" name="__codelineno-0-925"></a>
-</span><span id="__span-0-926"><a id="__codelineno-0-926" name="__codelineno-0-926"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-927"><a id="__codelineno-0-927" name="__codelineno-0-927"></a><span class="sd">        Device instance if found, None otherwise</span>
-</span><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a>
-</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a><span class="sd">        ```python</span>
-</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a><span class="sd">        # Find device at specific IP</span>
-</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a><span class="sd">        device = await find_by_ip(&quot;192.168.1.100&quot;)</span>
-</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a><span class="sd">        if device:</span>
-</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="sd">            async with device:</span>
-</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a><span class="sd">                print(f&quot;Found: {device.label}&quot;)</span>
-</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="sd">        ```</span>
-</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a>    <span class="c1"># Use the target IP as the &quot;broadcast&quot; address - only that device will respond</span>
-</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">discovered</span> <span class="ow">in</span> <span class="n">discover_devices</span><span class="p">(</span>
-</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
-</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="n">ip</span><span class="p">,</span>  <span class="c1"># Protocol trick: send directly to target IP</span>
-</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a>        <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
-</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a>        <span class="n">max_response_time</span><span class="o">=</span><span class="n">max_response_time</span><span class="p">,</span>
-</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a>        <span class="n">idle_timeout_multiplier</span><span class="o">=</span><span class="n">idle_timeout_multiplier</span><span class="p">,</span>
-</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a>        <span class="n">device_timeout</span><span class="o">=</span><span class="n">device_timeout</span><span class="p">,</span>
-</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a>        <span class="n">max_retries</span><span class="o">=</span><span class="n">max_retries</span><span class="p">,</span>
-</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a>    <span class="p">):</span>
-</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a>        <span class="c1"># Should only get one response (or none)</span>
-</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a>        <span class="k">return</span> <span class="k">await</span> <span class="n">discovered</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
-</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a>
-</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a>    <span class="k">return</span> <span class="kc">None</span>
+<span class="normal"><a href="#__codelineno-0-951">951</a></span>
+<span class="normal"><a href="#__codelineno-0-952">952</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-903"><a id="__codelineno-0-903" name="__codelineno-0-903"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">find_by_ip</span><span class="p">(</span>
+</span><span id="__span-0-904"><a id="__codelineno-0-904" name="__codelineno-0-904"></a>    <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-0-905"><a id="__codelineno-0-905" name="__codelineno-0-905"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DISCOVERY_TIMEOUT</span><span class="p">,</span>
+</span><span id="__span-0-906"><a id="__codelineno-0-906" name="__codelineno-0-906"></a>    <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">LIFX_UDP_PORT</span><span class="p">,</span>
+</span><span id="__span-0-907"><a id="__codelineno-0-907" name="__codelineno-0-907"></a>    <span class="n">max_response_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_RESPONSE_TIME</span><span class="p">,</span>
+</span><span id="__span-0-908"><a id="__codelineno-0-908" name="__codelineno-0-908"></a>    <span class="n">idle_timeout_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">IDLE_TIMEOUT_MULTIPLIER</span><span class="p">,</span>
+</span><span id="__span-0-909"><a id="__codelineno-0-909" name="__codelineno-0-909"></a>    <span class="n">device_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_REQUEST_TIMEOUT</span><span class="p">,</span>
+</span><span id="__span-0-910"><a id="__codelineno-0-910" name="__codelineno-0-910"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_RETRIES</span><span class="p">,</span>
+</span><span id="__span-0-911"><a id="__codelineno-0-911" name="__codelineno-0-911"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Device</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-912"><a id="__codelineno-0-912" name="__codelineno-0-912"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Find a LIFX device by IP address.</span>
+</span><span id="__span-0-913"><a id="__codelineno-0-913" name="__codelineno-0-913"></a>
+</span><span id="__span-0-914"><a id="__codelineno-0-914" name="__codelineno-0-914"></a><span class="sd">    Uses a targeted discovery by sending the broadcast to the specific IP address,</span>
+</span><span id="__span-0-915"><a id="__codelineno-0-915" name="__codelineno-0-915"></a><span class="sd">    which means only that device will respond (if it exists). This is more efficient</span>
+</span><span id="__span-0-916"><a id="__codelineno-0-916" name="__codelineno-0-916"></a><span class="sd">    than broadcasting to all devices and filtering.</span>
+</span><span id="__span-0-917"><a id="__codelineno-0-917" name="__codelineno-0-917"></a>
+</span><span id="__span-0-918"><a id="__codelineno-0-918" name="__codelineno-0-918"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-919"><a id="__codelineno-0-919" name="__codelineno-0-919"></a><span class="sd">        ip: Target device IP address</span>
+</span><span id="__span-0-920"><a id="__codelineno-0-920" name="__codelineno-0-920"></a><span class="sd">        timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)</span>
+</span><span id="__span-0-921"><a id="__codelineno-0-921" name="__codelineno-0-921"></a><span class="sd">        port: Port to use (default LIFX_UDP_PORT)</span>
+</span><span id="__span-0-922"><a id="__codelineno-0-922" name="__codelineno-0-922"></a><span class="sd">        max_response_time: Max time to wait for responses</span>
+</span><span id="__span-0-923"><a id="__codelineno-0-923" name="__codelineno-0-923"></a><span class="sd">        idle_timeout_multiplier: Idle timeout multiplier</span>
+</span><span id="__span-0-924"><a id="__codelineno-0-924" name="__codelineno-0-924"></a><span class="sd">        device_timeout: request timeout set on discovered device</span>
+</span><span id="__span-0-925"><a id="__codelineno-0-925" name="__codelineno-0-925"></a><span class="sd">        max_retries: max retries per request set on discovered device</span>
+</span><span id="__span-0-926"><a id="__codelineno-0-926" name="__codelineno-0-926"></a>
+</span><span id="__span-0-927"><a id="__codelineno-0-927" name="__codelineno-0-927"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a><span class="sd">        Device instance if found, None otherwise</span>
+</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>
+</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a><span class="sd">        ```python</span>
+</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a><span class="sd">        # Find device at specific IP</span>
+</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a><span class="sd">        device = await find_by_ip(&quot;192.168.1.100&quot;)</span>
+</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="sd">        if device:</span>
+</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a><span class="sd">            async with device:</span>
+</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="sd">                print(f&quot;Found: {device.label}&quot;)</span>
+</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a><span class="sd">        ```</span>
+</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a>    <span class="c1"># Use the target IP as the &quot;broadcast&quot; address - only that device will respond</span>
+</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">discovered</span> <span class="ow">in</span> <span class="n">discover_devices</span><span class="p">(</span>
+</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a>        <span class="n">broadcast_address</span><span class="o">=</span><span class="n">ip</span><span class="p">,</span>  <span class="c1"># Protocol trick: send directly to target IP</span>
+</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a>        <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
+</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a>        <span class="n">max_response_time</span><span class="o">=</span><span class="n">max_response_time</span><span class="p">,</span>
+</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a>        <span class="n">idle_timeout_multiplier</span><span class="o">=</span><span class="n">idle_timeout_multiplier</span><span class="p">,</span>
+</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a>        <span class="n">device_timeout</span><span class="o">=</span><span class="n">device_timeout</span><span class="p">,</span>
+</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a>        <span class="n">max_retries</span><span class="o">=</span><span class="n">max_retries</span><span class="p">,</span>
+</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a>    <span class="p">):</span>
+</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a>        <span class="c1"># Should only get one response (or none)</span>
+</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a>        <span class="k">return</span> <span class="k">await</span> <span class="n">discovered</span><span class="o">.</span><span class="n">create_device</span><span class="p">()</span>
+</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a>
+</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a>    <span class="k">return</span> <span class="kc">None</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6218,7 +6248,7 @@ than broadcasting to all devices and filtering.</p>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="c1"># Find device with exact label match</span>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="n">find_by_label</span><span class="p">(</span><span class="s2">&quot;Living Room&quot;</span><span class="p">,</span> <span class="n">exact_match</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">WARM_WHITE</span><span class="p">)</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="k">await</span> <span class="n">device</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">Colors</span><span class="o">.</span><span class="n">WARM</span><span class="p">)</span>
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="k">break</span>  <span class="c1"># exact_match returns at most one device</span>
 </span></code></pre></div>
 <h3 id="find-by-ip-address">Find by IP Address<a class="headerlink" href="#find-by-ip-address" title="Permanent link">&para;</a></h3>
@@ -6254,7 +6284,7 @@ than broadcasting to all devices and filtering.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="December 13, 2025 12:28:11 UTC">December 13, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 18, 2026 18:02:23 UTC">March 18, 2026</span>
   </span>
 
     

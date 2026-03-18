@@ -24,7 +24,7 @@ No! lifx-async communicates directly with devices over your local network. No cl
 
 ### What Python versions are supported?
 
-Python 3.11 or higher is required.
+Python 3.10 or higher is required.
 
 ## Installation & Setup
 
@@ -124,7 +124,10 @@ await asyncio.gather(
 By label:
 
 ```python
-lights = await find_lights(label_contains="Bedroom")
+from lifx import find_by_label
+
+async for device in find_by_label("Bedroom"):
+    print(f"Found: {device.serial}")
 ```
 
 By serial number:
@@ -144,7 +147,7 @@ from lifx import Colors
 Colors.RED, Colors.GREEN, Colors.BLUE
 
 # White variants
-Colors.WARM_WHITE, Colors.COOL_WHITE, Colors.DAYLIGHT
+Colors.WARM, Colors.COOL, Colors.DAYLIGHT
 
 # Pastels
 Colors.PASTEL_BLUE, Colors.PASTEL_PINK
@@ -170,8 +173,8 @@ Yes! Use the `pulse()` or `breathe()` methods:
 # Pulse red 5 times
 await light.pulse(Colors.RED, period=1.0, cycles=5)
 
-# Breathe blue infinitely
-await light.breathe(Colors.BLUE, period=2.0, cycles=0)
+# Breathe blue 10 times
+await light.breathe(Colors.BLUE, period=2.0, cycles=10)
 ```
 
 ## Performance
@@ -261,7 +264,7 @@ await light.set_color(Colors.BLUE, duration=2.0)
 
 lifx-async is fully type-hinted. If you get type errors:
 
-1. Ensure you're using Python 3.11+
+1. Ensure you're using Python 3.10+
 1. Update your type checker (Pyright, mypy)
 1. Check you're using correct types
 
