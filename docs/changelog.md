@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v5.2.1 (2026-03-18)
+
+### Bug Fixes
+
+- **tests**: Add pytest-timeout, retry flaky Windows emulator tests
+  ([`4b6b3a9`](https://github.com/Djelibeybi/lifx-async/commit/4b6b3a9f5870c4fe9b4e356152c0b0cd3086854a))
+
+- **tests**: Extend timeout to 120s for emulator tests
+  ([`016e1aa`](https://github.com/Djelibeybi/lifx-async/commit/016e1aa50c703b8da651b911624cecd21755f2ef))
+
+### Documentation
+
+- Add security policy
+  ([`4e6c152`](https://github.com/Djelibeybi/lifx-async/commit/4e6c1526cc09c2ad08a85c8ce9978e6c6b708d3c))
+
+
 ## v5.2.0 (2026-02-07)
 
 ### Bug Fixes
