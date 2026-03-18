@@ -22,10 +22,12 @@ Establish performance baselines before optimizing so improvements are measurable
 - [x] Task 1.3: Write `tests/benchmarks/test_packets_perf.py` — benchmark `update_colors` and `MatrixPacketGenerator.generate_packet` for 64px and 128px devices; record baseline (PERF-H2, T-H4)
 - [x] Task 1.4: Write `tests/benchmarks/test_effect_frame_perf.py` — benchmark `AuroraEffect.generate_frame()` for 128-pixel device; record baseline (PERF-C1, T-H4)
 
+- [x] Task 1.5: Run benchmarks and save as `review-perf_20260318-Phase1`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase1`
+
 ### Verification
 
-- [ ] `uv run pytest tests/benchmarks/ -v -m benchmark` — all benchmark tests run and establish baseline numbers
-- [ ] Baseline numbers documented in benchmark test docstrings
+- [x] `uv run pytest tests/benchmarks/ -v -m benchmark` — all 10 benchmark tests pass
+- [x] Baseline persisted via pytest-benchmark `--benchmark-save=baseline` to `.benchmarks/`
 
 ---
 
@@ -41,11 +43,12 @@ Eliminate the two highest-cost per-frame bottlenecks.
 - [ ] Task 2.4: In `MatrixPacketGenerator.update_colors()`, replace `flat.extend(...)` per-pixel loop with direct `struct.pack_into` writes into `self._buf` at correct offsets (PERF-H2)
 - [ ] Task 2.5: Apply same optimization to `MultiZonePacketGenerator.update_colors()` if applicable (PERF-H2)
 - [ ] Task 2.6: Guard `dataclasses.asdict()` call in `Packet.unpack()` behind `_LOGGER.isEnabledFor(logging.DEBUG)` check (`base.py:114`) (PERF-L3)
+- [ ] Task 2.7: Run benchmarks and save as `review-perf_20260318-Phase2`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase2`
 
 ### Verification
 
 - [ ] `uv run pytest tests/animation/ -v` — all existing animation tests pass
-- [ ] `uv run pytest tests/benchmarks/ -v -m benchmark` — `_apply_canvas` benchmark shows improvement vs Phase 1 baseline
+- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=baseline` — `_apply_canvas` benchmark shows improvement vs baseline
 - [ ] `uv run pyright` — no type errors on FrameBuffer changes
 
 ---
@@ -60,11 +63,12 @@ Add optional high-performance frame generation that bypasses HSBK object constru
 - [ ] Task 3.2: Update `FrameEffect._run_loop()` to call `generate_protocol_frame()` instead of `generate_frame()` + conversion (PERF-C1, AR-M3)
 - [ ] Task 3.3: Implement a direct `generate_protocol_frame()` override in `AuroraEffect` as a proof-of-concept (bypasses HSBK, returns raw uint16 tuples directly) (PERF-C1)
 - [ ] Task 3.4: Write benchmark test verifying `AuroraEffect.generate_protocol_frame()` is faster than `generate_frame()` + conversion for 128-pixel device
+- [ ] Task 3.5: Run benchmarks and save as `review-perf_20260318-Phase3`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase3`
 
 ### Verification
 
 - [ ] `uv run pytest tests/effects/ -v` — all existing effects tests pass
-- [ ] `uv run pytest tests/benchmarks/ -v -m benchmark` — protocol-direct path shows measurable improvement over baseline
+- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=baseline` — protocol-direct path shows measurable improvement over baseline
 - [ ] `uv run --frozen pytest` — full test suite passes
 - [ ] `uv run ruff format . && uv run ruff check .` — clean
 - [ ] `uv run pyright` — clean

@@ -1,0 +1,16 @@
+{
+  "id": "review-tests_20260318",
+  "title": "Full Review — Test Coverage Gaps",
+  "type": "chore",
+  "status": "pending",
+  "created": "2026-03-18T00:00:00Z",
+  "updated": "2026-03-18T00:00:00Z",
+  "phases": {
+    "total": 3,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 21,
+    "completed": 0
+  }
+}
