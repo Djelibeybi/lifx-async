@@ -95,8 +95,9 @@ class TestDiscoveryWithEmulatorErrors:
     @pytest.mark.asyncio
     async def test_discovery_idle_timeout_branch(self) -> None:
         """Test discovery exits via idle timeout when idle_timeout is zero."""
-        # With idle_timeout=0.0, the idle check triggers immediately
-        # on the first iteration (any elapsed time > 0.0)
+        # With idle_timeout=0.0, the condition elapsed_since_last >= 0.0
+        # is always true (even if elapsed is exactly 0.0), so the idle
+        # timeout branch triggers immediately on the first iteration.
         count = 0
         async for disc in discover_devices(
             timeout=1.0,
