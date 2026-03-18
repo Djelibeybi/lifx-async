@@ -133,7 +133,7 @@ plugins:
       - user-guide/effects-custom.md: Creating custom light effects
       - user-guide/troubleshooting.md: Common issues and solutions
       - user-guide/effects-troubleshooting.md: Effects-specific troubleshooting
-      - user-guide/protocol-deep-dive.md: Understanding the LIFX protocol
+      - architecture/protocol-deep-dive.md: Understanding the LIFX protocol
       Architecture:
       - architecture/overview.md: System architecture and design
       - architecture/effects-architecture.md: Effects system architecture
@@ -207,10 +207,10 @@ nav:
   - Custom Effects: user-guide/effects-custom.md
   - Troubleshooting: user-guide/troubleshooting.md
   - Effects Troubleshooting: user-guide/effects-troubleshooting.md
-  - Protocol Deep Dive: user-guide/protocol-deep-dive.md
 - Architecture:
   - Overview: architecture/overview.md
   - Effects System: architecture/effects-architecture.md
+  - Protocol Deep Dive: architecture/protocol-deep-dive.md
 - API Reference:
   - Overview: api/index.md
   - High-Level API: api/high-level.md

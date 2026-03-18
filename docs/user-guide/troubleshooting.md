@@ -401,6 +401,7 @@ If you're still experiencing issues:
 
 ## Next Steps
 
-- [Advanced Usage](advanced-usage.md) - Optimization patterns
-- [API Reference](../api/index.md) - Complete API documentation
-- [FAQ](../faq.md) - Frequently asked questions
+- [Effects Troubleshooting](effects-troubleshooting.md) — Issues specific to the effects framework
+- [Advanced Usage](advanced-usage.md) — Optimization patterns
+- [API Reference](../api/index.md) — Complete API documentation
+- [FAQ](../faq.md) — Frequently asked questions

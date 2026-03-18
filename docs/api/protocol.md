@@ -3,6 +3,8 @@
 The protocol layer contains auto-generated structures from the official LIFX protocol specification.
 These classes handle binary serialization and deserialization of LIFX messages.
 
+> For a detailed walkthrough of the protocol's packet structure, message flow, and code generation process, see the [Protocol Deep Dive](../architecture/protocol-deep-dive.md).
+
 !!! warning "Auto-Generated Code" Files in the protocol layer are automatically generated from
 `protocol.yml`. Never edit these files directly. To update the protocol, download the latest
 `protocol.yml` from the [LIFX public-protocol repository](https://github.com/LIFX/public-protocol)

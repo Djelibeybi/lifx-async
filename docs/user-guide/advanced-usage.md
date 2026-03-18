@@ -595,6 +595,7 @@ async def rainbow_animation():
 
 ## Next Steps
 
-- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
-- [Protocol Reference](../api/protocol.md) - Low-level protocol details
-- [API Reference](../api/index.md) - Complete API documentation
+- [Troubleshooting Guide](troubleshooting.md) — Common issues and solutions
+- [Network Layer API](../api/network.md) — Low-level discovery, connection, and transport reference
+- [Protocol Reference](../api/protocol.md) — Protocol layer and packet structures
+- [API Reference](../api/index.md) — Complete API documentation
