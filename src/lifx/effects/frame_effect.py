@@ -143,6 +143,12 @@ class FrameEffect(LIFXEffect):
         construction entirely. The default implementation delegates to
         generate_frame() and converts via HSBK.as_tuple().
 
+        Note: Effects that override this method will not populate
+        ``_last_frames``, so ``Conductor.get_last_frame()`` will return
+        ``None`` for those effects. This is an intentional trade-off:
+        the protocol-direct path skips HSBK object construction, so there
+        is no HSBK frame to store for state restoration.
+
         Args:
             ctx: Frame context with timing and layout info
 
