@@ -72,13 +72,13 @@ LifxError (base exception)
 ### Basic Exception Handling
 
 ```python
-from lifx import discover, LifxError, LifxTimeoutError
+from lifx import discover, Colors, LifxError, LifxTimeoutError
 
 
 async def main():
     try:
-        async with discover(timeout=5.0) as group:
-            await group.set_color(Colors.BLUE)
+        async for device in discover(timeout=5.0):
+            await device.set_color(Colors.BLUE)
     except LifxTimeoutError:
         print("Discovery timed out - no devices found")
     except LifxError as e:
@@ -104,14 +104,13 @@ async def main():
 ### Catching All LIFX Exceptions
 
 ```python
-from lifx import find_lights, LifxError
+from lifx import discover, LifxError
 
 
 async def safe_control():
     try:
-        async with find_lights() as lights:
-            for light in lights:
-                await light.set_brightness(0.8)
+        async for device in discover():
+            await device.set_brightness(0.8)
     except LifxError as e:
         # Catches all LIFX-specific exceptions
         print(f"LIFX operation failed: {e}")
@@ -121,17 +120,20 @@ async def safe_control():
 ### Timeout Handling
 
 ```python
-from lifx import DeviceConnection, LifxTimeoutError
-from lifx.protocol.packets import LightGet, LightState
+from lifx.network.connection import DeviceConnection
+from lifx.exceptions import LifxTimeoutError
+from lifx.protocol import packets
 
 
 async def main():
     try:
-        async with DeviceConnection(serial, ip, timeout=2.0) as conn:
-            response = await conn.request_response(LightGet(), LightState)
+        conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100", timeout=2.0)
+        response = await conn.request(packets.Light.Get())
     except LifxTimeoutError:
         print("Device did not respond in time")
         # Device may be offline or unreachable
+    finally:
+        await conn.close()
 ```
 
 ### Protocol Error Handling
@@ -151,18 +153,17 @@ async def main():
 ### Unsupported Command Handling
 
 ```python
-from lifx import find_lights, LifxUnsupportedCommandError
+from lifx import discover, LifxUnsupportedCommandError
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            try:
-                # Some devices may not support all features
-                await light.set_infrared(0.5)
-            except LifxUnsupportedCommandError:
-                print(f"{light.label} doesn't support this command")
-                continue
+    async for device in discover():
+        try:
+            # Some devices may not support all features
+            await device.set_infrared(0.5)
+        except LifxUnsupportedCommandError:
+            print(f"{device.serial} doesn't support this command")
+            continue
 ```
 
 ### Device Not Found Handling
@@ -214,14 +215,13 @@ except LifxError:
     print("Error occurred but connection was closed properly")
 
 # ❌ Bad - connection may leak on exception
-light = Light(serial, ip)
-await light.connect()
+light = Light(serial="d073d5123456", ip="192.168.1.100")
 try:
     await light.set_color(Colors.BLUE)
 except LifxError:
-    pass  # Connection not closed!
+    pass  # Connection not properly managed!
 finally:
-    await light.disconnect()
+    await light.connection.close()
 ```
 
 ### Log Exceptions for Debugging
@@ -248,18 +248,17 @@ async def main():
 ### Graceful Degradation
 
 ```python
-from lifx import find_lights, LifxError
+from lifx import discover, Colors, LifxError
 
 
 async def main():
-    async with find_lights() as lights:
-        for light in lights:
-            try:
-                await light.set_color(Colors.BLUE)
-            except LifxError as e:
-                # Continue with other lights even if one fails
-                print(f"Failed to control {light.label}: {e}")
-                continue
+    async for device in discover():
+        try:
+            await device.set_color(Colors.BLUE)
+        except LifxError as e:
+            # Continue with other devices even if one fails
+            print(f"Failed to control {device.serial}: {e}")
+            continue
 ```
 
 ## Common Error Scenarios
@@ -283,9 +282,11 @@ Causes:
 
 ```python
 # May raise: LifxTimeoutError or LifxDeviceNotFoundError
-async with discover(timeout=3.0) as group:
-    if not group.devices:
-        print("No devices found")
+devices = []
+async for device in discover(timeout=3.0):
+    devices.append(device)
+if not devices:
+    print("No devices found")
 ```
 
 Causes:
@@ -299,8 +300,8 @@ Causes:
 
 ```python
 # Raises: LifxConnectionError
-async with DeviceConnection(serial, ip) as conn:
-    await conn.send_packet(packet)
+conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
+response = await conn.request(packet)
 ```
 
 Causes:

@@ -121,7 +121,7 @@ from lifx import find_by_label, find_by_ip, find_by_serial, Colors
 async def main():
     # Find by label (substring match)
     async for device in find_by_label("Bedroom"):  # Matches "Bedroom", "Master Bedroom", etc.
-        await device.set_color(Colors.WARM_WHITE)
+        await device.set_color(Colors.WARM)
 
     # Find by exact label
     async for device in find_by_label("Master Bedroom", exact_match=True):
@@ -155,8 +155,8 @@ Colors.GREEN
 Colors.BLUE
 
 # White variants
-Colors.WARM_WHITE
-Colors.COOL_WHITE
+Colors.WARM
+Colors.COOL
 Colors.DAYLIGHT
 
 # Pastels
@@ -190,8 +190,8 @@ async def main():
         # Pulse effect
         await light.pulse(Colors.RED, period=1.0, cycles=5)
 
-        # Breathe effect (infinite)
-        await light.breathe(Colors.BLUE, period=2.0, cycles=0)
+        # Breathe effect (10 cycles)
+        await light.breathe(Colors.BLUE, period=2.0, cycles=10)
 
 
 asyncio.run(main())

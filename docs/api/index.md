@@ -252,11 +252,10 @@ async def set_custom_color(light: Light, hue: float) -> None:
 async with await Light.from_ip("192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 
-# ❌ Bad - manual cleanup required
-light = Light("d073d5123456", "192.168.1.100")
-await light.connect()
+# ❌ Bad - no context manager, no state initialization
+light = Light(serial="d073d5123456", ip="192.168.1.100")
 await light.set_color(Colors.BLUE)
-await light.disconnect()
+await light.connection.close()
 ```
 
 ### Handle Exceptions

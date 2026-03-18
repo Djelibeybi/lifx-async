@@ -6,7 +6,7 @@ A modern, type-safe, async Python library for controlling LIFX smart devices ove
 [![Codecov](https://codecov.io/gh/Djelibeybi/lifx-async/branch/main/graph/badge.svg)](https://codecov.io/gh/Djelibeybi/lifx-async)
 [![Docs](https://github.com/Djelibeybi/lifx-async/workflows/Documentation/badge.svg)](https://Djelibeybi.github.io/lifx-async/)
 
-[![Python](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13%20|%203.14-blue)](https://www.python.org)
+[![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue)](https://www.python.org)
 [![PyPI](https://img.shields.io/pypi/v/lifx-async)](https://pypi.org/project/lifx-async/)
 [![License](https://img.shields.io/badge/license-UPL--1.0-blue)](https://opensource.org/license/UPL)
 
