@@ -7,6 +7,8 @@
 | [x] | [review-docs_20260318](./tracks/review-docs_20260318/index.md) | Full Review — Documentation Repair | 2026-03-18 | 2026-03-19 |
 | [ ] | [review-tests_20260318](./tracks/review-tests_20260318/index.md) | Full Review — Test Coverage Gaps | 2026-03-18 | 2026-03-18 |
 
+| [~] | [docs-ia-restructure_20260319](./tracks/docs-ia-restructure_20260319/index.md) | Docs IA Restructure | 2026-03-19 | 2026-03-19 |
+
 <!-- Tracks registered by /conductor:new-track -->
 
 ## Archived Tracks
