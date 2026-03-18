@@ -39,12 +39,12 @@ color = Colors.BLUE
 # Create custom colors
 custom = HSBK(hue=180.0, saturation=1.0, brightness=0.8, kelvin=3500)
 
-# Create from RGB
-red = HSBK.from_rgb(255, 0, 0, kelvin=3500)
+# Create from RGB (0.0-1.0)
+red = HSBK.from_rgb(1.0, 0.0, 0.0)
 
-# Convert to RGB
+# Convert to RGB (returns 0.0-1.0)
 r, g, b = Colors.BLUE.to_rgb()
-print(f"RGB: ({r}, {g}, {b})")
+print(f"RGB: ({r:.2f}, {g:.2f}, {b:.2f})")
 ```
 
 ### Color Components
@@ -117,16 +117,15 @@ The `Colors` class provides these preset colors:
 
 When converting from RGB to HSBK, note that:
 
-- RGB values are 0-255
-- The Kelvin value must be specified (default: 3500K)
-- Some RGB colors may not have exact HSBK equivalents
-- Conversion uses standard HSV formulas with brightness mapping
+- RGB values are floats in the range 0.0-1.0
+- Kelvin defaults to 3500K (neutral)
+- Conversion uses standard HSV formulas via Python's `colorsys`
 
 ### HSBK to RGB
 
 When converting from HSBK to RGB:
 
-- Returns tuple of (r, g, b) with values 0-255
+- Returns tuple of (r, g, b) with float values 0.0-1.0
 - Kelvin temperature is not represented in RGB
 - White colors (saturation=0) will be pure gray values
-- Conversion is lossy - converting back may not yield the same HSBK
+- Round-trip conversion (`from_rgb` -> `to_rgb`) preserves values within floating-point epsilon
