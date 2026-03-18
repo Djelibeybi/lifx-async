@@ -112,12 +112,12 @@ class TestDiscoveryWithEmulatorErrors:
 
     @pytest.mark.asyncio
     async def test_discovery_overall_timeout_branch(self) -> None:
-        """Test discovery exits via overall timeout when timeout is near-zero."""
+        """Test discovery exits via overall timeout when timeout is zero."""
         # idle_timeout is large (default 2.0s) so idle check is False,
-        # but overall timeout is tiny so overall check triggers first
+        # but timeout=0.0 makes the overall timeout check immediately true
         count = 0
         async for disc in discover_devices(
-            timeout=0.000001,
+            timeout=0.0,
             broadcast_address="255.255.255.255",
             port=65432,
         ):
