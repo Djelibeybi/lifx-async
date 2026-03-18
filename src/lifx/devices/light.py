@@ -828,9 +828,7 @@ class Light(Device[LightState]):
             await light.breathe(HSBK(0, 0, 1.0, 3500))
 
             # Breathe purple 10 times
-            await light.breathe(
-                HSBK.from_rgb(0.5019607843, 0.0, 0.5019607843), cycles=10
-            )
+            await light.breathe(HSBK.from_rgb(0.5, 0.0, 0.5), cycles=10)
             ```
         """
         await self.set_waveform(

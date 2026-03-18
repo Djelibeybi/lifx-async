@@ -329,7 +329,7 @@ Override this to customize the color used when powering on a device.
 ```python
 async def from_poweroff_hsbk(self, light: Light) -> HSBK:
     """Always start with soft blue."""
-    return HSBK.from_rgb(0, 50, 200, kelvin=KELVIN_NEUTRAL)
+    return HSBK.from_rgb(0.0, 0.2, 0.78)
 ```
 
 **Use cases:**
@@ -598,7 +598,7 @@ class WaveEffect(LIFXEffect):
         # Define wave colors
         colors = [
             HSBK.from_rgb(1.0, 0.0, 0.0),      # Red
-            HSBK.from_rgb(1.0, 0.4980392157, 0.0),    # Orange
+            HSBK.from_rgb(1.0, 0.5, 0.0),    # Orange
             HSBK.from_rgb(1.0, 1.0, 0.0),    # Yellow
             HSBK.from_rgb(0.0, 1.0, 0.0),      # Green
             HSBK.from_rgb(0.0, 0.0, 1.0),      # Blue
@@ -769,7 +769,7 @@ class NotificationEffect(LIFXEffect):
 
     async def _warning_notification(self) -> None:
         """Orange blink - attention needed."""
-        orange = HSBK.from_rgb(1.0, 0.6470588235, 0.0)
+        orange = HSBK.from_rgb(1.0, 0.65, 0.0)
         for _ in range(3):
             await asyncio.gather(*[
                 light.set_color(orange, duration=0.1)
@@ -802,7 +802,7 @@ class NotificationEffect(LIFXEffect):
         if self.level == 'info':
             return HSBK.from_rgb(0.0, 0.0, 1.0)  # Blue
         elif self.level == 'warning':
-            return HSBK.from_rgb(1.0, 0.6470588235, 0.0)  # Orange
+            return HSBK.from_rgb(1.0, 0.65, 0.0)  # Orange
         else:
             return HSBK.from_rgb(1.0, 0.0, 0.0)  # Red
 ```

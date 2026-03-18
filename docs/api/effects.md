@@ -240,7 +240,7 @@ Return startup color when light is powered off.
 ```python
 async def from_poweroff_hsbk(self, light: Light) -> HSBK:
     # Always start with red
-    return HSBK.from_rgb(255, 0, 0, kelvin=KELVIN_NEUTRAL)
+    return HSBK.from_rgb(1.0, 0.0, 0.0)
 ```
 
 #### `inherit_prestate(other: LIFXEffect) -> bool`

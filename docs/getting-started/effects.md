@@ -500,7 +500,7 @@ async def notify(lights: list, level: str = 'info'):
         effect = EffectPulse(mode='breathe', cycles=2, color=color)
     elif level == 'warning':
         # Orange blink
-        color = HSBK.from_rgb(1.0, 0.6470588235, 0.0)
+        color = HSBK.from_rgb(1.0, 0.65, 0.0)
         effect = EffectPulse(mode='blink', cycles=3, color=color)
     elif level == 'error':
         # Red strobe

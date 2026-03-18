@@ -101,12 +101,12 @@ Use `HSBK.from_rgb()`:
 ```python
 from lifx import HSBK
 
-# Create color from RGB (0-255)
-purple = HSBK.from_rgb(0.5019607843, 0.0, 0.5019607843)
+# Create color from RGB (0.0-1.0)
+purple = HSBK.from_rgb(0.5, 0.0, 0.5)
 await light.set_color(purple)
 
-# Or use hex
-color = HSBK.from_rgb(0xFF, 0x00, 0xFF)
+# Full brightness magenta
+color = HSBK.from_rgb(1.0, 0.0, 1.0)
 ```
 
 ### Can I control lights concurrently?
