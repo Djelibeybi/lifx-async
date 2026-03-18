@@ -664,5 +664,25 @@ class TestLightInitializeStateParallel:
 
         assert light._capabilities is None
 
-        with pytest.raises(LifxTimeoutError):
+        with pytest.raises(LifxTimeoutError, match="Error initializing state"):
             await light._initialize_state()
+
+    @pytest.mark.asyncio
+    async def test_light_initialize_state_wraps_lifx_error(self, light):
+        """Test Light._initialize_state() wraps LifxError with serial context."""
+        from unittest.mock import MagicMock
+
+        from lifx.exceptions import LifxError
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Device.GetVersion):
+                return packets.Device.StateVersion(vendor=1, product=32)
+            elif isinstance(packet, packets.Light.GetColor):
+                raise LifxError("Connection lost")
+            return MagicMock()
+
+        light.connection.request.side_effect = mock_request
+
+        with pytest.raises(LifxError, match="Error initializing state") as exc_info:
+            await light._initialize_state()
+        assert exc_info.value.__cause__ is not None
