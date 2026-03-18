@@ -13,6 +13,7 @@ Navigation hub for project context.
 ## Active Tracks
 
 - [ ] [hsbk-rgb-float_20260318](./tracks/hsbk-rgb-float_20260318/index.md) — Update HSBK RGB Conversion to Float
+- [ ] [effects-docs_20260318](./tracks/effects-docs_20260318/index.md) — Effects Documentation and Demo Script
 
 <!-- Auto-populated by /conductor:new-track -->
 
