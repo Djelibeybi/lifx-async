@@ -531,13 +531,14 @@ await conductor.stop(lights)
 | ------------ | ------------------------------------- |
 | `ValueError` | If parameters are out of valid ranges |
 
-| METHOD                | DESCRIPTION                                             |
-| --------------------- | ------------------------------------------------------- |
-| `generate_frame`      | Generate a frame of aurora colors for one device.       |
-| `from_poweroff_hsbk`  | Return startup color when light is powered off.         |
-| `is_light_compatible` | Check if light is compatible with aurora effect.        |
-| `inherit_prestate`    | Aurora can inherit prestate from another aurora effect. |
-| `__repr__`            | String representation of aurora effect.                 |
+| METHOD                    | DESCRIPTION                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `generate_frame`          | Generate a frame of aurora colors for one device.       |
+| `generate_protocol_frame` | Generate a frame of protocol-ready uint16 HSBK tuples.  |
+| `from_poweroff_hsbk`      | Return startup color when light is powered off.         |
+| `is_light_compatible`     | Check if light is compatible with aurora effect.        |
+| `inherit_prestate`        | Aurora can inherit prestate from another aurora effect. |
+| `__repr__`                | String representation of aurora effect.                 |
 
 ##### Attributes
 
@@ -568,6 +569,24 @@ Creates flowing colored bands with brightness modulation. Matrix devices get a v
 | RETURNS      | DESCRIPTION                                         |
 | ------------ | --------------------------------------------------- |
 | `list[HSBK]` | List of HSBK colors (length equals ctx.pixel_count) |
+
+###### generate_protocol_frame
+
+```python
+generate_protocol_frame(ctx: FrameContext) -> list[tuple[int, int, int, int]]
+```
+
+Generate a frame of protocol-ready uint16 HSBK tuples.
+
+Bypasses HSBK object construction and validation for maximum throughput. Computes uint16 values directly from the aurora algorithm, avoiding per-pixel object allocation and float-to-int conversion overhead.
+
+| PARAMETER | DESCRIPTION                                                        |
+| --------- | ------------------------------------------------------------------ |
+| `ctx`     | Frame context with timing and layout info **TYPE:** `FrameContext` |
+
+| RETURNS                           | DESCRIPTION                                          |
+| --------------------------------- | ---------------------------------------------------- |
+| `list[tuple[int, int, int, int]]` | List of (hue, sat, brightness, kelvin) uint16 tuples |
 
 ###### from_poweroff_hsbk
 

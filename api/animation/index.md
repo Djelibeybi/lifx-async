@@ -706,10 +706,15 @@ def __init__(
         # Calculate from tile regions
         self._canvas_width = canvas_width
         self._canvas_height = canvas_height
+        # Pre-compute canvas-to-device index lookup table.
+        # Each entry maps an output position to a canvas index,
+        # with orientation remapping baked in.
+        self._lut: list[int] | None = self._build_lut(tile_regions, canvas_width)
     else:
         # Linear (multizone) or single tile
         self._canvas_width = canvas_width if canvas_width > 0 else pixel_count
         self._canvas_height = canvas_height if canvas_height > 0 else 1
+        self._lut = None
 ```
 
 #### Attributes
@@ -1002,15 +1007,15 @@ def apply(
     Raises:
         ValueError: If hsbk length doesn't match expected size
     """
-    # Multi-tile canvas mode
-    if self._tile_regions:
+    # Multi-tile canvas mode — use pre-computed LUT
+    if self._lut is not None:
         expected_size = self._canvas_width * self._canvas_height
         if len(hsbk) != expected_size:
             raise ValueError(
                 f"HSBK length ({len(hsbk)}) must match "
                 f"canvas_size ({expected_size})"
             )
-        return self._apply_canvas(hsbk)
+        return [hsbk[i] for i in self._lut]
 
     # Single-tile or multizone mode (passthrough)
     if len(hsbk) != self._pixel_count:
@@ -1363,6 +1368,10 @@ Update color data in prebaked templates.
 | `templates` | Prebaked packet templates **TYPE:** `list[PacketTemplate]`                          |
 | `hsbk`      | Protocol-ready HSBK data for all pixels **TYPE:** `list[tuple[int, int, int, int]]` |
 
+| RAISES       | DESCRIPTION                                         |
+| ------------ | --------------------------------------------------- |
+| `ValueError` | If hsbk has fewer values than the total pixel count |
+
 Source code in `src/lifx/animation/packets.py`
 
 ```python
@@ -1374,18 +1383,26 @@ def update_colors(
     Args:
         templates: Prebaked packet templates
         hsbk: Protocol-ready HSBK data for all pixels
+
+    Raises:
+        ValueError: If hsbk has fewer values than the total pixel count
     """
+    if len(hsbk) < self._total_pixels:
+        raise ValueError(
+            f"Expected {self._total_pixels} HSBK values, got {len(hsbk)}"
+        )
+
     for tmpl in templates:
         if tmpl.color_count == 0:
             continue  # Skip CopyFrameBuffer packets
 
-        # Flatten HSBK tuples and pack in one bulk call
-        start = tmpl.hsbk_start
-        end = start + tmpl.color_count
-        flat: list[int] = []
-        for h, s, b, k in hsbk[start:end]:
-            flat.extend((h, s, b, k))
-        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
+        # Write each HSBK tuple directly into the packet buffer
+        data = tmpl.data
+        offset = tmpl.color_offset
+        for i in range(tmpl.hsbk_start, tmpl.hsbk_start + tmpl.color_count):
+            h, s, b, k = hsbk[i]
+            _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
+            offset += 8
 ```
 
 ### MultiZonePacketGenerator
@@ -1548,6 +1565,10 @@ Update color data in prebaked templates.
 | `templates` | Prebaked packet templates **TYPE:** `list[PacketTemplate]`                         |
 | `hsbk`      | Protocol-ready HSBK data for all zones **TYPE:** `list[tuple[int, int, int, int]]` |
 
+| RAISES       | DESCRIPTION                                        |
+| ------------ | -------------------------------------------------- |
+| `ValueError` | If hsbk has fewer values than the total zone count |
+
 Source code in `src/lifx/animation/packets.py`
 
 ```python
@@ -1559,15 +1580,23 @@ def update_colors(
     Args:
         templates: Prebaked packet templates
         hsbk: Protocol-ready HSBK data for all zones
+
+    Raises:
+        ValueError: If hsbk has fewer values than the total zone count
     """
+    if len(hsbk) < self._zone_count:
+        raise ValueError(
+            f"Expected {self._zone_count} HSBK values, got {len(hsbk)}"
+        )
+
     for tmpl in templates:
-        # Flatten HSBK tuples and pack in one bulk call
-        start = tmpl.hsbk_start
-        end = start + tmpl.color_count
-        flat: list[int] = []
-        for h, s, b, k in hsbk[start:end]:
-            flat.extend((h, s, b, k))
-        struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
+        # Write each HSBK tuple directly into the packet buffer
+        data = tmpl.data
+        offset = tmpl.color_offset
+        for i in range(tmpl.hsbk_start, tmpl.hsbk_start + tmpl.color_count):
+            h, s, b, k = hsbk[i]
+            _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
+            offset += 8
 ```
 
 ## Tile Orientation
