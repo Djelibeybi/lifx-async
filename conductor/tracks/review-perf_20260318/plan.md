@@ -27,7 +27,7 @@ Establish performance baselines before optimizing so improvements are measurable
 ### Verification
 
 - [x] `uv run pytest tests/benchmarks/ -v -m benchmark` — all 10 benchmark tests pass
-- [x] Baseline persisted via pytest-benchmark `--benchmark-save=baseline` to `.benchmarks/`
+- [x] Baseline persisted via pytest-benchmark `--benchmark-save=review-perf_20260318-Phase1` to `.benchmarks/`
 
 ---
 
@@ -48,7 +48,7 @@ Eliminate the two highest-cost per-frame bottlenecks.
 ### Verification
 
 - [ ] `uv run pytest tests/animation/ -v` — all existing animation tests pass
-- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=baseline` — `_apply_canvas` benchmark shows improvement vs baseline
+- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=review-perf_20260318-Phase1` — `_apply_canvas` benchmark shows improvement vs Phase 1
 - [ ] `uv run pyright` — no type errors on FrameBuffer changes
 
 ---
@@ -68,7 +68,7 @@ Add optional high-performance frame generation that bypasses HSBK object constru
 ### Verification
 
 - [ ] `uv run pytest tests/effects/ -v` — all existing effects tests pass
-- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=baseline` — protocol-direct path shows measurable improvement over baseline
+- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=review-perf_20260318-Phase2` — protocol-direct path shows measurable improvement vs Phase 2
 - [ ] `uv run --frozen pytest` — full test suite passes
 - [ ] `uv run ruff format . && uv run ruff check .` — clean
 - [ ] `uv run pyright` — clean

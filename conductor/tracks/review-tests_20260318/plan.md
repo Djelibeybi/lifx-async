@@ -79,7 +79,7 @@ Test network-layer security properties: source ID validation, queue bounded beha
 ## Final Verification
 
 - [ ] All acceptance criteria in spec.md met
-- [ ] `uv run --frozen pytest` — all 2425+ tests pass plus new tests
+- [ ] `uv run --frozen pytest` — full test suite passes including new tests
 - [ ] No `xfail` tests without tracking issues filed
 - [ ] `uv run pyright` — clean
 - [ ] `uv run ruff format . && uv run ruff check .` — clean

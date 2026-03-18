@@ -11,12 +11,12 @@ Fill critical test coverage gaps identified in the comprehensive code review: ad
 
 ## Context
 
-Despite 2425+ tests, the review identified 4 High-severity coverage gaps in security-relevant and correctness-critical paths. The mDNS DNS parser handles fully attacker-controlled network data but has no adversarial input tests. The unbounded UDP transport queue has no flood resilience test. Discovery source ID validation is untested with spoofed packets. The MultiZone direction setter bug (creating a 9-element list instead of 8) has no test that would have caught it.
+Despite 2425+ tests, the review identified 4 High-severity coverage gaps in security-relevant and correctness-critical paths (with additional acceptance criteria for related sub-cases like `get_color_zones()` state updates). The mDNS DNS parser handles fully attacker-controlled network data but has no adversarial input tests. The unbounded UDP transport queue has no flood resilience test. Discovery source ID validation is untested with spoofed packets. The MultiZone direction setter bug (creating a 9-element list instead of 8) has no test that would have caught it.
 
 ## Acceptance Criteria
 
 - [ ] Adversarial mDNS DNS parser test suite covers: inflated record counts, oversized `rdlength`, deeply nested compression pointer chains, malformed UTF-8 labels in DNS names
-- [ ] UDP transport queue test verifies bounded behavior (drop-on-full after CICD-M1 fix lands) or documents current unbounded behavior
+- [ ] UDP transport queue test verifies bounded behavior (drop-on-full after review-critical_20260318 `maxsize=1000` fix lands) or documents current unbounded behavior
 - [ ] Discovery source ID rejection test verifies that responses with wrong source ID are not returned as discovered devices
 - [ ] `MultiZoneEffect.direction` setter test asserts `len(parameters) == 8` exactly
 - [ ] `get_color_zones()` state update test verifies state updated exactly once per call
