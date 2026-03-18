@@ -91,7 +91,7 @@ class Theme:
             color = theme.random()
             ```
         """
-        return random.choice(self.colors)  # nosec
+        return random.choice(self.colors)
 
     def shuffled(self) -> Theme:
         """Get a new theme with colors in random order.

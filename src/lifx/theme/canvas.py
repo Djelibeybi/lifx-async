@@ -28,8 +28,8 @@ def color_weighting(distances: list[tuple[int, HSBK]]) -> Iterable[HSBK]:
 
 def shuffle_point(i: int, j: int) -> tuple[int, int]:
     """Return a new (i, j) value that is the current (i, j) value +/- ~3."""
-    new_x = random.randint(i - 3, i + 3)  # nosec
-    new_y = random.randint(j - 3, j + 3)  # nosec
+    new_x = random.randint(i - 3, i + 3)
+    new_y = random.randint(j - 3, j + 3)
     return new_x, new_y
 
 
@@ -88,8 +88,8 @@ class Canvas:
                     if not self.has_neighbour(i, j):
                         random_color = theme.random()
                         self[(i, j)] = random_color
-                j += random.choice([1, 2, 3])  # nosec
-            i += random.choice([1, 2, 3])  # nosec
+                j += random.choice([1, 2, 3])
+            i += random.choice([1, 2, 3])
 
     def surrounding_colors(self, i: int, j: int) -> list[HSBK]:
         """Return the colors that surround this (i, j) point.

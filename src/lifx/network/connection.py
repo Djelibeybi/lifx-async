@@ -338,7 +338,7 @@ class DeviceConnection:
 
         # Full jitter: random value between 0 and exponential_delay
         # This spreads retries across time to avoid synchronized retries
-        return random.uniform(0, exponential_delay)  # nosec
+        return random.uniform(0, exponential_delay)
 
     @staticmethod
     def _allocate_source() -> int:

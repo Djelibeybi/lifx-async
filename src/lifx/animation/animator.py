@@ -117,7 +117,7 @@ class Animator:
         self._packet_generator = packet_generator
 
         # Protocol source ID (random, identifies this client)
-        self._source = random.randint(1, 0xFFFFFFFF)  # nosec B311
+        self._source = random.randint(1, 0xFFFFFFFF)
 
         # Sequence number (0-255, wraps around)
         self._sequence = 0

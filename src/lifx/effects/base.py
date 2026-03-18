@@ -160,7 +160,7 @@ class LIFXEffect(ABC):
             ```
         """
         return HSBK(
-            hue=random.randint(0, 360),  # nosec
+            hue=random.randint(0, 360),
             saturation=1.0,
             brightness=0.0,
             kelvin=KELVIN_NEUTRAL,
@@ -300,7 +300,7 @@ class LIFXEffect(ABC):
             HSBK color with random hue, full saturation, specified brightness
         """
         return HSBK(
-            hue=random.randint(0, 360),  # nosec
+            hue=random.randint(0, 360),
             saturation=1.0,
             brightness=brightness,
             kelvin=KELVIN_NEUTRAL,
