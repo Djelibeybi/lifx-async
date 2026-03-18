@@ -449,9 +449,9 @@ class HSBK:
         """
         return HSBK(
             hue=hue,
-            saturation=self.saturation,
-            brightness=self.brightness,
-            kelvin=self.kelvin,
+            saturation=self._saturation,
+            brightness=self._brightness,
+            kelvin=self._kelvin,
         )
 
     def with_saturation(self, saturation: float) -> HSBK:
@@ -464,10 +464,10 @@ class HSBK:
             New HSBK instance
         """
         return HSBK(
-            hue=self.hue,
+            hue=self._hue,
             saturation=saturation,
-            brightness=self.brightness,
-            kelvin=self.kelvin,
+            brightness=self._brightness,
+            kelvin=self._kelvin,
         )
 
     def with_brightness(self, brightness: float) -> HSBK:
@@ -480,10 +480,10 @@ class HSBK:
             New HSBK instance
         """
         return HSBK(
-            hue=self.hue,
-            saturation=self.saturation,
+            hue=self._hue,
+            saturation=self._saturation,
             brightness=brightness,
-            kelvin=self.kelvin,
+            kelvin=self._kelvin,
         )
 
     def with_kelvin(self, kelvin: int) -> HSBK:
@@ -496,9 +496,9 @@ class HSBK:
             New HSBK instance
         """
         return HSBK(
-            hue=self.hue,
-            saturation=self.saturation,
-            brightness=self.brightness,
+            hue=self._hue,
+            saturation=self._saturation,
+            brightness=self._brightness,
             kelvin=kelvin,
         )
 
