@@ -116,7 +116,7 @@ class Animator:
         self._framebuffer = framebuffer
         self._packet_generator = packet_generator
 
-        # Protocol source ID (random, identifies this client)
+        # Protocol source ID (unique per-session, identifies this client)
         self._source = allocate_source()
 
         # Sequence number (0-255, wraps around)
