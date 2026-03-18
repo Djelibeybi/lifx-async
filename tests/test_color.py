@@ -58,7 +58,7 @@ class TestHSBK:
 
     def test_from_rgb_red(self) -> None:
         """Test RGB to HSBK conversion for red."""
-        color = HSBK.from_rgb(255, 0, 0)
+        color = HSBK.from_rgb(1.0, 0.0, 0.0)
         assert color.hue == pytest.approx(0, abs=1)
         assert color.saturation == pytest.approx(1.0, abs=0.01)
         assert color.brightness == pytest.approx(1.0, abs=0.01)
@@ -66,91 +66,91 @@ class TestHSBK:
 
     def test_from_rgb_green(self) -> None:
         """Test RGB to HSBK conversion for green."""
-        color = HSBK.from_rgb(0, 255, 0)
+        color = HSBK.from_rgb(0.0, 1.0, 0.0)
         assert color.hue == pytest.approx(120, abs=1)
         assert color.saturation == pytest.approx(1.0, abs=0.01)
         assert color.brightness == pytest.approx(1.0, abs=0.01)
 
     def test_from_rgb_blue(self) -> None:
         """Test RGB to HSBK conversion for blue."""
-        color = HSBK.from_rgb(0, 0, 255)
+        color = HSBK.from_rgb(0.0, 0.0, 1.0)
         assert color.hue == pytest.approx(240, abs=1)
         assert color.saturation == pytest.approx(1.0, abs=0.01)
         assert color.brightness == pytest.approx(1.0, abs=0.01)
 
     def test_from_rgb_white(self) -> None:
         """Test RGB to HSBK conversion for white."""
-        color = HSBK.from_rgb(255, 255, 255)
+        color = HSBK.from_rgb(1.0, 1.0, 1.0)
         assert color.saturation == pytest.approx(0.0, abs=0.01)
         assert color.brightness == pytest.approx(1.0, abs=0.01)
 
     def test_from_rgb_black(self) -> None:
         """Test RGB to HSBK conversion for black."""
-        color = HSBK.from_rgb(0, 0, 0)
+        color = HSBK.from_rgb(0.0, 0.0, 0.0)
         assert color.saturation == pytest.approx(0.0, abs=0.01)
         assert color.brightness == pytest.approx(0.0, abs=0.01)
 
     def test_from_rgb_invalid_values(self) -> None:
         """Test RGB validation."""
         with pytest.raises(ValueError, match="Red must be between"):
-            HSBK.from_rgb(-1, 0, 0)
+            HSBK.from_rgb(-0.1, 0.0, 0.0)
 
         with pytest.raises(ValueError, match="Green must be between"):
-            HSBK.from_rgb(0, 256, 0)
+            HSBK.from_rgb(0.0, 1.1, 0.0)
 
         with pytest.raises(ValueError, match="Blue must be between"):
-            HSBK.from_rgb(0, 0, 300)
+            HSBK.from_rgb(0.0, 0.0, 2.0)
 
     def test_to_rgb_red(self) -> None:
         """Test HSBK to RGB conversion for red."""
         color = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
         r, g, b = color.to_rgb()
-        assert r == 255
-        assert g == 0
-        assert b == 0
+        assert r == pytest.approx(1.0)
+        assert g == pytest.approx(0.0)
+        assert b == pytest.approx(0.0)
 
     def test_to_rgb_green(self) -> None:
         """Test HSBK to RGB conversion for green."""
         color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
         r, g, b = color.to_rgb()
-        assert r == 0
-        assert g == 255
-        assert b == 0
+        assert r == pytest.approx(0.0)
+        assert g == pytest.approx(1.0)
+        assert b == pytest.approx(0.0)
 
     def test_to_rgb_blue(self) -> None:
         """Test HSBK to RGB conversion for blue."""
         color = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
         r, g, b = color.to_rgb()
-        assert r == 0
-        assert g == 0
-        assert b == 255
+        assert r == pytest.approx(0.0)
+        assert g == pytest.approx(0.0)
+        assert b == pytest.approx(1.0)
 
     def test_to_rgb_white(self) -> None:
         """Test HSBK to RGB conversion for white."""
         color = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
         r, g, b = color.to_rgb()
-        assert r == 255
-        assert g == 255
-        assert b == 255
+        assert r == pytest.approx(1.0)
+        assert g == pytest.approx(1.0)
+        assert b == pytest.approx(1.0)
 
     def test_to_rgb_black(self) -> None:
         """Test HSBK to RGB conversion for black."""
         color = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
         r, g, b = color.to_rgb()
-        assert r == 0
-        assert g == 0
-        assert b == 0
+        assert r == pytest.approx(0.0)
+        assert g == pytest.approx(0.0)
+        assert b == pytest.approx(0.0)
 
     def test_rgb_roundtrip(self) -> None:
-        """Test RGB -> HSBK -> RGB roundtrip."""
-        original = (255, 128, 64)
+        """Test RGB -> HSBK -> RGB roundtrip with floating-point precision."""
+        original = (1.0, 128 / 255, 64 / 255)
         color = HSBK.from_rgb(*original)
         result = color.to_rgb()
 
-        # Allow small differences due to floating point
-        assert result[0] == pytest.approx(original[0], abs=2)
-        assert result[1] == pytest.approx(original[1], abs=2)
-        assert result[2] == pytest.approx(original[2], abs=2)
+        # Float roundtrip should be within floating-point epsilon
+        assert result[0] == pytest.approx(original[0], abs=1e-10)
+        assert result[1] == pytest.approx(original[1], abs=1e-10)
+        assert result[2] == pytest.approx(original[2], abs=1e-10)
 
     def test_to_protocol(self) -> None:
         """Test conversion to protocol HSBK."""
