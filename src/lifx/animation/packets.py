@@ -390,7 +390,15 @@ class MatrixPacketGenerator(PacketGenerator):
         Args:
             templates: Prebaked packet templates
             hsbk: Protocol-ready HSBK data for all pixels
+
+        Raises:
+            ValueError: If hsbk has fewer values than the total pixel count
         """
+        if len(hsbk) < self._total_pixels:
+            raise ValueError(
+                f"Expected {self._total_pixels} HSBK values, got {len(hsbk)}"
+            )
+
         for tmpl in templates:
             if tmpl.color_count == 0:
                 continue  # Skip CopyFrameBuffer packets
@@ -504,7 +512,15 @@ class MultiZonePacketGenerator(PacketGenerator):
         Args:
             templates: Prebaked packet templates
             hsbk: Protocol-ready HSBK data for all zones
+
+        Raises:
+            ValueError: If hsbk has fewer values than the total zone count
         """
+        if len(hsbk) < self._zone_count:
+            raise ValueError(
+                f"Expected {self._zone_count} HSBK values, got {len(hsbk)}"
+            )
+
         for tmpl in templates:
             # Write each HSBK tuple directly into the packet buffer
             data = tmpl.data

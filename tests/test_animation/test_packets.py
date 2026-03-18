@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import struct
 
+import pytest
+
 from lifx.animation.packets import (
     HEADER_SIZE,
     LightPacketGenerator,
@@ -79,25 +81,14 @@ class TestMatrixPacketGenerator:
         assert get_payload(templates[1])[0] == 1
         assert get_payload(templates[2])[0] == 2
 
-    def test_update_colors_short_input_partial_update(self) -> None:
-        """Test that short HSBK list updates only available pixels.
-
-        Per-pixel struct.pack_into writes directly into the buffer, so a short
-        input list simply updates fewer pixels without raising an error.
-        """
+    def test_update_colors_short_input_raises(self) -> None:
+        """Test that short HSBK list raises ValueError."""
         gen = MatrixPacketGenerator(tile_count=1, tile_width=8, tile_height=8)
         templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 32
 
-        # Should not raise — processes available pixels only
-        gen.update_colors(templates, hsbk)
-
-        # First 32 pixels should be updated
-        tmpl = templates[0]
-        for i in range(32):
-            offset = tmpl.color_offset + i * 8
-            h, s, b, k = struct.unpack_from("<HHHH", tmpl.data, offset)
-            assert (h, s, b, k) == (100, 100, 100, 3500)
+        with pytest.raises(ValueError, match="Expected 64 HSBK values, got 32"):
+            gen.update_colors(templates, hsbk)
 
     def test_update_colors_packed(self) -> None:
         """Test that HSBK values are correctly packed into packet bytes."""
@@ -380,25 +371,14 @@ class TestMultiZonePacketGenerator:
         payload = get_payload(templates[0])
         assert payload[7] == 82  # colors_count
 
-    def test_update_colors_short_input_partial_update(self) -> None:
-        """Test that short HSBK list updates only available zones.
-
-        Per-pixel struct.pack_into writes directly into the buffer, so a short
-        input list simply updates fewer zones without raising an error.
-        """
+    def test_update_colors_short_input_raises(self) -> None:
+        """Test that short HSBK list raises ValueError."""
         gen = MultiZonePacketGenerator(zone_count=82)
         templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
         hsbk: list[tuple[int, int, int, int]] = [(200, 200, 200, 4000)] * 40
 
-        # Should not raise — processes available zones only
-        gen.update_colors(templates, hsbk)
-
-        # First 40 zones should be updated
-        tmpl = templates[0]
-        for i in range(40):
-            offset = tmpl.color_offset + i * 8
-            h, s, b, k = struct.unpack_from("<HHHH", tmpl.data, offset)
-            assert (h, s, b, k) == (200, 200, 200, 4000)
+        with pytest.raises(ValueError, match="Expected 82 HSBK values, got 40"):
+            gen.update_colors(templates, hsbk)
 
     def test_update_colors_packed(self) -> None:
         """Test that HSBK values are correctly packed into packet bytes."""
