@@ -465,6 +465,7 @@ class Device(Generic[StateT]):
             port: Port number (default LIFX_UDP_PORT)
             serial: Serial number as 12-digit hex string
             timeout: Request timeout for this device instance
+            max_retries: Maximum number of retry attempts
 
         Returns:
             Device instance ready to use with async context manager
@@ -519,14 +520,14 @@ class Device(Generic[StateT]):
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
-        """Create and return a fully initialized device instance.
+        """Create a device instance with the correct type for the given IP.
 
-        This factory method creates the appropriate device type (Light, etc)
-        based on the device's capabilities and initializes its state. The returned
-        device MUST be used with an async context manager.
+        This factory method queries the device to determine its product type
+        and returns the appropriate subclass (Light, MatrixLight, etc.).
 
-        The returned device subclass has guaranteed initialized state - the state
-        property will never be None for devices created via this method.
+        State is NOT initialized on return. Use ``async with`` to enter the
+        context manager, which calls ``__aenter__()`` → ``_initialize_state()``
+        and guarantees that ``device.state`` is non-None.
 
         Args:
             ip: IP address of the device
@@ -537,8 +538,8 @@ class Device(Generic[StateT]):
             max_retries: Maximum number of retry attempts
 
         Returns:
-            Fully initialized device instance (Light, MultiZoneLight, MatrixLight, etc.)
-            with complete state loaded and guaranteed non-None state property.
+            Device instance of the correct subclass, ready to use with
+            ``async with`` for state initialization and automatic cleanup.
 
         Raises:
             LifxDeviceNotFoundError: If device cannot be found or contacted
@@ -550,7 +551,7 @@ class Device(Generic[StateT]):
             # Connect by IP (serial auto-detected)
             device = await Device.connect(ip="192.168.1.100")
             async with device:
-                # device.state is guaranteed to be initialized
+                # State is initialized here by __aenter__()
                 print(f"{device.state.model}: {device.state.label}")
                 if device.state.is_on:
                     print("Device is on")

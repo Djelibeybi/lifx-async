@@ -818,7 +818,8 @@ async def discover_mdns(
         max_retries: max retries per request set on discovered devices
 
     Yields:
-        Device instances as they are discovered
+        Device instances (Light, MatrixLight, MultiZoneLight, etc.)
+        as they are discovered
 
     Example:
         ```python
