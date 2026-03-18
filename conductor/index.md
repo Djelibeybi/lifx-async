@@ -12,8 +12,10 @@ Navigation hub for project context.
 
 ## Active Tracks
 
-- [ ] [hsbk-rgb-float_20260318](./tracks/hsbk-rgb-float_20260318/index.md) — Update HSBK RGB Conversion to Float
-- [ ] [effects-docs_20260318](./tracks/effects-docs_20260318/index.md) — Effects Documentation and Demo Script
+- [ ] [review-critical_20260318](./tracks/review-critical_20260318/index.md) — Full Review — Critical Fixes
+- [ ] [review-perf_20260318](./tracks/review-perf_20260318/index.md) — Full Review — Animation Pipeline Performance
+- [ ] [review-docs_20260318](./tracks/review-docs_20260318/index.md) — Full Review — Documentation Repair
+- [ ] [review-tests_20260318](./tracks/review-tests_20260318/index.md) — Full Review — Test Coverage Gaps
 
 <!-- Auto-populated by /conductor:new-track -->
 
