@@ -127,10 +127,49 @@ class FrameBuffer:
             # Calculate from tile regions
             self._canvas_width = canvas_width
             self._canvas_height = canvas_height
+            # Pre-compute canvas-to-device index lookup table.
+            # Each entry maps an output position to a canvas index,
+            # with orientation remapping baked in.
+            self._lut: list[int] | None = self._build_lut(tile_regions, canvas_width)
         else:
             # Linear (multizone) or single tile
             self._canvas_width = canvas_width if canvas_width > 0 else pixel_count
             self._canvas_height = canvas_height if canvas_height > 0 else 1
+            self._lut = None
+
+    @staticmethod
+    def _build_lut(tile_regions: list[TileRegion], canvas_width: int) -> list[int]:
+        """Pre-compute canvas-to-device index lookup table.
+
+        For each output pixel position, stores the canvas index to read from.
+        Orientation remapping is baked into the indices so per-frame work
+        is a single list comprehension with no arithmetic.
+
+        Args:
+            tile_regions: Tile regions with positions and orientations
+            canvas_width: Width of the logical canvas
+
+        Returns:
+            Flat list of canvas indices in device output order
+        """
+        lut: list[int] = []
+        for region in tile_regions:
+            # Compute canvas indices in row-major order for this tile
+            canvas_indices: list[int] = []
+            for row in range(region.height):
+                canvas_y = region.y + row
+                for col in range(region.width):
+                    canvas_x = region.x + col
+                    canvas_indices.append(canvas_y * canvas_width + canvas_x)
+
+            # Bake orientation into the LUT
+            if region.orientation_lut:
+                for i in range(len(canvas_indices)):
+                    lut.append(canvas_indices[region.orientation_lut[i]])
+            else:
+                lut.extend(canvas_indices)
+
+        return lut
 
     @classmethod
     async def for_matrix(
@@ -360,15 +399,15 @@ class FrameBuffer:
         Raises:
             ValueError: If hsbk length doesn't match expected size
         """
-        # Multi-tile canvas mode
-        if self._tile_regions:
+        # Multi-tile canvas mode — use pre-computed LUT
+        if self._lut is not None:
             expected_size = self._canvas_width * self._canvas_height
             if len(hsbk) != expected_size:
                 raise ValueError(
                     f"HSBK length ({len(hsbk)}) must match "
                     f"canvas_size ({expected_size})"
                 )
-            return self._apply_canvas(hsbk)
+            return [hsbk[i] for i in self._lut]
 
         # Single-tile or multizone mode (passthrough)
         if len(hsbk) != self._pixel_count:
@@ -378,39 +417,3 @@ class FrameBuffer:
             )
 
         return list(hsbk)
-
-    def _apply_canvas(
-        self, hsbk: list[tuple[int, int, int, int]]
-    ) -> list[tuple[int, int, int, int]]:
-        """Extract tile regions from canvas and apply orientation.
-
-        Args:
-            hsbk: Row-major canvas data (canvas_width x canvas_height)
-
-        Returns:
-            Device-ordered pixels (concatenated tiles)
-        """
-        result: list[tuple[int, int, int, int]] = []
-        canvas_width = self._canvas_width
-
-        for region in self._tile_regions:  # type: ignore[union-attr]
-            # Extract pixels for this tile from the canvas
-            tile_pixels: list[tuple[int, int, int, int]] = []
-
-            for row in range(region.height):
-                canvas_y = region.y + row
-                for col in range(region.width):
-                    canvas_x = region.x + col
-                    canvas_idx = canvas_y * canvas_width + canvas_x
-                    tile_pixels.append(hsbk[canvas_idx])
-
-            # Apply orientation remapping for this tile
-            if region.orientation_lut:
-                tile_pixels = [
-                    tile_pixels[region.orientation_lut[i]]
-                    for i in range(len(tile_pixels))
-                ]
-
-            result.extend(tile_pixels)
-
-        return result

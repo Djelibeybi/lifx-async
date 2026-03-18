@@ -380,6 +380,121 @@ class TestFrameBufferMultiTileCanvas:
         assert len(fb.tile_regions) == 5
 
 
+class TestFrameBufferLUT:
+    """Tests for FrameBuffer pre-computed lookup table."""
+
+    def test_lut_computed_for_tile_regions(self) -> None:
+        """Test that _lut is computed when tile_regions are provided."""
+        regions = [TileRegion(x=0, y=0, width=2, height=2)]
+        fb = FrameBuffer(
+            pixel_count=4,
+            canvas_width=2,
+            canvas_height=2,
+            tile_regions=regions,
+        )
+        assert hasattr(fb, "_lut")
+        assert fb._lut is not None
+
+    def test_lut_not_computed_without_tile_regions(self) -> None:
+        """Test that _lut is None when no tile_regions."""
+        fb = FrameBuffer(pixel_count=4)
+        assert fb._lut is None
+
+    def test_lut_single_tile_no_orientation(self) -> None:
+        """Test LUT for a single 2x2 tile without orientation.
+
+        Canvas layout (2x2):
+            idx 0  idx 1
+            idx 2  idx 3
+
+        Without orientation, output order = canvas row-major order.
+        """
+        regions = [TileRegion(x=0, y=0, width=2, height=2)]
+        fb = FrameBuffer(
+            pixel_count=4,
+            canvas_width=2,
+            canvas_height=2,
+            tile_regions=regions,
+        )
+        assert fb._lut == [0, 1, 2, 3]
+
+    def test_lut_single_tile_with_orientation(self) -> None:
+        """Test LUT for a single 2x2 tile with 180-degree rotation.
+
+        Orientation LUT (3,2,1,0) means output[i] reads from position lut[i].
+        Combined with canvas indices [0,1,2,3]:
+            output[0] = canvas[3], output[1] = canvas[2], etc.
+        """
+        lut = (3, 2, 1, 0)
+        regions = [TileRegion(x=0, y=0, width=2, height=2, orientation_lut=lut)]
+        fb = FrameBuffer(
+            pixel_count=4,
+            canvas_width=2,
+            canvas_height=2,
+            tile_regions=regions,
+        )
+        assert fb._lut == [3, 2, 1, 0]
+
+    def test_lut_two_tiles_horizontal(self) -> None:
+        """Test LUT for two 2x2 tiles arranged horizontally.
+
+        Canvas layout (4x2):
+            0  1 | 2  3
+            4  5 | 6  7
+
+        Tile 0 at (0,0): canvas indices [0, 1, 4, 5]
+        Tile 1 at (2,0): canvas indices [2, 3, 6, 7]
+        LUT = [0, 1, 4, 5, 2, 3, 6, 7]
+        """
+        regions = [
+            TileRegion(x=0, y=0, width=2, height=2),
+            TileRegion(x=2, y=0, width=2, height=2),
+        ]
+        fb = FrameBuffer(
+            pixel_count=8,
+            canvas_width=4,
+            canvas_height=2,
+            tile_regions=regions,
+        )
+        assert fb._lut == [0, 1, 4, 5, 2, 3, 6, 7]
+
+    def test_lut_tile_with_offset_orientation(self) -> None:
+        """Test LUT for tile at non-zero offset with orientation.
+
+        Canvas (4x2), single tile at x=2 with 180-degree rotation:
+            .  . | 2  3
+            .  . | 6  7
+
+        Canvas indices for tile: [2, 3, 6, 7]
+        After orientation (3,2,1,0): [7, 6, 3, 2]
+        """
+        lut = (3, 2, 1, 0)
+        regions = [
+            TileRegion(x=2, y=0, width=2, height=2, orientation_lut=lut),
+        ]
+        fb = FrameBuffer(
+            pixel_count=4,
+            canvas_width=4,
+            canvas_height=2,
+            tile_regions=regions,
+        )
+        assert fb._lut == [7, 6, 3, 2]
+
+    def test_lut_length_matches_pixel_count(self) -> None:
+        """Test LUT length equals total device pixels (not canvas size)."""
+        regions = [
+            TileRegion(x=0, y=0, width=4, height=4),
+            TileRegion(x=4, y=0, width=4, height=4),
+        ]
+        fb = FrameBuffer(
+            pixel_count=32,
+            canvas_width=8,
+            canvas_height=4,
+            tile_regions=regions,
+        )
+        assert len(fb._lut) == 32
+
+
 class TestFrameBufferForLight:
     """Tests for FrameBuffer.for_light() factory method."""
 
