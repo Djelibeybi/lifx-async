@@ -226,7 +226,8 @@ class TestGenerateFrame:
         ball_hues = {c.hue for c in colors if c.brightness > 0}
         # Due to specular blend, some ball zones may have interpolated hues,
         # but non-specular zones should have exactly the configured hue.
-        assert 200 in ball_hues or len(ball_hues) > 0
+        assert len(ball_hues) > 0, "Expected at least one lit zone"
+        assert 200 in ball_hues, f"Expected hue 200 in ball zones, got {ball_hues}"
 
     def test_kelvin_matches_configured(self) -> None:
         """Test all zones have the configured kelvin."""
@@ -302,7 +303,7 @@ class TestZonesPerBulb:
         assert len(colors) == 82
 
         # Each pair of adjacent zones should have the same color
-        for i in range(0, 80, 2):
+        for i in range(0, len(colors), 2):
             assert colors[i] == colors[i + 1]
 
     def test_zones_per_bulb_correct_count(self) -> None:
@@ -787,6 +788,6 @@ class TestEdgeCases:
             canvas_height=1,
         )
         colors = effect.generate_frame(ctx)
-        # All ball zones should have zero or near-zero saturation
+        # All zones should have zero saturation (grayscale)
         for c in colors:
-            assert c.saturation <= 1.0  # valid range
+            assert c.saturation <= 0.01

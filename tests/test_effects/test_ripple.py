@@ -463,7 +463,7 @@ class TestRippleGenerateFrame:
         # With calm surface, displacement is ~0, but floor should prevent
         # brightness from being exactly zero (floor = brightness * 0.02)
         for color in colors:
-            assert color.brightness >= 0.0
+            assert color.brightness > 0.0
 
     def test_consecutive_frames_differ_with_drops(self) -> None:
         """Test that frames evolve over time with drops."""
