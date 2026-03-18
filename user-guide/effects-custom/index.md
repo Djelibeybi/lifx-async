@@ -289,9 +289,9 @@ async def async_play(self) -> None:
     from lifx import HSBK
 
     colors = [
-        HSBK.from_rgb(255, 0, 0),    # Red
-        HSBK.from_rgb(0, 255, 0),    # Green
-        HSBK.from_rgb(0, 0, 255),    # Blue
+        HSBK.from_rgb(1.0, 0.0, 0.0),    # Red
+        HSBK.from_rgb(0.0, 1.0, 0.0),    # Green
+        HSBK.from_rgb(0.0, 0.0, 1.0),    # Blue
     ]
 
     for color in colors:
@@ -329,7 +329,7 @@ Override this to customize the color used when powering on a device.
 ```python
 async def from_poweroff_hsbk(self, light: Light) -> HSBK:
     """Always start with soft blue."""
-    return HSBK.from_rgb(0, 50, 200, kelvin=KELVIN_NEUTRAL)
+    return HSBK.from_rgb(0.0, 0.2, 0.78)
 ```
 
 **Use cases:**
@@ -460,11 +460,11 @@ async def async_play(self) -> None:
         label = await light.get_label()
 
         if "Bedroom" in label:
-            color = HSBK.from_rgb(0, 0, 255)  # Blue
+            color = HSBK.from_rgb(0.0, 0.0, 1.0)  # Blue
         elif "Kitchen" in label:
-            color = HSBK.from_rgb(255, 255, 255)  # White
+            color = HSBK.from_rgb(1.0, 1.0, 1.0)  # White
         else:
-            color = HSBK.from_rgb(255, 0, 0)  # Red
+            color = HSBK.from_rgb(1.0, 0.0, 0.0)  # Red
 
         tasks.append(light.set_color(color, duration=1.0))
 
@@ -597,11 +597,11 @@ class WaveEffect(LIFXEffect):
         """Execute the wave effect."""
         # Define wave colors
         colors = [
-            HSBK.from_rgb(255, 0, 0),      # Red
-            HSBK.from_rgb(255, 127, 0),    # Orange
-            HSBK.from_rgb(255, 255, 0),    # Yellow
-            HSBK.from_rgb(0, 255, 0),      # Green
-            HSBK.from_rgb(0, 0, 255),      # Blue
+            HSBK.from_rgb(1.0, 0.0, 0.0),      # Red
+            HSBK.from_rgb(1.0, 0.5, 0.0),    # Orange
+            HSBK.from_rgb(1.0, 1.0, 0.0),    # Yellow
+            HSBK.from_rgb(0.0, 1.0, 0.0),      # Green
+            HSBK.from_rgb(0.0, 0.0, 1.0),      # Blue
         ]
 
         for wave in range(self.wave_count):
@@ -754,7 +754,7 @@ class NotificationEffect(LIFXEffect):
 
     async def _info_notification(self) -> None:
         """Blue breathe - calm information."""
-        blue = HSBK.from_rgb(0, 0, 255)
+        blue = HSBK.from_rgb(0.0, 0.0, 1.0)
         for _ in range(2):
             await asyncio.gather(*[
                 light.set_color(blue, duration=0.5)
@@ -769,7 +769,7 @@ class NotificationEffect(LIFXEffect):
 
     async def _warning_notification(self) -> None:
         """Orange blink - attention needed."""
-        orange = HSBK.from_rgb(255, 165, 0)
+        orange = HSBK.from_rgb(1.0, 0.65, 0.0)
         for _ in range(3):
             await asyncio.gather(*[
                 light.set_color(orange, duration=0.1)
@@ -784,7 +784,7 @@ class NotificationEffect(LIFXEffect):
 
     async def _error_notification(self) -> None:
         """Red strobe - urgent."""
-        red = HSBK.from_rgb(255, 0, 0)
+        red = HSBK.from_rgb(1.0, 0.0, 0.0)
         for _ in range(10):
             await asyncio.gather(*[
                 light.set_color(red, duration=0.0)
@@ -800,11 +800,11 @@ class NotificationEffect(LIFXEffect):
     async def from_poweroff_hsbk(self, light: Light) -> HSBK:
         """Return appropriate startup color based on level."""
         if self.level == 'info':
-            return HSBK.from_rgb(0, 0, 255)  # Blue
+            return HSBK.from_rgb(0.0, 0.0, 1.0)  # Blue
         elif self.level == 'warning':
-            return HSBK.from_rgb(255, 165, 0)  # Orange
+            return HSBK.from_rgb(1.0, 0.65, 0.0)  # Orange
         else:
-            return HSBK.from_rgb(255, 0, 0)  # Red
+            return HSBK.from_rgb(1.0, 0.0, 0.0)  # Red
 ```
 
 **Usage:**

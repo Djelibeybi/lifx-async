@@ -743,7 +743,7 @@ devices = []
 async for device in discover():
     devices.append(device)
 group = DeviceGroup(devices)
-await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
+await group.set_color(HSBK.from_rgb(1.0, 0.0, 0.0), duration=2.0)
 ```
 
 Source code in `src/lifx/api.py`
@@ -762,7 +762,7 @@ async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
         async for device in discover():
             devices.append(device)
         group = DeviceGroup(devices)
-        await group.set_color(HSBK.from_rgb(255, 0, 0), duration=2.0)
+        await group.set_color(HSBK.from_rgb(1.0, 0.0, 0.0), duration=2.0)
         ```
     """
     await asyncio.gather(

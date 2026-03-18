@@ -2465,7 +2465,7 @@ light = Light(serial="d073d5123456", ip="192.168.1.100")
 
 async with light:
     # Set color
-    await light.set_color(HSBK.from_rgb(255, 0, 0))
+    await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
 
     # Set brightness
     await light.set_brightness(0.5)
@@ -2478,7 +2478,7 @@ Using the simplified connect method (without knowing the serial):
 
 ```python
 async with await Light.from_ip(ip="192.168.1.100") as light:
-    await light.set_color(HSBK.from_rgb(255, 0, 0))
+    await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
 ```
 
 | METHOD                    | DESCRIPTION                                                             |
@@ -2684,10 +2684,10 @@ Example
 
 ```python
 # Set to red instantly
-await light.set_color(HSBK.from_rgb(255, 0, 0))
+await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
 
 # Fade to blue over 2 seconds
-await light.set_color(HSBK.from_rgb(0, 0, 255), duration=2.0)
+await light.set_color(HSBK.from_rgb(0.0, 0.0, 1.0), duration=2.0)
 ```
 
 Source code in `src/lifx/devices/light.py`
@@ -2712,10 +2712,10 @@ async def set_color(
     Example:
         ```python
         # Set to red instantly
-        await light.set_color(HSBK.from_rgb(255, 0, 0))
+        await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
 
         # Fade to blue over 2 seconds
-        await light.set_color(HSBK.from_rgb(0, 0, 255), duration=2.0)
+        await light.set_color(HSBK.from_rgb(0.0, 0.0, 1.0), duration=2.0)
         ```
     """
     # Convert to protocol HSBK
@@ -3353,7 +3353,7 @@ from lifx.protocol.protocol_types import LightWaveform
 
 # Pulse red 5 times
 await light.set_waveform(
-    color=HSBK.from_rgb(255, 0, 0),
+    color=HSBK.from_rgb(1.0, 0.0, 0.0),
     period=1.0,
     cycles=5,
     waveform=LightWaveform.SINE,
@@ -3406,7 +3406,7 @@ async def set_waveform(
 
         # Pulse red 5 times
         await light.set_waveform(
-            color=HSBK.from_rgb(255, 0, 0),
+            color=HSBK.from_rgb(1.0, 0.0, 0.0),
             period=1.0,
             cycles=5,
             waveform=LightWaveform.SINE,
@@ -3706,10 +3706,10 @@ Example
 
 ```python
 # Pulse red once
-await light.pulse(HSBK.from_rgb(255, 0, 0))
+await light.pulse(HSBK.from_rgb(1.0, 0.0, 0.0))
 
 # Pulse blue 3 times, 2 seconds per pulse
-await light.pulse(HSBK.from_rgb(0, 0, 255), period=2.0, cycles=3)
+await light.pulse(HSBK.from_rgb(0.0, 0.0, 1.0), period=2.0, cycles=3)
 ```
 
 Source code in `src/lifx/devices/light.py`
@@ -3735,10 +3735,10 @@ async def pulse(
     Example:
         ```python
         # Pulse red once
-        await light.pulse(HSBK.from_rgb(255, 0, 0))
+        await light.pulse(HSBK.from_rgb(1.0, 0.0, 0.0))
 
         # Pulse blue 3 times, 2 seconds per pulse
-        await light.pulse(HSBK.from_rgb(0, 0, 255), period=2.0, cycles=3)
+        await light.pulse(HSBK.from_rgb(0.0, 0.0, 1.0), period=2.0, cycles=3)
         ```
     """
     await self.set_waveform(
@@ -3773,7 +3773,7 @@ Example
 await light.breathe(HSBK(0, 0, 1.0, 3500))
 
 # Breathe purple 10 times
-await light.breathe(HSBK.from_rgb(128, 0, 128), cycles=10)
+await light.breathe(HSBK.from_rgb(0.5, 0.0, 0.5), cycles=10)
 ```
 
 Source code in `src/lifx/devices/light.py`
@@ -3800,7 +3800,7 @@ async def breathe(
         await light.breathe(HSBK(0, 0, 1.0, 3500))
 
         # Breathe purple 10 times
-        await light.breathe(HSBK.from_rgb(128, 0, 128), cycles=10)
+        await light.breathe(HSBK.from_rgb(0.5, 0.0, 0.5), cycles=10)
         ```
     """
     await self.set_waveform(
@@ -5051,7 +5051,7 @@ async with light:
 
     # Set all zones to red
     await light.set_color_zones(
-        start=0, end=zone_count - 1, color=HSBK.from_rgb(255, 0, 0)
+        start=0, end=zone_count - 1, color=HSBK.from_rgb(1.0, 0.0, 0.0)
     )
 
     # Get colors for first 5 zones
@@ -5609,10 +5609,12 @@ Example
 
 ```python
 # Set zones 0-9 to red
-await light.set_color_zones(0, 9, HSBK.from_rgb(255, 0, 0))
+await light.set_color_zones(0, 9, HSBK.from_rgb(1.0, 0.0, 0.0))
 
 # Set with transition
-await light.set_color_zones(0, 9, HSBK.from_rgb(0, 255, 0), duration=2.0)
+await light.set_color_zones(
+    0, 9, HSBK.from_rgb(0.0, 1.0, 0.0), duration=2.0
+)
 
 # Batch updates
 await light.set_color_zones(
@@ -5655,10 +5657,12 @@ async def set_color_zones(
     Example:
         ```python
         # Set zones 0-9 to red
-        await light.set_color_zones(0, 9, HSBK.from_rgb(255, 0, 0))
+        await light.set_color_zones(0, 9, HSBK.from_rgb(1.0, 0.0, 0.0))
 
         # Set with transition
-        await light.set_color_zones(0, 9, HSBK.from_rgb(0, 255, 0), duration=2.0)
+        await light.set_color_zones(
+            0, 9, HSBK.from_rgb(0.0, 1.0, 0.0), duration=2.0
+        )
 
         # Batch updates
         await light.set_color_zones(
@@ -6430,7 +6434,7 @@ Zone Addressing:
 
 Example
 
-> > > async with await MatrixLight.from_ip("192.168.1.100") as matrix: ... # Get device chain info ... chain = await matrix.get_device_chain() ... print(f"Device has {len(chain)} tile(s)") ... ... # Set colors on first tile (8x8 = 64 zones) ... colors = [HSBK.from_rgb(255, 0, 0)] * 64 ... await matrix.set64(tile_index=0, colors=colors, width=8)
+> > > async with await MatrixLight.from_ip("192.168.1.100") as matrix: ... # Get device chain info ... chain = await matrix.get_device_chain() ... print(f"Device has {len(chain)} tile(s)") ... ... # Set colors on first tile (8x8 = 64 zones) ... colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64 ... await matrix.set64(tile_index=0, colors=colors, width=8)
 
 See :class:`Light` for parameter documentation.
 
@@ -6940,7 +6944,7 @@ Example
 
 > > > ###### Set 8x8 tile to red
 > > >
-> > > colors = [HSBK.from_rgb(255, 0, 0)] * 64 await matrix.set64( ... tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colors ... )
+> > > colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64 await matrix.set64( ... tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colors ... )
 
 Source code in `src/lifx/devices/matrix.py`
 
@@ -6973,7 +6977,7 @@ async def set64(
 
     Example:
         >>> # Set 8x8 tile to red
-        >>> colors = [HSBK.from_rgb(255, 0, 0)] * 64
+        >>> colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64
         >>> await matrix.set64(
         ...     tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colors
         ... )
@@ -7175,7 +7179,7 @@ Example
 
 > > > ###### Set entire tile to solid red (uses SetColor packet)
 > > >
-> > > colors = [HSBK.from_rgb(255, 0, 0)] * 64 await matrix.set_matrix_colors(tile_index=0, colors=colors)
+> > > colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64 await matrix.set_matrix_colors(tile_index=0, colors=colors)
 > > >
 > > > ###### Set 8x8 tile to gradient (uses set64 with zones)
 > > >
@@ -7200,7 +7204,7 @@ async def set_matrix_colors(
 
     Example:
         >>> # Set entire tile to solid red (uses SetColor packet)
-        >>> colors = [HSBK.from_rgb(255, 0, 0)] * 64
+        >>> colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64
         >>> await matrix.set_matrix_colors(tile_index=0, colors=colors)
 
         >>> # Set 8x8 tile to gradient (uses set64 with zones)

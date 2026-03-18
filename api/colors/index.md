@@ -9,7 +9,7 @@ The `HSBK` class represents colors in the Hue, Saturation, Brightness, Kelvin co
 ### HSBK
 
 ```python
-HSBK(hue: int, saturation: float, brightness: float, kelvin: int)
+HSBK(hue: float, saturation: float, brightness: float, kelvin: int)
 ```
 
 User-friendly HSBK color representation.
@@ -18,7 +18,7 @@ LIFX devices use HSBK (Hue, Saturation, Brightness, Kelvin) color space. This cl
 
 | ATTRIBUTE    | DESCRIPTION                                                                           |
 | ------------ | ------------------------------------------------------------------------------------- |
-| `hue`        | Hue value in degrees (0-360) **TYPE:** `int`                                          |
+| `hue`        | Hue value in degrees (0-360) **TYPE:** `float`                                        |
 | `saturation` | Saturation (0.0-1.0, where 0 is white and 1 is fully saturated) **TYPE:** `float`     |
 | `brightness` | Brightness (0.0-1.0, where 0 is off and 1 is full brightness) **TYPE:** `float`       |
 | `kelvin`     | Color temperature in Kelvin (1500-9000, typically 2500-9000 for LIFX) **TYPE:** `int` |
@@ -30,7 +30,7 @@ Example
 red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
 
 # Create from RGB
-purple = HSBK.from_rgb(128, 0, 128)
+purple = HSBK.from_rgb(0.5, 0.0, 0.5)
 
 # Convert to RGB
 r, g, b = purple.to_rgb()
@@ -62,7 +62,7 @@ Source code in `src/lifx/color.py`
 
 ```python
 def __init__(
-    self, hue: int, saturation: float, brightness: float, kelvin: int
+    self, hue: float, saturation: float, brightness: float, kelvin: int
 ) -> None:
     """Instantiate a color using hue, saturation, brightness and kelvin."""
 
@@ -82,10 +82,10 @@ def __init__(
 ##### hue
 
 ```python
-hue: int
+hue: float
 ```
 
-Return hue.
+Return hue (rounded to nearest integer degree for display).
 
 ##### saturation
 
@@ -93,7 +93,7 @@ Return hue.
 saturation: float
 ```
 
-Return saturation.
+Return saturation (rounded to 2 decimal places for display).
 
 ##### brightness
 
@@ -101,7 +101,7 @@ Return saturation.
 brightness: float
 ```
 
-Return brightness.
+Return brightness (rounded to 2 decimal places for display).
 
 ##### kelvin
 
@@ -197,88 +197,78 @@ def __repr__(self) -> str:
 ##### from_rgb
 
 ```python
-from_rgb(red: int, green: int, blue: int) -> HSBK
+from_rgb(red: float, green: float, blue: float) -> HSBK
 ```
 
 Create HSBK from RGB values.
 
-| PARAMETER | DESCRIPTION                             |
-| --------- | --------------------------------------- |
-| `red`     | Red component (0-255) **TYPE:** `int`   |
-| `green`   | Green component (0-255) **TYPE:** `int` |
-| `blue`    | Blue component (0-255) **TYPE:** `int`  |
+| PARAMETER | DESCRIPTION                                 |
+| --------- | ------------------------------------------- |
+| `red`     | Red component (0.0-1.0) **TYPE:** `float`   |
+| `green`   | Green component (0.0-1.0) **TYPE:** `float` |
+| `blue`    | Blue component (0.0-1.0) **TYPE:** `float`  |
 
 | RETURNS | DESCRIPTION   |
 | ------- | ------------- |
 | `HSBK`  | HSBK instance |
 
-| RAISES       | DESCRIPTION                            |
-| ------------ | -------------------------------------- |
-| `ValueError` | If RGB values are out of range (0-255) |
+| RAISES       | DESCRIPTION                              |
+| ------------ | ---------------------------------------- |
+| `ValueError` | If RGB values are out of range (0.0-1.0) |
 
 Example
 
 ```python
 # Pure red
-red = HSBK.from_rgb(255, 0, 0)
+red = HSBK.from_rgb(1.0, 0.0, 0.0)
 
-# Purple with warm white
-purple = HSBK.from_rgb(128, 0, 128, kelvin=2500)
+# Purple
+purple = HSBK.from_rgb(0.5, 0.0, 0.5)
 ```
 
 Source code in `src/lifx/color.py`
 
 ````python
 @classmethod
-def from_rgb(cls, red: int, green: int, blue: int) -> HSBK:
+def from_rgb(cls, red: float, green: float, blue: float) -> HSBK:
     """Create HSBK from RGB values.
 
     Args:
-        red: Red component (0-255)
-        green: Green component (0-255)
-        blue: Blue component (0-255)
+        red: Red component (0.0-1.0)
+        green: Green component (0.0-1.0)
+        blue: Blue component (0.0-1.0)
 
     Returns:
         HSBK instance
 
     Raises:
-        ValueError: If RGB values are out of range (0-255)
+        ValueError: If RGB values are out of range (0.0-1.0)
 
     Example:
         ```python
         # Pure red
-        red = HSBK.from_rgb(255, 0, 0)
+        red = HSBK.from_rgb(1.0, 0.0, 0.0)
 
-        # Purple with warm white
-        purple = HSBK.from_rgb(128, 0, 128, kelvin=2500)
+        # Purple
+        purple = HSBK.from_rgb(0.5, 0.0, 0.5)
         ```
     """
 
-    def _validate_rgb_component(value: int, name: str) -> None:
-        if not (0 <= value <= 255):
-            raise ValueError(f"{name} must be between 0 and 255, got {value}")
+    def _validate_rgb_component(value: float, name: str) -> None:
+        if not (0.0 <= value <= 1.0):
+            raise ValueError(f"{name} must be between 0.0 and 1.0, got {value}")
 
     _validate_rgb_component(red, "Red")
     _validate_rgb_component(green, "Green")
     _validate_rgb_component(blue, "Blue")
 
-    # Normalize to 0-1
-    red_norm = red / 255
-    green_norm = green / 255
-    blue_norm = blue / 255
-
-    # Convert to HSV using colorsys
-    h, s, v = colorsys.rgb_to_hsv(red_norm, green_norm, blue_norm)
-
-    # Convert to LIFX ranges
-    hue = round(h * 360)  # 0-1 -> 0-360
-    saturation = round(s, 2)  # Already 0-1
-    brightness = round(v, 2)  # Already 0-1
+    # Convert to HSV using colorsys (already 0-1 range)
+    h, s, v = colorsys.rgb_to_hsv(red, green, blue)
 
     return cls(
-        hue=hue,
-        saturation=saturation,
-        brightness=brightness,
+        hue=h * 360,  # 0-1 -> 0-360
+        saturation=s,
+        brightness=v,
         kelvin=KELVIN_NEUTRAL,
     )
 ````
@@ -286,56 +276,44 @@ def from_rgb(cls, red: int, green: int, blue: int) -> HSBK:
 ##### to_rgb
 
 ```python
-to_rgb() -> tuple[int, int, int]
+to_rgb() -> tuple[float, float, float]
 ```
 
 Convert HSBK to RGB values.
 
 Color temperature (kelvin) is not considered in this conversion, as it only affects the white point of the device.
 
-| RETURNS                | DESCRIPTION                                   |
-| ---------------------- | --------------------------------------------- |
-| `tuple[int, int, int]` | Tuple of (red, green, blue) with values 0-255 |
+| RETURNS                      | DESCRIPTION                                     |
+| ---------------------------- | ----------------------------------------------- |
+| `tuple[float, float, float]` | Tuple of (red, green, blue) with values 0.0-1.0 |
 
 Example
 
 ```python
 color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
-r, g, b = color.to_rgb()  # Returns (0, 255, 0) - green
+r, g, b = color.to_rgb()  # Returns (0.0, 1.0, 0.0) - green
 ```
 
 Source code in `src/lifx/color.py`
 
 ````python
-def to_rgb(self) -> tuple[int, int, int]:
+def to_rgb(self) -> tuple[float, float, float]:
     """Convert HSBK to RGB values.
 
     Color temperature (kelvin) is not considered in this conversion,
     as it only affects the white point of the device.
 
     Returns:
-        Tuple of (red, green, blue) with values 0-255
+        Tuple of (red, green, blue) with values 0.0-1.0
 
     Example:
         ```python
         color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
-        r, g, b = color.to_rgb()  # Returns (0, 255, 0) - green
+        r, g, b = color.to_rgb()  # Returns (0.0, 1.0, 0.0) - green
         ```
     """
-    # Convert to colorsys ranges
     h = self._hue / 360  # 0-360 -> 0-1
-    s = self._saturation  # Already 0-1
-    v = self._brightness  # Already 0-1
-
-    # Convert using colorsys
-    red_norm, green_norm, blue_norm = colorsys.hsv_to_rgb(h, s, v)
-
-    # Scale to 0-255 and round
-    red = int(round(red_norm * 255))
-    green = int(round(green_norm * 255))
-    blue = int(round(blue_norm * 255))
-
-    return red, green, blue
+    return colorsys.hsv_to_rgb(h, self._saturation, self._brightness)
 ````
 
 ##### to_protocol
@@ -461,14 +439,14 @@ def from_protocol(cls, protocol: LightHsbk) -> HSBK:
 ##### with_hue
 
 ```python
-with_hue(hue: int) -> HSBK
+with_hue(hue: float) -> HSBK
 ```
 
 Create a new HSBK with modified hue.
 
-| PARAMETER | DESCRIPTION                           |
-| --------- | ------------------------------------- |
-| `hue`     | New hue value (0-360) **TYPE:** `int` |
+| PARAMETER | DESCRIPTION                             |
+| --------- | --------------------------------------- |
+| `hue`     | New hue value (0-360) **TYPE:** `float` |
 
 | RETURNS | DESCRIPTION       |
 | ------- | ----------------- |
@@ -477,7 +455,7 @@ Create a new HSBK with modified hue.
 Source code in `src/lifx/color.py`
 
 ```python
-def with_hue(self, hue: int) -> HSBK:
+def with_hue(self, hue: float) -> HSBK:
     """Create a new HSBK with modified hue.
 
     Args:
@@ -488,9 +466,9 @@ def with_hue(self, hue: int) -> HSBK:
     """
     return HSBK(
         hue=hue,
-        saturation=self.saturation,
-        brightness=self.brightness,
-        kelvin=self.kelvin,
+        saturation=self._saturation,
+        brightness=self._brightness,
+        kelvin=self._kelvin,
     )
 ```
 
@@ -523,10 +501,10 @@ def with_saturation(self, saturation: float) -> HSBK:
         New HSBK instance
     """
     return HSBK(
-        hue=self.hue,
+        hue=self._hue,
         saturation=saturation,
-        brightness=self.brightness,
-        kelvin=self.kelvin,
+        brightness=self._brightness,
+        kelvin=self._kelvin,
     )
 ```
 
@@ -559,10 +537,10 @@ def with_brightness(self, brightness: float) -> HSBK:
         New HSBK instance
     """
     return HSBK(
-        hue=self.hue,
-        saturation=self.saturation,
+        hue=self._hue,
+        saturation=self._saturation,
         brightness=brightness,
-        kelvin=self.kelvin,
+        kelvin=self._kelvin,
     )
 ```
 
@@ -595,9 +573,9 @@ def with_kelvin(self, kelvin: int) -> HSBK:
         New HSBK instance
     """
     return HSBK(
-        hue=self.hue,
-        saturation=self.saturation,
-        brightness=self.brightness,
+        hue=self._hue,
+        saturation=self._saturation,
+        brightness=self._brightness,
         kelvin=kelvin,
     )
 ```
@@ -1005,12 +983,12 @@ color = Colors.BLUE
 # Create custom colors
 custom = HSBK(hue=180.0, saturation=1.0, brightness=0.8, kelvin=3500)
 
-# Create from RGB
-red = HSBK.from_rgb(255, 0, 0, kelvin=3500)
+# Create from RGB (0.0-1.0)
+red = HSBK.from_rgb(1.0, 0.0, 0.0)
 
-# Convert to RGB
+# Convert to RGB (returns 0.0-1.0)
 r, g, b = Colors.BLUE.to_rgb()
-print(f"RGB: ({r}, {g}, {b})")
+print(f"RGB: ({r:.2f}, {g:.2f}, {b:.2f})")
 ```
 
 ### Color Components
@@ -1083,16 +1061,15 @@ The `Colors` class provides these preset colors:
 
 When converting from RGB to HSBK, note that:
 
-- RGB values are 0-255
-- The Kelvin value must be specified (default: 3500K)
-- Some RGB colors may not have exact HSBK equivalents
-- Conversion uses standard HSV formulas with brightness mapping
+- RGB values are floats in the range 0.0-1.0
+- Kelvin defaults to 3500K (neutral)
+- Conversion uses standard HSV formulas via Python's `colorsys`
 
 ### HSBK to RGB
 
 When converting from HSBK to RGB:
 
-- Returns tuple of (r, g, b) with values 0-255
+- Returns tuple of (r, g, b) with float values 0.0-1.0
 - Kelvin temperature is not represented in RGB
 - White colors (saturation=0) will be pure gray values
-- Conversion is lossy - converting back may not yield the same HSBK
+- Round-trip conversion (`from_rgb` -> `to_rgb`) preserves values within floating-point epsilon
