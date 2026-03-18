@@ -107,7 +107,7 @@ async def main():
 
     # Find device with exact label match
     async for device in find_by_label("Living Room", exact_match=True):
-        await device.set_color(Colors.WARM_WHITE)
+        await device.set_color(Colors.WARM)
         break  # exact_match returns at most one device
 ```
 

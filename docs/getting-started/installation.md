@@ -2,7 +2,7 @@
 
 ## System Requirements
 
-- **Python**: 3.11 or higher
+- **Python**: 3.10 or higher
 - **Network**: Local network access to LIFX devices
 - **OS**: Linux, macOS, Windows
 
@@ -44,7 +44,7 @@ For the latest development version:
 
 ```bash
 git clone https://github.com/Djelibeybi/lifx-async.git
-cd lifx
+cd lifx-async
 
 # Using uv (recommended)
 uv pip install -e .
@@ -59,7 +59,7 @@ To install with development tools (recommended for contributors):
 
 ```bash
 git clone https://github.com/Djelibeybi/lifx-async.git
-cd lifx
+cd lifx-async
 
 # Using uv (recommended)
 uv sync
@@ -86,11 +86,10 @@ from lifx import discover
 
 
 async def main():
-    async with discover(timeout=3.0) as group:
-        print(f"Found {len(group)} devices")
-        for device in group:
+    async for device in discover(timeout=3.0):
+        async with device:
             label = await device.get_label()
-            print(f"  - {label}")
+            print(f"Found: {label}")
 
 
 asyncio.run(main())

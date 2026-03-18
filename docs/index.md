@@ -61,7 +61,7 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
             await light.set_color(red)
 
             # Use presets
-            await light.set_color(Colors.WARM_WHITE)
+            await light.set_color(Colors.WARM)
 
             # Custom HSBK
             custom = HSBK(
@@ -89,7 +89,7 @@ For development:
 
 ```bash
 git clone https://github.com/Djelibeybi/lifx-async.git
-cd lifx
+cd lifx-async
 uv sync
 ```
 
@@ -100,11 +100,11 @@ uv sync
 - **Async For** and **Async With**: extensive use of asynchronous generators and context managers
 - **Async/Await**: Native asyncio support for concurrent operations
 - **Type Hints**: Full type annotations for better IDE support
-- **Python 3.11+**: Modern language features and performance
+- **Python 3.10+**: Modern language features and performance
 
 ### Reliable
 
-- **Comprehensive Tests**: over 700 tests covering over 90% of the source code
+- **Comprehensive Tests**: 2425+ tests covering over 90% of the source code
 - **Lazy Connections**: Auto-open on first request
 - **Stores State**: Reduces network traffic
 
@@ -117,7 +117,7 @@ uv sync
 
 ## Support
 
-- **Documentation**: [https://lifx.readthedocs.io](https://lifx.readthedocs.io)
+- **Documentation**: [https://djelibeybi.github.io/lifx-async/](https://djelibeybi.github.io/lifx-async/)
 - **Issues**: [GitHub Issues](https://github.com/Djelibeybi/lifx-async/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Djelibeybi/lifx-async/discussions)
 

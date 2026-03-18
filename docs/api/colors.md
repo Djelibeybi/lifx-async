@@ -108,8 +108,8 @@ The `Colors` class provides these preset colors:
 - `Colors.BLUE` - Blue
 - `Colors.PURPLE` - Purple
 - `Colors.PINK` - Pink
-- `Colors.WARM_WHITE` - Warm white (2500K)
-- `Colors.COOL_WHITE` - Cool white (6500K)
+- `Colors.WARM` - Warm white (2500K)
+- `Colors.COOL` - Cool white (6500K)
 
 ## Color Conversion Notes
 
