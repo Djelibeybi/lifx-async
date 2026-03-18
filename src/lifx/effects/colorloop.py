@@ -329,7 +329,7 @@ class EffectColorloop(FrameEffect):
         """
         # Ensure capabilities are loaded
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
 
         # Check if light has color support
         return light.capabilities.has_color if light.capabilities else False

@@ -173,7 +173,7 @@ class FrameBuffer:
 
         # Ensure capabilities are loaded
         if device.capabilities is None:
-            await device._ensure_capabilities()
+            await device.ensure_capabilities()
 
         # Only build canvas mapping for devices with chain capability.
         # The original LIFX Tile is the only matrix device with accelerometer-based

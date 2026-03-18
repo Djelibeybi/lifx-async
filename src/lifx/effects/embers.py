@@ -111,7 +111,7 @@ class EffectEmbers(FrameEffect):
 
     Attributes:
         intensity: Probability of heat injection per frame (0.0-1.0)
-        cooling: Cooling factor per diffusion step (0.80-0.999)
+        cooling: Cooling factor per diffusion step (0.0-1.0)
         turbulence: Random per-cell flicker amplitude (0.0-0.3)
         brightness: Overall brightness (0.0-1.0)
         kelvin: Color temperature (1500-9000)
@@ -306,7 +306,7 @@ class EffectEmbers(FrameEffect):
             True if light has color support and is not a matrix device
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         if light.capabilities is None:
             return False
         # Embers does not support matrix devices

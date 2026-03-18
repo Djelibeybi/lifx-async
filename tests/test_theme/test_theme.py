@@ -274,5 +274,5 @@ class TestPaletteThemes:
 
     def test_palette_names_dont_collide_with_existing(self) -> None:
         """Palette names should not collide with existing themes."""
-        all_names = ThemeLibrary.list()
+        all_names = ThemeLibrary.get_available_themes()
         assert len(all_names) == len(set(all_names))

@@ -267,7 +267,7 @@ class EffectProgress(FrameEffect):
             True if light has multizone support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_multizone if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

@@ -761,6 +761,15 @@ class Device(Generic[StateT]):
         host_firmware = await self.get_host_firmware()
         self._process_capabilities(version, host_firmware)
 
+    async def ensure_capabilities(self) -> None:
+        """Ensure device capabilities are populated.
+
+        Fetches device version and firmware to determine product capabilities.
+        This is a no-op if capabilities have already been loaded (e.g. via
+        the async context manager).
+        """
+        await self._ensure_capabilities()
+
     @property
     def capabilities(self) -> ProductInfo | None:
         """Get device product capabilities.

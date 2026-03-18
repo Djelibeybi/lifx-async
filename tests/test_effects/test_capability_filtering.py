@@ -22,7 +22,7 @@ def color_light() -> MagicMock:
     capabilities = MagicMock()
     capabilities.has_color = True
     light.capabilities = capabilities
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     # Mock methods
     light.get_power = AsyncMock(return_value=True)
@@ -51,7 +51,7 @@ def white_light() -> MagicMock:
     capabilities = MagicMock()
     capabilities.has_color = False
     light.capabilities = capabilities
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     # Mock methods
     light.get_power = AsyncMock(return_value=True)
@@ -135,7 +135,7 @@ async def test_colorloop_with_all_color_lights(color_light) -> None:
     capabilities = MagicMock()
     capabilities.has_color = True
     color_light2.capabilities = capabilities
-    color_light2._ensure_capabilities = AsyncMock()
+    color_light2.ensure_capabilities = AsyncMock()
     color_light2.get_power = AsyncMock(return_value=True)
     color_light2.get_color = AsyncMock(
         return_value=(
@@ -173,13 +173,13 @@ async def test_colorloop_with_light_without_cached_capabilities() -> None:
     # Initially no capabilities cached
     light.capabilities = None
 
-    # Mock _ensure_capabilities to set capabilities
+    # Mock ensure_capabilities to set capabilities
     async def ensure_caps() -> None:
         caps = MagicMock()
         caps.has_color = True
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
     light.get_power = AsyncMock(return_value=True)
     light.get_color = AsyncMock(
         return_value=(
@@ -195,7 +195,7 @@ async def test_colorloop_with_light_without_cached_capabilities() -> None:
     await conductor.start(effect, [light])
 
     # Capabilities should have been loaded
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
     # Light should be running
     assert light.serial in conductor._running

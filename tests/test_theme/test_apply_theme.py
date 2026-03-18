@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -22,91 +22,92 @@ class TestLightApplyTheme:
     ) -> None:
         """Test that apply_theme selects a random color from theme."""
         light = emulator_devices[0]
-
-        light.set_color = AsyncMock()
-        light.set_power = AsyncMock()
-        light.get_power = AsyncMock(return_value=False)
         theme = Theme([Colors.RED, Colors.BLUE, Colors.GREEN])
 
-        await light.apply_theme(theme)
+        with (
+            patch.object(light, "set_color", new_callable=AsyncMock) as mock_set_color,
+            patch.object(light, "set_power", new_callable=AsyncMock) as mock_set_power,
+            patch.object(
+                light, "get_power", new_callable=AsyncMock, return_value=False
+            ),
+        ):
+            await light.apply_theme(theme)
 
-        # Verify set_color was called
-        light.set_color.assert_called_once()
-        args, kwargs = light.set_color.call_args
-        assert isinstance(args[0], HSBK)
-        assert kwargs.get("duration", 0.0) == 0.0
+            # Verify set_color was called
+            mock_set_color.assert_called_once()
+            args, kwargs = mock_set_color.call_args
+            assert isinstance(args[0], HSBK)
+            assert kwargs.get("duration", 0.0) == 0.0
 
-        # Verify set_power was not called
-        light.set_power.assert_not_called()
-
-        light.set_color.reset_mock()
-        light.set_power.reset_mock()
-        light.get_power.reset_mock()
+            # Verify set_power was not called
+            mock_set_power.assert_not_called()
 
     async def test_apply_theme_with_duration(
         self, emulator_devices: DeviceGroup
     ) -> None:
         """Test apply_theme with transition duration."""
         light = emulator_devices[0]
-
-        light.get_power = AsyncMock(return_value=True)
         theme = Theme([Colors.RED, Colors.BLUE])
 
-        await light.apply_theme(theme, duration=1.5)
+        with (
+            patch.object(light, "set_color", new_callable=AsyncMock) as mock_set_color,
+            patch.object(light, "set_power", new_callable=AsyncMock),
+            patch.object(light, "get_power", new_callable=AsyncMock, return_value=True),
+        ):
+            await light.apply_theme(theme, duration=1.5)
 
-        light.set_color.assert_called_once()
-        args, kwargs = light.set_color.call_args
-        assert kwargs.get("duration", 0.0) == 1.5
-
-        light.set_color.reset_mock()
-        light.set_power.reset_mock()
-        light.get_power.reset_mock()
+            mock_set_color.assert_called_once()
+            args, kwargs = mock_set_color.call_args
+            assert kwargs.get("duration", 0.0) == 1.5
 
     async def test_apply_theme_with_power_on(
         self, emulator_devices: DeviceGroup
     ) -> None:
         """Test apply_theme with power_on=True."""
         light = emulator_devices[0]
-        light.get_power = AsyncMock(return_value=False)
-
         theme = Theme([Colors.RED])
 
-        await light.apply_theme(theme, power_on=True)
+        with (
+            patch.object(light, "set_color", new_callable=AsyncMock) as mock_set_color,
+            patch.object(light, "set_power", new_callable=AsyncMock) as mock_set_power,
+            patch.object(
+                light, "get_power", new_callable=AsyncMock, return_value=False
+            ),
+        ):
+            await light.apply_theme(theme, power_on=True)
 
-        light.set_color.assert_called_once()
-        light.set_power.assert_called_once()
-        # Check that set_power was called with True (and default duration)
-        args, kwargs = light.set_power.call_args
-        assert args[0] is True
-
-        light.set_color.reset_mock()
-        light.set_power.reset_mock()
-        light.get_power.reset_mock()
+            mock_set_color.assert_called_once()
+            mock_set_power.assert_called_once()
+            # Check that set_power was called with True (and default duration)
+            args, kwargs = mock_set_power.call_args
+            assert args[0] is True
 
     async def test_apply_theme_color_from_theme(
         self, emulator_devices: DeviceGroup
     ) -> None:
         """Test that apply_theme receives a color from the theme."""
         light = emulator_devices[0]
-
         original_color = HSBK(hue=45, saturation=0.8, brightness=0.9, kelvin=4000)
         theme = Theme([original_color])
 
-        await light.apply_theme(theme)
+        with (
+            patch.object(light, "set_color", new_callable=AsyncMock) as mock_set_color,
+            patch.object(light, "set_power", new_callable=AsyncMock),
+            patch.object(
+                light, "get_power", new_callable=AsyncMock, return_value=False
+            ),
+        ):
+            await light.apply_theme(theme)
 
-        # Get the color that was passed to set_color
-        args, _ = light.set_color.call_args
-        applied_color = args[0]
+            # Get the color that was passed to set_color
+            args, _ = mock_set_color.call_args
+            applied_color = args[0]
 
-        # Should have same values as the color in the theme
-        assert applied_color.hue == original_color.hue
-        assert applied_color.saturation == original_color.saturation
-        assert applied_color.brightness == original_color.brightness
-        assert applied_color.kelvin == original_color.kelvin
-
-        light.set_color.reset_mock()
-        light.set_power.reset_mock()
-        light.get_power.reset_mock()
+            # Should have same values as the color in the theme
+            assert applied_color.hue == original_color.hue
+            assert applied_color.saturation == original_color.saturation
+            assert applied_color.brightness == original_color.brightness
+            assert applied_color.kelvin == original_color.kelvin
 
 
 class TestMultiZoneLightApplyTheme:

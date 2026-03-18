@@ -206,7 +206,10 @@ class EffectNewtonsCradle(FrameEffect):
                 x_rel = (z - cx) / half
                 if abs(x_rel) >= 1.0:
                     continue
-                bulb_colors[z] = self._shade(x_rel)
+                shaded = self._shade(x_rel)
+                # Keep the brighter color when balls overlap.
+                if shaded.brightness > bulb_colors[z].brightness:
+                    bulb_colors[z] = shaded
 
         # Expand logical bulbs to physical zones
         if self.zones_per_bulb == 1:
@@ -354,7 +357,7 @@ class EffectNewtonsCradle(FrameEffect):
             True if light has multizone support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_multizone if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

@@ -278,7 +278,7 @@ async def test_is_light_compatible_color_required_with_color_support() -> None:
         async def is_light_compatible(self, light) -> bool:
             """Require color capability."""
             if light.capabilities is None:
-                await light._ensure_capabilities()
+                await light.ensure_capabilities()
             return light.capabilities.has_color if light.capabilities else False
 
     effect = ColorEffect()
@@ -301,7 +301,7 @@ async def test_is_light_compatible_color_required_without_color_support() -> Non
         async def is_light_compatible(self, light) -> bool:
             """Require color capability."""
             if light.capabilities is None:
-                await light._ensure_capabilities()
+                await light.ensure_capabilities()
             return light.capabilities.has_color if light.capabilities else False
 
     effect = ColorEffect()
@@ -324,7 +324,7 @@ async def test_is_light_compatible_loads_capabilities() -> None:
         async def is_light_compatible(self, light) -> bool:
             """Require color capability."""
             if light.capabilities is None:
-                await light._ensure_capabilities()
+                await light.ensure_capabilities()
             return light.capabilities.has_color if light.capabilities else False
 
     effect = ColorEffect()
@@ -333,19 +333,19 @@ async def test_is_light_compatible_loads_capabilities() -> None:
     light = MagicMock()
     light.serial = "d073d5nocaps"
     light.capabilities = None
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     # After loading, set capabilities
     async def mock_ensure_capabilities():
         light.capabilities = MagicMock()
         light.capabilities.has_color = True
 
-    light._ensure_capabilities.side_effect = mock_ensure_capabilities
+    light.ensure_capabilities.side_effect = mock_ensure_capabilities
 
     is_compatible = await effect.is_light_compatible(light)
 
     # Should have loaded capabilities
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
     assert is_compatible is True
 
 
@@ -359,7 +359,7 @@ async def test_is_light_compatible_custom_implementation() -> None:
         async def is_light_compatible(self, light) -> bool:
             """Require multizone capability."""
             if light.capabilities is None:
-                await light._ensure_capabilities()
+                await light.ensure_capabilities()
             return light.capabilities.has_multizone if light.capabilities else False
 
     effect = CustomEffect()

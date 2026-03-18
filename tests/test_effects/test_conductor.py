@@ -24,7 +24,7 @@ def _make_color_light(serial: str, ip: str = "192.168.1.100") -> MagicMock:
     capabilities.has_multizone = False
     capabilities.has_matrix = False
     light.capabilities = capabilities
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     light.get_power = AsyncMock(return_value=True)
     light.get_color = AsyncMock(
@@ -57,7 +57,7 @@ class _SimpleFrameEffect(FrameEffect):
 
     async def is_light_compatible(self, light: Light) -> bool:
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_color if light.capabilities else False
 
 

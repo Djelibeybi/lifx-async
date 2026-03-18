@@ -490,10 +490,10 @@ async def test_plasma2d_is_light_compatible_none_capabilities() -> None:
         caps.has_matrix = True
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is True
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -502,7 +502,7 @@ async def test_plasma2d_is_light_compatible_none_after_ensure() -> None:
     effect = EffectPlasma2D()
     light = MagicMock()
     light.capabilities = None
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     assert await effect.is_light_compatible(light) is False
 

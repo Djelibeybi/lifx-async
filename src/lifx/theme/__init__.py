@@ -25,7 +25,7 @@ Example:
     await light.apply_theme(theme, power_on=True)
 
     # List available themes
-    all_themes = ThemeLibrary.list()
+    all_themes = ThemeLibrary.get_available_themes()
     ```
 """
 

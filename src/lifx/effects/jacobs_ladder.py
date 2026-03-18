@@ -276,6 +276,7 @@ class EffectJacobsLadder(FrameEffect):
         bulb_hue: list[int] = [0] * bulb_count
         bulb_sat: list[float] = [0.0] * bulb_count
         bulb_bri: list[float] = [0.0] * bulb_count
+        bulb_peak: list[float] = [0.0] * bulb_count
 
         for arc in self._arc_pairs:
             left: float = arc.left_edge()
@@ -339,7 +340,8 @@ class EffectJacobsLadder(FrameEffect):
 
                 # Additive blend with existing buffer.
                 bulb_bri[b] = min(1.0, bulb_bri[b] + intensity)
-                if intensity > bulb_sat[b]:
+                if intensity > bulb_peak[b]:
+                    bulb_peak[b] = intensity
                     bulb_hue[b] = _ARC_HUE_DEG
                     bulb_sat[b] = sat
 
@@ -405,7 +407,7 @@ class EffectJacobsLadder(FrameEffect):
             True if light has multizone support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_multizone if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

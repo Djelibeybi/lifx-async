@@ -226,7 +226,7 @@ class EffectPlasma2D(FrameEffect):
             True if light has matrix support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_matrix if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

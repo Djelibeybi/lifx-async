@@ -6,9 +6,8 @@ trail. At the apex, a burst creates a gaussian brightness bloom that
 expands over time. Color evolves: white-hot flash, peak chemical color
 (random hue), then cooling toward warm orange.
 
-Overlapping bursts use additive RGB blending via ``HSBK.to_rgb()`` /
-``HSBK.from_rgb()`` for physically correct color mixing (red + green =
-yellow, two reds = brighter red).
+Overlapping bursts use additive RGB blending for physically correct
+color mixing (red + green = yellow, two reds = brighter red).
 
 This effect is designed for multizone (strip/beam) LIFX devices.
 """
@@ -251,7 +250,7 @@ class EffectFireworks(FrameEffect):
             power_on: Power on devices if off (default True)
             max_rockets: Maximum simultaneous rockets, 1-20 (default 3)
             launch_rate: Average launches per second, 0.05-5.0 (default 0.5)
-            ascent_speed: Zones per second travel speed, 1.0-60.0 (default 0.3)
+            ascent_speed: Zones per second travel speed, 0.1-60.0 (default 0.3)
             burst_spread: Max burst radius in zones, 2.0-60.0 (default 5.0)
             burst_duration: Seconds for burst fade, 0.2-8.0 (default 2.0)
             brightness: Peak brightness 0.0-1.0 (default 0.8)
@@ -547,7 +546,7 @@ class EffectFireworks(FrameEffect):
             True if light has multizone support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_multizone if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
