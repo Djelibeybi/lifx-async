@@ -187,10 +187,7 @@ def _rgb_to_hsb(r: float, g: float, b: float) -> tuple[float, float, float]:
     else:
         hue = 60.0 * (((r - g) / delta) + 4.0)
 
-    if hue < 0.0:
-        hue += 360.0
-
-    return (hue, sat, bri)
+    return (hue % 360.0, sat, bri)
 
 
 # ---------------------------------------------------------------------------
@@ -427,9 +424,7 @@ class EffectFireworks(FrameEffect):
                         1.0 - _BURST_COOL_START
                     )
                     diff = _BURST_COOL_HUE - rocket.burst_hue
-                    if diff > 180.0:
-                        diff -= 360.0
-                    elif diff < -180.0:
+                    if diff < -180.0:
                         diff += 360.0
                     zone_hue = (rocket.burst_hue + diff * cool_frac) % 360.0
                     zone_sat = _BURST_SATURATION * (1.0 - 0.5 * cool_frac)

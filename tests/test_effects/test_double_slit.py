@@ -274,6 +274,20 @@ class TestDoubleSlitGenerateFrame:
         colors = effect.generate_frame(self._ctx(pixel_count=10))
         assert len(colors) == 10
 
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectDoubleSlit(zones_per_bulb=3)
+        colors = effect.generate_frame(self._ctx(pixel_count=17))
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectDoubleSlit(zones_per_bulb=3)
+        colors = effect.generate_frame(self._ctx(pixel_count=1))
+        assert len(colors) == 1
+
     def test_interference_pattern_symmetric(self) -> None:
         """Test that interference pattern is symmetric about center.
 

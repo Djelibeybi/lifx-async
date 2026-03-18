@@ -424,6 +424,20 @@ class TestRule30CellularAutomaton:
         # For rule 30: bit 1 = 1, so cell 4 should be alive
         assert effect._state[4] == 1
 
+    def test_step_on_empty_state_returns_early(self) -> None:
+        """Test _step() returns immediately when state is empty.
+
+        Line 180: if n == 0: return. When _state is an empty list,
+        _step() should do nothing and not crash.
+        """
+        effect = EffectRule30()
+        effect._state = []
+        effect._generation = 0
+        effect._step()
+        # State should remain empty and generation should not increment
+        assert effect._state == []
+        assert effect._generation == 0
+
     def test_rule0_kills_all_cells(self) -> None:
         """Test Rule 0 turns all cells dead regardless of input."""
         effect = EffectRule30(rule=0, seed="all", speed=1.0)
@@ -594,6 +608,34 @@ class TestRule30GenerateFrame:
         # Each pair of adjacent zones should have the same color
         for i in range(0, 8, 2):
             assert colors[i] == colors[i + 1]
+
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectRule30(zones_per_bulb=3, seed="all")
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=17,
+            canvas_width=17,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectRule30(zones_per_bulb=3, seed="all")
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 1
 
     def test_lazy_initialization(self) -> None:
         """Test state is lazily initialized on first generate_frame call."""

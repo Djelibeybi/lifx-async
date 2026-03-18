@@ -297,6 +297,34 @@ class TestPendulumWaveGenerateFrame:
         for i in range(0, 8, 2):
             assert colors[i] == colors[i + 1]
 
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectPendulumWave(zones_per_bulb=3)
+        ctx = FrameContext(
+            elapsed_s=0.5,
+            device_index=0,
+            pixel_count=17,
+            canvas_width=17,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectPendulumWave(zones_per_bulb=3)
+        ctx = FrameContext(
+            elapsed_s=0.5,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 1
+
     def test_all_pendulums_in_phase_at_start(self) -> None:
         """Test all pendulums start in phase at t=0 (all at sin(0)=0)."""
         effect = EffectPendulumWave(speed=30.0, cycles=8)

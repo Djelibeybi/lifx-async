@@ -340,6 +340,20 @@ class TestEmbersGenerateFrame:
         effect.generate_frame(self._make_ctx(pixel_count=16))
         assert len(effect._heat) == 16
 
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectEmbers(zones_per_bulb=3)
+        colors = effect.generate_frame(self._make_ctx(pixel_count=17))
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectEmbers(zones_per_bulb=3)
+        colors = effect.generate_frame(self._make_ctx(pixel_count=1))
+        assert len(colors) == 1
+
     def test_high_intensity_produces_nonzero_brightness(self) -> None:
         """Test high intensity injects heat, producing visible colors."""
         random.seed(42)

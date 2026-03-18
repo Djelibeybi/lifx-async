@@ -307,6 +307,20 @@ class TestPlasmaGenerateFrame:
         colors = effect.generate_frame(self._make_ctx(pixel_count=10))
         assert len(colors) == 10
 
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectPlasma(zones_per_bulb=3)
+        colors = effect.generate_frame(self._make_ctx(pixel_count=17))
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectPlasma(zones_per_bulb=3)
+        colors = effect.generate_frame(self._make_ctx(pixel_count=1))
+        assert len(colors) == 1
+
     def test_core_glow_at_center(self) -> None:
         """Test that center bulbs have nonzero brightness from the core."""
         effect = EffectPlasma(brightness=0.8)
@@ -733,6 +747,50 @@ class TestPlasmaEdgeCases:
             for color in colors:
                 assert 0.0 <= color.brightness <= 1.0
                 assert 0 <= color.hue <= 360
+
+    def test_tendril_rate_zero_is_dead_code(self) -> None:
+        """Verify line 320 (tendril_rate <= 0 fallback) is dead code.
+
+        The __init__ validates tendril_rate > 0, so the else branch at
+        line 320 can never be reached in normal usage. This test confirms
+        that the validation prevents zero tendril_rate.
+        """
+        with pytest.raises(ValueError, match="Tendril rate must be positive"):
+            EffectPlasma(tendril_rate=0)
+        with pytest.raises(ValueError, match="Tendril rate must be positive"):
+            EffectPlasma(tendril_rate=-1.0)
+
+    def test_tendril_zone_boundary_skip(self) -> None:
+        """Test zones outside bounds are skipped (line 356).
+
+        When a tendril path contains zone indices outside [0, bulb_count),
+        those zones are skipped via the continue statement.
+        """
+        effect = EffectPlasma(brightness=0.8)
+
+        # Manually add a tendril with out-of-bounds zones
+        out_of_bounds_tendril = _Tendril(
+            zones=[-5, -1, 0, 3, 7, 15, 20, 100],
+            birth_t=0.0,
+            lifetime=10.0,
+            hue_off=0.0,
+        )
+        effect._tendrils = [out_of_bounds_tendril]
+        effect._initialized = True
+        effect._next_spawn_t = 999.0  # Suppress auto-spawn
+
+        ctx = FrameContext(
+            elapsed_s=0.0,
+            device_index=0,
+            pixel_count=8,
+            canvas_width=8,
+            canvas_height=1,
+        )
+        # Should not crash; out-of-bounds zones are skipped
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 8
+        for color in colors:
+            assert 0.0 <= color.brightness <= 1.0
 
     def test_hue_wrapping(self) -> None:
         """Test hue values wrap correctly near boundaries."""
