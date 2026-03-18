@@ -58,16 +58,16 @@ Move misplaced content to correct sections and fix troubleshooting cross-links.
 
 ### Tasks
 
-- [ ] Task 3.1: Move `user-guide/protocol-deep-dive.md` → `architecture/protocol-deep-dive.md` — update all internal links within the file; add cross-link from `api/protocol.md` to the deep dive
-- [ ] Task 3.2: Add cross-link from `user-guide/troubleshooting.md` to `user-guide/effects-troubleshooting.md` — add an "Effects Troubleshooting" entry in the troubleshooting guide's table or "See Also" section
-- [ ] Task 3.3: Add cross-links to orphaned API pages — add links to `api/network.md` from `user-guide/advanced-usage.md` and `api/index.md`; add links to `api/high-level.md` from `getting-started/quickstart.md`; add links to `api/colors.md` from `getting-started/quickstart.md` and `user-guide/themes.md`
-- [ ] Task 3.4: Verify Phase 3 — run `uv run mkdocs build` and check for broken links
+- [x] Task 3.1: Move `user-guide/protocol-deep-dive.md` → `architecture/protocol-deep-dive.md` — update all internal links within the file; add cross-link from `api/protocol.md` to the deep dive
+- [x] Task 3.2: Add cross-link from `user-guide/troubleshooting.md` to `user-guide/effects-troubleshooting.md` — add an "Effects Troubleshooting" entry in the troubleshooting guide's table or "See Also" section
+- [x] Task 3.3: Add cross-links to orphaned API pages — add links to `api/network.md` from `user-guide/advanced-usage.md` and `api/index.md`; add links to `api/high-level.md` from `getting-started/quickstart.md`; add links to `api/colors.md` from `getting-started/quickstart.md` and `user-guide/themes.md`
+- [x] Task 3.4: Verify Phase 3 — run `uv run mkdocs build` and check for broken links
 
 ### Verification
 
-- [ ] `uv run mkdocs build` completes with no errors
-- [ ] `architecture/protocol-deep-dive.md` exists
-- [ ] `user-guide/protocol-deep-dive.md` is deleted
+- [x] `uv run mkdocs build` completes with no errors
+- [x] `architecture/protocol-deep-dive.md` exists
+- [x] `user-guide/protocol-deep-dive.md` is deleted
 
 ---
 

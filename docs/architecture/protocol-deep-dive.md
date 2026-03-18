@@ -311,6 +311,6 @@ MIN_DURATION = 0           # Instant
 
 ## Next Steps
 
-- [Connection Management](advanced-usage.md#connection-management) - Connection patterns
-- [API Reference](../api/protocol.md) - Protocol API documentation
-- [Architecture](../architecture/overview.md) - System architecture
+- [Connection Management](../user-guide/advanced-usage.md#connection-management) — Connection patterns
+- [API Reference](../api/protocol.md) — Protocol API documentation
+- [Architecture](overview.md) — System architecture
