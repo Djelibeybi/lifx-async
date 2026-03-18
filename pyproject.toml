@@ -101,6 +101,7 @@ python_functions = ["test_*"]
 addopts = """\
     -v
     -Wdefault
+    -m "not benchmark"
     --cov=lifx
     --cov-branch
     --cov-report=xml
