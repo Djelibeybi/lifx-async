@@ -176,16 +176,23 @@ class TestUdpProtocol:
 
         assert protocol.queue.full()
 
-        # Next packet should be dropped without raising
+        # First drop logs immediately (rate-limited: 1st, then every Nth)
         with patch("lifx.network.transport._LOGGER") as mock_logger:
             protocol.datagram_received(test_data, test_addr)
             mock_logger.warning.assert_called_once()
             log_dict = mock_logger.warning.call_args[0][0]
             assert log_dict["action"] == "packet_dropped"
             assert log_dict["reason"] == "queue_full"
+            assert log_dict["total_dropped"] == 1
+
+        # Subsequent drops are rate-limited (no log until interval)
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            protocol.datagram_received(test_data, test_addr)
+            mock_logger.warning.assert_not_called()
 
         # Queue size should remain at max
         assert protocol.queue.qsize() == protocol._MAX_QUEUE_SIZE
+        assert protocol._dropped_count == 2
 
 
 class TestPacketSizeValidation:
