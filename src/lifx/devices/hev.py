@@ -162,12 +162,7 @@ class HevLight(Light):
         # Update state if it exists
         if self._state is not None and hasattr(self._state, "hev_cycle"):
             self._state.hev_cycle = cycle_state
-            self._state.last_updated = __import__("time").time()
-
-        # Update state if it exists
-        if self._state is not None and hasattr(self._state, "hev_cycle"):
-            self._state.hev_cycle = cycle_state
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
@@ -267,7 +262,7 @@ class HevLight(Light):
         # Update state if it exists
         if self._state is not None and hasattr(self._state, "hev_config"):
             self._state.hev_config = config
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
@@ -368,7 +363,7 @@ class HevLight(Light):
         # Update state if it exists
         if self._state is not None and hasattr(self._state, "hev_result"):
             self._state.hev_result = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {

@@ -215,7 +215,7 @@ async def _discover_with_packet(
 
     expected_response_type: int = getattr(packet, "STATE_TYPE")
     responses: dict[str, DiscoveryResponse] = {}
-    start_time = time.time()
+    start_time = time.monotonic()
 
     async with UdpTransport(port=0, broadcast=True) as transport:
         # Allocate unique source for this discovery session
@@ -230,7 +230,7 @@ async def _discover_with_packet(
             ack_required=False,
         )
 
-        request_time = time.time()
+        request_time = time.monotonic()
         _LOGGER.debug(
             {
                 "class": "_discover_with_packet",
@@ -248,7 +248,7 @@ async def _discover_with_packet(
         last_response_time = request_time
 
         while True:
-            elapsed_since_last = time.time() - last_response_time
+            elapsed_since_last = time.monotonic() - last_response_time
 
             if elapsed_since_last >= idle_timeout:
                 _LOGGER.debug(
@@ -260,23 +260,23 @@ async def _discover_with_packet(
                 )
                 break
 
-            if time.time() - request_time >= timeout:
+            if time.monotonic() - request_time >= timeout:
                 _LOGGER.debug(
                     {
                         "class": "_discover_with_packet",
                         "action": "overall_timeout",
-                        "elapsed": time.time() - request_time,
+                        "elapsed": time.monotonic() - request_time,
                     }
                 )
                 break
 
             remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.time() - request_time)
+            remaining_overall = timeout - (time.monotonic() - request_time)
             remaining = min(remaining_idle, remaining_overall)
 
             try:
                 data, addr = await transport.receive(timeout=remaining)
-                response_timestamp = time.time()
+                response_timestamp = time.monotonic()
             except LifxTimeoutError:
                 break
 
@@ -302,25 +302,10 @@ async def _discover_with_packet(
                 # Extract serial from header
                 device_serial = Serial.from_protocol(header.target).to_string()
 
-                # Dynamically get the response packet class and unpack
-                # We need to find the packet class that matches this pkt_type
-                from lifx.protocol import packets as all_packets
+                # Look up the response packet class by type (O(1) registry lookup)
+                from lifx.protocol.packets import get_packet_class
 
-                response_packet_class = None
-                for category_name in dir(all_packets):
-                    category = getattr(all_packets, category_name)
-                    if not hasattr(category, "__dict__"):
-                        continue
-                    for packet_name in dir(category):
-                        pkt_class = getattr(category, packet_name)
-                        if (
-                            hasattr(pkt_class, "PKT_TYPE")
-                            and pkt_class.PKT_TYPE == header.pkt_type
-                        ):
-                            response_packet_class = pkt_class
-                            break
-                    if response_packet_class:
-                        break
+                response_packet_class = get_packet_class(header.pkt_type)
 
                 if not response_packet_class:
                     _LOGGER.warning(
@@ -392,7 +377,7 @@ async def _discover_with_packet(
                 "class": "_discover_with_packet",
                 "action": "complete",
                 "devices_found": len(responses),
-                "elapsed": time.time() - start_time,
+                "elapsed": time.monotonic() - start_time,
             }
         )
 
@@ -465,7 +450,7 @@ async def discover_devices(
     """
     seen_serials: set[str] = set()
     packet_count = 0
-    start_time = time.time()
+    start_time = time.monotonic()
 
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
@@ -484,7 +469,7 @@ async def discover_devices(
         )
 
         # Send broadcast
-        request_time = time.time()
+        request_time = time.monotonic()
         _LOGGER.debug(
             {
                 "class": "discover_devices",
@@ -505,7 +490,7 @@ async def discover_devices(
         # Collect responses with dynamic timeout
         while True:
             # Calculate elapsed time since last response
-            elapsed_since_last = time.time() - last_response_time
+            elapsed_since_last = time.monotonic() - last_response_time
 
             # Stop if we've been idle too long
             if elapsed_since_last >= idle_timeout:
@@ -521,13 +506,13 @@ async def discover_devices(
                 break
 
             # Stop if we've exceeded the overall timeout
-            if time.time() - request_time >= timeout:
+            if time.monotonic() - request_time >= timeout:
                 _LOGGER.debug(
                     {
                         "class": "discover_devices",
                         "method": "discover",
                         "action": "overall_timeout",
-                        "elapsed": time.time() - request_time,
+                        "elapsed": time.monotonic() - request_time,
                         "timeout": timeout,
                     }
                 )
@@ -535,13 +520,13 @@ async def discover_devices(
 
             # Calculate remaining timeout (use the shorter of idle or overall timeout)
             remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.time() - request_time)
+            remaining_overall = timeout - (time.monotonic() - request_time)
             remaining = min(remaining_idle, remaining_overall)
 
             # Try to receive a packet
             try:
                 data, addr = await transport.receive(timeout=remaining)
-                response_timestamp = time.time()
+                response_timestamp = time.monotonic()
 
             except LifxTimeoutError:
                 # Timeout means no more responses within the idle period
@@ -675,6 +660,6 @@ async def discover_devices(
                 "action": "complete",
                 "devices_found": len(seen_serials),
                 "packets_processed": packet_count,
-                "elapsed": time.time() - start_time,
+                "elapsed": time.monotonic() - start_time,
             }
         )

@@ -136,12 +136,7 @@ class InfraredLight(Light):
         # Update state if it exists
         if self._state is not None and hasattr(self._state, "infrared"):
             self._state.infrared = brightness
-            self._state.last_updated = __import__("time").time()
-
-        # Update state if it exists
-        if self._state is not None and hasattr(self._state, "infrared"):
-            self._state.infrared = brightness
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {

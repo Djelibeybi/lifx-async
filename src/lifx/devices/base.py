@@ -829,7 +829,7 @@ class Device(Generic[StateT]):
         # Update state if it exists
         if self._state is not None:
             self._state.label = label_value
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
@@ -918,7 +918,7 @@ class Device(Generic[StateT]):
         # Update state if it exists
         if self._state is not None:
             self._state.power = power_level
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
