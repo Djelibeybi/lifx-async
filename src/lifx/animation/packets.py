@@ -395,13 +395,14 @@ class MatrixPacketGenerator(PacketGenerator):
             if tmpl.color_count == 0:
                 continue  # Skip CopyFrameBuffer packets
 
-            # Flatten HSBK tuples and pack in one bulk call
-            start = tmpl.hsbk_start
-            end = start + tmpl.color_count
-            flat: list[int] = []
-            for h, s, b, k in hsbk[start:end]:
-                flat.extend((h, s, b, k))
-            struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
+            # Write each HSBK tuple directly into the packet buffer
+            data = tmpl.data
+            offset = tmpl.color_offset
+            for h, s, b, k in hsbk[
+                tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count
+            ]:
+                struct.pack_into("<HHHH", data, offset, h, s, b, k)
+                offset += 8
 
 
 class MultiZonePacketGenerator(PacketGenerator):
@@ -505,13 +506,14 @@ class MultiZonePacketGenerator(PacketGenerator):
             hsbk: Protocol-ready HSBK data for all zones
         """
         for tmpl in templates:
-            # Flatten HSBK tuples and pack in one bulk call
-            start = tmpl.hsbk_start
-            end = start + tmpl.color_count
-            flat: list[int] = []
-            for h, s, b, k in hsbk[start:end]:
-                flat.extend((h, s, b, k))
-            struct.pack_into(tmpl.fmt, tmpl.data, tmpl.color_offset, *flat)
+            # Write each HSBK tuple directly into the packet buffer
+            data = tmpl.data
+            offset = tmpl.color_offset
+            for h, s, b, k in hsbk[
+                tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count
+            ]:
+                struct.pack_into("<HHHH", data, offset, h, s, b, k)
+                offset += 8
 
 
 class LightPacketGenerator(PacketGenerator):
