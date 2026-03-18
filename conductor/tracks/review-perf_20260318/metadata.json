@@ -2,19 +2,25 @@
   "id": "review-perf_20260318",
   "title": "Full Review — Animation Pipeline Performance",
   "type": "refactor",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-03-18T00:00:00Z",
   "updated": "2026-03-19T00:00:00Z",
-  "current_phase": 2,
+  "current_phase": 3,
   "phases": {
     "total": 3,
-    "completed": 1
+    "completed": 3
   },
   "tasks": {
     "total": 17,
-    "completed": 5
+    "completed": 17
   },
   "commits": [
-    "7d568b5: test(benchmarks): add Phase 1 benchmark infrastructure (review-perf_20260318)"
+    "7d568b5: test(benchmarks): add Phase 1 benchmark infrastructure (review-perf_20260318)",
+    "2a15989: perf(framebuffer): pre-compute canvas-to-device LUT at init time (review-perf_20260318)",
+    "ffa58cc: perf(packets): replace flat list building with direct struct.pack_into (review-perf_20260318)",
+    "7308c2b: perf(protocol): guard asdict() in Packet.unpack() behind debug check (review-perf_20260318)",
+    "c5936e8: perf(effects): add generate_protocol_frame() to FrameEffect (review-perf_20260318)",
+    "ec8429f: perf(aurora): add direct generate_protocol_frame() override (review-perf_20260318)",
+    "35c5c37: test(benchmarks): add protocol-direct frame generation benchmarks (review-perf_20260318)"
   ]
 }

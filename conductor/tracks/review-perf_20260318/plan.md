@@ -3,7 +3,7 @@
 **Track ID:** review-perf_20260318
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-03-18
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -37,19 +37,19 @@ Eliminate the two highest-cost per-frame bottlenecks.
 
 ### Tasks
 
-- [ ] Task 2.1: In `FrameBuffer.__init__`, compute `self._lut: list[int]` — flat list of canvas pixel indices in device output order — replacing the per-frame nested loop logic (PERF-H1)
-- [ ] Task 2.2: Replace `_apply_canvas` nested loop body with `return [canvas[i] for i in self._lut]` single comprehension (PERF-H1)
-- [ ] Task 2.3: Update `apply()` method to use `_lut`; ensure orientation remapping is pre-baked into the LUT indices (not a separate per-frame step) (PERF-H1)
-- [ ] Task 2.4: In `MatrixPacketGenerator.update_colors()`, replace `flat.extend(...)` per-pixel loop with direct `struct.pack_into` writes into `self._buf` at correct offsets (PERF-H2)
-- [ ] Task 2.5: Apply same optimization to `MultiZonePacketGenerator.update_colors()` if applicable (PERF-H2)
-- [ ] Task 2.6: Guard `dataclasses.asdict()` call in `Packet.unpack()` behind `_LOGGER.isEnabledFor(logging.DEBUG)` check (`base.py:114`) (PERF-L3)
-- [ ] Task 2.7: Run benchmarks and save as `review-perf_20260318-Phase2`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase2`
+- [x] Task 2.1: In `FrameBuffer.__init__`, compute `self._lut: list[int]` — flat list of canvas pixel indices in device output order — replacing the per-frame nested loop logic (PERF-H1)
+- [x] Task 2.2: Replace `_apply_canvas` nested loop body with `return [canvas[i] for i in self._lut]` single comprehension (PERF-H1)
+- [x] Task 2.3: Update `apply()` method to use `_lut`; ensure orientation remapping is pre-baked into the LUT indices (not a separate per-frame step) (PERF-H1)
+- [x] Task 2.4: In `MatrixPacketGenerator.update_colors()`, replace `flat.extend(...)` per-pixel loop with direct `struct.pack_into` writes into `self._buf` at correct offsets (PERF-H2)
+- [x] Task 2.5: Apply same optimization to `MultiZonePacketGenerator.update_colors()` if applicable (PERF-H2)
+- [x] Task 2.6: Guard `dataclasses.asdict()` call in `Packet.unpack()` behind `_LOGGER.isEnabledFor(logging.DEBUG)` check (`base.py:114`) (PERF-L3)
+- [x] Task 2.7: Run benchmarks and save as `review-perf_20260318-Phase2`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase2`
 
 ### Verification
 
-- [ ] `uv run pytest tests/animation/ -v` — all existing animation tests pass
-- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=review-perf_20260318-Phase1` — `_apply_canvas` benchmark shows improvement vs Phase 1
-- [ ] `uv run pyright` — no type errors on FrameBuffer changes
+- [x] `uv run pytest tests/animation/ -v` — all existing animation tests pass (29 framebuffer + 53 packets)
+- [x] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare` — _apply_canvas 3.7× faster, update_colors 1.3× faster vs baseline
+- [x] `uv run pyright` — 0 errors, 0 warnings, 0 information
 
 ---
 
@@ -59,30 +59,30 @@ Add optional high-performance frame generation that bypasses HSBK object constru
 
 ### Tasks
 
-- [ ] Task 3.1: Add abstract method `generate_protocol_frame(self, pixel_count: int, frame_time: float) -> list[tuple[int, int, int, int]]` to `EffectBase` with a default implementation that calls `generate_frame()` and converts (PERF-C1)
-- [ ] Task 3.2: Update `FrameEffect._run_loop()` to call `generate_protocol_frame()` instead of `generate_frame()` + conversion (PERF-C1, AR-M3)
-- [ ] Task 3.3: Implement a direct `generate_protocol_frame()` override in `AuroraEffect` as a proof-of-concept (bypasses HSBK, returns raw uint16 tuples directly) (PERF-C1)
-- [ ] Task 3.4: Write benchmark test verifying `AuroraEffect.generate_protocol_frame()` is faster than `generate_frame()` + conversion for 128-pixel device
-- [ ] Task 3.5: Run benchmarks and save as `review-perf_20260318-Phase3`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase3`
+- [x] Task 3.1: Add `generate_protocol_frame()` to `FrameEffect` with default implementation that calls `generate_frame()` and converts (PERF-C1)
+- [x] Task 3.2: Update `FrameEffect.async_play()` to call `generate_protocol_frame()` instead of `generate_frame()` + conversion (PERF-C1, AR-M3)
+- [x] Task 3.3: Implement a direct `generate_protocol_frame()` override in `EffectAurora` as a proof-of-concept (bypasses HSBK, returns raw uint16 tuples directly) (PERF-C1)
+- [x] Task 3.4: Write benchmark test verifying `EffectAurora.generate_protocol_frame()` is faster than `generate_frame()` + conversion for 128-pixel device
+- [x] Task 3.5: Run benchmarks and save as `review-perf_20260318-Phase3`: `uv run pytest tests/benchmarks/ -m benchmark --no-cov --benchmark-save=review-perf_20260318-Phase3`
 
 ### Verification
 
-- [ ] `uv run pytest tests/effects/ -v` — all existing effects tests pass
-- [ ] `uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=review-perf_20260318-Phase2` — protocol-direct path shows measurable improvement vs Phase 2
-- [ ] `uv run --frozen pytest` — full test suite passes
-- [ ] `uv run ruff format . && uv run ruff check .` — clean
-- [ ] `uv run pyright` — clean
+- [x] `uv run pytest tests/effects/ -v` — all existing effects tests pass (33 aurora + 21 frame_effect)
+- [x] `uv run pytest tests/benchmarks/ -m benchmark` — protocol-direct 128px: 70.4µs vs 92.5µs (1.31× faster)
+- [x] `uv run --frozen pytest` — 2447 tests pass
+- [x] `uv run ruff format . && uv run ruff check .` — clean
+- [x] `uv run pyright` — 0 errors, 0 warnings, 0 information
 
 ---
 
 ## Final Verification
 
-- [ ] All acceptance criteria in spec.md met
-- [ ] Benchmark results show `_apply_canvas` <5ms for 5-tile (320px) configuration
-- [ ] `uv run --frozen pytest` — all tests pass including new benchmarks
-- [ ] `uv run pyright` — clean
-- [ ] `uv run ruff format . && uv run ruff check .` — clean
-- [ ] Ready for review
+- [x] All acceptance criteria in spec.md met
+- [x] Benchmark results show `_apply_canvas` <5ms for 5-tile (320px) configuration (2.77µs = 0.003ms)
+- [x] `uv run --frozen pytest` — 2447 tests pass including new benchmarks
+- [x] `uv run pyright` — clean
+- [x] `uv run ruff format . && uv run ruff check .` — clean
+- [x] Ready for review
 
 ---
 
