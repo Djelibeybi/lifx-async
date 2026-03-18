@@ -86,6 +86,8 @@ class EffectSpin(FrameEffect):
 
         self.speed = speed
         self.theme = theme if theme is not None else ThemeLibrary.get("exciting")
+        if not self.theme.colors:
+            raise ValueError("Theme must have at least one color")
         self.bulb_offset = bulb_offset
         self.brightness = brightness
         self.kelvin = kelvin
@@ -195,7 +197,7 @@ class EffectSpin(FrameEffect):
             True if light has color support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_color if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

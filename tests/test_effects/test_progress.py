@@ -495,10 +495,10 @@ class TestProgressCompatibility:
             caps.has_multizone = True
             light.capabilities = caps
 
-        light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+        light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
         assert await effect.is_light_compatible(light) is True
-        light._ensure_capabilities.assert_called_once()
+        light.ensure_capabilities.assert_called_once()
 
 
 class TestProgressFrameLoop:

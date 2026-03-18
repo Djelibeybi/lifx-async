@@ -58,19 +58,19 @@ class TestThemeLibraryGet:
 
 
 class TestThemeLibraryList:
-    """Tests for ThemeLibrary.list() method."""
+    """Tests for ThemeLibrary.get_available_themes() method."""
 
     def test_list_returns_sorted_list(self) -> None:
         """Test that list() returns a sorted list of theme names."""
-        themes = ThemeLibrary.list()
+        themes = ThemeLibrary.get_available_themes()
 
         assert isinstance(themes, list)
-        assert len(themes) == 57  # Should have 42 themes
+        assert len(themes) == 57  # Should have 57 themes
         assert themes == sorted(themes)  # Should be sorted
 
     def test_list_contains_well_known_themes(self) -> None:
         """Test that list includes well-known themes."""
-        themes = ThemeLibrary.list()
+        themes = ThemeLibrary.get_available_themes()
         expected_themes = [
             "christmas",
             "halloween",
@@ -86,7 +86,7 @@ class TestThemeLibraryList:
 
     def test_list_count(self) -> None:
         """Test that we have the expected number of themes."""
-        themes = ThemeLibrary.list()
+        themes = ThemeLibrary.get_available_themes()
         # We should have exactly 42 themes
         assert len(themes) == 57
 
@@ -208,7 +208,7 @@ class TestThemeLibraryIntegration:
 
     def test_all_themes_are_valid(self) -> None:
         """Test that all themes in the library are valid."""
-        for theme_name in ThemeLibrary.list():
+        for theme_name in ThemeLibrary.get_available_themes():
             theme = ThemeLibrary.get(theme_name)
             assert isinstance(theme, Theme)
             assert len(theme) > 0
@@ -222,7 +222,7 @@ class TestThemeLibraryIntegration:
 
     def test_theme_library_has_minimum_themes(self) -> None:
         """Test that library has at least 42 themes."""
-        themes = ThemeLibrary.list()
+        themes = ThemeLibrary.get_available_themes()
         assert len(themes) >= 42
 
     def test_all_categories_have_themes(self) -> None:

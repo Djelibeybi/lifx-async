@@ -438,9 +438,11 @@ class TestEmbersConvection:
         # _CONVECTION_FRAMES)
         effect.generate_frame(ctx)
 
-        # After convection + diffusion with cooling=0.0 (factor=1.0),
-        # heat[0] was set to 0.0 by convection before diffusion
-        # The exact values depend on diffusion, but convection happened
+        # After convection, heat should have shifted upward:
+        # heat[0] was set to 0.0 by convection before diffusion.
+        # Upper zones should have received heat from below.
+        assert effect._heat[0] < 0.8  # Bottom zone was cleared or reduced
+        assert any(h > 0.0 for h in effect._heat[1:])  # Heat shifted upward
 
 
 # ---------------------------------------------------------------------------
@@ -546,10 +548,10 @@ async def test_embers_is_light_compatible_none_capabilities() -> None:
         caps.has_matrix = False
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is True
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -558,7 +560,7 @@ async def test_embers_is_light_compatible_capabilities_still_none() -> None:
     effect = EffectEmbers()
     light = MagicMock()
     light.capabilities = None
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     assert await effect.is_light_compatible(light) is False
 

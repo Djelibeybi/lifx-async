@@ -588,10 +588,10 @@ async def test_plasma_is_light_compatible_none_capabilities() -> None:
         caps.has_matrix = False
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is True
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -604,7 +604,7 @@ async def test_plasma_is_light_compatible_none_after_ensure() -> None:
     async def ensure_caps() -> None:
         pass  # capabilities stays None
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is False
 
