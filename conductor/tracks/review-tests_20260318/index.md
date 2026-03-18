@@ -22,4 +22,3 @@ Fill critical test coverage gaps: adversarial mDNS DNS parser tests (inflated re
 
 - [Back to Tracks](../../tracks.md)
 - [Product Context](../../product.md)
-- [Review Final Report](../../../.full-review/05-final-report.md)
