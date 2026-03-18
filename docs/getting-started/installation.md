@@ -128,6 +128,6 @@ sudo usermod -a -G netdev $USER  # Linux
 
 ## Next Steps
 
-- [Quick Start Guide](quickstart.md) - Start controlling your lights
-- [API Reference](../api/index.md) - Complete API documentation
-- [FAQ](../faq.md) - Frequently asked questions
+- **Next: [Quick Start Guide](quickstart.md)** — Start controlling your lights
+- [Themes Quick Start](themes.md) — Apply color palettes
+- [Light Effects](effects.md) — Run visual effects

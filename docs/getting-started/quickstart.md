@@ -221,8 +221,7 @@ asyncio.run(main())
 
 ## Next Steps
 
+- **Next: [Themes Quick Start](themes.md)** — Apply color palettes to your lights
+- **Next: [Light Effects](effects.md)** — Run visual effects on your lights
 - [High-Level API](../api/high-level.md) — `discover()`, `find_by_serial()`, `DeviceGroup` reference
 - [Color Utilities](../api/colors.md) — HSBK, RGB conversion, built-in presets
-- [API Reference](../api/index.md) — Complete API documentation
-- [Architecture](../architecture/overview.md) — How lifx-async works
-- [FAQ](../faq.md) — Frequently asked questions
