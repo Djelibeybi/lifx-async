@@ -149,12 +149,43 @@ class TestUdpProtocol:
         assert protocol.transport is None
 
     async def test_protocol_error_received(self) -> None:
-        """Test protocol error_received callback doesn't crash."""
+        """Test protocol error_received logs warning."""
         from lifx.network.transport import _UdpProtocol
 
         protocol = _UdpProtocol()
-        # Should not raise - errors are silently ignored
-        protocol.error_received(OSError("test error"))
+
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            protocol.error_received(OSError("test error"))
+            mock_logger.warning.assert_called_once()
+            log_dict = mock_logger.warning.call_args[0][0]
+            assert log_dict["class"] == "_UdpProtocol"
+            assert log_dict["method"] == "error_received"
+            assert "test error" in log_dict["error"]
+
+    async def test_protocol_queue_full_drops_packet(self) -> None:
+        """Test datagram_received drops packets when queue is full."""
+        from lifx.network.transport import _UdpProtocol
+
+        protocol = _UdpProtocol()
+        test_addr = ("192.168.1.100", 56700)
+        test_data = b"\x00" * 36
+
+        # Fill the queue to capacity
+        for _ in range(protocol._MAX_QUEUE_SIZE):
+            protocol.datagram_received(test_data, test_addr)
+
+        assert protocol.queue.full()
+
+        # Next packet should be dropped without raising
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            protocol.datagram_received(test_data, test_addr)
+            mock_logger.warning.assert_called_once()
+            log_dict = mock_logger.warning.call_args[0][0]
+            assert log_dict["action"] == "packet_dropped"
+            assert log_dict["reason"] == "queue_full"
+
+        # Queue size should remain at max
+        assert protocol.queue.qsize() == protocol._MAX_QUEUE_SIZE
 
 
 class TestPacketSizeValidation:

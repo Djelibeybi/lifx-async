@@ -929,11 +929,14 @@ class TestGetMethodsStateUpdates:
         light.connection.request.side_effect = get_label_mock
 
         # Get label
+        before = time.time()
         label = await light.get_label()
+        after = time.time()
 
         # State should be updated
         assert label == b"New Label"
         assert light.state.label == b"New Label"
+        assert before <= light.state.last_updated <= after
 
 
 class TestStateDataclasses:
