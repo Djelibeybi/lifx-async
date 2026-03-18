@@ -12,7 +12,7 @@
 ## Progress
 
 - Phases: 0/2 complete
-- Tasks: 0/13 complete
+- Tasks: 0/15 complete
 
 ## Summary
 
