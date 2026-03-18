@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
+import sys
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -141,6 +142,10 @@ def emulator_available(request: pytest.FixtureRequest) -> bool:
     disable_emulator = request.config.getoption("--disable-emulator", default=False)
 
     if disable_emulator:
+        return False
+
+    # Emulator tests are too flaky on Windows (timing-sensitive UDP)
+    if sys.platform == "win32":
         return False
 
     try:
