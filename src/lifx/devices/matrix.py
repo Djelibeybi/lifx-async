@@ -414,7 +414,7 @@ class MatrixLight(Light):
         if self._state is not None and hasattr(self._state, "chain"):
             self._state.chain = tiles
             self._state.tile_count = len(tiles)
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug("Device chain has %d tile(s)", len(tiles))
         return tiles
@@ -536,7 +536,7 @@ class MatrixLight(Light):
         if self._state is not None and hasattr(self._state, "tile_colors"):
             if tile_index == 0 and x == 0 and y == 0 and len(result) == max_colors:
                 self._state.tile_colors = result
-                self._state.last_updated = __import__("time").time()
+                self._state.last_updated = time.time()
 
         return result
 
@@ -925,7 +925,7 @@ class MatrixLight(Light):
         # Update state if it exists
         if self._state is not None and hasattr(self._state, "effect"):
             self._state.effect = effect.effect_type
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         return effect
 
