@@ -1,0 +1,16 @@
+{
+  "id": "review-docs_20260318",
+  "title": "Full Review — Documentation Repair",
+  "type": "chore",
+  "status": "pending",
+  "created": "2026-03-18T00:00:00Z",
+  "updated": "2026-03-18T00:00:00Z",
+  "phases": {
+    "total": 2,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 15,
+    "completed": 0
+  }
+}

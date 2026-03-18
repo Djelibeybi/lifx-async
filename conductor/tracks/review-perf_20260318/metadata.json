@@ -2,15 +2,19 @@
   "id": "review-perf_20260318",
   "title": "Full Review — Animation Pipeline Performance",
   "type": "refactor",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-03-18T00:00:00Z",
-  "updated": "2026-03-18T00:00:00Z",
+  "updated": "2026-03-19T00:00:00Z",
+  "current_phase": 1,
   "phases": {
     "total": 3,
-    "completed": 0
+    "completed": 1
   },
   "tasks": {
-    "total": 14,
-    "completed": 0
-  }
+    "total": 17,
+    "completed": 5
+  },
+  "commits": [
+    "7d568b5: test(benchmarks): add Phase 1 benchmark infrastructure (review-perf_20260318)"
+  ]
 }
