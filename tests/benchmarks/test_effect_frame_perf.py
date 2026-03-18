@@ -1,33 +1,31 @@
 """Performance benchmarks for effect frame generation.
 
-Baseline numbers (Phase 1) documented here for reference when comparing
-against Phase 3 optimized results (generate_protocol_frame path).
-
 Run with:
-    uv run pytest tests/benchmarks/test_effect_frame_perf.py -v -m benchmark -s
+    uv run pytest tests/benchmarks/test_effect_frame_perf.py -v -m benchmark
+
+Save a named baseline:
+    uv run pytest tests/benchmarks/ -m benchmark --benchmark-save=phase1
+
+Compare against a saved baseline:
+    uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=phase1
 """
 
 from __future__ import annotations
-
-import time
 
 import pytest
 
 from lifx.effects.aurora import EffectAurora
 from lifx.effects.frame_effect import FrameContext
 
-BENCHMARK_ITERATIONS = 500
-
 
 @pytest.mark.benchmark
-def test_aurora_generate_frame_128px() -> None:
+def test_aurora_generate_frame_128px(benchmark) -> None:  # type: ignore[no-untyped-def]
     """Benchmark EffectAurora.generate_frame() for a 128-pixel device (16×8).
 
-    Phase 1 baseline: measures HSBK object construction cost.
-    At 30 FPS with 128 pixels: ~3,840 HSBK objects/second per device.
-
-    Phase 3 will add generate_protocol_frame() returning raw uint16 tuples
-    directly, bypassing HSBK construction entirely.
+    LIFX Ceiling Capsule configuration. Measures HSBK object construction
+    cost: 128 HSBK objects created per call. At 30 FPS: ~3,840 objects/sec
+    per device. Phase 3 will add generate_protocol_frame() to bypass this
+    (PERF-C1).
     """
     effect = EffectAurora()
     ctx = FrameContext(
@@ -37,24 +35,15 @@ def test_aurora_generate_frame_128px() -> None:
         canvas_width=16,
         canvas_height=8,
     )
-
-    start = time.perf_counter()
-    for _ in range(BENCHMARK_ITERATIONS):
-        effect.generate_frame(ctx)
-    elapsed = time.perf_counter() - start
-
-    avg_ms = (elapsed / BENCHMARK_ITERATIONS) * 1000
-    print(
-        f"\n  aurora generate_frame 128px baseline: {avg_ms:.3f}ms avg ({BENCHMARK_ITERATIONS} iters)"
-    )
+    benchmark(effect.generate_frame, ctx)
 
 
 @pytest.mark.benchmark
-def test_aurora_generate_frame_320px() -> None:
+def test_aurora_generate_frame_320px(benchmark) -> None:  # type: ignore[no-untyped-def]
     """Benchmark EffectAurora.generate_frame() for a 5-tile canvas (5×8×8=320px).
 
-    Phase 1 baseline: canvas-scale generation for multi-tile LIFX Tile setup.
-    At 30 FPS: ~9,600 HSBK objects/second per device.
+    Multi-tile LIFX Tile setup. 320 HSBK objects created per call.
+    At 30 FPS: ~9,600 objects/sec per device (PERF-C1).
     """
     effect = EffectAurora()
     ctx = FrameContext(
@@ -64,13 +53,4 @@ def test_aurora_generate_frame_320px() -> None:
         canvas_width=40,
         canvas_height=8,
     )
-
-    start = time.perf_counter()
-    for _ in range(BENCHMARK_ITERATIONS):
-        effect.generate_frame(ctx)
-    elapsed = time.perf_counter() - start
-
-    avg_ms = (elapsed / BENCHMARK_ITERATIONS) * 1000
-    print(
-        f"\n  aurora generate_frame 320px baseline: {avg_ms:.3f}ms avg ({BENCHMARK_ITERATIONS} iters)"
-    )
+    benchmark(effect.generate_frame, ctx)
