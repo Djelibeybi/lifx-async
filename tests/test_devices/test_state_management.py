@@ -938,6 +938,58 @@ class TestGetMethodsStateUpdates:
         assert light.state.label == b"New Label"
         assert before <= light.state.last_updated <= after
 
+    @pytest.mark.asyncio
+    async def test_get_power_updates_state_timestamp(self, light, mock_product_info):
+        """Test Device.get_power() updates state.last_updated when state exists."""
+        # Initialize state
+        product_info = mock_product_info(has_color=True)
+        light._capabilities = product_info
+
+        mock_color = MagicMock()
+        mock_color.color = LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500)
+        mock_color.power = 65535
+        mock_color.label = "Test"
+
+        async def init_mock(packet):
+            if isinstance(packet, packets.Light.GetColor):
+                return mock_color
+            elif isinstance(packet, packets.Device.GetHostFirmware):
+                return packets.Device.StateHostFirmware(
+                    build=0, version_major=2, version_minor=80
+                )
+            elif isinstance(packet, packets.Device.GetWifiFirmware):
+                return packets.Device.StateWifiFirmware(
+                    build=0, version_major=2, version_minor=80
+                )
+            elif isinstance(packet, packets.Device.GetLocation):
+                return packets.Device.StateLocation(
+                    location=b"\x00" * 16, label=b"Location", updated_at=0
+                )
+            elif isinstance(packet, packets.Device.GetGroup):
+                return packets.Device.StateGroup(
+                    group=b"\x00" * 16, label=b"Group", updated_at=0
+                )
+
+        light.connection.request.side_effect = init_mock
+        await light._initialize_state()
+
+        # Mock get_power response for Device.get_power (base class)
+        async def get_power_mock(packet):
+            if isinstance(packet, packets.Device.GetPower):
+                return packets.Device.StatePower(level=65535)
+
+        light.connection.request.side_effect = get_power_mock
+
+        # Call base Device.get_power() directly (Light overrides it)
+        before = time.time()
+        power = await Device.get_power(light)
+        after = time.time()
+
+        # State should be updated with timestamp
+        assert power == 65535
+        assert light.state.power == 65535
+        assert before <= light.state.last_updated <= after
+
 
 class TestStateDataclasses:
     """Tests for state dataclass properties and functionality."""
