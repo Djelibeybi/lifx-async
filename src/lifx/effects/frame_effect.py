@@ -203,7 +203,8 @@ class FrameEffect(LIFXEffect):
                     self._last_frames[participants[idx].serial] = (
                         self._last_generated_hsbk
                     )
-                    self._last_generated_hsbk = None
+                # Always clear to prevent stale frames leaking across iterations
+                self._last_generated_hsbk = None
 
                 # Send via direct UDP
                 animator.send_frame(protocol_frame)
