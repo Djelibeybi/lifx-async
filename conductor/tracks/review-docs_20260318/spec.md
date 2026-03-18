@@ -11,7 +11,7 @@ Fix all documentation correctness issues identified in the comprehensive code re
 
 ## Context
 
-The documentation review found 4 High and 5 Medium severity issues where the published documentation either references APIs that don't exist, shows wrong Python version requirements (3.11+ when minimum is 3.10), or describes architectural patterns that no longer match the implementation. These issues mislead users who follow the documentation examples.
+The documentation review found 4 High and 5 Medium severity issues where the published documentation either references APIs that don't exist, shows wrong Python version requirements (3.11+ when minimum is 3.10), or describes architectural patterns that no longer match the implementation. These issues mislead users who follow the documentation examples. Some acceptance criteria below address multiple issues from a single fix location, and some issues require fixes across multiple files, resulting in more criteria than issue count.
 
 ## Acceptance Criteria
 
