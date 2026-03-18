@@ -3,7 +3,7 @@
 **Track ID:** effects-docs_20260318
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-03-18
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -21,8 +21,8 @@ Update the getting-started and API docs to cover the new effects.
 
 ### Verification
 
-- [ ] `mkdocs build` passes cleanly
-- [ ] New effects section visible in local `mkdocs serve`
+- [x] `mkdocs build` passes cleanly
+- [x] New effects section visible in local `mkdocs serve`
 
 ## Phase 2: Example Script
 
@@ -38,8 +38,8 @@ Create the demo script with device-type detection and effect cycling.
 
 ### Verification
 
-- [ ] Script runs with `uv run examples/effects_demo.py --help`
-- [ ] Script runs against emulated devices with `--ip` and `--effect`
+- [x] Script runs with `uv run examples/effects_demo.py --help`
+- [x] Script runs against emulated devices with `--ip` and `--effect`
 
 ## Phase 3: Animated GIF Capture
 
@@ -55,18 +55,18 @@ Use the LIFX emulator's web visualizer and Playwright MCP to screen-record each 
 
 ### Verification
 
-- [ ] Each of the 18 effects has a corresponding animated GIF
-- [ ] GIFs render correctly in `mkdocs serve`
-- [ ] `mkdocs build` succeeds with embedded images
+- [x] Each of the 18 effects has a corresponding animated GIF
+- [x] GIFs render correctly in `mkdocs serve`
+- [x] `mkdocs build` succeeds with embedded images
 
 ## Final Verification
 
-- [ ] All acceptance criteria met
-- [ ] `mkdocs build` passes
-- [ ] Example script runs successfully
-- [ ] Attribution to pkivolowitz/lifx is present in documentation
-- [ ] Animated GIFs embedded for all effects
-- [ ] Ready for review
+- [x] All acceptance criteria met
+- [x] `mkdocs build` passes
+- [x] Example script runs successfully
+- [x] Attribution to pkivolowitz/lifx is present in documentation
+- [x] Animated GIFs embedded for all effects
+- [x] Ready for review
 
 ---
 
