@@ -1,5 +1,7 @@
 # Effects Reference
 
+> **Looking for usage examples?** See the [Light Effects Guide](../user-guide/effects.md) for tutorials, common patterns, and best practices. This page covers the API surface only.
+
 This reference guide provides comprehensive documentation for all effect classes in the Light Effects Framework.
 
 ## Table of Contents
@@ -714,7 +716,9 @@ All built-in effect classes, listed alphabetically. Effects adapted from [pkivol
 
 ## See Also
 
-- [Getting Started](../getting-started/effects.md) - Basic usage and common patterns
-- [Custom Effects](../user-guide/effects-custom.md) - Creating your own effects
-- [Architecture](../architecture/effects-architecture.md) - How the system works
-- [Troubleshooting](../user-guide/effects-troubleshooting.md) - Common issues and solutions
+- [Light Effects Guide](../user-guide/effects.md) — Usage examples, common patterns, and best practices
+- [Effects Gallery](../user-guide/effects-gallery.md) — Animated previews of all effects
+- [Custom Effects](../user-guide/effects-custom.md) — Creating your own effects
+- [Effect API Changes](../migration/effect-api-changes.md) — Migration guide for breaking changes
+- [Architecture](../architecture/effects-architecture.md) — How the system works
+- [Troubleshooting](../user-guide/effects-troubleshooting.md) — Common issues and solutions

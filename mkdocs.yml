@@ -197,8 +197,9 @@ nav:
   - Quick Start: getting-started/quickstart.md
   - Themes: getting-started/themes.md
   - Light Effects: getting-started/effects.md
-  - Effects Gallery: getting-started/effects-gallery.md
 - User Guide:
+  - Light Effects: user-guide/effects.md
+  - Effects Gallery: user-guide/effects-gallery.md
   - Themes: user-guide/themes.md
   - Ceiling Lights: user-guide/ceiling-lights.md
   - Animation: user-guide/animation.md
