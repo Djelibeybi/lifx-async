@@ -236,7 +236,7 @@ class TestSineGenerateFrame:
             assert color.kelvin == 5000
 
     def test_brightness_in_valid_range(self) -> None:
-        """Test all brightness values are between floor and brightness."""
+        """Test all brightness values are within valid normalized range [0, 1]."""
         effect = EffectSine(brightness=0.8, floor=0.02)
         ctx = FrameContext(
             elapsed_s=1.0,

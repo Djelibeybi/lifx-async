@@ -209,11 +209,11 @@ class EffectWave(FrameEffect):
 
         # Expand logical bulbs to physical zones
         if self.zones_per_bulb == 1:
-            return bulb_colors
-
-        colors: list[HSBK] = []
-        for color in bulb_colors:
-            colors.extend([color] * self.zones_per_bulb)
+            colors = bulb_colors
+        else:
+            colors = []
+            for color in bulb_colors:
+                colors.extend([color] * self.zones_per_bulb)
 
         # Trim or pad to exact pixel_count
         if len(colors) < ctx.pixel_count:

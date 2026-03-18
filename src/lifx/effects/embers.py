@@ -219,7 +219,7 @@ class EffectEmbers(FrameEffect):
         heat = self._heat
 
         # --- 1. Convection: shift heat upward periodically ----------------
-        if self._frame_count % _CONVECTION_FRAMES == 0:
+        if bulb_count > 1 and self._frame_count % _CONVECTION_FRAMES == 0:
             for i in range(bulb_count - 1, 0, -1):
                 heat[i] = heat[i - 1]
             heat[0] = 0.0

@@ -224,6 +224,7 @@ class EffectRuleTrio(FrameEffect):
         self._ca_a = _CA()
         self._ca_b = _CA()
         self._ca_c = _CA()
+        self._last_elapsed_s: float = 0.0
 
     @property
     def name(self) -> str:
@@ -266,11 +267,17 @@ class EffectRuleTrio(FrameEffect):
         # Compute logical bulb count.
         bulb_count = max(ctx.pixel_count // self.zones_per_bulb, 1)
 
-        # Lazy initialization: seed state on first call or if bulb count changed.
-        if len(self._ca_a.state) != bulb_count:
+        # Lazy initialization: seed state on first call, if bulb count changed,
+        # or if elapsed time reset (effect restarted).
+        needs_reseed = (
+            len(self._ca_a.state) != bulb_count or ctx.elapsed_s < self._last_elapsed_s
+        )
+        if needs_reseed:
             self._ca_a.seed(bulb_count, self.rule_a)
             self._ca_b.seed(bulb_count, self.rule_b)
             self._ca_c.seed(bulb_count, self.rule_c)
+
+        self._last_elapsed_s = ctx.elapsed_s
 
         # Advance each CA to its target generation.
         base = self.speed
@@ -315,11 +322,11 @@ class EffectRuleTrio(FrameEffect):
 
         # Expand logical bulbs to physical zones.
         if self.zones_per_bulb == 1:
-            return bulb_colors
-
-        colors: list[HSBK] = []
-        for color in bulb_colors:
-            colors.extend([color] * self.zones_per_bulb)
+            colors = bulb_colors
+        else:
+            colors = []
+            for color in bulb_colors:
+                colors.extend([color] * self.zones_per_bulb)
 
         # Trim or pad to exact pixel_count.
         if len(colors) < ctx.pixel_count:

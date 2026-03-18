@@ -61,7 +61,7 @@ class TestThemeLibraryList:
     """Tests for ThemeLibrary.get_available_themes() method."""
 
     def test_list_returns_sorted_list(self) -> None:
-        """Test that list() returns a sorted list of theme names."""
+        """Test that get_available_themes() returns a sorted list of theme names."""
         themes = ThemeLibrary.get_available_themes()
 
         assert isinstance(themes, list)
@@ -87,7 +87,7 @@ class TestThemeLibraryList:
     def test_list_count(self) -> None:
         """Test that we have the expected number of themes."""
         themes = ThemeLibrary.get_available_themes()
-        # We should have exactly 42 themes
+        # We should have exactly 57 themes
         assert len(themes) == 57
 
 
