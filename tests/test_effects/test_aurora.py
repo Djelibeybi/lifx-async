@@ -370,3 +370,77 @@ def test_aurora_repr() -> None:
     assert "speed=2.0" in repr_str
     assert "brightness=0.7" in repr_str
     assert "spread=45" in repr_str
+
+
+class TestAuroraProtocolFrame:
+    """Tests for EffectAurora.generate_protocol_frame() direct path."""
+
+    def test_returns_protocol_tuples(self) -> None:
+        """Protocol frame returns raw uint16 tuples, not HSBK objects."""
+        effect = EffectAurora()
+        ctx = FrameContext(
+            elapsed_s=1.0,
+            device_index=0,
+            pixel_count=16,
+            canvas_width=16,
+            canvas_height=1,
+        )
+
+        result = effect.generate_protocol_frame(ctx)
+
+        assert len(result) == 16
+        for h, s, b, k in result:
+            assert isinstance(h, int)
+            assert isinstance(s, int)
+            assert isinstance(b, int)
+            assert isinstance(k, int)
+            assert 0 <= h <= 65535
+            assert 0 <= s <= 65535
+            assert 0 <= b <= 65535
+            assert k == KELVIN_NEUTRAL
+
+    def test_matches_generate_frame_output(self) -> None:
+        """Protocol frame must produce equivalent values to generate_frame path."""
+        effect = EffectAurora(speed=1.5, brightness=0.6, palette=[100, 200, 300])
+        ctx = FrameContext(
+            elapsed_s=2.5,
+            device_index=1,
+            pixel_count=32,
+            canvas_width=8,
+            canvas_height=4,
+        )
+
+        # generate_frame → as_tuple (reference path)
+        hsbk_frame = effect.generate_frame(ctx)
+        reference = [c.as_tuple() for c in hsbk_frame]
+
+        # generate_protocol_frame (direct path)
+        direct = effect.generate_protocol_frame(ctx)
+
+        assert len(direct) == len(reference)
+        for i, (ref, dir_) in enumerate(zip(reference, direct, strict=True)):
+            assert ref == dir_, f"Pixel {i}: reference={ref} direct={dir_}"
+
+    def test_matrix_vertical_gradient(self) -> None:
+        """Protocol frame preserves matrix vertical brightness gradient."""
+        effect = EffectAurora()
+        ctx = FrameContext(
+            elapsed_s=1.0,
+            device_index=0,
+            pixel_count=64,
+            canvas_width=8,
+            canvas_height=8,
+        )
+
+        result = effect.generate_protocol_frame(ctx)
+
+        # Check vertical gradient: middle rows brighter than edges
+        row_brightness: list[float] = []
+        for row in range(8):
+            start = row * 8
+            avg = sum(result[start + i][2] for i in range(8)) / 8
+            row_brightness.append(avg)
+
+        mid_avg = (row_brightness[3] + row_brightness[4]) / 2
+        edge_avg = (row_brightness[0] + row_brightness[7]) / 2
+        assert mid_avg > edge_avg
