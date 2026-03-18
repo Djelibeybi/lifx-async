@@ -54,3 +54,40 @@ def test_aurora_generate_frame_320px(benchmark) -> None:  # type: ignore[no-unty
         canvas_height=8,
     )
     benchmark(effect.generate_frame, ctx)
+
+
+@pytest.mark.benchmark
+def test_aurora_protocol_frame_128px(benchmark) -> None:  # type: ignore[no-untyped-def]
+    """Benchmark EffectAurora.generate_protocol_frame() for 128px (16×8).
+
+    Protocol-direct path bypassing HSBK object construction, validation,
+    to_protocol() conversion, and LightHsbk allocation. Compare against
+    test_aurora_generate_frame_128px to measure the overhead eliminated.
+    """
+    effect = EffectAurora()
+    ctx = FrameContext(
+        elapsed_s=1.0,
+        device_index=0,
+        pixel_count=128,
+        canvas_width=16,
+        canvas_height=8,
+    )
+    benchmark(effect.generate_protocol_frame, ctx)
+
+
+@pytest.mark.benchmark
+def test_aurora_protocol_frame_320px(benchmark) -> None:  # type: ignore[no-untyped-def]
+    """Benchmark EffectAurora.generate_protocol_frame() for 320px (5×8×8).
+
+    Protocol-direct path for multi-tile setup. Compare against
+    test_aurora_generate_frame_320px to measure HSBK overhead eliminated.
+    """
+    effect = EffectAurora()
+    ctx = FrameContext(
+        elapsed_s=1.0,
+        device_index=0,
+        pixel_count=320,
+        canvas_width=40,
+        canvas_height=8,
+    )
+    benchmark(effect.generate_protocol_frame, ctx)
