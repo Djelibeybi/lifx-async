@@ -259,3 +259,108 @@ class TestFrameEffectCloseAnimators:
         effect.close_animators()
 
         assert len(effect._animators) == 0
+
+
+class TestGenerateProtocolFrame:
+    """Tests for FrameEffect.generate_protocol_frame()."""
+
+    def test_default_returns_protocol_tuples(self) -> None:
+        """Default implementation calls generate_frame() and converts."""
+        effect = ConcreteFrameEffect()
+        effect.frame_color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=4000)
+
+        ctx = FrameContext(
+            elapsed_s=1.0,
+            device_index=0,
+            pixel_count=4,
+            canvas_width=4,
+            canvas_height=1,
+        )
+
+        result = effect.generate_protocol_frame(ctx)
+
+        assert len(result) == 4
+        # All pixels should be identical protocol tuples
+        for h, s, b, k in result:
+            assert isinstance(h, int)
+            assert isinstance(s, int)
+            assert isinstance(b, int)
+            assert isinstance(k, int)
+            assert k == 4000  # Kelvin passes through unchanged
+
+    def test_default_calls_generate_frame(self) -> None:
+        """Default implementation delegates to generate_frame()."""
+        effect = ConcreteFrameEffect()
+
+        ctx = FrameContext(
+            elapsed_s=1.0,
+            device_index=0,
+            pixel_count=2,
+            canvas_width=2,
+            canvas_height=1,
+        )
+
+        effect.generate_protocol_frame(ctx)
+
+        # generate_frame should have been called
+        assert len(effect.generate_frame_calls) == 1
+        assert effect.generate_frame_calls[0] is ctx
+
+    def test_override_bypasses_generate_frame(self) -> None:
+        """Subclass override can bypass generate_frame() entirely."""
+
+        class DirectFrameEffect(ConcreteFrameEffect):
+            """Effect that overrides generate_protocol_frame directly."""
+
+            def generate_protocol_frame(
+                self, ctx: FrameContext
+            ) -> list[tuple[int, int, int, int]]:
+                return [(10000, 20000, 30000, 3500)] * ctx.pixel_count
+
+        effect = DirectFrameEffect()
+        ctx = FrameContext(
+            elapsed_s=1.0,
+            device_index=0,
+            pixel_count=3,
+            canvas_width=3,
+            canvas_height=1,
+        )
+
+        result = effect.generate_protocol_frame(ctx)
+
+        assert len(result) == 3
+        assert result[0] == (10000, 20000, 30000, 3500)
+        # generate_frame should NOT have been called
+        assert len(effect.generate_frame_calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_async_play_uses_protocol_frame(self) -> None:
+        """Test that async_play calls generate_protocol_frame in the loop."""
+
+        class TrackingEffect(ConcreteFrameEffect):
+            """Effect that tracks protocol frame calls."""
+
+            def __init__(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
+                super().__init__(**kwargs)
+                self.protocol_frame_calls: list[FrameContext] = []
+
+            def generate_protocol_frame(
+                self, ctx: FrameContext
+            ) -> list[tuple[int, int, int, int]]:
+                self.protocol_frame_calls.append(ctx)
+                return [(0, 0, 0, 3500)] * ctx.pixel_count
+
+        effect = TrackingEffect(fps=30.0, duration=0.05)
+        animator = MagicMock()
+        animator.pixel_count = 1
+        animator.canvas_width = 1
+        animator.canvas_height = 1
+        animator.send_frame = MagicMock()
+        effect._animators = [animator]
+
+        await asyncio.wait_for(effect.async_play(), timeout=2.0)
+
+        # generate_protocol_frame should have been called
+        assert len(effect.protocol_frame_calls) > 0
+        # generate_frame should NOT have been called (overridden)
+        assert len(effect.generate_frame_calls) == 0
