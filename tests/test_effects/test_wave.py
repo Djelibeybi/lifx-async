@@ -429,6 +429,26 @@ def test_wave_inherit_prestate() -> None:
     assert effect.inherit_prestate(MagicMock()) is False
 
 
+def test_wave_zones_per_bulb_padding() -> None:
+    """Test output is padded when zones don't fill pixel_count."""
+    effect = EffectWave(zones_per_bulb=3)
+    ctx = FrameContext(
+        elapsed_s=0.5, device_index=0, pixel_count=17, canvas_width=17, canvas_height=1
+    )
+    colors = effect.generate_frame(ctx)
+    assert len(colors) == 17
+
+
+def test_wave_zones_per_bulb_trimming() -> None:
+    """Test output is trimmed when zones exceed pixel_count."""
+    effect = EffectWave(zones_per_bulb=3)
+    ctx = FrameContext(
+        elapsed_s=0.5, device_index=0, pixel_count=1, canvas_width=1, canvas_height=1
+    )
+    colors = effect.generate_frame(ctx)
+    assert len(colors) == 1
+
+
 def test_wave_repr() -> None:
     """Test EffectWave string representation."""
     effect = EffectWave(speed=6.0, nodes=4, hue1=120, hue2=300)
