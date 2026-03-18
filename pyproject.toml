@@ -43,6 +43,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-retry>=1.7.0",
     "pytest-sugar>=1.1.1",
+    "pytest-timeout>=2.4.0",
     "pyyaml>=6.0.3",
     "ruff>=0.14.2",
     "typing-extensions>=4.15.0",
@@ -104,9 +105,12 @@ addopts = """\
     --cov-report=term-missing:skip-covered
     --junitxml=junit.xml -o junit_family=legacy
     --cov-context=test
+    --timeout=30
     """
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+timeout = 30
+timeout_method = "thread"
 markers = [
     "emulator: tests that require the lifx-emulator-core embedded emulator",
 ]
