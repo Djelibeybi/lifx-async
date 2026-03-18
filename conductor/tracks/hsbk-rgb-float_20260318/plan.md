@@ -67,8 +67,8 @@ Replace fireworks private RGB helpers with the now-equivalent `HSBK` methods.
 
 ### Verification
 
-- [x]Fireworks tests pass with identical behavior
-- [x]No private RGB helpers remain in `fireworks.py`
+- [x] Fireworks tests pass with identical behavior
+- [x] No private RGB helpers remain in `fireworks.py`
 
 ## Final Verification
 
