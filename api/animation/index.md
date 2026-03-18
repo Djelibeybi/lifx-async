@@ -189,7 +189,7 @@ def __init__(
     self._packet_generator = packet_generator
 
     # Protocol source ID (random, identifies this client)
-    self._source = random.randint(1, 0xFFFFFFFF)  # nosec B311
+    self._source = random.randint(1, 0xFFFFFFFF)
 
     # Sequence number (0-255, wraps around)
     self._sequence = 0
@@ -398,7 +398,7 @@ async def for_multizone(
     """
     # Ensure capabilities are loaded
     if device.capabilities is None:
-        await device._ensure_capabilities()
+        await device.ensure_capabilities()
 
     # Check extended multizone capability
     has_extended = bool(
@@ -828,7 +828,7 @@ async def for_matrix(
 
     # Ensure capabilities are loaded
     if device.capabilities is None:
-        await device._ensure_capabilities()
+        await device.ensure_capabilities()
 
     # Only build canvas mapping for devices with chain capability.
     # The original LIFX Tile is the only matrix device with accelerometer-based

@@ -50,6 +50,8 @@ r, g, b = purple.to_rgb()
 | `with_saturation`   | Create a new HSBK with modified saturation.                           |
 | `with_brightness`   | Create a new HSBK with modified brightness.                           |
 | `with_kelvin`       | Create a new HSBK with modified color temperature.                    |
+| `lerp_hsb`          | Interpolate to another color via shortest-path HSB blending.          |
+| `lerp_oklab`        | Interpolate to another color through Oklab perceptual color space.    |
 | `clone`             | Create a copy of this color.                                          |
 | `as_tuple`          | Return HSBK values as a tuple of protocol uint16 values.              |
 | `as_dict`           | Return HSBK values as a dictionary of user-friendly values.           |
@@ -597,6 +599,110 @@ def with_kelvin(self, kelvin: int) -> HSBK:
         saturation=self.saturation,
         brightness=self.brightness,
         kelvin=kelvin,
+    )
+```
+
+##### lerp_hsb
+
+```python
+lerp_hsb(other: HSBK, blend: float) -> HSBK
+```
+
+Interpolate to another color via shortest-path HSB blending.
+
+| PARAMETER | DESCRIPTION                                                                      |
+| --------- | -------------------------------------------------------------------------------- |
+| `other`   | Target color to interpolate towards. **TYPE:** `HSBK`                            |
+| `blend`   | Blend factor from 0.0 (self) to 1.0 (other), clamped to range. **TYPE:** `float` |
+
+| RETURNS | DESCRIPTION                                                                |
+| ------- | -------------------------------------------------------------------------- |
+| `HSBK`  | New HSBK instance with interpolated values. Kelvin is preserved from self. |
+
+Source code in `src/lifx/color.py`
+
+```python
+def lerp_hsb(self, other: HSBK, blend: float) -> HSBK:
+    """Interpolate to another color via shortest-path HSB blending.
+
+    Args:
+        other: Target color to interpolate towards.
+        blend: Blend factor from 0.0 (self) to 1.0 (other), clamped to range.
+
+    Returns:
+        New HSBK instance with interpolated values. Kelvin is preserved from self.
+    """
+    blend = max(0.0, min(1.0, blend))
+    diff = other._hue - self._hue
+    if diff > 180:
+        diff -= 360
+    elif diff < -180:
+        diff += 360
+    hue = round(self._hue + diff * blend) % 360
+    sat = self._saturation + (other._saturation - self._saturation) * blend
+    bri = self._brightness + (other._brightness - self._brightness) * blend
+    return HSBK(
+        hue=hue,
+        saturation=round(sat, 2),
+        brightness=round(bri, 2),
+        kelvin=self._kelvin,
+    )
+```
+
+##### lerp_oklab
+
+```python
+lerp_oklab(other: HSBK, blend: float) -> HSBK
+```
+
+Interpolate to another color through Oklab perceptual color space.
+
+Oklab produces perceptually uniform transitions without brightness dips or muddy intermediates that occur with naive HSB blending.
+
+| PARAMETER | DESCRIPTION                                                                      |
+| --------- | -------------------------------------------------------------------------------- |
+| `other`   | Target color to interpolate towards. **TYPE:** `HSBK`                            |
+| `blend`   | Blend factor from 0.0 (self) to 1.0 (other), clamped to range. **TYPE:** `float` |
+
+| RETURNS | DESCRIPTION                                                                |
+| ------- | -------------------------------------------------------------------------- |
+| `HSBK`  | New HSBK instance with interpolated values. Kelvin is preserved from self. |
+
+Source code in `src/lifx/color.py`
+
+```python
+def lerp_oklab(self, other: HSBK, blend: float) -> HSBK:
+    """Interpolate to another color through Oklab perceptual color space.
+
+    Oklab produces perceptually uniform transitions without brightness
+    dips or muddy intermediates that occur with naive HSB blending.
+
+    Args:
+        other: Target color to interpolate towards.
+        blend: Blend factor from 0.0 (self) to 1.0 (other), clamped to range.
+
+    Returns:
+        New HSBK instance with interpolated values. Kelvin is preserved from self.
+    """
+    blend = max(0.0, min(1.0, blend))
+    r1, g1, b1 = colorsys.hsv_to_rgb(
+        self._hue / 360.0, self._saturation, self._brightness
+    )
+    r2, g2, b2 = colorsys.hsv_to_rgb(
+        other._hue / 360.0, other._saturation, other._brightness
+    )
+    l1, a1, ob1 = _srgb_to_oklab(r1, g1, b1)
+    l2, a2, ob2 = _srgb_to_oklab(r2, g2, b2)
+    l_interp = l1 + (l2 - l1) * blend
+    a_interp = a1 + (a2 - a1) * blend
+    ob_interp = ob1 + (ob2 - ob1) * blend
+    r, g, b = _oklab_to_srgb(l_interp, a_interp, ob_interp)
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    return HSBK(
+        hue=round(h * 360) % 360,
+        saturation=round(s, 2),
+        brightness=round(v, 2),
+        kelvin=self._kelvin,
     )
 ```
 

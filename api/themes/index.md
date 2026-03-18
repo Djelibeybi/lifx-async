@@ -168,7 +168,7 @@ def random(self) -> HSBK:
         color = theme.random()
         ```
     """
-    return random.choice(self.colors)  # nosec
+    return random.choice(self.colors)
 ````
 
 ##### shuffled
@@ -451,7 +451,7 @@ Example
 evening_theme = ThemeLibrary.get("evening")
 
 # List all available themes
-all_themes = ThemeLibrary.list()
+all_themes = ThemeLibrary.get_available_themes()
 
 # Get themes by category
 seasonal = ThemeLibrary.get_by_category("seasonal")
@@ -460,11 +460,11 @@ seasonal = ThemeLibrary.get_by_category("seasonal")
 await light.apply_theme(evening_theme, power_on=True)
 ```
 
-| METHOD            | DESCRIPTION                     |
-| ----------------- | ------------------------------- |
-| `get`             | Get a theme by name.            |
-| `list`            | List all available theme names. |
-| `get_by_category` | Get all themes in a category.   |
+| METHOD                 | DESCRIPTION                       |
+| ---------------------- | --------------------------------- |
+| `get`                  | Get a theme by name.              |
+| `get_available_themes` | Get all available themes by name. |
+| `get_by_category`      | Get all themes in a category.     |
 
 #### Functions
 
@@ -528,13 +528,13 @@ def get(cls, name: str) -> Theme:
     return Theme(cls._THEMES[normalized_name])
 ````
 
-##### list
+##### get_available_themes
 
 ```python
-list() -> list[str]
+get_available_themes() -> list[str]
 ```
 
-List all available theme names.
+Get all available themes by name.
 
 | RETURNS     | DESCRIPTION                |
 | ----------- | -------------------------- |
@@ -545,7 +545,7 @@ Example
 ```python
 from lifx.theme import ThemeLibrary
 
-all_themes = ThemeLibrary.list()
+all_themes = ThemeLibrary.get_available_themes()
 for theme_name in all_themes:
     print(f"- {theme_name}")
 ```
@@ -554,8 +554,8 @@ Source code in `src/lifx/theme/library.py`
 
 ````python
 @classmethod
-def list(cls) -> list[str]:
-    """List all available theme names.
+def get_available_themes(cls) -> list[str]:
+    """Get all available themes by name.
 
     Returns:
         Sorted list of theme names
@@ -564,7 +564,7 @@ def list(cls) -> list[str]:
         ```python
         from lifx.theme import ThemeLibrary
 
-        all_themes = ThemeLibrary.list()
+        all_themes = ThemeLibrary.get_available_themes()
         for theme_name in all_themes:
             print(f"- {theme_name}")
         ```
@@ -775,8 +775,8 @@ def add_points_for_tile(self, tile: tuple[int, int] | None, theme: Theme) -> Non
                 if not self.has_neighbour(i, j):
                     random_color = theme.random()
                     self[(i, j)] = random_color
-            j += random.choice([1, 2, 3])  # nosec
-        i += random.choice([1, 2, 3])  # nosec
+            j += random.choice([1, 2, 3])
+        i += random.choice([1, 2, 3])
 ```
 
 ##### surrounding_colors

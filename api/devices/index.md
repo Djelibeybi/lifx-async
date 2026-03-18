@@ -370,27 +370,28 @@ async with device:
 | ------------ | --------------------------- |
 | `ValueError` | If any parameter is invalid |
 
-| METHOD              | DESCRIPTION                                             |
-| ------------------- | ------------------------------------------------------- |
-| `from_ip`           | Create and return an instance for the given IP address. |
-| `connect`           | Create and return a fully initialized device instance.  |
-| `get_mac_address`   | Calculate and return the MAC address for this device.   |
-| `get_label`         | Get device label/name.                                  |
-| `set_label`         | Set device label/name.                                  |
-| `get_power`         | Get device power state.                                 |
-| `set_power`         | Set device power state.                                 |
-| `get_version`       | Get device version information.                         |
-| `get_info`          | Get device runtime information.                         |
-| `get_wifi_info`     | Get device WiFi module information.                     |
-| `get_host_firmware` | Get device host (WiFi module) firmware information.     |
-| `get_wifi_firmware` | Get device WiFi module firmware information.            |
-| `get_location`      | Get device location information.                        |
-| `set_location`      | Set device location information.                        |
-| `get_group`         | Get device group information.                           |
-| `set_group`         | Set device group information.                           |
-| `set_reboot`        | Reboot the device.                                      |
-| `close`             | Close device connection and cleanup resources.          |
-| `refresh_state`     | Refresh device state from hardware.                     |
+| METHOD                | DESCRIPTION                                             |
+| --------------------- | ------------------------------------------------------- |
+| `from_ip`             | Create and return an instance for the given IP address. |
+| `connect`             | Create and return a fully initialized device instance.  |
+| `get_mac_address`     | Calculate and return the MAC address for this device.   |
+| `ensure_capabilities` | Ensure device capabilities are populated.               |
+| `get_label`           | Get device label/name.                                  |
+| `set_label`           | Set device label/name.                                  |
+| `get_power`           | Get device power state.                                 |
+| `set_power`           | Set device power state.                                 |
+| `get_version`         | Get device version information.                         |
+| `get_info`            | Get device runtime information.                         |
+| `get_wifi_info`       | Get device WiFi module information.                     |
+| `get_host_firmware`   | Get device host (WiFi module) firmware information.     |
+| `get_wifi_firmware`   | Get device WiFi module firmware information.            |
+| `get_location`        | Get device location information.                        |
+| `set_location`        | Set device location information.                        |
+| `get_group`           | Get device group information.                           |
+| `set_group`           | Set device group information.                           |
+| `set_reboot`          | Reboot the device.                                      |
+| `close`               | Close device connection and cleanup resources.          |
+| `refresh_state`       | Refresh device state from hardware.                     |
 
 | ATTRIBUTE       | DESCRIPTION                                                     |
 | --------------- | --------------------------------------------------------------- |
@@ -1049,6 +1050,29 @@ async def get_mac_address(self) -> str:
         self._mac_address = ":".join(f"{octet:02x}" for octet in octets)
 
     return self._mac_address
+```
+
+##### ensure_capabilities
+
+```python
+ensure_capabilities() -> None
+```
+
+Ensure device capabilities are populated.
+
+Fetches device version and firmware to determine product capabilities. This is a no-op if capabilities have already been loaded (e.g. via the async context manager).
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+async def ensure_capabilities(self) -> None:
+    """Ensure device capabilities are populated.
+
+    Fetches device version and firmware to determine product capabilities.
+    This is a no-op if capabilities have already been loaded (e.g. via
+    the async context manager).
+    """
+    await self._ensure_capabilities()
 ```
 
 ##### get_label

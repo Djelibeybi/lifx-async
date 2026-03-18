@@ -406,7 +406,7 @@ await group.apply_theme(theme)
 from lifx import ThemeLibrary
 
 # Get all 42 theme names
-themes = ThemeLibrary.list()
+themes = ThemeLibrary.get_available_themes()
 print(themes)
 
 # Get themes by category
@@ -8504,7 +8504,7 @@ def random(self) -> HSBK:
         color = theme.random()
         ```
     """
-    return random.choice(self.colors)  # nosec
+    return random.choice(self.colors)
 ````
 
 ##### shuffled
@@ -8787,7 +8787,7 @@ Example
 evening_theme = ThemeLibrary.get("evening")
 
 # List all available themes
-all_themes = ThemeLibrary.list()
+all_themes = ThemeLibrary.get_available_themes()
 
 # Get themes by category
 seasonal = ThemeLibrary.get_by_category("seasonal")
@@ -8796,11 +8796,11 @@ seasonal = ThemeLibrary.get_by_category("seasonal")
 await light.apply_theme(evening_theme, power_on=True)
 ```
 
-| METHOD            | DESCRIPTION                     |
-| ----------------- | ------------------------------- |
-| `get`             | Get a theme by name.            |
-| `list`            | List all available theme names. |
-| `get_by_category` | Get all themes in a category.   |
+| METHOD                 | DESCRIPTION                       |
+| ---------------------- | --------------------------------- |
+| `get`                  | Get a theme by name.              |
+| `get_available_themes` | Get all available themes by name. |
+| `get_by_category`      | Get all themes in a category.     |
 
 #### Functions
 
@@ -8864,13 +8864,13 @@ def get(cls, name: str) -> Theme:
     return Theme(cls._THEMES[normalized_name])
 ````
 
-##### list
+##### get_available_themes
 
 ```python
-list() -> list[str]
+get_available_themes() -> list[str]
 ```
 
-List all available theme names.
+Get all available themes by name.
 
 | RETURNS     | DESCRIPTION                |
 | ----------- | -------------------------- |
@@ -8881,7 +8881,7 @@ Example
 ```python
 from lifx.theme import ThemeLibrary
 
-all_themes = ThemeLibrary.list()
+all_themes = ThemeLibrary.get_available_themes()
 for theme_name in all_themes:
     print(f"- {theme_name}")
 ```
@@ -8890,8 +8890,8 @@ Source code in `src/lifx/theme/library.py`
 
 ````python
 @classmethod
-def list(cls) -> list[str]:
-    """List all available theme names.
+def get_available_themes(cls) -> list[str]:
+    """Get all available themes by name.
 
     Returns:
         Sorted list of theme names
@@ -8900,7 +8900,7 @@ def list(cls) -> list[str]:
         ```python
         from lifx.theme import ThemeLibrary
 
-        all_themes = ThemeLibrary.list()
+        all_themes = ThemeLibrary.get_available_themes()
         for theme_name in all_themes:
             print(f"- {theme_name}")
         ```
@@ -9111,8 +9111,8 @@ def add_points_for_tile(self, tile: tuple[int, int] | None, theme: Theme) -> Non
                 if not self.has_neighbour(i, j):
                     random_color = theme.random()
                     self[(i, j)] = random_color
-            j += random.choice([1, 2, 3])  # nosec
-        i += random.choice([1, 2, 3])  # nosec
+            j += random.choice([1, 2, 3])
+        i += random.choice([1, 2, 3])
 ```
 
 ##### surrounding_colors
@@ -11061,7 +11061,7 @@ def __init__(
     self._packet_generator = packet_generator
 
     # Protocol source ID (random, identifies this client)
-    self._source = random.randint(1, 0xFFFFFFFF)  # nosec B311
+    self._source = random.randint(1, 0xFFFFFFFF)
 
     # Sequence number (0-255, wraps around)
     self._sequence = 0
@@ -11270,7 +11270,7 @@ async def for_multizone(
     """
     # Ensure capabilities are loaded
     if device.capabilities is None:
-        await device._ensure_capabilities()
+        await device.ensure_capabilities()
 
     # Check extended multizone capability
     has_extended = bool(
@@ -11700,7 +11700,7 @@ async def for_matrix(
 
     # Ensure capabilities are loaded
     if device.capabilities is None:
-        await device._ensure_capabilities()
+        await device.ensure_capabilities()
 
     # Only build canvas mapping for devices with chain capability.
     # The original LIFX Tile is the only matrix device with accelerometer-based
@@ -12819,6 +12819,8 @@ r, g, b = purple.to_rgb()
 | `with_saturation`   | Create a new HSBK with modified saturation.                           |
 | `with_brightness`   | Create a new HSBK with modified brightness.                           |
 | `with_kelvin`       | Create a new HSBK with modified color temperature.                    |
+| `lerp_hsb`          | Interpolate to another color via shortest-path HSB blending.          |
+| `lerp_oklab`        | Interpolate to another color through Oklab perceptual color space.    |
 | `clone`             | Create a copy of this color.                                          |
 | `as_tuple`          | Return HSBK values as a tuple of protocol uint16 values.              |
 | `as_dict`           | Return HSBK values as a dictionary of user-friendly values.           |
@@ -13366,6 +13368,110 @@ def with_kelvin(self, kelvin: int) -> HSBK:
         saturation=self.saturation,
         brightness=self.brightness,
         kelvin=kelvin,
+    )
+```
+
+##### lerp_hsb
+
+```python
+lerp_hsb(other: HSBK, blend: float) -> HSBK
+```
+
+Interpolate to another color via shortest-path HSB blending.
+
+| PARAMETER | DESCRIPTION                                                                      |
+| --------- | -------------------------------------------------------------------------------- |
+| `other`   | Target color to interpolate towards. **TYPE:** `HSBK`                            |
+| `blend`   | Blend factor from 0.0 (self) to 1.0 (other), clamped to range. **TYPE:** `float` |
+
+| RETURNS | DESCRIPTION                                                                |
+| ------- | -------------------------------------------------------------------------- |
+| `HSBK`  | New HSBK instance with interpolated values. Kelvin is preserved from self. |
+
+Source code in `src/lifx/color.py`
+
+```python
+def lerp_hsb(self, other: HSBK, blend: float) -> HSBK:
+    """Interpolate to another color via shortest-path HSB blending.
+
+    Args:
+        other: Target color to interpolate towards.
+        blend: Blend factor from 0.0 (self) to 1.0 (other), clamped to range.
+
+    Returns:
+        New HSBK instance with interpolated values. Kelvin is preserved from self.
+    """
+    blend = max(0.0, min(1.0, blend))
+    diff = other._hue - self._hue
+    if diff > 180:
+        diff -= 360
+    elif diff < -180:
+        diff += 360
+    hue = round(self._hue + diff * blend) % 360
+    sat = self._saturation + (other._saturation - self._saturation) * blend
+    bri = self._brightness + (other._brightness - self._brightness) * blend
+    return HSBK(
+        hue=hue,
+        saturation=round(sat, 2),
+        brightness=round(bri, 2),
+        kelvin=self._kelvin,
+    )
+```
+
+##### lerp_oklab
+
+```python
+lerp_oklab(other: HSBK, blend: float) -> HSBK
+```
+
+Interpolate to another color through Oklab perceptual color space.
+
+Oklab produces perceptually uniform transitions without brightness dips or muddy intermediates that occur with naive HSB blending.
+
+| PARAMETER | DESCRIPTION                                                                      |
+| --------- | -------------------------------------------------------------------------------- |
+| `other`   | Target color to interpolate towards. **TYPE:** `HSBK`                            |
+| `blend`   | Blend factor from 0.0 (self) to 1.0 (other), clamped to range. **TYPE:** `float` |
+
+| RETURNS | DESCRIPTION                                                                |
+| ------- | -------------------------------------------------------------------------- |
+| `HSBK`  | New HSBK instance with interpolated values. Kelvin is preserved from self. |
+
+Source code in `src/lifx/color.py`
+
+```python
+def lerp_oklab(self, other: HSBK, blend: float) -> HSBK:
+    """Interpolate to another color through Oklab perceptual color space.
+
+    Oklab produces perceptually uniform transitions without brightness
+    dips or muddy intermediates that occur with naive HSB blending.
+
+    Args:
+        other: Target color to interpolate towards.
+        blend: Blend factor from 0.0 (self) to 1.0 (other), clamped to range.
+
+    Returns:
+        New HSBK instance with interpolated values. Kelvin is preserved from self.
+    """
+    blend = max(0.0, min(1.0, blend))
+    r1, g1, b1 = colorsys.hsv_to_rgb(
+        self._hue / 360.0, self._saturation, self._brightness
+    )
+    r2, g2, b2 = colorsys.hsv_to_rgb(
+        other._hue / 360.0, other._saturation, other._brightness
+    )
+    l1, a1, ob1 = _srgb_to_oklab(r1, g1, b1)
+    l2, a2, ob2 = _srgb_to_oklab(r2, g2, b2)
+    l_interp = l1 + (l2 - l1) * blend
+    a_interp = a1 + (a2 - a1) * blend
+    ob_interp = ob1 + (ob2 - ob1) * blend
+    r, g, b = _oklab_to_srgb(l_interp, a_interp, ob_interp)
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    return HSBK(
+        hue=round(h * 360) % 360,
+        saturation=round(s, 2),
+        brightness=round(v, 2),
+        kelvin=self._kelvin,
     )
 ```
 
@@ -14132,27 +14238,28 @@ async with device:
 | ------------ | --------------------------- |
 | `ValueError` | If any parameter is invalid |
 
-| METHOD              | DESCRIPTION                                             |
-| ------------------- | ------------------------------------------------------- |
-| `from_ip`           | Create and return an instance for the given IP address. |
-| `connect`           | Create and return a fully initialized device instance.  |
-| `get_mac_address`   | Calculate and return the MAC address for this device.   |
-| `get_label`         | Get device label/name.                                  |
-| `set_label`         | Set device label/name.                                  |
-| `get_power`         | Get device power state.                                 |
-| `set_power`         | Set device power state.                                 |
-| `get_version`       | Get device version information.                         |
-| `get_info`          | Get device runtime information.                         |
-| `get_wifi_info`     | Get device WiFi module information.                     |
-| `get_host_firmware` | Get device host (WiFi module) firmware information.     |
-| `get_wifi_firmware` | Get device WiFi module firmware information.            |
-| `get_location`      | Get device location information.                        |
-| `set_location`      | Set device location information.                        |
-| `get_group`         | Get device group information.                           |
-| `set_group`         | Set device group information.                           |
-| `set_reboot`        | Reboot the device.                                      |
-| `close`             | Close device connection and cleanup resources.          |
-| `refresh_state`     | Refresh device state from hardware.                     |
+| METHOD                | DESCRIPTION                                             |
+| --------------------- | ------------------------------------------------------- |
+| `from_ip`             | Create and return an instance for the given IP address. |
+| `connect`             | Create and return a fully initialized device instance.  |
+| `get_mac_address`     | Calculate and return the MAC address for this device.   |
+| `ensure_capabilities` | Ensure device capabilities are populated.               |
+| `get_label`           | Get device label/name.                                  |
+| `set_label`           | Set device label/name.                                  |
+| `get_power`           | Get device power state.                                 |
+| `set_power`           | Set device power state.                                 |
+| `get_version`         | Get device version information.                         |
+| `get_info`            | Get device runtime information.                         |
+| `get_wifi_info`       | Get device WiFi module information.                     |
+| `get_host_firmware`   | Get device host (WiFi module) firmware information.     |
+| `get_wifi_firmware`   | Get device WiFi module firmware information.            |
+| `get_location`        | Get device location information.                        |
+| `set_location`        | Set device location information.                        |
+| `get_group`           | Get device group information.                           |
+| `set_group`           | Set device group information.                           |
+| `set_reboot`          | Reboot the device.                                      |
+| `close`               | Close device connection and cleanup resources.          |
+| `refresh_state`       | Refresh device state from hardware.                     |
 
 | ATTRIBUTE       | DESCRIPTION                                                     |
 | --------------- | --------------------------------------------------------------- |
@@ -14811,6 +14918,29 @@ async def get_mac_address(self) -> str:
         self._mac_address = ":".join(f"{octet:02x}" for octet in octets)
 
     return self._mac_address
+```
+
+##### ensure_capabilities
+
+```python
+ensure_capabilities() -> None
+```
+
+Ensure device capabilities are populated.
+
+Fetches device version and firmware to determine product capabilities. This is a no-op if capabilities have already been loaded (e.g. via the async context manager).
+
+Source code in `src/lifx/devices/base.py`
+
+```python
+async def ensure_capabilities(self) -> None:
+    """Ensure device capabilities are populated.
+
+    Fetches device version and firmware to determine product capabilities.
+    This is a no-op if capabilities have already been loaded (e.g. via
+    the async context manager).
+    """
+    await self._ensure_capabilities()
 ```
 
 ##### get_label
@@ -23626,7 +23756,7 @@ async def create_device(self) -> Device | None:
     temp_device = Device(**kwargs)
 
     try:
-        await temp_device._ensure_capabilities()
+        await temp_device.ensure_capabilities()
 
         if temp_device.capabilities:
             # Check for Ceiling products first (before generic MatrixLight)
