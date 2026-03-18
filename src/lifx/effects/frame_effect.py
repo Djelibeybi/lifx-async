@@ -4,7 +4,9 @@ This module provides FrameEffect, an abstract base class for effects that
 generate color frames at a fixed FPS. Frame generation is separated from
 delivery: effects implement generate_frame() returning user-friendly HSBK
 colors, and the base class handles conversion and dispatch via the
-animation module.
+animation module. For performance-critical effects, generate_protocol_frame()
+can be overridden to produce raw uint16 HSBK tuples directly, bypassing
+HSBK object construction entirely.
 """
 
 from __future__ import annotations
@@ -53,8 +55,10 @@ class FrameEffect(LIFXEffect):
     matching ctx.pixel_count.
 
     The Conductor creates Animators for each participant and sets them
-    on this effect before starting. The frame loop handles timing,
-    HSBK-to-protocol conversion, and frame dispatch.
+    on this effect before starting. The frame loop calls
+    generate_protocol_frame() per device, which by default delegates to
+    generate_frame() and converts the result. Performance-critical effects
+    can override generate_protocol_frame() directly to skip HSBK allocation.
 
     Attributes:
         fps: Frames per second
@@ -164,7 +168,11 @@ class FrameEffect(LIFXEffect):
         """Run the frame loop.
 
         Iterates animators, creates FrameContext per device, calls
-        generate_frame(), converts to protocol format, and sends frames.
+        generate_protocol_frame(), and sends the resulting protocol tuples.
+        The default generate_protocol_frame() delegates to generate_frame()
+        and converts via HSBK.as_tuple(); subclasses can override it to
+        produce protocol tuples directly for better performance.
+
         Runs until duration expires, stop() is called, or cancelled.
         """
         self._stop_event.clear()
