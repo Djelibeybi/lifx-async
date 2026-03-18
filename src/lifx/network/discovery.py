@@ -23,6 +23,7 @@ from lifx.network.utils import allocate_source
 from lifx.protocol.base import Packet
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device as DevicePackets
+from lifx.protocol.packets import get_packet_class
 
 if TYPE_CHECKING:
     from lifx.devices.base import Device
@@ -303,8 +304,6 @@ async def _discover_with_packet(
                 device_serial = Serial.from_protocol(header.target).to_string()
 
                 # Look up the response packet class by type (O(1) registry lookup)
-                from lifx.protocol.packets import get_packet_class
-
                 response_packet_class = get_packet_class(header.pkt_type)
 
                 if not response_packet_class:
