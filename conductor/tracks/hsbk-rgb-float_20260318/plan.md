@@ -3,7 +3,7 @@
 **Track ID:** hsbk-rgb-float_20260318
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-03-18
-**Status:** [ ] Not Started
+**Status:** [x] Complete
 
 ## Overview
 
@@ -15,15 +15,15 @@ Update `from_rgb()` and `to_rgb()` signatures and their direct tests.
 
 ### Tasks
 
-- [ ] Task 1.1: Update `test_color.py` tests to use float inputs/outputs (red phase — tests will fail)
-- [ ] Task 1.2: Update `HSBK.from_rgb()` to accept `float` (0.0–1.0), remove int validation and `/ 255` normalization, remove rounding of hue/sat/bri
-- [ ] Task 1.3: Update `HSBK.to_rgb()` to return `tuple[float, float, float]` (0.0–1.0), remove `* 255` denormalization and `int(round())`
-- [ ] Task 1.4: Update docstrings and examples on both methods
+- [x] Task 1.1: Update `test_color.py` tests to use float inputs/outputs (red phase — tests will fail)
+- [x] Task 1.2: Update `HSBK.from_rgb()` to accept `float` (0.0–1.0), remove int validation and `/ 255` normalization, remove rounding of hue/sat/bri
+- [x] Task 1.3: Update `HSBK.to_rgb()` to return `tuple[float, float, float]` (0.0–1.0), remove `* 255` denormalization and `int(round())`
+- [x] Task 1.4: Update docstrings and examples on both methods
 
 ### Verification
 
-- [ ] `test_color.py` passes with float-based assertions
-- [ ] Round-trip error is within floating-point epsilon
+- [x]`test_color.py` passes with float-based assertions
+- [x]Round-trip error is within floating-point epsilon
 
 ## Phase 2: Colors Enum
 
@@ -31,13 +31,13 @@ Convert all ~148 `Colors` entries from int to float values.
 
 ### Tasks
 
-- [ ] Task 2.1: Convert all `Colors` enum entries from `from_rgb(int, int, int)` to `from_rgb(float, float, float)` by dividing each value by 255
-- [ ] Task 2.2: Verify `Colors` enum values are correct (spot-check primaries, grays, edge cases)
+- [x] Task 2.1: Convert all `Colors` enum entries from `from_rgb(int, int, int)` to `from_rgb(float, float, float)` by dividing each value by 255
+- [x] Task 2.2: Verify `Colors` enum values are correct (spot-check primaries, grays, edge cases)
 
 ### Verification
 
-- [ ] All existing `Colors`-related tests pass
-- [ ] Pyright passes on `color.py`
+- [x]All existing `Colors`-related tests pass
+- [x]Pyright passes on `color.py`
 
 ## Phase 3: Caller Updates
 
@@ -45,14 +45,14 @@ Update all docstrings, effect code, and remaining tests that reference the old i
 
 ### Tasks
 
-- [ ] Task 3.1: Update docstring examples in `light.py`, `multizone.py`, `matrix.py`, `api.py`, `effects/base.py`, `effects/pulse.py`
-- [ ] Task 3.2: Update `test_effects/test_pulse.py` to use float values
-- [ ] Task 3.3: Run full test suite and fix any remaining breakage
+- [x] Task 3.1: Update docstring examples in `light.py`, `multizone.py`, `matrix.py`, `api.py`, `effects/base.py`, `effects/pulse.py`
+- [x] Task 3.2: Update `test_effects/test_pulse.py` to use float values
+- [x] Task 3.3: Run full test suite and fix any remaining breakage
 
 ### Verification
 
-- [ ] Full test suite passes
-- [ ] `ruff check` and `ruff format` pass
+- [x]Full test suite passes
+- [x]`ruff check` and `ruff format` pass
 
 ## Phase 4: Fireworks Consolidation
 
@@ -60,23 +60,23 @@ Replace fireworks private RGB helpers with the now-equivalent `HSBK` methods.
 
 ### Tasks
 
-- [ ] Task 4.1: Replace `_hsb_to_rgb()` calls with `HSBK.to_rgb()` (via temporary HSBK instance or extracted method)
-- [ ] Task 4.2: Replace `_rgb_to_hsb()` calls with `HSBK.from_rgb()`
-- [ ] Task 4.3: Remove `_hsb_to_rgb()` and `_rgb_to_hsb()` functions and `_HUE_SEXTANTS` constant
-- [ ] Task 4.4: Run fireworks tests to confirm no regressions
+- [x] Task 4.1: Replace `_hsb_to_rgb()` calls with `HSBK.to_rgb()` (via temporary HSBK instance or extracted method)
+- [x] Task 4.2: Replace `_rgb_to_hsb()` calls with `HSBK.from_rgb()`
+- [x] Task 4.3: Remove `_hsb_to_rgb()` and `_rgb_to_hsb()` functions and `_HUE_SEXTANTS` constant
+- [x] Task 4.4: Run fireworks tests to confirm no regressions
 
 ### Verification
 
-- [ ] Fireworks tests pass with identical behavior
-- [ ] No private RGB helpers remain in `fireworks.py`
+- [x]Fireworks tests pass with identical behavior
+- [x]No private RGB helpers remain in `fireworks.py`
 
 ## Final Verification
 
-- [ ] All acceptance criteria met
-- [ ] `uv run --frozen pytest` — full suite passes
-- [ ] `uv run pyright` — no type errors
-- [ ] `uv run ruff check . && uv run ruff format --check .` — clean
-- [ ] Ready for review
+- [x]All acceptance criteria met
+- [x]`uv run --frozen pytest` — full suite passes
+- [x]`uv run pyright` — no type errors
+- [x]`uv run ruff check . && uv run ruff format --check .` — clean
+- [x]Ready for review
 
 ---
 
