@@ -29882,6 +29882,48 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.3.0 (2026-03-18)
+
+### Bug Fixes
+
+- **color**: Clamp blend parameter in lerp methods ([`4c41ca4`](https://github.com/Djelibeybi/lifx-async/commit/4c41ca468ebdf288771be5972f628a43cc1fc0af))
+- **effects**: Fix zones_per_bulb normalization, embers single-zone, CA restart, and test assertions ([`f049252`](https://github.com/Djelibeybi/lifx-async/commit/f04925282ccd15ef38f55639776c6a77357f3183))
+- **effects**: Polish ported effects and fix API surface issues ([`ee01ec9`](https://github.com/Djelibeybi/lifx-async/commit/ee01ec9014dc5f26ff4d67d1efea8d97914c7870))
+- **effects**: Resolve Pyright possibly-unbound variable in Sine effect ([`b6629ad`](https://github.com/Djelibeybi/lifx-async/commit/b6629ad7c15732b005ada925288416e91152a26e))
+- **security**: Skip bandit B311 globally and remove nosec comments ([`90e713b`](https://github.com/Djelibeybi/lifx-async/commit/90e713b62743dc34b47ea21bc7b1087a96cb4258))
+- **tests**: Update registry test to use superset check ([`a9c3063`](https://github.com/Djelibeybi/lifx-async/commit/a9c30635ba89238355b8e4b6c864e7b9cb9c8b7d))
+- **tests**: Update theme count from 42 to 57 after palette additions ([`e416341`](https://github.com/Djelibeybi/lifx-async/commit/e4163414a24427d9e0f2d6bfe7d6e7669a4beed5))
+
+### Documentation
+
+- Add design spec for porting pkivolowitz/lifx effects ([`2d17778`](https://github.com/Djelibeybi/lifx-async/commit/2d17778dbdd8bc558fe33e061791832e9f11a928))
+- Add implementation plan for effects port ([`70bfe89`](https://github.com/Djelibeybi/lifx-async/commit/70bfe8986cb77fb331db5f672883b69b6f200af8))
+- Address spec review findings ([`9a3ca10`](https://github.com/Djelibeybi/lifx-async/commit/9a3ca106357a446b19b433dcfc2b1a8f42614f90))
+
+### Features
+
+- **color**: Add lerp_oklab and lerp_hsb methods to HSBK ([`71a794a`](https://github.com/Djelibeybi/lifx-async/commit/71a794a1ae8d7fc08e314e7b7f0acc79887ee720))
+- **effects**: Add Cylon (Larson scanner) effect ([`26e75d5`](https://github.com/Djelibeybi/lifx-async/commit/26e75d5ee5f71a2e4764c00d4121735a18f2bdd3))
+- **effects**: Add Double Slit (wave interference) effect ([`7617cca`](https://github.com/Djelibeybi/lifx-async/commit/7617ccad43b5b4b8d25ef4a3de3602a391a8e9bb))
+- **effects**: Add Embers (fire simulation) effect ([`3a9ab6c`](https://github.com/Djelibeybi/lifx-async/commit/3a9ab6c44ec3a1f65a4c44bc969242be355e7c1e))
+- **effects**: Add Fireworks effect ([`d509f4b`](https://github.com/Djelibeybi/lifx-async/commit/d509f4b5593e63d21e1bfd1c5e597e1b6f06e547))
+- **effects**: Add Jacob's Ladder (electric arcs) effect ([`c447011`](https://github.com/Djelibeybi/lifx-async/commit/c4470119202e81d42712a0deca7984b3532f7ae7))
+- **effects**: Add Newton's Cradle effect ([`a414b37`](https://github.com/Djelibeybi/lifx-async/commit/a414b37a69c590198c9d4e1dd98aaf6c069c61d7))
+- **effects**: Add Pendulum Wave effect ([`9315730`](https://github.com/Djelibeybi/lifx-async/commit/931573011baf13d0fe1691a050a55215051b5fb4))
+- **effects**: Add Plasma (electric tendrils) effect ([`6fed46d`](https://github.com/Djelibeybi/lifx-async/commit/6fed46d6409ebc95ea94eea3d828c08bd8367ae7))
+- **effects**: Add Plasma2D effect for matrix devices ([`2a94fd7`](https://github.com/Djelibeybi/lifx-async/commit/2a94fd76e3b6fa177e50d6f857f108c9faddd5d4))
+- **effects**: Add Ripple (water drops) effect ([`d3a4a33`](https://github.com/Djelibeybi/lifx-async/commit/d3a4a3356abe23290dd3f88997bdd95f8e6d04a9))
+- **effects**: Add Rule 30 (cellular automaton) effect ([`13b9f07`](https://github.com/Djelibeybi/lifx-async/commit/13b9f077902d10eda1b66f7e57d0a70cc2b96b79))
+- **effects**: Add Rule Trio (three CAs blended) effect ([`45346d4`](https://github.com/Djelibeybi/lifx-async/commit/45346d4a80e3128ab69bd393a38d56cabe7e6a38))
+- **effects**: Add Sine (traveling ease wave) effect ([`24a2ec9`](https://github.com/Djelibeybi/lifx-async/commit/24a2ec9faadc30f809792dce9411d1efa5094cc2))
+- **effects**: Add Sonar (radar pulses) effect ([`575fed4`](https://github.com/Djelibeybi/lifx-async/commit/575fed424eafe9e163efeecbe9d2119a1ef9dba9))
+- **effects**: Add Spectrum Sweep effect ([`9aad95b`](https://github.com/Djelibeybi/lifx-async/commit/9aad95b924c8ee4e553b2ec23470d8b05b0049cf))
+- **effects**: Add Spin (color migration) effect ([`9b91fc9`](https://github.com/Djelibeybi/lifx-async/commit/9b91fc9caa4304a99d92dc7ac13cfe9733e337f8))
+- **effects**: Add Twinkle (sparkle) effect ([`2660f19`](https://github.com/Djelibeybi/lifx-async/commit/2660f19e39d75d4f081bb1d79cc4782c238a1aaf))
+- **effects**: Add Wave (standing wave) effect ([`63cdf9b`](https://github.com/Djelibeybi/lifx-async/commit/63cdf9b3ffc105f7c0e26758221c6be518230303))
+- **effects**: Register and export all 18 ported effects ([`c5caa0d`](https://github.com/Djelibeybi/lifx-async/commit/c5caa0db7334c3b40e3d702ea1fbff9474d1c678))
+- **theme**: Add palette themes from pkivolowitz/lifx ([`4126ccf`](https://github.com/Djelibeybi/lifx-async/commit/4126ccff479f2e615634221b1e854c67b1caa4c4))
+
 ## v5.2.1 (2026-03-18)
 
 ### Bug Fixes
