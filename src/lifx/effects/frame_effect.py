@@ -102,6 +102,9 @@ class FrameEffect(LIFXEffect):
         self._stop_event = asyncio.Event()
         self._animators: list[Animator] = []
         self._last_frames: dict[str, list[HSBK]] = {}
+        # Cache for HSBK frame from default generate_protocol_frame()
+        # Allows _last_frames tracking without coupling to the loop
+        self._last_generated_hsbk: list[HSBK] | None = None
 
     @property
     def fps(self) -> float:
@@ -126,6 +129,25 @@ class FrameEffect(LIFXEffect):
         Returns:
             List of HSBK colors (length must equal ctx.pixel_count)
         """
+
+    def generate_protocol_frame(
+        self, ctx: FrameContext
+    ) -> list[tuple[int, int, int, int]]:
+        """Generate a frame of protocol-ready uint16 HSBK tuples.
+
+        Override this in performance-critical effects to bypass HSBK object
+        construction entirely. The default implementation delegates to
+        generate_frame() and converts via HSBK.as_tuple().
+
+        Args:
+            ctx: Frame context with timing and layout info
+
+        Returns:
+            List of (hue, sat, brightness, kelvin) tuples with uint16 values
+        """
+        frame = self.generate_frame(ctx)
+        self._last_generated_hsbk = frame
+        return [color.as_tuple() for color in frame]
 
     async def async_setup(self, _participants: list[Light]) -> None:
         """Optional setup hook called before the frame loop starts.
@@ -171,15 +193,17 @@ class FrameEffect(LIFXEffect):
                     canvas_height=animator.canvas_height,
                 )
 
-                # Generate user-friendly HSBK frame
-                hsbk_frame = self.generate_frame(ctx)
+                # Generate protocol-ready frame (subclasses can override
+                # generate_protocol_frame for zero-HSBK-allocation path)
+                protocol_frame = self.generate_protocol_frame(ctx)
 
-                # Store last frame keyed by device serial
-                if idx < len(participants):
-                    self._last_frames[participants[idx].serial] = hsbk_frame
-
-                # Convert to protocol tuples
-                protocol_frame = [color.as_tuple() for color in hsbk_frame]
+                # Track HSBK frame for state restoration (populated by
+                # default generate_protocol_frame, None for direct overrides)
+                if idx < len(participants) and self._last_generated_hsbk is not None:
+                    self._last_frames[participants[idx].serial] = (
+                        self._last_generated_hsbk
+                    )
+                    self._last_generated_hsbk = None
 
                 # Send via direct UDP
                 animator.send_frame(protocol_frame)
