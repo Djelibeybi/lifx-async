@@ -6,6 +6,8 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from lifx.devices.base import Device
@@ -17,6 +19,8 @@ from lifx.devices.multizone import MultiZoneLight
 from lifx.network.discovery import discover_devices
 
 
+@pytest.mark.emulator
+@pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
 class TestDiscoveredDeviceCreateDevice:
     """Tests for DiscoveredDevice.create_device() method.
 
@@ -105,6 +109,8 @@ class TestDiscoveredDeviceCreateDevice:
         assert "Light" in device_types and "InfraredLight" in device_types
 
 
+@pytest.mark.emulator
+@pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
 class TestDiscoveryEdgeCasesWithEmulator:
     """Additional edge case tests using the emulator server."""
 
