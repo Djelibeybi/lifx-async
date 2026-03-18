@@ -152,7 +152,7 @@ class EffectColorloop(FrameEffect):
             participants: List of lights participating in the effect
         """
         self._initial_colors = await self._get_initial_colors(participants)
-        self._direction = random.choice([1, -1])  # nosec
+        self._direction = random.choice([1, -1])
 
     def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
         """Generate a frame of colors for one device.
@@ -299,8 +299,8 @@ class EffectColorloop(FrameEffect):
             HSBK color to use as startup color
         """
         return HSBK(
-            hue=random.randint(0, 360),  # nosec
-            saturation=random.uniform(self.saturation_min, self.saturation_max),  # nosec
+            hue=random.randint(0, 360),
+            saturation=random.uniform(self.saturation_min, self.saturation_max),
             brightness=self.brightness if self.brightness is not None else 0.8,
             kelvin=KELVIN_NEUTRAL,
         )

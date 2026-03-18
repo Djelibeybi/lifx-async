@@ -71,7 +71,7 @@ class _CA:
             rule: Wolfram elementary rule number 0-255.
         """
         self.generation = 0
-        self.state = [random.randint(0, 1) for _ in range(cell_count)]  # nosec
+        self.state = [random.randint(0, 1) for _ in range(cell_count)]
         self._ensure_table(rule)
 
     def advance_to(self, target_gen: int, rule: int) -> None:
