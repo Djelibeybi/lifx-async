@@ -45,7 +45,7 @@ class LIFXEffect(ABC):
             async def async_play(self) -> None:
                 # Custom effect logic
                 for light in self.participants:
-                    await light.set_color(HSBK.from_rgb(255, 0, 0))
+                    await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
         ```
     """
 
@@ -156,7 +156,7 @@ class LIFXEffect(ABC):
             ```python
             # Override for custom startup color
             async def from_poweroff_hsbk(self, light: Light) -> HSBK:
-                return HSBK.from_rgb(255, 0, 0)  # Always start with red
+                return HSBK.from_rgb(1.0, 0.0, 0.0)  # Always start with red
             ```
         """
         return HSBK(

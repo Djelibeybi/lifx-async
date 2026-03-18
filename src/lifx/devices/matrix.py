@@ -345,7 +345,7 @@ class MatrixLight(Light):
         ...     print(f"Device has {len(chain)} tile(s)")
         ...
         ...     # Set colors on first tile (8x8 = 64 zones)
-        ...     colors = [HSBK.from_rgb(255, 0, 0)] * 64
+        ...     colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64
         ...     await matrix.set64(tile_index=0, colors=colors, width=8)
     """
 
@@ -642,7 +642,7 @@ class MatrixLight(Light):
 
         Example:
             >>> # Set 8x8 tile to red
-            >>> colors = [HSBK.from_rgb(255, 0, 0)] * 64
+            >>> colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64
             >>> await matrix.set64(
             ...     tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colors
             ... )
@@ -789,7 +789,7 @@ class MatrixLight(Light):
 
         Example:
             >>> # Set entire tile to solid red (uses SetColor packet)
-            >>> colors = [HSBK.from_rgb(255, 0, 0)] * 64
+            >>> colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64
             >>> await matrix.set_matrix_colors(tile_index=0, colors=colors)
 
             >>> # Set 8x8 tile to gradient (uses set64 with zones)

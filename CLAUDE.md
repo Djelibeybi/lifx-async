@@ -380,8 +380,8 @@ The `HSBK` class (in `color.py`) provides user-friendly color handling:
 
 Conversion methods:
 
-- `HSBK.from_rgb(r, g, b, kelvin)`: Create from RGB (0-255)
-- `hsbk.to_rgb()`: Convert to RGB tuple
+- `HSBK.from_rgb(r, g, b)`: Create from RGB (0.0-1.0)
+- `hsbk.to_rgb()`: Convert to RGB tuple (0.0-1.0)
 - Protocol uses uint16 (0-65535) internally
 
 ### HEV Light Control (Anti-Bacterial Cleaning)
@@ -467,7 +467,7 @@ async with await MultiZoneLight.from_ip("192.168.1.100") as light:
 
     # Set all zones to red
     zone_count = await light.get_zone_count()
-    await light.set_color_zones(0, zone_count - 1, HSBK.from_rgb(255, 0, 0))
+    await light.set_color_zones(0, zone_count - 1, HSBK.from_rgb(1.0, 0.0, 0.0))
 ```
 
 **Note on methods:**

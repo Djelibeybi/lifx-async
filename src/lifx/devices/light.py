@@ -63,7 +63,7 @@ class Light(Device[LightState]):
 
         async with light:
             # Set color
-            await light.set_color(HSBK.from_rgb(255, 0, 0))
+            await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
 
             # Set brightness
             await light.set_brightness(0.5)
@@ -75,7 +75,7 @@ class Light(Device[LightState]):
         Using the simplified connect method (without knowing the serial):
         ```python
         async with await Light.from_ip(ip="192.168.1.100") as light:
-            await light.set_color(HSBK.from_rgb(255, 0, 0))
+            await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
         ```
     """
 
@@ -182,10 +182,10 @@ class Light(Device[LightState]):
         Example:
             ```python
             # Set to red instantly
-            await light.set_color(HSBK.from_rgb(255, 0, 0))
+            await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
 
             # Fade to blue over 2 seconds
-            await light.set_color(HSBK.from_rgb(0, 0, 255), duration=2.0)
+            await light.set_color(HSBK.from_rgb(0.0, 0.0, 1.0), duration=2.0)
             ```
         """
         # Convert to protocol HSBK
@@ -572,7 +572,7 @@ class Light(Device[LightState]):
 
             # Pulse red 5 times
             await light.set_waveform(
-                color=HSBK.from_rgb(255, 0, 0),
+                color=HSBK.from_rgb(1.0, 0.0, 0.0),
                 period=1.0,
                 cycles=5,
                 waveform=LightWaveform.SINE,
@@ -793,10 +793,10 @@ class Light(Device[LightState]):
         Example:
             ```python
             # Pulse red once
-            await light.pulse(HSBK.from_rgb(255, 0, 0))
+            await light.pulse(HSBK.from_rgb(1.0, 0.0, 0.0))
 
             # Pulse blue 3 times, 2 seconds per pulse
-            await light.pulse(HSBK.from_rgb(0, 0, 255), period=2.0, cycles=3)
+            await light.pulse(HSBK.from_rgb(0.0, 0.0, 1.0), period=2.0, cycles=3)
             ```
         """
         await self.set_waveform(
@@ -828,7 +828,9 @@ class Light(Device[LightState]):
             await light.breathe(HSBK(0, 0, 1.0, 3500))
 
             # Breathe purple 10 times
-            await light.breathe(HSBK.from_rgb(128, 0, 128), cycles=10)
+            await light.breathe(
+                HSBK.from_rgb(0.5019607843, 0.0, 0.5019607843), cycles=10
+            )
             ```
         """
         await self.set_waveform(

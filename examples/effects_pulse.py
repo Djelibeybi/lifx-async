@@ -104,21 +104,21 @@ async def main() -> None:
 
     # Example 2: Strobe effect with red color for contrast
     print("\n2. Red strobe effect (15 flashes)")
-    red_strobe = HSBK.from_rgb(255, 0, 0)
+    red_strobe = HSBK.from_rgb(1.0, 0.0, 0.0)
     effect = EffectPulse(mode="strobe", period=0.2, cycles=15, color=red_strobe)
     await conductor.start(effect, lights)
     await asyncio.sleep(4)  # 0.2s * 15 cycles + buffer
 
     # Example 3: Breathe effect with custom color
     print("\n3. Breathe effect with blue color")
-    blue = HSBK.from_rgb(0, 0, 255)
+    blue = HSBK.from_rgb(0.0, 0.0, 1.0)
     effect = EffectPulse(mode="breathe", period=2.0, cycles=3, color=blue)
     await conductor.start(effect, lights)
     await asyncio.sleep(7)  # 2.0s * 3 cycles + buffer
 
     # Example 4: Ping effect (single pulse)
     print("\n4. Ping effect (single pulse)")
-    red = HSBK.from_rgb(255, 0, 0)
+    red = HSBK.from_rgb(1.0, 0.0, 0.0)
     effect = EffectPulse(mode="ping", color=red)
     await conductor.start(effect, lights)
     await asyncio.sleep(2)

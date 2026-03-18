@@ -71,7 +71,9 @@ class EffectPulse(LIFXEffect):
         await conductor.start(effect, [light])
 
         # Strobe with custom color
-        effect = EffectPulse(mode="strobe", cycles=20, color=HSBK.from_rgb(255, 0, 0))
+        effect = EffectPulse(
+            mode="strobe", cycles=20, color=HSBK.from_rgb(1.0, 0.0, 0.0)
+        )
         await conductor.start(effect, [light])
 
         # Breathe effect
