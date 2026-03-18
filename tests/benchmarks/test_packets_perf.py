@@ -51,8 +51,10 @@ def test_matrix_update_colors_64px() -> None:
 def test_matrix_update_colors_128px() -> None:
     """Benchmark MatrixPacketGenerator.update_colors for a 128px tile (16×8).
 
-    Phase 1 baseline: per-frame cost for Ceiling (16×8 = 128px, large tile mode).
-    Multiple Set64 packets required — cost scales with packet count.
+    Phase 1 baseline: per-frame cost for LIFX Ceiling Capsule (16×8 = 128px).
+    Large tile mode: 3 templates per frame (2× Set64 into temp buffer +
+    1× CopyFrameBuffer to display). update_colors skips the CopyFrameBuffer
+    packet, so it iterates over 2 color-bearing templates × 64px each.
     """
     gen = MatrixPacketGenerator(tile_count=1, tile_width=16, tile_height=8)
     templates = gen.create_templates(SOURCE, TARGET)
@@ -66,6 +68,29 @@ def test_matrix_update_colors_128px() -> None:
     avg_us = (elapsed / BENCHMARK_ITERATIONS) * 1_000_000
     print(
         f"\n  update_colors 128px baseline: {avg_us:.1f}µs avg ({BENCHMARK_ITERATIONS} iters)"
+    )
+
+
+@pytest.mark.benchmark
+def test_multizone_update_colors_120() -> None:
+    """Benchmark MultiZonePacketGenerator.update_colors for a 120-zone strip.
+
+    Phase 1 baseline: per-frame cost for LIFX Neon (120 zones).
+    2 SetExtendedColorZones packets required (82 zones + 38 zones).
+    Each packet flattens its zone slice independently before packing.
+    """
+    gen = MultiZonePacketGenerator(zone_count=120)
+    templates = gen.create_templates(SOURCE, TARGET)
+    hsbk = _make_hsbk(120)
+
+    start = time.perf_counter()
+    for _ in range(BENCHMARK_ITERATIONS):
+        gen.update_colors(templates, hsbk)
+    elapsed = time.perf_counter() - start
+
+    avg_us = (elapsed / BENCHMARK_ITERATIONS) * 1_000_000
+    print(
+        f"\n  multizone update_colors 120z baseline: {avg_us:.1f}µs avg ({BENCHMARK_ITERATIONS} iters)"
     )
 
 
