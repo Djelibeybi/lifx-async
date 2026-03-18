@@ -314,10 +314,7 @@ class EffectPlasma(FrameEffect):
         if t >= self._next_spawn_t and len(self._tendrils) < _MAX_TENDRILS:
             self._spawn_tendril(t, bulb_count)
             # Exponential inter-arrival time based on tendril_rate.
-            if self.tendril_rate > 0:
-                self._next_spawn_t = t + random.expovariate(self.tendril_rate)
-            else:
-                self._next_spawn_t = t + 1.0
+            self._next_spawn_t = t + random.expovariate(self.tendril_rate)
 
         # Expire dead tendrils.
         self._tendrils = [td for td in self._tendrils if td.is_alive(t)]

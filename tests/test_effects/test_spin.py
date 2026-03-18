@@ -117,6 +117,20 @@ def test_spin_invalid_speed() -> None:
         EffectSpin(speed=-1.0)
 
 
+def test_spin_empty_theme_validation() -> None:
+    """Test EffectSpin line 90: empty theme colors check.
+
+    The Theme constructor defaults empty lists to [Colors.WHITE_NEUTRAL],
+    so Theme([]) always has at least one color. To reach line 90, we must
+    bypass Theme's constructor by directly setting .colors to [].
+    """
+    custom_theme = Theme([HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)])
+    # Bypass Theme's default-fill by clearing colors after construction
+    custom_theme.colors = []
+    with pytest.raises(ValueError, match="Theme must have at least one color"):
+        EffectSpin(theme=custom_theme)
+
+
 def test_spin_invalid_bulb_offset() -> None:
     """Test EffectSpin with invalid bulb_offset raises ValueError."""
     with pytest.raises(ValueError, match="bulb_offset must be"):
@@ -288,6 +302,34 @@ class TestSpinGenerateFrame:
         # Each pair of adjacent zones should have the same color
         for i in range(0, 8, 2):
             assert colors[i] == colors[i + 1]
+
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectSpin(zones_per_bulb=3)
+        ctx = FrameContext(
+            elapsed_s=0.5,
+            device_index=0,
+            pixel_count=17,
+            canvas_width=17,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectSpin(zones_per_bulb=3)
+        ctx = FrameContext(
+            elapsed_s=0.5,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 1
 
     def test_single_pixel(self) -> None:
         """Test single-pixel device returns one color."""

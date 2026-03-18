@@ -261,6 +261,34 @@ class TestSpectrumSweepGenerateFrame:
         for i in range(0, 8, 2):
             assert colors[i] == colors[i + 1]
 
+    def test_zones_per_bulb_padding(self) -> None:
+        """Test output is padded when zones don't fill pixel_count."""
+        # 5 bulbs * 3 zones = 15 < 17, triggers padding
+        effect = EffectSpectrumSweep(zones_per_bulb=3)
+        ctx = FrameContext(
+            elapsed_s=0.5,
+            device_index=0,
+            pixel_count=17,
+            canvas_width=17,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 17
+
+    def test_zones_per_bulb_trimming(self) -> None:
+        """Test output is trimmed when zones exceed pixel_count."""
+        # 1 bulb * 3 zones = 3 > 1, triggers trimming
+        effect = EffectSpectrumSweep(zones_per_bulb=3)
+        ctx = FrameContext(
+            elapsed_s=0.5,
+            device_index=0,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+        colors = effect.generate_frame(ctx)
+        assert len(colors) == 1
+
     def test_hue_varies_with_three_phases(self) -> None:
         """Test that the effect produces hues from all three phase regions."""
         effect = EffectSpectrumSweep(waves=1.0)

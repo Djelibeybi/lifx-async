@@ -384,6 +384,33 @@ class TestTwinkleStatefulBehavior:
         for color in colors:
             assert color.brightness == 0.0
 
+    def test_sparkle_timer_clamps_to_zero(self) -> None:
+        """Test sparkle timer is clamped to 0.0 when decay overshoots."""
+        effect = EffectTwinkle(
+            density=1.0,
+            speed=0.1,  # Very short sparkle duration
+            brightness=1.0,
+            background_brightness=0.0,
+        )
+
+        with patch("lifx.effects.twinkle.random") as mock_random:
+            mock_random.random.return_value = 0.0  # Always trigger
+
+            # Frame 0: initialize timers
+            effect.generate_frame(_make_ctx(elapsed_s=0.0, pixel_count=4))
+            # Frame 1: trigger sparkles (speed=0.1, so timer = 0.1)
+            effect.generate_frame(_make_ctx(elapsed_s=0.01, pixel_count=4))
+
+            # Stop triggering new sparkles
+            mock_random.random.return_value = 1.0
+
+            # Frame 2: large dt (0.5) overshoots timer past 0 (0.1 - 0.5 < 0)
+            effect.generate_frame(_make_ctx(elapsed_s=0.51, pixel_count=4))
+
+            # All timers should be clamped to 0.0 (not negative)
+            for timer in effect._sparkle_timers:  # type: ignore[union-attr]
+                assert timer >= 0.0
+
     def test_backwards_time_jump_clamped(self) -> None:
         """Test backwards elapsed_s is handled gracefully (dt clamped to 0)."""
         effect = EffectTwinkle(density=0.0)

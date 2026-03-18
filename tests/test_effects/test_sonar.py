@@ -478,6 +478,23 @@ class TestSonarObstacleDrift:
         # Should reverse to +1 after hitting left boundary.
         assert effect._obstacles[0].drift_dir == 1
 
+    def test_obstacle_clamped_to_right_boundary(self) -> None:
+        """Test obstacle drifting rightward is clamped to right boundary.
+
+        Lines 295-296: When new_pos > right_limit, pos is clamped and
+        drift_dir is reversed to -1.
+        """
+        effect = EffectSonar(obstacle_speed=100.0)
+        effect._obstacles = [_Obstacle(pos=40.0)]
+        effect._obstacles[0].drift_dir = 1  # Moving right
+        effect._obstacles[0].next_turn = 999.0
+
+        effect._drift_obstacles(t=1.0, dt=1.0, bulb_count=48)
+        # Should be clamped to right_limit = bulb_count - 1 - MIN_GAP_BULBS = 44
+        assert effect._obstacles[0].pos <= 44.0
+        # Direction should reverse to -1
+        assert effect._obstacles[0].drift_dir == -1
+
     def test_stationary_obstacles_dont_move(self) -> None:
         """Test obstacles don't move when obstacle_speed=0."""
         effect = EffectSonar(obstacle_speed=0.0)
@@ -633,6 +650,57 @@ class TestSonarWavefrontUpdate:
 
         effect._update_wavefronts(dt=1.0, bulb_count=48)
         # Wavefront should be pruned (off-string).
+        assert len(effect._wavefronts) == 0
+
+    def test_wavefront_absorbed_moving_left_past_source(self) -> None:
+        """Test reflected wavefront absorbed when moving left past source.
+
+        Lines 409-410: A wavefront reflected off an obstacle now moves
+        leftward. When it reaches or passes its source position, it is
+        absorbed. Lines 382-383: On the next update, the absorbed
+        wavefront's alive flag is set to False and it is pruned.
+        """
+        effect = EffectSonar(speed=10.0)
+        effect._obstacles = []
+
+        # Create a wavefront already reflected, moving left toward source
+        wf = _Wavefront(source=20.0, direction=-1, speed=10.0)
+        wf.reflected = True
+        wf.pos = 21.0  # Just past source, moving left
+        effect._wavefronts = [wf]
+
+        # First update: pos moves to 16.0, absorption check triggers (line 409-410)
+        effect._update_wavefronts(dt=0.5, bulb_count=48)
+        assert wf.absorbed is True
+        assert wf.alive is True  # Still alive until next update
+
+        # Second update: line 381 checks absorbed=True, sets alive=False (lines 382-383)
+        effect._update_wavefronts(dt=0.1, bulb_count=48)
+        # Wavefront should be pruned (alive=False)
+        assert len(effect._wavefronts) == 0
+
+    def test_wavefront_absorbed_moving_right_past_source(self) -> None:
+        """Test reflected wavefront absorbed when moving right past source.
+
+        Line 411-412: A wavefront reflected off an obstacle now moves
+        rightward. When it reaches or passes its source position, it is
+        absorbed. Lines 382-383: On the next update, it is killed.
+        """
+        effect = EffectSonar(speed=10.0)
+        effect._obstacles = []
+
+        # Create a wavefront already reflected, moving right toward source
+        wf = _Wavefront(source=20.0, direction=1, speed=10.0)
+        wf.reflected = True
+        wf.pos = 19.0  # Just before source, moving right
+        effect._wavefronts = [wf]
+
+        # First update: pos moves to 24.0, absorption check triggers (line 411-412)
+        effect._update_wavefronts(dt=0.5, bulb_count=48)
+        assert wf.absorbed is True
+
+        # Second update: line 381 checks absorbed, kills wavefront (lines 382-383)
+        effect._update_wavefronts(dt=0.1, bulb_count=48)
         assert len(effect._wavefronts) == 0
 
     def test_dead_wavefronts_pruned(self) -> None:
