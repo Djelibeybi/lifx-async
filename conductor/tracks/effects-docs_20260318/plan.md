@@ -47,11 +47,11 @@ Use the LIFX emulator's web visualizer and Playwright MCP to screen-record each 
 
 ### Tasks
 
-- [ ] Task 3.1: Stand up the LIFX emulator with a multizone device and expose its web visualizer
-- [ ] Task 3.2: Create a capture script that runs each effect against the emulator, uses the Playwright MCP server to navigate to the visualizer and record the viewport for ~5 seconds per effect
-- [ ] Task 3.3: Convert recordings to optimized animated GIFs (using ffmpeg or similar)
-- [ ] Task 3.4: Store GIFs in `docs/assets/effects/` and embed them in `docs/getting-started/effects.md` alongside each effect description
-- [ ] Task 3.5: Verify GIF file sizes are reasonable (<2MB each) and visually representative
+- [x] Task 3.1: Stand up the LIFX emulator with a multizone device and expose its web visualizer
+- [x] Task 3.2: Create a capture script that runs each effect against the emulator, uses the Playwright MCP server to navigate to the visualizer and record the viewport for ~5 seconds per effect
+- [x] Task 3.3: Convert recordings to optimized animated GIFs (using ffmpeg or similar)
+- [x] Task 3.4: Store GIFs in `docs/assets/effects/` and embed them in `docs/getting-started/effects.md` alongside each effect description
+- [x] Task 3.5: Verify GIF file sizes are reasonable (<2MB each) and visually representative
 
 ### Verification
 
