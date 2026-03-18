@@ -2,18 +2,18 @@
   "id": "effects-docs_20260318",
   "title": "Effects Documentation and Demo Script",
   "type": "chore",
-  "status": "in_progress",
+  "status": "archived",
   "created": "2026-03-18T00:00:00Z",
   "updated": "2026-03-18T00:00:00Z",
-  "current_phase": 1,
-  "current_task": "1.1",
+  "archived": true,
+  "archived_at": "2026-03-18T00:00:00Z",
+  "archive_reason": "Completed",
   "phases": {
     "total": 3,
-    "completed": 0
+    "completed": 3
   },
   "tasks": {
     "total": 13,
-    "completed": 0
-  },
-  "commits": []
+    "completed": 13
+  }
 }

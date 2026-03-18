@@ -2,9 +2,12 @@
   "id": "hsbk-rgb-float_20260318",
   "title": "Update HSBK RGB Conversion to Float",
   "type": "refactor",
-  "status": "complete",
+  "status": "archived",
   "created": "2026-03-18T00:00:00Z",
   "updated": "2026-03-18T00:00:00Z",
+  "archived": true,
+  "archived_at": "2026-03-18T00:00:00Z",
+  "archive_reason": "Completed",
   "phases": {
     "total": 4,
     "completed": 4
