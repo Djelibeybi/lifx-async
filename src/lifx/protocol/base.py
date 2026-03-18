@@ -110,16 +110,18 @@ class Packet:
         # This ensures all State packets have human-readable labels
         cls._decode_labels_inplace(packet)
 
-        # Log packet values after unpacking and decoding labels
-        packet_values = asdict(packet)
-        _LOGGER.debug(
-            {
-                "class": "Packet",
-                "method": "unpack",
-                "packet_type": type(packet).__name__,
-                "values": packet_values,
-            }
-        )
+        # Log packet values after unpacking and decoding labels.
+        # Guard asdict() behind isEnabledFor() to avoid deep-copying the
+        # entire packet on every unpack when debug logging is inactive.
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug(
+                {
+                    "class": "Packet",
+                    "method": "unpack",
+                    "packet_type": type(packet).__name__,
+                    "values": asdict(packet),
+                }
+            )
 
         return packet
 
