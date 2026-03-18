@@ -171,7 +171,7 @@ def _oklab_to_srgb(ok_l: float, ok_a: float, ok_b: float) -> tuple[float, float,
     return (_linear_to_srgb(rl), _linear_to_srgb(gl), _linear_to_srgb(bl))
 
 
-def validate_hue(value: int) -> None:
+def validate_hue(value: float) -> None:
     """Validate hue value is in range 0-360 degrees.
 
     Args:
@@ -242,7 +242,7 @@ class HSBK:
         red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
 
         # Create from RGB
-        purple = HSBK.from_rgb(128, 0, 128)
+        purple = HSBK.from_rgb(0.5, 0.0, 0.5)
 
         # Convert to RGB
         r, g, b = purple.to_rgb()
@@ -250,7 +250,7 @@ class HSBK:
     """
 
     def __init__(
-        self, hue: int, saturation: float, brightness: float, kelvin: int
+        self, hue: float, saturation: float, brightness: float, kelvin: int
     ) -> None:
         """Instantiate a color using hue, saturation, brightness and kelvin."""
 
@@ -298,19 +298,19 @@ class HSBK:
         return repr
 
     @property
-    def hue(self) -> int:
+    def hue(self) -> float:
         """Return hue."""
-        return round(self._hue)
+        return self._hue
 
     @property
     def saturation(self) -> float:
         """Return saturation."""
-        return round(self._saturation, 2)
+        return self._saturation
 
     @property
     def brightness(self) -> float:
         """Return brightness."""
-        return round(self._brightness, 2)
+        return self._brightness
 
     @property
     def kelvin(self) -> int:
@@ -318,87 +318,65 @@ class HSBK:
         return self._kelvin
 
     @classmethod
-    def from_rgb(cls, red: int, green: int, blue: int) -> HSBK:
+    def from_rgb(cls, red: float, green: float, blue: float) -> HSBK:
         """Create HSBK from RGB values.
 
         Args:
-            red: Red component (0-255)
-            green: Green component (0-255)
-            blue: Blue component (0-255)
+            red: Red component (0.0-1.0)
+            green: Green component (0.0-1.0)
+            blue: Blue component (0.0-1.0)
 
         Returns:
             HSBK instance
 
         Raises:
-            ValueError: If RGB values are out of range (0-255)
+            ValueError: If RGB values are out of range (0.0-1.0)
 
         Example:
             ```python
             # Pure red
-            red = HSBK.from_rgb(255, 0, 0)
+            red = HSBK.from_rgb(1.0, 0.0, 0.0)
 
-            # Purple with warm white
-            purple = HSBK.from_rgb(128, 0, 128, kelvin=2500)
+            # Purple
+            purple = HSBK.from_rgb(0.5, 0.0, 0.5)
             ```
         """
 
-        def _validate_rgb_component(value: int, name: str) -> None:
-            if not (0 <= value <= 255):
-                raise ValueError(f"{name} must be between 0 and 255, got {value}")
+        def _validate_rgb_component(value: float, name: str) -> None:
+            if not (0.0 <= value <= 1.0):
+                raise ValueError(f"{name} must be between 0.0 and 1.0, got {value}")
 
         _validate_rgb_component(red, "Red")
         _validate_rgb_component(green, "Green")
         _validate_rgb_component(blue, "Blue")
 
-        # Normalize to 0-1
-        red_norm = red / 255
-        green_norm = green / 255
-        blue_norm = blue / 255
-
-        # Convert to HSV using colorsys
-        h, s, v = colorsys.rgb_to_hsv(red_norm, green_norm, blue_norm)
-
-        # Convert to LIFX ranges
-        hue = round(h * 360)  # 0-1 -> 0-360
-        saturation = round(s, 2)  # Already 0-1
-        brightness = round(v, 2)  # Already 0-1
+        # Convert to HSV using colorsys (already 0-1 range)
+        h, s, v = colorsys.rgb_to_hsv(red, green, blue)
 
         return cls(
-            hue=hue,
-            saturation=saturation,
-            brightness=brightness,
+            hue=h * 360,  # 0-1 -> 0-360
+            saturation=s,
+            brightness=v,
             kelvin=KELVIN_NEUTRAL,
         )
 
-    def to_rgb(self) -> tuple[int, int, int]:
+    def to_rgb(self) -> tuple[float, float, float]:
         """Convert HSBK to RGB values.
 
         Color temperature (kelvin) is not considered in this conversion,
         as it only affects the white point of the device.
 
         Returns:
-            Tuple of (red, green, blue) with values 0-255
+            Tuple of (red, green, blue) with values 0.0-1.0
 
         Example:
             ```python
             color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
-            r, g, b = color.to_rgb()  # Returns (0, 255, 0) - green
+            r, g, b = color.to_rgb()  # Returns (0.0, 1.0, 0.0) - green
             ```
         """
-        # Convert to colorsys ranges
         h = self._hue / 360  # 0-360 -> 0-1
-        s = self._saturation  # Already 0-1
-        v = self._brightness  # Already 0-1
-
-        # Convert using colorsys
-        red_norm, green_norm, blue_norm = colorsys.hsv_to_rgb(h, s, v)
-
-        # Scale to 0-255 and round
-        red = int(round(red_norm * 255))
-        green = int(round(green_norm * 255))
-        blue = int(round(blue_norm * 255))
-
-        return red, green, blue
+        return colorsys.hsv_to_rgb(h, self._saturation, self._brightness)
 
     def to_protocol(self) -> LightHsbk:
         """Convert to protocol HSBK for packet serialization.
@@ -460,7 +438,7 @@ class HSBK:
             kelvin=protocol.kelvin,
         )
 
-    def with_hue(self, hue: int) -> HSBK:
+    def with_hue(self, hue: float) -> HSBK:
         """Create a new HSBK with modified hue.
 
         Args:
@@ -737,154 +715,154 @@ class Colors:
     OFF = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=KELVIN_NEUTRAL)
 
     # HTML Named Colors (alphabetical order)
-    ALICE_BLUE = HSBK.from_rgb(240, 248, 255)
-    ANTIQUE_WHITE = HSBK.from_rgb(250, 235, 215)
-    AQUA = HSBK.from_rgb(0, 255, 255)
-    AQUAMARINE = HSBK.from_rgb(127, 255, 212)
-    AZURE = HSBK.from_rgb(240, 255, 255)
-    BEIGE = HSBK.from_rgb(245, 245, 220)
-    BISQUE = HSBK.from_rgb(255, 228, 196)
-    BLACK = HSBK.from_rgb(0, 0, 0)
-    BLANCHED_ALMOND = HSBK.from_rgb(255, 235, 205)
-    BLUE = HSBK.from_rgb(0, 0, 255)
-    BLUE_VIOLET = HSBK.from_rgb(138, 43, 226)
-    BROWN = HSBK.from_rgb(165, 42, 42)
-    BURLYWOOD = HSBK.from_rgb(222, 184, 135)
-    CADET_BLUE = HSBK.from_rgb(95, 158, 160)
-    CHARTREUSE = HSBK.from_rgb(127, 255, 0)
-    CHOCOLATE = HSBK.from_rgb(210, 105, 30)
-    CORAL = HSBK.from_rgb(255, 127, 80)
-    CORNFLOWER_BLUE = HSBK.from_rgb(100, 149, 237)
-    CORNSILK = HSBK.from_rgb(255, 248, 220)
-    CRIMSON = HSBK.from_rgb(220, 20, 60)
-    CYAN = HSBK.from_rgb(0, 255, 255)
-    DARK_BLUE = HSBK.from_rgb(0, 0, 139)
-    DARK_CYAN = HSBK.from_rgb(0, 139, 139)
-    DARK_GOLDENROD = HSBK.from_rgb(184, 134, 11)
-    DARK_GRAY = HSBK.from_rgb(169, 169, 169)
-    DARK_GREEN = HSBK.from_rgb(0, 100, 0)
-    DARK_GREY = HSBK.from_rgb(169, 169, 169)
-    DARK_KHAKI = HSBK.from_rgb(189, 183, 107)
-    DARK_MAGENTA = HSBK.from_rgb(139, 0, 139)
-    DARK_OLIVE_GREEN = HSBK.from_rgb(85, 107, 47)
-    DARK_ORANGE = HSBK.from_rgb(255, 140, 0)
-    DARK_ORCHID = HSBK.from_rgb(153, 50, 204)
-    DARK_RED = HSBK.from_rgb(139, 0, 0)
-    DARK_SALMON = HSBK.from_rgb(233, 150, 122)
-    DARK_SEA_GREEN = HSBK.from_rgb(143, 188, 143)
-    DARK_SLATE_BLUE = HSBK.from_rgb(72, 61, 139)
-    DARK_SLATE_GRAY = HSBK.from_rgb(47, 79, 79)
-    DARK_SLATE_GREY = HSBK.from_rgb(47, 79, 79)
-    DARK_TURQUOISE = HSBK.from_rgb(0, 206, 209)
-    DARK_VIOLET = HSBK.from_rgb(148, 0, 211)
-    DEEP_PINK = HSBK.from_rgb(255, 20, 147)
-    DEEP_SKY_BLUE = HSBK.from_rgb(0, 191, 255)
-    DIM_GRAY = HSBK.from_rgb(105, 105, 105)
-    DIM_GREY = HSBK.from_rgb(105, 105, 105)
-    DODGER_BLUE = HSBK.from_rgb(30, 144, 255)
-    FIREBRICK = HSBK.from_rgb(178, 34, 34)
-    FLORAL_WHITE = HSBK.from_rgb(255, 250, 240)
-    FOREST_GREEN = HSBK.from_rgb(34, 139, 34)
-    FUCHSIA = HSBK.from_rgb(255, 0, 255)
-    GAINSBORO = HSBK.from_rgb(220, 220, 220)
-    GHOST_WHITE = HSBK.from_rgb(248, 248, 255)
-    GOLD = HSBK.from_rgb(255, 215, 0)
-    GOLDENROD = HSBK.from_rgb(218, 165, 32)
-    GRAY = HSBK.from_rgb(128, 128, 128)
-    GREEN = HSBK.from_rgb(0, 128, 0)
-    GREEN_YELLOW = HSBK.from_rgb(173, 255, 47)
-    GREY = HSBK.from_rgb(128, 128, 128)
-    HONEYDEW = HSBK.from_rgb(240, 255, 240)
-    HOT_PINK = HSBK.from_rgb(255, 105, 180)
-    INDIAN_RED = HSBK.from_rgb(205, 92, 92)
-    INDIGO = HSBK.from_rgb(75, 0, 130)
-    IVORY = HSBK.from_rgb(255, 255, 240)
-    KHAKI = HSBK.from_rgb(240, 230, 140)
-    LAVENDER = HSBK.from_rgb(230, 230, 250)
-    LAVENDER_BLUSH = HSBK.from_rgb(255, 240, 245)
-    LAWN_GREEN = HSBK.from_rgb(124, 252, 0)
-    LEMON_CHIFFON = HSBK.from_rgb(255, 250, 205)
-    LIGHT_BLUE = HSBK.from_rgb(173, 216, 230)
-    LIGHT_CORAL = HSBK.from_rgb(240, 128, 128)
-    LIGHT_CYAN = HSBK.from_rgb(224, 255, 255)
-    LIGHT_GOLDENROD_YELLOW = HSBK.from_rgb(250, 250, 210)
-    LIGHT_GRAY = HSBK.from_rgb(211, 211, 211)
-    LIGHT_GREEN = HSBK.from_rgb(144, 238, 144)
-    LIGHT_GREY = HSBK.from_rgb(211, 211, 211)
-    LIGHT_PINK = HSBK.from_rgb(255, 182, 193)
-    LIGHT_SALMON = HSBK.from_rgb(255, 160, 122)
-    LIGHT_SEA_GREEN = HSBK.from_rgb(32, 178, 170)
-    LIGHT_SKY_BLUE = HSBK.from_rgb(135, 206, 250)
-    LIGHT_SLATE_GRAY = HSBK.from_rgb(119, 136, 153)
-    LIGHT_SLATE_GREY = HSBK.from_rgb(119, 136, 153)
-    LIGHT_STEEL_BLUE = HSBK.from_rgb(176, 196, 222)
-    LIGHT_YELLOW = HSBK.from_rgb(255, 255, 224)
-    LIME = HSBK.from_rgb(0, 255, 0)
-    LIME_GREEN = HSBK.from_rgb(50, 205, 50)
-    LINEN = HSBK.from_rgb(250, 240, 230)
-    MAGENTA = HSBK.from_rgb(255, 0, 255)
-    MAROON = HSBK.from_rgb(128, 0, 0)
-    MEDIUM_AQUAMARINE = HSBK.from_rgb(102, 205, 170)
-    MEDIUM_BLUE = HSBK.from_rgb(0, 0, 205)
-    MEDIUM_ORCHID = HSBK.from_rgb(186, 85, 211)
-    MEDIUM_PURPLE = HSBK.from_rgb(147, 112, 219)
-    MEDIUM_SEA_GREEN = HSBK.from_rgb(60, 179, 113)
-    MEDIUM_SLATE_BLUE = HSBK.from_rgb(123, 104, 238)
-    MEDIUM_SPRING_GREEN = HSBK.from_rgb(0, 250, 154)
-    MEDIUM_TURQUOISE = HSBK.from_rgb(72, 209, 204)
-    MEDIUM_VIOLET_RED = HSBK.from_rgb(199, 21, 133)
-    MIDNIGHT_BLUE = HSBK.from_rgb(25, 25, 112)
-    MINT_CREAM = HSBK.from_rgb(245, 255, 250)
-    MISTY_ROSE = HSBK.from_rgb(255, 228, 225)
-    MOCCASIN = HSBK.from_rgb(255, 228, 181)
-    NAVAJO_WHITE = HSBK.from_rgb(255, 222, 173)
-    NAVY = HSBK.from_rgb(0, 0, 128)
-    OLD_LACE = HSBK.from_rgb(253, 245, 230)
-    OLIVE = HSBK.from_rgb(128, 128, 0)
-    OLIVE_DRAB = HSBK.from_rgb(107, 142, 35)
-    ORANGE = HSBK.from_rgb(255, 165, 0)
-    ORANGE_RED = HSBK.from_rgb(255, 69, 0)
-    ORCHID = HSBK.from_rgb(218, 112, 214)
-    PALE_GOLDENROD = HSBK.from_rgb(238, 232, 170)
-    PALE_GREEN = HSBK.from_rgb(152, 251, 152)
-    PALE_TURQUOISE = HSBK.from_rgb(175, 238, 238)
-    PALE_VIOLET_RED = HSBK.from_rgb(219, 112, 147)
-    PAPAYA_WHIP = HSBK.from_rgb(255, 239, 213)
-    PEACH_PUFF = HSBK.from_rgb(255, 218, 185)
-    PERU = HSBK.from_rgb(205, 133, 63)
-    PINK = HSBK.from_rgb(255, 192, 203)
-    PLUM = HSBK.from_rgb(221, 160, 221)
-    POWDER_BLUE = HSBK.from_rgb(176, 224, 230)
-    PURPLE = HSBK.from_rgb(128, 0, 128)
-    REBECCA_PURPLE = HSBK.from_rgb(102, 51, 153)
-    RED = HSBK.from_rgb(255, 0, 0)
-    ROSY_BROWN = HSBK.from_rgb(188, 143, 143)
-    ROYAL_BLUE = HSBK.from_rgb(65, 105, 225)
-    SADDLE_BROWN = HSBK.from_rgb(139, 69, 19)
-    SALMON = HSBK.from_rgb(250, 128, 114)
-    SANDY_BROWN = HSBK.from_rgb(244, 164, 96)
-    SEA_GREEN = HSBK.from_rgb(46, 139, 87)
-    SEASHELL = HSBK.from_rgb(255, 245, 238)
-    SIENNA = HSBK.from_rgb(160, 82, 45)
-    SILVER = HSBK.from_rgb(192, 192, 192)
-    SKY_BLUE = HSBK.from_rgb(135, 206, 235)
-    SLATE_BLUE = HSBK.from_rgb(106, 90, 205)
-    SLATE_GRAY = HSBK.from_rgb(112, 128, 144)
-    SLATE_GREY = HSBK.from_rgb(112, 128, 144)
-    SNOW = HSBK.from_rgb(255, 250, 250)
-    SPRING_GREEN = HSBK.from_rgb(0, 255, 127)
-    STEEL_BLUE = HSBK.from_rgb(70, 130, 180)
-    TAN = HSBK.from_rgb(210, 180, 140)
-    TEAL = HSBK.from_rgb(0, 128, 128)
-    THISTLE = HSBK.from_rgb(216, 191, 216)
-    TOMATO = HSBK.from_rgb(255, 99, 71)
-    TURQUOISE = HSBK.from_rgb(64, 224, 208)
-    VIOLET = HSBK.from_rgb(238, 130, 238)
-    WHEAT = HSBK.from_rgb(245, 222, 179)
-    WHITE = HSBK.from_rgb(255, 255, 255)
-    WHITE_SMOKE = HSBK.from_rgb(245, 245, 245)
-    YELLOW = HSBK.from_rgb(255, 255, 0)
-    YELLOW_GREEN = HSBK.from_rgb(154, 205, 50)
+    ALICE_BLUE = HSBK.from_rgb(0.9411764706, 0.9725490196, 1.0)
+    ANTIQUE_WHITE = HSBK.from_rgb(0.9803921569, 0.9215686275, 0.8431372549)
+    AQUA = HSBK.from_rgb(0.0, 1.0, 1.0)
+    AQUAMARINE = HSBK.from_rgb(0.4980392157, 1.0, 0.831372549)
+    AZURE = HSBK.from_rgb(0.9411764706, 1.0, 1.0)
+    BEIGE = HSBK.from_rgb(0.9607843137, 0.9607843137, 0.862745098)
+    BISQUE = HSBK.from_rgb(1.0, 0.8941176471, 0.768627451)
+    BLACK = HSBK.from_rgb(0.0, 0.0, 0.0)
+    BLANCHED_ALMOND = HSBK.from_rgb(1.0, 0.9215686275, 0.8039215686)
+    BLUE = HSBK.from_rgb(0.0, 0.0, 1.0)
+    BLUE_VIOLET = HSBK.from_rgb(0.5411764706, 0.168627451, 0.8862745098)
+    BROWN = HSBK.from_rgb(0.6470588235, 0.1647058824, 0.1647058824)
+    BURLYWOOD = HSBK.from_rgb(0.8705882353, 0.7215686275, 0.5294117647)
+    CADET_BLUE = HSBK.from_rgb(0.3725490196, 0.6196078431, 0.6274509804)
+    CHARTREUSE = HSBK.from_rgb(0.4980392157, 1.0, 0.0)
+    CHOCOLATE = HSBK.from_rgb(0.8235294118, 0.4117647059, 0.1176470588)
+    CORAL = HSBK.from_rgb(1.0, 0.4980392157, 0.3137254902)
+    CORNFLOWER_BLUE = HSBK.from_rgb(0.3921568627, 0.5843137255, 0.9294117647)
+    CORNSILK = HSBK.from_rgb(1.0, 0.9725490196, 0.862745098)
+    CRIMSON = HSBK.from_rgb(0.862745098, 0.0784313725, 0.2352941176)
+    CYAN = HSBK.from_rgb(0.0, 1.0, 1.0)
+    DARK_BLUE = HSBK.from_rgb(0.0, 0.0, 0.5450980392)
+    DARK_CYAN = HSBK.from_rgb(0.0, 0.5450980392, 0.5450980392)
+    DARK_GOLDENROD = HSBK.from_rgb(0.7215686275, 0.5254901961, 0.0431372549)
+    DARK_GRAY = HSBK.from_rgb(0.662745098, 0.662745098, 0.662745098)
+    DARK_GREEN = HSBK.from_rgb(0.0, 0.3921568627, 0.0)
+    DARK_GREY = HSBK.from_rgb(0.662745098, 0.662745098, 0.662745098)
+    DARK_KHAKI = HSBK.from_rgb(0.7411764706, 0.7176470588, 0.4196078431)
+    DARK_MAGENTA = HSBK.from_rgb(0.5450980392, 0.0, 0.5450980392)
+    DARK_OLIVE_GREEN = HSBK.from_rgb(0.3333333333, 0.4196078431, 0.1843137255)
+    DARK_ORANGE = HSBK.from_rgb(1.0, 0.5490196078, 0.0)
+    DARK_ORCHID = HSBK.from_rgb(0.6, 0.1960784314, 0.8)
+    DARK_RED = HSBK.from_rgb(0.5450980392, 0.0, 0.0)
+    DARK_SALMON = HSBK.from_rgb(0.9137254902, 0.5882352941, 0.4784313725)
+    DARK_SEA_GREEN = HSBK.from_rgb(0.5607843137, 0.737254902, 0.5607843137)
+    DARK_SLATE_BLUE = HSBK.from_rgb(0.2823529412, 0.2392156863, 0.5450980392)
+    DARK_SLATE_GRAY = HSBK.from_rgb(0.1843137255, 0.3098039216, 0.3098039216)
+    DARK_SLATE_GREY = HSBK.from_rgb(0.1843137255, 0.3098039216, 0.3098039216)
+    DARK_TURQUOISE = HSBK.from_rgb(0.0, 0.8078431373, 0.8196078431)
+    DARK_VIOLET = HSBK.from_rgb(0.5803921569, 0.0, 0.8274509804)
+    DEEP_PINK = HSBK.from_rgb(1.0, 0.0784313725, 0.5764705882)
+    DEEP_SKY_BLUE = HSBK.from_rgb(0.0, 0.7490196078, 1.0)
+    DIM_GRAY = HSBK.from_rgb(0.4117647059, 0.4117647059, 0.4117647059)
+    DIM_GREY = HSBK.from_rgb(0.4117647059, 0.4117647059, 0.4117647059)
+    DODGER_BLUE = HSBK.from_rgb(0.1176470588, 0.5647058824, 1.0)
+    FIREBRICK = HSBK.from_rgb(0.6980392157, 0.1333333333, 0.1333333333)
+    FLORAL_WHITE = HSBK.from_rgb(1.0, 0.9803921569, 0.9411764706)
+    FOREST_GREEN = HSBK.from_rgb(0.1333333333, 0.5450980392, 0.1333333333)
+    FUCHSIA = HSBK.from_rgb(1.0, 0.0, 1.0)
+    GAINSBORO = HSBK.from_rgb(0.862745098, 0.862745098, 0.862745098)
+    GHOST_WHITE = HSBK.from_rgb(0.9725490196, 0.9725490196, 1.0)
+    GOLD = HSBK.from_rgb(1.0, 0.8431372549, 0.0)
+    GOLDENROD = HSBK.from_rgb(0.8549019608, 0.6470588235, 0.1254901961)
+    GRAY = HSBK.from_rgb(0.5019607843, 0.5019607843, 0.5019607843)
+    GREEN = HSBK.from_rgb(0.0, 0.5019607843, 0.0)
+    GREEN_YELLOW = HSBK.from_rgb(0.6784313725, 1.0, 0.1843137255)
+    GREY = HSBK.from_rgb(0.5019607843, 0.5019607843, 0.5019607843)
+    HONEYDEW = HSBK.from_rgb(0.9411764706, 1.0, 0.9411764706)
+    HOT_PINK = HSBK.from_rgb(1.0, 0.4117647059, 0.7058823529)
+    INDIAN_RED = HSBK.from_rgb(0.8039215686, 0.3607843137, 0.3607843137)
+    INDIGO = HSBK.from_rgb(0.2941176471, 0.0, 0.5098039216)
+    IVORY = HSBK.from_rgb(1.0, 1.0, 0.9411764706)
+    KHAKI = HSBK.from_rgb(0.9411764706, 0.9019607843, 0.5490196078)
+    LAVENDER = HSBK.from_rgb(0.9019607843, 0.9019607843, 0.9803921569)
+    LAVENDER_BLUSH = HSBK.from_rgb(1.0, 0.9411764706, 0.9607843137)
+    LAWN_GREEN = HSBK.from_rgb(0.4862745098, 0.9882352941, 0.0)
+    LEMON_CHIFFON = HSBK.from_rgb(1.0, 0.9803921569, 0.8039215686)
+    LIGHT_BLUE = HSBK.from_rgb(0.6784313725, 0.8470588235, 0.9019607843)
+    LIGHT_CORAL = HSBK.from_rgb(0.9411764706, 0.5019607843, 0.5019607843)
+    LIGHT_CYAN = HSBK.from_rgb(0.8784313725, 1.0, 1.0)
+    LIGHT_GOLDENROD_YELLOW = HSBK.from_rgb(0.9803921569, 0.9803921569, 0.8235294118)
+    LIGHT_GRAY = HSBK.from_rgb(0.8274509804, 0.8274509804, 0.8274509804)
+    LIGHT_GREEN = HSBK.from_rgb(0.5647058824, 0.9333333333, 0.5647058824)
+    LIGHT_GREY = HSBK.from_rgb(0.8274509804, 0.8274509804, 0.8274509804)
+    LIGHT_PINK = HSBK.from_rgb(1.0, 0.7137254902, 0.7568627451)
+    LIGHT_SALMON = HSBK.from_rgb(1.0, 0.6274509804, 0.4784313725)
+    LIGHT_SEA_GREEN = HSBK.from_rgb(0.1254901961, 0.6980392157, 0.6666666667)
+    LIGHT_SKY_BLUE = HSBK.from_rgb(0.5294117647, 0.8078431373, 0.9803921569)
+    LIGHT_SLATE_GRAY = HSBK.from_rgb(0.4666666667, 0.5333333333, 0.6)
+    LIGHT_SLATE_GREY = HSBK.from_rgb(0.4666666667, 0.5333333333, 0.6)
+    LIGHT_STEEL_BLUE = HSBK.from_rgb(0.6901960784, 0.768627451, 0.8705882353)
+    LIGHT_YELLOW = HSBK.from_rgb(1.0, 1.0, 0.8784313725)
+    LIME = HSBK.from_rgb(0.0, 1.0, 0.0)
+    LIME_GREEN = HSBK.from_rgb(0.1960784314, 0.8039215686, 0.1960784314)
+    LINEN = HSBK.from_rgb(0.9803921569, 0.9411764706, 0.9019607843)
+    MAGENTA = HSBK.from_rgb(1.0, 0.0, 1.0)
+    MAROON = HSBK.from_rgb(0.5019607843, 0.0, 0.0)
+    MEDIUM_AQUAMARINE = HSBK.from_rgb(0.4, 0.8039215686, 0.6666666667)
+    MEDIUM_BLUE = HSBK.from_rgb(0.0, 0.0, 0.8039215686)
+    MEDIUM_ORCHID = HSBK.from_rgb(0.7294117647, 0.3333333333, 0.8274509804)
+    MEDIUM_PURPLE = HSBK.from_rgb(0.5764705882, 0.4392156863, 0.8588235294)
+    MEDIUM_SEA_GREEN = HSBK.from_rgb(0.2352941176, 0.7019607843, 0.4431372549)
+    MEDIUM_SLATE_BLUE = HSBK.from_rgb(0.4823529412, 0.4078431373, 0.9333333333)
+    MEDIUM_SPRING_GREEN = HSBK.from_rgb(0.0, 0.9803921569, 0.6039215686)
+    MEDIUM_TURQUOISE = HSBK.from_rgb(0.2823529412, 0.8196078431, 0.8)
+    MEDIUM_VIOLET_RED = HSBK.from_rgb(0.7803921569, 0.0823529412, 0.5215686275)
+    MIDNIGHT_BLUE = HSBK.from_rgb(0.0980392157, 0.0980392157, 0.4392156863)
+    MINT_CREAM = HSBK.from_rgb(0.9607843137, 1.0, 0.9803921569)
+    MISTY_ROSE = HSBK.from_rgb(1.0, 0.8941176471, 0.8823529412)
+    MOCCASIN = HSBK.from_rgb(1.0, 0.8941176471, 0.7098039216)
+    NAVAJO_WHITE = HSBK.from_rgb(1.0, 0.8705882353, 0.6784313725)
+    NAVY = HSBK.from_rgb(0.0, 0.0, 0.5019607843)
+    OLD_LACE = HSBK.from_rgb(0.9921568627, 0.9607843137, 0.9019607843)
+    OLIVE = HSBK.from_rgb(0.5019607843, 0.5019607843, 0.0)
+    OLIVE_DRAB = HSBK.from_rgb(0.4196078431, 0.5568627451, 0.137254902)
+    ORANGE = HSBK.from_rgb(1.0, 0.6470588235, 0.0)
+    ORANGE_RED = HSBK.from_rgb(1.0, 0.2705882353, 0.0)
+    ORCHID = HSBK.from_rgb(0.8549019608, 0.4392156863, 0.8392156863)
+    PALE_GOLDENROD = HSBK.from_rgb(0.9333333333, 0.9098039216, 0.6666666667)
+    PALE_GREEN = HSBK.from_rgb(0.5960784314, 0.9843137255, 0.5960784314)
+    PALE_TURQUOISE = HSBK.from_rgb(0.6862745098, 0.9333333333, 0.9333333333)
+    PALE_VIOLET_RED = HSBK.from_rgb(0.8588235294, 0.4392156863, 0.5764705882)
+    PAPAYA_WHIP = HSBK.from_rgb(1.0, 0.937254902, 0.8352941176)
+    PEACH_PUFF = HSBK.from_rgb(1.0, 0.8549019608, 0.7254901961)
+    PERU = HSBK.from_rgb(0.8039215686, 0.5215686275, 0.2470588235)
+    PINK = HSBK.from_rgb(1.0, 0.7529411765, 0.7960784314)
+    PLUM = HSBK.from_rgb(0.8666666667, 0.6274509804, 0.8666666667)
+    POWDER_BLUE = HSBK.from_rgb(0.6901960784, 0.8784313725, 0.9019607843)
+    PURPLE = HSBK.from_rgb(0.5019607843, 0.0, 0.5019607843)
+    REBECCA_PURPLE = HSBK.from_rgb(0.4, 0.2, 0.6)
+    RED = HSBK.from_rgb(1.0, 0.0, 0.0)
+    ROSY_BROWN = HSBK.from_rgb(0.737254902, 0.5607843137, 0.5607843137)
+    ROYAL_BLUE = HSBK.from_rgb(0.2549019608, 0.4117647059, 0.8823529412)
+    SADDLE_BROWN = HSBK.from_rgb(0.5450980392, 0.2705882353, 0.0745098039)
+    SALMON = HSBK.from_rgb(0.9803921569, 0.5019607843, 0.4470588235)
+    SANDY_BROWN = HSBK.from_rgb(0.9568627451, 0.6431372549, 0.3764705882)
+    SEA_GREEN = HSBK.from_rgb(0.1803921569, 0.5450980392, 0.3411764706)
+    SEASHELL = HSBK.from_rgb(1.0, 0.9607843137, 0.9333333333)
+    SIENNA = HSBK.from_rgb(0.6274509804, 0.3215686275, 0.1764705882)
+    SILVER = HSBK.from_rgb(0.7529411765, 0.7529411765, 0.7529411765)
+    SKY_BLUE = HSBK.from_rgb(0.5294117647, 0.8078431373, 0.9215686275)
+    SLATE_BLUE = HSBK.from_rgb(0.4156862745, 0.3529411765, 0.8039215686)
+    SLATE_GRAY = HSBK.from_rgb(0.4392156863, 0.5019607843, 0.5647058824)
+    SLATE_GREY = HSBK.from_rgb(0.4392156863, 0.5019607843, 0.5647058824)
+    SNOW = HSBK.from_rgb(1.0, 0.9803921569, 0.9803921569)
+    SPRING_GREEN = HSBK.from_rgb(0.0, 1.0, 0.4980392157)
+    STEEL_BLUE = HSBK.from_rgb(0.2745098039, 0.5098039216, 0.7058823529)
+    TAN = HSBK.from_rgb(0.8235294118, 0.7058823529, 0.5490196078)
+    TEAL = HSBK.from_rgb(0.0, 0.5019607843, 0.5019607843)
+    THISTLE = HSBK.from_rgb(0.8470588235, 0.7490196078, 0.8470588235)
+    TOMATO = HSBK.from_rgb(1.0, 0.3882352941, 0.2784313725)
+    TURQUOISE = HSBK.from_rgb(0.2509803922, 0.8784313725, 0.8156862745)
+    VIOLET = HSBK.from_rgb(0.9333333333, 0.5098039216, 0.9333333333)
+    WHEAT = HSBK.from_rgb(0.9607843137, 0.8705882353, 0.7019607843)
+    WHITE = HSBK.from_rgb(1.0, 1.0, 1.0)
+    WHITE_SMOKE = HSBK.from_rgb(0.9607843137, 0.9607843137, 0.9607843137)
+    YELLOW = HSBK.from_rgb(1.0, 1.0, 0.0)
+    YELLOW_GREEN = HSBK.from_rgb(0.6039215686, 0.8039215686, 0.1960784314)
 
     # White temperature variants (kelvin-based, warmest to coolest)
     CANDLELIGHT = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=KELVIN_CANDLELIGHT)
