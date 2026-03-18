@@ -26,7 +26,6 @@ Example:
 
 from __future__ import annotations
 
-import random
 import socket
 import time
 from dataclasses import dataclass
@@ -42,6 +41,7 @@ from lifx.animation.packets import (
     PacketTemplate,
 )
 from lifx.const import LIFX_UDP_PORT
+from lifx.network.utils import allocate_source
 from lifx.protocol.models import Serial
 
 if TYPE_CHECKING:
@@ -117,7 +117,7 @@ class Animator:
         self._packet_generator = packet_generator
 
         # Protocol source ID (random, identifies this client)
-        self._source = random.randint(1, 0xFFFFFFFF)
+        self._source = allocate_source()
 
         # Sequence number (0-255, wraps around)
         self._sequence = 0

@@ -799,7 +799,7 @@ async def discover_mdns(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
-) -> AsyncGenerator[Light, None]:
+) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices via mDNS and yield them as they are found.
 
     Uses mDNS/DNS-SD discovery with the _lifx._udp.local service type.

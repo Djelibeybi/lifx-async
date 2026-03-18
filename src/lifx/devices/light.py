@@ -1026,7 +1026,7 @@ class Light(Device[LightState]):
 
             return self._state
 
-        except LifxTimeoutError:
-            raise LifxTimeoutError(f"Error initializing state for {self.serial}")
-        except LifxError:
-            raise LifxError(f"Error initializing state for {self.serial}")
+        except LifxTimeoutError as e:
+            raise LifxTimeoutError(f"Error initializing state for {self.serial}") from e
+        except LifxError as e:
+            raise LifxError(f"Error initializing state for {self.serial}") from e
