@@ -406,7 +406,7 @@ for theme_name in themes:
 
 ## See Also
 
-- [Themes API Reference](../api/themes.md) - Complete API documentation
-- [Quick Start: Themes](../getting-started/themes.md) - Simple examples
-- [Colors Guide](../api/colors.md) - Working with HSBK colors
-- [Device Classes](../api/devices.md) - Device-specific documentation
+- [Themes Quick Start](../getting-started/themes.md) — Get started in 30 seconds
+- [Themes API Reference](../api/themes.md) — Complete API documentation
+- [Color Utilities](../api/colors.md) — HSBK color representation and RGB conversion
+- [Device Classes](../api/devices.md) — Device-specific `apply_theme()` methods
