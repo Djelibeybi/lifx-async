@@ -22,4 +22,3 @@ Fix all documentation correctness issues: non-existent API examples, wrong Pytho
 
 - [Back to Tracks](../../tracks.md)
 - [Product Context](../../product.md)
-- [Review Final Report](../../../.full-review/05-final-report.md)
