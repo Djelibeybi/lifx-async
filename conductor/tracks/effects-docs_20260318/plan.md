@@ -30,11 +30,11 @@ Create the demo script with device-type detection and effect cycling.
 
 ### Tasks
 
-- [ ] Task 2.1: Create `examples/effects_demo.py` with argparse CLI (`--effect`, `--cycle`, `--ip`, `--serial`, `--duration`)
-- [ ] Task 2.2: Implement device discovery and type detection (MatrixLight, MultiZoneLight, Light)
-- [ ] Task 2.3: Implement single-effect mode (`--effect <name>`) with device-appropriate effect selection
-- [ ] Task 2.4: Implement cycle mode (`--cycle`) that rotates through compatible effects with configurable duration
-- [ ] Task 2.5: Add PEP 723 inline metadata and usage docstring
+- [x] Task 2.1: Create `examples/effects_demo.py` with argparse CLI (`--effect`, `--cycle`, `--ip`, `--serial`, `--duration`)
+- [x] Task 2.2: Implement device discovery and type detection (MatrixLight, MultiZoneLight, Light)
+- [x] Task 2.3: Implement single-effect mode (`--effect <name>`) with device-appropriate effect selection
+- [x] Task 2.4: Implement cycle mode (`--cycle`) that rotates through compatible effects with configurable duration
+- [x] Task 2.5: Add PEP 723 inline metadata and usage docstring
 
 ### Verification
 
