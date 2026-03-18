@@ -200,11 +200,11 @@ nav:
 - User Guide:
   - Light Effects: user-guide/effects.md
   - Effects Gallery: user-guide/effects-gallery.md
-  - Themes: user-guide/themes.md
-  - Ceiling Lights: user-guide/ceiling-lights.md
-  - Animation: user-guide/animation.md
-  - Advanced Usage: user-guide/advanced-usage.md
   - Custom Effects: user-guide/effects-custom.md
+  - Themes: user-guide/themes.md
+  - Animation: user-guide/animation.md
+  - Ceiling Lights: user-guide/ceiling-lights.md
+  - Advanced Usage: user-guide/advanced-usage.md
   - Troubleshooting: user-guide/troubleshooting.md
   - Effects Troubleshooting: user-guide/effects-troubleshooting.md
 - Architecture:
