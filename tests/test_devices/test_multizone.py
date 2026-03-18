@@ -653,6 +653,22 @@ class TestMultiZoneEffect:
         assert effect.parameters[1] == int(Direction.FORWARD)
         assert effect.direction == Direction.FORWARD
 
+    def test_direction_setter_produces_exactly_8_parameters(self) -> None:
+        """Test direction setter preserves 8-element parameter list (T-C1).
+
+        The LIFX protocol expects exactly 8 uint32 parameters for multizone
+        effects. The direction setter must not produce 9.
+        """
+        effect = MultiZoneEffect(
+            effect_type=FirmwareEffect.MOVE,
+            speed=5000,
+        )
+        assert len(effect.parameters) == 8  # default is correct
+        effect.direction = Direction.FORWARD
+        assert len(effect.parameters) == 8  # must stay 8 after setter
+        effect.direction = Direction.REVERSED
+        assert len(effect.parameters) == 8  # must stay 8 after setter
+
     def test_direction_property_set_for_non_move_effect_raises_error(self) -> None:
         """Test setting direction for non-MOVE effect raises ValueError."""
         effect = MultiZoneEffect(
