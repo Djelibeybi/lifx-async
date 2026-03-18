@@ -299,18 +299,18 @@ class HSBK:
 
     @property
     def hue(self) -> float:
-        """Return hue."""
-        return self._hue
+        """Return hue (rounded to nearest integer degree for display)."""
+        return round(self._hue)
 
     @property
     def saturation(self) -> float:
-        """Return saturation."""
-        return self._saturation
+        """Return saturation (rounded to 2 decimal places for display)."""
+        return round(self._saturation, 2)
 
     @property
     def brightness(self) -> float:
-        """Return brightness."""
-        return self._brightness
+        """Return brightness (rounded to 2 decimal places for display)."""
+        return round(self._brightness, 2)
 
     @property
     def kelvin(self) -> int:

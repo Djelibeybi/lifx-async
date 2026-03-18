@@ -324,8 +324,8 @@ Both pulse and colorloop effects support custom colors:
 from lifx import HSBK
 
 # Create custom color
-red = HSBK.from_rgb(255, 0, 0)
-blue = HSBK.from_rgb(0, 0, 255)
+red = HSBK.from_rgb(1.0, 0.0, 0.0)
+blue = HSBK.from_rgb(0.0, 0.0, 1.0)
 
 # Pulse with custom color
 effect = EffectPulse(mode='breathe', cycles=5, color=red)
@@ -496,15 +496,15 @@ async def notify(lights: list, level: str = 'info'):
 
     if level == 'info':
         # Blue breathe
-        color = HSBK.from_rgb(0, 0, 255)
+        color = HSBK.from_rgb(0.0, 0.0, 1.0)
         effect = EffectPulse(mode='breathe', cycles=2, color=color)
     elif level == 'warning':
         # Orange blink
-        color = HSBK.from_rgb(255, 165, 0)
+        color = HSBK.from_rgb(1.0, 0.6470588235, 0.0)
         effect = EffectPulse(mode='blink', cycles=3, color=color)
     elif level == 'error':
         # Red strobe
-        color = HSBK.from_rgb(255, 0, 0)
+        color = HSBK.from_rgb(1.0, 0.0, 0.0)
         effect = EffectPulse(mode='strobe', cycles=10, color=color)
 
     await conductor.start(effect, lights)

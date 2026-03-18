@@ -72,7 +72,7 @@ def test_pulse_custom_parameters() -> None:
 
 def test_pulse_with_color() -> None:
     """Test EffectPulse with custom color."""
-    color = HSBK.from_rgb(255, 0, 0)
+    color = HSBK.from_rgb(1.0, 0.0, 0.0)
     effect = EffectPulse(mode="blink", color=color)
 
     assert effect.color == color

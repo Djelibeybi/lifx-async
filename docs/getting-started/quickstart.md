@@ -172,7 +172,7 @@ Convert RGB values to HSBK:
 from lifx import HSBK
 
 # Create color from RGB
-purple = HSBK.from_rgb(128, 0, 128)
+purple = HSBK.from_rgb(0.5019607843, 0.0, 0.5019607843)
 await light.set_color(purple)
 ```
 

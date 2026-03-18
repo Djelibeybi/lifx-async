@@ -57,7 +57,7 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
     async def main():
         async with Light(serial="d073d5010203", ip="192.168.1.100") as light:
             # Use RGB
-            red = HSBK.from_rgb(255, 0, 0)
+            red = HSBK.from_rgb(1.0, 0.0, 0.0)
             await light.set_color(red)
 
             # Use presets

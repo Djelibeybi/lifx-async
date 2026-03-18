@@ -195,7 +195,7 @@ class MultiZoneLight(Light):
 
             # Set all zones to red
             await light.set_color_zones(
-                start=0, end=zone_count - 1, color=HSBK.from_rgb(255, 0, 0)
+                start=0, end=zone_count - 1, color=HSBK.from_rgb(1.0, 0.0, 0.0)
             )
 
             # Get colors for first 5 zones
@@ -543,10 +543,12 @@ class MultiZoneLight(Light):
         Example:
             ```python
             # Set zones 0-9 to red
-            await light.set_color_zones(0, 9, HSBK.from_rgb(255, 0, 0))
+            await light.set_color_zones(0, 9, HSBK.from_rgb(1.0, 0.0, 0.0))
 
             # Set with transition
-            await light.set_color_zones(0, 9, HSBK.from_rgb(0, 255, 0), duration=2.0)
+            await light.set_color_zones(
+                0, 9, HSBK.from_rgb(0.0, 1.0, 0.0), duration=2.0
+            )
 
             # Batch updates
             await light.set_color_zones(

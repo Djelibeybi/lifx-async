@@ -77,11 +77,11 @@ class WaveEffect(LIFXEffect):
         """Execute the wave effect."""
         # Define wave colors
         colors = [
-            HSBK.from_rgb(255, 0, 0),  # Red
-            HSBK.from_rgb(255, 127, 0),  # Orange
-            HSBK.from_rgb(255, 255, 0),  # Yellow
-            HSBK.from_rgb(0, 255, 0),  # Green
-            HSBK.from_rgb(0, 0, 255),  # Blue
+            HSBK.from_rgb(1.0, 0.0, 0.0),  # Red
+            HSBK.from_rgb(1.0, 0.4980392157, 0.0),  # Orange
+            HSBK.from_rgb(1.0, 1.0, 0.0),  # Yellow
+            HSBK.from_rgb(0.0, 1.0, 0.0),  # Green
+            HSBK.from_rgb(0.0, 0.0, 1.0),  # Blue
         ]
 
         for wave in range(self.wave_count):
