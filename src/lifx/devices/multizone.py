@@ -127,7 +127,7 @@ class MultiZoneEffect:
                 f"Direction can only be set for MOVE effects, "
                 f"current type is {self.effect_type.name}"
             )
-        self.parameters = [0, int(value), 0, 0, 0, 0, 0, 0, 0]
+        self.parameters = [0, int(value), 0, 0, 0, 0, 0, 0]
 
 
 @dataclass
@@ -361,12 +361,6 @@ class MultiZoneLight(Light):
                 self._state.zones = result
                 self._state.last_updated = __import__("time").time()
 
-        # Update state if it exists and we fetched all zones
-        if self._state is not None and hasattr(self._state, "zones"):
-            if start == 0 and len(result) == zone_count:
-                self._state.zones = result
-                self._state.last_updated = __import__("time").time()
-
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -451,12 +445,6 @@ class MultiZoneLight(Light):
 
         # Return only the requested range to caller
         result = colors[start : end + 1]
-
-        # Update state if it exists and we fetched all zones
-        if self._state is not None and hasattr(self._state, "zones"):
-            if start == 0 and len(result) == zone_count:
-                self._state.zones = result
-                self._state.last_updated = __import__("time").time()
 
         # Update state if it exists and we fetched all zones
         if self._state is not None and hasattr(self._state, "zones"):
