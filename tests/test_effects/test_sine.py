@@ -386,11 +386,11 @@ class TestSineGenerateFrame:
         )
         colors = effect.generate_frame(ctx)
 
-        # With gradient, hues should vary across the strip (for bright zones)
+        # With gradient from hue=0 to hue2=240, bright zones should show
+        # multiple distinct hue values across the strip
         bright_hues = {round(c.hue, 1) for c in colors if c.brightness > 0.03}
-        # Should have multiple different hue values if gradient is active
-        if len(bright_hues) > 0:
-            assert len(bright_hues) >= 1  # At minimum we have one hue
+        # A 32-pixel strip with hue gradient should produce several distinct hues
+        assert len(bright_hues) >= 2, f"Expected gradient hues, got {bright_hues}"
 
 
 class TestSineFrameLoop:
@@ -465,10 +465,10 @@ async def test_sine_is_light_compatible_none_capabilities() -> None:
         caps.has_color = True
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is True
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
 
 def test_sine_inherit_prestate() -> None:

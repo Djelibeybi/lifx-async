@@ -26,7 +26,7 @@ class ThemeLibrary:
         evening_theme = ThemeLibrary.get("evening")
 
         # List all available themes
-        all_themes = ThemeLibrary.list()
+        all_themes = ThemeLibrary.get_available_themes()
 
         # Get themes by category
         seasonal = ThemeLibrary.get_by_category("seasonal")
@@ -432,8 +432,8 @@ class ThemeLibrary:
         return Theme(cls._THEMES[normalized_name])
 
     @classmethod
-    def list(cls) -> list[str]:
-        """List all available theme names.
+    def get_available_themes(cls) -> list[str]:
+        """Get all available themes by name.
 
         Returns:
             Sorted list of theme names
@@ -442,7 +442,7 @@ class ThemeLibrary:
             ```python
             from lifx.theme import ThemeLibrary
 
-            all_themes = ThemeLibrary.list()
+            all_themes = ThemeLibrary.get_available_themes()
             for theme_name in all_themes:
                 print(f"- {theme_name}")
             ```

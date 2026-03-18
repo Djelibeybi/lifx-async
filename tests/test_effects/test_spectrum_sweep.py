@@ -145,8 +145,8 @@ class TestSpectrumSweepGenerateFrame:
         )
         colors = effect.generate_frame(ctx)
         for color in colors:
-            # Oklab blending may slightly reduce saturation
-            assert color.saturation >= 0.0
+            # Oklab blending can reduce saturation at hue boundaries
+            assert color.saturation >= 0.5
 
     def test_kelvin_matches_configured(self) -> None:
         """Test kelvin values match configured kelvin."""
@@ -399,10 +399,10 @@ async def test_spectrum_sweep_is_light_compatible_none_capabilities() -> None:
         caps.has_color = True
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is True
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
 
 def test_spectrum_sweep_inherit_prestate() -> None:

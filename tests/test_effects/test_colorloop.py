@@ -541,17 +541,17 @@ async def test_colorloop_is_light_compatible_with_none_capabilities() -> None:
 
     light = MagicMock()
     light.capabilities = None
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     async def set_capabilities():
         light.capabilities = MagicMock()
         light.capabilities.has_color = True
 
-    light._ensure_capabilities.side_effect = set_capabilities
+    light.ensure_capabilities.side_effect = set_capabilities
 
     result = await effect.is_light_compatible(light)
 
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
     assert result is True
 
 
@@ -562,7 +562,7 @@ async def test_colorloop_is_light_compatible_capabilities_still_none() -> None:
 
     light = MagicMock()
     light.capabilities = None
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     result = await effect.is_light_compatible(light)
 
@@ -577,11 +577,11 @@ async def test_colorloop_is_light_compatible_capabilities_already_loaded() -> No
     light = MagicMock()
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
-    light._ensure_capabilities = AsyncMock()
+    light.ensure_capabilities = AsyncMock()
 
     result = await effect.is_light_compatible(light)
 
-    light._ensure_capabilities.assert_not_called()
+    light.ensure_capabilities.assert_not_called()
     assert result is True
 
 

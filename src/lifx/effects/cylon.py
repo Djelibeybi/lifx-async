@@ -112,6 +112,7 @@ class EffectCylon(FrameEffect):
         self.trail = trail
         self.kelvin = kelvin
         self.zones_per_bulb = zones_per_bulb
+        self._trail_buffer: list[float] = []
 
     @property
     def name(self) -> str:
@@ -123,7 +124,9 @@ class EffectCylon(FrameEffect):
 
         The eye position is computed via sinusoidal easing across the
         zone range. Each zone's brightness is the cosine falloff from
-        the eye center, floored at the background brightness.
+        the eye center, floored at the background brightness. When
+        trail > 0, previous frame brightness decays and blends with
+        the current frame to create a glowing tail behind the eye.
 
         Args:
             ctx: Frame context with timing and layout info
@@ -146,6 +149,15 @@ class EffectCylon(FrameEffect):
         # [0..travel..0] for a smooth bounce at both ends.
         position = travel * (1 - math.cos(phase * _FULL_CYCLE)) / _COSINE_DIVISOR
 
+        # Initialise or resize trail buffer if needed.
+        if len(self._trail_buffer) != bulb_count:
+            self._trail_buffer = [0.0] * bulb_count
+
+        # Decay the trail buffer: previous brightness fades by the trail factor.
+        if self.trail > 0:
+            for i in range(bulb_count):
+                self._trail_buffer[i] *= self.trail
+
         # Render to logical bulbs
         bulb_colors: list[HSBK] = []
         for i in range(bulb_count):
@@ -161,6 +173,11 @@ class EffectCylon(FrameEffect):
                 zone_bri = max(eye_bri, self.background_brightness)
             else:
                 zone_bri = self.background_brightness
+
+            # Blend with trail: take the brighter of current eye or decayed trail.
+            if self.trail > 0:
+                self._trail_buffer[i] = max(self._trail_buffer[i], zone_bri)
+                zone_bri = self._trail_buffer[i]
 
             zone_bri = max(0.0, min(1.0, zone_bri))
 
@@ -217,7 +234,7 @@ class EffectCylon(FrameEffect):
             True if light has color support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_color if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

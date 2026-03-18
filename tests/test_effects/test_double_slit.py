@@ -160,7 +160,7 @@ def test_invalid_zones_per_bulb() -> None:
 # ---------------------------------------------------------------------------
 
 
-class TestDobleSlitInheritance:
+class TestDoubleSlitInheritance:
     """Tests for EffectDoubleSlit class hierarchy."""
 
     def test_is_frame_effect(self) -> None:
@@ -179,7 +179,7 @@ class TestDobleSlitInheritance:
 # ---------------------------------------------------------------------------
 
 
-class TestDoubleslitGenerateFrame:
+class TestDoubleSlitGenerateFrame:
     """Tests for EffectDoubleSlit.generate_frame()."""
 
     def _ctx(
@@ -345,7 +345,7 @@ class TestDoubleslitGenerateFrame:
 # ---------------------------------------------------------------------------
 
 
-class TestDobleSlitFrameLoop:
+class TestDoubleSlitFrameLoop:
     """Tests for EffectDoubleSlit running via FrameEffect frame loop."""
 
     @pytest.mark.asyncio
@@ -420,10 +420,10 @@ async def test_double_slit_is_light_compatible_none_capabilities() -> None:
         caps.has_color = True
         light.capabilities = caps
 
-    light._ensure_capabilities = AsyncMock(side_effect=ensure_caps)
+    light.ensure_capabilities = AsyncMock(side_effect=ensure_caps)
 
     assert await effect.is_light_compatible(light) is True
-    light._ensure_capabilities.assert_called_once()
+    light.ensure_capabilities.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

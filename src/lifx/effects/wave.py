@@ -264,7 +264,7 @@ class EffectWave(FrameEffect):
             True if light has color support, False otherwise
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         return light.capabilities.has_color if light.capabilities else False
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:

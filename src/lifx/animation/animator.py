@@ -224,7 +224,7 @@ class Animator:
         """
         # Ensure capabilities are loaded
         if device.capabilities is None:
-            await device._ensure_capabilities()
+            await device.ensure_capabilities()
 
         # Check extended multizone capability
         has_extended = bool(

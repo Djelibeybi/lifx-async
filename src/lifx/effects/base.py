@@ -205,14 +205,14 @@ class LIFXEffect(ABC):
             # Effect that requires color capability
             async def is_light_compatible(self, light: Light) -> bool:
                 if light.capabilities is None:
-                    await light._ensure_capabilities()
+                    await light.ensure_capabilities()
                 return light.capabilities.has_color if light.capabilities else False
 
 
             # Effect that requires multizone capability
             async def is_light_compatible(self, light: Light) -> bool:
                 if light.capabilities is None:
-                    await light._ensure_capabilities()
+                    await light.ensure_capabilities()
                 return light.capabilities.has_multizone if light.capabilities else False
             ```
         """

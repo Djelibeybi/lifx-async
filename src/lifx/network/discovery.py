@@ -99,7 +99,7 @@ class DiscoveredDevice:
         temp_device = Device(**kwargs)
 
         try:
-            await temp_device._ensure_capabilities()
+            await temp_device.ensure_capabilities()
 
             if temp_device.capabilities:
                 # Check for Ceiling products first (before generic MatrixLight)

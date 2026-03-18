@@ -172,7 +172,7 @@ class TestDeviceGroupApplyTheme:
         group = emulator_devices
 
         async with group:
-            theme_names = ThemeLibrary.list()
+            theme_names = ThemeLibrary.get_available_themes()
 
             # Test a subset to keep test time reasonable
             for theme_name in theme_names[:10]:

@@ -436,7 +436,7 @@ class EffectPlasma(FrameEffect):
             True if light has color support and is not a matrix device
         """
         if light.capabilities is None:
-            await light._ensure_capabilities()
+            await light.ensure_capabilities()
         if light.capabilities is None:
             return False
         if light.capabilities.has_matrix:

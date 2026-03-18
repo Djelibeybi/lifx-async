@@ -25,7 +25,7 @@ await group.apply_theme(theme)
 from lifx import ThemeLibrary
 
 # Get all 42 theme names
-themes = ThemeLibrary.list()
+themes = ThemeLibrary.get_available_themes()
 print(themes)
 
 # Get themes by category
