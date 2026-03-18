@@ -409,9 +409,8 @@ class MatrixPacketGenerator(PacketGenerator):
             # Write each HSBK tuple directly into the packet buffer
             data = tmpl.data
             offset = tmpl.color_offset
-            for h, s, b, k in hsbk[
-                tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count
-            ]:
+            for i in range(tmpl.hsbk_start, tmpl.hsbk_start + tmpl.color_count):
+                h, s, b, k = hsbk[i]
                 _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
                 offset += 8
 
@@ -528,9 +527,8 @@ class MultiZonePacketGenerator(PacketGenerator):
             # Write each HSBK tuple directly into the packet buffer
             data = tmpl.data
             offset = tmpl.color_offset
-            for h, s, b, k in hsbk[
-                tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count
-            ]:
+            for i in range(tmpl.hsbk_start, tmpl.hsbk_start + tmpl.color_count):
+                h, s, b, k = hsbk[i]
                 _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
                 offset += 8
 
