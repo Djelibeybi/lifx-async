@@ -33428,6 +33428,17 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.4.0 (2026-03-18)
+
+### Documentation
+
+- **effects**: Add animated GIFs and effects gallery page ([`fbcaadc`](https://github.com/Djelibeybi/lifx-async/commit/fbcaadcd93d03b03cacd154857a4b6de4c34bf01))
+- **effects**: Add documentation for 18 effects adapted from pkivolowitz/lifx ([`a4f47be`](https://github.com/Djelibeybi/lifx-async/commit/a4f47be11646da48b91a2b879c698f43aa7ca979))
+
+### Features
+
+- **examples**: Add effects demo script with device-type-aware selection ([`be36b95`](https://github.com/Djelibeybi/lifx-async/commit/be36b956eac3f5fc8de02da3f175d49de367da12))
+
 ## v5.3.0 (2026-03-18)
 
 ### Bug Fixes
