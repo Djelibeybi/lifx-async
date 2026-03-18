@@ -173,6 +173,60 @@ class EffectAurora(FrameEffect):
 
         return colors
 
+    def generate_protocol_frame(
+        self, ctx: FrameContext
+    ) -> list[tuple[int, int, int, int]]:
+        """Generate a frame of protocol-ready uint16 HSBK tuples.
+
+        Bypasses HSBK object construction and validation for maximum
+        throughput. Computes uint16 values directly from the aurora
+        algorithm, avoiding per-pixel object allocation and float-to-int
+        conversion overhead.
+
+        Args:
+            ctx: Frame context with timing and layout info
+
+        Returns:
+            List of (hue, sat, brightness, kelvin) uint16 tuples
+        """
+        t = ctx.elapsed_s * self.speed * 0.05
+        device_offset = ctx.device_index * self.spread / 360.0
+        is_matrix = ctx.canvas_height > 1
+        pixel_count = ctx.pixel_count
+        inv_pixel_count = 1.0 / max(pixel_count, 1)
+        pi = math.pi
+        sin = math.sin
+
+        result: list[tuple[int, int, int, int]] = []
+        for i in range(pixel_count):
+            i_norm = i * inv_pixel_count
+            position = (i_norm + t + device_offset) % 1.0
+            hue = self._palette_hue(position)
+
+            # Brightness modulation
+            brightness_mod = 0.5 + 0.5 * sin(i_norm * pi * 3 + t * 6)
+            pixel_brightness = self.brightness * brightness_mod
+
+            # Matrix vertical gradient
+            if is_matrix:
+                y = i // ctx.canvas_width
+                y_norm = y / max(ctx.canvas_height - 1, 1)
+                pixel_brightness *= sin(y_norm * pi)
+
+            pixel_brightness = max(0.0, min(1.0, pixel_brightness))
+
+            # Saturation variation
+            saturation = 0.7 + 0.3 * sin(position * 2 * pi)
+
+            # Convert directly to uint16 protocol values
+            hue_u16 = int(round(0x10000 * hue) / 360) % 0x10000
+            sat_u16 = int(round(0xFFFF * saturation))
+            bri_u16 = int(round(0xFFFF * pixel_brightness))
+
+            result.append((hue_u16, sat_u16, bri_u16, KELVIN_NEUTRAL))
+
+        return result
+
     async def from_poweroff_hsbk(self, _light: Light) -> HSBK:
         """Return startup color when light is powered off.
 
