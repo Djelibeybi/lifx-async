@@ -72,11 +72,11 @@ Replace fireworks private RGB helpers with the now-equivalent `HSBK` methods.
 
 ## Final Verification
 
-- [x]All acceptance criteria met
-- [x]`uv run --frozen pytest` — full suite passes
-- [x]`uv run pyright` — no type errors
-- [x]`uv run ruff check . && uv run ruff format --check .` — clean
-- [x]Ready for review
+- [x] All acceptance criteria met
+- [x] `uv run --frozen pytest` — full suite passes
+- [x] `uv run pyright` — no type errors
+- [x] `uv run ruff check . && uv run ruff format --check .` — clean
+- [x] Ready for review
 
 ---
 
