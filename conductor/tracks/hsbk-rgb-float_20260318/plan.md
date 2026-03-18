@@ -22,8 +22,8 @@ Update `from_rgb()` and `to_rgb()` signatures and their direct tests.
 
 ### Verification
 
-- [x]`test_color.py` passes with float-based assertions
-- [x]Round-trip error is within floating-point epsilon
+- [x] `test_color.py` passes with float-based assertions
+- [x] Round-trip error is within floating-point epsilon
 
 ## Phase 2: Colors Enum
 
