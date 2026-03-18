@@ -3,7 +3,7 @@
 **Track ID:** effects-docs_20260318
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-03-18
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 
@@ -15,9 +15,9 @@ Update the getting-started and API docs to cover the new effects.
 
 ### Tasks
 
-- [ ] Task 1.1: Update `docs/getting-started/effects.md` — add a new section for the 18 ported effects with attribution to pkivolowitz/lifx, brief descriptions, key parameters, and device compatibility notes
-- [ ] Task 1.2: Update `docs/api/effects.md` — add API reference entries for all new effect classes using mkdocstrings
-- [ ] Task 1.3: Verify `mkdocs build` succeeds with no warnings
+- [x] Task 1.1: Update `docs/getting-started/effects.md` — add a new section for the 18 ported effects with attribution to pkivolowitz/lifx, brief descriptions, key parameters, and device compatibility notes
+- [x] Task 1.2: Update `docs/api/effects.md` — add API reference entries for all new effect classes using mkdocstrings
+- [x] Task 1.3: Verify `mkdocs build` succeeds with no warnings
 
 ### Verification
 
