@@ -36,8 +36,8 @@ Convert all ~148 `Colors` entries from int to float values.
 
 ### Verification
 
-- [x]All existing `Colors`-related tests pass
-- [x]Pyright passes on `color.py`
+- [x] All existing `Colors`-related tests pass
+- [x] Pyright passes on `color.py`
 
 ## Phase 3: Caller Updates
 
