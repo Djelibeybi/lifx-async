@@ -14608,8 +14608,8 @@ def __init__(
     self._framebuffer = framebuffer
     self._packet_generator = packet_generator
 
-    # Protocol source ID (random, identifies this client)
-    self._source = random.randint(1, 0xFFFFFFFF)
+    # Protocol source ID (unique per-session, identifies this client)
+    self._source = allocate_source()
 
     # Sequence number (0-255, wraps around)
     self._sequence = 0
@@ -18537,7 +18537,7 @@ async def get_label(self) -> str:
     # Update state if it exists
     if self._state is not None:
         self._state.label = label_value
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -18688,7 +18688,7 @@ async def get_power(self) -> int:
     # Update state if it exists
     if self._state is not None:
         self._state.power = power_level
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -20033,7 +20033,7 @@ async def get_color(self) -> tuple[HSBK, int, str]:
         if hasattr(self._state, "color"):
             self._state.color = color
 
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -21549,12 +21549,7 @@ async def get_hev_cycle(self) -> HevCycleState:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "hev_cycle"):
         self._state.hev_cycle = cycle_state
-        self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists
-    if self._state is not None and hasattr(self._state, "hev_cycle"):
-        self._state.hev_cycle = cycle_state
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -21719,7 +21714,7 @@ async def get_hev_config(self) -> HevConfig:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "hev_config"):
         self._state.hev_config = config
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -21884,7 +21879,7 @@ async def get_last_hev_result(
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "hev_result"):
         self._state.hev_result = result
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -22188,12 +22183,7 @@ async def get_infrared(self) -> float:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "infrared"):
         self._state.infrared = brightness
-        self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists
-    if self._state is not None and hasattr(self._state, "infrared"):
-        self._state.infrared = brightness
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -22736,13 +22726,7 @@ async def get_color_zones(
     if self._state is not None and hasattr(self._state, "zones"):
         if start == 0 and len(result) == zone_count:
             self._state.zones = result
-            self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists and we fetched all zones
-    if self._state is not None and hasattr(self._state, "zones"):
-        if start == 0 and len(result) == zone_count:
-            self._state.zones = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -22876,13 +22860,7 @@ async def get_extended_color_zones(
     if self._state is not None and hasattr(self._state, "zones"):
         if start == 0 and len(result) == zone_count:
             self._state.zones = result
-            self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists and we fetched all zones
-    if self._state is not None and hasattr(self._state, "zones"):
-        if start == 0 and len(result) == zone_count:
-            self._state.zones = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -23358,7 +23336,7 @@ async def get_effect(self) -> MultiZoneEffect:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "effect"):
         self._state.effect = result.effect_type
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -23982,7 +23960,7 @@ async def get_device_chain(self) -> list[TileInfo]:
     if self._state is not None and hasattr(self._state, "chain"):
         self._state.chain = tiles
         self._state.tile_count = len(tiles)
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug("Device chain has %d tile(s)", len(tiles))
     return tiles
@@ -24182,7 +24160,7 @@ async def get64(
     if self._state is not None and hasattr(self._state, "tile_colors"):
         if tile_index == 0 and x == 0 and y == 0 and len(result) == max_colors:
             self._state.tile_colors = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
     return result
 ```
@@ -24759,7 +24737,7 @@ async def get_effect(self) -> MatrixEffect:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "effect"):
         self._state.effect = effect.effect_type
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     return effect
 ```
@@ -26956,7 +26934,7 @@ async def discover_devices(
     """
     seen_serials: set[str] = set()
     packet_count = 0
-    start_time = time.time()
+    start_time = time.monotonic()
 
     # Create transport with broadcast enabled
     async with UdpTransport(port=0, broadcast=True) as transport:
@@ -26975,7 +26953,7 @@ async def discover_devices(
         )
 
         # Send broadcast
-        request_time = time.time()
+        request_time = time.monotonic()
         _LOGGER.debug(
             {
                 "class": "discover_devices",
@@ -26996,7 +26974,7 @@ async def discover_devices(
         # Collect responses with dynamic timeout
         while True:
             # Calculate elapsed time since last response
-            elapsed_since_last = time.time() - last_response_time
+            elapsed_since_last = time.monotonic() - last_response_time
 
             # Stop if we've been idle too long
             if elapsed_since_last >= idle_timeout:
@@ -27012,13 +26990,13 @@ async def discover_devices(
                 break
 
             # Stop if we've exceeded the overall timeout
-            if time.time() - request_time >= timeout:
+            if time.monotonic() - request_time >= timeout:
                 _LOGGER.debug(
                     {
                         "class": "discover_devices",
                         "method": "discover",
                         "action": "overall_timeout",
-                        "elapsed": time.time() - request_time,
+                        "elapsed": time.monotonic() - request_time,
                         "timeout": timeout,
                     }
                 )
@@ -27026,13 +27004,13 @@ async def discover_devices(
 
             # Calculate remaining timeout (use the shorter of idle or overall timeout)
             remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.time() - request_time)
+            remaining_overall = timeout - (time.monotonic() - request_time)
             remaining = min(remaining_idle, remaining_overall)
 
             # Try to receive a packet
             try:
                 data, addr = await transport.receive(timeout=remaining)
-                response_timestamp = time.time()
+                response_timestamp = time.monotonic()
 
             except LifxTimeoutError:
                 # Timeout means no more responses within the idle period
@@ -27166,7 +27144,7 @@ async def discover_devices(
                 "action": "complete",
                 "devices_found": len(seen_serials),
                 "packets_processed": packet_count,
-                "elapsed": time.time() - start_time,
+                "elapsed": time.monotonic() - start_time,
             }
         )
 ````

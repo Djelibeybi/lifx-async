@@ -1144,7 +1144,7 @@ async def get_label(self) -> str:
     # Update state if it exists
     if self._state is not None:
         self._state.label = label_value
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -1295,7 +1295,7 @@ async def get_power(self) -> int:
     # Update state if it exists
     if self._state is not None:
         self._state.power = power_level
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -2640,7 +2640,7 @@ async def get_color(self) -> tuple[HSBK, int, str]:
         if hasattr(self._state, "color"):
             self._state.color = color
 
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -4156,12 +4156,7 @@ async def get_hev_cycle(self) -> HevCycleState:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "hev_cycle"):
         self._state.hev_cycle = cycle_state
-        self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists
-    if self._state is not None and hasattr(self._state, "hev_cycle"):
-        self._state.hev_cycle = cycle_state
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -4326,7 +4321,7 @@ async def get_hev_config(self) -> HevConfig:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "hev_config"):
         self._state.hev_config = config
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -4491,7 +4486,7 @@ async def get_last_hev_result(
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "hev_result"):
         self._state.hev_result = result
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -4795,12 +4790,7 @@ async def get_infrared(self) -> float:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "infrared"):
         self._state.infrared = brightness
-        self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists
-    if self._state is not None and hasattr(self._state, "infrared"):
-        self._state.infrared = brightness
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -5343,13 +5333,7 @@ async def get_color_zones(
     if self._state is not None and hasattr(self._state, "zones"):
         if start == 0 and len(result) == zone_count:
             self._state.zones = result
-            self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists and we fetched all zones
-    if self._state is not None and hasattr(self._state, "zones"):
-        if start == 0 and len(result) == zone_count:
-            self._state.zones = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -5483,13 +5467,7 @@ async def get_extended_color_zones(
     if self._state is not None and hasattr(self._state, "zones"):
         if start == 0 and len(result) == zone_count:
             self._state.zones = result
-            self._state.last_updated = __import__("time").time()
-
-    # Update state if it exists and we fetched all zones
-    if self._state is not None and hasattr(self._state, "zones"):
-        if start == 0 and len(result) == zone_count:
-            self._state.zones = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -5965,7 +5943,7 @@ async def get_effect(self) -> MultiZoneEffect:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "effect"):
         self._state.effect = result.effect_type
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug(
         {
@@ -6589,7 +6567,7 @@ async def get_device_chain(self) -> list[TileInfo]:
     if self._state is not None and hasattr(self._state, "chain"):
         self._state.chain = tiles
         self._state.tile_count = len(tiles)
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     _LOGGER.debug("Device chain has %d tile(s)", len(tiles))
     return tiles
@@ -6789,7 +6767,7 @@ async def get64(
     if self._state is not None and hasattr(self._state, "tile_colors"):
         if tile_index == 0 and x == 0 and y == 0 and len(result) == max_colors:
             self._state.tile_colors = result
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
     return result
 ```
@@ -7366,7 +7344,7 @@ async def get_effect(self) -> MatrixEffect:
     # Update state if it exists
     if self._state is not None and hasattr(self._state, "effect"):
         self._state.effect = effect.effect_type
-        self._state.last_updated = __import__("time").time()
+        self._state.last_updated = time.time()
 
     return effect
 ```
