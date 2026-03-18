@@ -83,7 +83,8 @@ class Conductor:
         For frame-based effects, returns the list of HSBK colors from the
         most recent call to generate_frame() for this device. Returns None
         if no effect is running on the device, the effect is not frame-based,
-        or no frame has been generated yet.
+        no frame has been generated yet, or the effect overrides
+        generate_protocol_frame() directly (bypassing HSBK construction).
 
         Args:
             light: The device to query
