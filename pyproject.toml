@@ -76,6 +76,7 @@ ignore = []
 "src/lifx/protocol/packets.py" = ["E501"]
 "src/lifx/products/registry.py" = ["E501"]
 "benchmarks/*.py" = ["E501"]
+"tests/benchmarks/*.py" = ["E501"]
 
 [tool.pyright]
 typeCheckingMode = "standard"
@@ -113,6 +114,7 @@ timeout = 30
 timeout_method = "thread"
 markers = [
     "emulator: tests that require the lifx-emulator-core embedded emulator",
+    "benchmark: performance benchmark tests — run with -m benchmark to measure baselines",
 ]
 
 [tool.coverage.run]
