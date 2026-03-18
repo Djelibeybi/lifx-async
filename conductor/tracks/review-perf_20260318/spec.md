@@ -41,7 +41,7 @@ As a developer building real-time lighting effects, I want the animation pipelin
 
 ### FrameBuffer LUT pre-computation (PERF-H1)
 
-Current `_apply_canvas` at `framebuffer.py:382-416` iterates `tiles × rows × cols` on every frame to build the output list. The mapping from canvas position to output index is static — computed once at `__init__` time and stored as a `list[tuple[int, int]]` of `(canvas_index, output_index)` pairs. Per-frame work becomes:
+Current `_apply_canvas` at `framebuffer.py:382-416` iterates `tiles × rows × cols` on every frame to build the output list. The mapping from canvas position to output index is static — computed once at `__init__` time and stored as a `list[int]` of canvas indices in output order. Per-frame work becomes:
 
 ```python
 # Pre-computed at init:
