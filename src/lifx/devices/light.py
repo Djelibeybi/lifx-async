@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -143,7 +144,7 @@ class Light(Device[LightState]):
             if hasattr(self._state, "color"):
                 self._state.color = color
 
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {

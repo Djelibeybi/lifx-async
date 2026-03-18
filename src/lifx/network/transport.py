@@ -24,8 +24,12 @@ _LOGGER = logging.getLogger(__name__)
 class _UdpProtocol(asyncio.DatagramProtocol):
     """Internal DatagramProtocol implementation for receiving UDP packets."""
 
+    _MAX_QUEUE_SIZE = 1000
+
     def __init__(self) -> None:
-        self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue()
+        self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue(
+            maxsize=self._MAX_QUEUE_SIZE
+        )
         self.transport: DatagramTransport | None = None
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
@@ -34,12 +38,24 @@ class _UdpProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         """Called when a datagram is received."""
-        self.queue.put_nowait((data, addr))
+        try:
+            self.queue.put_nowait((data, addr))
+        except asyncio.QueueFull:
+            _LOGGER.warning(
+                {
+                    "class": "_UdpProtocol",
+                    "method": "datagram_received",
+                    "action": "packet_dropped",
+                    "reason": "queue_full",
+                    "addr": addr,
+                }
+            )
 
     def error_received(self, exc: Exception) -> None:
         """Called when an error is received."""
-        # Log error but don't stop receiving
-        pass
+        _LOGGER.warning(
+            {"class": "_UdpProtocol", "method": "error_received", "error": str(exc)}
+        )
 
     def connection_lost(self, exc: Exception | None) -> None:
         """Called when connection is lost."""

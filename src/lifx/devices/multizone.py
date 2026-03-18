@@ -359,7 +359,7 @@ class MultiZoneLight(Light):
         if self._state is not None and hasattr(self._state, "zones"):
             if start == 0 and len(result) == zone_count:
                 self._state.zones = result
-                self._state.last_updated = __import__("time").time()
+                self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
@@ -450,7 +450,7 @@ class MultiZoneLight(Light):
         if self._state is not None and hasattr(self._state, "zones"):
             if start == 0 and len(result) == zone_count:
                 self._state.zones = result
-                self._state.last_updated = __import__("time").time()
+                self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
@@ -750,7 +750,7 @@ class MultiZoneLight(Light):
         # Update state if it exists
         if self._state is not None and hasattr(self._state, "effect"):
             self._state.effect = result.effect_type
-            self._state.last_updated = __import__("time").time()
+            self._state.last_updated = time.time()
 
         _LOGGER.debug(
             {
