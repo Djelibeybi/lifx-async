@@ -367,3 +367,7 @@ print(f"Avg packets/frame: {total_packets / frame_count:.1f}")
 1. Reuse frame lists when possible
 2. Use generator patterns for very long animations
 3. Clear references after use
+
+## See Also
+
+- [Animation API Reference](../api/animation.md) — Class reference, packet generators, and performance characteristics

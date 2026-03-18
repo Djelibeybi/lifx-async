@@ -38,17 +38,17 @@ Fix the remaining content duplication in Themes and Animation sections.
 
 ### Tasks
 
-- [ ] Task 2.1: Trim `getting-started/themes.md` — keep only "Apply a Theme" (code example) and "Next Steps" links (~40 lines total); remove the full categories list and "Create a Custom Theme" section (these are already in `user-guide/themes.md`)
-- [ ] Task 2.2: Add "See also" links to `user-guide/themes.md` — ensure it links to `getting-started/themes.md` (intro), `api/themes.md` (reference), and `api/colors.md` (HSBK details)
-- [ ] Task 2.3: Trim `api/animation.md` — remove duplicated prose guide (which is identical to `user-guide/animation.md`); replace with a brief overview paragraph, a "See [Animation Guide](../user-guide/animation.md) for usage" link, and keep only the Performance Characteristics table and any API-specific reference content
-- [ ] Task 2.4: Add "See also" links to `user-guide/animation.md` — link to `api/animation.md` for API reference at the bottom
-- [ ] Task 2.5: Verify Phase 2 — run `uv run mkdocs build` and check for broken links
+- [x] Task 2.1: Trim `getting-started/themes.md` — keep only "Apply a Theme" (code example) and "Next Steps" links (~40 lines total); remove the full categories list and "Create a Custom Theme" section (these are already in `user-guide/themes.md`)
+- [x] Task 2.2: Add "See also" links to `user-guide/themes.md` — ensure it links to `getting-started/themes.md` (intro), `api/themes.md` (reference), and `api/colors.md` (HSBK details)
+- [x] Task 2.3: Trim `api/animation.md` — remove duplicated prose guide (which is identical to `user-guide/animation.md`); replace with a brief overview paragraph, a "See [Animation Guide](../user-guide/animation.md) for usage" link, and keep only the Performance Characteristics table and any API-specific reference content
+- [x] Task 2.4: Add "See also" links to `user-guide/animation.md` — link to `api/animation.md` for API reference at the bottom
+- [x] Task 2.5: Verify Phase 2 — run `uv run mkdocs build` and check for broken links
 
 ### Verification
 
-- [ ] `uv run mkdocs build` completes with no errors
-- [ ] `getting-started/themes.md` is under 50 lines
-- [ ] `api/animation.md` is significantly shorter than `user-guide/animation.md`
+- [x] `uv run mkdocs build` completes with no errors
+- [x] `getting-started/themes.md` is under 50 lines (38 lines)
+- [x] `api/animation.md` is significantly shorter than `user-guide/animation.md` (156 vs 373)
 
 ---
 
