@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## v5.4.1 (2026-03-19)
+
+### Bug Fixes
+
+- Asyncio and import pattern cleanup (review-critical_20260318) ([`07fed68`](https://github.com/Djelibeybi/lifx-async/commit/07fed681f42b8d413a944b5ba111ba6de3025766))
+- Protocol correctness and code quality fixes (review-critical_20260318) ([`e3276bf`](https://github.com/Djelibeybi/lifx-async/commit/e3276bf1bd0e7f52f884e96d9a990704df4955f8))
+- **animation**: Validate HSBK input length in update_colors() ([`94b232f`](https://github.com/Djelibeybi/lifx-async/commit/94b232f66646830ea933aa3c03ed22c7dc90a014))
+- **codecov**: Allow coverage uploads from failing CI runs ([`1843d19`](https://github.com/Djelibeybi/lifx-async/commit/1843d195037eb77233ce521e1798b67410d6f9f5))
+- **color**: Preserve full precision in with\_\* helpers ([`35f6229`](https://github.com/Djelibeybi/lifx-async/commit/35f62293a67c7337a5bb0a1f681fd382ed6e20a7))
+- **effects**: Clear \_last_generated_hsbk unconditionally after iteration ([`b6bf2bb`](https://github.com/Djelibeybi/lifx-async/commit/b6bf2bb6b64d9a059b5d0d1dcc5bbb89d954370b))
+- **test**: Make source ID rejection test deterministic ([`3d93826`](https://github.com/Djelibeybi/lifx-async/commit/3d93826458ec4d7e7a3ac2f5d5d860ed32dea27f))
+- **test**: Move noqa ARG001 to the actually unused config parameter ([`2c068bc`](https://github.com/Djelibeybi/lifx-async/commit/2c068bc2cf91feae62755813fe2c829cf3a705e0))
+- **transport**: Rate-limit QueueFull warning to prevent log flooding ([`82378af`](https://github.com/Djelibeybi/lifx-async/commit/82378afbda25f35354bc60c834baf32389c55961))
+
+### Documentation
+
+- Fix remaining int RGB references and clean up long float literals ([`5880ad2`](https://github.com/Djelibeybi/lifx-async/commit/5880ad29be9adda8d8d6534400f2539f0aa5dfe9))
+- Streamline CLAUDE.md from 907 to 381 lines ([`59769e8`](https://github.com/Djelibeybi/lifx-async/commit/59769e86e1031949491fd151ef3634b06ebd8980))
+- **animator**: Fix stale comment about source ID allocation ([`6336427`](https://github.com/Djelibeybi/lifx-async/commit/63364276975ed510e4a3176079268746e1653e7f))
+- **effects**: Consolidate effects content into user-guide (Phase 1) ([`71a5684`](https://github.com/Djelibeybi/lifx-async/commit/71a56848953ba13b6684faf4a8f35d0c7987053c))
+- **effects**: Document \_last_frames limitation for protocol-direct path ([`257febf`](https://github.com/Djelibeybi/lifx-async/commit/257febf9158c595b3e4c68eb8fc0cd5b13e02098))
+- **effects**: Update FrameEffect docstrings for generate_protocol_frame ([`8e52cee`](https://github.com/Djelibeybi/lifx-async/commit/8e52ceecccf52506563a61f6fddbebb2f65d858d))
+- **mkdocs**: Fix all documentation correctness issues ([`7a061e4`](https://github.com/Djelibeybi/lifx-async/commit/7a061e4c0776b2eecd362ed8dd8f56098df65b30))
+- **nav**: Update navigation and add progressive disclosure links (Phase 4) ([`42caf99`](https://github.com/Djelibeybi/lifx-async/commit/42caf994f545641fa6140b6a872d86795eb47ce7))
+- **plan**: Fix task list checkbox spacing at line 25-26 ([`2f9e5e9`](https://github.com/Djelibeybi/lifx-async/commit/2f9e5e91a62da9ccdef5638dba784ccd9fe67d85))
+- **plan**: Fix task list checkbox spacing at line 39-40 ([`cb09448`](https://github.com/Djelibeybi/lifx-async/commit/cb09448a1bafb8f633e7a06f8f8918b45afc3610))
+- **plan**: Fix task list checkbox spacing at line 54-55 ([`5b3dd32`](https://github.com/Djelibeybi/lifx-async/commit/5b3dd32279066eef694d664b3f3f0b82957ce9e0))
+- **plan**: Fix task list checkbox spacing at line 70-71 ([`c0990aa`](https://github.com/Djelibeybi/lifx-async/commit/c0990aa67bc50f5456d2f9a71cbba581a38835be))
+- **plan**: Fix task list checkbox spacing at line 75-79 ([`70440a2`](https://github.com/Djelibeybi/lifx-async/commit/70440a255c13f73a73a0752f6e44526fe04c018b))
+- **source**: Fix misleading docstrings in base.py, api.py, exceptions.py ([`901d4aa`](https://github.com/Djelibeybi/lifx-async/commit/901d4aad0910c7a84bffeee13056464148719000))
+- **structure**: Relocate misplaced content and fix orphaned links (Phase 3) ([`25f2186`](https://github.com/Djelibeybi/lifx-async/commit/25f21864d4df28491e1dfdcf5678318d473edf07))
+- **tests**: Fix misleading comment in idle timeout test ([`b76a418`](https://github.com/Djelibeybi/lifx-async/commit/b76a418d513b51c0b3de21a742303744c902e4b5))
+- **themes,animation**: Deduplicate themes and animation content (Phase 2) ([`c489bc7`](https://github.com/Djelibeybi/lifx-async/commit/c489bc7cdb38eb2c64010f61cdd038e08c3c0a10))
+
+### Performance Improvements
+
+- **animation**: Avoid slice allocation in update_colors() hot loop ([`b3152e1`](https://github.com/Djelibeybi/lifx-async/commit/b3152e170f469cb814fc9f3ec24768e37b9b141b))
+- **animation**: Use pre-compiled struct.Struct for HSBK writes ([`1b54956`](https://github.com/Djelibeybi/lifx-async/commit/1b5495635abb792f2884158507bfc07cf4546ece))
+- **aurora**: Add direct generate_protocol_frame() override (review-perf_20260318) ([`a01f289`](https://github.com/Djelibeybi/lifx-async/commit/a01f2890521f7080ffbbf87e2d25dcfa8f3fdde3))
+- **effects**: Add generate_protocol_frame() to FrameEffect (review-perf_20260318) ([`24bb03c`](https://github.com/Djelibeybi/lifx-async/commit/24bb03cc42f4ab3ab64a63207068f061f19a2de9))
+- **framebuffer**: Pre-compute canvas-to-device LUT at init time (review-perf_20260318) ([`3b28194`](https://github.com/Djelibeybi/lifx-async/commit/3b2819454f636eeec327cedf79d40640003e1d6e))
+- **packets**: Replace flat list building with direct struct.pack_into (review-perf_20260318) ([`ced40eb`](https://github.com/Djelibeybi/lifx-async/commit/ced40eb96d8c675bf33dcad99a0fb4caf39171c5))
+- **protocol**: Guard asdict() in Packet.unpack() behind debug check (review-perf_20260318) ([`44617c1`](https://github.com/Djelibeybi/lifx-async/commit/44617c141674e86603fc4c82b512b8a3aa909a22))
+
 ## v5.4.0 (2026-03-18)
 
 ### Documentation
