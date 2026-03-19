@@ -1,0 +1,51 @@
+# Codecov configuration
+# https://docs.codecov.io/docs/codecov-yaml
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+    patch:
+      default:
+        target: 100%
+
+# Flag management: each Python version uploads separately
+flags:
+  python3.10:
+    paths:
+    - src/lifx/
+    carryforward: true
+  python3.11:
+    paths:
+    - src/lifx/
+    carryforward: true
+  python3.12:
+    paths:
+    - src/lifx/
+    carryforward: true
+  python3.13:
+    paths:
+    - src/lifx/
+    carryforward: true
+  python3.14:
+    paths:
+    - src/lifx/
+    carryforward: true
+
+# Ignore auto-generated and non-source files in coverage reports
+ignore:
+- tests/
+- src/lifx/protocol/generator.py
+- src/lifx/protocol/protocol_types.py
+- src/lifx/products/generator.py
+- benchmarks/
+- docs/
+
+comment:
+  layout: reach,diff,flags,components
+  behavior: default
+  require_changes: true
