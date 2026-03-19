@@ -1,7 +1,7 @@
 # Codecov configuration
 # https://docs.codecov.io/docs/codecov-yaml
 codecov:
-  require_ci_to_pass: true
+  require_ci_to_pass: false
 
 coverage:
   status:
