@@ -13,6 +13,8 @@ on:
     - pyproject.toml
     - uv.lock
     - .pre-commit-config.yaml
+    - .github/workflows/ci.yml
+    - codecov.yml
   workflow_dispatch:
     inputs:
       release_tag:
@@ -27,6 +29,32 @@ env:
   UV_VERSION: 0.9.4
 
 jobs:
+  # Detect which files changed to determine test matrix scope
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+    - name: Check for source/test changes
+      id: filter
+      run: |
+        if [ "${{ github.event_name }}" != "pull_request" ]; then
+          echo "source=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        # Check if any source/test files changed in this PR
+        CHANGED=$(gh pr diff ${{ github.event.number }} --name-only | grep -cE '^(src/|tests/|pyproject\.toml|uv\.lock)' || true)
+        if [ "$CHANGED" -gt 0 ]; then
+          echo "source=true" >> $GITHUB_OUTPUT
+        else
+          echo "source=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Code quality checks
   quality:
     name: Code Quality
@@ -103,15 +131,18 @@ jobs:
         fi
         echo "All generated files are up-to-date."
 
-  # Testing matrix: full OS matrix on PRs, Ubuntu-only on push to main
-  # (the PR that merged into main already validated all OS combinations)
+  # Testing matrix scope:
+  # - PRs with source/test changes: full 3-OS matrix
+  # - PRs with CI-only changes: Ubuntu-only (smoke test)
+  # - Push to main: Ubuntu-only (PR already validated all OSes)
   test:
+    needs: changes
     name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest","macos-latest","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
+        os: ${{ needs.changes.outputs.source == 'true' && github.event_name == 'pull_request' && fromJSON('["ubuntu-latest","macos-latest","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
