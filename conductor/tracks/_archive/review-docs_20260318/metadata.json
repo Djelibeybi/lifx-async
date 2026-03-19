@@ -1,8 +1,8 @@
 {
   "id": "review-docs_20260318",
-  "title": "Full Review — Documentation Repair",
+  "title": "Full Review \u2014 Documentation Repair",
   "type": "chore",
-  "status": "complete",
+  "status": "archived",
   "created": "2026-03-18T00:00:00Z",
   "updated": "2026-03-19T00:00:00Z",
   "current_phase": 2,
@@ -18,5 +18,8 @@
   "commits": [
     "901d4aa: docs(source): fix misleading docstrings in base.py, api.py, exceptions.py",
     "7a061e4: docs(mkdocs): fix all documentation correctness issues"
-  ]
+  ],
+  "archived": true,
+  "archived_at": "2026-03-19T00:00:00Z",
+  "archive_reason": "Completed"
 }

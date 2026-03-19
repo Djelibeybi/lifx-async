@@ -2,16 +2,40 @@
 
 | Status | Track ID | Title | Created | Updated |
 | ------ | -------- | ----- | ------- | ------- |
-| [x] | [review-critical_20260318](./tracks/review-critical_20260318/index.md) | Full Review — Critical Fixes | 2026-03-18 | 2026-03-19 |
-| [x] | [review-perf_20260318](./tracks/review-perf_20260318/index.md) | Full Review — Animation Pipeline Performance | 2026-03-18 | 2026-03-19 |
-| [x] | [review-docs_20260318](./tracks/review-docs_20260318/index.md) | Full Review — Documentation Repair | 2026-03-18 | 2026-03-19 |
-| [x] | [review-tests_20260318](./tracks/review-tests_20260318/index.md) | Full Review — Test Coverage Gaps | 2026-03-18 | 2026-03-19 |
-
-| [x] | [docs-ia-restructure_20260319](./tracks/docs-ia-restructure_20260319/index.md) | Docs IA Restructure | 2026-03-19 | 2026-03-19 |
 
 <!-- Tracks registered by /conductor:new-track -->
 
 ## Archived Tracks
+
+### review-critical_20260318: Full Review — Critical Fixes
+
+**Reason:** Completed
+**Archived:** 2026-03-19
+**Folder:** [./tracks/_archive/review-critical_20260318/](./tracks/_archive/review-critical_20260318/)
+
+### review-perf_20260318: Full Review — Animation Pipeline Performance
+
+**Reason:** Completed
+**Archived:** 2026-03-19
+**Folder:** [./tracks/_archive/review-perf_20260318/](./tracks/_archive/review-perf_20260318/)
+
+### review-docs_20260318: Full Review — Documentation Repair
+
+**Reason:** Completed
+**Archived:** 2026-03-19
+**Folder:** [./tracks/_archive/review-docs_20260318/](./tracks/_archive/review-docs_20260318/)
+
+### review-tests_20260318: Full Review — Test Coverage Gaps
+
+**Reason:** Completed
+**Archived:** 2026-03-19
+**Folder:** [./tracks/_archive/review-tests_20260318/](./tracks/_archive/review-tests_20260318/)
+
+### docs-ia-restructure_20260319: Docs IA Restructure
+
+**Reason:** Completed
+**Archived:** 2026-03-19
+**Folder:** [./tracks/_archive/docs-ia-restructure_20260319/](./tracks/_archive/docs-ia-restructure_20260319/)
 
 ### hsbk-rgb-float_20260318: Update HSBK RGB Conversion to Float
 
