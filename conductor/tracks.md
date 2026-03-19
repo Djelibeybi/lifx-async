@@ -5,7 +5,7 @@
 | [x] | [review-critical_20260318](./tracks/review-critical_20260318/index.md) | Full Review — Critical Fixes | 2026-03-18 | 2026-03-19 |
 | [x] | [review-perf_20260318](./tracks/review-perf_20260318/index.md) | Full Review — Animation Pipeline Performance | 2026-03-18 | 2026-03-19 |
 | [x] | [review-docs_20260318](./tracks/review-docs_20260318/index.md) | Full Review — Documentation Repair | 2026-03-18 | 2026-03-19 |
-| [ ] | [review-tests_20260318](./tracks/review-tests_20260318/index.md) | Full Review — Test Coverage Gaps | 2026-03-18 | 2026-03-18 |
+| [x] | [review-tests_20260318](./tracks/review-tests_20260318/index.md) | Full Review — Test Coverage Gaps | 2026-03-18 | 2026-03-19 |
 
 | [x] | [docs-ia-restructure_20260319](./tracks/docs-ia-restructure_20260319/index.md) | Docs IA Restructure | 2026-03-19 | 2026-03-19 |
 
