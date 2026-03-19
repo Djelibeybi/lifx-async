@@ -1,8 +1,8 @@
 {
   "id": "review-critical_20260318",
-  "title": "Full Review — Critical Fixes",
+  "title": "Full Review \u2014 Critical Fixes",
   "type": "refactor",
-  "status": "complete",
+  "status": "archived",
   "created": "2026-03-18T00:00:00Z",
   "updated": "2026-03-19T00:00:00Z",
   "current_phase": 3,
@@ -18,5 +18,8 @@
     "74d18d4: ci: tighten release gate and pin PyPI publish action",
     "433e56e: fix: protocol correctness and code quality fixes",
     "94bb3d6: fix: asyncio and import pattern cleanup"
-  ]
+  ],
+  "archived": true,
+  "archived_at": "2026-03-19T00:00:00Z",
+  "archive_reason": "Completed"
 }

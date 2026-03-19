@@ -2,7 +2,7 @@
   "id": "docs-ia-restructure_20260319",
   "title": "Docs IA Restructure",
   "type": "chore",
-  "status": "complete",
+  "status": "archived",
   "created": "2026-03-19T00:00:00Z",
   "updated": "2026-03-19T00:00:00Z",
   "current_phase": 4,
@@ -19,5 +19,8 @@
     "71a5684: docs(effects): consolidate effects content into user-guide (Phase 1)",
     "c489bc7: docs(themes,animation): deduplicate themes and animation content (Phase 2)",
     "25f2186: docs(structure): relocate misplaced content and fix orphaned links (Phase 3)"
-  ]
+  ],
+  "archived": true,
+  "archived_at": "2026-03-19T00:00:00Z",
+  "archive_reason": "Completed"
 }
