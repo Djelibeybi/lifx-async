@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import Direction, FirmwareEffect
 
@@ -466,6 +466,117 @@ class TestMultiZoneLight:
         # Verify fire-and-forget flags
         assert call_args[1]["ack_required"] is False
         assert call_args[1]["res_required"] is False
+
+
+class TestMultiZoneStateUpdates:
+    """Tests for state updates during get_color_zones and get_extended_color_zones."""
+
+    async def test_get_color_zones_updates_state(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test get_color_zones() updates _state.zones when fetching all zones (T-C2).
+
+        State should be updated exactly once when start=0 and result covers
+        all zones. This verifies the state caching path in get_color_zones().
+        """
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+
+        # Initialize _state with a MultiZoneLightState so the update path is exercised
+        initial_zones = [
+            HSBK(hue=0, saturation=0, brightness=0, kelvin=3500) for _ in range(8)
+        ]
+        multizone_light._state = MultiZoneLightState(
+            model="Test",
+            label="Test",
+            serial="d073d5010203",
+            mac_address="D0:73:D5:01:02:03",
+            power=True,
+            capabilities=mock_product_info(has_extended_multizone=False),
+            host_firmware=None,
+            wifi_firmware=None,
+            location=None,
+            group=None,
+            color=HSBK(hue=0, saturation=0, brightness=0, kelvin=3500),
+            zones=initial_zones,
+            zone_count=8,
+            effect=FirmwareEffect.OFF,
+            last_updated=0.0,
+        )
+
+        # Mock response: 8 zones with distinct colors
+        expected_colors = [
+            HSBK(hue=i * 45, saturation=0.5, brightness=0.75, kelvin=3500).to_protocol()
+            for i in range(8)
+        ]
+        mock_state = packets.MultiZone.StateMultiZone(
+            count=8, index=0, colors=expected_colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_color_zones(0, 7)
+
+        assert len(result) == 8
+        # State should have been updated with the fetched zones
+        assert multizone_light._state.zones == result
+        assert multizone_light._state.last_updated > 0.0
+
+    async def test_get_extended_color_zones_updates_state(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Test get_extended_color_zones() updates _state.zones when fetching all zones.
+
+        Same pattern as get_color_zones but for the extended protocol path.
+        """
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+
+        zone_count = 10
+        initial_zones = [
+            HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)
+            for _ in range(zone_count)
+        ]
+        multizone_light._state = MultiZoneLightState(
+            model="Test",
+            label="Test",
+            serial="d073d5010203",
+            mac_address="D0:73:D5:01:02:03",
+            power=True,
+            capabilities=mock_product_info(has_extended_multizone=True),
+            host_firmware=None,
+            wifi_firmware=None,
+            location=None,
+            group=None,
+            color=HSBK(hue=0, saturation=0, brightness=0, kelvin=3500),
+            zones=initial_zones,
+            zone_count=zone_count,
+            effect=FirmwareEffect.OFF,
+            last_updated=0.0,
+        )
+
+        # Mock response: 10 zones with distinct colors, padded to 82
+        colors = [
+            HSBK(hue=i * 36, saturation=0.8, brightness=0.9, kelvin=3500).to_protocol()
+            for i in range(zone_count)
+        ]
+        colors.extend(
+            [
+                HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()
+                for _ in range(72)
+            ]
+        )
+
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=zone_count, index=0, colors_count=zone_count, colors=colors
+        )
+        multizone_light.connection.request.return_value = mock_state
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_extended_color_zones(0, zone_count - 1)
+
+        assert len(result) == zone_count
+        # State should have been updated with the fetched zones
+        assert multizone_light._state.zones == result
+        assert multizone_light._state.last_updated > 0.0
 
 
 class TestMultiZoneEffect:
