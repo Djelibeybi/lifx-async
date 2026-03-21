@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v5.4.4 (2026-03-21)
+
+### Bug Fixes
+
+- Set a default value for duration_seconds for set_hev_cycle
+  ([`f7fc708`](https://github.com/Djelibeybi/lifx-async/commit/f7fc708d37964fb8b95e5a63096925ff539badfa))
+
+### Documentation
+
+- Update docstring to provide more detail on hev config
+  ([`02de0f0`](https://github.com/Djelibeybi/lifx-async/commit/02de0f07463b77b89982afa8e50a65f58d6519b7))
+
+
 ## v5.4.3 (2026-03-21)
 
 ### Bug Fixes
