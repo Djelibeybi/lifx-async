@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v5.4.3 (2026-03-21)
+
+### Bug Fixes
+
+- Defer is_on flag updates and add power-aware factory initialisation
+  ([`3db28a3`](https://github.com/Djelibeybi/lifx-async/commit/3db28a3f9c69b4d767e67d09843282a3cfdf1d89))
+
+- Defer is_on flags until after power-on and sync public fields on power-off
+  ([`b412e40`](https://github.com/Djelibeybi/lifx-async/commit/b412e4069a0b9ba60962d8c537171a9616015b45))
+
+- Defer stored state updates until after I/O succeeds in turn-off methods
+  ([`01588ec`](https://github.com/Djelibeybi/lifx-async/commit/01588ec847271094d32dce576de0531af498292d))
+
+- Harden CeilingLightState against aliased mutations and stale snapshots
+  ([`73a7275`](https://github.com/Djelibeybi/lifx-async/commit/73a727515f03496f5e8cce7338bd94688e37dc8f))
+
+- Move ceiling component state to CeilingLightState dataclass
+  ([`06372b9`](https://github.com/Djelibeybi/lifx-async/commit/06372b9c89e483dfb94cfdaed6b298f7f7ac0bc7))
+
+- Resolve remaining CodeRabbit review comments
+  ([`cd450a8`](https://github.com/Djelibeybi/lifx-async/commit/cd450a8e5337fc452fb864dbc2dc6e6c07cfbca4))
+
+- Return defensive copy of stored downlight colours
+  ([`2575889`](https://github.com/Djelibeybi/lifx-async/commit/2575889ddaccf4d38be9aab7803a67c8ab828152))
+
+- Sync ceiling component is_on state in getter methods
+  ([`8b83f35`](https://github.com/Djelibeybi/lifx-async/commit/8b83f35a2e0035a0af301d4cb8774216c87b6533))
+
+- Sync public CeilingLightState fields in all mutators and getters
+  ([`1eac576`](https://github.com/Djelibeybi/lifx-async/commit/1eac576ace714420f190b1df1c756ad6d2a73b1c))
+
+
 ## v5.4.2 (2026-03-21)
 
 ### Bug Fixes
