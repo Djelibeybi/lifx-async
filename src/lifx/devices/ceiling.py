@@ -1092,7 +1092,7 @@ class CeilingLight(MatrixLight):
         state = self.state
         if state.stored_downlight_colors is not None:
             if any(c.brightness > 0 for c in state.stored_downlight_colors):
-                return state.stored_downlight_colors
+                return list(state.stored_downlight_colors)
 
         # Get current colors (use pre-fetched if available)
         if tile_colors is None:
