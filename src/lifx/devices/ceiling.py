@@ -127,7 +127,7 @@ class CeilingLightState(MatrixLightState):
             stored_uplight_color=stored_uplight_color,
             stored_downlight_colors=stored_downlight_colors,
             last_uplight_color=uplight_color,
-            last_downlight_colors=downlight_colors,
+            last_downlight_colors=list(downlight_colors),
             last_updated=time.time(),
         )
 
@@ -262,9 +262,9 @@ class CeilingLight(MatrixLight):
         # Update ceiling-specific state fields
         state = cast(CeilingLightState, self._state)
         state.uplight_color = uplight_color
-        state.downlight_colors = downlight_colors
+        state.downlight_colors = list(downlight_colors)
         state.last_uplight_color = uplight_color
-        state.last_downlight_colors = downlight_colors
+        state.last_downlight_colors = list(downlight_colors)
         state.uplight_is_on = bool(state.power > 0 and uplight_color.brightness > 0)
         state.downlight_is_on = bool(
             state.power > 0 and any(c.brightness > 0 for c in downlight_colors)
@@ -438,10 +438,6 @@ class CeilingLight(MatrixLight):
         # Extract uplight zone
         uplight_color = tile_colors[self.uplight_zone]
 
-        # Update state cache (don't update uplight_is_on — power may be stale)
-        self.state.uplight_color = uplight_color
-        self.state.last_uplight_color = uplight_color
-
         return uplight_color
 
     async def get_downlight_colors(self) -> list[HSBK]:
@@ -460,11 +456,7 @@ class CeilingLight(MatrixLight):
         # Extract downlight zones
         downlight_colors = tile_colors[self.downlight_zones]
 
-        # Update state cache (don't update downlight_is_on — power may be stale)
-        self.state.downlight_colors = list(downlight_colors)
-        self.state.last_downlight_colors = downlight_colors
-
-        return downlight_colors
+        return list(downlight_colors)
 
     async def set_uplight_color(self, color: HSBK, duration: float = 0.0) -> None:
         """Set uplight component color.
@@ -558,10 +550,10 @@ class CeilingLight(MatrixLight):
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
         # Update state — public fields, stored state, and last-known
-        self.state.downlight_colors = downlight_colors
+        self.state.downlight_colors = list(downlight_colors)
         self.state.downlight_is_on = True  # brightness > 0 validated above
-        self.state.stored_downlight_colors = downlight_colors
-        self.state.last_downlight_colors = downlight_colors
+        self.state.stored_downlight_colors = list(downlight_colors)
+        self.state.last_downlight_colors = list(downlight_colors)
 
         # Persist if enabled
         if self._state_file:
@@ -629,6 +621,8 @@ class CeilingLight(MatrixLight):
             self.state.downlight_is_on = False  # downlight zones were zeroed
             self.state.stored_uplight_color = target_color
             self.state.last_uplight_color = target_color
+            self.state.downlight_colors = list(tile_colors[self.downlight_zones])
+            self.state.last_downlight_colors = list(tile_colors[self.downlight_zones])
 
             # Turn on with the requested duration - light fades on to target color
             await super().set_power(True, duration)
@@ -776,11 +770,13 @@ class CeilingLight(MatrixLight):
             await self.set_matrix_colors(0, tile_colors, duration=0)
 
             # Update state — public fields, stored state, and last-known
-            self.state.downlight_colors = target_colors
+            self.state.downlight_colors = list(target_colors)
             self.state.downlight_is_on = True
             self.state.uplight_is_on = False  # uplight zone was zeroed
-            self.state.stored_downlight_colors = target_colors
-            self.state.last_downlight_colors = target_colors
+            self.state.stored_downlight_colors = list(target_colors)
+            self.state.last_downlight_colors = list(target_colors)
+            self.state.uplight_color = tile_colors[self.uplight_zone]
+            self.state.last_uplight_color = tile_colors[self.uplight_zone]
 
             # Turn on with the requested duration - light fades on to target colors
             await super().set_power(True, duration)
@@ -858,12 +854,22 @@ class CeilingLight(MatrixLight):
 
             # Update last-known and mark components as off (power is being turned off)
             state.last_uplight_color = state.stored_uplight_color
-            state.last_downlight_colors = state.stored_downlight_colors
+            state.last_downlight_colors = list(state.stored_downlight_colors)
             state.uplight_is_on = False
             state.downlight_is_on = False
 
         # Call parent to perform actual power change
         await super().set_power(level, duration)
+
+        # When turning on, recompute booleans from last-known colours
+        if not turning_off:
+            state = self.state
+            if state.last_uplight_color is not None:
+                state.uplight_is_on = state.last_uplight_color.brightness > 0
+            if state.last_downlight_colors is not None:
+                state.downlight_is_on = any(
+                    c.brightness > 0 for c in state.last_downlight_colors
+                )
 
         # Persist AFTER device operation completes
         if turning_off and self._state_file:
@@ -910,13 +916,13 @@ class CeilingLight(MatrixLight):
         is_on = color.brightness > 0
         downlight_colors = [color] * self.downlight_zone_count
         state.uplight_color = color
-        state.downlight_colors = downlight_colors
+        state.downlight_colors = list(downlight_colors)
         state.uplight_is_on = is_on
         state.downlight_is_on = is_on
         state.last_uplight_color = color
-        state.last_downlight_colors = downlight_colors
+        state.last_downlight_colors = list(downlight_colors)
         state.stored_uplight_color = color
-        state.stored_downlight_colors = downlight_colors
+        state.stored_downlight_colors = list(downlight_colors)
 
         # Persist if enabled
         if self._state_file:
@@ -973,10 +979,10 @@ class CeilingLight(MatrixLight):
         # If colors not provided, extract from fetched data
         if stored_colors is None:
             stored_colors = list(tile_colors[self.downlight_zones])
-            self.state.last_downlight_colors = stored_colors
+            self.state.last_downlight_colors = list(stored_colors)
 
         # Store for future restoration
-        self.state.stored_downlight_colors = stored_colors
+        self.state.stored_downlight_colors = list(stored_colors)
 
         # Create colors with brightness=0 for device
         off_colors = [
@@ -994,7 +1000,9 @@ class CeilingLight(MatrixLight):
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
         # Update cache
-        self.state.last_downlight_colors = off_colors
+        self.state.downlight_colors = list(off_colors)
+        self.state.downlight_is_on = False
+        self.state.last_downlight_colors = list(off_colors)
 
         # Persist if enabled
         if self._state_file:
