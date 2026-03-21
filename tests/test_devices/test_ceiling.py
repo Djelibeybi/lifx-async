@@ -16,6 +16,17 @@ from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout
 
 
+def _make_mock_state(power: int = 65535) -> MagicMock:
+    """Create a mock CeilingLightState with correct defaults."""
+    state = MagicMock()
+    state.power = power
+    state.stored_uplight_color = None
+    state.stored_downlight_colors = None
+    state.last_uplight_color = None
+    state.last_downlight_colors = None
+    return state
+
+
 class TestCeilingLightComponentDetection:
     """Tests for component detection and configuration."""
 
@@ -115,6 +126,7 @@ class TestCeilingLightGetMethods:
         """Create a Ceiling product 176 (8x8) instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
@@ -166,6 +178,7 @@ class TestCeilingLightSetMethods:
         """Create a Ceiling product 176 (8x8) instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -196,7 +209,7 @@ class TestCeilingLightSetMethods:
         assert call_args.kwargs.get("duration") == 1000  # duration in milliseconds
 
         # Verify stored state was updated
-        assert ceiling_176._stored_uplight_state == color
+        assert ceiling_176.state.stored_uplight_color == color
 
     async def test_set_uplight_color_zero_brightness_raises(
         self, ceiling_176: CeilingLight
@@ -226,8 +239,8 @@ class TestCeilingLightSetMethods:
         assert call_args.kwargs.get("duration") == 500  # duration in milliseconds
 
         # Verify stored state was updated
-        assert len(ceiling_176._stored_downlight_state) == 63
-        assert all(c == color for c in ceiling_176._stored_downlight_state)
+        assert len(ceiling_176.state.stored_downlight_colors) == 63
+        assert all(c == color for c in ceiling_176.state.stored_downlight_colors)
 
     async def test_set_downlight_colors_list_hsbk(
         self, ceiling_176: CeilingLight
@@ -251,7 +264,7 @@ class TestCeilingLightSetMethods:
         assert call_args.args[1][0:63] == colors
 
         # Verify stored state was updated
-        assert ceiling_176._stored_downlight_state == colors
+        assert ceiling_176.state.stored_downlight_colors == colors
 
     async def test_set_downlight_colors_invalid_length_raises(
         self, ceiling_176: CeilingLight
@@ -299,6 +312,7 @@ class TestCeilingLightTurnOnOff:
         """Create a Ceiling product 176 (8x8) instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -322,14 +336,14 @@ class TestCeilingLightTurnOnOff:
         # Verify set_matrix_colors was called
         ceiling_176.set_matrix_colors.assert_called_once()
         # Verify stored state was updated
-        assert ceiling_176._stored_uplight_state == color
+        assert ceiling_176.state.stored_uplight_color == color
 
     async def test_turn_uplight_on_without_color_uses_stored(
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test turning uplight on without color uses stored state."""
         stored_color = HSBK(hue=60, saturation=0.5, brightness=0.7, kelvin=4000)
-        ceiling_176._stored_uplight_state = stored_color
+        ceiling_176.state.stored_uplight_color = stored_color
 
         await ceiling_176.turn_uplight_on()
 
@@ -345,7 +359,7 @@ class TestCeilingLightTurnOnOff:
     ) -> None:
         """Test turning uplight on infers brightness from downlight average."""
         # No stored state
-        ceiling_176._stored_uplight_state = None
+        ceiling_176.state.stored_uplight_color = None
 
         # Mock downlight colors with average brightness 0.6
         downlight_colors = [
@@ -373,7 +387,7 @@ class TestCeilingLightTurnOnOff:
     ) -> None:
         """Test turn uplight on uses default brightness when no stored state."""
         # No stored state
-        ceiling_176._stored_uplight_state = None
+        ceiling_176.state.stored_uplight_color = None
 
         # Mock current uplight color (off) and downlight colors (all off too)
         uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
@@ -405,8 +419,8 @@ class TestCeilingLightTurnOnOff:
         await ceiling_176.turn_uplight_off()
 
         # Should store current color (with brightness preserved)
-        assert ceiling_176._stored_uplight_state is not None
-        assert ceiling_176._stored_uplight_state.brightness == pytest.approx(
+        assert ceiling_176.state.stored_uplight_color is not None
+        assert ceiling_176.state.stored_uplight_color.brightness == pytest.approx(
             0.5, abs=0.01
         )
 
@@ -426,7 +440,7 @@ class TestCeilingLightTurnOnOff:
         await ceiling_176.turn_uplight_off(provided_color)
 
         # Should store provided color
-        assert ceiling_176._stored_uplight_state == provided_color
+        assert ceiling_176.state.stored_uplight_color == provided_color
 
         # Should set device to brightness=0 (with provided H, S, K)
         ceiling_176.set_matrix_colors.assert_called_once()
@@ -481,7 +495,7 @@ class TestCeilingLightTurnOnOff:
             HSBK(hue=i * 5, saturation=1.0, brightness=0.7, kelvin=3500)
             for i in range(63)
         ]
-        ceiling_176._stored_downlight_state = stored_colors
+        ceiling_176.state.stored_downlight_colors = stored_colors
 
         await ceiling_176.turn_downlight_on()
 
@@ -497,7 +511,7 @@ class TestCeilingLightTurnOnOff:
     ) -> None:
         """Test turning downlight on infers brightness from uplight."""
         # No stored state
-        ceiling_176._stored_downlight_state = None
+        ceiling_176.state.stored_downlight_colors = None
 
         # Mock uplight with brightness 0.5
         uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
@@ -542,11 +556,11 @@ class TestCeilingLightTurnOnOff:
         await ceiling_176.turn_downlight_off()
 
         # Should store current colors (with brightness preserved)
-        assert ceiling_176._stored_downlight_state is not None
-        assert len(ceiling_176._stored_downlight_state) == 63
+        assert ceiling_176.state.stored_downlight_colors is not None
+        assert len(ceiling_176.state.stored_downlight_colors) == 63
         assert all(
             c.brightness == pytest.approx(0.8, abs=0.01)
-            for c in ceiling_176._stored_downlight_state
+            for c in ceiling_176.state.stored_downlight_colors
         )
 
         # Should set device to brightness=0
@@ -566,9 +580,11 @@ class TestCeilingLightTurnOnOff:
         await ceiling_176.turn_downlight_off(provided_color)
 
         # Should store provided color for all zones
-        assert ceiling_176._stored_downlight_state is not None
-        assert len(ceiling_176._stored_downlight_state) == 63
-        assert all(c == provided_color for c in ceiling_176._stored_downlight_state)
+        assert ceiling_176.state.stored_downlight_colors is not None
+        assert len(ceiling_176.state.stored_downlight_colors) == 63
+        assert all(
+            c == provided_color for c in ceiling_176.state.stored_downlight_colors
+        )
 
         # Should set device to brightness=0
         ceiling_176.set_matrix_colors.assert_called_once()
@@ -611,9 +627,7 @@ class TestCeilingLightProperties:
         """Create a Ceiling product 176 (8x8) instance."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
-        # Mock cached power state
-        ceiling._state = MagicMock()
-        ceiling._state.power = 65535  # Power on
+        ceiling._state = _make_mock_state()
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
@@ -622,7 +636,7 @@ class TestCeilingLightProperties:
     def test_uplight_is_on_when_on(self, ceiling_176: CeilingLight) -> None:
         """Test uplight_is_on returns True when uplight is on."""
         # Set cached uplight color with brightness > 0
-        ceiling_176._last_uplight_color = HSBK(
+        ceiling_176.state.last_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.5, kelvin=2700
         )
 
@@ -631,7 +645,7 @@ class TestCeilingLightProperties:
     def test_uplight_is_on_when_off(self, ceiling_176: CeilingLight) -> None:
         """Test uplight_is_on returns False when uplight is off."""
         # Set cached uplight color with brightness = 0
-        ceiling_176._last_uplight_color = HSBK(
+        ceiling_176.state.last_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.0, kelvin=2700
         )
 
@@ -640,7 +654,7 @@ class TestCeilingLightProperties:
     def test_uplight_is_on_when_power_off(self, ceiling_176: CeilingLight) -> None:
         """Test uplight_is_on returns False when device power is off."""
         ceiling_176._state.power = 0  # Power off
-        ceiling_176._last_uplight_color = HSBK(
+        ceiling_176.state.last_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.5, kelvin=2700
         )
 
@@ -648,14 +662,14 @@ class TestCeilingLightProperties:
 
     def test_uplight_is_on_when_no_cached_data(self, ceiling_176: CeilingLight) -> None:
         """Test uplight_is_on returns False when no cached data."""
-        ceiling_176._last_uplight_color = None
+        ceiling_176.state.last_uplight_color = None
 
         assert ceiling_176.uplight_is_on is False
 
     def test_downlight_is_on_when_on(self, ceiling_176: CeilingLight) -> None:
         """Test downlight_is_on returns True when any downlight zone is on."""
         # Set some zones with brightness > 0
-        ceiling_176._last_downlight_colors = [
+        ceiling_176.state.last_downlight_colors = [
             HSBK(hue=0, saturation=0, brightness=0.0 if i < 10 else 1.0, kelvin=3500)
             for i in range(63)
         ]
@@ -665,7 +679,7 @@ class TestCeilingLightProperties:
     def test_downlight_is_on_when_all_off(self, ceiling_176: CeilingLight) -> None:
         """Test downlight_is_on returns False when all zones are off."""
         # All zones with brightness = 0
-        ceiling_176._last_downlight_colors = [
+        ceiling_176.state.last_downlight_colors = [
             HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500) for _ in range(63)
         ]
 
@@ -675,7 +689,7 @@ class TestCeilingLightProperties:
         """Test downlight_is_on returns False when device power is off."""
         ceiling_176._state.power = 0  # Power off
         white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
-        ceiling_176._last_downlight_colors = [white] * 63
+        ceiling_176.state.last_downlight_colors = [white] * 63
 
         assert ceiling_176.downlight_is_on is False
 
@@ -683,7 +697,7 @@ class TestCeilingLightProperties:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test downlight_is_on returns False when no cached data."""
-        ceiling_176._last_downlight_colors = None
+        ceiling_176.state.last_downlight_colors = None
 
         assert ceiling_176.downlight_is_on is False
 
@@ -702,6 +716,7 @@ class TestCeilingLightStatePersistence:
                 state_file=str(state_file),
             )
             ceiling.connection = AsyncMock()
+            ceiling._state = _make_mock_state()
             ceiling.set_matrix_colors = AsyncMock()
             ceiling.get_all_tile_colors = AsyncMock()
 
@@ -714,11 +729,11 @@ class TestCeilingLightStatePersistence:
         """Test state file is created when saving state."""
         # Set some state
         uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
-        ceiling_176._stored_uplight_state = uplight_color
+        ceiling_176.state.stored_uplight_color = uplight_color
 
         white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
         downlight_colors = [white] * 63
-        ceiling_176._stored_downlight_state = downlight_colors
+        ceiling_176.state.stored_downlight_colors = downlight_colors
 
         # Save to file
         ceiling_176._save_state_to_file()
@@ -759,17 +774,17 @@ class TestCeilingLightStatePersistence:
         ceiling_176._load_state_from_file()
 
         # Verify loaded state
-        assert ceiling_176._stored_uplight_state is not None
-        assert ceiling_176._stored_uplight_state.hue == pytest.approx(30, abs=1)
-        assert ceiling_176._stored_uplight_state.brightness == pytest.approx(
+        assert ceiling_176.state.stored_uplight_color is not None
+        assert ceiling_176.state.stored_uplight_color.hue == pytest.approx(30, abs=1)
+        assert ceiling_176.state.stored_uplight_color.brightness == pytest.approx(
             0.5, abs=0.01
         )
 
-        assert ceiling_176._stored_downlight_state is not None
-        assert len(ceiling_176._stored_downlight_state) == 63
+        assert ceiling_176.state.stored_downlight_colors is not None
+        assert len(ceiling_176.state.stored_downlight_colors) == 63
         assert all(
             c.brightness == pytest.approx(1.0, abs=0.01)
-            for c in ceiling_176._stored_downlight_state
+            for c in ceiling_176.state.stored_downlight_colors
         )
 
     async def test_state_persistence_across_operations(
@@ -789,12 +804,13 @@ class TestCeilingLightStatePersistence:
             ip="192.168.1.100",
             state_file=ceiling_176._state_file,
         )
+        ceiling_new._state = _make_mock_state()
         ceiling_new._load_state_from_file()
 
         # Verify state was loaded
-        assert ceiling_new._stored_uplight_state is not None
-        assert ceiling_new._stored_uplight_state.hue == pytest.approx(60, abs=1)
-        assert ceiling_new._stored_uplight_state.brightness == pytest.approx(
+        assert ceiling_new.state.stored_uplight_color is not None
+        assert ceiling_new.state.stored_uplight_color.hue == pytest.approx(60, abs=1)
+        assert ceiling_new.state.stored_uplight_color.brightness == pytest.approx(
             0.7, abs=0.01
         )
 
@@ -807,6 +823,7 @@ class TestCeilingLightBackwardCompatibility:
         """Create a Ceiling product 176 instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling._save_state_to_file = MagicMock()
 
         # Mock version for product detection
@@ -826,12 +843,12 @@ class TestCeilingLightBackwardCompatibility:
         assert ceiling_176.connection.request.called
 
         # Verify uplight state was updated
-        assert ceiling_176._last_uplight_color == color
-        assert ceiling_176._stored_uplight_state == color
+        assert ceiling_176.state.last_uplight_color == color
+        assert ceiling_176.state.stored_uplight_color == color
 
         # Verify downlight state was updated (63 zones for product 176)
-        assert ceiling_176._last_downlight_colors == [color] * 63
-        assert ceiling_176._stored_downlight_state == [color] * 63
+        assert ceiling_176.state.last_downlight_colors == [color] * 63
+        assert ceiling_176.state.stored_downlight_colors == [color] * 63
 
         # Verify state was NOT persisted (no state_file configured)
         ceiling_176._save_state_to_file.assert_not_called()
@@ -1118,9 +1135,6 @@ class TestCeilingLightErrorHandling:
         """Test uplight_is_on returns False when _state is None."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling._state = None
-        ceiling._last_uplight_color = HSBK(
-            hue=30, saturation=0.2, brightness=0.5, kelvin=2700
-        )
 
         assert ceiling.uplight_is_on is False
 
@@ -1128,8 +1142,6 @@ class TestCeilingLightErrorHandling:
         """Test downlight_is_on returns False when _state is None."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling._state = None
-        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
-        ceiling._last_downlight_colors = [white] * 63
 
         assert ceiling.downlight_is_on is False
 
@@ -1141,13 +1153,14 @@ class TestCeilingLightIsStoredStateValid:
     def ceiling_176(self) -> CeilingLight:
         """Create a Ceiling product 176 instance."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = _make_mock_state()
         ceiling._version = MagicMock()
         ceiling._version.product = 176
         return ceiling
 
     def test_uplight_valid_match(self, ceiling_176: CeilingLight) -> None:
         """Test uplight stored state matches current (ignoring brightness)."""
-        ceiling_176._stored_uplight_state = HSBK(
+        ceiling_176.state.stored_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.8, kelvin=2700
         )
         current = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
@@ -1156,14 +1169,14 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_uplight_no_stored_state(self, ceiling_176: CeilingLight) -> None:
         """Test uplight returns False when no stored state."""
-        ceiling_176._stored_uplight_state = None
+        ceiling_176.state.stored_uplight_color = None
         current = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
 
         assert ceiling_176._is_stored_state_valid("uplight", current) is False
 
     def test_uplight_wrong_type(self, ceiling_176: CeilingLight) -> None:
         """Test uplight returns False when current is not HSBK."""
-        ceiling_176._stored_uplight_state = HSBK(
+        ceiling_176.state.stored_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.8, kelvin=2700
         )
         # Pass a list instead of HSBK
@@ -1173,7 +1186,7 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_uplight_hue_mismatch(self, ceiling_176: CeilingLight) -> None:
         """Test uplight returns False when hue doesn't match."""
-        ceiling_176._stored_uplight_state = HSBK(
+        ceiling_176.state.stored_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.8, kelvin=2700
         )
         current = HSBK(hue=60, saturation=0.2, brightness=0.5, kelvin=2700)
@@ -1182,7 +1195,7 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_downlight_valid_match(self, ceiling_176: CeilingLight) -> None:
         """Test downlight stored state matches current (ignoring brightness)."""
-        ceiling_176._stored_downlight_state = [
+        ceiling_176.state.stored_downlight_colors = [
             HSBK(hue=i * 5, saturation=0.8, brightness=0.9, kelvin=3500)
             for i in range(63)
         ]
@@ -1195,7 +1208,7 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_downlight_no_stored_state(self, ceiling_176: CeilingLight) -> None:
         """Test downlight returns False when no stored state."""
-        ceiling_176._stored_downlight_state = None
+        ceiling_176.state.stored_downlight_colors = None
         current = [
             HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500) for _ in range(63)
         ]
@@ -1204,7 +1217,7 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_downlight_wrong_type(self, ceiling_176: CeilingLight) -> None:
         """Test downlight returns False when current is not list."""
-        ceiling_176._stored_downlight_state = [
+        ceiling_176.state.stored_downlight_colors = [
             HSBK(hue=0, saturation=0, brightness=0.9, kelvin=3500) for _ in range(63)
         ]
         # Pass HSBK instead of list
@@ -1214,7 +1227,7 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_downlight_length_mismatch(self, ceiling_176: CeilingLight) -> None:
         """Test downlight returns False when lengths don't match."""
-        ceiling_176._stored_downlight_state = [
+        ceiling_176.state.stored_downlight_colors = [
             HSBK(hue=0, saturation=0, brightness=0.9, kelvin=3500) for _ in range(63)
         ]
         current = [
@@ -1226,7 +1239,7 @@ class TestCeilingLightIsStoredStateValid:
 
     def test_downlight_saturation_mismatch(self, ceiling_176: CeilingLight) -> None:
         """Test downlight returns False when saturation doesn't match."""
-        ceiling_176._stored_downlight_state = [
+        ceiling_176.state.stored_downlight_colors = [
             HSBK(hue=0, saturation=0.8, brightness=0.9, kelvin=3500) for _ in range(63)
         ]
         current = [
@@ -1251,12 +1264,13 @@ class TestCeilingLightStateFileEdgeCases:
     def test_load_state_no_state_file(self) -> None:
         """Test _load_state_from_file does nothing when no state file."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = _make_mock_state()
         ceiling._state_file = None
 
         # Should not raise
         ceiling._load_state_from_file()
-        assert ceiling._stored_uplight_state is None
-        assert ceiling._stored_downlight_state is None
+        assert ceiling.state.stored_uplight_color is None
+        assert ceiling.state.stored_downlight_colors is None
 
     def test_load_state_file_not_exists(self) -> None:
         """Test _load_state_from_file handles non-existent file."""
@@ -1266,10 +1280,11 @@ class TestCeilingLightStateFileEdgeCases:
                 ip="192.168.1.100",
                 state_file=str(Path(tmpdir) / "nonexistent.json"),
             )
+            ceiling._state = _make_mock_state()
 
             # Should not raise
             ceiling._load_state_from_file()
-            assert ceiling._stored_uplight_state is None
+            assert ceiling.state.stored_uplight_color is None
 
     def test_load_state_no_device_state(self) -> None:
         """Test _load_state_from_file handles file without device state."""
@@ -1284,9 +1299,10 @@ class TestCeilingLightStateFileEdgeCases:
                 ip="192.168.1.100",
                 state_file=str(state_file),
             )
+            ceiling._state = _make_mock_state()
 
             ceiling._load_state_from_file()
-            assert ceiling._stored_uplight_state is None
+            assert ceiling.state.stored_uplight_color is None
 
     def test_load_state_invalid_json(self) -> None:
         """Test _load_state_from_file handles invalid JSON gracefully."""
@@ -1300,16 +1316,18 @@ class TestCeilingLightStateFileEdgeCases:
                 ip="192.168.1.100",
                 state_file=str(state_file),
             )
+            ceiling._state = _make_mock_state()
 
             # Should not raise, just log warning
             ceiling._load_state_from_file()
-            assert ceiling._stored_uplight_state is None
+            assert ceiling.state.stored_uplight_color is None
 
     def test_save_state_no_state_file(self) -> None:
         """Test _save_state_to_file does nothing when no state file."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = _make_mock_state()
         ceiling._state_file = None
-        ceiling._stored_uplight_state = HSBK(
+        ceiling.state.stored_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.5, kelvin=2700
         )
 
@@ -1325,7 +1343,8 @@ class TestCeilingLightStateFileEdgeCases:
                 ip="192.168.1.100",
                 state_file=str(state_file),
             )
-            ceiling._stored_uplight_state = HSBK(
+            ceiling._state = _make_mock_state()
+            ceiling.state.stored_uplight_color = HSBK(
                 hue=30, saturation=0.2, brightness=0.5, kelvin=2700
             )
 
@@ -1361,7 +1380,8 @@ class TestCeilingLightStateFileEdgeCases:
                 ip="192.168.1.100",
                 state_file=str(state_file),
             )
-            ceiling._stored_uplight_state = HSBK(
+            ceiling._state = _make_mock_state()
+            ceiling.state.stored_uplight_color = HSBK(
                 hue=30, saturation=0.2, brightness=0.5, kelvin=2700
             )
 
@@ -1381,7 +1401,8 @@ class TestCeilingLightStateFileEdgeCases:
             ip="192.168.1.100",
             state_file="/nonexistent/path/that/cannot/be/created/state.json",
         )
-        ceiling._stored_uplight_state = HSBK(
+        ceiling._state = _make_mock_state()
+        ceiling.state.stored_uplight_color = HSBK(
             hue=30, saturation=0.2, brightness=0.5, kelvin=2700
         )
 
@@ -1397,6 +1418,7 @@ class TestCeilingLightTurnDownlightOffWithList:
         """Create a Ceiling product 176 instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -1421,9 +1443,9 @@ class TestCeilingLightTurnDownlightOffWithList:
         await ceiling_176.turn_downlight_off(provided_colors)
 
         # Should store provided colors
-        assert ceiling_176._stored_downlight_state is not None
-        assert len(ceiling_176._stored_downlight_state) == 63
-        assert ceiling_176._stored_downlight_state == provided_colors
+        assert ceiling_176.state.stored_downlight_colors is not None
+        assert len(ceiling_176.state.stored_downlight_colors) == 63
+        assert ceiling_176.state.stored_downlight_colors == provided_colors
 
         # Should set device to brightness=0
         ceiling_176.set_matrix_colors.assert_called_once()
@@ -1463,6 +1485,7 @@ class TestCeilingLightBrightnessInference:
         """Create a Ceiling product 176 instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -1474,7 +1497,7 @@ class TestCeilingLightBrightnessInference:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test _determine_uplight_brightness falls back when downlights are off."""
-        ceiling_176._stored_uplight_state = None
+        ceiling_176.state.stored_uplight_color = None
 
         # All downlights have brightness=0, uplight has target H, S, K
         uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
@@ -1499,7 +1522,7 @@ class TestCeilingLightBrightnessInference:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test _determine_downlight_brightness falls back to default on exception."""
-        ceiling_176._stored_downlight_state = None
+        ceiling_176.state.stored_downlight_colors = None
 
         # Create downlight colors
         downlight_colors = [
@@ -1531,7 +1554,7 @@ class TestCeilingLightBrightnessInference:
         self, ceiling_176: CeilingLight
     ) -> None:
         """Test turn_downlight_on uses default when uplight is off (brightness=0)."""
-        ceiling_176._stored_downlight_state = None
+        ceiling_176.state.stored_downlight_colors = None
 
         # Mock uplight with brightness 0 and downlight with brightness 0
         uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
@@ -1632,9 +1655,11 @@ class TestCeilingLightContextManager:
                 await ceiling.__aenter__()
 
                 # Verify state was loaded
-                assert ceiling._stored_uplight_state is not None
-                assert ceiling._stored_uplight_state.hue == pytest.approx(60, abs=1)
-                assert ceiling._stored_uplight_state.brightness == pytest.approx(
+                assert ceiling.state.stored_uplight_color is not None
+                assert ceiling.state.stored_uplight_color.hue == pytest.approx(
+                    60, abs=1
+                )
+                assert ceiling.state.stored_uplight_color.brightness == pytest.approx(
                     0.7, abs=0.01
                 )
             finally:
@@ -1649,6 +1674,7 @@ class TestCeilingLightSetDownlightSingleZeroBrightness:
         """Create a Ceiling product 176 instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -1678,6 +1704,7 @@ class TestCeilingLightSetPowerOverride:
         """Create a Ceiling product 176 instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -1715,8 +1742,8 @@ class TestCeilingLightSetPowerOverride:
             mock_parent.assert_called_once_with(False, 0.0)
 
         # Both colors should be stored (regardless of brightness)
-        assert ceiling_176._stored_uplight_state == uplight_color
-        assert ceiling_176._stored_downlight_state == downlight_off
+        assert ceiling_176.state.stored_uplight_color == uplight_color
+        assert ceiling_176.state.stored_downlight_colors == downlight_off
 
         # State file should NOT be saved (no state_file set in fixture)
         ceiling_176._save_state_to_file.assert_not_called()
@@ -1744,8 +1771,8 @@ class TestCeilingLightSetPowerOverride:
             mock_parent.assert_called_once_with(False, 0.0)
 
         # Both should be stored (regardless of brightness)
-        assert ceiling_176._stored_uplight_state == uplight_off
-        assert ceiling_176._stored_downlight_state == downlight_colors
+        assert ceiling_176.state.stored_uplight_color == uplight_off
+        assert ceiling_176.state.stored_downlight_colors == downlight_colors
 
     async def test_set_power_off_captures_both_components(
         self, ceiling_176: CeilingLight
@@ -1768,8 +1795,8 @@ class TestCeilingLightSetPowerOverride:
             mock_parent.assert_called_once_with(False, 0.0)
 
         # Both should be stored
-        assert ceiling_176._stored_uplight_state == uplight_color
-        assert ceiling_176._stored_downlight_state == downlight_colors
+        assert ceiling_176.state.stored_uplight_color == uplight_color
+        assert ceiling_176.state.stored_downlight_colors == downlight_colors
 
     async def test_set_power_off_with_duration(self, ceiling_176: CeilingLight) -> None:
         """Test set_power(False) passes duration to parent."""
@@ -1791,10 +1818,10 @@ class TestCeilingLightSetPowerOverride:
     ) -> None:
         """Test set_power(True) does NOT capture colors (only off captures)."""
         # Pre-set stored states
-        ceiling_176._stored_uplight_state = HSBK(
+        ceiling_176.state.stored_uplight_color = HSBK(
             hue=100, saturation=0.5, brightness=0.5, kelvin=3500
         )
-        ceiling_176._stored_downlight_state = [
+        ceiling_176.state.stored_downlight_colors = [
             HSBK(hue=200, saturation=0.5, brightness=0.5, kelvin=3500)
         ] * 16
 
@@ -1808,8 +1835,8 @@ class TestCeilingLightSetPowerOverride:
         # (they weren't mocked, so they would fail if called)
 
         # Stored states should remain unchanged
-        assert ceiling_176._stored_uplight_state.hue == 100
-        assert ceiling_176._stored_downlight_state[0].hue == 200
+        assert ceiling_176.state.stored_uplight_color.hue == 100
+        assert ceiling_176.state.stored_downlight_colors[0].hue == 200
 
     async def test_set_power_with_integer_off(self, ceiling_176: CeilingLight) -> None:
         """Test set_power(0) captures colors (integer form)."""
@@ -1830,8 +1857,8 @@ class TestCeilingLightSetPowerOverride:
             mock_parent.assert_called_once_with(0, 0.0)
 
         # Both should be stored regardless of brightness
-        assert ceiling_176._stored_uplight_state == uplight_color
-        assert ceiling_176._stored_downlight_state == downlight_colors
+        assert ceiling_176.state.stored_uplight_color == uplight_color
+        assert ceiling_176.state.stored_downlight_colors == downlight_colors
 
     async def test_set_power_with_integer_on(self, ceiling_176: CeilingLight) -> None:
         """Test set_power(65535) does not capture colors (integer form)."""
@@ -1911,11 +1938,11 @@ class TestCeilingLightSetPowerOverride:
             await ceiling_176.set_power(False)
 
         # Verify uplight was stored
-        assert ceiling_176._stored_uplight_state == uplight_color
+        assert ceiling_176.state.stored_uplight_color == uplight_color
 
         # Now _determine_uplight_brightness should return stored color
         # (simulate what turn_uplight_on() would do)
-        assert ceiling_176._stored_uplight_state.brightness > 0
+        assert ceiling_176.state.stored_uplight_color.brightness > 0
 
 
 class TestCeilingLightTurnOnPowerBehavior:
@@ -1926,6 +1953,7 @@ class TestCeilingLightTurnOnPowerBehavior:
         """Create a Ceiling product 176 (8x8) instance with mocked connection."""
         ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
         ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
         ceiling.set_matrix_colors = AsyncMock()
         ceiling._save_state_to_file = MagicMock()
 
@@ -2140,9 +2168,11 @@ class TestCeilingLightTurnOnPowerBehavior:
             await ceiling_176.turn_uplight_on(uplight_color)
 
         # Verify downlight colors were stored
-        assert ceiling_176._stored_downlight_state is not None
-        assert len(ceiling_176._stored_downlight_state) == 63
-        assert all(c == downlight_color for c in ceiling_176._stored_downlight_state)
+        assert ceiling_176.state.stored_downlight_colors is not None
+        assert len(ceiling_176.state.stored_downlight_colors) == 63
+        assert all(
+            c == downlight_color for c in ceiling_176.state.stored_downlight_colors
+        )
 
     async def test_turn_downlight_on_zeros_uplight_when_light_off(
         self, ceiling_176: CeilingLight
@@ -2191,7 +2221,7 @@ class TestCeilingLightTurnOnPowerBehavior:
             await ceiling_176.turn_downlight_on(downlight_color)
 
         # Verify uplight color was stored
-        assert ceiling_176._stored_uplight_state == uplight_color
+        assert ceiling_176.state.stored_uplight_color == uplight_color
 
     async def test_turn_downlight_on_uses_default_brightness_after_uplight_on(
         self, ceiling_176: CeilingLight
@@ -2199,7 +2229,7 @@ class TestCeilingLightTurnOnPowerBehavior:
         """Stored brightness=0 colors are skipped; brightness is inferred instead."""
         # Simulate: device was off, user called turn_uplight_on which stored
         # downlight colors with brightness=0
-        ceiling_176._stored_downlight_state = [
+        ceiling_176.state.stored_downlight_colors = [
             HSBK(hue=60, saturation=0.5, brightness=0.0, kelvin=4000)
         ] * 63
 
@@ -2233,7 +2263,7 @@ class TestCeilingLightTurnOnPowerBehavior:
         """Stored brightness=0 color is skipped; brightness is inferred instead."""
         # Simulate: device was off, user called turn_downlight_on which stored
         # uplight color with brightness=0
-        ceiling_176._stored_uplight_state = HSBK(
+        ceiling_176.state.stored_uplight_color = HSBK(
             hue=60, saturation=0.5, brightness=0.0, kelvin=4000
         )
 
