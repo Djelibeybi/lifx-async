@@ -85,7 +85,8 @@ class WifiInfo:
         if self.signal > 0:
             self.rssi = int(floor(10 * log10(self.signal) + 0.5))
         else:
-            self.rssi = -100  # Minimum RSSI value when signal is zero
+            # Minimum RSSI value if signal is ever less than or equal to zero
+            self.rssi = -100
 
 
 @dataclass
