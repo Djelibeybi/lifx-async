@@ -85,6 +85,19 @@ class TestHevLight:
         assert packet.enable is False
         assert packet.duration_s == 0
 
+    async def test_set_hev_cycle_default_duration(self, hev_light: HevLight) -> None:
+        """Test starting a HEV cycle with default duration (0 = device default)."""
+        hev_light.connection.request.return_value = True
+
+        await hev_light.set_hev_cycle(enable=True)
+
+        call_args = hev_light.connection.request.call_args
+        packet = call_args[0][0]
+
+        assert isinstance(packet, packets.Light.SetHevCycle)
+        assert packet.enable is True
+        assert packet.duration_s == 0
+
     async def test_set_hev_cycle_invalid_duration(self, hev_light: HevLight) -> None:
         """Test setting HEV cycle with invalid duration."""
         with pytest.raises(ValueError, match="Duration must be non-negative"):

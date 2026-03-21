@@ -182,7 +182,7 @@ class HevLight(Light):
 
         return cycle_state
 
-    async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
+    async def set_hev_cycle(self, enable: bool, duration_seconds: int = 0) -> None:
         """Start or stop a HEV cleaning cycle.
 
         If a duration is not provided, the light will use whatever the default
