@@ -82,7 +82,10 @@ class WifiInfo:
 
     def __post_init__(self) -> None:
         """Calculate RSSI from signal."""
-        self.rssi = int(floor(10 * log10(self.signal) + 0.5))
+        if self.signal > 0:
+            self.rssi = int(floor(10 * log10(self.signal) + 0.5))
+        else:
+            self.rssi = -100  # Minimum RSSI value when signal is zero
 
 
 @dataclass
