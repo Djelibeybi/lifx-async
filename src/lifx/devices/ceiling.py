@@ -120,8 +120,9 @@ class CeilingLightState(MatrixLightState):
             effect=matrix_state.effect,
             uplight_color=uplight_color,
             downlight_colors=downlight_colors,
-            uplight_is_on=uplight_color.brightness > 0,
-            downlight_is_on=any(c.brightness > 0 for c in downlight_colors),
+            uplight_is_on=matrix_state.power > 0 and uplight_color.brightness > 0,
+            downlight_is_on=matrix_state.power > 0
+            and any(c.brightness > 0 for c in downlight_colors),
             uplight_zone=uplight_zone,
             downlight_zones=downlight_zones,
             stored_uplight_color=stored_uplight_color,
@@ -858,16 +859,20 @@ class CeilingLight(MatrixLight):
             state.stored_uplight_color = tile_colors[self.uplight_zone]
             state.stored_downlight_colors = list(tile_colors[self.downlight_zones])
 
-            # Sync public fields, last-known, and mark components as off
+            # Sync public fields and last-known colours
             state.uplight_color = state.stored_uplight_color
             state.downlight_colors = list(state.stored_downlight_colors)
             state.last_uplight_color = state.stored_uplight_color
             state.last_downlight_colors = list(state.stored_downlight_colors)
-            state.uplight_is_on = False
-            state.downlight_is_on = False
 
         # Call parent to perform actual power change
         await super().set_power(level, duration)
+
+        # Mark components as off only after power-off succeeds
+        if turning_off:
+            state = self.state
+            state.uplight_is_on = False
+            state.downlight_is_on = False
 
         # When turning on, recompute booleans from last-known colours
         if not turning_off:
