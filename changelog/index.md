@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v5.4.2 (2026-03-21)
+
+### Bug Fixes
+
+- Guard against ValueError if signal is negative or 0 ([`a1085c6`](https://github.com/Djelibeybi/lifx-async/commit/a1085c66e03f06546ad23d5529277bcc616bcc6f))
+
 ## v5.4.1 (2026-03-19)
 
 ### Bug Fixes
