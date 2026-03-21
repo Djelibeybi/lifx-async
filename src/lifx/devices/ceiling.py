@@ -440,6 +440,9 @@ class CeilingLight(MatrixLight):
 
         # Update state cache
         self.state.last_uplight_color = uplight_color
+        self.state.uplight_is_on = bool(
+            self._state.power > 0 and uplight_color.brightness > 0
+        )
 
         return uplight_color
 
@@ -461,6 +464,9 @@ class CeilingLight(MatrixLight):
 
         # Update state cache
         self.state.last_downlight_colors = downlight_colors
+        self.state.downlight_is_on = bool(
+            self._state.power > 0 and any(c.brightness > 0 for c in downlight_colors)
+        )
 
         return downlight_colors
 
