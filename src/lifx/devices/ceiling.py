@@ -382,9 +382,8 @@ class CeilingLight(MatrixLight):
         Calculated as: power_level > 0 AND uplight brightness > 0
 
         Note:
-            Requires recent data from device. Call get_uplight_color()
-            or get_power() to refresh cached values before checking
-            this property.
+            Requires recent data from device. Call refresh_state()
+            to update cached values before checking this property.
 
         Returns:
             True if uplight component is on, False otherwise
@@ -406,9 +405,8 @@ class CeilingLight(MatrixLight):
         have brightness == 0
 
         Note:
-            Requires recent data from device. Call
-            get_downlight_colors() or get_power() to refresh cached
-            values before checking this property.
+            Requires recent data from device. Call refresh_state()
+            to update cached values before checking this property.
 
         Returns:
             True if downlight component is on, False otherwise
@@ -1088,11 +1086,14 @@ class CeilingLight(MatrixLight):
         Returns:
             List of HSBK colors for downlight zones
         """
-        # 1. Stored state (only if any color has brightness > 0)
+        # 1. Stored state (only if correct length and any brightness > 0)
         state = self.state
-        if state.stored_downlight_colors is not None:
-            if any(c.brightness > 0 for c in state.stored_downlight_colors):
-                return list(state.stored_downlight_colors)
+        if (
+            state.stored_downlight_colors is not None
+            and len(state.stored_downlight_colors) == self.downlight_zone_count
+            and any(c.brightness > 0 for c in state.stored_downlight_colors)
+        ):
+            return list(state.stored_downlight_colors)
 
         # Get current colors (use pre-fetched if available)
         if tile_colors is None:
@@ -1106,10 +1107,11 @@ class CeilingLight(MatrixLight):
         state.last_downlight_colors = current_downlight
         state.last_uplight_color = uplight_color
 
-        # Prefer stored H, S, K if available, otherwise use current
+        # Prefer stored H, S, K if available and correct length, otherwise use current
         source_colors: list[HSBK] = (
             state.stored_downlight_colors
             if state.stored_downlight_colors is not None
+            and len(state.stored_downlight_colors) == self.downlight_zone_count
             else current_downlight
         )
 
@@ -1211,10 +1213,10 @@ class CeilingLight(MatrixLight):
                     kelvin=uplight_data["kelvin"],
                 )
 
-            # Load downlight state
+            # Load downlight state (validate zone count if version is available)
             if "downlight" in device_state:
                 downlight_data = device_state["downlight"]
-                state.stored_downlight_colors = [
+                loaded_colors = [
                     HSBK(
                         hue=c["hue"],
                         saturation=c["saturation"],
@@ -1223,6 +1225,21 @@ class CeilingLight(MatrixLight):
                     )
                     for c in downlight_data
                 ]
+                try:
+                    expected = self.downlight_zone_count
+                except LifxError:
+                    # Version not yet available — accept loaded data
+                    state.stored_downlight_colors = loaded_colors
+                else:
+                    if len(loaded_colors) == expected:
+                        state.stored_downlight_colors = loaded_colors
+                    else:
+                        _LOGGER.warning(
+                            "Ignoring stored downlight state:"
+                            " expected %d zones, got %d",
+                            expected,
+                            len(loaded_colors),
+                        )
 
             _LOGGER.debug("Loaded state from %s for device %s", state_path, self.serial)
 

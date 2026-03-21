@@ -2676,3 +2676,41 @@ class TestCeilingLightStateCoverage:
             assert ceiling.state.stored_uplight_color is None
             assert ceiling.state.stored_downlight_colors is not None
             assert len(ceiling.state.stored_downlight_colors) == 1
+
+    def test_load_state_ignores_wrong_zone_count(self) -> None:
+        """Test _load_state_from_file ignores downlight with wrong zone count."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            # Product 176 expects 63 downlight zones, provide only 10
+            state_data = {
+                "d073d5010203": {
+                    "downlight": [
+                        {
+                            "hue": 0.0,
+                            "saturation": 0.0,
+                            "brightness": 1.0,
+                            "kelvin": 3500,
+                        }
+                        for _ in range(10)
+                    ],
+                }
+            }
+            with state_file.open("w") as f:
+                json.dump(state_data, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._state = _make_mock_state()
+            ceiling._version = MagicMock()
+            ceiling._version.product = 176
+
+            ceiling._load_state_from_file()
+
+            # Downlight should be rejected due to zone count mismatch
+            assert ceiling.state.stored_downlight_colors is None
