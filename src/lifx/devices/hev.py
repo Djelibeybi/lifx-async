@@ -1,5 +1,8 @@
 """HEV light device class for LIFX lights with anti-bacterial capability."""
 
+#  Copyright (c) 2026 Avi Miller <me@dje.li>
+#  Licensed under the Universal Permissive License v 1.0 as shown at https://opensource.org/license/UPL
+
 from __future__ import annotations
 
 import asyncio
@@ -174,7 +177,7 @@ class HevLight(Light):
                     "remaining_s": state.remaining_s,
                     "last_power": state.last_power,
                 },
-            }
+            },
         )
 
         return cycle_state
@@ -182,9 +185,13 @@ class HevLight(Light):
     async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
         """Start or stop a HEV cleaning cycle.
 
+        If a duration is not provided, the light will use whatever the default
+        duration is currently stored in the HEV configuration.
+        See the get_hev_config() and set_hev_config() methods for details.
+
         Args:
             enable: True to start cycle, False to stop
-            duration_seconds: Duration of the cleaning cycle in seconds
+            duration_seconds: Duration of the cleaning cycle in seconds (optional)
 
         Raises:
             ValueError: If duration is negative
@@ -219,7 +226,7 @@ class HevLight(Light):
                 "method": "set_hev_cycle",
                 "action": "change",
                 "values": {"enable": enable, "duration_s": duration_seconds},
-            }
+            },
         )
 
         # Schedule debounced refresh to update HEV cycle state
@@ -273,7 +280,7 @@ class HevLight(Light):
                     "indication": state.indication,
                     "duration_s": state.duration_s,
                 },
-            }
+            },
         )
 
         return config
@@ -315,7 +322,7 @@ class HevLight(Light):
                 "method": "set_hev_config",
                 "action": "change",
                 "values": {"indication": indication, "duration_s": duration_seconds},
-            }
+            },
         )
 
         # Update cache and state on acknowledgement
@@ -371,7 +378,7 @@ class HevLight(Light):
                 "method": "get_last_hev_result",
                 "action": "query",
                 "reply": {"result": result.value},
-            }
+            },
         )
 
         return result
