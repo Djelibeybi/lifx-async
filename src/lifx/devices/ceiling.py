@@ -672,15 +672,11 @@ class CeilingLight(MatrixLight):
         all_colors = await self.get_all_tile_colors()
         tile_colors = all_colors[0]
 
-        # Determine which color to store
+        # Determine which color to store (kept local until I/O succeeds)
         if color is not None:
             stored_color = color
         else:
             stored_color = tile_colors[self.uplight_zone]
-            self.state.last_uplight_color = stored_color
-
-        # Store for future restoration
-        self.state.stored_uplight_color = stored_color
 
         # Create color with brightness=0 for device
         off_color = HSBK(
@@ -694,7 +690,8 @@ class CeilingLight(MatrixLight):
         tile_colors[self.uplight_zone] = off_color
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
-        # Update state — public fields and last-known
+        # Update state only after I/O succeeds
+        self.state.stored_uplight_color = stored_color
         self.state.uplight_color = off_color
         self.state.uplight_is_on = False
         self.state.last_uplight_color = off_color
@@ -989,13 +986,10 @@ class CeilingLight(MatrixLight):
         all_colors = await self.get_all_tile_colors()
         tile_colors = all_colors[0]
 
-        # If colors not provided, extract from fetched data
+        # If not provided, extract from fetched data
+        # (kept local until I/O succeeds)
         if stored_colors is None:
             stored_colors = list(tile_colors[self.downlight_zones])
-            self.state.last_downlight_colors = list(stored_colors)
-
-        # Store for future restoration
-        self.state.stored_downlight_colors = list(stored_colors)
 
         # Create colors with brightness=0 for device
         off_colors = [
@@ -1012,7 +1006,8 @@ class CeilingLight(MatrixLight):
         tile_colors[self.downlight_zones] = off_colors
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
-        # Update cache
+        # Update state only after I/O succeeds
+        self.state.stored_downlight_colors = list(stored_colors)
         self.state.downlight_colors = list(off_colors)
         self.state.downlight_is_on = False
         self.state.last_downlight_colors = list(off_colors)
