@@ -488,7 +488,8 @@ class CeilingLight(MatrixLight):
 
         # Update state — public fields, stored state, and last-known
         self.state.uplight_color = color
-        self.state.uplight_is_on = True  # brightness > 0 validated above
+        # brightness > 0 validated above; is_on also requires power
+        self.state.uplight_is_on = bool(self.state.power > 0)
         self.state.stored_uplight_color = color
         self.state.last_uplight_color = color
 
@@ -549,7 +550,8 @@ class CeilingLight(MatrixLight):
 
         # Update state — public fields, stored state, and last-known
         self.state.downlight_colors = list(downlight_colors)
-        self.state.downlight_is_on = True  # brightness > 0 validated above
+        # brightness > 0 validated above; is_on also requires power
+        self.state.downlight_is_on = bool(self.state.power > 0)
         self.state.stored_downlight_colors = list(downlight_colors)
         self.state.last_downlight_colors = list(downlight_colors)
 
@@ -614,9 +616,8 @@ class CeilingLight(MatrixLight):
             await self.set_matrix_colors(0, tile_colors, duration=0)
 
             # Update state — public fields, stored state, and last-known
+            # (is_on flags deferred until after power-on succeeds)
             self.state.uplight_color = target_color
-            self.state.uplight_is_on = True
-            self.state.downlight_is_on = False  # downlight zones were zeroed
             self.state.stored_uplight_color = target_color
             self.state.last_uplight_color = target_color
             self.state.downlight_colors = list(tile_colors[self.downlight_zones])
@@ -624,6 +625,10 @@ class CeilingLight(MatrixLight):
 
             # Turn on with the requested duration - light fades on to target color
             await super().set_power(True, duration)
+
+            # Mark is_on flags only after power-on succeeds
+            self.state.uplight_is_on = True
+            self.state.downlight_is_on = False  # downlight zones were zeroed
 
             # Persist AFTER device operations complete
             if self._state_file:
@@ -768,9 +773,8 @@ class CeilingLight(MatrixLight):
             await self.set_matrix_colors(0, tile_colors, duration=0)
 
             # Update state — public fields, stored state, and last-known
+            # (is_on flags deferred until after power-on succeeds)
             self.state.downlight_colors = list(target_colors)
-            self.state.downlight_is_on = True
-            self.state.uplight_is_on = False  # uplight zone was zeroed
             self.state.stored_downlight_colors = list(target_colors)
             self.state.last_downlight_colors = list(target_colors)
             self.state.uplight_color = tile_colors[self.uplight_zone]
@@ -778,6 +782,10 @@ class CeilingLight(MatrixLight):
 
             # Turn on with the requested duration - light fades on to target colors
             await super().set_power(True, duration)
+
+            # Mark is_on flags only after power-on succeeds
+            self.state.downlight_is_on = True
+            self.state.uplight_is_on = False  # uplight zone was zeroed
 
             # Persist AFTER device operations complete
             if self._state_file:
@@ -850,7 +858,9 @@ class CeilingLight(MatrixLight):
             state.stored_uplight_color = tile_colors[self.uplight_zone]
             state.stored_downlight_colors = list(tile_colors[self.downlight_zones])
 
-            # Update last-known and mark components as off (power is being turned off)
+            # Sync public fields, last-known, and mark components as off
+            state.uplight_color = state.stored_uplight_color
+            state.downlight_colors = list(state.stored_downlight_colors)
             state.last_uplight_color = state.stored_uplight_color
             state.last_downlight_colors = list(state.stored_downlight_colors)
             state.uplight_is_on = False
@@ -911,7 +921,7 @@ class CeilingLight(MatrixLight):
 
         # Update all state fields — all zones now have the same color
         state = self.state
-        is_on = color.brightness > 0
+        is_on = bool(state.power > 0 and color.brightness > 0)
         downlight_colors = [color] * self.downlight_zone_count
         state.uplight_color = color
         state.downlight_colors = list(downlight_colors)
