@@ -16669,7 +16669,11 @@ Source code in `src/lifx/devices/base.py`
 ```python
 def __post_init__(self) -> None:
     """Calculate RSSI from signal."""
-    self.rssi = int(floor(10 * log10(self.signal) + 0.5))
+    if self.signal > 0:
+        self.rssi = int(floor(10 * log10(self.signal) + 0.5))
+    else:
+        # Minimum RSSI value if signal is ever less than or equal to zero
+        self.rssi = -100
 ```
 
 ### FirmwareInfo
