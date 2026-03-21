@@ -207,6 +207,20 @@ class TestDevice:
         assert isinstance(wifi_info, WifiInfo)
         assert wifi_info.rssi == -51
 
+    @pytest.mark.parametrize("signal", [-1.0, -0.001, 0.0])
+    async def test_get_wifi_info_returns_minimum_rssi_for_non_positive_signal(
+        self, device: Device, signal: float
+    ) -> None:
+        """Test that WifiInfo returns -100 RSSI when signal is zero or negative."""
+        mock_state = MagicMock()
+        mock_state.signal = signal
+        device.connection.request.return_value = mock_state
+
+        wifi_info = await device.get_wifi_info()
+
+        assert isinstance(wifi_info, WifiInfo)
+        assert wifi_info.rssi == -100
+
     async def test_get_host_firmware(self, device: Device) -> None:
         """Test getting host firmware info."""
 
