@@ -2290,3 +2290,389 @@ class TestCeilingLightTurnOnPowerBehavior:
         assert sent_colors[63].hue == 60
         assert sent_colors[63].saturation == 0.5
         assert sent_colors[63].kelvin == 4000
+
+
+class TestCeilingLightStateCoverage:
+    """Additional tests for uncovered branches in CeilingLight."""
+
+    @pytest.fixture
+    def ceiling_176(self) -> CeilingLight:
+        """Create a Ceiling product 176 (8x8) instance with mocked connection."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
+        ceiling.set_matrix_colors = AsyncMock()
+        ceiling._save_state_to_file = MagicMock()
+
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        default_tile_colors = [white] * 64
+        ceiling.get_all_tile_colors = AsyncMock(return_value=[default_tile_colors])
+
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    def test_as_dict_property(self) -> None:
+        """Test CeilingLightState.as_dict returns a dict via dataclasses.asdict."""
+        from lifx.devices.ceiling import CeilingLightState
+
+        state = MagicMock(spec=CeilingLightState)
+        mock_dict = {"key": "value"}
+        with patch(
+            "lifx.devices.ceiling.asdict", return_value=mock_dict
+        ) as mock_asdict:
+            # Call the real property implementation
+            result = CeilingLightState.as_dict.fget(state)  # type: ignore[union-attr]
+            mock_asdict.assert_called_once_with(state)
+        assert result == mock_dict
+
+    def test_state_property_raises_when_uninitialised(self) -> None:
+        """Test state property raises RuntimeError when _state is None."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = None
+        with pytest.raises(RuntimeError, match="State not found"):
+            _ = ceiling.state
+
+    def test_downlight_zone_count_raises_on_invalid_config(self) -> None:
+        """Test downlight_zone_count raises LifxError when stop is None."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling._state = _make_mock_state()
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        # Monkey-patch downlight_zones to return slice with stop=None
+        none_slice = property(lambda self: slice(0, None))
+        with patch.object(
+            type(ceiling), "downlight_zones", new_callable=lambda: none_slice
+        ):
+            with pytest.raises(LifxError, match="Invalid downlight zones"):
+                _ = ceiling.downlight_zone_count
+
+    async def test_refresh_state_updates_component_fields(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test refresh_state updates ceiling-specific fields from tile_colors."""
+        uplight_color = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=4000)
+        downlight_colors = [
+            HSBK(hue=i * 5, saturation=0.5, brightness=0.9, kelvin=3500)
+            for i in range(63)
+        ]
+        tile_colors = downlight_colors + [uplight_color]
+
+        # Use a MagicMock state with tile_colors list that supports slicing
+        state = _make_mock_state(power=65535)
+        state.tile_colors = tile_colors
+        ceiling_176._state = state
+
+        with patch.object(MatrixLight, "refresh_state", new_callable=AsyncMock):
+            await ceiling_176.refresh_state()
+
+        assert state.uplight_color == uplight_color
+        assert len(state.downlight_colors) == 63
+        assert state.last_uplight_color == uplight_color
+        assert state.last_downlight_colors == downlight_colors
+        assert state.uplight_is_on is True
+        assert state.downlight_is_on is True
+
+    async def test_refresh_state_power_off(self, ceiling_176: CeilingLight) -> None:
+        """Test refresh_state marks components off when power is 0."""
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        tile_colors = [white] * 63 + [white]
+
+        state = _make_mock_state(power=0)
+        state.tile_colors = tile_colors
+        ceiling_176._state = state
+
+        with patch.object(MatrixLight, "refresh_state", new_callable=AsyncMock):
+            await ceiling_176.refresh_state()
+
+        assert state.uplight_is_on is False
+        assert state.downlight_is_on is False
+
+    async def test_turn_uplight_on_persists_state_file_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_uplight_on saves state to file when light is off."""
+        ceiling_176._state_file = "/tmp/test_state.json"
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_uplight_on(color, duration=1.0)
+
+        ceiling_176._save_state_to_file.assert_called_once()
+
+    async def test_turn_downlight_on_persists_state_file_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_on saves state to file when light is off."""
+        ceiling_176._state_file = "/tmp/test_state.json"
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_downlight_on(color, duration=1.0)
+
+        ceiling_176._save_state_to_file.assert_called_once()
+
+    async def test_turn_downlight_on_list_all_zero_brightness_raises(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_on raises when list of colours all have brightness=0."""
+        colors = [HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500)] * 63
+        with pytest.raises(ValueError, match="brightness"):
+            await ceiling_176.turn_downlight_on(colors)
+
+    async def test_turn_downlight_on_list_wrong_length_raises(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_on raises when list length doesn't match zone count."""
+        colors = [HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500)] * 10
+        with pytest.raises(ValueError, match="Expected 63 colors"):
+            await ceiling_176.turn_downlight_on(colors)
+
+    async def test_turn_downlight_on_list_colors_when_light_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turn_downlight_on with list of colours when light is off."""
+        ceiling_176.get_power = AsyncMock(return_value=0)
+        colors = [
+            HSBK(hue=i * 5, saturation=1.0, brightness=0.8, kelvin=3500)
+            for i in range(63)
+        ]
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_downlight_on(colors, duration=1.0)
+
+        ceiling_176.set_matrix_colors.assert_called_once()
+        call_args = ceiling_176.set_matrix_colors.call_args
+        sent_colors = call_args[0][1]
+        # Downlight zones should have the provided colours
+        for i in range(63):
+            assert sent_colors[i].brightness == pytest.approx(0.8, abs=0.01)
+
+    async def test_set_power_on_recomputes_component_booleans(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test set_power(True) recomputes uplight_is_on/downlight_is_on."""
+        # Set last-known colours with specific brightness values
+        ceiling_176.state.last_uplight_color = HSBK(
+            hue=120, saturation=0.5, brightness=0.7, kelvin=3500
+        )
+        ceiling_176.state.last_downlight_colors = [
+            HSBK(hue=0, saturation=0.0, brightness=0.9, kelvin=3500)
+        ] * 63
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.set_power(True)
+
+        assert ceiling_176.state.uplight_is_on is True
+        assert ceiling_176.state.downlight_is_on is True
+
+    async def test_set_power_on_recomputes_booleans_zero_brightness(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test set_power(True) sets booleans False when brightness is 0."""
+        ceiling_176.state.last_uplight_color = HSBK(
+            hue=120, saturation=0.5, brightness=0.0, kelvin=3500
+        )
+        ceiling_176.state.last_downlight_colors = [
+            HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+        ] * 63
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.set_power(True)
+
+        assert ceiling_176.state.uplight_is_on is False
+        assert ceiling_176.state.downlight_is_on is False
+
+    async def test_determine_uplight_brightness_fetches_when_no_tile_colors(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test _determine_uplight_brightness fetches tile_colors when not passed."""
+        ceiling_176.state.stored_uplight_color = None
+
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
+        downlight_colors = [
+            HSBK(hue=0, saturation=0.0, brightness=0.8, kelvin=3500)
+        ] * 63
+        ceiling_176.get_all_tile_colors = AsyncMock(
+            return_value=[downlight_colors + [uplight_color]]
+        )
+
+        # Call without tile_colors argument (triggers fetch)
+        result = await ceiling_176._determine_uplight_brightness()
+
+        ceiling_176.get_all_tile_colors.assert_called_once()
+        assert result.brightness > 0
+
+    async def test_determine_uplight_brightness_with_prefetched_tile_colors(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test _determine_uplight_brightness skips fetch when tile_colors passed."""
+        ceiling_176.state.stored_uplight_color = None
+
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
+        downlight_colors = [
+            HSBK(hue=0, saturation=0.0, brightness=0.8, kelvin=3500)
+        ] * 63
+        tile_colors = downlight_colors + [uplight_color]
+
+        # Call with pre-fetched tile_colors (skips fetch)
+        result = await ceiling_176._determine_uplight_brightness(tile_colors)
+
+        ceiling_176.get_all_tile_colors.assert_not_called()
+        assert result.brightness > 0
+
+    async def test_determine_downlight_brightness_fetches_when_no_tile_colors(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test _determine_downlight_brightness fetches tile_colors when not passed."""
+        ceiling_176.state.stored_downlight_colors = None
+
+        downlight_colors = [
+            HSBK(hue=i * 5, saturation=0.8, brightness=0.0, kelvin=3500)
+            for i in range(63)
+        ]
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.8, kelvin=2700)
+        ceiling_176.get_all_tile_colors = AsyncMock(
+            return_value=[downlight_colors + [uplight_color]]
+        )
+
+        # Call without tile_colors argument (triggers fetch)
+        result = await ceiling_176._determine_downlight_brightness()
+
+        ceiling_176.get_all_tile_colors.assert_called_once()
+        assert len(result) == 63
+
+    async def test_determine_downlight_brightness_with_prefetched_tile_colors(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test _determine_downlight_brightness skips fetch when tile_colors passed."""
+        ceiling_176.state.stored_downlight_colors = None
+
+        downlight_colors = [
+            HSBK(hue=i * 5, saturation=0.8, brightness=0.0, kelvin=3500)
+            for i in range(63)
+        ]
+        uplight_color = HSBK(hue=30, saturation=0.2, brightness=0.8, kelvin=2700)
+        tile_colors = downlight_colors + [uplight_color]
+
+        # Call with pre-fetched tile_colors (skips fetch)
+        result = await ceiling_176._determine_downlight_brightness(tile_colors)
+
+        ceiling_176.get_all_tile_colors.assert_not_called()
+        assert len(result) == 63
+
+    def test_load_state_from_file_with_downlight_data(self) -> None:
+        """Test _load_state_from_file loads both uplight and downlight data."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            state_data = {
+                "d073d5010203": {
+                    "uplight": {
+                        "hue": 120.0,
+                        "saturation": 0.8,
+                        "brightness": 0.6,
+                        "kelvin": 4000,
+                    },
+                    "downlight": [
+                        {
+                            "hue": float(i * 5),
+                            "saturation": 0.5,
+                            "brightness": 0.9,
+                            "kelvin": 3500,
+                        }
+                        for i in range(63)
+                    ],
+                }
+            }
+            with state_file.open("w") as f:
+                json.dump(state_data, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._state = _make_mock_state()
+
+            ceiling._load_state_from_file()
+
+            assert ceiling.state.stored_uplight_color is not None
+            assert ceiling.state.stored_uplight_color.hue == pytest.approx(120.0)
+            assert ceiling.state.stored_downlight_colors is not None
+            assert len(ceiling.state.stored_downlight_colors) == 63
+            assert ceiling.state.stored_downlight_colors[0].saturation == pytest.approx(
+                0.5
+            )
+
+    def test_load_state_from_file_uplight_only(self) -> None:
+        """Test _load_state_from_file with uplight data but no downlight."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            state_data = {
+                "d073d5010203": {
+                    "uplight": {
+                        "hue": 60.0,
+                        "saturation": 0.3,
+                        "brightness": 0.9,
+                        "kelvin": 3000,
+                    },
+                }
+            }
+            with state_file.open("w") as f:
+                json.dump(state_data, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._state = _make_mock_state()
+
+            ceiling._load_state_from_file()
+
+            assert ceiling.state.stored_uplight_color is not None
+            assert ceiling.state.stored_uplight_color.hue == pytest.approx(60.0)
+            assert ceiling.state.stored_downlight_colors is None
+
+    def test_load_state_from_file_downlight_only(self) -> None:
+        """Test _load_state_from_file with downlight data but no uplight."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            state_data = {
+                "d073d5010203": {
+                    "downlight": [
+                        {
+                            "hue": 0.0,
+                            "saturation": 0.0,
+                            "brightness": 1.0,
+                            "kelvin": 3500,
+                        }
+                    ],
+                }
+            }
+            with state_file.open("w") as f:
+                json.dump(state_data, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._state = _make_mock_state()
+
+            ceiling._load_state_from_file()
+
+            assert ceiling.state.stored_uplight_color is None
+            assert ceiling.state.stored_downlight_colors is not None
+            assert len(ceiling.state.stored_downlight_colors) == 1
