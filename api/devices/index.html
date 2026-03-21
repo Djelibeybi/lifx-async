@@ -15516,7 +15516,7 @@ HEV uses UV-C light to sanitize surfaces and air with anti-bacterial properties.
   </span>
 
 <a href="#lifx.devices.hev.HevLight.set_hev_cycle" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_hev_cycle</span><span class="p">(</span><span class="n">enable</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span><span class="p">,</span> <span class="n">duration_seconds</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_hev_cycle</span><span class="p">(</span><span class="n">enable</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span><span class="p">,</span> <span class="n">duration_seconds</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -15563,6 +15563,10 @@ See the get_hev_config() and set_hev_config() methods for details.</p>
                   <span class="doc-param-annotation">
                     <b>TYPE:</b>
                       <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>0</code>
                   </span>
               </p>
             </td>
@@ -15693,7 +15697,7 @@ See the get_hev_config() and set_hev_config() methods for details.</p>
 <span class="normal"><a href="#__codelineno-0-232">232</a></span>
 <span class="normal"><a href="#__codelineno-0-233">233</a></span>
 <span class="normal"><a href="#__codelineno-0-234">234</a></span>
-<span class="normal"><a href="#__codelineno-0-235">235</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-185"><a id="__codelineno-0-185" name="__codelineno-0-185"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_hev_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">duration_seconds</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-235">235</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-185"><a id="__codelineno-0-185" name="__codelineno-0-185"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_hev_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">duration_seconds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-186"><a id="__codelineno-0-186" name="__codelineno-0-186"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Start or stop a HEV cleaning cycle.</span>
 </span><span id="__span-0-187"><a id="__codelineno-0-187" name="__codelineno-0-187"></a>
 </span><span id="__span-0-188"><a id="__codelineno-0-188" name="__codelineno-0-188"></a><span class="sd">    If a duration is not provided, the light will use whatever the default</span>

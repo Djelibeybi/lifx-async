@@ -4183,17 +4183,17 @@ async def get_hev_cycle(self) -> HevCycleState:
 ##### set_hev_cycle
 
 ```python
-set_hev_cycle(enable: bool, duration_seconds: int) -> None
+set_hev_cycle(enable: bool, duration_seconds: int = 0) -> None
 ```
 
 Start or stop a HEV cleaning cycle.
 
 If a duration is not provided, the light will use whatever the default duration is currently stored in the HEV configuration. See the get_hev_config() and set_hev_config() methods for details.
 
-| PARAMETER          | DESCRIPTION                                                          |
-| ------------------ | -------------------------------------------------------------------- |
-| `enable`           | True to start cycle, False to stop **TYPE:** `bool`                  |
-| `duration_seconds` | Duration of the cleaning cycle in seconds (optional) **TYPE:** `int` |
+| PARAMETER          | DESCRIPTION                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| `enable`           | True to start cycle, False to stop **TYPE:** `bool`                                   |
+| `duration_seconds` | Duration of the cleaning cycle in seconds (optional) **TYPE:** `int` **DEFAULT:** `0` |
 
 | RAISES                        | DESCRIPTION                            |
 | ----------------------------- | -------------------------------------- |
@@ -4215,7 +4215,7 @@ await light.set_hev_cycle(enable=False, duration_seconds=0)
 Source code in `src/lifx/devices/hev.py`
 
 ````python
-async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
+async def set_hev_cycle(self, enable: bool, duration_seconds: int = 0) -> None:
     """Start or stop a HEV cleaning cycle.
 
     If a duration is not provided, the light will use whatever the default
