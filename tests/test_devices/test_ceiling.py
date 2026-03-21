@@ -1838,6 +1838,51 @@ class TestCeilingLightSetPowerOverride:
         assert ceiling_176.state.stored_uplight_color.hue == 100
         assert ceiling_176.state.stored_downlight_colors[0].hue == 200
 
+    async def test_set_power_on_recomputes_is_on_flags(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test set_power(True) recomputes is_on from last colours."""
+        # Pre-set last-known colours with brightness > 0
+        ceiling_176.state.last_uplight_color = HSBK(
+            hue=100, saturation=0.5, brightness=0.8, kelvin=3500
+        )
+        ceiling_176.state.last_downlight_colors = [
+            HSBK(hue=200, saturation=0.5, brightness=0.6, kelvin=3500)
+        ] * 16
+
+        # Before power-on, mark as off
+        ceiling_176.state.uplight_is_on = False
+        ceiling_176.state.downlight_is_on = False
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.set_power(True)
+
+        # After power-on, flags should be recomputed from last-known colours
+        assert ceiling_176.state.uplight_is_on is True
+        assert ceiling_176.state.downlight_is_on is True
+
+    async def test_set_power_on_recomputes_is_on_flags_zero_brightness(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test set_power(True) sets is_on=False for zero brightness."""
+        # Pre-set last-known colours with brightness == 0
+        ceiling_176.state.last_uplight_color = HSBK(
+            hue=100, saturation=0.5, brightness=0.0, kelvin=3500
+        )
+        ceiling_176.state.last_downlight_colors = [
+            HSBK(hue=200, saturation=0.5, brightness=0.0, kelvin=3500)
+        ] * 16
+
+        ceiling_176.state.uplight_is_on = False
+        ceiling_176.state.downlight_is_on = False
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.set_power(True)
+
+        # Zero brightness means components are not considered "on"
+        assert ceiling_176.state.uplight_is_on is False
+        assert ceiling_176.state.downlight_is_on is False
+
     async def test_set_power_with_integer_off(self, ceiling_176: CeilingLight) -> None:
         """Test set_power(0) captures colors (integer form)."""
         uplight_color = HSBK(hue=300, saturation=0.9, brightness=0.6, kelvin=3000)
