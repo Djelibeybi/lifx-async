@@ -4174,7 +4174,7 @@ async def get_hev_cycle(self) -> HevCycleState:
                 "remaining_s": state.remaining_s,
                 "last_power": state.last_power,
             },
-        }
+        },
     )
 
     return cycle_state
@@ -4188,10 +4188,12 @@ set_hev_cycle(enable: bool, duration_seconds: int) -> None
 
 Start or stop a HEV cleaning cycle.
 
-| PARAMETER          | DESCRIPTION                                               |
-| ------------------ | --------------------------------------------------------- |
-| `enable`           | True to start cycle, False to stop **TYPE:** `bool`       |
-| `duration_seconds` | Duration of the cleaning cycle in seconds **TYPE:** `int` |
+If a duration is not provided, the light will use whatever the default duration is currently stored in the HEV configuration. See the get_hev_config() and set_hev_config() methods for details.
+
+| PARAMETER          | DESCRIPTION                                                          |
+| ------------------ | -------------------------------------------------------------------- |
+| `enable`           | True to start cycle, False to stop **TYPE:** `bool`                  |
+| `duration_seconds` | Duration of the cleaning cycle in seconds (optional) **TYPE:** `int` |
 
 | RAISES                        | DESCRIPTION                            |
 | ----------------------------- | -------------------------------------- |
@@ -4216,9 +4218,13 @@ Source code in `src/lifx/devices/hev.py`
 async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
     """Start or stop a HEV cleaning cycle.
 
+    If a duration is not provided, the light will use whatever the default
+    duration is currently stored in the HEV configuration.
+    See the get_hev_config() and set_hev_config() methods for details.
+
     Args:
         enable: True to start cycle, False to stop
-        duration_seconds: Duration of the cleaning cycle in seconds
+        duration_seconds: Duration of the cleaning cycle in seconds (optional)
 
     Raises:
         ValueError: If duration is negative
@@ -4253,7 +4259,7 @@ async def set_hev_cycle(self, enable: bool, duration_seconds: int) -> None:
             "method": "set_hev_cycle",
             "action": "change",
             "values": {"enable": enable, "duration_s": duration_seconds},
-        }
+        },
     )
 
     # Schedule debounced refresh to update HEV cycle state
@@ -4338,7 +4344,7 @@ async def get_hev_config(self) -> HevConfig:
                 "indication": state.indication,
                 "duration_s": state.duration_s,
             },
-        }
+        },
     )
 
     return config
@@ -4411,7 +4417,7 @@ async def set_hev_config(self, indication: bool, duration_seconds: int) -> None:
             "method": "set_hev_config",
             "action": "change",
             "values": {"indication": indication, "duration_s": duration_seconds},
-        }
+        },
     )
 
     # Update cache and state on acknowledgement
@@ -4500,7 +4506,7 @@ async def get_last_hev_result(
             "method": "get_last_hev_result",
             "action": "query",
             "reply": {"result": result.value},
-        }
+        },
     )
 
     return result
