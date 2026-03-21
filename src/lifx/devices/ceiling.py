@@ -438,11 +438,9 @@ class CeilingLight(MatrixLight):
         # Extract uplight zone
         uplight_color = tile_colors[self.uplight_zone]
 
-        # Update state cache
+        # Update state cache (don't update uplight_is_on — power may be stale)
+        self.state.uplight_color = uplight_color
         self.state.last_uplight_color = uplight_color
-        self.state.uplight_is_on = bool(
-            self._state.power > 0 and uplight_color.brightness > 0
-        )
 
         return uplight_color
 
@@ -462,11 +460,9 @@ class CeilingLight(MatrixLight):
         # Extract downlight zones
         downlight_colors = tile_colors[self.downlight_zones]
 
-        # Update state cache
+        # Update state cache (don't update downlight_is_on — power may be stale)
+        self.state.downlight_colors = list(downlight_colors)
         self.state.last_downlight_colors = downlight_colors
-        self.state.downlight_is_on = bool(
-            self._state.power > 0 and any(c.brightness > 0 for c in downlight_colors)
-        )
 
         return downlight_colors
 
@@ -500,7 +496,9 @@ class CeilingLight(MatrixLight):
         # Set all colors back (duration in milliseconds for set_matrix_colors)
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
-        # Store state
+        # Update state — public fields, stored state, and last-known
+        self.state.uplight_color = color
+        self.state.uplight_is_on = True  # brightness > 0 validated above
         self.state.stored_uplight_color = color
         self.state.last_uplight_color = color
 
@@ -559,7 +557,9 @@ class CeilingLight(MatrixLight):
         # Set all colors back
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
-        # Store state
+        # Update state — public fields, stored state, and last-known
+        self.state.downlight_colors = downlight_colors
+        self.state.downlight_is_on = True  # brightness > 0 validated above
         self.state.stored_downlight_colors = downlight_colors
         self.state.last_downlight_colors = downlight_colors
 
@@ -623,7 +623,10 @@ class CeilingLight(MatrixLight):
             # Set all colors instantly (duration=0) while light is off
             await self.set_matrix_colors(0, tile_colors, duration=0)
 
-            # Update stored state for uplight
+            # Update state — public fields, stored state, and last-known
+            self.state.uplight_color = target_color
+            self.state.uplight_is_on = True
+            self.state.downlight_is_on = False  # downlight zones were zeroed
             self.state.stored_uplight_color = target_color
             self.state.last_uplight_color = target_color
 
@@ -693,7 +696,9 @@ class CeilingLight(MatrixLight):
         tile_colors[self.uplight_zone] = off_color
         await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
 
-        # Update cache
+        # Update state — public fields and last-known
+        self.state.uplight_color = off_color
+        self.state.uplight_is_on = False
         self.state.last_uplight_color = off_color
 
         # Persist if enabled
@@ -770,7 +775,10 @@ class CeilingLight(MatrixLight):
             # Set all colors instantly (duration=0) while light is off
             await self.set_matrix_colors(0, tile_colors, duration=0)
 
-            # Update stored state for downlight
+            # Update state — public fields, stored state, and last-known
+            self.state.downlight_colors = target_colors
+            self.state.downlight_is_on = True
+            self.state.uplight_is_on = False  # uplight zone was zeroed
             self.state.stored_downlight_colors = target_colors
             self.state.last_downlight_colors = target_colors
 
@@ -848,9 +856,11 @@ class CeilingLight(MatrixLight):
             state.stored_uplight_color = tile_colors[self.uplight_zone]
             state.stored_downlight_colors = list(tile_colors[self.downlight_zones])
 
-            # Also update cache for is_on properties
+            # Update last-known and mark components as off (power is being turned off)
             state.last_uplight_color = state.stored_uplight_color
             state.last_downlight_colors = state.stored_downlight_colors
+            state.uplight_is_on = False
+            state.downlight_is_on = False
 
         # Call parent to perform actual power change
         await super().set_power(level, duration)
@@ -895,14 +905,18 @@ class CeilingLight(MatrixLight):
         # Call parent to perform actual color change
         await super().set_color(color, duration)
 
-        # Update cached component colors - all zones now have the same color
+        # Update all state fields — all zones now have the same color
         state = self.state
+        is_on = color.brightness > 0
+        downlight_colors = [color] * self.downlight_zone_count
+        state.uplight_color = color
+        state.downlight_colors = downlight_colors
+        state.uplight_is_on = is_on
+        state.downlight_is_on = is_on
         state.last_uplight_color = color
-        state.last_downlight_colors = [color] * self.downlight_zone_count
-
-        # Also update stored state for restoration
+        state.last_downlight_colors = downlight_colors
         state.stored_uplight_color = color
-        state.stored_downlight_colors = [color] * self.downlight_zone_count
+        state.stored_downlight_colors = downlight_colors
 
         # Persist if enabled
         if self._state_file:
