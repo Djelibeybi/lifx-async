@@ -968,45 +968,11 @@ async def connect(
             raise LifxDeviceNotFoundError(f"Unknown product ID: {version.product}")
 
         # Step 4: Determine correct device class based on capabilities
-        # Import device classes here to avoid circular imports
-        from typing import TYPE_CHECKING
+        from lifx.devices.detection import (
+            get_device_class_for_product,
+        )
 
-        if TYPE_CHECKING:
-            from lifx.devices.hev import HevLight
-            from lifx.devices.infrared import InfraredLight
-            from lifx.devices.light import Light
-            from lifx.devices.matrix import MatrixLight
-            from lifx.devices.multizone import MultiZoneLight
-
-        device_class: type[Device] = cls
-
-        # Check for ceiling products first (subset of matrix devices)
-        from lifx.products import is_ceiling_product
-
-        if is_ceiling_product(version.product):
-            from lifx.devices.ceiling import CeilingLight
-
-            device_class = CeilingLight
-        elif product_info.has_matrix:
-            from lifx.devices.matrix import MatrixLight
-
-            device_class = MatrixLight
-        elif product_info.has_multizone:
-            from lifx.devices.multizone import MultiZoneLight
-
-            device_class = MultiZoneLight
-        elif product_info.has_infrared:
-            from lifx.devices.infrared import InfraredLight
-
-            device_class = InfraredLight
-        elif product_info.has_hev:
-            from lifx.devices.hev import HevLight
-
-            device_class = HevLight
-        elif product_info.has_color:
-            from lifx.devices.light import Light
-
-            device_class = Light
+        device_class = get_device_class_for_product(version.product, product_info)
 
         # Step 5: Create instance of correct device class
         device = device_class(
@@ -1020,7 +986,7 @@ async def connect(
         # Type system note: device._state is guaranteed non-None after
         # _initialize_state().
         # Each subclass overrides _state to be non-optional
-        return device  # type: ignore[return-value]
+        return device
 
     finally:
         # Clean up temporary device

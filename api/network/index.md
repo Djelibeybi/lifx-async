@@ -405,13 +405,8 @@ async def create_device(self) -> Device | None:
         ```
     """
     from lifx.devices.base import Device
-    from lifx.devices.ceiling import CeilingLight
-    from lifx.devices.hev import HevLight
-    from lifx.devices.infrared import InfraredLight
-    from lifx.devices.light import Light
-    from lifx.devices.matrix import MatrixLight
-    from lifx.devices.multizone import MultiZoneLight
-    from lifx.products import is_ceiling_product
+    from lifx.devices.detection import get_device_class_for_product
+    from lifx.exceptions import LifxUnsupportedDeviceError
 
     kwargs = {
         "serial": self.serial,
@@ -427,34 +422,21 @@ async def create_device(self) -> Device | None:
     try:
         await temp_device.ensure_capabilities()
 
-        if temp_device.capabilities:
-            # Check for Ceiling products first (before generic MatrixLight)
-            if temp_device.version and is_ceiling_product(
-                temp_device.version.product
-            ):
-                return CeilingLight(**kwargs)
+        if temp_device.capabilities and temp_device.version:
+            device_class = get_device_class_for_product(
+                temp_device.version.product,
+                temp_device.capabilities,
+            )
+            return device_class(**kwargs)
 
-            if temp_device.capabilities.has_matrix:
-                return MatrixLight(**kwargs)
-            if temp_device.capabilities.has_multizone:
-                return MultiZoneLight(**kwargs)
-            if temp_device.capabilities.has_infrared:
-                return InfraredLight(**kwargs)
-            if temp_device.capabilities.has_hev:
-                return HevLight(**kwargs)
-            if temp_device.capabilities.has_relays or (
-                temp_device.capabilities.has_buttons
-                and not temp_device.capabilities.has_color
-            ):
-                return None
-
-            return Light(**kwargs)
+    except LifxUnsupportedDeviceError:
+        return None
 
     except Exception:
         return None
 
     finally:
-        # Always close the temporary device connection to prevent resource leaks
+        # Always close the temporary device connection
         await temp_device.connection.close()
 
     return None
