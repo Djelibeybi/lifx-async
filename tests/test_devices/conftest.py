@@ -99,6 +99,8 @@ def mock_product_info():
         has_matrix: bool = False,
         has_infrared: bool = False,
         has_hev: bool = False,
+        has_relays: bool = False,
+        has_buttons: bool = False,
     ) -> ProductInfo:
         """Create a mock ProductInfo with specified capabilities."""
         capabilities = 0
@@ -114,6 +116,10 @@ def mock_product_info():
             capabilities |= ProductCapability.INFRARED
         if has_hev:
             capabilities |= ProductCapability.HEV
+        if has_relays:
+            capabilities |= ProductCapability.RELAYS
+        if has_buttons:
+            capabilities |= ProductCapability.BUTTONS
 
         return ProductInfo(
             pid=pid,
