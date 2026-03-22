@@ -14,9 +14,11 @@ from lifx.devices.base import (
     Device,
     DeviceCapabilities,
     DeviceState,
+    DeviceVersion,
     FirmwareInfo,
 )
 from lifx.devices.light import Light, LightState
+from lifx.exceptions import LifxDeviceNotFoundError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 
@@ -170,6 +172,78 @@ class TestDeviceConnectFactory:
 
                     # State should never be None after connect
                     assert device._state is not None
+
+    @pytest.mark.asyncio
+    async def test_connect_returns_light_for_cct_device(self, mock_product_info):
+        """Test connect() returns Light for CCT products."""
+        product_info = mock_product_info(
+            pid=125,
+            name="LIFX White to Warm US",
+            has_color=False,
+            has_multizone=False,
+        )
+
+        with (
+            patch("lifx.devices.base.get_product", return_value=product_info),
+            patch(
+                "lifx.devices.base.Device.get_version",
+                new_callable=AsyncMock,
+                return_value=DeviceVersion(vendor=1, product=125),
+            ),
+            patch("lifx.products.is_ceiling_product", return_value=False),
+        ):
+            device = await Device.connect(ip="192.168.1.100", serial="d073d5010203")
+            assert isinstance(device, Light)
+
+    @pytest.mark.asyncio
+    async def test_connect_raises_for_relay_device(self, mock_product_info):
+        """Test Device.connect() raises LifxDeviceNotFoundError for relay devices."""
+        product_info = mock_product_info(
+            pid=70,
+            name="LIFX Switch",
+            has_color=False,
+            has_multizone=False,
+            has_relays=True,
+        )
+
+        with (
+            patch("lifx.devices.base.get_product", return_value=product_info),
+            patch(
+                "lifx.devices.base.Device.get_version",
+                new_callable=AsyncMock,
+                return_value=DeviceVersion(vendor=1, product=70),
+            ),
+            patch("lifx.products.is_ceiling_product", return_value=False),
+        ):
+            with pytest.raises(
+                LifxDeviceNotFoundError, match="Relay/button-only device"
+            ):
+                await Device.connect(ip="192.168.1.100", serial="d073d5010203")
+
+    @pytest.mark.asyncio
+    async def test_connect_raises_for_button_only_device(self, mock_product_info):
+        """Test connect() raises for button-only devices."""
+        product_info = mock_product_info(
+            pid=71,
+            name="LIFX Button",
+            has_color=False,
+            has_multizone=False,
+            has_buttons=True,
+        )
+
+        with (
+            patch("lifx.devices.base.get_product", return_value=product_info),
+            patch(
+                "lifx.devices.base.Device.get_version",
+                new_callable=AsyncMock,
+                return_value=DeviceVersion(vendor=1, product=71),
+            ),
+            patch("lifx.products.is_ceiling_product", return_value=False),
+        ):
+            with pytest.raises(
+                LifxDeviceNotFoundError, match="Relay/button-only device"
+            ):
+                await Device.connect(ip="192.168.1.100", serial="d073d5010203")
 
 
 class TestStateInitialization:
