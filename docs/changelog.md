@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v5.4.6 (2026-03-22)
+
+### Bug Fixes
+
+- Add MIT license header to effects ported from pkivolowitz/lifx
+  ([`5830c98`](https://github.com/Djelibeybi/lifx-async/commit/5830c98b460db4b5fb62f684c06a12190b4b496e))
+
+
 ## v5.4.5 (2026-03-22)
 
 ### Bug Fixes
