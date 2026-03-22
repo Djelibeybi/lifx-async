@@ -190,7 +190,7 @@ class TestDeviceConnectFactory:
                 new_callable=AsyncMock,
                 return_value=DeviceVersion(vendor=1, product=125),
             ),
-            patch("lifx.products.is_ceiling_product", return_value=False),
+            patch("lifx.devices.detection.is_ceiling_product", return_value=False),
         ):
             device = await Device.connect(ip="192.168.1.100", serial="d073d5010203")
             assert isinstance(device, Light)
@@ -213,7 +213,7 @@ class TestDeviceConnectFactory:
                 new_callable=AsyncMock,
                 return_value=DeviceVersion(vendor=1, product=70),
             ),
-            patch("lifx.products.is_ceiling_product", return_value=False),
+            patch("lifx.devices.detection.is_ceiling_product", return_value=False),
         ):
             with pytest.raises(
                 LifxUnsupportedDeviceError, match="Relay/button-only device"
@@ -238,7 +238,7 @@ class TestDeviceConnectFactory:
                 new_callable=AsyncMock,
                 return_value=DeviceVersion(vendor=1, product=71),
             ),
-            patch("lifx.products.is_ceiling_product", return_value=False),
+            patch("lifx.devices.detection.is_ceiling_product", return_value=False),
         ):
             with pytest.raises(
                 LifxUnsupportedDeviceError, match="Relay/button-only device"
