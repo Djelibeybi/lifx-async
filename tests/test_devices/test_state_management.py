@@ -18,7 +18,7 @@ from lifx.devices.base import (
     FirmwareInfo,
 )
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxDeviceNotFoundError
+from lifx.exceptions import LifxUnsupportedDeviceError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 
@@ -216,7 +216,7 @@ class TestDeviceConnectFactory:
             patch("lifx.products.is_ceiling_product", return_value=False),
         ):
             with pytest.raises(
-                LifxDeviceNotFoundError, match="Relay/button-only device"
+                LifxUnsupportedDeviceError, match="Relay/button-only device"
             ):
                 await Device.connect(ip="192.168.1.100", serial="d073d5010203")
 
@@ -241,7 +241,7 @@ class TestDeviceConnectFactory:
             patch("lifx.products.is_ceiling_product", return_value=False),
         ):
             with pytest.raises(
-                LifxDeviceNotFoundError, match="Relay/button-only device"
+                LifxUnsupportedDeviceError, match="Relay/button-only device"
             ):
                 await Device.connect(ip="192.168.1.100", serial="d073d5010203")
 
