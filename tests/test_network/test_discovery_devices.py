@@ -7,16 +7,18 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 from __future__ import annotations
 
 import sys
+from unittest.mock import patch
 
 import pytest
 
-from lifx.devices.base import Device
+from lifx.devices.base import Device, DeviceVersion
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.network.discovery import discover_devices
+from lifx.network.discovery import DiscoveredDevice, discover_devices
+from lifx.products.registry import ProductCapability, ProductInfo
 
 
 @pytest.mark.emulator
@@ -188,3 +190,33 @@ class TestDiscoveryEdgeCasesWithEmulator:
         for device in devices:
             # Port should be valid
             assert 1024 <= device.port <= 65535
+
+
+class TestCreateDeviceUnsupported:
+    """Unit tests for create_device() with unsupported products."""
+
+    @pytest.mark.asyncio
+    async def test_create_device_returns_none_for_relay(self) -> None:
+        """Test create_device() returns None for relay devices."""
+        relay_product = ProductInfo(
+            pid=70,
+            name="LIFX Switch",
+            vendor=1,
+            capabilities=ProductCapability.RELAYS,
+            temperature_range=None,
+            min_ext_mz_firmware=None,
+        )
+
+        disc = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="192.168.1.100",
+        )
+
+        async def fake_ensure(self: Device) -> None:
+            self._capabilities = relay_product
+            self._version = DeviceVersion(vendor=1, product=70)
+
+        with patch.object(Device, "ensure_capabilities", fake_ensure):
+            result = await disc.create_device()
+
+        assert result is None
