@@ -32506,6 +32506,13 @@ Each device owns its own connection that opens lazily on first request. The conn
 
 # CHANGELOG
 
+## v5.4.5 (2026-03-22)
+
+### Bug Fixes
+
+- Device.connect() now returns Light for CCT and brightness-only products ([`df6d787`](https://github.com/Djelibeybi/lifx-async/commit/df6d7877593cabf77daa5b2871281e5b8558581c))
+- Patch correct target for is_ceiling_product in tests ([`666a406`](https://github.com/Djelibeybi/lifx-async/commit/666a4069dab44ecdc21bf23fee995f79524e9c16))
+
 ## v5.4.4 (2026-03-21)
 
 ### Bug Fixes
