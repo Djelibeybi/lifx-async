@@ -647,7 +647,16 @@ class Device(Generic[StateT]):
                 from lifx.devices.hev import HevLight
 
                 device_class = HevLight
-            elif product_info.has_color:
+
+            elif product_info.has_relays or (
+                product_info.has_buttons and not product_info.has_color
+            ):
+                raise LifxDeviceNotFoundError(
+                    f"Relay/button-only device (product {version.product}) "
+                    "is not a supported light"
+                )
+
+            else:
                 from lifx.devices.light import Light
 
                 device_class = Light
@@ -664,7 +673,7 @@ class Device(Generic[StateT]):
             # Type system note: device._state is guaranteed non-None after
             # _initialize_state().
             # Each subclass overrides _state to be non-optional
-            return device  # type: ignore[return-value]
+            return device
 
         finally:
             # Clean up temporary device
