@@ -71,3 +71,17 @@ class LifxUnsupportedCommandError(LifxError):
     """
 
     pass
+
+
+class LifxUnsupportedDeviceError(LifxError):
+    """Raised when a reachable device is not a supported type.
+
+    Raised by ``Device.connect()`` and ``DiscoveredDevice.create_device()``
+    when the device responds but its product type is not supported by this
+    library (e.g. relay-only or button-only devices).
+
+    This is distinct from ``LifxDeviceNotFoundError`` which indicates the
+    device could not be reached or has an unknown product ID.
+    """
+
+    pass

@@ -67,6 +67,7 @@ from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
     LifxUnsupportedCommandError,
+    LifxUnsupportedDeviceError,
 )
 from lifx.network.discovery import DiscoveredDevice, discover_devices
 from lifx.network.mdns import LifxServiceRecord, discover_lifx_services
@@ -165,4 +166,5 @@ __all__ = [
     "LifxConnectionError",
     "LifxNetworkError",
     "LifxUnsupportedCommandError",
+    "LifxUnsupportedDeviceError",
 ]
