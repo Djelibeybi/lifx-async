@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.ceiling import CeilingLight
+from lifx.devices.ceiling import CeilingLight, CeilingLightState
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout
@@ -1988,6 +1988,60 @@ class TestCeilingLightSetPowerOverride:
         # Now _determine_uplight_brightness should return stored color
         # (simulate what turn_uplight_on() would do)
         assert ceiling_176.state.stored_uplight_color.brightness > 0
+
+    async def test_set_power_off_initialises_state_if_missing(self) -> None:
+        """Test set_power(False) calls _initialize_state when state is None."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        # State is NOT initialised (self._state is None)
+
+        mock_state = _make_mock_state()
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        ceiling.get_all_tile_colors = AsyncMock(return_value=[[white] * 64])
+
+        async def init_side_effect() -> CeilingLightState:
+            ceiling._state = mock_state
+            return mock_state
+
+        with (
+            patch.object(
+                CeilingLight,
+                "_initialize_state",
+                new_callable=AsyncMock,
+                side_effect=init_side_effect,
+            ) as mock_init,
+            patch.object(MatrixLight, "set_power", new_callable=AsyncMock),
+        ):
+            await ceiling.set_power(False)
+            mock_init.assert_called_once()
+
+    async def test_set_power_on_initialises_state_if_missing(self) -> None:
+        """Test set_power(True) calls _initialize_state when state is None."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        # State is NOT initialised (self._state is None)
+
+        mock_state = _make_mock_state()
+
+        async def init_side_effect() -> CeilingLightState:
+            ceiling._state = mock_state
+            return mock_state
+
+        with (
+            patch.object(
+                CeilingLight,
+                "_initialize_state",
+                new_callable=AsyncMock,
+                side_effect=init_side_effect,
+            ) as mock_init,
+            patch.object(MatrixLight, "set_power", new_callable=AsyncMock),
+        ):
+            await ceiling.set_power(True)
+            mock_init.assert_called_once()
 
 
 class TestCeilingLightTurnOnPowerBehavior:
