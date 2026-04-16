@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "updated_at": "2026-04-16T13:03:01.169Z",
+    "version": 2
+  },
+  "languages": [
+    "Python"
+  ],
+  "frameworks": [
+    "asyncio"
+  ],
+  "tools": [
+    "Ruff",
+    "Pyright",
+    "pytest",
+    "uv",
+    "MkDocs",
+    "semantic-release"
+  ],
+  "build_system": "hatchling",
+  "test_framework": "pytest",
+  "package_manager": "uv",
+  "content_formats": [
+    "YAML (protocol.yml spec)",
+    "JSON (products.json registry)",
+    "Markdown (MkDocs documentation)"
+  ],
+  "python_versions": [
+    "3.10",
+    "3.11",
+    "3.12",
+    "3.13",
+    "3.14"
+  ],
+  "runtime_dependencies": "none",
+  "ci": [
+    "GitHub Actions (ci.yml, docs.yml, pr-automation.yml)"
+  ]
+}
