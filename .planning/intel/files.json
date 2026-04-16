@@ -1,0 +1,645 @@
+{
+  "_meta": {
+    "updated_at": "2026-04-16T13:03:45.504Z",
+    "version": 3
+  },
+  "entries": {
+    "src/lifx/__init__.py": {
+      "exports": [
+        "__version__",
+        "Device",
+        "Light",
+        "LightState",
+        "HevLight",
+        "HevLightState",
+        "InfraredLight",
+        "InfraredLightState",
+        "MultiZoneLight",
+        "MultiZoneLightState",
+        "MatrixLight",
+        "MatrixLightState",
+        "CeilingLight",
+        "CeilingLightState",
+        "HSBK",
+        "Colors",
+        "DeviceInfo",
+        "DeviceVersion",
+        "FirmwareInfo",
+        "WifiInfo",
+        "MultiZoneEffect",
+        "MatrixEffect",
+        "TileInfo",
+        "Conductor",
+        "DeviceSupport",
+        "DeviceType",
+        "EffectAurora",
+        "EffectColorloop",
+        "EffectFlame",
+        "EffectInfo",
+        "EffectProgress",
+        "EffectPulse",
+        "EffectRainbow",
+        "EffectRegistry",
+        "EffectSunrise",
+        "EffectSunset",
+        "FrameContext",
+        "FrameEffect",
+        "LIFXEffect",
+        "SunOrigin",
+        "get_effect_registry",
+        "Animator",
+        "AnimatorStats",
+        "Theme",
+        "ThemeLibrary",
+        "get_theme",
+        "DeviceGroup",
+        "discover",
+        "discover_mdns",
+        "find_by_serial",
+        "find_by_label",
+        "find_by_ip",
+        "discover_devices",
+        "DiscoveredDevice",
+        "discover_lifx_services",
+        "LifxServiceRecord",
+        "ProductInfo",
+        "ProductRegistry",
+        "ProductCapability",
+        "LightWaveform",
+        "FirmwareEffect",
+        "Direction",
+        "LifxError",
+        "LifxDeviceNotFoundError",
+        "LifxTimeoutError",
+        "LifxProtocolError",
+        "LifxConnectionError",
+        "LifxNetworkError",
+        "LifxUnsupportedCommandError",
+        "LifxUnsupportedDeviceError"
+      ],
+      "imports": [
+        "lifx.animation",
+        "lifx.api",
+        "lifx.color",
+        "lifx.devices",
+        "lifx.effects",
+        "lifx.exceptions",
+        "lifx.network.discovery",
+        "lifx.network.mdns",
+        "lifx.products",
+        "lifx.protocol.protocol_types",
+        "lifx.theme"
+      ],
+      "type": "entry-point"
+    },
+    "src/lifx/api.py": {
+      "exports": [
+        "LocationGrouping",
+        "GroupGrouping",
+        "DeviceGroup",
+        "discover",
+        "discover_mdns",
+        "find_by_serial",
+        "find_by_label",
+        "find_by_ip"
+      ],
+      "imports": [
+        "lifx.color",
+        "lifx.const",
+        "lifx.devices",
+        "lifx.network.discovery",
+        "lifx.protocol",
+        "lifx.theme"
+      ],
+      "type": "module"
+    },
+    "src/lifx/color.py": {
+      "exports": [
+        "HSBK",
+        "Colors"
+      ],
+      "imports": [
+        "lifx.const",
+        "lifx.protocol.protocol_types"
+      ],
+      "type": "module"
+    },
+    "src/lifx/const.py": {
+      "exports": [
+        "LIFX_UDP_PORT",
+        "MAX_PACKET_SIZE",
+        "MIN_PACKET_SIZE",
+        "DISCOVERY_TIMEOUT",
+        "MAX_RESPONSE_TIME",
+        "DEFAULT_REQUEST_TIMEOUT",
+        "DEFAULT_MAX_RETRIES",
+        "MDNS_ADDRESS",
+        "MDNS_PORT",
+        "LIFX_MDNS_SERVICE",
+        "PROTOCOL_URL",
+        "PRODUCTS_URL",
+        "TIMEOUT_ERRORS"
+      ],
+      "imports": [],
+      "type": "config"
+    },
+    "src/lifx/exceptions.py": {
+      "exports": [
+        "LifxError",
+        "LifxDeviceNotFoundError",
+        "LifxTimeoutError",
+        "LifxProtocolError",
+        "LifxConnectionError",
+        "LifxNetworkError",
+        "LifxUnsupportedCommandError",
+        "LifxUnsupportedDeviceError"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/lifx/devices/__init__.py": {
+      "exports": [
+        "Device",
+        "DeviceInfo",
+        "DeviceVersion",
+        "FirmwareInfo",
+        "WifiInfo",
+        "CollectionInfo",
+        "Light",
+        "LightState",
+        "HevLight",
+        "HevLightState",
+        "InfraredLight",
+        "InfraredLightState",
+        "MultiZoneLight",
+        "MultiZoneLightState",
+        "MatrixLight",
+        "MatrixLightState",
+        "MatrixEffect",
+        "TileInfo",
+        "CeilingLight",
+        "CeilingLightState",
+        "MultiZoneEffect"
+      ],
+      "imports": [
+        "lifx.devices.base",
+        "lifx.devices.ceiling",
+        "lifx.devices.hev",
+        "lifx.devices.infrared",
+        "lifx.devices.light",
+        "lifx.devices.matrix",
+        "lifx.devices.multizone"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/base.py": {
+      "exports": [
+        "Device",
+        "DeviceInfo",
+        "DeviceVersion",
+        "FirmwareInfo",
+        "WifiInfo",
+        "CollectionInfo"
+      ],
+      "imports": [
+        "lifx.network.connection",
+        "lifx.protocol",
+        "lifx.products",
+        "lifx.exceptions",
+        "lifx.const"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/light.py": {
+      "exports": [
+        "Light",
+        "LightState"
+      ],
+      "imports": [
+        "lifx.devices.base",
+        "lifx.color",
+        "lifx.protocol"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/ceiling.py": {
+      "exports": [
+        "CeilingLight",
+        "CeilingLightState"
+      ],
+      "imports": [
+        "lifx.devices.matrix",
+        "lifx.products"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/hev.py": {
+      "exports": [
+        "HevLight",
+        "HevLightState"
+      ],
+      "imports": [
+        "lifx.devices.light",
+        "lifx.protocol"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/infrared.py": {
+      "exports": [
+        "InfraredLight",
+        "InfraredLightState"
+      ],
+      "imports": [
+        "lifx.devices.light",
+        "lifx.protocol"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/multizone.py": {
+      "exports": [
+        "MultiZoneLight",
+        "MultiZoneLightState",
+        "MultiZoneEffect"
+      ],
+      "imports": [
+        "lifx.devices.light",
+        "lifx.color",
+        "lifx.protocol"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/matrix.py": {
+      "exports": [
+        "MatrixLight",
+        "MatrixLightState",
+        "MatrixEffect",
+        "TileInfo"
+      ],
+      "imports": [
+        "lifx.devices.light",
+        "lifx.color",
+        "lifx.protocol"
+      ],
+      "type": "module"
+    },
+    "src/lifx/devices/detection.py": {
+      "exports": [
+        "create_device_from_discovery"
+      ],
+      "imports": [
+        "lifx.devices",
+        "lifx.products"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/__init__.py": {
+      "exports": [
+        "UdpTransport",
+        "create_message",
+        "parse_message",
+        "DiscoveredDevice",
+        "discover_devices",
+        "DeviceConnection"
+      ],
+      "imports": [
+        "lifx.network.connection",
+        "lifx.network.discovery",
+        "lifx.network.message",
+        "lifx.network.transport"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/transport.py": {
+      "exports": [
+        "UdpTransport"
+      ],
+      "imports": [
+        "lifx.const",
+        "lifx.exceptions"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/discovery.py": {
+      "exports": [
+        "DiscoveredDevice",
+        "discover_devices"
+      ],
+      "imports": [
+        "lifx.network.transport",
+        "lifx.protocol",
+        "lifx.const",
+        "lifx.exceptions"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/connection.py": {
+      "exports": [
+        "DeviceConnection"
+      ],
+      "imports": [
+        "lifx.network.transport",
+        "lifx.network.message",
+        "lifx.protocol",
+        "lifx.exceptions",
+        "lifx.const"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/message.py": {
+      "exports": [
+        "create_message",
+        "parse_message",
+        "MessageBuilder"
+      ],
+      "imports": [
+        "lifx.protocol"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/mdns/discovery.py": {
+      "exports": [
+        "discover_lifx_services",
+        "discover_devices_mdns"
+      ],
+      "imports": [
+        "lifx.network.mdns.transport",
+        "lifx.network.mdns.dns",
+        "lifx.network.mdns.types",
+        "lifx.const"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/mdns/dns.py": {
+      "exports": [
+        "parse_dns_response"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/lifx/network/mdns/transport.py": {
+      "exports": [
+        "MdnsTransport"
+      ],
+      "imports": [
+        "lifx.const"
+      ],
+      "type": "module"
+    },
+    "src/lifx/network/mdns/types.py": {
+      "exports": [
+        "LifxServiceRecord"
+      ],
+      "imports": [],
+      "type": "type-def"
+    },
+    "src/lifx/protocol/header.py": {
+      "exports": [
+        "Header"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/lifx/protocol/serializer.py": {
+      "exports": [
+        "Serializer"
+      ],
+      "imports": [
+        "lifx.protocol.header",
+        "lifx.protocol.base"
+      ],
+      "type": "module"
+    },
+    "src/lifx/protocol/packets.py": {
+      "exports": [
+        "Device",
+        "Light",
+        "MultiZone",
+        "Sensor",
+        "Tile"
+      ],
+      "imports": [
+        "lifx.protocol.base",
+        "lifx.protocol.protocol_types"
+      ],
+      "type": "module"
+    },
+    "src/lifx/protocol/protocol_types.py": {
+      "exports": [
+        "LightHsbk",
+        "LightWaveform",
+        "FirmwareEffect",
+        "Direction"
+      ],
+      "imports": [
+        "lifx.protocol.base"
+      ],
+      "type": "type-def"
+    },
+    "src/lifx/protocol/base.py": {
+      "exports": [
+        "ProtocolField",
+        "ProtocolStruct"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/lifx/protocol/models.py": {
+      "exports": [
+        "Serial"
+      ],
+      "imports": [],
+      "type": "type-def"
+    },
+    "src/lifx/protocol/generator.py": {
+      "exports": [
+        "generate_protocol"
+      ],
+      "imports": [
+        "pyyaml"
+      ],
+      "type": "script"
+    },
+    "src/lifx/products/registry.py": {
+      "exports": [
+        "ProductCapability",
+        "ProductInfo",
+        "ProductRegistry",
+        "TemperatureRange",
+        "get_product",
+        "get_registry"
+      ],
+      "imports": [],
+      "type": "data"
+    },
+    "src/lifx/products/generator.py": {
+      "exports": [
+        "generate_products"
+      ],
+      "imports": [
+        "lifx.const"
+      ],
+      "type": "script"
+    },
+    "src/lifx/products/quirks.py": {
+      "exports": [
+        "CeilingComponentLayout",
+        "get_ceiling_layout",
+        "is_ceiling_product"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/lifx/effects/__init__.py": {
+      "exports": [
+        "Conductor",
+        "LIFXEffect",
+        "EffectAurora",
+        "EffectColorloop",
+        "EffectCylon",
+        "EffectDoubleSlit",
+        "EffectEmbers",
+        "EffectFireworks",
+        "EffectFlame",
+        "EffectJacobsLadder",
+        "EffectNewtonsCradle",
+        "EffectPendulumWave",
+        "EffectPlasma",
+        "EffectPlasma2D",
+        "EffectProgress",
+        "EffectPulse",
+        "EffectRainbow",
+        "EffectRegistry",
+        "EffectRipple",
+        "EffectRule30",
+        "EffectRuleTrio",
+        "EffectSine",
+        "EffectSonar",
+        "EffectSpectrumSweep",
+        "EffectSpin",
+        "EffectSunrise",
+        "EffectSunset",
+        "EffectTwinkle",
+        "EffectWave",
+        "FrameContext",
+        "FrameEffect",
+        "DeviceStateManager",
+        "DeviceSupport",
+        "DeviceType",
+        "EffectInfo",
+        "get_effect_registry",
+        "PreState",
+        "RunningEffect",
+        "SunOrigin"
+      ],
+      "imports": [
+        "lifx.effects.aurora",
+        "lifx.effects.base",
+        "lifx.effects.colorloop",
+        "lifx.effects.conductor",
+        "lifx.effects.cylon",
+        "lifx.effects.double_slit",
+        "lifx.effects.embers",
+        "lifx.effects.fireworks",
+        "lifx.effects.flame",
+        "lifx.effects.frame_effect",
+        "lifx.effects.jacobs_ladder",
+        "lifx.effects.models",
+        "lifx.effects.newtons_cradle",
+        "lifx.effects.pendulum_wave",
+        "lifx.effects.plasma",
+        "lifx.effects.plasma2d",
+        "lifx.effects.progress",
+        "lifx.effects.pulse",
+        "lifx.effects.rainbow",
+        "lifx.effects.registry",
+        "lifx.effects.ripple",
+        "lifx.effects.rule30",
+        "lifx.effects.rule_trio",
+        "lifx.effects.sine",
+        "lifx.effects.sonar",
+        "lifx.effects.spectrum_sweep",
+        "lifx.effects.spin",
+        "lifx.effects.state_manager",
+        "lifx.effects.sunrise",
+        "lifx.effects.twinkle",
+        "lifx.effects.wave"
+      ],
+      "type": "module"
+    },
+    "src/lifx/effects/base.py": {
+      "exports": [
+        "LIFXEffect"
+      ],
+      "imports": [
+        "lifx.color"
+      ],
+      "type": "module"
+    },
+    "src/lifx/effects/conductor.py": {
+      "exports": [
+        "Conductor"
+      ],
+      "imports": [
+        "lifx.effects.base",
+        "lifx.effects.models",
+        "lifx.effects.state_manager"
+      ],
+      "type": "module"
+    },
+    "src/lifx/effects/registry.py": {
+      "exports": [
+        "EffectRegistry",
+        "EffectInfo",
+        "DeviceSupport",
+        "DeviceType",
+        "get_effect_registry"
+      ],
+      "imports": [
+        "lifx.effects.base"
+      ],
+      "type": "module"
+    },
+    "src/lifx/animation/__init__.py": {
+      "exports": [
+        "Animator",
+        "AnimatorStats",
+        "FrameBuffer",
+        "TileRegion",
+        "Orientation",
+        "build_orientation_lut",
+        "PacketGenerator",
+        "PacketTemplate",
+        "LightPacketGenerator",
+        "MatrixPacketGenerator",
+        "MultiZonePacketGenerator",
+        "HEADER_SIZE",
+        "SEQUENCE_OFFSET"
+      ],
+      "imports": [
+        "lifx.animation.animator",
+        "lifx.animation.framebuffer",
+        "lifx.animation.orientation",
+        "lifx.animation.packets"
+      ],
+      "type": "module"
+    },
+    "src/lifx/theme/__init__.py": {
+      "exports": [
+        "Canvas",
+        "MatrixGenerator",
+        "MultiZoneGenerator",
+        "SingleZoneGenerator",
+        "Theme",
+        "ThemeLibrary",
+        "get_theme"
+      ],
+      "imports": [
+        "lifx.theme.canvas",
+        "lifx.theme.generators",
+        "lifx.theme.library",
+        "lifx.theme.theme"
+      ],
+      "type": "module"
+    }
+  }
+}

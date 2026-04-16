@@ -1,0 +1,155 @@
+{
+  "_meta": {
+    "updated_at": "2026-04-16T13:03:03.945Z",
+    "version": 2
+  },
+  "entries": {
+    "hatchling": {
+      "version": ">=1.27.0",
+      "type": "development",
+      "used_by": [
+        "uv build"
+      ],
+      "invocation": "uv build"
+    },
+    "lifx-emulator-core": {
+      "version": ">=3.1.0",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "mkdocs-material": {
+      "version": ">=9.6.22",
+      "type": "development",
+      "used_by": [
+        "uv run mkdocs serve",
+        "uv run mkdocs build"
+      ],
+      "invocation": "uv run mkdocs serve"
+    },
+    "mkdocstrings": {
+      "version": ">=0.30.1",
+      "type": "development",
+      "used_by": [
+        "uv run mkdocs serve",
+        "uv run mkdocs build"
+      ],
+      "invocation": "uv run mkdocs build"
+    },
+    "mkdocs-git-revision-date-localized-plugin": {
+      "version": ">=1.4.7",
+      "type": "development",
+      "used_by": [
+        "uv run mkdocs build"
+      ],
+      "invocation": "uv run mkdocs build"
+    },
+    "mkdocs-llmstxt": {
+      "version": ">=0.4.0",
+      "type": "development",
+      "used_by": [
+        "uv run mkdocs build"
+      ],
+      "invocation": "uv run mkdocs build"
+    },
+    "prek": {
+      "version": ">=0.3.6",
+      "type": "development",
+      "used_by": [
+        "uv run prek"
+      ],
+      "invocation": "uv run prek"
+    },
+    "pyright": {
+      "version": ">=1.1.407",
+      "type": "development",
+      "used_by": [
+        "uv run pyright"
+      ],
+      "invocation": "uv run pyright"
+    },
+    "pytest": {
+      "version": ">=8.4.2",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "pytest-asyncio": {
+      "version": ">=0.24.0",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "pytest-benchmark": {
+      "version": ">=5.2.3",
+      "type": "development",
+      "used_by": [
+        "uv run pytest -m benchmark"
+      ],
+      "invocation": "uv run pytest -m benchmark"
+    },
+    "pytest-cov": {
+      "version": ">=7.0.0",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "pytest-retry": {
+      "version": ">=1.7.0",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "pytest-sugar": {
+      "version": ">=1.1.1",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "pytest-timeout": {
+      "version": ">=2.4.0",
+      "type": "development",
+      "used_by": [
+        "uv run pytest"
+      ],
+      "invocation": "uv run pytest"
+    },
+    "pyyaml": {
+      "version": ">=6.0.3",
+      "type": "development",
+      "used_by": [
+        "src/lifx/protocol/generator.py"
+      ],
+      "invocation": "uv run python -m lifx.protocol.generator"
+    },
+    "ruff": {
+      "version": ">=0.14.2",
+      "type": "development",
+      "used_by": [
+        "uv run ruff check",
+        "uv run ruff format"
+      ],
+      "invocation": "uv run ruff check"
+    },
+    "typing-extensions": {
+      "version": ">=4.15.0",
+      "type": "development",
+      "used_by": [
+        "src/lifx/"
+      ],
+      "invocation": "implicit"
+    }
+  }
+}
