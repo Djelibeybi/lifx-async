@@ -8853,6 +8853,10 @@ async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
     else:
         raise TypeError(f"Expected bool or int, got {type(level).__name__}")
 
+    # Ensure state is initialised so component colours can be captured
+    if self._state is None:
+        await self._initialize_state()
+
     # If turning off, capture current colors for both components with single fetch
     if turning_off:
         # Single fetch to capture both uplight and downlight colors

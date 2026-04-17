@@ -29831,7 +29831,11 @@ determined at turn-on time using the standard brightness inference logic.</p>
 <span class="normal"><a href="#__codelineno-0-883">883</a></span>
 <span class="normal"><a href="#__codelineno-0-884">884</a></span>
 <span class="normal"><a href="#__codelineno-0-885">885</a></span>
-<span class="normal"><a href="#__codelineno-0-886">886</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-804"><a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_power</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-886">886</a></span>
+<span class="normal"><a href="#__codelineno-0-887">887</a></span>
+<span class="normal"><a href="#__codelineno-0-888">888</a></span>
+<span class="normal"><a href="#__codelineno-0-889">889</a></span>
+<span class="normal"><a href="#__codelineno-0-890">890</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-804"><a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_power</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-805"><a id="__codelineno-0-805" name="__codelineno-0-805"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set light power state, capturing component colors before turning off.</span>
 </span><span id="__span-0-806"><a id="__codelineno-0-806" name="__codelineno-0-806"></a>
 </span><span id="__span-0-807"><a id="__codelineno-0-807" name="__codelineno-0-807"></a><span class="sd">    Overrides Light.set_power() to capture the current uplight and downlight</span>
@@ -29875,45 +29879,49 @@ determined at turn-on time using the standard brightness inference logic.</p>
 </span><span id="__span-0-845"><a id="__codelineno-0-845" name="__codelineno-0-845"></a>    <span class="k">else</span><span class="p">:</span>
 </span><span id="__span-0-846"><a id="__codelineno-0-846" name="__codelineno-0-846"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected bool or int, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="__span-0-847"><a id="__codelineno-0-847" name="__codelineno-0-847"></a>
-</span><span id="__span-0-848"><a id="__codelineno-0-848" name="__codelineno-0-848"></a>    <span class="c1"># If turning off, capture current colors for both components with single fetch</span>
-</span><span id="__span-0-849"><a id="__codelineno-0-849" name="__codelineno-0-849"></a>    <span class="k">if</span> <span class="n">turning_off</span><span class="p">:</span>
-</span><span id="__span-0-850"><a id="__codelineno-0-850" name="__codelineno-0-850"></a>        <span class="c1"># Single fetch to capture both uplight and downlight colors</span>
-</span><span id="__span-0-851"><a id="__codelineno-0-851" name="__codelineno-0-851"></a>        <span class="n">all_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_all_tile_colors</span><span class="p">()</span>
-</span><span id="__span-0-852"><a id="__codelineno-0-852" name="__codelineno-0-852"></a>        <span class="n">tile_colors</span> <span class="o">=</span> <span class="n">all_colors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-0-853"><a id="__codelineno-0-853" name="__codelineno-0-853"></a>
-</span><span id="__span-0-854"><a id="__codelineno-0-854" name="__codelineno-0-854"></a>        <span class="c1"># Extract and store both component colors</span>
-</span><span id="__span-0-855"><a id="__codelineno-0-855" name="__codelineno-0-855"></a>        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
-</span><span id="__span-0-856"><a id="__codelineno-0-856" name="__codelineno-0-856"></a>        <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span> <span class="o">=</span> <span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">uplight_zone</span><span class="p">]</span>
-</span><span id="__span-0-857"><a id="__codelineno-0-857" name="__codelineno-0-857"></a>        <span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zones</span><span class="p">])</span>
-</span><span id="__span-0-858"><a id="__codelineno-0-858" name="__codelineno-0-858"></a>
-</span><span id="__span-0-859"><a id="__codelineno-0-859" name="__codelineno-0-859"></a>        <span class="c1"># Sync public fields and last-known colours</span>
-</span><span id="__span-0-860"><a id="__codelineno-0-860" name="__codelineno-0-860"></a>        <span class="n">state</span><span class="o">.</span><span class="n">uplight_color</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span>
-</span><span id="__span-0-861"><a id="__codelineno-0-861" name="__codelineno-0-861"></a>        <span class="n">state</span><span class="o">.</span><span class="n">downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span><span class="p">)</span>
-</span><span id="__span-0-862"><a id="__codelineno-0-862" name="__codelineno-0-862"></a>        <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span>
-</span><span id="__span-0-863"><a id="__codelineno-0-863" name="__codelineno-0-863"></a>        <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span><span class="p">)</span>
-</span><span id="__span-0-864"><a id="__codelineno-0-864" name="__codelineno-0-864"></a>
-</span><span id="__span-0-865"><a id="__codelineno-0-865" name="__codelineno-0-865"></a>    <span class="c1"># Call parent to perform actual power change</span>
-</span><span id="__span-0-866"><a id="__codelineno-0-866" name="__codelineno-0-866"></a>    <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">duration</span><span class="p">)</span>
-</span><span id="__span-0-867"><a id="__codelineno-0-867" name="__codelineno-0-867"></a>
-</span><span id="__span-0-868"><a id="__codelineno-0-868" name="__codelineno-0-868"></a>    <span class="c1"># Mark components as off only after power-off succeeds</span>
-</span><span id="__span-0-869"><a id="__codelineno-0-869" name="__codelineno-0-869"></a>    <span class="k">if</span> <span class="n">turning_off</span><span class="p">:</span>
-</span><span id="__span-0-870"><a id="__codelineno-0-870" name="__codelineno-0-870"></a>        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
-</span><span id="__span-0-871"><a id="__codelineno-0-871" name="__codelineno-0-871"></a>        <span class="n">state</span><span class="o">.</span><span class="n">uplight_is_on</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="__span-0-872"><a id="__codelineno-0-872" name="__codelineno-0-872"></a>        <span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="__span-0-873"><a id="__codelineno-0-873" name="__codelineno-0-873"></a>
-</span><span id="__span-0-874"><a id="__codelineno-0-874" name="__codelineno-0-874"></a>    <span class="c1"># When turning on, recompute booleans from last-known colours</span>
-</span><span id="__span-0-875"><a id="__codelineno-0-875" name="__codelineno-0-875"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">turning_off</span><span class="p">:</span>
-</span><span id="__span-0-876"><a id="__codelineno-0-876" name="__codelineno-0-876"></a>        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
-</span><span id="__span-0-877"><a id="__codelineno-0-877" name="__codelineno-0-877"></a>        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-878"><a id="__codelineno-0-878" name="__codelineno-0-878"></a>            <span class="n">state</span><span class="o">.</span><span class="n">uplight_is_on</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span><span class="o">.</span><span class="n">brightness</span> <span class="o">&gt;</span> <span class="mi">0</span>
-</span><span id="__span-0-879"><a id="__codelineno-0-879" name="__codelineno-0-879"></a>        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-880"><a id="__codelineno-0-880" name="__codelineno-0-880"></a>            <span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
-</span><span id="__span-0-881"><a id="__codelineno-0-881" name="__codelineno-0-881"></a>                <span class="n">c</span><span class="o">.</span><span class="n">brightness</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span>
-</span><span id="__span-0-882"><a id="__codelineno-0-882" name="__codelineno-0-882"></a>            <span class="p">)</span>
-</span><span id="__span-0-883"><a id="__codelineno-0-883" name="__codelineno-0-883"></a>
-</span><span id="__span-0-884"><a id="__codelineno-0-884" name="__codelineno-0-884"></a>    <span class="c1"># Persist AFTER device operation completes</span>
-</span><span id="__span-0-885"><a id="__codelineno-0-885" name="__codelineno-0-885"></a>    <span class="k">if</span> <span class="n">turning_off</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_file</span><span class="p">:</span>
-</span><span id="__span-0-886"><a id="__codelineno-0-886" name="__codelineno-0-886"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_save_state_to_file</span><span class="p">()</span>
+</span><span id="__span-0-848"><a id="__codelineno-0-848" name="__codelineno-0-848"></a>    <span class="c1"># Ensure state is initialised so component colours can be captured</span>
+</span><span id="__span-0-849"><a id="__codelineno-0-849" name="__codelineno-0-849"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-850"><a id="__codelineno-0-850" name="__codelineno-0-850"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_state</span><span class="p">()</span>
+</span><span id="__span-0-851"><a id="__codelineno-0-851" name="__codelineno-0-851"></a>
+</span><span id="__span-0-852"><a id="__codelineno-0-852" name="__codelineno-0-852"></a>    <span class="c1"># If turning off, capture current colors for both components with single fetch</span>
+</span><span id="__span-0-853"><a id="__codelineno-0-853" name="__codelineno-0-853"></a>    <span class="k">if</span> <span class="n">turning_off</span><span class="p">:</span>
+</span><span id="__span-0-854"><a id="__codelineno-0-854" name="__codelineno-0-854"></a>        <span class="c1"># Single fetch to capture both uplight and downlight colors</span>
+</span><span id="__span-0-855"><a id="__codelineno-0-855" name="__codelineno-0-855"></a>        <span class="n">all_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_all_tile_colors</span><span class="p">()</span>
+</span><span id="__span-0-856"><a id="__codelineno-0-856" name="__codelineno-0-856"></a>        <span class="n">tile_colors</span> <span class="o">=</span> <span class="n">all_colors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-0-857"><a id="__codelineno-0-857" name="__codelineno-0-857"></a>
+</span><span id="__span-0-858"><a id="__codelineno-0-858" name="__codelineno-0-858"></a>        <span class="c1"># Extract and store both component colors</span>
+</span><span id="__span-0-859"><a id="__codelineno-0-859" name="__codelineno-0-859"></a>        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-0-860"><a id="__codelineno-0-860" name="__codelineno-0-860"></a>        <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span> <span class="o">=</span> <span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">uplight_zone</span><span class="p">]</span>
+</span><span id="__span-0-861"><a id="__codelineno-0-861" name="__codelineno-0-861"></a>        <span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zones</span><span class="p">])</span>
+</span><span id="__span-0-862"><a id="__codelineno-0-862" name="__codelineno-0-862"></a>
+</span><span id="__span-0-863"><a id="__codelineno-0-863" name="__codelineno-0-863"></a>        <span class="c1"># Sync public fields and last-known colours</span>
+</span><span id="__span-0-864"><a id="__codelineno-0-864" name="__codelineno-0-864"></a>        <span class="n">state</span><span class="o">.</span><span class="n">uplight_color</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span>
+</span><span id="__span-0-865"><a id="__codelineno-0-865" name="__codelineno-0-865"></a>        <span class="n">state</span><span class="o">.</span><span class="n">downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span><span class="p">)</span>
+</span><span id="__span-0-866"><a id="__codelineno-0-866" name="__codelineno-0-866"></a>        <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span>
+</span><span id="__span-0-867"><a id="__codelineno-0-867" name="__codelineno-0-867"></a>        <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span><span class="p">)</span>
+</span><span id="__span-0-868"><a id="__codelineno-0-868" name="__codelineno-0-868"></a>
+</span><span id="__span-0-869"><a id="__codelineno-0-869" name="__codelineno-0-869"></a>    <span class="c1"># Call parent to perform actual power change</span>
+</span><span id="__span-0-870"><a id="__codelineno-0-870" name="__codelineno-0-870"></a>    <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_power</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">duration</span><span class="p">)</span>
+</span><span id="__span-0-871"><a id="__codelineno-0-871" name="__codelineno-0-871"></a>
+</span><span id="__span-0-872"><a id="__codelineno-0-872" name="__codelineno-0-872"></a>    <span class="c1"># Mark components as off only after power-off succeeds</span>
+</span><span id="__span-0-873"><a id="__codelineno-0-873" name="__codelineno-0-873"></a>    <span class="k">if</span> <span class="n">turning_off</span><span class="p">:</span>
+</span><span id="__span-0-874"><a id="__codelineno-0-874" name="__codelineno-0-874"></a>        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-0-875"><a id="__codelineno-0-875" name="__codelineno-0-875"></a>        <span class="n">state</span><span class="o">.</span><span class="n">uplight_is_on</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-876"><a id="__codelineno-0-876" name="__codelineno-0-876"></a>        <span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-877"><a id="__codelineno-0-877" name="__codelineno-0-877"></a>
+</span><span id="__span-0-878"><a id="__codelineno-0-878" name="__codelineno-0-878"></a>    <span class="c1"># When turning on, recompute booleans from last-known colours</span>
+</span><span id="__span-0-879"><a id="__codelineno-0-879" name="__codelineno-0-879"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">turning_off</span><span class="p">:</span>
+</span><span id="__span-0-880"><a id="__codelineno-0-880" name="__codelineno-0-880"></a>        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-0-881"><a id="__codelineno-0-881" name="__codelineno-0-881"></a>        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-882"><a id="__codelineno-0-882" name="__codelineno-0-882"></a>            <span class="n">state</span><span class="o">.</span><span class="n">uplight_is_on</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span><span class="o">.</span><span class="n">brightness</span> <span class="o">&gt;</span> <span class="mi">0</span>
+</span><span id="__span-0-883"><a id="__codelineno-0-883" name="__codelineno-0-883"></a>        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-884"><a id="__codelineno-0-884" name="__codelineno-0-884"></a>            <span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+</span><span id="__span-0-885"><a id="__codelineno-0-885" name="__codelineno-0-885"></a>                <span class="n">c</span><span class="o">.</span><span class="n">brightness</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span>
+</span><span id="__span-0-886"><a id="__codelineno-0-886" name="__codelineno-0-886"></a>            <span class="p">)</span>
+</span><span id="__span-0-887"><a id="__codelineno-0-887" name="__codelineno-0-887"></a>
+</span><span id="__span-0-888"><a id="__codelineno-0-888" name="__codelineno-0-888"></a>    <span class="c1"># Persist AFTER device operation completes</span>
+</span><span id="__span-0-889"><a id="__codelineno-0-889" name="__codelineno-0-889"></a>    <span class="k">if</span> <span class="n">turning_off</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_file</span><span class="p">:</span>
+</span><span id="__span-0-890"><a id="__codelineno-0-890" name="__codelineno-0-890"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_save_state_to_file</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -30059,11 +30067,7 @@ correct color values.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/devices/ceiling.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-888">888</a></span>
-<span class="normal"><a href="#__codelineno-0-889">889</a></span>
-<span class="normal"><a href="#__codelineno-0-890">890</a></span>
-<span class="normal"><a href="#__codelineno-0-891">891</a></span>
-<span class="normal"><a href="#__codelineno-0-892">892</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-892">892</a></span>
 <span class="normal"><a href="#__codelineno-0-893">893</a></span>
 <span class="normal"><a href="#__codelineno-0-894">894</a></span>
 <span class="normal"><a href="#__codelineno-0-895">895</a></span>
@@ -30110,58 +30114,62 @@ correct color values.</p>
 <span class="normal"><a href="#__codelineno-0-936">936</a></span>
 <span class="normal"><a href="#__codelineno-0-937">937</a></span>
 <span class="normal"><a href="#__codelineno-0-938">938</a></span>
-<span class="normal"><a href="#__codelineno-0-939">939</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-888"><a id="__codelineno-0-888" name="__codelineno-0-888"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_color</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span> <span class="n">HSBK</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-889"><a id="__codelineno-0-889" name="__codelineno-0-889"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set light color, updating component state tracking.</span>
-</span><span id="__span-0-890"><a id="__codelineno-0-890" name="__codelineno-0-890"></a>
-</span><span id="__span-0-891"><a id="__codelineno-0-891" name="__codelineno-0-891"></a><span class="sd">    Overrides Light.set_color() to track the color change in the ceiling</span>
-</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a><span class="sd">    light&#39;s component state. When set_color() is called, all zones (uplight</span>
-</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="sd">    and downlight) are set to the same color. This override ensures that</span>
-</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a><span class="sd">    the cached component colors stay in sync so that subsequent component</span>
-</span><span id="__span-0-895"><a id="__codelineno-0-895" name="__codelineno-0-895"></a><span class="sd">    control methods (like turn_uplight_on or turn_downlight_on) use the</span>
-</span><span id="__span-0-896"><a id="__codelineno-0-896" name="__codelineno-0-896"></a><span class="sd">    correct color values.</span>
-</span><span id="__span-0-897"><a id="__codelineno-0-897" name="__codelineno-0-897"></a>
-</span><span id="__span-0-898"><a id="__codelineno-0-898" name="__codelineno-0-898"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-899"><a id="__codelineno-0-899" name="__codelineno-0-899"></a><span class="sd">        color: HSBK color to set for the entire light</span>
-</span><span id="__span-0-900"><a id="__codelineno-0-900" name="__codelineno-0-900"></a><span class="sd">        duration: Transition duration in seconds (default 0.0)</span>
+<span class="normal"><a href="#__codelineno-0-939">939</a></span>
+<span class="normal"><a href="#__codelineno-0-940">940</a></span>
+<span class="normal"><a href="#__codelineno-0-941">941</a></span>
+<span class="normal"><a href="#__codelineno-0-942">942</a></span>
+<span class="normal"><a href="#__codelineno-0-943">943</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_color</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span> <span class="n">HSBK</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set light color, updating component state tracking.</span>
+</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a>
+</span><span id="__span-0-895"><a id="__codelineno-0-895" name="__codelineno-0-895"></a><span class="sd">    Overrides Light.set_color() to track the color change in the ceiling</span>
+</span><span id="__span-0-896"><a id="__codelineno-0-896" name="__codelineno-0-896"></a><span class="sd">    light&#39;s component state. When set_color() is called, all zones (uplight</span>
+</span><span id="__span-0-897"><a id="__codelineno-0-897" name="__codelineno-0-897"></a><span class="sd">    and downlight) are set to the same color. This override ensures that</span>
+</span><span id="__span-0-898"><a id="__codelineno-0-898" name="__codelineno-0-898"></a><span class="sd">    the cached component colors stay in sync so that subsequent component</span>
+</span><span id="__span-0-899"><a id="__codelineno-0-899" name="__codelineno-0-899"></a><span class="sd">    control methods (like turn_uplight_on or turn_downlight_on) use the</span>
+</span><span id="__span-0-900"><a id="__codelineno-0-900" name="__codelineno-0-900"></a><span class="sd">    correct color values.</span>
 </span><span id="__span-0-901"><a id="__codelineno-0-901" name="__codelineno-0-901"></a>
-</span><span id="__span-0-902"><a id="__codelineno-0-902" name="__codelineno-0-902"></a><span class="sd">    Raises:</span>
-</span><span id="__span-0-903"><a id="__codelineno-0-903" name="__codelineno-0-903"></a><span class="sd">        LifxDeviceNotFoundError: If device is not connected</span>
-</span><span id="__span-0-904"><a id="__codelineno-0-904" name="__codelineno-0-904"></a><span class="sd">        LifxTimeoutError: If device does not respond</span>
-</span><span id="__span-0-905"><a id="__codelineno-0-905" name="__codelineno-0-905"></a><span class="sd">        LifxUnsupportedCommandError: If device doesn&#39;t support this command</span>
-</span><span id="__span-0-906"><a id="__codelineno-0-906" name="__codelineno-0-906"></a>
-</span><span id="__span-0-907"><a id="__codelineno-0-907" name="__codelineno-0-907"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-908"><a id="__codelineno-0-908" name="__codelineno-0-908"></a><span class="sd">        ```python</span>
-</span><span id="__span-0-909"><a id="__codelineno-0-909" name="__codelineno-0-909"></a><span class="sd">        from lifx.color import HSBK</span>
+</span><span id="__span-0-902"><a id="__codelineno-0-902" name="__codelineno-0-902"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-903"><a id="__codelineno-0-903" name="__codelineno-0-903"></a><span class="sd">        color: HSBK color to set for the entire light</span>
+</span><span id="__span-0-904"><a id="__codelineno-0-904" name="__codelineno-0-904"></a><span class="sd">        duration: Transition duration in seconds (default 0.0)</span>
+</span><span id="__span-0-905"><a id="__codelineno-0-905" name="__codelineno-0-905"></a>
+</span><span id="__span-0-906"><a id="__codelineno-0-906" name="__codelineno-0-906"></a><span class="sd">    Raises:</span>
+</span><span id="__span-0-907"><a id="__codelineno-0-907" name="__codelineno-0-907"></a><span class="sd">        LifxDeviceNotFoundError: If device is not connected</span>
+</span><span id="__span-0-908"><a id="__codelineno-0-908" name="__codelineno-0-908"></a><span class="sd">        LifxTimeoutError: If device does not respond</span>
+</span><span id="__span-0-909"><a id="__codelineno-0-909" name="__codelineno-0-909"></a><span class="sd">        LifxUnsupportedCommandError: If device doesn&#39;t support this command</span>
 </span><span id="__span-0-910"><a id="__codelineno-0-910" name="__codelineno-0-910"></a>
-</span><span id="__span-0-911"><a id="__codelineno-0-911" name="__codelineno-0-911"></a><span class="sd">        # Set entire ceiling light to warm white</span>
-</span><span id="__span-0-912"><a id="__codelineno-0-912" name="__codelineno-0-912"></a><span class="sd">        await ceiling.set_color(</span>
-</span><span id="__span-0-913"><a id="__codelineno-0-913" name="__codelineno-0-913"></a><span class="sd">            HSBK(hue=0, saturation=0, brightness=1.0, kelvin=2700)</span>
-</span><span id="__span-0-914"><a id="__codelineno-0-914" name="__codelineno-0-914"></a><span class="sd">        )</span>
-</span><span id="__span-0-915"><a id="__codelineno-0-915" name="__codelineno-0-915"></a>
-</span><span id="__span-0-916"><a id="__codelineno-0-916" name="__codelineno-0-916"></a><span class="sd">        # Later component control will use this color</span>
-</span><span id="__span-0-917"><a id="__codelineno-0-917" name="__codelineno-0-917"></a><span class="sd">        await ceiling.turn_uplight_off()  # Uplight off</span>
-</span><span id="__span-0-918"><a id="__codelineno-0-918" name="__codelineno-0-918"></a><span class="sd">        await ceiling.turn_uplight_on()  # Restores to warm white</span>
-</span><span id="__span-0-919"><a id="__codelineno-0-919" name="__codelineno-0-919"></a><span class="sd">        ```</span>
-</span><span id="__span-0-920"><a id="__codelineno-0-920" name="__codelineno-0-920"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-921"><a id="__codelineno-0-921" name="__codelineno-0-921"></a>    <span class="c1"># Call parent to perform actual color change</span>
-</span><span id="__span-0-922"><a id="__codelineno-0-922" name="__codelineno-0-922"></a>    <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">duration</span><span class="p">)</span>
-</span><span id="__span-0-923"><a id="__codelineno-0-923" name="__codelineno-0-923"></a>
-</span><span id="__span-0-924"><a id="__codelineno-0-924" name="__codelineno-0-924"></a>    <span class="c1"># Update all state fields — all zones now have the same color</span>
-</span><span id="__span-0-925"><a id="__codelineno-0-925" name="__codelineno-0-925"></a>    <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
-</span><span id="__span-0-926"><a id="__codelineno-0-926" name="__codelineno-0-926"></a>    <span class="n">is_on</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">power</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">color</span><span class="o">.</span><span class="n">brightness</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-0-927"><a id="__codelineno-0-927" name="__codelineno-0-927"></a>    <span class="n">downlight_colors</span> <span class="o">=</span> <span class="p">[</span><span class="n">color</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span>
-</span><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a>    <span class="n">state</span><span class="o">.</span><span class="n">uplight_color</span> <span class="o">=</span> <span class="n">color</span>
-</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>    <span class="n">state</span><span class="o">.</span><span class="n">downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downlight_colors</span><span class="p">)</span>
-</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a>    <span class="n">state</span><span class="o">.</span><span class="n">uplight_is_on</span> <span class="o">=</span> <span class="n">is_on</span>
-</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a>    <span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="n">is_on</span>
-</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a>    <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span> <span class="o">=</span> <span class="n">color</span>
-</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a>    <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downlight_colors</span><span class="p">)</span>
-</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a>    <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span> <span class="o">=</span> <span class="n">color</span>
-</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a>    <span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downlight_colors</span><span class="p">)</span>
-</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a>
-</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a>    <span class="c1"># Persist if enabled</span>
-</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_file</span><span class="p">:</span>
-</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_save_state_to_file</span><span class="p">()</span>
+</span><span id="__span-0-911"><a id="__codelineno-0-911" name="__codelineno-0-911"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-912"><a id="__codelineno-0-912" name="__codelineno-0-912"></a><span class="sd">        ```python</span>
+</span><span id="__span-0-913"><a id="__codelineno-0-913" name="__codelineno-0-913"></a><span class="sd">        from lifx.color import HSBK</span>
+</span><span id="__span-0-914"><a id="__codelineno-0-914" name="__codelineno-0-914"></a>
+</span><span id="__span-0-915"><a id="__codelineno-0-915" name="__codelineno-0-915"></a><span class="sd">        # Set entire ceiling light to warm white</span>
+</span><span id="__span-0-916"><a id="__codelineno-0-916" name="__codelineno-0-916"></a><span class="sd">        await ceiling.set_color(</span>
+</span><span id="__span-0-917"><a id="__codelineno-0-917" name="__codelineno-0-917"></a><span class="sd">            HSBK(hue=0, saturation=0, brightness=1.0, kelvin=2700)</span>
+</span><span id="__span-0-918"><a id="__codelineno-0-918" name="__codelineno-0-918"></a><span class="sd">        )</span>
+</span><span id="__span-0-919"><a id="__codelineno-0-919" name="__codelineno-0-919"></a>
+</span><span id="__span-0-920"><a id="__codelineno-0-920" name="__codelineno-0-920"></a><span class="sd">        # Later component control will use this color</span>
+</span><span id="__span-0-921"><a id="__codelineno-0-921" name="__codelineno-0-921"></a><span class="sd">        await ceiling.turn_uplight_off()  # Uplight off</span>
+</span><span id="__span-0-922"><a id="__codelineno-0-922" name="__codelineno-0-922"></a><span class="sd">        await ceiling.turn_uplight_on()  # Restores to warm white</span>
+</span><span id="__span-0-923"><a id="__codelineno-0-923" name="__codelineno-0-923"></a><span class="sd">        ```</span>
+</span><span id="__span-0-924"><a id="__codelineno-0-924" name="__codelineno-0-924"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-925"><a id="__codelineno-0-925" name="__codelineno-0-925"></a>    <span class="c1"># Call parent to perform actual color change</span>
+</span><span id="__span-0-926"><a id="__codelineno-0-926" name="__codelineno-0-926"></a>    <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">duration</span><span class="p">)</span>
+</span><span id="__span-0-927"><a id="__codelineno-0-927" name="__codelineno-0-927"></a>
+</span><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a>    <span class="c1"># Update all state fields — all zones now have the same color</span>
+</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>    <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a>    <span class="n">is_on</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">power</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">color</span><span class="o">.</span><span class="n">brightness</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a>    <span class="n">downlight_colors</span> <span class="o">=</span> <span class="p">[</span><span class="n">color</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span>
+</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a>    <span class="n">state</span><span class="o">.</span><span class="n">uplight_color</span> <span class="o">=</span> <span class="n">color</span>
+</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a>    <span class="n">state</span><span class="o">.</span><span class="n">downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downlight_colors</span><span class="p">)</span>
+</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a>    <span class="n">state</span><span class="o">.</span><span class="n">uplight_is_on</span> <span class="o">=</span> <span class="n">is_on</span>
+</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a>    <span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="n">is_on</span>
+</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a>    <span class="n">state</span><span class="o">.</span><span class="n">last_uplight_color</span> <span class="o">=</span> <span class="n">color</span>
+</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a>    <span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downlight_colors</span><span class="p">)</span>
+</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a>    <span class="n">state</span><span class="o">.</span><span class="n">stored_uplight_color</span> <span class="o">=</span> <span class="n">color</span>
+</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a>    <span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downlight_colors</span><span class="p">)</span>
+</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a>
+</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a>    <span class="c1"># Persist if enabled</span>
+</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_file</span><span class="p">:</span>
+</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_save_state_to_file</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -30301,11 +30309,7 @@ If provided, stores these colors (with brightness=0 on device).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/lifx/devices/ceiling.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-941"> 941</a></span>
-<span class="normal"><a href="#__codelineno-0-942"> 942</a></span>
-<span class="normal"><a href="#__codelineno-0-943"> 943</a></span>
-<span class="normal"><a href="#__codelineno-0-944"> 944</a></span>
-<span class="normal"><a href="#__codelineno-0-945"> 945</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-945"> 945</a></span>
 <span class="normal"><a href="#__codelineno-0-946"> 946</a></span>
 <span class="normal"><a href="#__codelineno-0-947"> 947</a></span>
 <span class="normal"><a href="#__codelineno-0-948"> 948</a></span>
@@ -30377,83 +30381,87 @@ If provided, stores these colors (with brightness=0 on device).</p>
 <span class="normal"><a href="#__codelineno-0-1014">1014</a></span>
 <span class="normal"><a href="#__codelineno-0-1015">1015</a></span>
 <span class="normal"><a href="#__codelineno-0-1016">1016</a></span>
-<span class="normal"><a href="#__codelineno-0-1017">1017</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">turn_downlight_off</span><span class="p">(</span>
-</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">colors</span><span class="p">:</span> <span class="n">HSBK</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
-</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Turn downlight component off.</span>
-</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a>
-</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a><span class="sd">        colors: Optional colors to store for future turn_on. Can be:</span>
-</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a><span class="sd">            - None: stores current colors from device</span>
-</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a><span class="sd">            - Single HSBK: stores this color for all zones</span>
-</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a><span class="sd">            - List[HSBK]: stores individual colors (must match zone count)</span>
-</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">            If provided, stores these colors (with brightness=0 on device).</span>
-</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">        duration: Transition duration in seconds (default 0.0)</span>
-</span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a>
-</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">    Raises:</span>
-</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">        ValueError: If any color.brightness == 0</span>
-</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a><span class="sd">        ValueError: If list length doesn&#39;t match downlight zone count</span>
-</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a><span class="sd">        LifxTimeoutError: Device did not respond</span>
-</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>
-</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a><span class="sd">    Note:</span>
-</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a><span class="sd">        Sets all downlight zone brightness to 0 on device while preserving H, S, K.</span>
-</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>    <span class="c1"># Validate provided colors early (before fetching)</span>
-</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>    <span class="n">stored_colors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a>    <span class="k">if</span> <span class="n">colors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">colors</span><span class="p">,</span> <span class="n">HSBK</span><span class="p">):</span>
-</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>            <span class="k">if</span> <span class="n">colors</span><span class="o">.</span><span class="n">brightness</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-968"><a id="__codelineno-0-968" name="__codelineno-0-968"></a>                    <span class="s2">&quot;Provided color cannot have brightness=0. &quot;</span>
-</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a>                    <span class="s2">&quot;Omit the parameter to use current colors.&quot;</span>
-</span><span id="__span-0-970"><a id="__codelineno-0-970" name="__codelineno-0-970"></a>                <span class="p">)</span>
-</span><span id="__span-0-971"><a id="__codelineno-0-971" name="__codelineno-0-971"></a>            <span class="n">stored_colors</span> <span class="o">=</span> <span class="p">[</span><span class="n">colors</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span>
-</span><span id="__span-0-972"><a id="__codelineno-0-972" name="__codelineno-0-972"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a>            <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">brightness</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">colors</span><span class="p">):</span>
-</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a>                    <span class="s2">&quot;Provided colors cannot have brightness=0. &quot;</span>
-</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a>                    <span class="s2">&quot;Omit the parameter to use current colors.&quot;</span>
-</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a>                <span class="p">)</span>
-</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span><span class="p">:</span>
-</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a>                    <span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span><span class="si">}</span><span class="s2"> colors for downlight, &quot;</span>
-</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a>                    <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a>                <span class="p">)</span>
-</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>            <span class="n">stored_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span>
-</span><span id="__span-0-984"><a id="__codelineno-0-984" name="__codelineno-0-984"></a>
-</span><span id="__span-0-985"><a id="__codelineno-0-985" name="__codelineno-0-985"></a>    <span class="c1"># Fetch current state once and reuse to calculate brightness</span>
-</span><span id="__span-0-986"><a id="__codelineno-0-986" name="__codelineno-0-986"></a>    <span class="n">all_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_all_tile_colors</span><span class="p">()</span>
-</span><span id="__span-0-987"><a id="__codelineno-0-987" name="__codelineno-0-987"></a>    <span class="n">tile_colors</span> <span class="o">=</span> <span class="n">all_colors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="normal"><a href="#__codelineno-0-1017">1017</a></span>
+<span class="normal"><a href="#__codelineno-0-1018">1018</a></span>
+<span class="normal"><a href="#__codelineno-0-1019">1019</a></span>
+<span class="normal"><a href="#__codelineno-0-1020">1020</a></span>
+<span class="normal"><a href="#__codelineno-0-1021">1021</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">turn_downlight_off</span><span class="p">(</span>
+</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">colors</span><span class="p">:</span> <span class="n">HSBK</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Turn downlight component off.</span>
+</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a>
+</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">        colors: Optional colors to store for future turn_on. Can be:</span>
+</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">            - None: stores current colors from device</span>
+</span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a><span class="sd">            - Single HSBK: stores this color for all zones</span>
+</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">            - List[HSBK]: stores individual colors (must match zone count)</span>
+</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">            If provided, stores these colors (with brightness=0 on device).</span>
+</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a><span class="sd">        duration: Transition duration in seconds (default 0.0)</span>
+</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>
+</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a><span class="sd">    Raises:</span>
+</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a><span class="sd">        ValueError: If any color.brightness == 0</span>
+</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a><span class="sd">        ValueError: If list length doesn&#39;t match downlight zone count</span>
+</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a><span class="sd">        LifxTimeoutError: Device did not respond</span>
+</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>
+</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a><span class="sd">    Note:</span>
+</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a><span class="sd">        Sets all downlight zone brightness to 0 on device while preserving H, S, K.</span>
+</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>    <span class="c1"># Validate provided colors early (before fetching)</span>
+</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>    <span class="n">stored_colors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">HSBK</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-968"><a id="__codelineno-0-968" name="__codelineno-0-968"></a>    <span class="k">if</span> <span class="n">colors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">colors</span><span class="p">,</span> <span class="n">HSBK</span><span class="p">):</span>
+</span><span id="__span-0-970"><a id="__codelineno-0-970" name="__codelineno-0-970"></a>            <span class="k">if</span> <span class="n">colors</span><span class="o">.</span><span class="n">brightness</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="__span-0-971"><a id="__codelineno-0-971" name="__codelineno-0-971"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-972"><a id="__codelineno-0-972" name="__codelineno-0-972"></a>                    <span class="s2">&quot;Provided color cannot have brightness=0. &quot;</span>
+</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a>                    <span class="s2">&quot;Omit the parameter to use current colors.&quot;</span>
+</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a>                <span class="p">)</span>
+</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a>            <span class="n">stored_colors</span> <span class="o">=</span> <span class="p">[</span><span class="n">colors</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span>
+</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a>            <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">brightness</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">colors</span><span class="p">):</span>
+</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a>                    <span class="s2">&quot;Provided colors cannot have brightness=0. &quot;</span>
+</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a>                    <span class="s2">&quot;Omit the parameter to use current colors.&quot;</span>
+</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a>                <span class="p">)</span>
+</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span><span class="p">:</span>
+</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-984"><a id="__codelineno-0-984" name="__codelineno-0-984"></a>                    <span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zone_count</span><span class="si">}</span><span class="s2"> colors for downlight, &quot;</span>
+</span><span id="__span-0-985"><a id="__codelineno-0-985" name="__codelineno-0-985"></a>                    <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-0-986"><a id="__codelineno-0-986" name="__codelineno-0-986"></a>                <span class="p">)</span>
+</span><span id="__span-0-987"><a id="__codelineno-0-987" name="__codelineno-0-987"></a>            <span class="n">stored_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span>
 </span><span id="__span-0-988"><a id="__codelineno-0-988" name="__codelineno-0-988"></a>
-</span><span id="__span-0-989"><a id="__codelineno-0-989" name="__codelineno-0-989"></a>    <span class="c1"># If not provided, extract from fetched data</span>
-</span><span id="__span-0-990"><a id="__codelineno-0-990" name="__codelineno-0-990"></a>    <span class="c1"># (kept local until I/O succeeds)</span>
-</span><span id="__span-0-991"><a id="__codelineno-0-991" name="__codelineno-0-991"></a>    <span class="k">if</span> <span class="n">stored_colors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-992"><a id="__codelineno-0-992" name="__codelineno-0-992"></a>        <span class="n">stored_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zones</span><span class="p">])</span>
-</span><span id="__span-0-993"><a id="__codelineno-0-993" name="__codelineno-0-993"></a>
-</span><span id="__span-0-994"><a id="__codelineno-0-994" name="__codelineno-0-994"></a>    <span class="c1"># Create colors with brightness=0 for device</span>
-</span><span id="__span-0-995"><a id="__codelineno-0-995" name="__codelineno-0-995"></a>    <span class="n">off_colors</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-996"><a id="__codelineno-0-996" name="__codelineno-0-996"></a>        <span class="n">HSBK</span><span class="p">(</span>
-</span><span id="__span-0-997"><a id="__codelineno-0-997" name="__codelineno-0-997"></a>            <span class="n">hue</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">hue</span><span class="p">,</span>
-</span><span id="__span-0-998"><a id="__codelineno-0-998" name="__codelineno-0-998"></a>            <span class="n">saturation</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">saturation</span><span class="p">,</span>
-</span><span id="__span-0-999"><a id="__codelineno-0-999" name="__codelineno-0-999"></a>            <span class="n">brightness</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-0-1000"><a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>            <span class="n">kelvin</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">kelvin</span><span class="p">,</span>
-</span><span id="__span-0-1001"><a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>        <span class="p">)</span>
-</span><span id="__span-0-1002"><a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">stored_colors</span>
-</span><span id="__span-0-1003"><a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>    <span class="p">]</span>
-</span><span id="__span-0-1004"><a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>
-</span><span id="__span-0-1005"><a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>    <span class="c1"># Update downlight zones and send immediately</span>
-</span><span id="__span-0-1006"><a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>    <span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zones</span><span class="p">]</span> <span class="o">=</span> <span class="n">off_colors</span>
-</span><span id="__span-0-1007"><a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_matrix_colors</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">tile_colors</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">duration</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">))</span>
+</span><span id="__span-0-989"><a id="__codelineno-0-989" name="__codelineno-0-989"></a>    <span class="c1"># Fetch current state once and reuse to calculate brightness</span>
+</span><span id="__span-0-990"><a id="__codelineno-0-990" name="__codelineno-0-990"></a>    <span class="n">all_colors</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_all_tile_colors</span><span class="p">()</span>
+</span><span id="__span-0-991"><a id="__codelineno-0-991" name="__codelineno-0-991"></a>    <span class="n">tile_colors</span> <span class="o">=</span> <span class="n">all_colors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-0-992"><a id="__codelineno-0-992" name="__codelineno-0-992"></a>
+</span><span id="__span-0-993"><a id="__codelineno-0-993" name="__codelineno-0-993"></a>    <span class="c1"># If not provided, extract from fetched data</span>
+</span><span id="__span-0-994"><a id="__codelineno-0-994" name="__codelineno-0-994"></a>    <span class="c1"># (kept local until I/O succeeds)</span>
+</span><span id="__span-0-995"><a id="__codelineno-0-995" name="__codelineno-0-995"></a>    <span class="k">if</span> <span class="n">stored_colors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-996"><a id="__codelineno-0-996" name="__codelineno-0-996"></a>        <span class="n">stored_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zones</span><span class="p">])</span>
+</span><span id="__span-0-997"><a id="__codelineno-0-997" name="__codelineno-0-997"></a>
+</span><span id="__span-0-998"><a id="__codelineno-0-998" name="__codelineno-0-998"></a>    <span class="c1"># Create colors with brightness=0 for device</span>
+</span><span id="__span-0-999"><a id="__codelineno-0-999" name="__codelineno-0-999"></a>    <span class="n">off_colors</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-0-1000"><a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>        <span class="n">HSBK</span><span class="p">(</span>
+</span><span id="__span-0-1001"><a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>            <span class="n">hue</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">hue</span><span class="p">,</span>
+</span><span id="__span-0-1002"><a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>            <span class="n">saturation</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">saturation</span><span class="p">,</span>
+</span><span id="__span-0-1003"><a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>            <span class="n">brightness</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-0-1004"><a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>            <span class="n">kelvin</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">kelvin</span><span class="p">,</span>
+</span><span id="__span-0-1005"><a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>        <span class="p">)</span>
+</span><span id="__span-0-1006"><a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">stored_colors</span>
+</span><span id="__span-0-1007"><a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>    <span class="p">]</span>
 </span><span id="__span-0-1008"><a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>
-</span><span id="__span-0-1009"><a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>    <span class="c1"># Update state only after I/O succeeds</span>
-</span><span id="__span-0-1010"><a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">stored_colors</span><span class="p">)</span>
-</span><span id="__span-0-1011"><a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">off_colors</span><span class="p">)</span>
-</span><span id="__span-0-1012"><a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="__span-0-1013"><a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">off_colors</span><span class="p">)</span>
-</span><span id="__span-0-1014"><a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>
-</span><span id="__span-0-1015"><a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>    <span class="c1"># Persist if enabled</span>
-</span><span id="__span-0-1016"><a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_file</span><span class="p">:</span>
-</span><span id="__span-0-1017"><a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_save_state_to_file</span><span class="p">()</span>
+</span><span id="__span-0-1009"><a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>    <span class="c1"># Update downlight zones and send immediately</span>
+</span><span id="__span-0-1010"><a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>    <span class="n">tile_colors</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">downlight_zones</span><span class="p">]</span> <span class="o">=</span> <span class="n">off_colors</span>
+</span><span id="__span-0-1011"><a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_matrix_colors</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">tile_colors</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">duration</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">))</span>
+</span><span id="__span-0-1012"><a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>
+</span><span id="__span-0-1013"><a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>    <span class="c1"># Update state only after I/O succeeds</span>
+</span><span id="__span-0-1014"><a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">stored_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">stored_colors</span><span class="p">)</span>
+</span><span id="__span-0-1015"><a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">off_colors</span><span class="p">)</span>
+</span><span id="__span-0-1016"><a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">downlight_is_on</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-1017"><a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">last_downlight_colors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">off_colors</span><span class="p">)</span>
+</span><span id="__span-0-1018"><a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>
+</span><span id="__span-0-1019"><a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>    <span class="c1"># Persist if enabled</span>
+</span><span id="__span-0-1020"><a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_file</span><span class="p">:</span>
+</span><span id="__span-0-1021"><a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_save_state_to_file</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
