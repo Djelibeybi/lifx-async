@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v5.4.7 (2026-04-17)
+
+### Bug Fixes
+
+- Ensure CeilingLightState exists before caliing set_power ([`48cef24`](https://github.com/Djelibeybi/lifx-async/commit/48cef2425cfdea57c06ecb04743229facfc41911))
+
 ## v5.4.6 (2026-03-22)
 
 ### Bug Fixes
