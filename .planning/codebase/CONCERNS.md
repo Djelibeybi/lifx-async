@@ -37,7 +37,7 @@
 **Low Code Coverage (27%):**
 - Issue: Despite 2495+ tests, branch coverage sits at only 27% as reported by pytest-cov
 - Files: `pyproject.toml` (line 106, `--cov-branch`)
-- Impact: Large portions of production code paths are untested, particularly error handling branches, edge cases in network layer, and generated protocol code
+- Impact: Large portions of production code paths are untested, particularly error-handling branches, edge cases in network layer, and generated protocol code
 - Fix approach: The coverage report excludes `generator.py` and `protocol_types.py` but not `packets.py` (1404 lines of generated code). Consider adding `packets.py` to coverage omit list to get a more accurate measure of hand-written code coverage, then target gaps in `src/lifx/network/` and `src/lifx/devices/`.
 
 ## Security Considerations
@@ -72,7 +72,7 @@
 - Problem: No throttling mechanism for device requests. LIFX devices handle approximately 20 messages/second before becoming unresponsive.
 - Files: `src/lifx/network/connection.py` (entire module)
 - Cause: Documented as an application responsibility, but easy to accidentally overwhelm devices with batch operations via `DeviceGroup` or rapid sequential calls.
-- Improvement path: Consider an optional rate limiter (e.g., `asyncio.Semaphore` with timed release) on `DeviceConnection` or `DeviceGroup`. Could be opt-in via constructor parameter.
+- Improvement path: Consider an optional rate limiter (e.g., `asyncio.Semaphore` with timed release) on `DeviceConnection` or `DeviceGroup`. This could be opt-in via a constructor parameter.
 
 **Sequential Zone Restore for Non-Extended Multizone:**
 - Problem: Restoring multizone state on devices without extended multizone sends one packet per zone sequentially
