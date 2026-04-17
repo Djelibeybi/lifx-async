@@ -406,11 +406,7 @@ def create_mdns_socket() -> socket.socket:
         sock.bind(("", MDNS_PORT))
     except OSError as e:
         print(f"Warning: Could not bind to port {MDNS_PORT}: {e}", file=sys.stderr)
-        print(
-            "Binding to ephemeral port instead (may miss some responses)",
-            file=sys.stderr,
-        )
-        sock.bind(("", 0))
+        sys.exit(1)
 
     # Join multicast group (bind to all interfaces for multicast reception)
     local_addr = socket.inet_aton("0.0.0.0")  # nosec B104
