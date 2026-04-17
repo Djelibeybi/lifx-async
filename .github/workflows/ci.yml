@@ -28,11 +28,18 @@ env:
   PYTHON_VERSION: '3.11'
   UV_VERSION: 0.9.4
 
+# Restrictive default — jobs opt into additional scopes as needed.
+permissions:
+  contents: read
+
 jobs:
   # Detect which files changed to determine test matrix scope
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read  # gh pr diff needs to read PR metadata
     outputs:
       source: ${{ steps.filter.outputs.source }}
     steps:
