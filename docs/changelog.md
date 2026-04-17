@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v5.4.8 (2026-04-17)
+
+### Bug Fixes
+
+- Raise OSError in create_mdns_socket and handle exit in main()
+  ([`5d036be`](https://github.com/Djelibeybi/lifx-async/commit/5d036beb85a4e4184ebe9fe43a9f59268e10fecf))
+
+### Documentation
+
+- **planning**: Address code review nitpicks in codebase docs
+  ([`5609034`](https://github.com/Djelibeybi/lifx-async/commit/56090345365bba68f873ede2ac08d8584bac58d2))
+
+
 ## v5.4.7 (2026-04-17)
 
 ### Bug Fixes
