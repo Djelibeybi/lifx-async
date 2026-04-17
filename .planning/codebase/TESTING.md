@@ -42,7 +42,7 @@ uv run pytest -m emulator           # Run only emulator integration tests
 - Test functions: `test_{behaviour}` (e.g., `test_create_light`, `test_get_color`)
 
 **Structure:**
-```
+```text
 tests/
 ├── conftest.py                     # Root fixtures: emulator, cleanup, scenarios
 ├── test_color.py                   # Color utilities

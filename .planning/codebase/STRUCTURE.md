@@ -4,7 +4,7 @@
 
 ## Directory Layout
 
-```
+```text
 lifx-async/
 ├── src/lifx/                  # Main library package
 │   ├── __init__.py            # Public API re-exports (flat namespace)

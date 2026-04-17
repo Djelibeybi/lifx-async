@@ -64,7 +64,7 @@
 ## Import Organisation
 
 **Order (enforced by Ruff isort):**
-1. `from __future__ import annotations` — **always first line** in every module (71+ files)
+1. `from __future__ import annotations` — **first non-docstring statement** in every module (71+ files); a module-level docstring may precede it
 2. Standard library imports (`asyncio`, `logging`, `time`, `dataclasses`, etc.)
 3. Third-party imports (only in tests: `pytest`, `lifx_emulator`)
 4. Local imports using package-relative paths (`from lifx.color import HSBK`)
@@ -220,7 +220,7 @@ async def set_color(
 - `Device` class uses `Generic[TypeVar]` for state type: `Device[LightState]`, `Device[HevLightState]`
 
 **Future Annotations:**
-- Every module starts with `from __future__ import annotations` for PEP 604 union syntax (`X | Y`) and forward references
+- Every module uses `from __future__ import annotations` as its first non-docstring statement (after any module-level docstring) for PEP 604 union syntax (`X | Y`) and forward references
 
 ---
 
