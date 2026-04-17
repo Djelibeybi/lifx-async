@@ -405,8 +405,10 @@ def create_mdns_socket() -> socket.socket:
     try:
         sock.bind(("", MDNS_PORT))
     except OSError as e:
-        print(f"Warning: Could not bind to port {MDNS_PORT}: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise OSError(
+            f"Could not bind to port {MDNS_PORT}: {e}. "
+            "Another mDNS responder may already be using this port."
+        ) from e
 
     # Join multicast group (bind to all interfaces for multicast reception)
     local_addr = socket.inet_aton("0.0.0.0")  # nosec B104
@@ -461,7 +463,11 @@ def main() -> None:
     print("=" * 60)
 
     # Create socket
-    sock = create_mdns_socket()
+    try:
+        sock = create_mdns_socket()
+    except OSError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Build and send query
     query = build_mdns_query(args.service)
