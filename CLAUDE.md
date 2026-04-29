@@ -89,13 +89,14 @@ uv run python -m lifx.products.generator
 
 ```bash
 # Serve documentation locally with hot reload
-uv run mkdocs serve
+uv run zensical serve
 
 # Build static documentation
-uv run mkdocs build
+uv run zensical build
+uv run llmstxt-standalone build
 
-# Deploy to GitHub Pages
-uv run mkdocs gh-deploy
+# Deploy to GitHub Pages via the Documentation workflow
+gh workflow run docs.yml
 ```
 
 ## Architecture

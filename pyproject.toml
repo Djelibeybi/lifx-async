@@ -33,10 +33,8 @@ classifiers = [
 dev = [
     "hatchling>=1.27.0",
     "lifx-emulator-core>=3.1.0",
-    "mkdocs-git-revision-date-localized-plugin>=1.4.7",
-    "mkdocs-llmstxt>=0.4.0",
-    "mkdocs-material>=9.6.22",
-    "mkdocstrings[python]>=0.30.1",
+    "llmstxt-standalone>=0.2.0",
+    "mkdocstrings-python>=2.0.3",
     "prek>=0.3.6",
     "pyright>=1.1.407",
     "pytest>=8.4.2",
@@ -49,6 +47,7 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.14.2",
     "typing-extensions>=4.15.0",
+    "zensical>=0.0.37",
 ]
 
 [build-system]
