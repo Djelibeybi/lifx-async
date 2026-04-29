@@ -102,9 +102,7 @@ plugins:
           show_symbol_type_toc: true
           summary: true
 
-- git-revision-date-localized:
-    enable_creation_date: true
-
+# Used by llmstxt-standalone after Zensical builds the HTML site.
 - llmstxt:
     markdown_description: |
       lifx-async is a modern, type-safe, async Python library for controlling LIFX smart devices
@@ -121,38 +119,38 @@ plugins:
       - Concurrent request handling with connection pooling
     sections:
       Getting Started:
-      - getting-started/installation.md: Installation instructions and requirements
-      - getting-started/quickstart.md: Quick start guide with basic examples
-      - getting-started/themes.md: Using predefined color themes
-      - getting-started/effects.md: Light effects and animations
+      - getting-started/installation.md
+      - getting-started/quickstart.md
+      - getting-started/themes.md
+      - getting-started/effects.md
       User Guide:
-      - user-guide/themes.md: Working with color themes
-      - user-guide/ceiling-lights.md: Controlling LIFX Ceiling uplight and downlight components
-      - user-guide/animation.md: High-frequency animation for real-time effects
-      - user-guide/advanced-usage.md: Advanced usage patterns and best practices
-      - user-guide/effects-custom.md: Creating custom light effects
-      - user-guide/troubleshooting.md: Common issues and solutions
-      - user-guide/effects-troubleshooting.md: Effects-specific troubleshooting
-      - architecture/protocol-deep-dive.md: Understanding the LIFX protocol
+      - user-guide/themes.md
+      - user-guide/ceiling-lights.md
+      - user-guide/animation.md
+      - user-guide/advanced-usage.md
+      - user-guide/effects-custom.md
+      - user-guide/troubleshooting.md
+      - user-guide/effects-troubleshooting.md
+      - architecture/protocol-deep-dive.md
       Architecture:
-      - architecture/overview.md: System architecture and design
-      - architecture/effects-architecture.md: Effects system architecture
+      - architecture/overview.md
+      - architecture/effects-architecture.md
       API Reference:
-      - api/index.md: API reference overview
-      - api/high-level.md: High-level discovery and batch operations API
-      - api/themes.md: Theme system API
-      - api/effects.md: Effects API
-      - api/animation.md: Animation module for high-frequency frame delivery
-      - api/colors.md: Color utilities and HSBK conversion
-      - api/devices.md: Device classes and capabilities
-      - api/network.md: Network layer components
-      - api/protocol.md: Protocol layer and packet structures
-      - api/exceptions.md: Exception hierarchy
+      - api/index.md
+      - api/high-level.md
+      - api/themes.md
+      - api/effects.md
+      - api/animation.md
+      - api/colors.md
+      - api/devices.md
+      - api/network.md
+      - api/protocol.md
+      - api/exceptions.md
       Migration:
-      - migration/effect-api-changes.md: Effect API breaking changes and migration guide
+      - migration/effect-api-changes.md
       Additional Resources:
-      - faq.md: Frequently asked questions
-      - changelog.md: Version history and release notes
+      - faq.md
+      - changelog.md
     full_output: llms-full.txt
 
 markdown_extensions:
