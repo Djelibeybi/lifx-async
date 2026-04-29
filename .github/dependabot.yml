@@ -24,7 +24,9 @@ updates:
       - pytest*
       - ruff*
       - pyright*
-      - mkdocs*
+      - zensical*
+      - mkdocstrings*
+      - llmstxt-standalone
       - hatchling*
       - pyyaml*
       update-types:

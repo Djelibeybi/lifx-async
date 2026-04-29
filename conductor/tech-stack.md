@@ -14,7 +14,7 @@
 
 ## Infrastructure
 
-- **Distribution:** PyPI (published, currently v5.2.0)
+- **Distribution:** PyPI (latest published v5.2.0; project version v5.4.8)
 - **CI/CD:** GitHub Actions
 - **Release:** python-semantic-release with Conventional Commits
 
@@ -23,7 +23,7 @@
 - **Testing:** pytest, pytest-asyncio, pytest-cov, lifx-emulator-core
 - **Linting/Formatting:** ruff (line-length 88, select E/F/I/N/W/UP)
 - **Type Checking:** pyright (standard mode, Python 3.10 target)
-- **Documentation:** mkdocs-material, mkdocstrings
+- **Documentation:** Zensical, mkdocstrings-python, llmstxt-standalone
 - **Build:** hatchling
 
 ## Package Management
