@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v5.4.9 (2026-05-21)
+
+### Bug Fixes
+
+- Add new products to the LIFX product list
+  ([`f0e31c9`](https://github.com/Djelibeybi/lifx-async/commit/f0e31c909c65e7db4491fe6704f38e679ea2b017))
+
+
 ## v5.4.8 (2026-04-17)
 
 ### Bug Fixes
