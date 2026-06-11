@@ -1,0 +1,95 @@
+# lifx-async — Ceiling save-on-exit
+
+## What This Is
+
+`lifx-async` is a mature, zero-dependency, type-safe async Python library for controlling
+LIFX smart devices over the local network (published on PyPI as `lifx-async`). This milestone
+adds a **save-on-exit guarantee** to `CeilingLight`'s async context-manager lifecycle so that
+exiting an `async with` block always persists the device's latest in-memory state to its
+`state_file`.
+
+## Core Value
+
+Exiting a `CeilingLight` `async with` block reliably persists current state to disk — no
+uplight/downlight state is silently lost on context exit.
+
+## Requirements
+
+### Validated
+
+<!-- Inferred from existing code — already shipped and relied upon. -->
+
+- ✓ Base `Device.__aenter__`/`__aexit__` async context managers (`devices/base.py:639`) inherited by all device subclasses via `Generic[StateT]` with `Self` return — existing
+- ✓ `CeilingLight.__aenter__` override (`devices/ceiling.py:191`): product-ID validation + load persisted state from `state_file` on entry — existing
+- ✓ `CeilingLight` state persistence: `_save_state_to_file()` / `_load_state_from_file()` writing per-serial uplight/downlight colours to JSON (`devices/ceiling.py:1196`, `:1263`) — existing
+- ✓ State saved after each mutating operation (set colour, power-off, etc.) when `state_file` is set — existing
+- ✓ Async context managers on `DeviceGroup`, `UdpTransport`, `MdnsTransport`, `DeviceConnection` — existing
+
+### Active
+
+<!-- This milestone's scope. -->
+
+- [ ] `CeilingLight` overrides `__aexit__` to call `_save_state_to_file()` (when `state_file` is set) **before** the inherited `close()`, guaranteeing a final persist on context exit
+- [ ] Save-on-exit reuses the existing graceful error handling in `_save_state_to_file()` (I/O failures logged, never raised — must not mask the original `async with` exception)
+- [ ] Tests cover: save-on-exit with `state_file` set, no-op when `state_file` is `None`, and exit-during-exception behaviour
+
+### Out of Scope
+
+- Generalising `state_file` persistence into a reusable mixin for other device types (Matrix, MultiZone, etc.) — only `CeilingLight` persists state today; deferred until a second class actually needs it
+- New async-context-manager support on non-device classes (`Animator`, effect `StateManager`, running-effect handles) — separate concern, not requested
+- Changing the load/save JSON schema or the per-operation save points — exit save reuses the existing mechanism unchanged
+- Renaming `CeilingLight` to `LIFXCeiling` — no such class exists; `CeilingLight` is the established name
+
+## Context
+
+- Brownfield: full codebase map exists in `.planning/codebase/` (refreshed 2026-06-11).
+- `CeilingLight` extends `MatrixLight` and is the only device class with disk-backed state
+  persistence (`state_file` parameter). `state_file` stores per-serial stored uplight colour and
+  stored downlight colours so a Ceiling can restore its "remembered" colours across restarts.
+- Today, state is written after each mutating call, but the `async with` exit path inherits the
+  base `__aexit__` (which only calls `close()`), so there is no explicit final save tied to the
+  context-manager lifecycle. Any code path that mutates `state` without an intervening save would
+  lose that change on exit.
+- Library convention: device subclasses that need extra entry/exit behaviour override
+  `__aenter__`/`__aexit__` and chain to `super()` (see `CeilingLight.__aenter__`).
+
+## Constraints
+
+- **Tech stack**: Python 3.10–3.14, `asyncio`, zero runtime dependencies — no new deps.
+- **Compatibility**: Must not change the public API surface or `state_file` JSON schema; purely
+  additive exit behaviour.
+- **Error handling**: Save-on-exit must never raise — I/O errors are logged (existing
+  `_save_state_to_file` behaviour) and must not suppress or replace an exception propagating
+  out of the `async with` body.
+- **Quality gates**: `uv run pyright` (strict) clean, `uv run ruff check`/`format` clean,
+  `uv run pytest` green across all supported Python versions.
+- **Spelling**: Australian English in all prose/comments.
+
+## Key Decisions
+
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| Save-on-exit persists current state before `close()` | Guarantees the `async with` lifecycle never drops in-memory state, even via paths that didn't already save | — Pending |
+| Always save on exit (not only clean exit) | User chose "Final save then close"; per-operation saves already write valid state, so a final save is a safe superset | — Pending |
+| Ceiling-only scope (no mixin generalisation) | `CeilingLight` is the only class persisting state; premature abstraction adds risk with no consumer | — Pending |
+| Reuse existing `_save_state_to_file()` unchanged | Keeps JSON schema and graceful error handling intact; minimises blast radius | — Pending |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
+---
+*Last updated: 2026-06-11 after initialization*
