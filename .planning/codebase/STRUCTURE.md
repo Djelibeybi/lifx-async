@@ -1,303 +1,374 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-04-16
+**Analysis Date:** 2026-06-11
 
 ## Directory Layout
 
-```text
+```
 lifx-async/
-├── src/lifx/                  # Main library package
-│   ├── __init__.py            # Public API re-exports (flat namespace)
-│   ├── api.py                 # High-level discovery & batch operations
-│   ├── color.py               # HSBK class, RGB conversion, Colors presets
-│   ├── const.py               # All constants (network, HSBK ranges, URLs)
-│   ├── exceptions.py          # Exception hierarchy (LifxError base)
-│   ├── py.typed               # PEP 561 type marker
-│   ├── protocol/              # Wire protocol (auto-generated)
-│   │   ├── base.py            # Packet base class (pack/unpack)
-│   │   ├── header.py          # 36-byte LIFX header
-│   │   ├── serializer.py      # Binary field serialisation
-│   │   ├── models.py          # Serial dataclass, HEV types
-│   │   ├── packets.py         # [GENERATED] All packet classes
-│   │   ├── protocol_types.py  # [GENERATED] Enums and field structures
-│   │   └── generator.py       # Code generator (downloads protocol.yml)
-│   ├── network/               # Transport and discovery
-│   │   ├── transport.py       # UdpTransport (asyncio DatagramProtocol)
-│   │   ├── connection.py      # DeviceConnection (per-device, lazy, locked)
-│   │   ├── discovery.py       # DiscoveredDevice, broadcast discovery
-│   │   ├── message.py         # create_message() / parse_message()
-│   │   ├── utils.py           # allocate_source() helper
-│   │   └── mdns/              # mDNS/DNS-SD discovery (zero-dependency)
+├── .planning/                  # GSD planning artifacts (generated)
+├── .claude/                    # Project-specific instructions and skills
+├── src/lifx/                   # Main source code
+│   ├── __init__.py            # Public API exports
+│   ├── api.py                 # High-level discovery and batch operations
+│   ├── color.py               # HSBK color class with RGB conversion
+│   ├── const.py               # Constants (ports, defaults, UUIDs, timeouts)
+│   ├── exceptions.py          # Exception hierarchy (LifxError, LifxTimeoutError, etc.)
+│   │
+│   ├── protocol/              # LIFX protocol implementation
+│   │   ├── __init__.py
+│   │   ├── header.py          # 36-byte LIFX header serialization
+│   │   ├── packets.py         # Auto-generated packet definitions (NEVER edit manually)
+│   │   ├── protocol_types.py  # Auto-generated enums and types
+│   │   ├── serializer.py      # Binary encoding/decoding
+│   │   ├── models.py          # Protocol data models (Serial, HEV types)
+│   │   ├── base.py            # Base classes for protocol structures
+│   │   └── generator.py       # Code generator for protocol.yml → packets.py
+│   │
+│   ├── network/               # Network communication layer
+│   │   ├── __init__.py
+│   │   ├── connection.py      # Device connection with request/response, retry logic
+│   │   ├── discovery.py       # UDP broadcast device discovery (DoS-protected)
+│   │   ├── transport.py       # Async UDP socket management
+│   │   ├── message.py         # Message serialization (header + packet → binary)
+│   │   ├── utils.py           # Source ID allocation
+│   │   └── mdns/              # mDNS/DNS-SD discovery (faster single-query alternative)
+│   │       ├── __init__.py
 │   │       ├── discovery.py   # discover_lifx_services(), discover_devices_mdns()
-│   │       ├── dns.py         # DNS wire format parser (PTR, SRV, A, TXT)
-│   │       ├── transport.py   # MdnsTransport (multicast UDP)
+│   │       ├── dns.py         # DNS wire format parser (PTR, SRV, A, TXT records)
+│   │       ├── transport.py   # MdnsTransport for multicast UDP
 │   │       └── types.py       # LifxServiceRecord dataclass
-│   ├── products/              # Product capability registry
-│   │   ├── __init__.py        # Public exports (ProductInfo, ProductRegistry)
-│   │   ├── registry.py        # [GENERATED] Product database
-│   │   ├── quirks.py          # Product-specific quirks/overrides
-│   │   └── generator.py       # Code generator (downloads products.json)
-│   ├── devices/               # Device class hierarchy
-│   │   ├── __init__.py        # Re-exports all device classes
-│   │   ├── base.py            # Device[TState] generic base, DeviceState, factory methods
-│   │   ├── detection.py       # get_device_class_for_product() capability routing
-│   │   ├── light.py           # Light (colour control, waveforms)
-│   │   ├── hev.py             # HevLight (+ HEV cleaning cycles)
-│   │   ├── infrared.py        # InfraredLight (+ infrared LED)
-│   │   ├── multizone.py       # MultiZoneLight (zone-based strips/beams)
-│   │   ├── matrix.py          # MatrixLight (2D tiles, candle, path)
-│   │   └── ceiling.py         # CeilingLight (uplight/downlight components)
-│   ├── animation/             # High-frequency frame delivery
-│   │   ├── __init__.py        # Exports Animator, AnimatorStats
-│   │   ├── animator.py        # Animator class (direct UDP, factory methods)
-│   │   ├── framebuffer.py     # FrameBuffer (multi-tile canvas, orientation)
-│   │   ├── orientation.py     # Tile orientation remapping (LRU-cached)
-│   │   └── packets.py         # Prebaked packet templates (Matrix, MultiZone, Light)
-│   ├── effects/               # Visual effects framework
-│   │   ├── __init__.py        # Re-exports all effects
-│   │   ├── base.py            # LIFXEffect abstract base class
-│   │   ├── conductor.py       # Conductor orchestrator (lifecycle management)
-│   │   ├── state_manager.py   # DeviceStateManager (save/restore state)
-│   │   ├── registry.py        # EffectRegistry (discovery, device compatibility)
-│   │   ├── models.py          # PreState, RunningEffect dataclasses
+│   │
+│   ├── devices/               # Device types and state classes
+│   │   ├── __init__.py
+│   │   ├── base.py            # Device base class, state caching, MAC address logic
+│   │   ├── detection.py       # Device type detection from product ID
+│   │   ├── light.py           # Light with color control (HSBK)
+│   │   ├── hev.py             # Light + HEV (anti-bacterial cleaning)
+│   │   ├── infrared.py        # Light + infrared LED
+│   │   ├── multizone.py       # MultiZoneLight for strips/beams (zone-based control)
+│   │   ├── matrix.py          # MatrixLight for tiles (2D pixel control)
+│   │   └── ceiling.py         # CeilingLight (tiles + uplight/downlight components)
+│   │
+│   ├── effects/               # Visual effect generators (30+ built-in effects)
+│   │   ├── __init__.py
+│   │   ├── base.py            # Base effect class with frame generator interface
+│   │   ├── frame_effect.py    # FrameEffect for custom frame-based effects
+│   │   ├── registry.py        # Effect registry for discovering/instantiating by name
+│   │   ├── state_manager.py   # EffectStateManager for running effects on devices
+│   │   ├── conductor.py       # Conductor for orchestrating multiple effects
+│   │   ├── models.py          # Shared effect models
 │   │   ├── const.py           # Effect constants
-│   │   ├── frame_effect.py    # FrameEffect (Animator-based effects)
-│   │   ├── aurora.py          # EffectAurora
-│   │   ├── colorloop.py       # EffectColorloop
-│   │   ├── cylon.py           # EffectCylon
-│   │   ├── double_slit.py     # EffectDoubleSlit
-│   │   ├── embers.py          # EffectEmbers
-│   │   ├── fireworks.py       # EffectFireworks
-│   │   ├── flame.py           # EffectFlame
-│   │   ├── jacobs_ladder.py   # EffectJacobsLadder
-│   │   ├── newtons_cradle.py  # EffectNewtonsCradle
-│   │   ├── pendulum_wave.py   # EffectPendulumWave
-│   │   ├── plasma.py          # EffectPlasma
-│   │   ├── plasma2d.py        # EffectPlasma2D
-│   │   ├── progress.py        # EffectProgress
-│   │   ├── pulse.py           # EffectPulse
-│   │   ├── rainbow.py         # EffectRainbow
-│   │   ├── ripple.py          # EffectRipple
-│   │   ├── rule30.py          # EffectRule30
-│   │   ├── rule_trio.py       # EffectRuleTrio
-│   │   ├── sine.py            # EffectSine
-│   │   ├── sonar.py           # EffectSonar
-│   │   ├── spectrum_sweep.py  # EffectSpectrumSweep
-│   │   ├── spin.py            # EffectSpin
-│   │   ├── sunrise.py         # EffectSunrise, EffectSunset
-│   │   ├── twinkle.py         # EffectTwinkle
-│   │   └── wave.py            # EffectWave
-│   └── theme/                 # Colour palette system
-│       ├── __init__.py        # Exports Theme, ThemeLibrary, generators
-│       ├── theme.py           # Theme class (colour palette)
-│       ├── library.py         # ThemeLibrary, get_theme()
-│       ├── generators.py      # SingleZone/MultiZone/MatrixGenerator
-│       └── canvas.py          # Canvas abstraction for theme application
-├── tests/                     # Test suite (mirrors src structure)
-│   ├── conftest.py            # Shared fixtures, emulator setup
-│   ├── test_color.py          # HSBK, RGB conversion, roundtrip tests
-│   ├── test_utils.py          # General utility tests
-│   ├── benchmarks/            # Performance benchmarks
-│   ├── test_protocol/         # Protocol layer tests
-│   ├── test_network/          # Network layer tests
-│   │   └── test_mdns/         # mDNS subsystem tests
-│   ├── test_devices/          # Device layer tests (+ state management)
-│   ├── test_api/              # API layer tests
-│   ├── test_effects/          # Effects layer tests (30+ effect tests)
-│   ├── test_animation/        # Animation layer tests
-│   ├── test_theme/            # Theme layer tests
-│   └── test_products/         # Product registry tests
-├── examples/                  # Usage examples (runnable scripts)
-│   ├── discovery_*.py         # Discovery examples (broadcast, mDNS, find)
-│   ├── control_*.py           # Device control examples
-│   ├── animation_*.py         # Animation examples
-│   ├── effects_*.py           # Effect examples
-│   └── matrix_*.py            # Matrix device examples
-├── docs/                      # MkDocs documentation source
-│   ├── api/                   # API reference docs
-│   ├── architecture/          # Architecture docs
-│   ├── getting-started/       # Getting started guides
-│   ├── user-guide/            # User guide
-│   ├── migration/             # Migration guides
-│   ├── assets/                # Static assets (images, effect previews)
-│   └── stylesheets/           # Custom CSS
-├── scripts/                   # Development scripts
-├── conductor/                 # Development workflow tracking
-├── pyproject.toml             # Project config (uv, ruff, pyright, pytest)
-├── mkdocs.yml                 # Documentation site config
-├── uv.lock                    # Dependency lock file
-├── codecov.yml                # Coverage config
-├── renovate.json              # Dependency update bot config
-└── .pre-commit-config.yaml    # Pre-commit hooks (ruff, pyright)
+│   │   ├── aurora.py          # Aurora effect (animated gradient with randomness)
+│   │   ├── colorloop.py       # Colour loop effect
+│   │   ├── flame.py           # Flame effect
+│   │   ├── plasma.py          # Plasma effect
+│   │   ├── plasma2d.py        # 2D plasma for matrix devices
+│   │   ├── rainbow.py         # Rainbow effect
+│   │   ├── pulse.py           # Pulse effect
+│   │   ├── progress.py        # Progress bar effect
+│   │   ├── sunrise.py         # Sunrise effect with configurable origin
+│   │   ├── (20+ more effects) # Aurora, Cylon, Double Slit, Embers, Fireworks, etc.
+│   │
+│   ├── animation/             # High-frequency frame delivery for tiles/multizone
+│   │   ├── __init__.py
+│   │   ├── animator.py        # Animator class (high-level API, direct UDP sending)
+│   │   ├── framebuffer.py     # FrameBuffer with multi-tile canvas mapping
+│   │   ├── packets.py         # Packet templates and generators (Matrix, MultiZone, Light)
+│   │   └── orientation.py     # Tile orientation remapping with LRU cache
+│   │
+│   ├── theme/                 # Theme support (named color palettes)
+│   │   ├── __init__.py
+│   │   ├── theme.py           # Theme definition (list of HSBK colors)
+│   │   ├── library.py         # Built-in theme library
+│   │   ├── canvas.py          # Canvas abstraction for applying themes
+│   │   └── generators.py      # Generators for single/multi/matrix zones
+│   │
+│   └── products/              # Device capability registry
+│       ├── __init__.py
+│       ├── registry.py        # Auto-generated product database
+│       ├── generator.py       # Generator to download products.json
+│       └── quirks.py          # Device-specific quirks/workarounds
+│
+├── tests/                     # Test suite (2425+ tests, mirrors src structure)
+│   ├── conftest.py           # Pytest fixtures (emulator setup, async helpers)
+│   ├── test_protocol/        # Protocol layer tests (159 tests)
+│   │   ├── test_header.py
+│   │   ├── test_packets.py
+│   │   ├── test_serializer.py
+│   │   └── test_generator.py
+│   │
+│   ├── test_network/         # Network layer tests (183 tests)
+│   │   ├── test_transport.py
+│   │   ├── test_discovery.py
+│   │   ├── test_connection.py
+│   │   ├── test_message.py
+│   │   └── test_mdns/
+│   │
+│   ├── test_devices/         # Device layer tests (375 tests)
+│   │   ├── test_base.py
+│   │   ├── test_light.py
+│   │   ├── test_ceiling.py
+│   │   ├── test_matrix.py
+│   │   ├── test_multizone.py
+│   │   ├── test_hev.py
+│   │   └── test_state_*.py   # State management per device type
+│   │
+│   ├── test_api/             # High-level API tests (63 tests)
+│   │   ├── test_discovery.py
+│   │   ├── test_batch_operations.py
+│   │   └── test_device_group.py
+│   │
+│   ├── test_effects/         # Effects tests (1249 tests)
+│   │   ├── test_aurora.py
+│   │   ├── test_registry.py
+│   │   ├── test_integration.py
+│   │   └── (per-effect test files)
+│   │
+│   ├── test_theme/           # Theme tests (146 tests)
+│   │   ├── test_theme.py
+│   │   ├── test_canvas.py
+│   │   └── test_library.py
+│   │
+│   ├── test_animation/       # Animation tests (123 tests)
+│   │   ├── test_animator.py
+│   │   ├── test_framebuffer.py
+│   │   └── test_orientation.py
+│   │
+│   ├── test_products/        # Product registry tests
+│   │   └── test_registry.py
+│   │
+│   └── test_utils.py         # Utilities tests (color, products, etc.)
+│
+├── examples/                 # Usage examples (25+ examples)
+│   ├── discovery_broadcast.py        # UDP broadcast discovery
+│   ├── discovery_mdns.py             # mDNS discovery
+│   ├── discovery_find_device.py      # Find specific device
+│   ├── discovery_logging.py          # Discovery with logging
+│   ├── control_basic.py              # Basic on/off control
+│   ├── control_device_groups.py      # Batch operations
+│   ├── control_waveforms.py          # Waveform effects
+│   ├── effects_aurora.py             # Aurora effect example
+│   ├── effects_demo.py               # Multiple effects demo
+│   ├── effects_custom.py             # Custom effect creation
+│   ├── matrix_basic.py               # Basic tile control
+│   ├── matrix_large_tiles.py         # Multi-tile effects
+│   ├── matrix_effects.py             # Tile-specific effects
+│   ├── animation_basic.py            # Animator usage
+│   ├── animation_numpy.py            # Numpy integration
+│   └── (more examples)
+│
+├── docs/                    # Documentation (MkDocs)
+│   ├── index.md            # Landing page
+│   ├── getting-started.md  # Quick start guide
+│   ├── api/                # API documentation
+│   └── guides/             # Guides for different device types
+│
+├── scripts/                # Development scripts
+│   ├── mdns_probe.py       # mDNS debugging tool
+│   └── test_multiversion.py # Multi-Python version testing
+│
+├── pyproject.toml         # Project metadata, dependencies, tool config
+├── uv.lock                # Locked dependency versions
+├── mkdocs.yml             # Documentation site configuration
+├── README.md              # Project overview
+├── CLAUDE.md              # Project-specific coding instructions
+└── LICENSE                # MIT license
+
 ```
 
 ## Directory Purposes
 
-**`src/lifx/protocol/`:**
-- Purpose: LIFX binary wire protocol implementation
-- Contains: Auto-generated packet classes, header parsing, serialisation
-- Key files: `packets.py` (generated, ~1100 lines), `generator.py` (downloads + generates)
-- Rule: Never edit `packets.py` or `protocol_types.py` manually
+**`src/lifx/`**
+- Purpose: Main library source code
+- Contains: All public API, device classes, protocol, network, effects
+- Key files: `__init__.py` (public exports), `api.py` (high-level API), `color.py` (color utilities)
 
-**`src/lifx/network/`:**
-- Purpose: All network I/O - UDP transport, discovery, per-device connections
-- Contains: Transport, connection management, message framing, mDNS subsystem
-- Key files: `connection.py` (~1000 lines, core request/response), `discovery.py` (broadcast discovery)
+**`src/lifx/protocol/`**
+- Purpose: LIFX binary protocol implementation
+- Contains: Header format, packet definitions, serialization, type definitions
+- Generated: `packets.py` and `protocol_types.py` are auto-generated from YAML
+- Never edit: `packets.py`, `protocol_types.py` — edit generator.py instead
+- Key files: `generator.py` (regenerate all), `header.py` (36-byte header structure)
 
-**`src/lifx/devices/`:**
-- Purpose: Device class hierarchy with typed state and capability-specific methods
-- Contains: Base device, 6 device subclasses, detection logic
-- Key files: `base.py` (~1600 lines, Device generic base), `detection.py` (class routing)
+**`src/lifx/network/`**
+- Purpose: UDP communication and device discovery
+- Contains: Connection pooling, transport, discovery (UDP + mDNS), message building
+- Key patterns: Lazy connection opening, async generator streaming, DoS protection
+- Key files: `connection.py` (request/response), `discovery.py` (broadcast), `mdns/` (DNS-SD)
 
-**`src/lifx/effects/`:**
-- Purpose: Visual effects framework with 30+ built-in effects
-- Contains: Abstract base, conductor orchestrator, registry, individual effect implementations
-- Key files: `base.py` (LIFXEffect ABC), `conductor.py` (lifecycle management), `registry.py` (effect discovery)
+**`src/lifx/devices/`**
+- Purpose: Device-type-specific control APIs
+- Contains: Device class hierarchy, state dataclasses, capability-specific methods
+- Detection: `detection.py` maps product ID → device class name
+- Key patterns: Inheritance from Device[StateT], state caching per device
+- Key files: `base.py` (Device base class), device-specific files (light.py, matrix.py, etc.)
 
-**`src/lifx/animation/`:**
-- Purpose: High-frequency frame delivery for real-time animations (30+ FPS)
-- Contains: Animator, framebuffer, prebaked packet templates, orientation mapping
-- Key files: `animator.py` (direct UDP sender), `framebuffer.py` (multi-tile canvas)
+**`src/lifx/effects/`**
+- Purpose: Visual effect generators
+- Contains: 30+ built-in effects, effect registry, state manager, conductor
+- Key patterns: Frame generators, registry for name-based lookup
+- Key files: `registry.py` (discover effects), `conductor.py` (orchestrate multiple effects)
 
-**`src/lifx/theme/`:**
-- Purpose: Colour palette system for applying coordinated schemes to devices
-- Contains: Theme definitions, built-in library, zone/matrix generators, canvas abstraction
+**`src/lifx/animation/`**
+- Purpose: High-frequency frame delivery for matrix/multizone devices
+- Contains: Animator (direct UDP), FrameBuffer (canvas), packet pre-generation, orientation
+- Key patterns: Synchronous frame sending for performance
+- Key files: `animator.py` (high-level API), `framebuffer.py` (canvas), `packets.py` (templates)
 
-**`src/lifx/products/`:**
-- Purpose: LIFX product capability database
-- Contains: Auto-generated registry, quirks, generator
-- Key files: `registry.py` (generated, all products), `quirks.py` (product-specific overrides)
+**`src/lifx/theme/`**
+- Purpose: Coordinated color schemes for device groups
+- Contains: Theme definitions, generators for different device types
+- Key files: `library.py` (built-in themes), `generators.py` (device-specific)
+
+**`src/lifx/products/`**
+- Purpose: Device capability registry from LIFX products.json
+- Contains: Product database, device type detection
+- Generated: `registry.py` auto-generated from products.json
+- Key files: `generator.py` (download + regenerate), `registry.py` (lookup capabilities)
+
+**`tests/`**
+- Purpose: Test suite (2425+ tests)
+- Organization: Mirrors `src/` structure exactly
+- Coverage: Protocol (159), Network (183), Devices (375), API (63), Effects (1249), Theme (146), Animation (123), Utilities (127)
+- Key files: `conftest.py` (fixtures, emulator setup)
+
+**`examples/`**
+- Purpose: Usage examples for different patterns
+- Contains: Discovery, control, effects, animation, matrix, grouping examples
+- Executable: All examples can be run directly: `python examples/discovery_broadcast.py`
+
+**`docs/`**
+- Purpose: User-facing documentation (MkDocs)
+- Contains: API reference, guides for different device types, examples
+- Generated: Some sections auto-generated during release
+
+**`scripts/`**
+- Purpose: Development and debugging utilities
+- Contains: mDNS probe, multi-version testing
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/lifx/__init__.py`: Package public API (all re-exports)
-- `src/lifx/api.py`: High-level discovery and batch operations
-- `src/lifx/devices/base.py`: `Device.from_ip()`, `Device.connect()` factory methods
+- `src/lifx/__init__.py`: Public API exports (Device classes, discovery functions, Color, Exceptions)
+- `src/lifx/api.py`: High-level discovery and batch operations (discover, find_by_*, DeviceGroup)
 
 **Configuration:**
-- `pyproject.toml`: Project metadata, dependencies, tool config (ruff, pyright, pytest)
-- `mkdocs.yml`: Documentation site configuration
-- `.pre-commit-config.yaml`: Pre-commit hooks
-- `codecov.yml`: Coverage thresholds
+- `src/lifx/const.py`: Constants (LIFX_UDP_PORT, timeouts, default values, official URLs)
+- `pyproject.toml`: Project metadata, dependencies, tool configuration
 
 **Core Logic:**
-- `src/lifx/devices/base.py`: Device base class (state caching, connection management)
-- `src/lifx/network/connection.py`: DeviceConnection (request/response, retry, locking)
-- `src/lifx/network/discovery.py`: DiscoveredDevice and broadcast discovery
-- `src/lifx/protocol/base.py`: Packet base class (pack/unpack)
-- `src/lifx/color.py`: HSBK colour class with RGB conversion
+- `src/lifx/devices/base.py`: Base Device class, state management, common operations
+- `src/lifx/network/connection.py`: Request/response, retry logic, connection pooling
+- `src/lifx/protocol/header.py`: 36-byte LIFX header format
+- `src/lifx/protocol/serializer.py`: Binary encoding/decoding
 
-**Auto-Generated (do not edit):**
-- `src/lifx/protocol/packets.py`: Protocol packet classes
-- `src/lifx/protocol/protocol_types.py`: Protocol enums and field structures
-- `src/lifx/products/registry.py`: Product capability database
+**Device Types:**
+- `src/lifx/devices/light.py`: Color lights (HSBK control)
+- `src/lifx/devices/multizone.py`: Strips/beams (zone-based control)
+- `src/lifx/devices/matrix.py`: Tiles (2D pixel control)
+- `src/lifx/devices/ceiling.py`: Ceiling lights (tiles + components)
+- `src/lifx/devices/hev.py`: HEV lights (color + anti-bacterial)
+- `src/lifx/devices/infrared.py`: Infrared lights (color + IR LED)
 
 **Testing:**
-- `tests/conftest.py`: Shared fixtures, emulator configuration
-- `tests/test_devices/`: Device layer tests (most coverage)
-- `tests/test_effects/`: Effects tests (largest test count: 1249)
+- `tests/conftest.py`: Pytest fixtures, emulator setup
+- `tests/test_devices/test_light.py`: Light device tests
+- `tests/test_network/test_connection.py`: Connection/retry logic tests
 
 ## Naming Conventions
 
 **Files:**
-- `snake_case.py`: All Python files use snake_case
-- `[GENERATED]` files: `packets.py`, `protocol_types.py`, `registry.py` - never edit manually
-- Test files: `test_<module>.py` mirroring source file name
-- Effect files: `<effect_name>.py` containing `Effect<Name>` class
-- State test files: `test_state_<device>.py` for state management tests
+- `*.py`: Standard Python module files
+- Protocol files: `packets.py` (auto-generated), `protocol_types.py` (auto-generated), `header.py`, `serializer.py`
+- Device files: `base.py` (Device base), `light.py`, `multizone.py`, `matrix.py`, `ceiling.py`, `hev.py`, `infrared.py`
+- Effect files: `aurora.py`, `flame.py`, `plasma.py` (one file per effect), `registry.py`, `conductor.py`
+- Test files: `test_<module>.py` (e.g., `test_connection.py`, `test_light.py`)
 
-**Directories:**
-- `snake_case/`: All directories use snake_case
-- `test_<layer>/`: Test directories mirror source structure
+**Functions:**
+- `async def`: External API (discovery, control, requests)
+- `def`: Internal or synchronous operations
+- `_private`: Internal helpers (prefixed with `_`)
+- Factory methods: `from_*` (e.g., `Device.from_ip()`, `HSBK.from_rgb()`)
 
-**Classes:**
-- `PascalCase`: All classes (`Device`, `Light`, `MultiZoneLight`, `DeviceConnection`)
-- Device classes: `<Capability>Light` (e.g., `HevLight`, `InfraredLight`, `CeilingLight`)
-- Effect classes: `Effect<Name>` (e.g., `EffectFlame`, `EffectAurora`, `EffectPulse`)
-- State dataclasses: `<Device>State` (e.g., `LightState`, `MatrixLightState`)
-- Exception classes: `Lifx<Domain>Error` (e.g., `LifxTimeoutError`, `LifxProtocolError`)
+**Variables:**
+- `CONSTANT`: Module-level constants (LIFX_UDP_PORT, DEFAULT_REQUEST_TIMEOUT)
+- `_private`: Private module-level variables
+- Device properties: Lowercase (e.g., `device.label`, `device.power`)
+- Class names: PascalCase (Device, Light, HSBK, LifxHeader)
 
-**Functions/Methods:**
-- `snake_case`: All functions and methods
-- Async methods: `async def get_<property>()` for volatile state, `async def set_<property>()` for mutations
-- Factory methods: `from_ip()`, `connect()`, `create_device()`
-- Generator helpers: `for_matrix()`, `for_multizone()`, `for_light()` on Animator
-
-**Constants:**
-- `UPPER_SNAKE_CASE`: All constants in `src/lifx/const.py`
-- Module-level loggers: `_LOGGER = logging.getLogger(__name__)`
-- Class-level packet types: `PKT_TYPE: ClassVar[int]`
+**Types:**
+- State dataclasses: `[DeviceType]State` (LightState, MatrixLightState, MultiZoneLightState)
+- Exceptions: `Lifx[Error]` (LifxDeviceNotFoundError, LifxTimeoutError)
+- Enums: PascalCase (Direction, LightWaveform)
 
 ## Where to Add New Code
 
 **New Device Type:**
-1. Create device class: `src/lifx/devices/<device_type>.py` extending `Light` or `Device`
-2. Create state dataclass: `<DeviceType>State` extending `DeviceState` or `LightState`
-3. Add detection logic: Update `src/lifx/devices/detection.py` `get_device_class_for_product()`
-4. Export from `src/lifx/devices/__init__.py` and `src/lifx/__init__.py`
-5. Tests: `tests/test_devices/test_<device_type>.py`
+- Implementation: `src/lifx/devices/<device_name>.py` (inherit from Device[StateT])
+- State class: In same file as device (e.g., `LightState` in `light.py`)
+- Tests: `tests/test_devices/test_<device_name>.py`
+- Export: Add to `src/lifx/devices/__init__.py` and `src/lifx/__init__.py`
+- Detection: Update `src/lifx/devices/detection.py` to map product ID → device class
 
 **New Effect:**
-1. Create effect file: `src/lifx/effects/<effect_name>.py`
-2. Subclass `LIFXEffect` (or `FrameEffect` for animation-based effects)
-3. Implement `name` property and `async_play()` method
-4. Register in `src/lifx/effects/registry.py` (add to `_BUILTIN_EFFECTS`)
-5. Export from `src/lifx/effects/__init__.py` and `src/lifx/__init__.py`
-6. Tests: `tests/test_effects/test_<effect_name>.py`
+- Implementation: `src/lifx/effects/<effect_name>.py` (inherit from `FrameEffect`)
+- Frame generator: Implement `generate_frame(frame_context)` method
+- Tests: `tests/test_effects/test_<effect_name>.py`
+- Registry: Auto-discovered via `@registry.register` decorator or `registry.add()` call
+- Export: Add to `src/lifx/effects/__init__.py` and main `src/lifx/__init__.py` if public
 
-**New Protocol Packet:**
-- Do NOT add manually. Update `protocol.yml` source or add to generator quirks in `src/lifx/protocol/generator.py`
-- Run `uv run python -m lifx.protocol.generator` to regenerate
+**New Utility Function:**
+- Cross-module utility: `src/lifx/utils.py` (doesn't exist yet, would be appropriate for shared helpers)
+- Color-related: `src/lifx/color.py` (HSBK class)
+- Constants: `src/lifx/const.py` (module-level constants)
 
-**New Product:**
-- Do NOT add manually. Run `uv run python -m lifx.products.generator` to regenerate from upstream
-- For quirks/overrides: edit `src/lifx/products/quirks.py`
+**New Test:**
+- Mirror source structure: `tests/test_<module>/test_<feature>.py`
+- Use fixtures from `conftest.py` (emulator, async helpers)
+- Follow existing patterns (setup, act, assert)
+- Mark with `@pytest.mark.emulator` if using emulator
 
-**New Theme:**
-- Add to theme library in `src/lifx/theme/library.py`
-- Tests: `tests/test_theme/`
-
-**New Utility:**
-- Colour utilities: `src/lifx/color.py`
-- Constants: `src/lifx/const.py`
-- Exceptions: `src/lifx/exceptions.py`
-
-**New Example:**
-- Add to `examples/` with descriptive name following pattern: `<category>_<description>.py`
+**Protocol Changes:**
+1. Update LIFX official `protocol.yml` (not stored in repo)
+2. Run `uv run python -m lifx.protocol.generator`
+3. Review auto-generated `src/lifx/protocol/packets.py` and `protocol_types.py`
+4. For local quirks (field renames), edit `src/lifx/protocol/generator.py`
+5. Commit regenerated files
 
 ## Special Directories
 
-**`src/lifx/protocol/`:**
-- Purpose: Contains both hand-written base code and auto-generated protocol code
-- Generated: `packets.py`, `protocol_types.py` (via `generator.py`)
-- Committed: Yes (generated files are committed for zero-dependency installs)
+**`.planning/codebase/`**
+- Purpose: GSD codebase analysis documents
+- Generated: Created by `/gsd-map-codebase` command
+- Contents: ARCHITECTURE.md, STRUCTURE.md, CONVENTIONS.md, TESTING.md, STACK.md, INTEGRATIONS.md, CONCERNS.md
+- Committed: Yes, tracked in git
 
-**`src/lifx/products/`:**
-- Purpose: Product capability database
-- Generated: `registry.py` (via `generator.py`)
+**`.claude/`**
+- Purpose: Project-specific instructions
+- Contains: CLAUDE.md (this file's sibling), skills/ (project practices)
 - Committed: Yes
 
-**`conductor/`:**
-- Purpose: Development workflow tracking (tracks, archives, style guides)
-- Generated: No (manual)
+**`docs/`**
+- Purpose: User documentation
+- Generated: Some auto-generated during release (never edit changelog.md manually)
 - Committed: Yes
 
-**`examples/`:**
-- Purpose: Runnable usage examples for documentation and developer reference
-- Generated: No
+**`site/`**
+- Purpose: Built documentation (MkDocs output)
+- Generated: Yes (from docs/)
+- Committed: Yes (for GitHub Pages)
+
+**`.github/workflows/`**
+- Purpose: CI/CD pipelines
+- Contains: Tests, coverage, release workflows
 - Committed: Yes
 
-**`.github/`:**
-- Purpose: GitHub Actions workflows, issue templates
-- Generated: No
-- Committed: Yes
-
-**`docs/`:**
-- Purpose: MkDocs documentation source (served via `mkdocs serve`)
-- Generated: No (but `docs/changelog.md` is auto-generated by CI)
-- Committed: Yes
+**`.mypy_cache/`, `.ruff_cache/`, `__pycache__/`**
+- Purpose: Tool caches
+- Generated: Yes
+- Committed: No (in .gitignore)
 
 ---
 
-*Structure analysis: 2026-04-16*
+*Structure analysis: 2026-06-11*

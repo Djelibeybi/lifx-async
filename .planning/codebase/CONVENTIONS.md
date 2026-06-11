@@ -1,227 +1,290 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-04-16
+**Analysis Date:** 2026-06-11
 
 ## Naming Patterns
 
 **Files:**
-- Use `snake_case.py` for all Python source files
-- Module files match their primary class/purpose: `light.py` for `Light`, `connection.py` for `DeviceConnection`
-- Test files use `test_` prefix: `test_light.py`, `test_connection.py`
-- State management tests use `test_state_` prefix: `test_state_light.py`, `test_state_ceiling.py`
-- Auto-generated files: `packets.py`, `protocol_types.py`, `registry.py` — never edit manually
+- Snake case with `.py` extension
+- Module names describe contents: `protocol_types.py`, `connection.py`, `discovery.py`
+- Test files: `test_*.py` (pytest convention)
+- Conftest files: `conftest.py` for shared fixtures
 
 **Functions:**
-- Use `snake_case` for all functions and methods
-- Async methods: `async def get_color()`, `async def set_color()`
-- Private methods: prefix with `_` (e.g., `_initialize_state()`, `_raise_if_unhandled()`)
-- Factory methods: `from_ip()`, `from_string()`, `from_protocol()`, `from_rgb()`
-- Getter/setter pairs: `get_color()` / `set_color()`, `get_power()` / `set_power()`
-- Conversion methods: `to_protocol()`, `to_string()`, `to_rgb()`
+- Snake case: `get_color()`, `set_brightness()`, `allocate_source()`
+- Async functions: `async def` with `async_` prefix only if explicitly differentiating sync variant
+- Private functions: Leading underscore `_private_function()`
+- Factories/helpers: Descriptive names like `create_device()`, `pack_value()`, `unpack_value()`
 
 **Variables:**
-- Use `snake_case` for all variables
-- Module-level constants: `UPPER_SNAKE_CASE` with `Final` type annotation
-- Private module-level constants: `_UPPER_SNAKE_CASE` (e.g., `_LOGGER`, `_RETRY_SLEEP_BASE`)
-- Logger: always `_LOGGER = logging.getLogger(__name__)`
+- Snake case throughout: `mock_state`, `execution_order`, `response_time`
+- Private module-level: `_LOGGER`, `_STRUCT_CACHE`, `_EMULATOR_FIXTURES`, `_EMULATOR_TIMEOUT`
+- Constants: UPPER_SNAKE_CASE: `LIFX_UDP_PORT`, `DEFAULT_REQUEST_TIMEOUT`, `MAX_BRIGHTNESS`
+- Loop/temporary variables: Short but descriptive: `conn`, `device`, `i`, `item`
 
-**Types/Classes:**
-- Use `PascalCase` for classes: `Light`, `DeviceConnection`, `UdpTransport`
-- Dataclasses: `PascalCase` (e.g., `DeviceVersion`, `FirmwareInfo`, `CollectionInfo`)
-- State dataclasses: `{Device}State` pattern (e.g., `LightState`, `HevLightState`, `CeilingLightState`)
-- Exception classes: `Lifx{Category}Error` pattern (e.g., `LifxTimeoutError`, `LifxConnectionError`)
-- TypeVars: single uppercase letter `T` or descriptive `TypeVar("T")`
-
-**Constants:**
-- Defined in `src/lifx/const.py` with `Final` type annotations
-- Grouped by category with section headers using `# ====` comment blocks
-- Named constants for all magic numbers: `LIFX_UDP_PORT`, `MAX_PACKET_SIZE`, `DEFAULT_REQUEST_TIMEOUT`
-- Kelvin presets: `KELVIN_CANDLELIGHT`, `KELVIN_NEUTRAL`, `KELVIN_DAYLIGHT`, etc.
+**Types:**
+- PascalCase: `HSBK`, `Device`, `Light`, `DeviceConnection`, `DiscoveredDevice`
+- Dataclass names: `DeviceVersion`, `DeviceInfo`, `FirmwareInfo`, `WifiInfo`, `CollectionInfo`
+- Exception classes: `LifxError`, `LifxTimeoutError`, `LifxProtocolError`, `LifxConnectionError`, `LifxUnsupportedCommandError`
 
 ## Code Style
 
 **Formatting:**
-- Tool: Ruff formatter
+- Tool: `ruff format`
 - Line length: 88 characters
-- Indent: 4 spaces
-- Quote style: double quotes
-- Docstring code format: enabled
-- Config: `[tool.ruff.format]` section in `pyproject.toml`
+- Indentation: 4 spaces
+- Quote style: Double quotes (`"string"`, not `'string'`)
+- Docstring code: Formatted with double quotes
 
 **Linting:**
-- Tool: Ruff linter
-- Selected rules: `E` (pycodestyle errors), `F` (Pyflakes), `I` (isort), `N` (naming), `W` (warnings), `UP` (pyupgrade)
-- Per-file ignores for auto-generated code: E501 allowed in `packets.py`, `registry.py`, generators, benchmarks
-- Config: `[tool.ruff.lint]` section in `pyproject.toml`
+- Tool: `ruff check` with auto-fix
+- Selected rules: E (errors), F (Pyflakes), I (isort imports), N (pep8 naming), W (warnings), UP (pyupgrade)
+- Generator files exempt: `src/lifx/{protocol,products}/generator.py` and `src/lifx/protocol/packets.py` allow long lines (E501)
+- Auto-generated files exempt: `src/lifx/products/registry.py` allows long lines
 
-**Type Checking:**
-- Tool: Pyright in `standard` mode
-- Target: Python 3.10
-- Scope: `src/` directory only (excludes generators and auto-generated registry)
-- Library ships `py.typed` marker (`src/lifx/py.typed`)
-- Full type hints on all public APIs including return types
+**Type checking:**
+- Tool: `pyright` in standard mode
+- Python version: 3.10 (minimum supported)
+- Strict on `src/` only
+- Excludes: `generator.py` (untyped YAML/JSON handling), `registry.py` (auto-generated)
 
-## Import Organisation
+## Import Organization
 
-**Order (enforced by Ruff isort):**
-1. `from __future__ import annotations` — **first non-docstring statement** in every module (71+ files); a module-level docstring may precede it
-2. Standard library imports (`asyncio`, `logging`, `time`, `dataclasses`, etc.)
-3. Third-party imports (only in tests: `pytest`, `lifx_emulator`)
-4. Local imports using package-relative paths (`from lifx.color import HSBK`)
+**Order:**
+1. `from __future__ import annotations` (always first if used)
+2. Standard library imports (grouped alphabetically): `import asyncio`, `import logging`, `from dataclasses import dataclass`
+3. Third-party imports (grouped alphabetically): `import pytest`, `from lifx_emulator import EmulatedLifxServer`
+4. Local imports: `from lifx.color import HSBK`, `from lifx.devices import Light`
 
 **Path Aliases:**
-- No path aliases configured — all imports use full package paths
-- Always import from the public package: `from lifx.devices.light import Light`
-- Use `TYPE_CHECKING` guard for imports only needed for type annotations:
-```python
-from typing import TYPE_CHECKING
+- No aliases configured; imports use full paths
+- TYPE_CHECKING block for forward references to avoid circular imports:
+  ```python
+  if TYPE_CHECKING:
+      from lifx.devices import Light, HevLight
+  ```
 
-if TYPE_CHECKING:
-    from typing_extensions import Self
-    from lifx.devices import Light
-```
-
-**Pattern:**
-```python
-"""Module docstring."""
-
-from __future__ import annotations
-
-import asyncio
-import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-from lifx.const import DEFAULT_REQUEST_TIMEOUT
-from lifx.exceptions import LifxTimeoutError
-
-if TYPE_CHECKING:
-    from typing_extensions import Self
-
-_LOGGER = logging.getLogger(__name__)
-```
+**Barrel Files:**
+- `src/lifx/__init__.py` and module `__init__.py` files export public APIs
+- Device subpackage: `src/lifx/devices/__init__.py` exports `Device`, `Light`, `HevLight`, etc.
+- Products subpackage: `src/lifx/products/__init__.py` exports `get_product()`
 
 ## Error Handling
 
-**Exception hierarchy** (`src/lifx/exceptions.py`):
-- All exceptions inherit from `LifxError`
-- Use specific exception types: `LifxTimeoutError`, `LifxConnectionError`, `LifxProtocolError`, `LifxNetworkError`, `LifxDeviceNotFoundError`, `LifxUnsupportedCommandError`, `LifxUnsupportedDeviceError`
-- Validate inputs with `ValueError` and descriptive `match` messages:
-```python
-if not 0.0 <= brightness <= 1.0:
-    raise ValueError("Brightness must be between 0.0 and 1.0")
-```
+**Patterns:**
+- All exceptions inherit from `LifxError` base class
+- Specific exception types for different failure modes:
+  - `LifxDeviceNotFoundError`: Device unreachable or unknown product ID
+  - `LifxTimeoutError`: Operation timeout
+  - `LifxProtocolError`: Packet parsing/validation failure
+  - `LifxConnectionError`: Connection not open
+  - `LifxNetworkError`: UDP/mDNS socket errors
+  - `LifxUnsupportedCommandError`: Device returns StateUnhandled
+  - `LifxUnsupportedDeviceError`: Device is relay-only or button-only
+- Raised with descriptive messages including context where helpful
+- Custom exception docstrings document when/why they're raised
 
-**Error raising patterns:**
-- Use `_raise_if_unhandled(state)` to check for `StateUnhandled` responses from devices
-- Timeout handling wraps `asyncio.wait_for()` with `LifxTimeoutError`
-- Connection errors raise `LifxConnectionError` when operations attempted on closed connections
-
-**Context managers:**
-- All devices and connections implement `async with` for automatic cleanup
-- Pattern: `async with await Light.from_ip("192.168.1.100") as light:`
+**Best practices:**
+- Use `try/except` to catch specific exceptions
+- Let exceptions propagate unless explicitly handled
+- Finally blocks for cleanup (e.g., closing connections)
+- Log before raising exceptions for context
 
 ## Logging
 
-**Framework:** Python standard library `logging`
+**Framework:** Built-in `logging` module
 
 **Pattern:**
-- Module-level logger: `_LOGGER = logging.getLogger(__name__)` (19+ modules)
-- Structured debug logging with dicts:
 ```python
-_LOGGER.debug(
-    {
-        "class": "Device",
-        "method": "get_color",
-        "action": "query",
-        "reply": {
-            "hue": state.color.hue,
-            "saturation": state.color.saturation,
-        },
-    }
-)
+_LOGGER = logging.getLogger(__name__)
 ```
+- Module-level logger created once per file
+- Consistent logger name = module name for filtering
+
+**Levels used:**
+- `_LOGGER.debug()`: Detailed protocol/connection events ("Connected to 192.168.1.100")
+- `_LOGGER.warning()`: Non-fatal issues ("Response timeout, retrying...")
+- `_LOGGER.error()`: Failures that don't crash but prevent operation ("Failed to open UDP socket")
 
 **When to log:**
-- `debug`: All device request/response pairs, connection state changes
-- `warning`: Dropped packets, unexpected responses
-- Do not log at `info` or higher in library code (leave for application developers)
+- Connection lifecycle events (open, close, error)
+- Retry attempts with context
+- Packet send/receive boundaries
+- Network errors and timeouts
+- Do NOT log inside loops (performance impact)
 
 ## Comments
 
 **When to Comment:**
-- Section headers in `const.py` use `# ====` block separators
-- Inline comments for non-obvious protocol behaviour or workarounds
-- Never comment obvious code
+- **Explain why, not what** - Code should be self-documenting
+- Constants and magic numbers: Explain significance
+- Non-obvious algorithms: Document approach
+- Workarounds: Explain the constraint being worked around
+- Section headers: Use comment lines with `-` characters:
+  ```python
+  # ---------------------------------------------------------------------------
+  # sRGB gamma (IEC 61966-2-1)
+  # ---------------------------------------------------------------------------
+  ```
 
 **Docstrings:**
-- Google-style docstrings on all public classes, methods, and functions
-- Include `Args:`, `Returns:`, `Raises:`, `Example:` sections as applicable
-- Docstring code examples use fenced Python blocks
-- Module-level docstrings describe the module's purpose
 
-**Pattern:**
+Google-style format with full type annotations in code (not repeated in docstring):
+
 ```python
-async def set_color(
-    self,
-    color: HSBK,
-    duration: float = 0.0,
-) -> None:
-    """Set light color.
+def pack_value(value: Any, type_name: str) -> bytes:
+    """Pack a single value into bytes.
 
     Args:
-        color: HSBK color to set
-        duration: Transition duration in seconds (default 0.0)
+        value: Value to pack
+        type_name: Type name (e.g., 'uint16', 'float32')
+
+    Returns:
+        Packed bytes
 
     Raises:
-        LifxDeviceNotFoundError: If device is not connected
-        LifxTimeoutError: If device does not respond
+        ValueError: If type is unknown
+        struct.error: If value doesn't match type
+    """
+```
+
+- **Modules:** Docstring at top describes purpose and structure
+- **Classes:** Describe what the class represents
+- **Functions:** One-line summary, then Args/Returns/Raises sections
+- **Async functions:** Mark with "async" or indicate `async with` usage
+- **Properties:** One-line docstring for simple properties
+- **Type hints:** Include in signature, not repeated in docstring
+
+Example docstring with code:
+```python
+async def create_device(self) -> Device | None:
+    """Create appropriate device instance based on product capabilities.
 
     Example:
         ```python
-        await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
+        devices = await discover_devices()
+        for discovered in devices:
+            device = await discovered.create_device()
         ```
     """
 ```
 
 ## Function Design
 
-**Size:** Functions tend to be focused and single-purpose. Device methods typically: build packet, send request, parse response, update cache, log.
+**Size:** Functions should be under 50 lines (aim for <30)
 
 **Parameters:**
-- Use keyword arguments with defaults for optional params: `duration: float = 0.0`
-- Duration parameters accept seconds (float), convert to milliseconds for protocol internally
-- Use `HSBK` for user-facing colour, `LightHsbk` for protocol-level colour
+- Use keyword arguments for clarity on public APIs
+- Single positional argument acceptable (e.g., `get_device_class_for_product(product_id, capabilities)`)
+- Multiple parameters prefer explicit type hints:
+  ```python
+  async def request(self, packet: Packet, source: int, sequence: int) -> Packet | None
+  ```
 
 **Return Values:**
-- Getters return tuples for multi-value responses: `get_color() -> tuple[HSBK, int, str]`
-- Setters return `None`
-- Factory methods return `Self` or the constructed type
-- Properties expose cached state without network calls
+- Explicit return type hints always
+- Use tuples for multiple returns: `return (color, power, label)`
+- None for side-effect-only functions
+- Union types for conditional returns: `Device | None`
+
+**Async patterns:**
+- Mark async with `async def`
+- Use `async with` for context managers
+- Use `async for` for async generators
+- Use `await` on coroutines (linter enforces)
 
 ## Module Design
 
 **Exports:**
-- Each package has an `__init__.py` with explicit `__all__` list
-- Main `src/lifx/__init__.py` re-exports all public API symbols (170 items)
-- Use `__all__` to control public interface
+- `__all__` lists public API (used by `from module import *`)
+- Private items prefixed with `_`
+- Public items documented in module docstring
 
-**Barrel Files:**
-- `src/lifx/__init__.py` acts as the main barrel file for the entire library
-- Sub-packages (`devices`, `effects`, `products`, `theme`) have their own `__init__.py` with re-exports
+**Module-level code:**
+- Logger creation: `_LOGGER = logging.getLogger(__name__)`
+- Constants only (no side effects)
+- No network calls or I/O in module scope
 
-**Dataclass Usage:**
-- Prefer `@dataclass` for value objects and state containers
-- Use `@dataclass(frozen=True)` for immutable value types (e.g., `Serial`, `EffectInfo`)
-- Include `as_dict` property for serialisation where needed
-- Use `field(init=False)` for computed fields (e.g., `WifiInfo.rssi`)
+**Dataclasses:**
+- Use `@dataclass` decorator for value objects
+- Include type hints on all fields
+- Define docstring describing purpose
+- Provide field docstrings for complex attributes
+- Use `field(default_factory=...)` for mutable defaults
+- Use `field(init=False)` for computed fields with `__post_init__`
 
-**Generics:**
-- `Device` class uses `Generic[TypeVar]` for state type: `Device[LightState]`, `Device[HevLightState]`
+Example:
+```python
+@dataclass
+class DeviceVersion:
+    """Device version information.
 
-**Future Annotations:**
-- Every module uses `from __future__ import annotations` as its first non-docstring statement (after any module-level docstring) for PEP 604 union syntax (`X | Y`) and forward references
+    Attributes:
+        vendor: Vendor ID (typically 1 for LIFX)
+        product: Product ID (identifies specific device model)
+    """
+    vendor: int
+    product: int
+```
+
+## Type Annotations
+
+**Pattern:**
+- Annotate all function parameters and return types
+- Use `from typing import TYPE_CHECKING` for forward references
+- Use `from typing_extensions import Self` for self-references (Python 3.10 compat)
+- Union types: `X | Y` (Python 3.10+)
+- Optional: `X | None` instead of `Optional[X]`
+- Collections: `list[X]`, `dict[str, Y]`, `set[int]`
+- Callables: `Callable[[int, str], bool]`
+
+**Future annotations:**
+- Import `from __future__ import annotations` at file top
+- Allows forward references without string quotes
+- Used throughout the codebase
+
+## String Formatting
+
+**Style:**
+- f-strings preferred: `f"Device {serial} at {ip}"`
+- String literals use double quotes: `"string"` not `'string'`
+- Multiline strings use triple double quotes: `"""docstring"""`
+
+## Async Context Managers
+
+**Pattern:**
+```python
+async with connection as conn:
+    await conn.send_packet(packet)
+```
+
+- Use `async with` for resource management
+- Connection/device classes implement `__aenter__` and `__aexit__`
+- Lazy opening: Connections may not open until first use
+- Explicit close: Can call `await device.connection.close()` to reset
+
+## Common Patterns
+
+**State caching:**
+- Store in private attribute: `self._color = (hsbk_value, timestamp)`
+- Cache TTL configurable, no automatic expiration
+- Always provide `get_*()` methods for volatile state
+
+**Packet building:**
+- Use protocol packet classes: `packets.Light.SetColor()`
+- Build with keyword arguments
+- Send via connection: `await device.connection.request(packet)`
+
+**Discovery:**
+- Return `AsyncGenerator` for lazy streaming
+- Yields `DiscoveredDevice` namedtuples
+- Caller can break early to short-circuit
+
+**Error recovery:**
+- Timeout: Retry with exponential backoff
+- Network error: Log, propagate, let caller retry
+- Device not found: Raise `LifxDeviceNotFoundError`
 
 ---
 
-*Convention analysis: 2026-04-16*
+*Convention analysis: 2026-06-11*
