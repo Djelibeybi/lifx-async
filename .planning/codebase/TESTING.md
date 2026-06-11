@@ -1,183 +1,183 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-16
+**Analysis Date:** 2026-06-11
 
 ## Test Framework
 
 **Runner:**
-- pytest >= 8.4.2
-- Config: `[tool.pytest.ini_options]` in `pyproject.toml`
+- pytest 8.4.2+
+- Config: `pyproject.toml` `[tool.pytest.ini_options]`
 
-**Key plugins:**
-- `pytest-asyncio` >= 0.24.0 — async test support with `asyncio_mode = "auto"`
-- `pytest-cov` >= 7.0.0 — coverage reporting
-- `pytest-benchmark` >= 5.2.3 — performance benchmarks
-- `pytest-retry` >= 1.7.0 — retries for flaky network tests (`LifxTimeoutError`, `LifxConnectionError`)
-- `pytest-sugar` >= 1.1.1 — improved output formatting
-- `pytest-timeout` >= 2.4.0 — 30s default timeout per test
+**Async Support:**
+- pytest-asyncio 0.24.0+
+- Mode: `asyncio_mode = "auto"` (automatically detects async fixtures)
+- Scope: `asyncio_default_fixture_loop_scope = "function"` (fresh loop per test)
 
 **Assertion Library:**
-- Built-in `assert` statements
-- `pytest.approx()` for floating-point comparisons with tolerances
-- `pytest.raises()` with `match=` for exception message validation
+- Built-in pytest assertions
+- pytest.approx() for floating-point comparisons
 
 **Run Commands:**
 ```bash
-uv run --frozen pytest              # Run all tests (excludes benchmarks by default)
-uv run pytest -v                    # Verbose output
-uv run pytest --cov=lifx --cov-report=html  # With HTML coverage report
-uv run pytest tests/test_devices/test_light.py -v  # Specific file
-uv run pytest -m benchmark          # Run benchmarks only
-uv run pytest -m emulator           # Run only emulator integration tests
+# All tests
+uv run pytest
+
+# Watch mode (not configured)
+# Use: uv run pytest --co (list tests) or manually re-run
+
+# Coverage report
+uv run pytest --cov=lifx --cov-report=html
+
+# Specific test file
+uv run pytest tests/test_devices/test_light.py -v
+
+# Specific test
+uv run pytest tests/test_color.py::TestHSBK::test_create_hsbk -v
+
+# Exclude emulator tests (on Windows or without emulator)
+uv run pytest -m "not emulator"
+
+# Only emulator tests
+uv run pytest -m emulator
 ```
 
-## Test File Organisation
+## Test File Organization
 
-**Location:** Separate `tests/` directory mirroring `src/lifx/` structure
+**Location:**
+- Tests mirror source structure: `tests/test_devices/test_light.py` tests `src/lifx/devices/light.py`
 
 **Naming:**
-- Test files: `test_{module}.py`
-- State management tests: `test_state_{device}.py`
-- Test classes: `Test{Feature}` (e.g., `TestLight`, `TestDeviceConnection`)
-- Test functions: `test_{behaviour}` (e.g., `test_create_light`, `test_get_color`)
+- Test files: `test_*.py`
+- Test classes: `Test*` (e.g., `TestLight`, `TestHSBK`)
+- Test functions: `test_*` (e.g., `test_create_hsbk()`)
 
 **Structure:**
-```text
+```
 tests/
-├── conftest.py                     # Root fixtures: emulator, cleanup, scenarios
-├── test_color.py                   # Color utilities
-├── test_utils.py                   # General utilities
-├── test_protocol/                  # Protocol layer tests
-│   ├── test_serializer.py
-│   ├── test_header.py
-│   └── test_packets.py
-├── test_network/                   # Network layer tests
-│   ├── test_connection.py
-│   ├── test_transport.py
-│   ├── test_discovery_devices.py
-│   ├── test_discovery_errors.py
-│   ├── test_concurrent_requests.py
-│   ├── test_message.py
-│   ├── test_message_advanced.py
-│   └── test_mdns/                  # mDNS sub-module tests
-│       └── conftest.py
-├── test_devices/                   # Device layer tests
-│   ├── conftest.py                 # Device-specific fixtures
-│   ├── test_base.py
-│   ├── test_light.py
-│   ├── test_ceiling.py
-│   ├── test_hev.py
-│   ├── test_infrared.py
-│   ├── test_matrix.py
-│   ├── test_multizone.py
-│   ├── test_mac_address.py
-│   ├── test_state_light.py         # State management per device type
-│   ├── test_state_ceiling.py
-│   ├── test_state_hev.py
-│   ├── test_state_infrared.py
-│   ├── test_state_management.py
-│   ├── test_state_matrix.py
-│   └── test_state_multizone.py
-├── test_api/                       # High-level API tests
-│   ├── test_api_discovery.py
-│   ├── test_api_batch_operations.py
-│   ├── test_api_batch_errors.py
-│   ├── test_api_organization.py
-│   └── test_api_apply_theme.py
-├── test_effects/                   # Effects (30+ individual effect test files)
-│   ├── test_aurora.py
-│   ├── test_flame.py
-│   ├── test_rainbow.py
-│   ├── test_registry.py
-│   ├── test_integration.py
-│   ├── test_capability_filtering.py
-│   ├── test_state_manager.py
-│   ├── test_conductor.py
-│   └── ... (30+ effect test files)
-├── test_theme/                     # Theme tests
-├── test_animation/                 # Animation layer tests
-│   ├── conftest.py                 # Mock tile/device fixtures
-│   ├── test_animator.py
-│   ├── test_framebuffer.py
-│   ├── test_orientation.py
-│   └── test_packets.py
-├── test_products/                  # Product registry tests
-└── benchmarks/                     # Performance benchmarks
-    ├── conftest.py
-    ├── test_packets_perf.py
-    ├── test_framebuffer_perf.py
-    └── test_effect_frame_perf.py
+├── test_protocol/          # Protocol header, serializer, packets, generator
+├── test_network/           # Transport, discovery, connection, message, concurrent requests
+│   └── test_mdns/          # mDNS DNS parser, transport, discovery
+├── test_devices/           # Base, light, ceiling, hev, infrared, multizone, matrix
+│   ├── conftest.py         # Device fixtures (mock_device_factory, mock_product_info)
+│   └── test_state_*.py     # State management tests per device type
+├── test_api/               # Discovery, batch operations, errors, organization, themes
+├── test_effects/           # Individual effect tests + registry, integration
+├── test_theme/             # Theme, canvas, generators, library
+├── test_animation/         # Animator, framebuffer, packets, orientation
+├── test_color.py           # Color utilities and RGB roundtrip
+├── test_products/          # Product registry
+├── test_utils.py           # General utilities
+├── conftest.py             # Shared session-level fixtures (emulator, devices)
+└── benchmarks/             # Performance benchmarks with pytest-benchmark
+    └── test_*.py           # Benchmarks marked with @pytest.mark.benchmark
 ```
 
 ## Test Structure
 
-**Suite Organisation:**
+**Suite Organization:**
 ```python
-"""Tests for light device class."""
-
-from __future__ import annotations
-
-import pytest
-
-from lifx.color import HSBK
-from lifx.devices.light import Light
-
-
 class TestLight:
     """Tests for Light class."""
 
     def test_create_light(self) -> None:
         """Test creating a light."""
-        light = Light(serial="d073d5010203", ip="192.168.1.100", port=56700)
-        assert light.serial == "d073d5010203"
+        light = Light(...)
+        assert light.serial == "..."
 
     async def test_get_color(self, light: Light) -> None:
         """Test getting light color."""
-        mock_state = packets.Light.StateColor(...)
-        light.connection.request.return_value = mock_state
-
-        color, power, label = await light.get_color()
-        assert isinstance(color, HSBK)
-        assert color.hue == pytest.approx(180, abs=1)
+        await light.get_color()
+        assert ...
 ```
 
-**Key patterns:**
-- Group related tests in `Test{Feature}` classes (e.g., `TestAuroraInheritance`, `TestAuroraGenerateFrame`)
-- All test methods include `-> None` return type annotation
-- Async tests: just use `async def` — `asyncio_mode = "auto"` handles the rest (no `@pytest.mark.asyncio` needed for most tests)
-- Each test has a descriptive docstring explaining what it validates
-- Tests follow Arrange-Act-Assert pattern
+**Patterns:**
+- Class-based organization (one Test* class per unit under test)
+- Descriptive test names that explain what is tested
+- One assertion focus per test (or related group with comments)
+- Async tests: `async def test_*` methods (no need for `@pytest.mark.asyncio`)
 
 **Setup/Teardown:**
-- Fixtures handle setup; `yield`-based fixtures handle teardown
-- `autouse=True` fixture in root `conftest.py` cleans up device connections after each test
-- Session-scoped emulator fixture starts once, shared across all tests
+- Fixtures for setup (avoid setUp/tearDown methods)
+- Autouse fixtures for test isolation (e.g., `cleanup_device_connections`)
+- Session-level fixtures: `scope="session"` (emulator runs once)
+- Function-level fixtures: `scope="function"` (default, fresh per test)
+
+Example:
+```python
+@pytest.fixture(scope="session")
+def emulator_port(emulator_server):
+    """Return emulator port for all tests."""
+    return emulator_server[0]
+
+@pytest.fixture(autouse=True)
+async def cleanup_device_connections(request, emulator_available):
+    """Clean up connections after each test."""
+    yield
+    if emulator_available and "emulator_devices" in request.fixturenames:
+        emulator_devices = request.getfixturevalue("emulator_devices")
+        for device in emulator_devices:
+            await device.connection.close()
+```
 
 ## Mocking
 
-**Framework:** `unittest.mock` (stdlib)
+**Framework:** `unittest.mock` (built-in)
 
-**Primary pattern — Mock device factory** (`tests/test_devices/conftest.py`):
+**Patterns:**
+```python
+from unittest.mock import AsyncMock, MagicMock
+
+# Mock async function
+mock_conn = MagicMock()
+mock_conn.request = AsyncMock()
+device.connection = mock_conn
+
+# Use mock
+mock_conn.request.return_value = packets.Light.StateColor(...)
+await device.get_color()
+
+# Verify calls
+mock_conn.request.assert_called_once()
+call_args = mock_conn.request.call_args
+packet = call_args[0][0]  # First positional arg
+```
+
+**What to Mock:**
+- Network connections (`DeviceConnection`)
+- External dependencies (emulator when not testing real protocol)
+- Side effects (file I/O, timing)
+- Device responses (fixtures return mock packet data)
+
+**What NOT to Mock:**
+- Protocol serialization (test real serialization behavior)
+- Core business logic (test actual implementations)
+- Exceptions (raise real exceptions, not mocks)
+- Time-sensitive operations (use mock clocks or fixtures)
+
+**Fixture Factories:**
 ```python
 @pytest.fixture
 def mock_device_factory():
     """Factory for creating devices with mocked connections."""
-    def _create_device(
-        device_class: type[Device],
-        serial: str = "d073d5010203",
-        ip: str = "192.168.1.100",
-        port: int = 56700,
-    ) -> Device:
-        device = device_class(serial=serial, ip=ip, port=port)
+    def _create_device(device_class, serial="d073d5010203", ip="192.168.1.100"):
+        device = device_class(serial=serial, ip=ip, port=56700)
         mock_conn = MagicMock()
         mock_conn.request = AsyncMock()
-        mock_conn.request_ack = AsyncMock()
         device.connection = mock_conn
         return device
     return _create_device
+
+# Usage
+def test_something(mock_device_factory):
+    light = mock_device_factory(Light)
+    # light has mocked connection ready
 ```
 
-**Derived fixtures for each device type:**
+## Fixtures and Factories
+
+**Test Data:**
+
+Device fixture factory pattern (`tests/test_devices/conftest.py`):
 ```python
 @pytest.fixture
 def light(mock_device_factory) -> Light:
@@ -185,238 +185,351 @@ def light(mock_device_factory) -> Light:
     return mock_device_factory(Light)
 
 @pytest.fixture
-def multizone_light(mock_device_factory) -> MultiZoneLight:
-    return mock_device_factory(MultiZoneLight)
+def mock_product_info():
+    """Factory for creating mock ProductInfo objects."""
+    def _create_product_info(
+        pid: int = 32,
+        has_color: bool = True,
+        has_multizone: bool = True,
+    ) -> ProductInfo:
+        capabilities = 0
+        if has_color:
+            capabilities |= ProductCapability.COLOR
+        # ... build capabilities
+        return ProductInfo(pid=pid, capabilities=capabilities, ...)
+    return _create_product_info
+
+# Usage
+def test_something(mock_product_info):
+    info = mock_product_info(has_multizone=True)
 ```
 
-**Mocking protocol responses:**
+Emulator device fixtures (`tests/conftest.py`):
+```python
+@pytest.fixture(scope="session")
+def emulator_devices(emulator_server) -> DeviceGroup:
+    """Return a DeviceGroup with 7 hardcoded emulated devices."""
+    port, _, _ = emulator_server
+    devices = [
+        Light(serial="d073d5000001", ip="127.0.0.1", port=port, ...),
+        # ... 6 more devices
+    ]
+    return DeviceGroup(devices)
+
+# Usage
+async def test_batch_operation(emulator_devices):
+    await emulator_devices.set_power(True)
+```
+
+**Location:**
+- Shared fixtures: `tests/conftest.py` (session-level, emulator)
+- Device fixtures: `tests/test_devices/conftest.py` (mock factories)
+- Module-specific: In test file itself (if used by one module only)
+
+## Coverage
+
+**Requirements:** No minimum enforced; high coverage encouraged
+
+**Measurement:**
+- Tool: pytest-cov
+- Branch coverage enabled: `--cov-branch`
+- Report: XML (for CI), terminal with missing line numbers
+
+**View Coverage:**
+```bash
+# Generate HTML report
+uv run pytest --cov=lifx --cov-report=html
+
+# View in browser
+open htmlcov/index.html  # macOS
+xdg-open htmlcov/index.html  # Linux
+```
+
+**Omitted from Coverage:**
+- `src/lifx/protocol/generator.py` (generates code, not executed)
+- `src/lifx/protocol/protocol_types.py` (auto-generated)
+- `src/lifx/products/generator.py` (generates registry)
+
+**Exclude Lines:**
+- `pragma: no cover` (skip this line)
+- `@overload` (type hint only)
+- `if TYPE_CHECKING:` (type hints only)
+- `raise NotImplementedError` (abstract methods)
+- `if __name__ == "__main__":` (CLI only)
+
+## Test Types
+
+**Unit Tests:**
+- Scope: Individual functions/methods
+- Mocking: Mock external dependencies
+- Examples: `test_color.py` (color conversion), `test_protocol/` (serialization)
+- Location: Majority of tests
+
+**Integration Tests:**
+- Scope: Multiple layers together
+- Mocking: Mock network only
+- Examples: Device + Connection, Device + Protocol
+- Pattern: Use fixture devices
+
+**E2E/Emulator Tests:**
+- Framework: lifx-emulator-core (embedded in-process)
+- Marker: `@pytest.mark.emulator`
+- Scope: Full request/response cycle against emulator
+- Fixtures: `emulator_port`, `emulator_devices`, `scenario_manager`
+- Timeout: 120s (longer than normal 30s due to I/O variability)
+- Skip conditions: Windows (UDP timing sensitive), external emulator mode
+
+Example:
+```python
+@pytest.mark.emulator
+async def test_get_color(emulator_devices):
+    """Test getting color from emulated device."""
+    light = emulator_devices[0]
+    color, power, label = await light.get_color()
+    assert isinstance(color, HSBK)
+    assert power == 65535 or power == 0
+```
+
+## Common Patterns
+
+**Async Testing:**
+
+Simple async test:
+```python
+async def test_connection_opens(self) -> None:
+    """Test connection opens lazily on first request."""
+    conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+    assert not conn.is_open
+    await conn._ensure_open()
+    assert conn.is_open
+    await conn.close()
+```
+
+With asyncio.gather for concurrent tests:
+```python
+async def test_concurrent_requests(self) -> None:
+    """Test concurrent requests execute in parallel."""
+    await asyncio.gather(
+        mock_request(1),
+        mock_request(2),
+        mock_request(3),
+    )
+    # Verify all completed
+```
+
+**Error Testing:**
+
+```python
+async def test_set_brightness_invalid(self, light: Light) -> None:
+    """Test setting invalid brightness raises ValueError."""
+    with pytest.raises(ValueError, match="Brightness must be between"):
+        await light.set_brightness(1.5)
+```
+
+With context manager setup:
+```python
+async def test_send_without_open(self) -> None:
+    """Test sending without opening raises ConnectionError."""
+    conn = DeviceConnection(serial="...", ip="...")
+    packet = Device.GetLabel()
+    with pytest.raises(ConnectionError):
+        await conn.send_packet(packet, source=12345, sequence=0)
+```
+
+**Mocking Responses:**
+
 ```python
 async def test_get_color(self, light: Light) -> None:
+    """Test getting light color."""
+    # Setup mock response
     mock_state = packets.Light.StateColor(
         color=HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500).to_protocol(),
         power=65535,
         label="Test Light",
     )
     light.connection.request.return_value = mock_state
+
+    # Call method
     color, power, label = await light.get_color()
-```
 
-**Side-effect mocking for multi-packet conversations:**
-```python
-async def mock_request(packet):
-    if isinstance(packet, packets.Light.GetColor):
-        return mock_color
-    elif isinstance(packet, packets.Device.GetHostFirmware):
-        return packets.Device.StateHostFirmware(build=0, version_major=2, version_minor=80)
-    elif isinstance(packet, packets.Device.GetLocation):
-        return packets.Device.StateLocation(location=b"\x00" * 16, label="Home", ...)
-
-light.connection.request.side_effect = mock_request
-```
-
-**What to mock:**
-- Device connections (`MagicMock` with `AsyncMock` for `request`/`request_ack`)
-- Network transport for unit tests
-- Product info capabilities (`mock_product_info` fixture)
-- Firmware info (`mock_firmware_info` fixture)
-- Tile info for animation tests (`MockTileInfo` dataclass in `tests/test_animation/conftest.py`)
-
-**What NOT to mock:**
-- Protocol serialisation/deserialisation (test real binary encoding)
-- HSBK colour conversion (test real maths)
-- Product registry lookups (test real data)
-- Emulator integration tests (test against real protocol implementation)
-
-## Fixtures and Factories
-
-**Root fixtures** (`tests/conftest.py`):
-```python
-# Session-scoped emulator management
-@pytest.fixture(scope="session")
-def emulator_server(emulator_available):
-    """Start embedded lifx-emulator for entire session."""
-    # Returns (port, server, scenario_manager)
-
-@pytest.fixture(scope="session")
-def emulator_port(emulator_server) -> int:
-    """Return just the emulator port."""
-
-@pytest.fixture(scope="session")
-def emulator_devices(emulator_server) -> DeviceGroup:
-    """Return DeviceGroup with 7 hardcoded emulated devices."""
-
-@pytest.fixture(scope="session")
-def ceiling_device(emulator_server):
-    """Dynamically add ceiling device to running emulator."""
-
-@pytest.fixture
-def scenario_manager(emulator_server):
-    """Context manager for scenario-based testing."""
-```
-
-**Device fixtures** (`tests/test_devices/conftest.py`):
-- `mock_device_factory` — factory callable for any device type
-- `device`, `light`, `multizone_light`, `matrix_light`, `hev_light`, `infrared_light` — pre-built mocked devices
-- `mock_product_info` — factory for `ProductInfo` with configurable capabilities
-- `mock_firmware_info` — factory for `FirmwareInfo` with configurable versions
-
-**Animation fixtures** (`tests/test_animation/conftest.py`):
-- `MockTileInfo` dataclass — lightweight tile mock without device dependency
-- `mock_tile_upright`, `mock_tile_rotated_90`, etc. — orientation-specific tile fixtures
-- `mock_tile_chain` — multi-tile chain fixture
-- `mock_multizone_device`, `mock_matrix_device` — device mocks for animation
-
-**Test data location:**
-- No external fixture files — all test data inline or in conftest fixtures
-- Protocol test data uses raw bytes literals for binary testing
-- Serial numbers follow pattern `d073d5XXXXXX` matching LIFX vendor prefix
-
-## Coverage
-
-**Requirements:**
-- Branch coverage enabled (`--cov-branch`)
-- Coverage reported on `lifx` package only
-- XML and terminal reports generated by default
-- Coverage context per test (`--cov-context=test`)
-
-**Exclusions** (`[tool.coverage.run]` and `[tool.coverage.report]`):
-- Omitted: `src/lifx/protocol/generator.py`, `src/lifx/protocol/protocol_types.py`, `src/lifx/products/generator.py`
-- Excluded lines: `pragma: no cover`, `@overload`, `if TYPE_CHECKING`, `raise NotImplementedError`, `if __name__ == "__main__":`
-
-**View Coverage:**
-```bash
-uv run pytest --cov=lifx --cov-report=html    # HTML report in htmlcov/
-uv run pytest --cov=lifx --cov-report=term     # Terminal summary
-```
-
-## Test Types
-
-**Unit Tests (majority):**
-- Test individual classes and methods in isolation
-- Mock device connections, replace `request()` with `AsyncMock`
-- Validate packet construction, response parsing, state updates
-- Located throughout `tests/test_*` directories
-- ~2400+ tests
-
-**Integration Tests (emulator-based):**
-- Marked with `@pytest.mark.emulator`
-- Run against `lifx-emulator-core` embedded in-process
-- Test real UDP protocol communication
-- Session-scoped emulator with 7 default devices + dynamic device creation
-- Scenario-based testing for error conditions (packet drops, delays, malformed responses)
-- Located in `tests/test_api/test_api_discovery.py`, `tests/test_api/test_api_batch_operations.py`, `tests/test_animation/test_animator.py`
-- Auto-skipped if emulator unavailable or on Windows (timing-sensitive)
-- Extended timeout: 120s (vs 30s default)
-
-**Benchmark Tests:**
-- Marked with `@pytest.mark.benchmark`
-- Excluded from default test runs (`-m "not benchmark"`)
-- Use `pytest-benchmark` for statistical analysis
-- Located in `tests/benchmarks/`
-- Test animation packet generation, framebuffer operations, effect frame generation
-- Support baseline saving and comparison:
-```bash
-uv run pytest tests/benchmarks/ -m benchmark --benchmark-save=phase1
-uv run pytest tests/benchmarks/ -m benchmark --benchmark-compare=phase1
-```
-
-**E2E Tests:**
-- Not a separate category — emulator integration tests serve this purpose
-- External emulator mode supports testing against real hardware:
-```bash
-LIFX_EMULATOR_EXTERNAL=1 pytest  # Test against real LIFX hardware
-```
-
-## Common Patterns
-
-**Async Testing:**
-```python
-# asyncio_mode = "auto" means no decorator needed in most cases
-async def test_get_color(self, light: Light) -> None:
-    """Test getting light color."""
-    light.connection.request.return_value = mock_state
-    color, power, label = await light.get_color()
+    # Verify results
     assert isinstance(color, HSBK)
-
-# Explicit marker only needed when not using fixtures that imply async
-@pytest.mark.asyncio
-async def test_for_matrix_fetches_device_chain(self) -> None:
-    animator = await Animator.for_matrix(device)
-    assert animator.pixel_count == 64
+    assert color.hue == pytest.approx(180, abs=1)
+    assert power == 65535
+    assert label == "Test Light"
 ```
 
-**Error Testing:**
-```python
-def test_aurora_invalid_speed(self) -> None:
-    """Test EffectAurora with invalid speed raises ValueError."""
-    with pytest.raises(ValueError, match="Speed must be positive"):
-        EffectAurora(speed=0)
+**Timing Tests:**
 
-async def test_send_without_open(self) -> None:
-    """Test sending without opening raises error."""
-    conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
-    with pytest.raises(ConnectionError):
-        await conn.send_packet(packet, source=12345, sequence=0)
+```python
+async def test_concurrent_timing(self) -> None:
+    """Test concurrent requests complete faster than sequential."""
+    start_time = time.monotonic()
+    await asyncio.gather(
+        mock_request(conn1, "conn1"),
+        mock_request(conn2, "conn2"),
+    )
+    total_time = time.monotonic() - start_time
+
+    # If serial, would take ~0.2s (two 0.1s sleeps)
+    # If concurrent, should take ~0.1s (one sleep duration)
+    # Tolerance for CI variability
+    assert total_time < 0.19
 ```
 
-**Parametrised Tests:**
+## Scenario Management
+
+**Emulator Scenarios:**
+
+Use scenario_manager fixture to inject test conditions:
+
 ```python
-@pytest.mark.parametrize("pixel_count", [1, 8, 16, 82])
-def test_multi_pixel_returns_correct_count(self, pixel_count: int) -> None:
-    """Test correct number of colors for various pixel counts."""
-    effect = EffectAurora()
-    ctx = FrameContext(elapsed_s=1.0, device_index=0, pixel_count=pixel_count, ...)
-    colors = effect.generate_frame(ctx)
-    assert len(colors) == pixel_count
+async def test_packet_drop_retry(scenario_manager):
+    """Test retry on dropped packets."""
+    with scenario_manager("devices", "d073d5000001", {"drop_packets": {20: 0.5}}):
+        # 50% drop rate for packet type 20
+        light = Light(serial="d073d5000001", ip="127.0.0.1", port=port)
+        # Test should retry and succeed despite drops
+        color, power, label = await light.get_color()
+        assert color is not None
 ```
 
-**Floating-point Comparison:**
-```python
-assert color.hue == pytest.approx(180, abs=1)
-assert color.saturation == pytest.approx(0.5, abs=0.01)
-```
+Scenario types:
+- `"global"`: Affects all devices
+- `"devices"`: Specific device by serial
+- `"types"`: All devices of a type
+- `"locations"`: All devices in location
+- `"groups"`: All devices in group
 
-**Scenario-based Integration Testing:**
+Configuration:
 ```python
-@pytest.mark.emulator
-async def test_with_packet_drops(self, scenario_manager, emulator_devices):
-    """Test behaviour when device drops packets."""
-    with scenario_manager("devices", "d073d5000001", {"drop_packets": {20: 1.0}}):
-        # Test code with scenario active
-        pass
-    # Scenario automatically cleaned up
-```
-
-**Connection Cleanup (autouse fixture):**
-```python
-@pytest.fixture(autouse=True)
-async def cleanup_device_connections(request, emulator_available):
-    """Close all device connections after each test for isolation."""
-    yield
-    if "emulator_devices" in request.fixturenames:
-        for device in request.getfixturevalue("emulator_devices"):
-            await device.connection.close()
+{
+    "drop_packets": {pkt_type: rate},      # 0.0-1.0 drop probability
+    "response_delays": {pkt_type: seconds}, # Add latency
+    "malformed_packets": [pkt_types],       # Corrupt responses
+}
 ```
 
 ## Test Markers
 
-| Marker | Purpose | Default behaviour |
-|--------|---------|-------------------|
-| `@pytest.mark.emulator` | Requires lifx-emulator-core | Skipped if unavailable or on Windows |
-| `@pytest.mark.benchmark` | Performance benchmark | Excluded from default runs (`-m "not benchmark"`) |
-| `@pytest.mark.asyncio` | Explicit async test marker | Rarely needed (auto mode handles most cases) |
-| `@pytest.mark.timeout(N)` | Custom timeout | Emulator tests auto-set to 120s |
-| `@pytest.mark.parametrize(...)` | Parametrised test data | Standard pytest behaviour |
+**Defined Markers:**
+- `@pytest.mark.emulator` - Requires lifx-emulator-core
+- `@pytest.mark.benchmark` - Performance benchmark
 
-## Retry Behaviour
-
-Configured via `pytest-retry` in `tests/conftest.py`:
+**Usage:**
 ```python
-def pytest_set_filtered_exceptions() -> list[type[Exception]]:
-    """Only retry on transient network exceptions."""
-    return [LifxTimeoutError, LifxConnectionError]
+@pytest.mark.emulator
+async def test_real_protocol(emulator_devices):
+    """Test against emulated device."""
+    ...
+
+@pytest.mark.benchmark
+def test_color_conversion_perf(benchmark):
+    """Benchmark RGB conversion speed."""
+    result = benchmark(HSBK.from_rgb, 1.0, 0.5, 0.2)
 ```
+
+**Running:**
+```bash
+# Exclude emulator tests (CI without emulator)
+uv run pytest -m "not emulator"
+
+# Only emulator tests
+uv run pytest -m emulator
+
+# Skip benchmarks (default)
+uv run pytest -m "not benchmark"
+
+# Only benchmarks
+uv run pytest -m benchmark
+```
+
+## Test Isolation and Cleanup
+
+**Autouse Fixtures:**
+
+```python
+@pytest.fixture(autouse=True)
+async def cleanup_device_connections(request, emulator_available):
+    """Clean up device connections after each test.
+
+    Automatically runs after every test function.
+    Yields first (test runs), then cleanup happens.
+    """
+    yield  # Test runs here
+
+    # Cleanup happens here
+    if emulator_available and "emulator_devices" in request.fixturenames:
+        emulator_devices = request.getfixturevalue("emulator_devices")
+        for device in emulator_devices:
+            await device.connection.close()
+```
+
+**Scenario Cleanup:**
+
+```python
+@pytest.fixture
+def scenario_manager(emulator_server):
+    """Context manager that auto-cleans scenarios."""
+    _, server, sm = emulator_server
+
+    active_scenarios = []
+
+    @contextmanager
+    def manage_scenario(scope, identifier, config):
+        # Setup
+        sm.set_device_scenario(identifier, ScenarioConfig(**config))
+        active_scenarios.append((scope, identifier))
+        server.invalidate_all_scenario_caches()
+
+        try:
+            yield  # Test runs
+        finally:
+            # Cleanup
+            sm.delete_device_scenario(identifier)
+            active_scenarios.remove((scope, identifier))
+            server.invalidate_all_scenario_caches()
+
+    yield manage_scenario
+
+    # Final cleanup for any remaining scenarios
+    for scope, identifier in active_scenarios:
+        sm.delete_device_scenario(identifier)
+```
+
+## Timeout Configuration
+
+**Defaults:**
+- Normal tests: 30 seconds (`timeout = 30`)
+- Emulator tests: 120 seconds (auto-applied to tests using emulator fixtures)
+- Method: thread-based timeout
+
+**Per-test override:**
+```python
+@pytest.mark.timeout(60)
+async def test_slow_operation(self):
+    """This test gets 60 seconds instead of default."""
+    ...
+```
+
+## CI Integration
+
+**Command:**
+```bash
+uv run pytest
+```
+
+**Output:**
+- Verbose: `-v` flag
+- JUnit XML: junit.xml (for GitHub Actions)
+- Coverage XML: coverage.xml (for codecov)
+- Terminal: Formatted output with sugar plugin
+
+**Retry on Transient Failures:**
+- pytest-retry: Auto-retries on `LifxTimeoutError` and `LifxConnectionError`
+- Configured in `conftest.py`: `pytest_set_filtered_exceptions()`
+- Useful for network-sensitive tests
 
 ---
 
-*Testing analysis: 2026-04-16*
+*Testing analysis: 2026-06-11*

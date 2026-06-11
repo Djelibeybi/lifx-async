@@ -1,121 +1,104 @@
 # Technology Stack
 
-**Analysis Date:** 2026-04-16
+**Analysis Date:** 2026-06-11
 
 ## Languages
 
 **Primary:**
-- Python >=3.10 - Entire codebase (tested on 3.10, 3.11, 3.12, 3.13, 3.14)
+- Python 3.10, 3.11, 3.12, 3.13, 3.14 - Core library implementation, type-checked with Pyright in strict mode
 
 **Secondary:**
-- YAML - Protocol specification source (`protocol.yml`, downloaded from LIFX GitHub)
-- JSON - Product registry source (`products.json`, downloaded from LIFX GitHub)
+- YAML - Protocol specification source format (downloaded, not stored)
+- JSON - Product registry source format (downloaded, not stored)
 
 ## Runtime
 
 **Environment:**
-- CPython 3.10+ (CI default: 3.11)
-- asyncio (stdlib) - Core async runtime, no third-party async framework
+- Python built-in `asyncio` - Async/await event loop framework for concurrent device communication
 
 **Package Manager:**
-- uv 0.9.4 (pinned in CI via `astral-sh/setup-uv`)
-- Lockfile: `uv.lock` present and committed
+- `uv` (v0.9.4+) - Modern Python dependency manager for development and packaging
+- Lockfile: `uv.lock` present
 
 ## Frameworks
 
 **Core:**
-- asyncio (stdlib) - Async networking, UDP transport, device communication
-- No external runtime dependencies (zero-dependency library)
+- AsyncIO (built-in) - Single-threaded event loop for concurrent UDP communication with LIFX devices
 
 **Testing:**
-- pytest >=8.4.2 - Test runner (`pyproject.toml` `[tool.pytest.ini_options]`)
-- pytest-asyncio >=0.24.0 - Async test support (mode: `auto`, loop scope: `function`)
-- pytest-cov >=7.0.0 - Coverage reporting (target: 90% project, 100% patch)
-- pytest-benchmark >=5.2.3 - Performance benchmarks (marker: `benchmark`)
-- pytest-retry >=1.7.0 - Flaky test retry
-- pytest-sugar >=1.1.1 - Progress bar output
-- pytest-timeout >=2.4.0 - Test timeout enforcement (default: 30s, method: thread)
-- lifx-emulator-core >=3.1.0 - Embedded in-process protocol emulator for integration tests
+- pytest (8.4.2+) - Test runner and framework
+  - pytest-asyncio (0.24.0+) - AsyncIO test fixture management
+  - pytest-cov (7.0.0+) - Code coverage reporting with branch coverage
+  - pytest-timeout (2.4.0+) - Test execution timeout protection
+  - pytest-benchmark (5.2.3+) - Performance baseline benchmarking
+  - pytest-retry (1.7.0+) - Flaky test retry support
+  - pytest-sugar (1.1.1+) - Enhanced test output formatting
 
 **Build/Dev:**
-- hatchling >=1.27.0 - Build backend (`pyproject.toml` `[build-system]`)
-- ruff >=0.14.2 - Linting and formatting (line-length: 88, target: py310)
-- pyright >=1.1.407 - Static type checking (mode: `standard`, Python 3.10 target)
-- bandit - Security scanning (skips: B101, B311)
-- pre-commit - Git hooks (formatting, linting, security, spell check, conventional commits)
-- codespell - Spell checking
-- commitizen - Conventional commit enforcement
+- hatchling (1.27.0+) - Build backend and package builder
+- ruff (0.14.2+) - Unified Python formatter and linter (E, F, I, N, W, UP rules)
+- pyright (1.1.407+) - Strict static type checker (standard mode, Python 3.10 target)
+- bandit - Security vulnerability scanner (B101, B311 skipped)
 
 **Documentation:**
-- mkdocs-material >=9.6.22 - Documentation site framework
-- mkdocstrings[python] >=0.30.1 - Auto-generated API docs from docstrings (Google style)
-- mkdocs-git-revision-date-localized-plugin >=1.4.7 - Git-based page dates
-- mkdocs-llmstxt >=0.4.0 - LLM-friendly documentation output (`llms-full.txt`)
+- zensical (0.0.37+) - MkDocs site builder with hot reload
+- mkdocstrings-python (2.0.3+) - Python docstring-to-docs with Google/NumPy style support
+- llmstxt-standalone (0.2.0+) - LLM-optimized documentation generator
+- MkDocs Material theme - Modern responsive documentation theme
 
-**Release:**
-- python-semantic-release - Automated versioning and changelog (conventional commits)
-- pypa/gh-action-pypi-publish - PyPI publishing via trusted publisher (OIDC)
+**Code Generation:**
+- pyyaml (6.0.3+) - YAML parsing for protocol generation from specification
+- lifx-emulator-core (3.1.0+, dev only) - Embedded in-process LIFX device emulator for integration testing
 
 ## Key Dependencies
 
-**Critical (Runtime):**
-- None. Zero runtime dependencies. The library uses only Python stdlib.
+**Runtime (Zero Dependencies!):**
+- None - Library is completely dependency-free for production use
 
-**Critical (Dev/Build):**
-- pyyaml >=6.0.3 - Protocol generator parses YAML specification
-- lifx-emulator-core >=3.1.0 - Embedded emulator for integration testing
-- typing-extensions >=4.15.0 - Backported typing features for Python 3.10 compatibility
-- prek >=0.3.6 - Dev utility
-
-**Infrastructure:**
-- hatchling - Wheel/sdist build backend
-- uv - Dependency resolution, virtual environment management, script running
+**Development Dependencies (Selected Critical):**
+- lifx-emulator-core (3.1.0+) - Provides embedded emulator for testing all device types without network hardware
+- typing-extensions (4.15.0+) - Python 3.10 compatibility for newer typing features
+- pyyaml (6.0.3+) - Required for auto-generating protocol and product registry from YAML/JSON specifications
 
 ## Configuration
 
 **Environment:**
-- No `.env` files detected or required
-- `LIFX_EMULATOR_EXTERNAL` - Optional: use external emulator instance for testing
-- `LIFX_EMULATOR_PORT` - Optional: port for external emulator (default: 56700)
-- No secrets or API keys required for library operation (local network UDP only)
+- Development: `uv sync` installs all dependencies including dev tools
+- Production: `uv sync --no-dev` installs zero runtime dependencies
+- Python version: Managed by `.python-version` file or explicit selection in CI/CD
 
 **Build:**
-- `pyproject.toml` - All project metadata, tool configuration, build settings
-- `uv.lock` - Locked dependency versions (committed to repo)
-- `.pre-commit-config.yaml` - Pre-commit hook definitions
-- `mkdocs.yml` - Documentation site configuration
-- `codecov.yml` - Coverage reporting configuration (90% project target, 100% patch)
-- `renovate.json` - Automated dependency update configuration
+- `pyproject.toml` - Single source of truth for project metadata, dependencies, and tool configuration
+  - Semantic versioning with python-semantic-release
+  - Tool configuration: ruff, pyright, pytest, coverage, bandit
+- `uv.lock` - Frozen dependency lock file for reproducible installs
 
-**Linting/Formatting (all in `pyproject.toml`):**
-- Ruff format: double quotes, 4-space indent, 88 char line length
-- Ruff lint rules: E, F, I, N, W, UP (pycodestyle, pyflakes, isort, naming, warnings, pyupgrade)
-- Pyright: standard mode, Python 3.10 target, excludes generators and auto-generated files
+**Testing Configuration (`pyproject.toml`):**
+- Test paths: `tests/` directory
+- Python path: `src/` added for imports
+- Test discovery: `test_*.py` files, `Test*` classes, `test_*` functions
+- Coverage targets: 90% overall, 100% for patches
+- Timeout: 30 seconds per test
+- Markers: `@pytest.mark.emulator` for tests requiring lifx-emulator-core
 
-**Code Generation:**
-- `src/lifx/protocol/generator.py` - Downloads `protocol.yml` from GitHub, generates `packets.py` and `protocol_types.py`
-- `src/lifx/products/generator.py` - Downloads `products.json` from GitHub, generates `registry.py`
-- Generated files are committed but verified fresh in CI (`generated-files` job)
+**Type Checking:**
+- Strict mode: `standard` (equivalent to mypy strict with some Pyright enhancements)
+- Python target: 3.10
+- Include: `src/` only
+- Exclude: Generator files (untyped YAML parsing) and auto-generated registry
 
 ## Platform Requirements
 
 **Development:**
-- Python 3.10+ with uv installed
-- `uv sync` installs all dev dependencies
-- Pre-commit hooks: `pre-commit install`
-- No OS-specific requirements (tested on Ubuntu, macOS, Windows in CI)
+- OS: macOS, Windows, Linux (tested on all three in CI)
+- Python: 3.10+ (tested on 3.10, 3.11, 3.12, 3.13, 3.14 in parallel)
+- uv: v0.9.4+ (installed via `astral-sh/setup-uv` GitHub Action)
 
 **Production:**
-- Python 3.10+ (any OS)
-- Zero external dependencies
-- Local network access (UDP port 56700 for LIFX devices, mDNS port 5353 for discovery)
-- Published on PyPI as `lifx-async`: `pip install lifx-async`
-
-**CI/CD:**
-- GitHub Actions (3 workflows: `ci.yml`, `docs.yml`, `pr-automation.yml`)
-- Test matrix: 5 Python versions x 3 OSes (PRs with source changes) or Ubuntu-only (main pushes)
-- pre-commit.ci for automated hook updates and auto-fixes
+- OS: Any (macOS, Linux, Windows via WSL)
+- Python: 3.10+ (no external dependencies)
+- Network: Local network access to LIFX devices (UDP port 56700, mDNS multicast 224.0.0.251:5353)
 
 ---
 
-*Stack analysis: 2026-04-16*
+*Stack analysis: 2026-06-11*
