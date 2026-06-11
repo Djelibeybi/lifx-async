@@ -46,19 +46,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CEIL-01 | TBD | Pending |
-| CEIL-02 | TBD | Pending |
-| CEIL-03 | TBD | Pending |
-| CEIL-04 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
+| CEIL-01 | Phase 1 | Pending |
+| CEIL-02 | Phase 1 | Pending |
+| CEIL-03 | Phase 1 | Pending |
+| CEIL-04 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 1 | Pending |
+| TEST-03 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 7 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 7 ⚠️
+- Mapped to phases: 7
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-11*
-*Last updated: 2026-06-11 after initial definition*
+*Last updated: 2026-06-12 after roadmap creation (traceability mapped)*
