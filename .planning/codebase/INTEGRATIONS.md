@@ -1,132 +1,205 @@
 # External Integrations
 
-**Analysis Date:** 2026-04-16
+**Analysis Date:** 2026-06-11
 
 ## APIs & External Services
 
-**LIFX Protocol Specification (build-time only):**
-- Service: LIFX public-protocol GitHub repository
-- Purpose: Source of truth for protocol packet definitions
+**LIFX Protocol Specification:**
+- Service: GitHub (raw content)
 - URL: `https://raw.githubusercontent.com/LIFX/public-protocol/refs/heads/main/protocol.yml`
-- Client: `urllib.request.urlopen` (stdlib) in `src/lifx/protocol/generator.py`
-- Auth: None (public repository)
-- Usage: Downloaded on-demand during code generation, never stored locally
+- What it's used for: Source of truth for LIFX wire protocol (packet types, enums, fields, compound structures)
+- Client: Python `urllib.request.urlopen()` (stdlib only, no external HTTP library)
+- When: On-demand via `uv run python -m lifx.protocol.generator`
+- Implementation: `src/lifx/protocol/generator.py` downloads and parses YAML, generates `src/lifx/protocol/packets.py` and `src/lifx/protocol/protocol_types.py`
+- Never stored locally: Downloaded, parsed, and code-generated in a single pass
 
-**LIFX Products Registry (build-time only):**
-- Service: LIFX products GitHub repository
-- Purpose: Device capability database (product IDs, features, device class mapping)
+**LIFX Products Registry:**
+- Service: GitHub (raw content)
 - URL: `https://raw.githubusercontent.com/LIFX/products/refs/heads/master/products.json`
-- Client: `urllib.request.urlopen` (stdlib) in `src/lifx/products/generator.py`
-- Auth: None (public repository)
-- Usage: Downloaded on-demand during code generation, never stored locally
-
-**LIFX Devices (runtime - local network):**
-- Service: LIFX smart light hardware on local network
-- Purpose: Primary functionality - device discovery and control
-- Protocol: LIFX LAN Protocol over UDP (port 56700)
-- Discovery methods:
-  - UDP broadcast (`src/lifx/network/discovery.py`)
-  - mDNS/DNS-SD multicast at 224.0.0.251:5353 (`src/lifx/network/mdns/`)
-- Auth: None (local network, no authentication)
-- Connection: `src/lifx/network/connection.py` (lazy-opening, auto-retry)
+- What it's used for: Product definitions including device capabilities, feature flags, and product class mapping
+- Client: Python `urllib.request.urlopen()` (stdlib only)
+- When: On-demand via `uv run python -m lifx.products.generator`
+- Implementation: `src/lifx/products/generator.py` downloads and parses JSON, generates `src/lifx/products/registry.py`
+- Never stored locally: Downloaded, parsed, and code-generated in a single pass
 
 ## Data Storage
 
 **Databases:**
-- None. Library operates entirely in-memory with no persistence layer.
+- None - Library is stateless and passes-through to device queries
 
 **File Storage:**
-- Local filesystem only (no cloud storage)
-- Auto-generated source files committed to repo:
-  - `src/lifx/protocol/packets.py` - Generated packet classes
-  - `src/lifx/protocol/protocol_types.py` - Generated enums and field structures
-  - `src/lifx/products/registry.py` - Generated product database
+- Local filesystem only - No cloud storage integration
+- Documentation assets: `docs/` directory (MkDocs)
+- Generated code: `src/lifx/protocol/packets.py`, `src/lifx/protocol/protocol_types.py`, `src/lifx/products/registry.py`
 
 **Caching:**
-- In-memory state caching on device objects (configurable TTL)
-- No external cache service
+- None built-in - State caching is device-level and application-controlled
+- Devices implement optional state TTL via `get_*()` methods (see `src/lifx/devices/base.py`)
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Not applicable. LIFX LAN protocol requires no authentication.
-- Local network UDP communication only.
+- None - LIFX devices on local network require no authentication
+- Network assumption: Closed local network (LAN) only; devices respond to all requesters
+
+**Device Identification:**
+- Serial number: 12-digit hex (MAC-derived, e.g., `d073d5123456`)
+- Source ID: Random 4-byte identifier per request for response correlation
+- Sequence numbers: 0-255, atomically allocated per request
+
+## Networking
+
+**Device Communication:**
+- Protocol: UDP (User Datagram Protocol)
+- Port: 56700 (LIFX standard UDP port)
+- Address binding: `0.0.0.0` (all interfaces) with broadcast enabled for discovery
+- Implementation: `src/lifx/network/transport.py` using asyncio DatagramProtocol
+- Features:
+  - Async UDP sendto/recvfrom via asyncio event loop
+  - Queue-based packet buffering (max 1000 packets)
+  - Dropped packet logging at 1st and every 100th loss
+  - Configurable socket options: broadcast, reuseaddr
+
+**Discovery Methods:**
+
+1. **UDP Broadcast Discovery:**
+   - Sends GetService packet to 255.255.255.255:56700
+   - Collects StateService responses from all devices
+   - Timeout: 15 seconds overall, 1 second per-response, 4x idle multiplier (4 seconds with no responses)
+   - DoS Protection: Source ID validation, serial validation, broadcast filtering
+   - Implementation: `src/lifx/network/discovery.py` → `discover_devices()`
+
+2. **mDNS/DNS-SD Discovery:**
+   - Multicast address: 224.0.0.251:5353 (standard mDNS)
+   - Service type: `_lifx._udp.local`
+   - Queries: PTR (service discovery), SRV (service records), A (IPv4 addresses), TXT (metadata)
+   - DNS wire format parser: Fully custom, zero-dependency implementation in `src/lifx/network/mdns/dns.py`
+   - Transport: `src/lifx/network/mdns/transport.py` using asyncio multicast UDP
+   - Single query returns all devices (faster than UDP broadcast)
+   - Implementation: `src/lifx/api.py` → `discover_mdns()`
+
+**Connection Management:**
+- Lazy connection opening: Device connections auto-open on first request
+- Per-device connection: One UDP socket per device for concurrent operations
+- Request serialization: `_request_lock` (asyncio.Lock) prevents response mixing on same socket
+- Retry logic: Default 8 retries with exponential backoff (configurable per device)
+- Timeout: 16 seconds default (configurable per device)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None (library, not a service)
-- Custom exception hierarchy in `src/lifx/exceptions.py`
+- None (external) - Exceptions logged via Python `logging` module
+- Exception types: `LifxError` base with subtypes: `LifxDeviceNotFoundError`, `LifxTimeoutError`, `LifxProtocolError`, `LifxConnectionError`, `LifxNetworkError`, `LifxUnsupportedCommandError`
+- Implementation: `src/lifx/exceptions.py`
 
 **Logs:**
-- No logging framework integrated
-- Library consumers handle their own logging
-
-**Coverage:**
-- Codecov - Coverage tracking and PR reporting
-  - Config: `codecov.yml`
-  - Token: `CODECOV_TOKEN` secret in GitHub Actions
-  - Flags: per-Python-version coverage (3.10, 3.11, 3.12, 3.13, 3.14)
+- Standard Python `logging` module
+- Logger names: `lifx.*` (module-level loggers)
+- Log levels: INFO, WARNING, ERROR based on severity
+- Structured logging: Dict-based messages with context (class, method, action, reason, counts)
+- Example: UDP protocol warnings when packets dropped due to queue overflow
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- PyPI - Package distribution (`https://pypi.org/p/lifx-async`)
-  - Trusted publisher (OIDC, no API token needed)
-  - Published via `pypa/gh-action-pypi-publish`
-- GitHub Pages - Documentation site (`https://djelibeybi.github.io/lifx-async`)
-  - Deployed via `mkdocs gh-deploy`
+- PyPI (Python Package Index) - Standard Python package repository
+  - Package name: `lifx-async`
+  - Distribution: Wheel (`.whl`) and source (`.tar.gz`)
+  - URL: `https://pypi.org/project/lifx-async/`
 
 **CI Pipeline:**
-- GitHub Actions (3 workflows):
-  - `ci.yml` - Quality checks, test matrix, semantic release, PyPI deploy
-  - `docs.yml` - Documentation build, link validation, GitHub Pages deploy
-  - `pr-automation.yml` - Auto-labelling, size labels, PR title validation
-- pre-commit.ci - Automated hook execution and auto-fix on PRs
+- Platform: GitHub Actions
+- Workflows: `.github/workflows/`
+  - `ci.yml` - Main test and release pipeline
+  - `docs.yml` - Documentation build and deploy
+  - `pr-automation.yml` - Pull request automation
 
-**Release Automation:**
-- python-semantic-release - Automated version bumping from conventional commits
-  - Config: `pyproject.toml` `[tool.semantic_release]`
-  - Version source: `pyproject.toml:project.version`
-  - Changelog: auto-generated to `docs/changelog.md`
-  - Branch strategy: `main` = stable releases, other branches = dev pre-releases
+**Release Process:**
+- Tool: python-semantic-release (conventional commits parser)
+- Trigger: Automatic on push to `main` (semantic versioning)
+- Steps:
+  1. Detect version bump from conventional commits
+  2. Update version in `pyproject.toml`
+  3. Upgrade dependencies with `uv lock --upgrade-package`
+  4. Build distribution with `uv build`
+  5. Create GitHub release with changelog
+  6. Publish to PyPI via `pypa/gh-action-pypi-publish`
+- Manual trigger: Workflow dispatch with optional release tag override
+- Concurrency: Serialized (cancel in-progress if new push)
 
-**Dependency Automation:**
-- Renovate Bot - Automated dependency PRs
-  - Config: `renovate.json`
-  - Schedule: weekday nights and weekends (Australia/Melbourne timezone)
-  - Auto-merge: dev dependencies, patch/minor pytest updates, linting tools, GitHub Actions
-  - Lock file maintenance: weekly (Monday before 5am)
-  - Vulnerability alerts: auto-merged with no minimum release age
+**Test Matrix:**
+- Python versions: 3.10, 3.11, 3.12, 3.13, 3.14 (5 versions)
+- Operating systems (PR with source changes): ubuntu-latest, macos-latest, windows-latest
+- Operating systems (main push): ubuntu-latest only (PRs already validated)
+- Conditional matrix: Detects source vs CI-only changes to optimize test scope
 
-## Environment Configuration
+**Coverage Reporting:**
+- Tool: Codecov
+- Token: `CODECOV_TOKEN` (GitHub Actions secret)
+- Upload: Coverage reports and JUnit XML from each Python version
+- Targets: 90% overall project coverage, 100% for patches
+- Flags: Per-Python-version flags for carryforward and component breakdown
+- Exclusions: Tests, generators, auto-generated files, benchmarks, docs
 
-**Required env vars:**
-- None for library usage
+## Documentation
 
-**CI-specific secrets (GitHub Actions):**
-- `GITHUB_TOKEN` - Standard GitHub token for releases, PR automation
-- `DEPLOY_KEY` - SSH key for semantic-release git push
-- `CODECOV_TOKEN` - Coverage upload authentication
+**Hosting:**
+- GitHub Pages - Static site hosting
+- Custom domain: https://djelibeybi.github.io/lifx-async
+- Source: Built from `docs/` directory via MkDocs
 
-**Optional env vars (testing):**
-- `LIFX_EMULATOR_EXTERNAL` - Set to `1` to use external emulator instance
-- `LIFX_EMULATOR_PORT` - Port for external emulator (default: 56700)
+**Build & Deploy:**
+- Tool: Zensical (MkDocs wrapper) for local development and build
+- Theme: Material for MkDocs (modern, responsive)
+- LLM Export: llmstxt-standalone generates `llms-full.txt` for AI/LLM context
+- Deployment: GitHub Pages workflow (`.github/workflows/docs.yml`) on push to `main`
+- Site config: `mkdocs.yml` with navigation, plugins, extensions
 
-**Secrets location:**
-- GitHub Actions secrets (repository settings)
-- No local secrets files needed
+**Site Features:**
+- Search with suggestions and highlighting
+- Dark/light mode toggle
+- Sticky navigation tabs
+- Breadcrumb navigation
+- API reference via mkdocstrings (auto-generated from docstrings)
+- Code copying, annotation, and tabbed examples
+- Mermaid diagrams support
+- Full-text content indexing
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- Renovate Bot webhook (GitHub App) - Dependency update PRs
-- pre-commit.ci webhook (GitHub App) - Hook auto-updates and auto-fixes
+- None - Library is request-driven (no server component)
 
 **Outgoing:**
-- Codecov upload (from CI) - Coverage and test results
-- PyPI publish (from CI) - Package distribution via OIDC trusted publisher
+- None - Library does not call external webhooks
+
+## Environment Configuration
+
+**Required Environment Variables:**
+- None - Library operates with zero external configuration
+- Optional: `LIFX_EMULATOR_EXTERNAL=1` and `LIFX_EMULATOR_PORT=56700` for external emulator testing
+
+**Secrets Location:**
+- PyPI: `CODECOV_TOKEN` (GitHub Actions secret) for coverage reports
+- GitHub: `DEPLOY_KEY` (GitHub Actions secret) for semantic-release git operations
+- No application secrets required
+
+## Dependabot & Dependency Management
+
+**Dependency Updates:**
+- Tool: GitHub Dependabot
+- Config: `.github/dependabot.yml`
+- Scope: GitHub Actions versions and Python package versions
+- Frequency: Automatic PR creation on new releases
+
+**Pre-commit Hooks:**
+- Tool: pre-commit.ci (continuous integration)
+- Config: `.pre-commit-config.yaml`
+- Hooks: Ruff format/lint, uv dependency lock, Commitizen conventional commits, Pyright (manual), Bandit security, Codespell, YAML formatting
+- Auto-fix PRs: Enabled - auto-commits fixes on PRs
+- Auto-update: Weekly schedule for hook versions
+- CI Skip: Expensive hooks (pyright, run-tests) skipped in CI to speed up feedback
 
 ---
 
-*Integration audit: 2026-04-16*
+*Integration audit: 2026-06-11*
