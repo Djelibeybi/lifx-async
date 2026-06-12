@@ -204,6 +204,32 @@ class CeilingLight(MatrixLight):
 
         return self
 
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object,
+    ) -> None:
+        """Exit async context manager, saving state to file before closing.
+
+        Saves the current in-memory state to ``state_file`` (when set) before
+        delegating to the parent ``close()`` via ``super().__aexit__()``.  The
+        save is guarded by a belt-and-braces ``try/except`` so that any I/O
+        failure is logged as a WARNING and swallowed — the original body
+        exception (if any) is never replaced or suppressed, and the connection
+        is always cleaned up.
+        """
+        if self._state_file:
+            try:
+                self._save_state_to_file()
+            except (
+                Exception
+            ) as e:  # pragma: no cover — belt-and-braces; helper also catches
+                _LOGGER.warning(
+                    "Failed to save state on __aexit__ for %s: %s", self.serial, e
+                )
+        await super().__aexit__(exc_type, exc_val, exc_tb)
+
     async def _initialize_state(self) -> CeilingLightState:
         """Initialize ceiling light state transactionally.
 
