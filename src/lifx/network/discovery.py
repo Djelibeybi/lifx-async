@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import struct
 import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -375,8 +376,6 @@ def _parse_device_state_service(payload: bytes) -> tuple[int, int]:
     Raises:
         ProtocolError: If payload is invalid
     """
-    import struct
-
     if len(payload) < 5:
         raise LifxProtocolError(
             f"DeviceStateService payload too short: {len(payload)} bytes"

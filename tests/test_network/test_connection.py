@@ -12,6 +12,7 @@ from lifx.exceptions import (
     LifxUnsupportedCommandError,
 )
 from lifx.network.connection import DeviceConnection
+from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
 
@@ -91,8 +92,8 @@ class TestDeviceConnection:
 
     async def test_allocate_source(self) -> None:
         """Test source allocation generates valid sources."""
-        # Source allocation is now per-request, test the static method
-        source = DeviceConnection._allocate_source()
+        # Source allocation is per-request via the shared utility
+        source = allocate_source()
 
         # Should be in valid range [2, 0xFFFFFFFF]
         assert 2 <= source <= 0xFFFFFFFF
@@ -100,7 +101,7 @@ class TestDeviceConnection:
     async def test_allocate_source_uniqueness(self) -> None:
         """Test source allocation generates unique sources."""
         # Allocate multiple sources and verify they're different
-        sources = {DeviceConnection._allocate_source() for _ in range(100)}
+        sources = {allocate_source() for _ in range(100)}
 
         # Should generate unique values (probabilistically)
         assert len(sources) > 90  # At least 90% unique in 100 attempts

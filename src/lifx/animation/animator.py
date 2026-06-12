@@ -112,6 +112,7 @@ class Animator:
         """
         self._ip = ip
         self._port = port
+        self._addr = (ip, port)  # Prebuilt sockaddr for the per-packet send path
         self._serial = serial
         self._framebuffer = framebuffer
         self._packet_generator = packet_generator
@@ -348,7 +349,7 @@ class Animator:
         for tmpl in self._templates:
             tmpl.data[SEQUENCE_OFFSET] = self._sequence
             self._sequence = (self._sequence + 1) % 256
-            self._socket.sendto(tmpl.data, (self._ip, self._port))
+            self._socket.sendto(tmpl.data, self._addr)
 
         end_time = time.perf_counter()
 

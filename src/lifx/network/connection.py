@@ -29,6 +29,7 @@ from lifx.network.transport import UdpTransport
 from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
+from lifx.protocol.packets import Device, get_packet_class
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,7 +109,12 @@ class DeviceConnection:
 
         self._transport: UdpTransport | None = None
         self._is_open = False
-        self._is_opening = False  # Flag to prevent concurrent open() calls
+        # Flag to prevent concurrent open() calls. Deliberately a plain bool
+        # with a poll loop rather than asyncio.Lock: a Lock binds to the event
+        # loop that first awaits it, which breaks connections that are closed
+        # and reopened under a different loop (e.g. one connection shared
+        # across per-test event loops).
+        self._is_opening = False
 
         # Pre-compute serial bytes for fast comparison in background receiver
         self._is_discovery = serial == "000000000000"
@@ -156,7 +162,8 @@ class DeviceConnection:
         if self._is_open:
             return
 
-        # Prevent concurrent open() calls
+        # Prevent concurrent open() calls (see __init__ for why this is a
+        # poll loop rather than an asyncio.Lock)
         if self._is_opening:
             # Another task is already opening, wait for it
             while self._is_opening:
@@ -275,7 +282,7 @@ class DeviceConnection:
 
         # Allocate source if not provided
         if source is None:
-            source = self._allocate_source()
+            source = allocate_source()
 
         message = create_message(
             packet=packet,
@@ -339,18 +346,6 @@ class DeviceConnection:
         # Full jitter: random value between 0 and exponential_delay
         # This spreads retries across time to avoid synchronized retries
         return random.uniform(0, exponential_delay)
-
-    @staticmethod
-    def _allocate_source() -> int:
-        """Allocate unique source identifier for a request.
-
-        LIFX protocol defines source as Uint32, with 0 and 1 reserved.
-        We generate values in range [2, 0xFFFFFFFF].
-
-        Returns:
-            Unique source identifier (range: 2 to 4294967295)
-        """
-        return allocate_source()
 
     async def _background_receiver(self) -> None:
         """Background task to receive and route packets.
@@ -476,7 +471,7 @@ class DeviceConnection:
             max_retries = self.max_retries
 
         # Allocate ONE source for this logical request
-        request_source = self._allocate_source()
+        request_source = allocate_source()
 
         # Create ONE shared queue for ALL retry attempts
         # Responses from any attempt can satisfy the request
@@ -686,7 +681,7 @@ class DeviceConnection:
             max_retries = self.max_retries
 
         # Allocate ONE source for this logical request
-        request_source = self._allocate_source()
+        request_source = allocate_source()
 
         # Calculate timeouts with exponential backoff
         total_weight = (2 ** (max_retries + 1)) - 1
@@ -860,9 +855,6 @@ class DeviceConnection:
         packet_kind = getattr(packet, "_packet_kind", "OTHER")
 
         if packet_kind == "GET":
-            # Use PACKET_REGISTRY to find the appropriate packet class
-            from lifx.protocol.packets import get_packet_class
-
             # Stream responses and unpack each
             async for header, payload in self._request_stream_impl(
                 packet, timeout=timeout
@@ -874,36 +866,37 @@ class DeviceConnection:
                     )
 
                 # Update unknown serial with value from response header
-                serial = Serial(value=header.target_serial).to_string()
-                if self.serial == "000000000000" and serial != self.serial:
-                    self.serial = serial
-                    # Refresh cached fields now that we know the real serial
-                    self._is_discovery = False
-                    self._target_bytes = Serial.from_string(serial).to_protocol()
-                    self._send_target = self._target_bytes
+                if self._is_discovery:
+                    serial = Serial(value=header.target_serial).to_string()
+                    if serial != self.serial:
+                        self.serial = serial
+                        # Refresh cached fields now that we know the real serial
+                        self._is_discovery = False
+                        self._target_bytes = Serial.from_string(serial).to_protocol()
+                        self._send_target = self._target_bytes
 
                 # Unpack (labels are automatically decoded by Packet.unpack())
                 response_packet = packet_class.unpack(payload)
 
-                # Log the request/reply cycle
-                request_values = packet.as_dict
-                reply_values = response_packet.as_dict
-                _LOGGER.debug(
-                    {
-                        "class": "DeviceConnection",
-                        "method": "request_stream",
-                        "request": {
-                            "packet": type(packet).__name__,
-                            "values": request_values,
-                        },
-                        "reply": {
-                            "packet": type(response_packet).__name__,
-                            "values": reply_values,
-                        },
-                        "serial": self.serial,
-                        "ip": self.ip,
-                    }
-                )
+                # Log the request/reply cycle (as_dict is costly — skip
+                # building it unless DEBUG logging is enabled)
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "request_stream",
+                            "request": {
+                                "packet": type(packet).__name__,
+                                "values": packet.as_dict,
+                            },
+                            "reply": {
+                                "packet": type(response_packet).__name__,
+                                "values": response_packet.as_dict,
+                            },
+                            "serial": self.serial,
+                            "ip": self.ip,
+                        }
+                    )
 
                 yield response_packet
 
@@ -913,24 +906,25 @@ class DeviceConnection:
                 packet, timeout=timeout
             ):
                 # Log the request/ack cycle
-                request_values = packet.as_dict
-                reply_packet = "Acknowledgement" if ack_result else "StateUnhandled"
-                _LOGGER.debug(
-                    {
-                        "class": "DeviceConnection",
-                        "method": "request_stream",
-                        "request": {
-                            "packet": type(packet).__name__,
-                            "values": request_values,
-                        },
-                        "reply": {
-                            "packet": reply_packet,
-                            "values": {},
-                        },
-                        "serial": self.serial,
-                        "ip": self.ip,
-                    }
-                )
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "request_stream",
+                            "request": {
+                                "packet": type(packet).__name__,
+                                "values": packet.as_dict,
+                            },
+                            "reply": {
+                                "packet": "Acknowledgement"
+                                if ack_result
+                                else "StateUnhandled",
+                                "values": {},
+                            },
+                            "serial": self.serial,
+                            "ip": self.ip,
+                        }
+                    )
 
                 yield ack_result
                 return
@@ -941,32 +935,29 @@ class DeviceConnection:
                 pkt_type = packet.PKT_TYPE
                 # EchoRequest/EchoResponse (58/59)
                 if pkt_type == 58:  # EchoRequest
-                    from lifx.protocol.packets import Device
-
                     async for header, payload in self._request_stream_impl(
                         packet, timeout=timeout
                     ):
                         response_packet = Device.EchoResponse.unpack(payload)
 
                         # Log the request/reply cycle
-                        request_values = packet.as_dict
-                        reply_values = response_packet.as_dict
-                        _LOGGER.debug(
-                            {
-                                "class": "DeviceConnection",
-                                "method": "request_stream",
-                                "request": {
-                                    "packet": type(packet).__name__,
-                                    "values": request_values,
-                                },
-                                "reply": {
-                                    "packet": type(response_packet).__name__,
-                                    "values": reply_values,
-                                },
-                                "serial": self.serial,
-                                "ip": self.ip,
-                            }
-                        )
+                        if _LOGGER.isEnabledFor(logging.DEBUG):
+                            _LOGGER.debug(
+                                {
+                                    "class": "DeviceConnection",
+                                    "method": "request_stream",
+                                    "request": {
+                                        "packet": type(packet).__name__,
+                                        "values": packet.as_dict,
+                                    },
+                                    "reply": {
+                                        "packet": type(response_packet).__name__,
+                                        "values": response_packet.as_dict,
+                                    },
+                                    "serial": self.serial,
+                                    "ip": self.ip,
+                                }
+                            )
 
                         yield response_packet
                         return

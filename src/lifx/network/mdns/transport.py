@@ -11,54 +11,12 @@ import logging
 import socket
 import struct
 from asyncio import DatagramTransport
-from typing import TYPE_CHECKING
 
 from lifx.const import MDNS_ADDRESS, MDNS_PORT, TIMEOUT_ERRORS
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-
-if TYPE_CHECKING:
-    pass
+from lifx.network.transport import _UdpProtocol
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class _MdnsProtocol(asyncio.DatagramProtocol):
-    """Asyncio protocol for mDNS UDP communication."""
-
-    def __init__(self) -> None:
-        """Initialize the protocol."""
-        self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue()
-        self._transport: DatagramTransport | None = None
-
-    def connection_made(self, transport: DatagramTransport) -> None:  # type: ignore[override]
-        """Called when connection is established."""
-        self._transport = transport
-
-    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Called when a datagram is received."""
-        self.queue.put_nowait((data, addr))
-
-    def error_received(self, exc: Exception) -> None:
-        """Called when an error is received."""
-        _LOGGER.debug(
-            {
-                "class": "_MdnsProtocol",
-                "method": "error_received",
-                "action": "error",
-                "error": str(exc),
-            }
-        )
-
-    def connection_lost(self, exc: Exception | None) -> None:
-        """Called when connection is lost."""
-        _LOGGER.debug(
-            {
-                "class": "_MdnsProtocol",
-                "method": "connection_lost",
-                "action": "lost",
-                "error": str(exc) if exc else None,
-            }
-        )
 
 
 class MdnsTransport:
@@ -75,7 +33,7 @@ class MdnsTransport:
 
     def __init__(self) -> None:
         """Initialize mDNS transport."""
-        self._protocol: _MdnsProtocol | None = None
+        self._protocol: _UdpProtocol | None = None
         self._transport: DatagramTransport | None = None
         self._socket: socket.socket | None = None
 
@@ -170,8 +128,9 @@ class MdnsTransport:
             sock.setblocking(False)
             self._socket = sock
 
-            # Create protocol
-            protocol = _MdnsProtocol()
+            # Create protocol (shared with UdpTransport — bounded queue with
+            # drop logging guards against multicast floods)
+            protocol = _UdpProtocol()
             self._protocol = protocol
 
             # Create datagram endpoint using our configured socket

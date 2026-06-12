@@ -36,10 +36,8 @@ from __future__ import annotations
 import struct
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from itertools import chain
 from typing import ClassVar
-
-# Pre-compiled struct for per-pixel HSBK writes in hot path
-_HSBK_STRUCT = struct.Struct("<HHHH")
 
 # Header constants
 HEADER_SIZE = 36
@@ -406,13 +404,16 @@ class MatrixPacketGenerator(PacketGenerator):
             if tmpl.color_count == 0:
                 continue  # Skip CopyFrameBuffer packets
 
-            # Write each HSBK tuple directly into the packet buffer
-            data = tmpl.data
-            offset = tmpl.color_offset
-            for i in range(tmpl.hsbk_start, tmpl.hsbk_start + tmpl.color_count):
-                h, s, b, k = hsbk[i]
-                _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
-                offset += 8
+            # Write all HSBK tuples into the packet buffer with a single
+            # C-level pack using the precomputed bulk format string
+            struct.pack_into(
+                tmpl.fmt,
+                tmpl.data,
+                tmpl.color_offset,
+                *chain.from_iterable(
+                    hsbk[tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count]
+                ),
+            )
 
 
 class MultiZonePacketGenerator(PacketGenerator):
@@ -524,13 +525,16 @@ class MultiZonePacketGenerator(PacketGenerator):
             )
 
         for tmpl in templates:
-            # Write each HSBK tuple directly into the packet buffer
-            data = tmpl.data
-            offset = tmpl.color_offset
-            for i in range(tmpl.hsbk_start, tmpl.hsbk_start + tmpl.color_count):
-                h, s, b, k = hsbk[i]
-                _HSBK_STRUCT.pack_into(data, offset, h, s, b, k)
-                offset += 8
+            # Write all HSBK tuples into the packet buffer with a single
+            # C-level pack using the precomputed bulk format string
+            struct.pack_into(
+                tmpl.fmt,
+                tmpl.data,
+                tmpl.color_offset,
+                *chain.from_iterable(
+                    hsbk[tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count]
+                ),
+            )
 
 
 class LightPacketGenerator(PacketGenerator):
