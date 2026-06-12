@@ -10,7 +10,7 @@ import pytest
 
 from lifx.const import MDNS_ADDRESS, MDNS_PORT
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-from lifx.network.mdns.transport import MdnsTransport, _MdnsProtocol
+from lifx.network.mdns.transport import MdnsTransport
 
 
 class TestMdnsTransportInit:
@@ -386,48 +386,5 @@ class TestMdnsTransportIsOpen:
         assert transport.is_open is True
 
 
-class TestMdnsProtocol:
-    """Tests for the internal _MdnsProtocol class."""
-
-    def test_datagram_received_queues_data(self) -> None:
-        """Test that received datagrams are queued."""
-
-        protocol = _MdnsProtocol()
-
-        # Simulate receiving a datagram
-        test_data = b"test data"
-        test_addr = ("192.168.1.1", 5353)
-        protocol.datagram_received(test_data, test_addr)
-
-        # Check data is in queue
-        assert not protocol.queue.empty()
-        data, addr = protocol.queue.get_nowait()
-        assert data == test_data
-        assert addr == test_addr
-
-    def test_connection_made_stores_transport(self) -> None:
-        """Test that connection_made stores the transport."""
-
-        protocol = _MdnsProtocol()
-        mock_transport = MagicMock()
-
-        protocol.connection_made(mock_transport)
-
-        assert protocol._transport is mock_transport
-
-    def test_error_received_does_not_raise(self) -> None:
-        """Test that error_received handles errors gracefully."""
-
-        protocol = _MdnsProtocol()
-
-        # Should not raise
-        protocol.error_received(OSError("Test error"))
-
-    def test_connection_lost_does_not_raise(self) -> None:
-        """Test that connection_lost handles disconnection gracefully."""
-
-        protocol = _MdnsProtocol()
-
-        # Should not raise
-        protocol.connection_lost(None)
-        protocol.connection_lost(OSError("Disconnected"))
+# The mDNS transport shares _UdpProtocol with UdpTransport;
+# the protocol class is covered by tests/test_network/test_transport.py.

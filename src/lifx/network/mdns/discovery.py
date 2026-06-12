@@ -202,12 +202,12 @@ async def discover_lifx_services(
         ```
     """
     seen_serials: set[str] = set()
-    start_time = time.time()
+    start_time = time.monotonic()
 
     async with MdnsTransport() as transport:
         # Build and send PTR query
         query = build_ptr_query(LIFX_MDNS_SERVICE)
-        request_time = time.time()
+        request_time = time.monotonic()
 
         _LOGGER.debug(
             {
@@ -228,7 +228,7 @@ async def discover_lifx_services(
         # Collect responses with dynamic timeout
         while True:
             # Calculate elapsed time since last response
-            elapsed_since_last = time.time() - last_response_time
+            elapsed_since_last = time.monotonic() - last_response_time
 
             # Stop if we've been idle too long
             if elapsed_since_last >= idle_timeout:
@@ -244,13 +244,13 @@ async def discover_lifx_services(
                 break
 
             # Stop if we've exceeded the overall timeout
-            if time.time() - request_time >= timeout:
+            if time.monotonic() - request_time >= timeout:
                 _LOGGER.debug(
                     {
                         "class": "discover_lifx_services",
                         "method": "discover",
                         "action": "overall_timeout",
-                        "elapsed": time.time() - request_time,
+                        "elapsed": time.monotonic() - request_time,
                         "timeout": timeout,
                     }
                 )
@@ -258,12 +258,12 @@ async def discover_lifx_services(
 
             # Calculate remaining timeout
             remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.time() - request_time)
+            remaining_overall = timeout - (time.monotonic() - request_time)
             remaining = min(remaining_idle, remaining_overall)
 
             try:
                 data, addr = await transport.receive(timeout=remaining)
-                response_timestamp = time.time()
+                response_timestamp = time.monotonic()
 
             except Exception:
                 # Timeout or error - stop collecting
@@ -350,7 +350,7 @@ async def discover_lifx_services(
                 "method": "discover",
                 "action": "complete",
                 "devices_found": len(seen_serials),
-                "elapsed": time.time() - start_time,
+                "elapsed": time.monotonic() - start_time,
             }
         )
 
