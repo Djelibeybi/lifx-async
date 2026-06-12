@@ -358,7 +358,7 @@ Not applicable. This is a greenfield addition (new method) to an existing class,
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Log message wording for `__aexit__` guard**
    - What we know: Claude's Discretion; house style uses `_LOGGER.warning("Failed to save state to %s: %s", self._state_file, e)` in the helper
