@@ -13,6 +13,7 @@ from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.discovery import (
     _extract_lifx_info,
     create_device_from_record,
@@ -378,10 +379,10 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            # First receive returns data, second raises timeout
+            # First receive returns data, second raises LifxTimeoutError (clean end)
             mock_transport.receive.side_effect = [
                 (mock_response_data, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -410,11 +411,11 @@ class TestDiscoverLifxServices:
             ) -> tuple[bytes, tuple[str, int]]:
                 nonlocal call_count
                 call_count += 1
-                # First call succeeds quickly, subsequent calls wait
+                # First call sleeps past the idle timeout, then raises LifxTimeoutError
                 if call_count == 1:
-                    await asyncio.sleep(0.01)
-                    raise Exception("No data")
-                raise Exception("timeout")
+                    await asyncio.sleep(0.02)
+                    raise LifxTimeoutError("No data")
+                raise LifxTimeoutError("timeout")
 
             mock_transport.receive.side_effect = slow_receive
 
@@ -485,7 +486,7 @@ class TestDiscoverLifxServices:
 
             mock_transport.receive.side_effect = [
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -516,7 +517,7 @@ class TestDiscoverLifxServices:
 
             mock_transport.receive.side_effect = [
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -553,7 +554,7 @@ class TestDiscoverLifxServices:
 
             mock_transport.receive.side_effect = [
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -577,7 +578,7 @@ class TestDiscoverLifxServices:
 
             mock_transport.receive.side_effect = [
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -613,7 +614,7 @@ class TestDiscoverLifxServices:
 
             mock_transport.receive.side_effect = [
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -654,7 +655,7 @@ class TestDiscoverLifxServices:
             mock_transport.receive.side_effect = [
                 (b"\x00" * 100, ("192.168.1.100", 5353)),
                 (b"\x00" * 100, ("192.168.1.100", 5353)),
-                Exception("timeout"),
+                LifxTimeoutError("timeout"),
             ]
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
@@ -666,6 +667,39 @@ class TestDiscoverLifxServices:
 
                 # Should only get one record despite two responses
                 assert len(records) == 1
+
+    @pytest.mark.asyncio
+    async def test_discover_network_error_does_not_propagate(self) -> None:
+        """Test that LifxNetworkError breaks the loop without propagating (D-08)."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = LifxNetworkError("interface down")
+
+            records = []
+            # Must not raise — LifxNetworkError causes a clean break with a WARNING log
+            async for record in discover_lifx_services(timeout=0.1):
+                records.append(record)
+
+            assert len(records) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_unexpected_error_propagates(self) -> None:
+        """Test that unexpected receive exceptions are logged and re-raised (D-08)."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            mock_transport.receive.side_effect = RuntimeError("unexpected socket state")
+
+            with pytest.raises(RuntimeError, match="unexpected socket state"):
+                async for _record in discover_lifx_services(timeout=0.1):
+                    pass
 
 
 class TestDiscoverDevicesMdns:
