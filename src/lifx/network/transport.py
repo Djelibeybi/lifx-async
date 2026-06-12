@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
+import time
 from typing import TYPE_CHECKING
 
 from lifx.const import (
@@ -12,8 +14,7 @@ from lifx.const import (
     MIN_PACKET_SIZE,
     TIMEOUT_ERRORS,
 )
-from lifx.exceptions import LifxNetworkError
-from lifx.exceptions import LifxTimeoutError as LifxTimeoutError
+from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
 
 if TYPE_CHECKING:
     from asyncio import DatagramTransport
@@ -118,8 +119,6 @@ class UdpTransport:
             return
 
         try:
-            import socket as stdlib_socket
-
             loop = asyncio.get_running_loop()
 
             _LOGGER.debug(
@@ -141,8 +140,8 @@ class UdpTransport:
             self._transport, _ = await loop.create_datagram_endpoint(
                 lambda: protocol,
                 local_addr=(self._ip_address, self._port),
-                reuse_port=bool(hasattr(stdlib_socket, "SO_REUSEPORT")),
-                family=stdlib_socket.AF_INET,
+                reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
+                family=socket.AF_INET,
             )
 
             # Get actual port assigned
@@ -162,8 +161,8 @@ class UdpTransport:
                 sock = self._transport.get_extra_info("socket")
                 if sock:
                     sock.setsockopt(
-                        stdlib_socket.SOL_SOCKET,
-                        stdlib_socket.SO_BROADCAST,
+                        socket.SOL_SOCKET,
+                        socket.SO_BROADCAST,
                         1,
                     )
                     _LOGGER.debug(
@@ -251,8 +250,6 @@ class UdpTransport:
 
         # Validate packet size
         if len(data) > MAX_PACKET_SIZE:
-            from lifx.exceptions import LifxProtocolError
-
             _LOGGER.error(
                 {
                     "class": "UdpTransport",
@@ -267,8 +264,6 @@ class UdpTransport:
             )
 
         if len(data) < MIN_PACKET_SIZE:
-            from lifx.exceptions import LifxProtocolError
-
             _LOGGER.error(
                 {
                     "class": "UdpTransport",
@@ -301,8 +296,6 @@ class UdpTransport:
         """
         if self._protocol is None:
             raise LifxNetworkError("Socket not open")
-
-        import time
 
         packets: list[tuple[bytes, tuple[str, int]]] = []
         deadline = time.monotonic() + timeout
