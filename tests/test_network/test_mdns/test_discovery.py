@@ -669,6 +669,58 @@ class TestDiscoverLifxServices:
                 assert len(records) == 1
 
     @pytest.mark.asyncio
+    async def test_duplicate_responses_reset_idle_deadline(self) -> None:
+        """Duplicate announcements must reset the idle timer before dedup (D-04).
+
+        mark_response() must be called for every valid LIFX response —
+        including duplicates of an already-seen serial — so a re-announcement
+        flood from one device cannot cause premature idle expiry while slower
+        devices have not yet answered.
+        """
+        from lifx.network.mdns.discovery import discover_lifx_services
+        from lifx.network.utils import IdleDeadline
+
+        txt_data = TxtData(
+            strings=["id=d073d5123456", "p=27", "fw=4.112"],
+            pairs={"id": "d073d5123456", "p": "27", "fw": "4.112"},
+        )
+
+        mock_parsed_response = MagicMock()
+        mock_parsed_response.header.is_response = True
+        mock_parsed_response.records = [
+            MagicMock(
+                rtype=12, name="_lifx._udp.local", parsed_data="device._lifx._udp.local"
+            ),
+            MagicMock(rtype=16, parsed_data=txt_data),
+        ]
+
+        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+            mock_transport = AsyncMock()
+            mock_transport_cls.return_value.__aenter__.return_value = mock_transport
+
+            # Same device twice (duplicate), then timeout
+            mock_transport.receive.side_effect = [
+                (b"\x00" * 100, ("192.168.1.100", 5353)),
+                (b"\x00" * 100, ("192.168.1.100", 5353)),
+                LifxTimeoutError("timeout"),
+            ]
+
+            with (
+                patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse,
+                patch.object(IdleDeadline, "mark_response", autospec=True) as mock_mark,
+            ):
+                mock_parse.return_value = mock_parsed_response
+
+                records = []
+                async for record in discover_lifx_services(timeout=0.1):
+                    records.append(record)
+
+        # Dedup still yields one record, but BOTH valid responses must have
+        # reset the idle deadline.
+        assert len(records) == 1
+        assert mock_mark.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_discover_network_error_does_not_propagate(self) -> None:
         """Test that LifxNetworkError breaks the loop without propagating (D-08)."""
         from lifx.network.mdns.discovery import discover_lifx_services

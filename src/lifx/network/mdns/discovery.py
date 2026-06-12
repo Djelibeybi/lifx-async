@@ -313,6 +313,13 @@ async def discover_lifx_services(
                 if record is None:
                     continue
 
+                # Reset idle timer on every valid LIFX response, before the
+                # dedup check — repeated mDNS re-announcements from one device
+                # must not cause premature idle expiry while slower devices
+                # have not yet answered (Pitfall 1 / D-04, mirroring
+                # _discover_with_packet).
+                deadline.mark_response()
+
                 # Deduplicate by serial
                 if record.serial in seen_serials:
                     continue
@@ -332,9 +339,6 @@ async def discover_lifx_services(
                 )
 
                 yield record
-
-                # Reset the idle clock after a successful yield
-                deadline.mark_response()
 
             except Exception as e:
                 _LOGGER.debug(
