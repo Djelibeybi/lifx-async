@@ -13,6 +13,7 @@ exit-during-exception semantics. The change is purely additive: the existing
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
@@ -23,15 +24,16 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Ceiling Save-on-Exit
+
 **Goal**: Exiting a `CeilingLight` `async with` block reliably persists current state to disk — no uplight/downlight state is silently lost on context exit
 **Depends on**: Nothing (first phase)
 **Requirements**: CEIL-01, CEIL-02, CEIL-03, CEIL-04, TEST-01, TEST-02, TEST-03
 **Success Criteria** (what must be TRUE):
+
   1. Exiting `async with CeilingLight(..., state_file=path)` writes the device's current in-memory state to `state_file` before the connection is closed, and a test (TEST-01) proves the write occurs on exit
   2. Exiting `async with CeilingLight(...)` with `state_file=None` performs no state-file write — no file is created and no error is raised — and a test (TEST-02) proves it
   3. When the `async with` body raises, the original exception still propagates unchanged; the exit save is attempted and any I/O failure is logged and swallowed (never raised, never masking the body's exception), and a test (TEST-03) proves it
-  4. Existing `__aenter__` behaviour (product-ID validation, load-state-from-file) and `close()` cleanup continue to run unchanged — the full existing test suite stays green, with `pyright` (strict) and `ruff` clean
-**Plans**: 1 plan
+  4. Existing `__aenter__` behaviour (product-ID validation, load-state-from-file) and `close()` cleanup continue to run unchanged — the full existing test suite stays green, with `pyright` (strict) and `ruff` clean**Plans**: 1 plan
 - [ ] 01-01-PLAN.md — Add `CeilingLight.__aexit__` save-on-exit override + three emulator tests (TEST-01/02/03), then run the full quality gate
 
 ## Progress
