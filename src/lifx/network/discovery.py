@@ -20,7 +20,7 @@ from lifx.const import (
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
-from lifx.network.utils import allocate_source
+from lifx.network.utils import IdleDeadline, allocate_source
 from lifx.protocol.base import Packet
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device as DevicePackets
@@ -198,7 +198,7 @@ async def _discover_with_packet(
         )
 
     expected_response_type: int = getattr(packet, "STATE_TYPE")
-    responses: dict[str, DiscoveryResponse] = {}
+    seen_serials: set[str] = set()
     start_time = time.monotonic()
 
     async with UdpTransport(port=0, broadcast=True) as transport:
@@ -229,34 +229,32 @@ async def _discover_with_packet(
         await transport.send(message, (broadcast_address, port))
 
         idle_timeout = max_response_time * idle_timeout_multiplier
-        last_response_time = request_time
+        deadline = IdleDeadline(timeout, idle_timeout)
 
         while True:
-            elapsed_since_last = time.monotonic() - last_response_time
-
-            if elapsed_since_last >= idle_timeout:
+            if deadline.idle_expired:
                 _LOGGER.debug(
                     {
                         "class": "_discover_with_packet",
                         "action": "idle_timeout",
-                        "elapsed": elapsed_since_last,
+                        "elapsed": time.monotonic() - deadline._last_response,
                     }
                 )
                 break
 
-            if time.monotonic() - request_time >= timeout:
+            if deadline.overall_expired:
                 _LOGGER.debug(
                     {
                         "class": "_discover_with_packet",
                         "action": "overall_timeout",
-                        "elapsed": time.monotonic() - request_time,
+                        "elapsed": time.monotonic() - deadline._start,
                     }
                 )
                 break
 
-            remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.monotonic() - request_time)
-            remaining = min(remaining_idle, remaining_overall)
+            remaining = deadline.remaining()
+            if remaining <= 0:
+                break
 
             try:
                 data, addr = await transport.receive(timeout=remaining)
@@ -279,6 +277,18 @@ async def _discover_with_packet(
                             "action": "unexpected_packet_type",
                             "expected": expected_response_type,
                             "received": header.pkt_type,
+                        }
+                    )
+                    continue
+
+                # Reject broadcast/multicast serials (D-01, D-02)
+                if header.target[0] & 0x01 or header.target == b"\xff" * 8:
+                    _LOGGER.debug(
+                        {
+                            "class": "_discover_with_packet",
+                            "action": "invalid_serial",
+                            "serial": header.target.hex(),
+                            "source_ip": addr[0],
                         }
                     )
                     continue
@@ -317,10 +327,17 @@ async def _discover_with_packet(
                     response_payload=response_payload,
                 )
 
-                yield discovery_resp
+                # Reset idle timer on every valid protocol response, before dedup
+                # check — a duplicate flood must not cause premature idle expiry
+                # (Pitfall 1 / D-04).
+                deadline.mark_response()
 
-                responses[device_serial] = discovery_resp
-                last_response_time = response_timestamp
+                # First-wins dedup: yield each serial at most once (D-04)
+                if device_serial in seen_serials:
+                    continue
+                seen_serials.add(device_serial)
+
+                yield discovery_resp
 
                 _LOGGER.debug(
                     {
@@ -339,7 +356,8 @@ async def _discover_with_packet(
                         "action": "malformed_response",
                         "reason": str(e),
                         "source_ip": addr[0],
-                    }
+                    },
+                    exc_info=True,
                 )
                 continue
             except Exception as e:
@@ -358,7 +376,7 @@ async def _discover_with_packet(
             {
                 "class": "_discover_with_packet",
                 "action": "complete",
-                "devices_found": len(responses),
+                "devices_found": len(seen_serials),
                 "elapsed": time.monotonic() - start_time,
             }
         )
