@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from lifx.network.discovery import _discover_with_packet, discover_devices
+from lifx.network.transport import UdpTransport, _UdpProtocol
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device as DevicePackets
 
@@ -312,6 +313,105 @@ class TestMalformedPayloadHandling:
                 devices.append(device)
 
         assert len(devices) == 0
+
+
+class TestMalformedSizeDatagramHandling:
+    """Test that size-invalid datagrams never abort discovery (CR-01).
+
+    UdpTransport.receive() raises LifxProtocolError for datagrams outside the
+    [MIN_PACKET_SIZE, MAX_PACKET_SIZE] range. The shared discovery loop must
+    drop such datagrams and continue collecting — a single hostile UDP packet
+    must not terminate discovery (DoS protection contract).
+    """
+
+    @staticmethod
+    def _preloaded_transport(
+        datagrams: list[tuple[bytes, tuple[str, int]]],
+    ) -> UdpTransport:
+        """Build a real UdpTransport with a preloaded receive queue.
+
+        Uses the real receive() implementation (including size validation) so
+        malformed-size datagrams genuinely travel the LifxProtocolError path.
+        No socket is opened: open/close/send are no-ops.
+        """
+
+        class _PreloadedTransport(UdpTransport):
+            async def open(self) -> None:
+                return None
+
+            async def close(self) -> None:
+                return None
+
+            async def send(self, data: bytes, address: tuple[str, int]) -> None:
+                return None
+
+        transport = _PreloadedTransport(port=0, broadcast=True)
+        protocol = _UdpProtocol()
+        for data, addr in datagrams:
+            protocol.queue.put_nowait((data, addr))
+        transport._protocol = protocol
+        return transport
+
+    @pytest.mark.asyncio
+    async def test_undersized_datagram_dropped_discovery_continues(self) -> None:
+        """An undersized (<36 byte) datagram is dropped; the next valid response
+        is still yielded and the generator completes without raising."""
+        known_source = 42
+        valid_serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        sender = ("192.168.1.100", 56700)
+
+        transport = self._preloaded_transport(
+            [
+                (b"\x00" * 10, sender),  # undersized — real receive() raises
+                (
+                    _build_state_service_packet(
+                        source=known_source, target=valid_serial
+                    ),
+                    sender,
+                ),
+            ]
+        )
+
+        with (
+            patch("lifx.network.discovery.UdpTransport", return_value=transport),
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            devices = []
+            async for device in discover_devices(timeout=0.5):
+                devices.append(device)
+
+        assert len(devices) == 1
+        assert devices[0].serial == "d073d5010203"
+
+    @pytest.mark.asyncio
+    async def test_oversized_datagram_dropped_discovery_continues(self) -> None:
+        """An oversized (>1024 byte) datagram is dropped; discovery continues."""
+        known_source = 42
+        valid_serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        sender = ("192.168.1.100", 56700)
+
+        transport = self._preloaded_transport(
+            [
+                (b"\x00" * 2000, sender),  # oversized — real receive() raises
+                (
+                    _build_state_service_packet(
+                        source=known_source, target=valid_serial
+                    ),
+                    sender,
+                ),
+            ]
+        )
+
+        with (
+            patch("lifx.network.discovery.UdpTransport", return_value=transport),
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            devices = []
+            async for device in discover_devices(timeout=0.5):
+                devices.append(device)
+
+        assert len(devices) == 1
+        assert devices[0].serial == "d073d5010203"
 
 
 class TestDiscoverWithPacketSerialValidation:

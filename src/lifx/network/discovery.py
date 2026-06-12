@@ -260,6 +260,20 @@ async def _discover_with_packet(
                 response_timestamp = time.monotonic()
             except LifxTimeoutError:
                 break
+            except LifxProtocolError as e:
+                # Size-invalid datagram from a hostile or broken sender — skip
+                # it, never abort discovery (DoS protection contract). DEBUG
+                # level only: per-packet WARNING logging on a hostile network
+                # would itself be a flooding vector (D-02 rationale), and the
+                # transport already logs the size violation.
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_with_packet",
+                        "action": "invalid_packet_size",
+                        "reason": str(e),
+                    }
+                )
+                continue
 
             try:
                 header, payload = parse_message(data)
