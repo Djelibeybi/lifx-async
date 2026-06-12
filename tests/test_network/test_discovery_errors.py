@@ -509,6 +509,50 @@ class TestDiscoverWithPacketSerialValidation:
         assert len(responses) == 0
 
     @pytest.mark.asyncio
+    async def test_all_zeros_serial_rejected_at_generator(self) -> None:
+        """Packet with all-zeros serial yields no DiscoveryResponse (WR-01).
+
+        The all-zeros target is the LIFX broadcast address used by the
+        discovery request itself — a spoofed response echoing it must not
+        produce a phantom device with serial "000000000000".
+        """
+        known_source = 42
+        all_zeros = b"\x00" * 8
+
+        packets_to_send = [
+            _build_state_service_packet(source=known_source, target=all_zeros),
+        ]
+        packet_iter = iter(packets_to_send)
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                pkt = next(packet_iter)
+                return pkt, ("192.168.1.100", 56700)
+            except StopIteration:
+                from lifx.exceptions import LifxTimeoutError
+
+                raise LifxTimeoutError("timeout")
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            responses = []
+            async for resp in _discover_with_packet(
+                DevicePackets.GetService(), timeout=0.5
+            ):
+                responses.append(resp)
+
+        assert len(responses) == 0
+
+    @pytest.mark.asyncio
     async def test_first_wins_dedup_at_generator(self) -> None:
         """Two packets with the same valid serial yield exactly one DiscoveryResponse.
 

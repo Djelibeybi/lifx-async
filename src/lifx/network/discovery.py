@@ -294,8 +294,12 @@ async def _discover_with_packet(
                     )
                     continue
 
-                # Reject broadcast/multicast serials (D-01, D-02)
-                if header.target[0] & 0x01 or header.target == b"\xff" * 8:
+                # Reject broadcast/multicast serials (D-01, D-02). The
+                # multicast bit check also covers the all-0xff broadcast
+                # target; the all-zeros target is the LIFX broadcast address
+                # used by the discovery request itself and is never a valid
+                # device serial.
+                if header.target[0] & 0x01 or header.target == b"\x00" * 8:
                     _LOGGER.debug(
                         {
                             "class": "_discover_with_packet",
