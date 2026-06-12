@@ -19,14 +19,14 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Ceiling Save-on-Exit | v1.0 | 2/5 | In Progress|  |
+| 1. Ceiling Save-on-Exit | v1.0 | 3/5 | In Progress|  |
 
 ### Phase 1: Unify duplicated discovery loops
 
 **Goal:** Rebuild `discover_devices()` on top of `_discover_with_packet()` in `src/lifx/network/discovery.py`, removing ~150 near-identical lines that have already drifted. Move the documented DoS protections (serial/broadcast-bit validation, currently only in `discover_devices`) into the shared generator so every discovery caller gets them, and retire the hand-rolled `_parse_device_state_service()` in favour of the protocol layer's `StateService.unpack()`. Identified during the /simplify review of UDP transport mechanics (2026-06-13); the duplicated retry-budget arithmetic in `connection.py` (`_request_stream_impl` vs `_request_ack_stream_impl`) is a candidate follow-up but out of scope for this phase.
 **Requirements**: D-01..D-12 (CONTEXT.md decisions); no separate REQUIREMENTS.md IDs for this milestone
 **Depends on:** Nothing (first phase of milestone)
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 Plans:
 **Wave 1**
 
@@ -35,7 +35,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Hoist serial validation + dedup into _discover_with_packet, thin discover_devices, delete _parse_device_state_service (D-01..D-05)
+- [x] 01-02-PLAN.md — Hoist serial validation + dedup into _discover_with_packet, thin discover_devices, delete _parse_device_state_service (D-01..D-05)
 - [ ] 01-03-PLAN.md — Adopt IdleDeadline in mDNS discover_lifx_services + tighten receive() exception routing (D-07, D-08)
 
 **Wave 3** *(blocked on Wave 2 completion)*

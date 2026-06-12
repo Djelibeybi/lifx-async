@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-unify-duplicated-discovery-loops/01-01-PLAN.md
-last_updated: "2026-06-12T15:36:01.290Z"
+stopped_at: Completed 01-unify-duplicated-discovery-loops/01-02-PLAN.md
+last_updated: "2026-06-12T15:46:26.394Z"
 last_activity: 2026-06-12 -- Phase 1 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-12 after v1.0 milestone)
 ## Current Position
 
 Phase: 1 (Unify duplicated discovery loops) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-06-12 -- Phase 1 execution started
 
@@ -52,6 +52,7 @@ Last activity: 2026-06-12 -- Phase 1 execution started
 *Updated after each plan completion*
 | Phase 01-unify-duplicated-discovery-loops P01 | 3 | 2 tasks | 2 files |
 | Phase 01-unify-duplicated-discovery-loops P04 | 2 | 2 tasks | 2 files |
+| Phase 01-unify-duplicated-discovery-loops P02 | 5 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - Reuse existing `_save_state_to_file()` unchanged — keeps JSON schema and graceful error handling intact
 - [Phase ?]: IdleDeadline uses single monotonic read at construction (_last_response = _start) to avoid inter-value skew
 - [Phase ?]: idle_expired and overall_expired as separate properties to preserve distinct DEBUG log messages in discovery loops
+- [Phase ?]: D-01/D-02: Serial validation unconditional in _discover_with_packet; rejected serials at DEBUG only (no WARNING)
+- [Phase ?]: D-04: First-wins per-serial dedup in shared generator; vestigial responses dict deleted; mark_response() before dedup check (Pitfall 1)
+- [Phase ?]: D-05: discover_devices is thin wrapper over _discover_with_packet; _parse_device_state_service and import struct deleted
 
 ### Pending Todos
 
@@ -88,8 +92,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-12T15:36:01.286Z
-Stopped at: Completed 01-unify-duplicated-discovery-loops/01-01-PLAN.md
+Last session: 2026-06-12T15:46:26.390Z
+Stopped at: Completed 01-unify-duplicated-discovery-loops/01-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
