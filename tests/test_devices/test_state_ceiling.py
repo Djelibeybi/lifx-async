@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from lifx.color import HSBK
@@ -424,3 +426,86 @@ class TestCeilingLightStateManagement:
             assert hasattr(state, "serial")
             assert hasattr(state, "power")
             assert hasattr(state, "color")
+
+
+class TestCeilingLightSaveOnExit:
+    """Tests for CeilingLight save-on-exit behaviour via __aexit__.
+
+    Verifies that exiting an ``async with CeilingLight(...)`` block persists
+    device state to ``state_file`` (CEIL-01), performs no write when
+    ``state_file`` is ``None`` (CEIL-02), and that a body exception propagates
+    unchanged while any save-I/O failure is logged and swallowed (CEIL-03).
+
+    All tests use the ``ceiling_device`` fixture to exercise a real
+    ``async with`` block against the embedded emulator.
+    """
+
+    @pytest.mark.asyncio
+    async def test_save_on_exit_writes_state_file(
+        self, ceiling_device, tmp_path
+    ) -> None:
+        """CEIL-01 / TEST-01: state is written to state_file on __aexit__."""
+        state_file = tmp_path / "ceiling_state.json"
+
+        async with CeilingLight(
+            serial=ceiling_device.serial,
+            ip=ceiling_device.ip,
+            port=ceiling_device.port,
+            state_file=str(state_file),
+        ):
+            pass  # exit normally — __aexit__ must save state
+
+        assert state_file.exists(), "state_file must be created on context exit"
+        data = json.loads(state_file.read_text())
+        assert ceiling_device.serial in data, (
+            f"state_file must contain an entry for serial {ceiling_device.serial!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_save_on_exit_no_op_without_state_file(
+        self, ceiling_device, tmp_path
+    ) -> None:
+        """CEIL-02 / TEST-02: no file is created when state_file is None."""
+        async with CeilingLight(
+            serial=ceiling_device.serial,
+            ip=ceiling_device.ip,
+            port=ceiling_device.port,
+        ):
+            pass  # exit normally — no state_file, so nothing should be written
+
+        assert not any(tmp_path.iterdir()), (
+            "no file must be created in tmp_path when state_file is None"
+        )
+
+    @pytest.mark.asyncio
+    async def test_save_on_exit_body_exception_propagates(
+        self, ceiling_device, tmp_path, caplog, monkeypatch
+    ) -> None:
+        """CEIL-03 / TEST-03: body exception propagates; save error is logged.
+
+        Monkeypatches ``_save_state_to_file`` to raise ``OSError`` so the
+        belt-and-braces guard in ``__aexit__`` is exercised directly.  The
+        original ``RuntimeError`` from the body must still propagate unchanged,
+        and ``caplog`` must contain a WARNING record that mentions the failure.
+        """
+        state_file = tmp_path / "ceiling_state.json"
+
+        def _raise_disk_full() -> None:
+            raise OSError("disk full")
+
+        with pytest.raises(RuntimeError, match="body error"):
+            ceiling = CeilingLight(
+                serial=ceiling_device.serial,
+                ip=ceiling_device.ip,
+                port=ceiling_device.port,
+                state_file=str(state_file),
+            )
+            async with ceiling:
+                monkeypatch.setattr(ceiling, "_save_state_to_file", _raise_disk_full)
+                raise RuntimeError("body error")
+
+        assert any(
+            record.levelname == "WARNING"
+            and ("disk full" in record.message or "Failed to save" in record.message)
+            for record in caplog.records
+        ), "A WARNING log mentioning the save failure must be emitted"
