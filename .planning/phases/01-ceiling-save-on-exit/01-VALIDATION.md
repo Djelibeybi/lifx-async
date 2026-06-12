@@ -1,9 +1,9 @@
 ---
 phase: 1
 slug: ceiling-save-on-exit
-status: ready
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-06-12
 ---
 
@@ -38,9 +38,9 @@ created: 2026-06-12
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 01-01-01 | 01 | 1 | TEST-01, TEST-02, TEST-03 | — | N/A | integration (emulator) | `uv run pytest tests/test_devices/test_state_ceiling.py -k SaveOnExit -v` | ❌ W0 (this task creates) | ⬜ pending |
-| 01-01-02 | 01 | 1 | CEIL-01, CEIL-02, CEIL-03, CEIL-04 | T-01-02 | save errors swallowed + close() always runs | integration (emulator) | `uv run pytest tests/test_devices/test_state_ceiling.py -k SaveOnExit -v` | ✅ (created by 01-01-01) | ⬜ pending |
-| 01-01-03 | 01 | 1 | CEIL-04 | T-01-02 | full suite unaffected; types + lint clean | regression | `uv run ruff format . && uv run ruff check . && uv run pyright && uv run --frozen pytest` | ✅ (existing suite) | ⬜ pending |
+| 01-01-01 | 01 | 1 | TEST-01, TEST-02, TEST-03 | — | N/A | integration (emulator) | `uv run pytest tests/test_devices/test_state_ceiling.py -k SaveOnExit -v` | ✅ (created by 01-01-01) | ✅ green |
+| 01-01-02 | 01 | 1 | CEIL-01, CEIL-02, CEIL-03, CEIL-04 | T-01-02 | save errors swallowed + close() always runs | integration (emulator) | `uv run pytest tests/test_devices/test_state_ceiling.py -k SaveOnExit -v` | ✅ (created by 01-01-01) | ✅ green |
+| 01-01-03 | 01 | 1 | CEIL-04 | T-01-02 | full suite unaffected; types + lint clean | regression | `uv run ruff format . && uv run ruff check . && uv run pyright && uv run --frozen pytest` | ✅ (existing suite) | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,7 +48,7 @@ created: 2026-06-12
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_devices/test_state_ceiling.py` — add `TestCeilingLightSaveOnExit` class covering TEST-01, TEST-02, TEST-03 (created by Task 01-01-01)
+- [x] `tests/test_devices/test_state_ceiling.py` — add `TestCeilingLightSaveOnExit` class covering TEST-01, TEST-02, TEST-03 (created by Task 01-01-01)
 
 *No framework install needed — pytest + emulator (`lifx-emulator-core` dev dep) infrastructure already in place.*
 
