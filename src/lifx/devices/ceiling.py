@@ -1304,8 +1304,10 @@ class CeilingLight(MatrixLight):
             else:
                 data = {}
 
-            # Update state for this device
-            device_state = {}
+            # Update state for this device, merging with any existing on-disk
+            # entry so absent in-memory values (e.g. state that failed to load
+            # in __aenter__) are not clobbered by the exit-save
+            device_state = data.get(self.serial, {})
             state = self.state
 
             if state.stored_uplight_color:
