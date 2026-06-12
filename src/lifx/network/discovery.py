@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import struct
 import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -382,31 +381,6 @@ async def _discover_with_packet(
         )
 
 
-def _parse_device_state_service(payload: bytes) -> tuple[int, int]:
-    """Parse DeviceStateService payload.
-
-    Args:
-        payload: Payload bytes (at least 5 bytes)
-
-    Returns:
-        Tuple of (service, port)
-
-    Raises:
-        ProtocolError: If payload is invalid
-    """
-    if len(payload) < 5:
-        raise LifxProtocolError(
-            f"DeviceStateService payload too short: {len(payload)} bytes"
-        )
-
-    # DeviceStateService structure:
-    # - service: uint8 (1 byte)
-    # - port: uint32 (4 bytes)
-    service, port = struct.unpack("<BI", payload[:5])
-
-    return service, port
-
-
 async def discover_devices(
     timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
@@ -420,6 +394,8 @@ async def discover_devices(
 
     Sends a broadcast DeviceGetService packet and yields devices as they respond.
     Implements DoS protection via timeout, source validation, and serial validation.
+    Serial validation and per-serial deduplication are enforced inside
+    ``_discover_with_packet``, so every caller of that shared generator benefits.
 
     Args:
         timeout: Discovery timeout in seconds
@@ -427,8 +403,8 @@ async def discover_devices(
         port: UDP port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
         idle_timeout_multiplier: Idle timeout multiplier
-        device_timeout: request timeout set on discovered devices
-        max_retries: max retries per request set on discovered devices
+        device_timeout: Request timeout set on discovered devices
+        max_retries: Max retries per request set on discovered devices
 
     Yields:
         DiscoveredDevice instances as they are discovered
@@ -446,218 +422,22 @@ async def discover_devices(
             devices.append(device)
         ```
     """
-    seen_serials: set[str] = set()
-    packet_count = 0
-    start_time = time.monotonic()
-
-    # Create transport with broadcast enabled
-    async with UdpTransport(port=0, broadcast=True) as transport:
-        # Allocate unique source for this discovery session
-        discovery_source = allocate_source()
-
-        # Create discovery message
-        discovery_packet = DevicePackets.GetService()
-        message = create_message(
-            packet=discovery_packet,
-            source=discovery_source,
-            sequence=_DEFAULT_SEQUENCE_START,
-            target=b"\x00" * 8,  # Broadcast
-            res_required=True,
-            ack_required=False,
-        )
-
-        # Send broadcast
-        request_time = time.monotonic()
-        _LOGGER.debug(
-            {
-                "class": "discover_devices",
-                "method": "discover",
-                "action": "broadcast_sent",
-                "broadcast_address": broadcast_address,
-                "port": port,
-                "max_timeout": timeout,
-                "request_time": request_time,
-            }
-        )
-        await transport.send(message, (broadcast_address, port))
-
-        # Calculate idle timeout
-        idle_timeout = max_response_time * idle_timeout_multiplier
-        last_response_time = request_time
-
-        # Collect responses with dynamic timeout
-        while True:
-            # Calculate elapsed time since last response
-            elapsed_since_last = time.monotonic() - last_response_time
-
-            # Stop if we've been idle too long
-            if elapsed_since_last >= idle_timeout:
-                _LOGGER.debug(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "idle_timeout",
-                        "idle_time": elapsed_since_last,
-                        "idle_timeout": idle_timeout,
-                    }
-                )
-                break
-
-            # Stop if we've exceeded the overall timeout
-            if time.monotonic() - request_time >= timeout:
-                _LOGGER.debug(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "overall_timeout",
-                        "elapsed": time.monotonic() - request_time,
-                        "timeout": timeout,
-                    }
-                )
-                break
-
-            # Calculate remaining timeout (use the shorter of idle or overall timeout)
-            remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.monotonic() - request_time)
-            remaining = min(remaining_idle, remaining_overall)
-
-            # Try to receive a packet
-            try:
-                data, addr = await transport.receive(timeout=remaining)
-                response_timestamp = time.monotonic()
-
-            except LifxTimeoutError:
-                # Timeout means no more responses within the idle period
-                _LOGGER.debug(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "no_responses",
-                    }
-                )
-                break
-
-            # Increment packet counter for logging
-            packet_count += 1
-
-            try:
-                # Parse message
-                header, payload = parse_message(data)
-
-                # Validate source matches expected source
-                if header.source != discovery_source:
-                    _LOGGER.debug(
-                        {
-                            "class": "discover_devices",
-                            "method": "discover",
-                            "action": "source_mismatch",
-                            "expected_source": discovery_source,
-                            "received_source": header.source,
-                            "source_ip": addr[0],
-                        }
-                    )
-                    continue
-
-                # Check if this is a DeviceStateService response
-                if header.pkt_type != DevicePackets.StateService.PKT_TYPE:
-                    _LOGGER.debug(
-                        {
-                            "class": "discover_devices",
-                            "method": "discover",
-                            "action": "unexpected_packet_type",
-                            "pkt_type": header.pkt_type,
-                            "expected_type": DevicePackets.StateService.PKT_TYPE,
-                            "source_ip": addr[0],
-                        }
-                    )
-                    continue
-
-                # Validate serial is not multicast/broadcast
-                if header.target[0] & 0x01 or header.target == b"\xff" * 8:
-                    _LOGGER.warning(
-                        {
-                            "warning": "Invalid serial number in discovery response",
-                            "serial": header.target.hex(),
-                            "source_ip": addr[0],
-                        }
-                    )
-                    continue
-
-                # Parse service info
-                _service, device_port = _parse_device_state_service(payload)
-
-                # Calculate accurate response time from this specific response
-                response_time = response_timestamp - request_time
-
-                # Convert 8-byte protocol serial to string
-                device_serial = Serial.from_protocol(header.target).to_string()
-
-                # Deduplicate by serial number and yield new devices immediately
-                if device_serial not in seen_serials:
-                    seen_serials.add(device_serial)
-
-                    # Create device info
-                    device = DiscoveredDevice(
-                        serial=device_serial,
-                        ip=addr[0],
-                        port=device_port,
-                        response_time=response_time,
-                        timeout=device_timeout,
-                        max_retries=max_retries,
-                    )
-
-                    _LOGGER.debug(
-                        {
-                            "class": "discover_devices",
-                            "method": "discover",
-                            "action": "device_found",
-                            "serial": device.serial,
-                            "ip": device.ip,
-                            "port": device.port,
-                            "response_time": response_time,
-                        }
-                    )
-
-                    yield device
-
-                # Update last response time for idle timeout calculation
-                last_response_time = response_timestamp
-
-            except LifxProtocolError as e:
-                # Log malformed responses
-                _LOGGER.warning(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "malformed_response",
-                        "reason": str(e),
-                        "source_ip": addr[0],
-                        "packet_size": len(data),
-                    },
-                    exc_info=True,
-                )
-                continue
-            except Exception as e:
-                # Log unexpected errors
-                _LOGGER.error(
-                    {
-                        "class": "discover_devices",
-                        "method": "discover",
-                        "action": "unexpected_error",
-                        "error_details": str(e),
-                        "source_ip": addr[0],
-                    },
-                    exc_info=True,
-                )
-                continue
-
-        _LOGGER.debug(
-            {
-                "class": "discover_devices",
-                "method": "discover",
-                "action": "complete",
-                "devices_found": len(seen_serials),
-                "packets_processed": packet_count,
-                "elapsed": time.monotonic() - start_time,
-            }
+    async for resp in _discover_with_packet(
+        DevicePackets.GetService(),
+        timeout=timeout,
+        broadcast_address=broadcast_address,
+        port=port,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+    ):
+        # Device's actual service port comes from the StateService payload (D-05).
+        # resp.port is the broadcast port parameter — do not use it here (Pitfall 2).
+        device_port: int = resp.response_payload["port"]
+        yield DiscoveredDevice(
+            serial=resp.serial,
+            ip=resp.ip,
+            port=device_port,
+            response_time=resp.response_time,
+            timeout=device_timeout,
+            max_retries=max_retries,
         )
