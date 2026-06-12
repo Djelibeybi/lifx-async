@@ -172,6 +172,12 @@ async def _discover_with_packet(
         max_response_time: Max response time
         idle_timeout_multiplier: Idle timeout multiplier
 
+    Note:
+        The idle timer is reset before each response is yielded, so time the
+        consumer spends processing a yielded response counts against the idle
+        window. Slow consumers (e.g. performing network round trips per
+        response) should pass a larger ``idle_timeout_multiplier``.
+
     Returns:
         List of DiscoveryResponse objects with unpacked response payloads
 
