@@ -24,14 +24,15 @@ uplight/downlight state is silently lost on context exit.
 - ✓ `CeilingLight` state persistence: `_save_state_to_file()` / `_load_state_from_file()` writing per-serial uplight/downlight colours to JSON (`devices/ceiling.py:1196`, `:1263`) — existing
 - ✓ State saved after each mutating operation (set colour, power-off, etc.) when `state_file` is set — existing
 - ✓ Async context managers on `DeviceGroup`, `UdpTransport`, `MdnsTransport`, `DeviceConnection` — existing
+- ✓ `CeilingLight.__aexit__` override saves state to `state_file` (when set) before the inherited `close()`, with belt-and-braces error swallowing — Validated in Phase 1: Ceiling Save-on-Exit (`devices/ceiling.py:207`)
+- ✓ Save-on-exit never raises: I/O failures logged and swallowed; body exceptions propagate unchanged — Validated in Phase 1 (TEST-03)
+- ✓ Emulator tests cover save-on-exit with `state_file`, no-op when `None`, and exit-during-exception (`TestCeilingLightSaveOnExit`) — Validated in Phase 1
 
 ### Active
 
 <!-- This milestone's scope. -->
 
-- [ ] `CeilingLight` overrides `__aexit__` to call `_save_state_to_file()` (when `state_file` is set) **before** the inherited `close()`, guaranteeing a final persist on context exit
-- [ ] Save-on-exit reuses the existing graceful error handling in `_save_state_to_file()` (I/O failures logged, never raised — must not mask the original `async with` exception)
-- [ ] Tests cover: save-on-exit with `state_file` set, no-op when `state_file` is `None`, and exit-during-exception behaviour
+_None — all milestone requirements validated in Phase 1._
 
 ### Out of Scope
 
@@ -69,10 +70,10 @@ uplight/downlight state is silently lost on context exit.
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Save-on-exit persists current state before `close()` | Guarantees the `async with` lifecycle never drops in-memory state, even via paths that didn't already save | — Pending |
-| Always save on exit (not only clean exit) | User chose "Final save then close"; per-operation saves already write valid state, so a final save is a safe superset | — Pending |
-| Ceiling-only scope (no mixin generalisation) | `CeilingLight` is the only class persisting state; premature abstraction adds risk with no consumer | — Pending |
-| Reuse existing `_save_state_to_file()` unchanged | Keeps JSON schema and graceful error handling intact; minimises blast radius | — Pending |
+| Save-on-exit persists current state before `close()` | Guarantees the `async with` lifecycle never drops in-memory state, even via paths that didn't already save | ✓ Shipped (Phase 1) |
+| Always save on exit (not only clean exit) | User chose "Final save then close"; per-operation saves already write valid state, so a final save is a safe superset | ✓ Shipped (Phase 1) |
+| Ceiling-only scope (no mixin generalisation) | `CeilingLight` is the only class persisting state; premature abstraction adds risk with no consumer | ✓ Held (PERS-01 deferred to v2) |
+| Reuse existing `_save_state_to_file()` unchanged | Keeps JSON schema and graceful error handling intact; minimises blast radius | ✓ Shipped (Phase 1) |
 
 ## Evolution
 
@@ -92,4 +93,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-11 after initialization*
+*Last updated: 2026-06-12 after Phase 1 completion (Ceiling Save-on-Exit — verified, 4/4 success criteria)*
