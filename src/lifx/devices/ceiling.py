@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -1334,9 +1336,17 @@ class CeilingLight(MatrixLight):
             # Ensure directory exists
             state_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Write to file
-            with state_path.open("w") as f:
-                json.dump(data, f, indent=2)
+            # Write atomically: dump to a temp file in the same directory,
+            # then replace, so a crash mid-write cannot leave a truncated
+            # file that loses every device's stored state
+            fd, tmp = tempfile.mkstemp(dir=state_path.parent, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(data, f, indent=2)
+                os.replace(tmp, state_path)
+            except BaseException:
+                os.unlink(tmp)
+                raise
 
             _LOGGER.debug("Saved state to %s for device %s", state_path, self.serial)
 
