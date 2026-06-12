@@ -328,9 +328,15 @@ class CeilingLight(MatrixLight):
         """
         # Use parent class factory method
         device = await super().from_ip(ip, port, serial, timeout, max_retries)
-        # Type cast to CeilingLight and set state_file
-        ceiling = CeilingLight(device.serial, device.ip)
-        ceiling._state_file = state_file
+        # Type cast to CeilingLight, preserving the caller's configuration
+        ceiling = CeilingLight(
+            device.serial,
+            device.ip,
+            port,
+            timeout,
+            max_retries,
+            state_file=state_file,
+        )
         ceiling.connection = device.connection
         return ceiling
 
