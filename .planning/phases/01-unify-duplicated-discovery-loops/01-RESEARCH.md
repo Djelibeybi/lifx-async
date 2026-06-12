@@ -705,7 +705,9 @@ and the label/colour enrichment paths.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Both questions were resolved during planning: Q1 — `IdleDeadline` exposes separate `idle_expired`/`overall_expired` properties (Plan 01-01); Q2 — mDNS `LifxNetworkError` breaks with a WARNING log (Plan 01-03).
 
 1. **`IdleDeadline.expired` property vs inline `remaining() <= 0` check in the loop**
    - What we know: the existing loops check idle and overall separately to emit distinct log

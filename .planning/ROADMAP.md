@@ -27,13 +27,19 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 **Requirements**: D-01..D-12 (CONTEXT.md decisions); no separate REQUIREMENTS.md IDs for this milestone
 **Depends on:** Nothing (first phase of milestone)
 **Plans:** 5 plans
-
 Plans:
+**Wave 1**
 
 - [ ] 01-01-PLAN.md — Extract IdleDeadline timeout helper into network/utils.py + unit tests (D-06)
+- [ ] 01-04-PLAN.md — Deprecate UdpTransport.receive_many + DeprecationWarning test (D-09, D-12)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 01-02-PLAN.md — Hoist serial validation + dedup into _discover_with_packet, thin discover_devices, delete _parse_device_state_service (D-01..D-05)
 - [ ] 01-03-PLAN.md — Adopt IdleDeadline in mDNS discover_lifx_services + tighten receive() exception routing (D-07, D-08)
-- [ ] 01-04-PLAN.md — Deprecate UdpTransport.receive_many + DeprecationWarning test (D-09, D-12)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 01-05-PLAN.md — Rewrite discovery error tests: retire _parse_device_state_service tests, add generator-level validation/dedup tests (D-10, D-11)
 
 ---
