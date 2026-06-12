@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-12T07:10:25.835Z"
-last_activity: 2026-06-12
+status: Awaiting next milestone
+stopped_at: Milestone v1.0 archived
+last_updated: "2026-06-12T13:55:40.824Z"
+last_activity: 2026-06-12 — Milestone v1.0 completed and archived
 progress:
   total_phases: 1
   completed_phases: 1
@@ -18,19 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-11)
+See: .planning/PROJECT.md (updated 2026-06-12 after v1.0 milestone)
 
 **Core value:** Exiting a `CeilingLight` `async with` block reliably persists current state to disk — no uplight/downlight state is silently lost on context exit.
-**Current focus:** Phase 1 — Ceiling Save-on-Exit
+**Current focus:** Planning next milestone (/gsd-new-milestone)
 
 ## Current Position
 
-Phase: 1
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-06-12
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-12 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -83,5 +81,9 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-06-12T06:55:20.053Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-ceiling-save-on-exit/01-CONTEXT.md
+Stopped at: Milestone v1.0 archived (phases moved to milestones/v1.0-phases/)
+Resume file: —
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
