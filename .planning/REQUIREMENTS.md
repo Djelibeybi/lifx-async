@@ -53,6 +53,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 1 | Complete |
 | TEST-03 | Phase 1 | Complete |
+| PERS-01 | — (v2, deferred) | Deferred |
 
 **Coverage:**
 
