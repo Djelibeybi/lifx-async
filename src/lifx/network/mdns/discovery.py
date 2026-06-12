@@ -33,6 +33,7 @@ from lifx.const import (
     LIFX_MDNS_SERVICE,
     MAX_RESPONSE_TIME,
 )
+from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.dns import (
     DNS_TYPE_A,
     DNS_TYPE_PTR,
@@ -45,6 +46,7 @@ from lifx.network.mdns.dns import (
 )
 from lifx.network.mdns.transport import MdnsTransport
 from lifx.network.mdns.types import LifxServiceRecord
+from lifx.network.utils import IdleDeadline
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -207,7 +209,6 @@ async def discover_lifx_services(
     async with MdnsTransport() as transport:
         # Build and send PTR query
         query = build_ptr_query(LIFX_MDNS_SERVICE)
-        request_time = time.monotonic()
 
         _LOGGER.debug(
             {
@@ -221,60 +222,63 @@ async def discover_lifx_services(
 
         await transport.send(query)
 
-        # Calculate idle timeout
         idle_timeout = max_response_time * idle_timeout_multiplier
-        last_response_time = request_time
+        deadline = IdleDeadline(timeout, idle_timeout)
 
         # Collect responses with dynamic timeout
         while True:
-            # Calculate elapsed time since last response
-            elapsed_since_last = time.monotonic() - last_response_time
-
-            # Stop if we've been idle too long
-            if elapsed_since_last >= idle_timeout:
+            if deadline.idle_expired:
                 _LOGGER.debug(
                     {
                         "class": "discover_lifx_services",
                         "method": "discover",
                         "action": "idle_timeout",
-                        "idle_time": elapsed_since_last,
+                        "idle_time": time.monotonic() - deadline._last_response,
                         "idle_timeout": idle_timeout,
                     }
                 )
                 break
 
-            # Stop if we've exceeded the overall timeout
-            if time.monotonic() - request_time >= timeout:
+            if deadline.overall_expired:
                 _LOGGER.debug(
                     {
                         "class": "discover_lifx_services",
                         "method": "discover",
                         "action": "overall_timeout",
-                        "elapsed": time.monotonic() - request_time,
+                        "elapsed": time.monotonic() - deadline._start,
                         "timeout": timeout,
                     }
                 )
                 break
 
-            # Calculate remaining timeout
-            remaining_idle = idle_timeout - elapsed_since_last
-            remaining_overall = timeout - (time.monotonic() - request_time)
-            remaining = min(remaining_idle, remaining_overall)
+            remaining = deadline.remaining()
+            if remaining <= 0:
+                break
 
             try:
                 data, addr = await transport.receive(timeout=remaining)
-                response_timestamp = time.monotonic()
-
-            except Exception:
-                # Timeout or error - stop collecting
-                _LOGGER.debug(
+            except LifxTimeoutError:
+                # Clean end of collection — no more responses within the deadline
+                break
+            except LifxNetworkError as e:
+                _LOGGER.warning(
                     {
                         "class": "discover_lifx_services",
-                        "method": "discover",
-                        "action": "no_responses",
+                        "action": "network_error",
+                        "error": str(e),
                     }
                 )
                 break
+            except Exception as e:
+                _LOGGER.error(
+                    {
+                        "class": "discover_lifx_services",
+                        "action": "unexpected_error",
+                        "error": str(e),
+                    },
+                    exc_info=True,
+                )
+                raise
 
             try:
                 # Parse DNS response
@@ -329,8 +333,8 @@ async def discover_lifx_services(
 
                 yield record
 
-                # Update last response time for idle timeout
-                last_response_time = response_timestamp
+                # Reset the idle clock after a successful yield
+                deadline.mark_response()
 
             except Exception as e:
                 _LOGGER.debug(
