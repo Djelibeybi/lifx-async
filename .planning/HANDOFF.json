@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-12T16:21:56.006Z",
+  "phase": "1",
+  "phase_name": "Unify duplicated discovery loops",
+  "phase_dir": ".planning/phases/01-unify-duplicated-discovery-loops",
+  "plan": 5,
+  "task": 5,
+  "total_tasks": 5,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "01-01", "name": "IdleDeadline helper + unit tests", "status": "done", "commit": "85220dd"},
+    {"id": "01-04", "name": "Deprecate receive_many + warning test", "status": "done", "commit": "b17fd32"},
+    {"id": "01-02", "name": "Unify discovery loops (validation hoist, dedup, thin wrapper)", "status": "done", "commit": "07dc874"},
+    {"id": "01-03", "name": "mDNS IdleDeadline adoption + typed exception routing", "status": "done", "commit": "ce3c827"},
+    {"id": "01-05", "name": "Discovery error test rewrite (D-10/D-11)", "status": "done", "commit": "dbdf418"},
+    {"id": "review-fix", "name": "Code-review fix pass (CR-01, WR-01..WR-05)", "status": "in_progress", "progress": "CR-01 (f6cb654), WR-01 (560699a), WR-02 (77a3f38) committed; WR-03/04/05 in flight — fixer left uncommitted edits in src/lifx/network/discovery.py; REVIEW-FIX.md not yet written"}
+  ],
+  "remaining_tasks": [
+    {"id": "review-fix-completion", "name": "Finish/verify fix pass: WR-03 (docstring), WR-04 (DiscoveryResponse.port truthfulness), WR-05 (deprecation message + version), then REVIEW-FIX.md + full gates (pytest/pyright/ruff)", "status": "in_progress"},
+    {"id": "verify-phase", "name": "execute-phase pipeline tail: regression gate (full suite), schema/codebase drift gates (no ORM — trivial), spawn gsd-verifier → VERIFICATION.md", "status": "not_started"},
+    {"id": "complete-phase", "name": "If verification passes: phase.complete, commit tracking, return PHASE COMPLETE (--no-transition); then /gsd-secure-phase 1 is suggested (security enforcement on, no SECURITY.md yet)", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Background gsd-code-fixer agent (this session only) was mid-fix at pause; it dies with the session. Resume must reconcile: check REVIEW-FIX.md existence, fix commits in git log, and uncommitted src/lifx/network/discovery.py edits", "type": "technical", "workaround": "If REVIEW-FIX.md absent: review `git status`/`git diff`, finish WR-03/04/05 manually per 01-REVIEW.md constraints, write REVIEW-FIX.md, run full gates"}
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Run code-review --fix pass BEFORE the phase verifier (rather than advisory-only continue)", "rationale": "CR-01 was a genuine DoS-contract violation in the new single discovery path; user rule 'don't ignore a problem' + v1.0 REVIEW-FIX precedent", "phase": "1"},
+    {"decision": "Sequential execution on main working tree (no worktrees)", "rationale": "worktree base-check #683: HEAD diverged from origin/HEAD (unpushed local commits on main)", "phase": "1"},
+    {"decision": "Fixer constraints pinned to CONTEXT.md D-01..D-12; CR-01 fix = drop-and-continue malformed datagrams inside shared loop; do NOT change pyproject typeCheckingMode", "rationale": "Locked discuss-phase decisions must survive the fix pass", "phase": "1"}
+  ],
+  "uncommitted_files": ["src/lifx/network/discovery.py (fixer mid-edit — likely WR-03/WR-04)"],
+  "next_action": "Run /gsd-resume-work. First reconcile the fix pass: `git log --oneline -10` for fix(01) commits, `git status` for the uncommitted discovery.py edit, check for 01-REVIEW-FIX.md. Finish remaining WR findings per 01-REVIEW.md, verify (uv run --frozen pytest -q; uv run pyright; uv run ruff check .), write+commit REVIEW-FIX.md, then resume the execute-phase tail: gsd-verifier → phase.complete → PHASE COMPLETE.",
+  "context_notes": "Auto-advance chain is ACTIVE (workflow._auto_chain_active=true, workflow.auto_advance=true). This execute-phase run was spawned with `1 --auto --no-transition` from plan-phase, itself chained from discuss-phase. Phase planned same-day from /simplify review findings (see 01-CONTEXT.md D-01..D-12 and 01-RESEARCH.md difference table). All wave gates were green before the fix pass began: 2504 passed / pyright 0 / ruff clean at wave 3 close. Review found 1 Critical 5 Warning 7 Info (01-REVIEW.md, committed b1862d2). Naming collision warning: commit scopes 01-xx also exist from the ARCHIVED v1.0 ceiling milestone (2026-06-12) — match on date/content, not scope alone."
+}
