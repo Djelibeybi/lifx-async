@@ -9,16 +9,16 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Ceiling Save-on-Exit
 
-- [ ] **CEIL-01**: When a `CeilingLight` is used as an async context manager and `state_file` is set, exiting the `async with` block persists the device's current in-memory state to disk before the connection is closed
-- [ ] **CEIL-02**: When `state_file` is `None`, exiting the `async with` block performs no state-file write (no file created, no error)
-- [ ] **CEIL-03**: A save-on-exit I/O failure is logged and swallowed — it never raises out of `__aexit__` and never suppresses or replaces an exception propagating from the `async with` body
-- [ ] **CEIL-04**: The existing `__aenter__` behaviour (product-ID validation, load-state-from-file) and `close()` cleanup continue to run unchanged when entering/exiting the context
+- [x] **CEIL-01**: When a `CeilingLight` is used as an async context manager and `state_file` is set, exiting the `async with` block persists the device's current in-memory state to disk before the connection is closed
+- [x] **CEIL-02**: When `state_file` is `None`, exiting the `async with` block performs no state-file write (no file created, no error)
+- [x] **CEIL-03**: A save-on-exit I/O failure is logged and swallowed — it never raises out of `__aexit__` and never suppresses or replaces an exception propagating from the `async with` body
+- [x] **CEIL-04**: The existing `__aenter__` behaviour (product-ID validation, load-state-from-file) and `close()` cleanup continue to run unchanged when entering/exiting the context
 
 ### Verification
 
-- [ ] **TEST-01**: Test proves state is written to `state_file` on context exit when `state_file` is set
-- [ ] **TEST-02**: Test proves no write occurs on context exit when `state_file` is `None`
-- [ ] **TEST-03**: Test proves that when the `async with` body raises, the original exception still propagates and save-on-exit behaviour is correct (save attempted, errors swallowed)
+- [x] **TEST-01**: Test proves state is written to `state_file` on context exit when `state_file` is set
+- [x] **TEST-02**: Test proves no write occurs on context exit when `state_file` is `None`
+- [x] **TEST-03**: Test proves that when the `async with` body raises, the original exception still propagates and save-on-exit behaviour is correct (save attempted, errors swallowed)
 
 ## v2 Requirements
 
@@ -46,15 +46,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CEIL-01 | Phase 1 | Pending |
-| CEIL-02 | Phase 1 | Pending |
-| CEIL-03 | Phase 1 | Pending |
-| CEIL-04 | Phase 1 | Pending |
-| TEST-01 | Phase 1 | Pending |
-| TEST-02 | Phase 1 | Pending |
-| TEST-03 | Phase 1 | Pending |
+| CEIL-01 | Phase 1 | Complete |
+| CEIL-02 | Phase 1 | Complete |
+| CEIL-03 | Phase 1 | Complete |
+| CEIL-04 | Phase 1 | Complete |
+| TEST-01 | Phase 1 | Complete |
+| TEST-02 | Phase 1 | Complete |
+| TEST-03 | Phase 1 | Complete |
 
 **Coverage:**
+
 - v1 requirements: 7 total
 - Mapped to phases: 7
 - Unmapped: 0 ✓
