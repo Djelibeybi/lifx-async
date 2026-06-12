@@ -1,5 +1,22 @@
 # lifx-async — Ceiling save-on-exit
 
+## Current State (post-v1.0)
+
+**Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) — see `.planning/MILESTONES.md`.
+
+`CeilingLight.__aexit__` now persists in-memory state to `state_file` (when set) before the
+inherited `close()` runs. The save is executed via `asyncio.to_thread`, writes atomically
+(temp file + `os.replace`), merges the on-disk per-serial entry rather than replacing the
+whole file, never raises out of `__aexit__`, and never masks an exception propagating from
+the `async with` body. Proven by three emulator-backed tests (`TestCeilingLightSaveOnExit`).
+
+## Next Milestone Goals
+
+Not yet defined — run `/gsd-new-milestone`. Candidate carried forward:
+
+- **PERS-01** (deferred from v1.0): extract `state_file` save/load into a reusable mixin so
+  other device types (Matrix, MultiZone) can opt into persistence + save-on-exit
+
 ## What This Is
 
 `lifx-async` is a mature, zero-dependency, type-safe async Python library for controlling
@@ -74,6 +91,9 @@ _None — all milestone requirements validated in Phase 1._
 | Always save on exit (not only clean exit) | User chose "Final save then close"; per-operation saves already write valid state, so a final save is a safe superset | ✓ Shipped (Phase 1) |
 | Ceiling-only scope (no mixin generalisation) | `CeilingLight` is the only class persisting state; premature abstraction adds risk with no consumer | ✓ Held (PERS-01 deferred to v2) |
 | Reuse existing `_save_state_to_file()` unchanged | Keeps JSON schema and graceful error handling intact; minimises blast radius | ✓ Shipped (Phase 1) |
+| D-01 revised: exit-save runs via `asyncio.to_thread` | Code review (IN-02) flagged blocking file I/O on the event loop; original "synchronous like the other 8 call sites" decision reversed for the exit path | ✓ Shipped (review fix) |
+| Atomic state-file writes (temp file + `os.replace`) | Code review (WR-03) — a crash mid-write must not corrupt the state file | ✓ Shipped (review fix) |
+| Merge on-disk device entry instead of replacing file | Code review (WR-01) — multiple devices sharing one `state_file` must not clobber each other's entries | ✓ Shipped (review fix) |
 
 ## Evolution
 
@@ -93,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-12 after Phase 1 completion (Ceiling Save-on-Exit — verified, 4/4 success criteria)*
+*Last updated: 2026-06-12 after v1.0 milestone*
