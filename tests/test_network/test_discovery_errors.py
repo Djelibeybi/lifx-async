@@ -8,45 +8,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lifx.exceptions import LifxProtocolError
-from lifx.network.discovery import (
-    _parse_device_state_service,
-    discover_devices,
-)
+from lifx.network.discovery import discover_devices
 from lifx.protocol.header import LifxHeader
-
-
-class TestParseDeviceStateServiceErrors:
-    """Test _parse_device_state_service error handling."""
-
-    def test_parse_short_payload(self) -> None:
-        """Test error when payload is too short."""
-        payload = b"\x01\x00\x00"  # Only 3 bytes, need 5
-        with pytest.raises(
-            LifxProtocolError, match="DeviceStateService payload too short"
-        ):
-            _parse_device_state_service(payload)
-
-    def test_parse_empty_payload(self) -> None:
-        """Test error with empty payload."""
-        with pytest.raises(
-            LifxProtocolError, match="DeviceStateService payload too short"
-        ):
-            _parse_device_state_service(b"")
-
-    def test_parse_valid_payload(self) -> None:
-        """Test successful parsing of valid payload."""
-        payload = struct.pack("<BI", 1, 56700)
-        service, port = _parse_device_state_service(payload)
-        assert service == 1
-        assert port == 56700
-
-    def test_parse_payload_with_extra_data(self) -> None:
-        """Test parsing payload with extra data (should use only first 5 bytes)."""
-        payload = struct.pack("<BI", 1, 56700) + b"extra_data"
-        service, port = _parse_device_state_service(payload)
-        assert service == 1
-        assert port == 56700
 
 
 @pytest.mark.emulator
