@@ -328,19 +328,11 @@ class CeilingLight(MatrixLight):
             LifxTimeoutError: Device did not respond
             LifxError: Device is not a supported Ceiling product
         """
-        # Use parent class factory method
+        # Parent factory constructs via cls(...), so this is already a fully
+        # configured CeilingLight — only state_file needs setting
         device = await super().from_ip(ip, port, serial, timeout, max_retries)
-        # Type cast to CeilingLight, preserving the caller's configuration
-        ceiling = CeilingLight(
-            device.serial,
-            device.ip,
-            port,
-            timeout,
-            max_retries,
-            state_file=state_file,
-        )
-        ceiling.connection = device.connection
-        return ceiling
+        device._state_file = state_file
+        return device
 
     @property
     def state(self) -> CeilingLightState:
