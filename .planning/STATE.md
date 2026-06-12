@@ -53,6 +53,10 @@ Last activity: 2026-06-12 — Milestone v1.0 completed and archived
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 1 added: Unify duplicated discovery loops — rebuild `discover_devices()` on `_discover_with_packet()`, hoist DoS serial validation into the shared generator, retire `_parse_device_state_service()` (from /simplify review of UDP transport mechanics, 2026-06-13)
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
