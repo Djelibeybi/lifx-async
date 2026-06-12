@@ -444,22 +444,41 @@ class TestCeilingLightSaveOnExit:
     async def test_save_on_exit_writes_state_file(
         self, ceiling_device, tmp_path
     ) -> None:
-        """CEIL-01 / TEST-01: state is written to state_file on __aexit__."""
+        """CEIL-01 / TEST-01: state is written to state_file on __aexit__.
+
+        Mutates component state in the body (populating
+        ``stored_uplight_color``), then deletes the state file inside the
+        body so that only the ``__aexit__`` save can recreate it — the
+        per-operation saves wired into mutating methods cannot account for
+        the file's existence after the block exits.  Asserts on payload
+        content so an empty persisted entry fails the test.
+        """
         state_file = tmp_path / "ceiling_state.json"
+        stored_colour = HSBK(hue=120.0, saturation=1.0, brightness=0.8, kelvin=3500)
 
         async with CeilingLight(
             serial=ceiling_device.serial,
             ip=ceiling_device.ip,
             port=ceiling_device.port,
             state_file=str(state_file),
-        ):
-            pass  # exit normally — __aexit__ must save state
+        ) as ceiling:
+            # Populate stored_uplight_color deterministically (this also
+            # triggers a per-operation save) ...
+            await ceiling.turn_uplight_off(color=stored_colour)
+            # ... then remove the file so only __aexit__ can recreate it.
+            state_file.unlink()
 
         assert state_file.exists(), "state_file must be created on context exit"
         data = json.loads(state_file.read_text())
         assert ceiling_device.serial in data, (
             f"state_file must contain an entry for serial {ceiling_device.serial!r}"
         )
+        entry = data[ceiling_device.serial]
+        assert "uplight" in entry, "persisted entry must contain uplight state"
+        assert entry["uplight"]["brightness"] == pytest.approx(0.8), (
+            "stored uplight colour must round-trip via the __aexit__ save"
+        )
+        assert entry["uplight"]["hue"] == pytest.approx(120.0)
 
     @pytest.mark.asyncio
     async def test_save_on_exit_no_op_without_state_file(
