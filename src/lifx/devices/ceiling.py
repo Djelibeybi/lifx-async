@@ -224,9 +224,7 @@ class CeilingLight(MatrixLight):
         if self._state_file:
             try:
                 self._save_state_to_file()
-            except (
-                Exception
-            ) as e:  # pragma: no cover — belt-and-braces; helper also catches
+            except Exception as e:
                 _LOGGER.warning(
                     "Failed to save state on __aexit__ for %s: %s", self.serial, e
                 )
