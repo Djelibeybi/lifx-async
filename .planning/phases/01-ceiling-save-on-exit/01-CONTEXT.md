@@ -17,7 +17,7 @@ No public API changes, no JSON schema changes, no persistence mixin.
 ## Implementation Decisions
 
 ### Blocking I/O on exit
-- **D-01:** Call `_save_state_to_file()` directly (synchronous, inline) in `__aexit__`, exactly like the 8 existing call sites that call it from async methods (e.g. `src/lifx/devices/ceiling.py:499`, `:561`). No `asyncio.to_thread`.
+- **D-01:** ~~Call `_save_state_to_file()` directly (synchronous, inline) in `__aexit__`, exactly like the 8 existing call sites that call it from async methods (e.g. `src/lifx/devices/ceiling.py:499`, `:561`). No `asyncio.to_thread`.~~ **Revised 2026-06-12 (post code review, user-approved):** the `__aexit__` save now runs via `await asyncio.to_thread(self._save_state_to_file)` so file I/O never blocks the event loop (review finding IN-02, commit `71142ff`). The 8 per-operation call sites remain synchronous inline.
 - **D-02:** Guard the call with `if self._state_file:` at the call site, mirroring the established pattern — even though the helper also early-returns when `state_file` is `None`. Makes CEIL-02 obvious at the call site.
 
 ### Exception guard depth
