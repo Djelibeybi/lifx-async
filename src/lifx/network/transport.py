@@ -6,6 +6,7 @@ import asyncio
 import logging
 import socket
 import time
+import warnings
 from typing import TYPE_CHECKING
 
 from lifx.const import (
@@ -293,7 +294,19 @@ class UdpTransport:
 
         Raises:
             NetworkError: If socket is not open
+
+        .. deprecated::
+            :meth:`receive_many` is deprecated and will be removed in v2.0.
+            Use :meth:`receive` in a loop or
+            :func:`~lifx.network.discovery._discover_with_packet` for
+            multi-response collection.
         """
+        warnings.warn(
+            "UdpTransport.receive_many is deprecated and will be removed in v2.0. "
+            "Use receive() in a loop or _discover_with_packet() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._protocol is None:
             raise LifxNetworkError("Socket not open")
 
