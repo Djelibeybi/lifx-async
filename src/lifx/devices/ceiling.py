@@ -18,6 +18,7 @@ Product IDs:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -216,14 +217,15 @@ class CeilingLight(MatrixLight):
 
         Saves the current in-memory state to ``state_file`` (when set) before
         delegating to the parent ``close()`` via ``super().__aexit__()``.  The
-        save is guarded by a belt-and-braces ``try/except`` so that any I/O
-        failure is logged as a WARNING and swallowed — the original body
-        exception (if any) is never replaced or suppressed, and the connection
-        is always cleaned up.
+        save runs in a worker thread via ``asyncio.to_thread`` so the file I/O
+        never blocks the event loop.  It is guarded by a belt-and-braces
+        ``try/except`` so that any I/O failure is logged as a WARNING and
+        swallowed — the original body exception (if any) is never replaced or
+        suppressed, and the connection is always cleaned up.
         """
         if self._state_file:
             try:
-                self._save_state_to_file()
+                await asyncio.to_thread(self._save_state_to_file)
             except Exception as e:
                 _LOGGER.warning(
                     "Failed to save state on __aexit__ for %s: %s", self.serial, e
