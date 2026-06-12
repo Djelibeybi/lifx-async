@@ -14,7 +14,7 @@ from lifx.devices.matrix import MatrixLightState
 class TestCeilingLightStateDataclass:
     """Tests for CeilingLightState dataclass."""
 
-    def test_from_matrix_state_creates_ceiling_state(self, emulator_devices) -> None:
+    def test_from_matrix_state_creates_ceiling_state(self) -> None:
         """Test from_matrix_state creates CeilingLightState from MatrixLightState."""
         # Create a minimal MatrixLightState for testing
         from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
@@ -431,13 +431,9 @@ class TestCeilingLightStateManagement:
 class TestCeilingLightSaveOnExit:
     """Tests for CeilingLight save-on-exit behaviour via __aexit__.
 
-    Verifies that exiting an ``async with CeilingLight(...)`` block persists
-    device state to ``state_file`` (CEIL-01), performs no write when
-    ``state_file`` is ``None`` (CEIL-02), and that a body exception propagates
-    unchanged while any save-I/O failure is logged and swallowed (CEIL-03).
-
     All tests use the ``ceiling_device`` fixture to exercise a real
-    ``async with`` block against the embedded emulator.
+    ``async with`` block against the embedded emulator; per-test docstrings
+    carry the CEIL-01/02/03 requirement mapping.
     """
 
     @pytest.mark.asyncio
@@ -482,18 +478,25 @@ class TestCeilingLightSaveOnExit:
 
     @pytest.mark.asyncio
     async def test_save_on_exit_no_op_without_state_file(
-        self, ceiling_device, tmp_path
+        self, ceiling_device, monkeypatch
     ) -> None:
-        """CEIL-02 / TEST-02: no file is created when state_file is None."""
+        """CEIL-02 / TEST-02: no save is attempted when state_file is None."""
+        save_calls: list[str] = []
+        monkeypatch.setattr(
+            CeilingLight,
+            "_save_state_to_file",
+            lambda self: save_calls.append("save"),
+        )
+
         async with CeilingLight(
             serial=ceiling_device.serial,
             ip=ceiling_device.ip,
             port=ceiling_device.port,
         ):
-            pass  # exit normally — no state_file, so nothing should be written
+            pass  # exit normally — no state_file, so no save should run
 
-        assert not any(tmp_path.iterdir()), (
-            "no file must be created in tmp_path when state_file is None"
+        assert not save_calls, (
+            "_save_state_to_file must not be called when state_file is None"
         )
 
     @pytest.mark.asyncio
@@ -507,24 +510,22 @@ class TestCeilingLightSaveOnExit:
         original ``RuntimeError`` from the body must still propagate unchanged,
         and ``caplog`` must contain a WARNING record that mentions the failure.
         """
-        state_file = tmp_path / "ceiling_state.json"
 
         def _raise_disk_full() -> None:
             raise OSError("disk full")
 
+        ceiling = CeilingLight(
+            serial=ceiling_device.serial,
+            ip=ceiling_device.ip,
+            port=ceiling_device.port,
+            state_file=str(tmp_path / "ceiling_state.json"),
+        )
+        monkeypatch.setattr(ceiling, "_save_state_to_file", _raise_disk_full)
+
         with pytest.raises(RuntimeError, match="body error"):
-            ceiling = CeilingLight(
-                serial=ceiling_device.serial,
-                ip=ceiling_device.ip,
-                port=ceiling_device.port,
-                state_file=str(state_file),
-            )
             async with ceiling:
-                monkeypatch.setattr(ceiling, "_save_state_to_file", _raise_disk_full)
                 raise RuntimeError("body error")
 
-        assert any(
-            record.levelname == "WARNING"
-            and ("disk full" in record.message or "Failed to save" in record.message)
-            for record in caplog.records
-        ), "A WARNING log mentioning the save failure must be emitted"
+        assert "Failed to save state on __aexit__" in caplog.text, (
+            "A WARNING log mentioning the save failure must be emitted"
+        )
