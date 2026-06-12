@@ -7,6 +7,9 @@
     "budget": "high"
   },
   "mode": "yolo",
+  "git": {
+    "create_tag": false
+  },
   "granularity": "standard",
   "parallelization": true,
   "commit_docs": true,
