@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-12T15:25:09.841Z"
-last_activity: 2026-06-12 — Milestone v1.0 completed and archived
+status: executing
+stopped_at: Completed 01-unify-duplicated-discovery-loops/01-01-PLAN.md
+last_updated: "2026-06-12T15:31:53.121Z"
+last_activity: 2026-06-12 -- Phase 1 execution started
 progress:
   total_phases: 1
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12 after v1.0 milestone)
 
 **Core value:** Exiting a `CeilingLight` `async with` block reliably persists current state to disk — no uplight/downlight state is silently lost on context exit.
-**Current focus:** Planning next milestone (/gsd-new-milestone)
+**Current focus:** Phase 1 — Unify duplicated discovery loops
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-12 — Milestone v1.0 completed and archived
+Phase: 1 (Unify duplicated discovery loops) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-06-12 -- Phase 1 execution started
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Last activity: 2026-06-12 — Milestone v1.0 completed and archived
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-unify-duplicated-discovery-loops P01 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - Save-on-exit persists current state before `close()` (final save then close, always — including exits via exception)
 - Ceiling-only scope — no mixin generalisation (PERS-01 deferred to v2)
 - Reuse existing `_save_state_to_file()` unchanged — keeps JSON schema and graceful error handling intact
+- [Phase ?]: IdleDeadline uses single monotonic read at construction (_last_response = _start) to avoid inter-value skew
+- [Phase ?]: idle_expired and overall_expired as separate properties to preserve distinct DEBUG log messages in discovery loops
 
 ### Pending Todos
 
@@ -84,9 +87,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-12T15:04:12.580Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-unify-duplicated-discovery-loops/01-CONTEXT.md
+Last session: 2026-06-12T15:31:53.117Z
+Stopped at: Completed 01-unify-duplicated-discovery-loops/01-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
