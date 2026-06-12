@@ -31,7 +31,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Exiting `async with CeilingLight(...)` with `state_file=None` performs no state-file write — no file is created and no error is raised — and a test (TEST-02) proves it
   3. When the `async with` body raises, the original exception still propagates unchanged; the exit save is attempted and any I/O failure is logged and swallowed (never raised, never masking the body's exception), and a test (TEST-03) proves it
   4. Existing `__aenter__` behaviour (product-ID validation, load-state-from-file) and `close()` cleanup continue to run unchanged — the full existing test suite stays green, with `pyright` (strict) and `ruff` clean
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 01-01-PLAN.md — Add `CeilingLight.__aexit__` save-on-exit override + three emulator tests (TEST-01/02/03), then run the full quality gate
 
 ## Progress
 
@@ -40,4 +41,4 @@ Phases execute in numeric order: 1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Ceiling Save-on-Exit | 0/? | Not started | - |
+| 1. Ceiling Save-on-Exit | 0/1 | Not started | - |
