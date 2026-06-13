@@ -24,6 +24,7 @@ from lifx.protocol.base import Packet
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device as DevicePackets
 from lifx.protocol.packets import get_packet_class
+from lifx.protocol.protocol_types import DeviceService
 
 if TYPE_CHECKING:
     from lifx.devices.base import Device
@@ -332,6 +333,27 @@ async def _discover_with_packet(
 
                 # Unpack the response packet
                 response_packet = response_packet_class.unpack(payload)
+
+                # GetService discovery: a device advertises one StateService per
+                # service it supports, but only UDP carries an address we can
+                # talk to. Ignore the others so they neither claim the serial
+                # (first-wins dedup) nor supply a non-UDP port. The deserialiser
+                # tolerates service values from newer firmware (falls back to a
+                # raw int), so the comparison stays correct for unknown values.
+                if (
+                    isinstance(response_packet, DevicePackets.StateService)
+                    and response_packet.service != DeviceService.UDP
+                ):
+                    deadline.mark_response()  # live device — keep idle window open
+                    _LOGGER.debug(
+                        {
+                            "class": "_discover_with_packet",
+                            "action": "ignored_non_udp_service",
+                            "serial": device_serial,
+                            "service": int(response_packet.service),
+                        }
+                    )
+                    continue
 
                 # Extract all fields into a dict
                 response_payload = response_packet.as_dict

@@ -93,19 +93,24 @@ class TestDiscoveryWithEmulatorErrors:
         assert count == 0
 
 
-def _build_state_service_packet(source: int, target: bytes, port: int = 56700) -> bytes:
+def _build_state_service_packet(
+    source: int, target: bytes, port: int = 56700, service: int = 1
+) -> bytes:
     """Build a raw StateService response packet for testing.
 
     Args:
         source: Source ID to embed in the header
         target: 8-byte target serial
         port: Service port for the payload
+        service: Service identifier (1 = UDP; real devices also advertise
+            other, reserved services such as 5 that this library does not
+            define as a DeviceService enum member)
 
     Returns:
         Complete LIFX message bytes (header + payload)
     """
-    # StateService payload: service=1 (UDP), port
-    payload = struct.pack("<BI", 1, port)
+    # StateService payload: service (uint8), port (uint32)
+    payload = struct.pack("<BI", service, port)
 
     header = LifxHeader.create(
         pkt_type=3,  # StateService
@@ -614,3 +619,120 @@ class TestDiscoveryDeduplication:
             # Each yielded device should have a unique serial
             assert disc.serial not in seen_serials, f"Duplicate serial: {disc.serial}"
             seen_serials.add(disc.serial)
+
+
+class TestNonUdpServiceHandling:
+    """Non-UDP StateService responses must not crash or mislead discovery.
+
+    Real LIFX devices advertise one StateService per service they support, and
+    report service identifiers (e.g. 5) that this library does not define as a
+    DeviceService enum member. Two regressions are guarded here:
+
+    1. Deserialising an unknown service value must NOT raise ValueError
+       (the enum deserialiser falls back to the raw int).
+    2. The GetService discovery path must ignore non-UDP services so they
+       neither claim the serial (first-wins dedup) nor supply a non-UDP port —
+       while the device is still found via its UDP (service=1) response.
+    """
+
+    @pytest.mark.asyncio
+    async def test_unknown_service_value_does_not_raise(self) -> None:
+        """A StateService with service=5 unpacks to the raw int without raising."""
+        payload = struct.pack("<BI", 5, 56700)
+        pkt = DevicePackets.StateService.unpack(payload)
+        assert isinstance(pkt, DevicePackets.StateService)
+        assert pkt.service == 5
+        assert pkt.port == 56700
+        # Round-trips back to the wire unchanged.
+        assert pkt.pack() == payload
+
+    @pytest.mark.asyncio
+    async def test_non_udp_then_udp_yields_device_with_udp_port(self) -> None:
+        """Non-UDP service is ignored; the device is still found via its UDP port.
+
+        Simulates a device that emits its non-UDP StateService (service=5,
+        port=1) BEFORE its UDP StateService (service=1, port=56700). The non-UDP
+        response must not win the first-wins dedup nor set the device port; the
+        device must be yielded once with the UDP service port from the payload.
+        """
+        known_source = 42
+        serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+
+        packets_to_send = [
+            _build_state_service_packet(
+                source=known_source, target=serial, port=1, service=5
+            ),
+            _build_state_service_packet(
+                source=known_source, target=serial, port=56700, service=1
+            ),
+        ]
+        packet_iter = iter(packets_to_send)
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                pkt = next(packet_iter)
+                return pkt, ("192.168.1.100", 56700)
+            except StopIteration:
+                from lifx.exceptions import LifxTimeoutError
+
+                raise LifxTimeoutError("timeout")
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            devices = []
+            async for device in discover_devices(timeout=0.5):
+                devices.append(device)
+
+        assert len(devices) == 1
+        assert devices[0].serial == "d073d5010203"
+        # Port comes from the UDP StateService payload, not the non-UDP one.
+        assert devices[0].port == 56700
+
+    @pytest.mark.asyncio
+    async def test_only_non_udp_service_yields_no_device(self) -> None:
+        """A device advertising only a non-UDP service is ignored, without raising."""
+        known_source = 42
+        serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+
+        packets_to_send = [
+            _build_state_service_packet(
+                source=known_source, target=serial, port=1, service=5
+            ),
+        ]
+        packet_iter = iter(packets_to_send)
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                pkt = next(packet_iter)
+                return pkt, ("192.168.1.100", 56700)
+            except StopIteration:
+                from lifx.exceptions import LifxTimeoutError
+
+                raise LifxTimeoutError("timeout")
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            devices = []
+            # Must not raise — non-UDP service is skipped internally.
+            async for device in discover_devices(timeout=0.5):
+                devices.append(device)
+
+        assert len(devices) == 0
