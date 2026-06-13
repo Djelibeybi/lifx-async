@@ -86,3 +86,15 @@ class TestIdleDeadline:
             # remaining() must return the minimum: ~0.05, not 1.95
             assert remaining < 1.0  # capped by overall (0.05), not idle (1.95)
             assert remaining > 0  # not yet expired
+
+    def test_expired_convenience_property(self) -> None:
+        """`expired` is True once either deadline fires, False otherwise."""
+        # Shortly after construction: neither idle nor overall expired.
+        with patch("lifx.network.utils.time.monotonic", side_effect=[0.0, 1.0, 1.0]):
+            deadline = IdleDeadline(timeout=5.0, idle_timeout=2.0)
+            assert deadline.expired is False
+
+        # Past the idle timeout: expired short-circuits True on idle_expired.
+        with patch("lifx.network.utils.time.monotonic", side_effect=[0.0, 3.0]):
+            deadline = IdleDeadline(timeout=5.0, idle_timeout=2.0)
+            assert deadline.expired is True
