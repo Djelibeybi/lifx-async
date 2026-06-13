@@ -1,6 +1,6 @@
 [project]
 name = "lifx-async"
-version = "5.4.9"
+version = "5.5.0"
 description = "A modern, type-safe, async Python library for controlling LIFX lights"
 readme = "README.md"
 requires-python = ">=3.10"
