@@ -46,6 +46,27 @@ _PASCAL_TO_SNAKE = re.compile(r"(?<!^)(?=[A-Z])")
 _LOGGER = logging.getLogger(__name__)
 
 
+def _coerce_enum(enum_class: type, raw: int) -> Any:
+    """Coerce a raw integer to an enum member, tolerating unknown values.
+
+    LIFX devices running firmware newer than the bundled protocol
+    specification can report enum values this library does not yet define
+    (for example a ``DeviceService`` other than ``UDP``). The protocol's
+    guidance is to ignore unrecognised values rather than fail, so we fall
+    back to the raw integer instead of raising ``ValueError``. Equality
+    comparisons against known members (e.g. ``service == DeviceService.UDP``)
+    still behave correctly because the enums are ``IntEnum``, and the raw
+    integer round-trips back to the wire unchanged when packed.
+    """
+    try:
+        return enum_class(raw)
+    except ValueError:
+        _LOGGER.debug(
+            "Unknown %s value %d; preserving raw integer", enum_class.__name__, raw
+        )
+        return raw
+
+
 @dataclass
 class Packet:
     """Base class for all LIFX protocol packets.
@@ -272,7 +293,7 @@ class Packet:
                     item_raw, current_offset = serializer.unpack_value(
                         data, "uint8", current_offset
                     )
-                    result.append(enum_class(item_raw))
+                    result.append(_coerce_enum(enum_class, item_raw))
                 return result, current_offset
             elif is_nested:
                 # Array of nested structures
@@ -300,7 +321,7 @@ class Packet:
             # Single enum
             enum_class = enum_types[base_type]
             value_raw, new_offset = serializer.unpack_value(data, "uint8", offset)
-            return enum_class(value_raw), new_offset
+            return _coerce_enum(enum_class, value_raw), new_offset
         elif is_nested:
             # Nested structure
             struct_class = getattr(protocol_types, base_type)
