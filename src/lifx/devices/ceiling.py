@@ -218,19 +218,26 @@ class CeilingLight(MatrixLight):
         Saves the current in-memory state to ``state_file`` (when set) before
         delegating to the parent ``close()`` via ``super().__aexit__()``.  The
         save runs in a worker thread via ``asyncio.to_thread`` so the file I/O
-        never blocks the event loop.  It is guarded by a belt-and-braces
-        ``try/except`` so that any I/O failure is logged as a WARNING and
-        swallowed — the original body exception (if any) is never replaced or
-        suppressed, and the connection is always cleaned up.
+        never blocks the event loop.  Ordinary I/O failures are logged as a
+        WARNING and swallowed by the inner ``except Exception``.  The save is
+        wrapped in ``try/finally`` so the parent cleanup always runs — even if
+        cancellation (``asyncio.CancelledError``, a ``BaseException`` that the
+        inner handler deliberately does not catch) lands while the threaded save
+        is pending.  The original body exception (if any) is never replaced or
+        suppressed.
         """
-        if self._state_file:
-            try:
-                await asyncio.to_thread(self._save_state_to_file)
-            except Exception as e:
-                _LOGGER.warning(
-                    "Failed to save state on __aexit__ for %s: %s", self.serial, e
-                )
-        await super().__aexit__(exc_type, exc_val, exc_tb)
+        try:
+            if self._state_file:
+                try:
+                    await asyncio.to_thread(self._save_state_to_file)
+                except Exception as e:
+                    _LOGGER.warning(
+                        "Failed to save state on __aexit__ for %s: %s",
+                        self.serial,
+                        e,
+                    )
+        finally:
+            await super().__aexit__(exc_type, exc_val, exc_tb)
 
     async def _initialize_state(self) -> CeilingLightState:
         """Initialize ceiling light state transactionally.

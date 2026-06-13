@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -564,3 +565,40 @@ class TestCeilingLightSaveOnExit:
         leftover = list(tmp_path.glob("*.tmp"))
         assert not leftover, f"temp file left behind after failed write: {leftover}"
         assert "Failed to save state" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_aexit_cleans_up_connection_when_save_cancelled(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """Cancellation during the threaded save still runs the parent cleanup.
+
+        ``asyncio.CancelledError`` is a ``BaseException``, so it bypasses the
+        inner ``except Exception``. The ``try/finally`` must still delegate to
+        the parent ``close()`` so the connection is never leaked, and the
+        cancellation must continue to propagate.
+        """
+        ceiling = CeilingLight(
+            serial="d073d5000001",
+            ip="127.0.0.1",
+            port=56700,
+            state_file=str(tmp_path / "ceiling_state.json"),
+        )
+
+        async def _cancel(*_args, **_kwargs) -> None:
+            raise asyncio.CancelledError()
+
+        closed: list[bool] = []
+
+        async def _spy_close() -> None:
+            closed.append(True)
+
+        # The threaded save is cancelled; the parent close is spied.
+        monkeypatch.setattr("lifx.devices.ceiling.asyncio.to_thread", _cancel)
+        monkeypatch.setattr(ceiling, "close", _spy_close)
+
+        with pytest.raises(asyncio.CancelledError):
+            await ceiling.__aexit__(None, None, None)
+
+        assert closed == [True], (
+            "parent cleanup (close) must run even when the save is cancelled"
+        )
