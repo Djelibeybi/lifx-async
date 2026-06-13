@@ -2,6 +2,168 @@
 
 <!-- version list -->
 
+## v5.5.0 (2026-06-13)
+
+### Bug Fixes
+
+- **01**: CR-01 drop size-invalid datagrams instead of aborting discovery
+  ([`b33fde1`](https://github.com/Djelibeybi/lifx-async/commit/b33fde1464e73422cc260e649a75dfd77d79ffe8))
+
+- **01**: Finish review-fix pass — WR-03/WR-04/WR-05
+  ([`21c2b35`](https://github.com/Djelibeybi/lifx-async/commit/21c2b35e19f4c331c784af50ec655f36e35cdd8c))
+
+- **01**: IN-01 remove no-cover pragma from exit-save except clause
+  ([`282900c`](https://github.com/Djelibeybi/lifx-async/commit/282900c2e331309c77b160292c619efc1339e543))
+
+- **01**: IN-02 run exit-save via asyncio.to_thread (D-01 revised)
+  ([`0e46531`](https://github.com/Djelibeybi/lifx-async/commit/0e4653108c016cf40fb0fe445933bab51d3c2a8d))
+
+- **01**: IN-03 preserve port, timeout and max_retries in from_ip
+  ([`fa5da87`](https://github.com/Djelibeybi/lifx-async/commit/fa5da878025f8aed812b0a5ba0965b54a6bc8d3f))
+
+- **01**: Tolerate unknown DeviceService values from real hardware
+  ([`0cb5dc6`](https://github.com/Djelibeybi/lifx-async/commit/0cb5dc638e74ffe7c76ac6d31df66b99e6e60165))
+
+- **01**: WR-01 merge on-disk device entry instead of replacing on save
+  ([`a176243`](https://github.com/Djelibeybi/lifx-async/commit/a176243751cc2728730f9a130d4617cd8740bf59))
+
+- **01**: WR-01 reject all-zeros broadcast target in serial guard
+  ([`76b00ef`](https://github.com/Djelibeybi/lifx-async/commit/76b00efd5797b588254d40929651acd30e6a456d))
+
+- **01**: WR-02 align mDNS idle-reset semantics with D-04
+  ([`74928f8`](https://github.com/Djelibeybi/lifx-async/commit/74928f82e20e60ea7721c143a7750a5e3e30b47c))
+
+- **01**: WR-02 assert state payload content in save-on-exit test
+  ([`3c1c646`](https://github.com/Djelibeybi/lifx-async/commit/3c1c646c1ab8d1814457eb4dfce656e84842c5f6))
+
+- **01**: WR-03 write state file atomically via temp file and os.replace
+  ([`fde7b20`](https://github.com/Djelibeybi/lifx-async/commit/fde7b201b1e239b2b6af98542c24e42367b10176))
+
+- **devices**: Guarantee ceiling connection cleanup if save is cancelled
+  ([`6c5933d`](https://github.com/Djelibeybi/lifx-async/commit/6c5933d426fb8b8f98d5b1822656491434f813ac))
+
+- **discovery**: Reject non-zero target padding in the serial guard
+  ([`415006a`](https://github.com/Djelibeybi/lifx-async/commit/415006a5bde8988dedad775e64095cfc63c02e93))
+
+### Documentation
+
+- Add Phase 1 — unify duplicated discovery loops
+  ([`426f018`](https://github.com/Djelibeybi/lifx-async/commit/426f01802d0802d40796e4b9619b45fb09de46de))
+
+- Create roadmap (1 phase)
+  ([`c79fa7c`](https://github.com/Djelibeybi/lifx-async/commit/c79fa7c8a6e0d586280b966a7741ca3caaf2d173))
+
+- Define v1 requirements
+  ([`496ee75`](https://github.com/Djelibeybi/lifx-async/commit/496ee75f417ffd719bf91a06fc568527c0dd1147))
+
+- Initialize project
+  ([`31ec39f`](https://github.com/Djelibeybi/lifx-async/commit/31ec39f80c64f811de49c84a1ca9086aedb01eb8))
+
+- Map existing codebase
+  ([`ee7b4e0`](https://github.com/Djelibeybi/lifx-async/commit/ee7b4e079d074e665552047159ead62d9040098a))
+
+- **01**: Add code review fix report
+  ([`03aa5b6`](https://github.com/Djelibeybi/lifx-async/commit/03aa5b6136e3220425831036a89b790d172f058a))
+
+- **01**: Add code review fix report
+  ([`a876703`](https://github.com/Djelibeybi/lifx-async/commit/a8767032b5c852c1bda377f9283810e0b554ae74))
+
+- **01**: Add code review report
+  ([`b9d7b8f`](https://github.com/Djelibeybi/lifx-async/commit/b9d7b8feda9c2601b102023ce85ac2705d7a2497))
+
+- **01**: Add code review report
+  ([`48bfa88`](https://github.com/Djelibeybi/lifx-async/commit/48bfa88fec2ddd5febcd399a5f788a2a91f6ed61))
+
+- **01**: Capture phase context
+  ([`d856de1`](https://github.com/Djelibeybi/lifx-async/commit/d856de1d7d09f2793e52af2a3b5e501d4eba7f9b))
+
+- **01**: Capture phase context
+  ([`20e0252`](https://github.com/Djelibeybi/lifx-async/commit/20e02527626c70782968c9c183d1c61caf10c02a))
+
+- **01**: Create phase plan
+  ([`052253b`](https://github.com/Djelibeybi/lifx-async/commit/052253b55fe1572f1555099c84a25447c13ce014))
+
+- **01**: Create phase plan
+  ([`1b14726`](https://github.com/Djelibeybi/lifx-async/commit/1b14726bc0d3f1156b3d0444f46b69e81c9daeff))
+
+- **01**: Finalise phase plan artifacts
+  ([`8fbb139`](https://github.com/Djelibeybi/lifx-async/commit/8fbb139de5a7f3d33c35a2f7db04ab4c5385d0ae))
+
+- **01**: Mark Unify-discovery-loops phase complete & verified
+  ([`0109677`](https://github.com/Djelibeybi/lifx-async/commit/010967797649dd96a2412c411399c43fc157ca4d))
+
+- **01**: Record D-01 revision and final code review fix report
+  ([`086339f`](https://github.com/Djelibeybi/lifx-async/commit/086339f9a1bec6cd539e5da6b8d1d4bfe9058efb))
+
+- **01**: Research ceiling save-on-exit phase
+  ([`7456f22`](https://github.com/Djelibeybi/lifx-async/commit/7456f22dafee7cdae98ffb4663f06829ba782bc5))
+
+- **01-01**: Complete ceiling-save-on-exit plan
+  ([`488dff5`](https://github.com/Djelibeybi/lifx-async/commit/488dff596cd45b2f57bc699c1e6a2d807ae8e864))
+
+- **01-01**: Complete IdleDeadline plan
+  ([`5748c49`](https://github.com/Djelibeybi/lifx-async/commit/5748c49625267dba8aea978255aa2efc0aad03a5))
+
+- **01-02**: Complete thin-discover-devices-wrapper plan
+  ([`690fd20`](https://github.com/Djelibeybi/lifx-async/commit/690fd207a77d0712fbbe7320ebd4e83698fb411b))
+
+- **01-03**: Complete mDNS IdleDeadline adoption plan
+  ([`74aa472`](https://github.com/Djelibeybi/lifx-async/commit/74aa4728b8fbb37de2443464624c3dfec9b008a0))
+
+- **01-04**: Complete deprecate-receive-many plan
+  ([`4345760`](https://github.com/Djelibeybi/lifx-async/commit/4345760e8151be97c88450b40157e45d4bb815bf))
+
+- **01-05**: Complete discovery error test gap plan
+  ([`e23cec0`](https://github.com/Djelibeybi/lifx-async/commit/e23cec0e646180ff7f5468ebcc657f222f8b994c))
+
+- **phase-1**: Add security threat verification
+  ([`dbff129`](https://github.com/Djelibeybi/lifx-async/commit/dbff129c7084af7dfec1162bed05fb09db40dd47))
+
+- **phase-1**: Add security threat verification
+  ([`608929d`](https://github.com/Djelibeybi/lifx-async/commit/608929d8028b5032425e3dde87603c3e70843576))
+
+- **phase-1**: Add validation strategy
+  ([`f310ebf`](https://github.com/Djelibeybi/lifx-async/commit/f310ebf35dd3fc2aa466954410426d2f552ffd46))
+
+- **phase-1**: Add validation strategy
+  ([`b85ea2a`](https://github.com/Djelibeybi/lifx-async/commit/b85ea2ae7dab4683b6cc9170270bd6b19b2e0b76))
+
+- **phase-1**: Complete phase execution
+  ([`b941e14`](https://github.com/Djelibeybi/lifx-async/commit/b941e14f239301027dfbafd003ac471af3c913aa))
+
+- **phase-1**: Create phase plans for discovery loop unification
+  ([`be081e5`](https://github.com/Djelibeybi/lifx-async/commit/be081e5cbc960f0726c1a5640fbd609fdd747b57))
+
+- **phase-1**: Evolve PROJECT.md after phase completion
+  ([`376bf9f`](https://github.com/Djelibeybi/lifx-async/commit/376bf9fa99e34026bfa11e32d34443296ef569c3))
+
+- **phase-1**: Research unify-duplicated-discovery-loops
+  ([`e67c946`](https://github.com/Djelibeybi/lifx-async/commit/e67c9460735606246bb8fd02ed786551d8919827))
+
+- **state**: Record phase 1 context session
+  ([`262f8d3`](https://github.com/Djelibeybi/lifx-async/commit/262f8d38fce4a3a092a6b3385a11a983f289e2c1))
+
+- **state**: Record phase 1 context session
+  ([`1aa4b2f`](https://github.com/Djelibeybi/lifx-async/commit/1aa4b2f9cb8ba17e17e1074d44d81978b2ee226d))
+
+- **v1.0**: Add milestone audit (passed 7/7) and close out validation map
+  ([`c99e9ad`](https://github.com/Djelibeybi/lifx-async/commit/c99e9adcd523ebd38d37aeb0c9742b914ff4a1cb))
+
+### Features
+
+- **01-01**: Add IdleDeadline unit tests in test_network/test_utils.py
+  ([`40f9578`](https://github.com/Djelibeybi/lifx-async/commit/40f9578371edacbcbae8597818cd40ac95c01ddb))
+
+- **01-01**: Implement CeilingLight.__aexit__ to save state on exit (GREEN)
+  ([`272d79b`](https://github.com/Djelibeybi/lifx-async/commit/272d79bf822ce5b500b35367145887a782150824))
+
+- **01-01**: Implement IdleDeadline in network/utils.py
+  ([`28bb3d6`](https://github.com/Djelibeybi/lifx-async/commit/28bb3d67b15135a83a3dfedc0d152c3c416d7d08))
+
+- **01-04**: Deprecate UdpTransport.receive_many with DeprecationWarning
+  ([`bc6c95d`](https://github.com/Djelibeybi/lifx-async/commit/bc6c95d7ba9b2119039f0afd04a872a5839a189d))
+
+
 ## v5.4.9 (2026-05-21)
 
 ### Bug Fixes
