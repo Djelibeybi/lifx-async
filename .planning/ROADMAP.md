@@ -21,7 +21,13 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 |-------|-----------|----------------|--------|-----------|
 | 1. Ceiling Save-on-Exit | v1.0 | 5/5 | Complete   | 2026-06-12 |
 
-### Phase 1: Unify duplicated discovery loops
+### ✅ Phase 1: Unify duplicated discovery loops — COMPLETE (verified 2026-06-13)
+
+> Post-v1.0 standalone phase (from the /simplify review, 2026-06-13). Review-fix
+> 6/6, security 11/11 closed (01-SECURITY.md), UAT 4/4 including real-hardware
+> validation. A real-hardware regression (unknown `DeviceService` value) was
+> found and fixed (0d83deb). Full suite 2511 passed.
+> Not part of the v1.0 milestone; formalise the next milestone via `/gsd-new-milestone`.
 
 **Goal:** Rebuild `discover_devices()` on top of `_discover_with_packet()` in `src/lifx/network/discovery.py`, removing ~150 near-identical lines that have already drifted. Move the documented DoS protections (serial/broadcast-bit validation, currently only in `discover_devices`) into the shared generator so every discovery caller gets them, and retire the hand-rolled `_parse_device_state_service()` in favour of the protocol layer's `StateService.unpack()`. Identified during the /simplify review of UDP transport mechanics (2026-06-13); the duplicated retry-budget arithmetic in `connection.py` (`_request_stream_impl` vs `_request_ack_stream_impl`) is a candidate follow-up but out of scope for this phase.
 **Requirements**: D-01..D-12 (CONTEXT.md decisions); no separate REQUIREMENTS.md IDs for this milestone

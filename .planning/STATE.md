@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Review-fix pass complete (CR-01, WR-01..WR-05 all fixed); next is gsd-verifier -> VERIFICATION.md
-last_updated: "2026-06-13T13:57:00Z"
-last_activity: 2026-06-13 -- Resumed and completed Phase 1 review-fix pass (WR-03/04/05); all gates green
+status: complete
+stopped_at: Phase 1 (Unify discovery loops) COMPLETE & VERIFIED — UAT 4/4 (incl. real-hardware), security 11/11 closed, suite 2511 passed. Next milestone via /gsd-new-milestone.
+last_updated: "2026-06-13T14:35:00Z"
+last_activity: 2026-06-13 -- Phase 1 verified complete: hardware regression (DeviceService) fixed + confirmed, security verified
 progress:
   total_phases: 1
   completed_phases: 1
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-12 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 1 (Unify duplicated discovery loops) — EXECUTING
+Phase: 1 (Unify duplicated discovery loops) — COMPLETE & VERIFIED
 Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-06-12 -- Phase 1 execution started
+Status: Verified — review-fix (6/6), security (11/11 closed), UAT (4/4 incl. real hardware). Ready for next milestone.
+Last activity: 2026-06-13 -- Phase 1 verified complete
 
 ## Performance Metrics
 
