@@ -303,8 +303,17 @@ async def _discover_with_packet(
                 # multicast bit check also covers the all-0xff broadcast
                 # target; the all-zeros target is the LIFX broadcast address
                 # used by the discovery request itself and is never a valid
-                # device serial.
-                if header.target[0] & 0x01 or header.target == b"\x00" * 8:
+                # device serial. The two trailing bytes of the 8-byte target
+                # are protocol padding and MUST be zero — Serial.from_protocol
+                # silently drops target[6:], so a malformed/spoofed response
+                # with non-zero padding would otherwise normalise to a clean
+                # serial and could win the per-serial dedup race against the
+                # real device.
+                if (
+                    header.target[0] & 0x01
+                    or header.target == b"\x00" * 8
+                    or header.target[6:] != b"\x00\x00"
+                ):
                     _LOGGER.debug(
                         {
                             "class": "_discover_with_packet",
