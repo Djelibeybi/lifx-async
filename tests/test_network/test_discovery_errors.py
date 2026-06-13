@@ -773,3 +773,48 @@ class TestRemainingNonPositiveGuard:
 
         assert devices == []
         mock_transport.receive.assert_not_called()
+
+
+class TestNonZeroTargetPadding:
+    """A response with valid serial bytes but non-zero target padding is rejected.
+
+    The 8-byte target field is a 6-byte serial plus 2 padding bytes that must be
+    zero. Serial.from_protocol() drops the padding, so without an explicit guard
+    a spoofed response (valid first six bytes, non-zero padding) would normalise
+    to a clean serial and could win the per-serial dedup race.
+    """
+
+    @pytest.mark.asyncio
+    async def test_nonzero_padding_rejected(self) -> None:
+        known_source = 42
+        # Valid-looking first six bytes, but non-zero padding in bytes 6-7.
+        spoofed = b"\xd0\x73\xd5\x01\x02\x03\xff\xff"
+
+        packets_to_send = [
+            _build_state_service_packet(source=known_source, target=spoofed),
+        ]
+        packet_iter = iter(packets_to_send)
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                pkt = next(packet_iter)
+                return pkt, ("192.168.1.100", 56700)
+            except StopIteration:
+                from lifx.exceptions import LifxTimeoutError
+
+                raise LifxTimeoutError("timeout")
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            devices = [d async for d in discover_devices(timeout=0.5)]
+
+        assert devices == []
