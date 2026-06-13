@@ -134,7 +134,9 @@ class DiscoveryResponse:
     Attributes:
         serial: Device serial number
         ip: Device IP address
-        port: Device UDP port
+        port: UDP source port the device responded from (``addr[1]``), not a
+            device-reported service port. For GetService discovery the
+            authoritative service port is in ``response_payload["port"]``.
         response_time: Response time in seconds
         response_payload: Unpacked State packet fields as key/value dict
     """
@@ -178,23 +180,19 @@ async def _discover_with_packet(
         window. Slow consumers (e.g. performing network round trips per
         response) should pass a larger ``idle_timeout_multiplier``.
 
-    Returns:
-        List of DiscoveryResponse objects with unpacked response payloads
+    Yields:
+        DiscoveryResponse objects with unpacked response payloads, one per
+        unique serial (first response wins). ``response_payload`` keys are the
+        snake_case Python field names of the State packet (e.g. ``label``,
+        ``port``). Responses whose packet type does not match the request's
+        ``STATE_TYPE`` (e.g. StateUnhandled from non-lights) are skipped, not
+        yielded.
 
     Example:
         ```python
         # Find all devices and their labels
-        responses = await _discover_with_packet(DevicePackets.GetLabel())
-        for resp in responses:
-            print(f"{resp.serial}: {resp.response_payload['Label']}")
-
-        # Find only lights (filter out StateUnhandled)
-        responses = await _discover_with_packet(LightPackets.Get())
-        lights = [
-            r
-            for r in responses
-            if r.response_payload.get("pkt_type") != StateUnhandled.PKT_TYPE
-        ]
+        async for resp in _discover_with_packet(DevicePackets.GetLabel()):
+            print(f"{resp.serial}: {resp.response_payload['label']}")
         ```
     """
     if not hasattr(packet, "STATE_TYPE"):
@@ -341,11 +339,14 @@ async def _discover_with_packet(
                 # Calculate response time
                 response_time = response_timestamp - request_time
 
-                # Create discovery response
+                # Create discovery response. port is the device's actual source
+                # port (addr[1]), not the broadcast destination parameter — this
+                # is the only truthful port for State responses without a service
+                # port field (e.g. StateLabel via find_by_label). WR-04.
                 discovery_resp = DiscoveryResponse(
                     serial=device_serial,
                     ip=addr[0],
-                    port=port,
+                    port=addr[1],
                     response_time=response_time,
                     response_payload=response_payload,
                 )
@@ -454,8 +455,9 @@ async def discover_devices(
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
     ):
-        # Device's actual service port comes from the StateService payload (D-05).
-        # resp.port is the broadcast port parameter — do not use it here (Pitfall 2).
+        # Device's authoritative service port comes from the StateService
+        # payload (D-05). resp.port is only the device's source port (addr[1]) —
+        # prefer the reported service port here (Pitfall 2).
         device_port: int = resp.response_payload["port"]
         yield DiscoveredDevice(
             serial=resp.serial,

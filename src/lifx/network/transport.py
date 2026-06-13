@@ -295,15 +295,16 @@ class UdpTransport:
         Raises:
             NetworkError: If socket is not open
 
-        .. deprecated::
-            :meth:`receive_many` is deprecated and will be removed in v2.0.
-            Use :meth:`receive` in a loop or
-            :func:`~lifx.network.discovery._discover_with_packet` for
+        .. deprecated:: 5.5.0
+            :meth:`receive_many` is deprecated and will be removed in v6.0.
+            Use :meth:`receive` in a loop, or the public discovery API in
+            :mod:`lifx.api` (e.g. :func:`~lifx.api.discover`), for
             multi-response collection.
         """
         warnings.warn(
-            "UdpTransport.receive_many is deprecated and will be removed in v2.0. "
-            "Use receive() in a loop or _discover_with_packet() instead.",
+            "UdpTransport.receive_many is deprecated and will be removed in "
+            "v6.0. Use receive() in a loop, or the public discovery API in "
+            "lifx.api, for multi-response collection.",
             DeprecationWarning,
             stacklevel=2,
         )

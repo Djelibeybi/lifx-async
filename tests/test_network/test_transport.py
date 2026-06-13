@@ -101,9 +101,9 @@ class TestUdpTransport:
             assert packets == []
 
     async def test_receive_many_emits_deprecation_warning(self) -> None:
-        """receive_many must emit DeprecationWarning naming v2.0 (D-12)."""
+        """receive_many must emit DeprecationWarning naming v6.0 (D-12)."""
         async with UdpTransport() as transport:
-            with pytest.warns(DeprecationWarning, match="v2.0"):
+            with pytest.warns(DeprecationWarning, match="v6.0"):
                 await transport.receive_many(timeout=0.1)
 
 
