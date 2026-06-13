@@ -743,3 +743,53 @@ class TestRequestStreamDebugLogging:
             isinstance(r.msg, dict) and r.msg.get("method") == "request_stream"
             for r in caplog.records
         )
+
+
+class TestDiscoveryConnectionSerialUpdate:
+    """A discovery connection refreshes its serial from the GET response header.
+
+    Covers both sides of the ``serial != self.serial`` guard: the response
+    serial differing from the placeholder (update) and matching it (no-op).
+    """
+
+    @staticmethod
+    def _response(target_hex: str):
+        payload = b"x".ljust(32, b"\x00")  # 32-byte StateLabel payload
+        header = LifxHeader(
+            size=36 + len(payload),
+            protocol=1024,
+            source=1,
+            target=bytes.fromhex(target_hex),
+            tagged=False,
+            ack_required=False,
+            res_required=False,
+            sequence=1,
+            pkt_type=Device.StateLabel.PKT_TYPE,
+        )
+        return header, payload
+
+    async def _run(self, conn, header, payload):
+        async def impl(packet, timeout=None, max_retries=None):
+            yield header, payload
+
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(conn, "_request_stream_impl", side_effect=impl),
+        ):
+            return [r async for r in conn.request_stream(Device.GetLabel())]
+
+    async def test_serial_updated_when_response_differs(self) -> None:
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        assert conn._is_discovery is True
+        header, payload = self._response("d073d5001234")
+        results = await self._run(conn, header, payload)
+        assert len(results) == 1
+        assert conn.serial == "d073d5001234"
+        assert conn._is_discovery is False
+
+    async def test_serial_unchanged_when_response_matches(self) -> None:
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        header, payload = self._response("000000000000")
+        results = await self._run(conn, header, payload)
+        assert len(results) == 1
+        assert conn.serial == "000000000000"

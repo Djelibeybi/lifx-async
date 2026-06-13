@@ -848,3 +848,29 @@ class TestMdnsRemainingNonPositiveGuard:
 
         assert records == []
         mock_transport.receive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_idle_expired_breaks_with_debug(self) -> None:
+        """idle_expired True takes the idle-timeout break (covers the True side)."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        fake = MagicMock()
+        fake.idle_expired = True
+        fake._start = 0.0
+        fake._last_response = 0.0
+
+        with (
+            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=fake),
+            patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls,
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = AsyncMock()
+            mock_transport_cls.return_value = mock_transport
+
+            records = [r async for r in discover_lifx_services(timeout=0.5)]
+
+        assert records == []
+        mock_transport.receive.assert_not_called()
