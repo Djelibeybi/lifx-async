@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 01-unify-duplicated-discovery-loops/01-02-PLAN.md
-last_updated: "2026-06-12T16:01:07.080Z"
-last_activity: 2026-06-12 -- Phase 1 execution started
+stopped_at: Review-fix pass complete (CR-01, WR-01..WR-05 all fixed); next is gsd-verifier -> VERIFICATION.md
+last_updated: "2026-06-13T13:57:00Z"
+last_activity: 2026-06-13 -- Resumed and completed Phase 1 review-fix pass (WR-03/04/05); all gates green
 progress:
   total_phases: 1
   completed_phases: 1
@@ -92,10 +92,12 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-12T16:01:07.076Z
-Stopped at: Completed 01-unify-duplicated-discovery-loops/01-02-PLAN.md
+Last session: 2026-06-13T13:57:00Z
+Stopped at: Resumed via /gsd-resume-work; finished Phase 1 review-fix pass (WR-03/WR-04/WR-05), all 6 in-scope findings fixed, full suite 2508 passed. HANDOFF.json consumed.
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Run gsd-verifier to produce VERIFICATION.md, then complete Phase 1
+- Security enforcement is on but no SECURITY.md exists yet — /gsd-secure-phase 1 suggested after verification
+- Then start the next milestone with /gsd-new-milestone
