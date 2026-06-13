@@ -3,9 +3,42 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import Any, ClassVar
 from unittest.mock import patch
 
 from lifx.protocol import packets
+from lifx.protocol.base import Packet
+from lifx.protocol.protocol_types import DeviceService
+
+
+@dataclass
+class _ArrayEnumPacket(Packet):
+    """Synthetic packet with an array-of-enums field.
+
+    No real LIFX packet currently carries an enum array, so this exercises the
+    array-enum branch of the deserialiser directly — including its tolerance of
+    values outside the known enum (newer firmware).
+    """
+
+    PKT_TYPE: ClassVar[int] = 60001
+    _fields: ClassVar[list[dict[str, Any]]] = [
+        {"name": "Services", "type": "[2]<DeviceService>", "size_bytes": 1},
+    ]
+
+    services: list[Any] = None  # type: ignore[assignment]
+
+
+class TestArrayEnumDeserialisation:
+    """Array-of-enums fields tolerate values outside the known enum."""
+
+    def test_unpack_array_of_enums_tolerates_unknown(self) -> None:
+        # Two service bytes: UDP(1) known, 5 unknown.
+        pkt = _ArrayEnumPacket.unpack(b"\x01\x05")
+        assert isinstance(pkt, _ArrayEnumPacket)
+        assert pkt.services[0] == DeviceService.UDP
+        # Unknown value falls back to the raw int instead of raising.
+        assert pkt.services[1] == 5
 
 
 class TestPacketUnpackDebugGuard:

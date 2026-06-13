@@ -529,3 +529,38 @@ class TestCeilingLightSaveOnExit:
         assert "Failed to save state on __aexit__" in caplog.text, (
             "A WARNING log mentioning the save failure must be emitted"
         )
+
+    @pytest.mark.asyncio
+    async def test_save_state_atomic_write_failure_cleans_up_temp(
+        self, ceiling_device, tmp_path, caplog, monkeypatch
+    ) -> None:
+        """A failed atomic write unlinks the temp file and is handled, not raised.
+
+        Forces ``json.dump`` to raise after the temp file is opened, exercising
+        the cleanup branch (unlink the partial temp file, re-raise) and the
+        outer guard that logs a warning. No ``.tmp`` file may be left behind.
+        """
+        state_file = tmp_path / "ceiling_state.json"
+        ceiling = CeilingLight(
+            serial=ceiling_device.serial,
+            ip=ceiling_device.ip,
+            port=ceiling_device.port,
+            state_file=str(state_file),
+        )
+
+        def _boom(*_args, **_kwargs) -> None:
+            raise OSError("disk full")
+
+        async with ceiling:
+            # Give the device some state to serialise.
+            await ceiling.turn_uplight_off(
+                color=HSBK(hue=120.0, saturation=1.0, brightness=0.8, kelvin=3500)
+            )
+            # Force the write to fail after the temp file has been created.
+            monkeypatch.setattr("lifx.devices.ceiling.json.dump", _boom)
+            # The outer guard swallows the error — must not raise.
+            ceiling._save_state_to_file()
+
+        leftover = list(tmp_path.glob("*.tmp"))
+        assert not leftover, f"temp file left behind after failed write: {leftover}"
+        assert "Failed to save state" in caplog.text

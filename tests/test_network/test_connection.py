@@ -643,3 +643,103 @@ class TestStateUnhandledResponses:
             with pytest.raises(LifxUnsupportedCommandError):
                 # Send SetColor to a Switch, should raise LifxUnsupportedCommandError
                 await switch_device.request(set_packet)
+
+
+class TestRequestStreamDebugLogging:
+    """Cover the DEBUG-only request/reply logging blocks in request_stream().
+
+    These blocks are guarded by ``_LOGGER.isEnabledFor(logging.DEBUG)`` and only
+    execute when DEBUG logging is on, so they need explicit DEBUG-level coverage.
+    Impls are mocked so the tests stay deterministic and offline.
+    """
+
+    @staticmethod
+    def _header(pkt_type: int, payload_len: int) -> LifxHeader:
+        return LifxHeader(
+            size=36 + payload_len,
+            protocol=1024,
+            source=1,
+            target=bytes.fromhex("d073d5001234"),
+            tagged=False,
+            ack_required=False,
+            res_required=False,
+            sequence=1,
+            pkt_type=pkt_type,
+        )
+
+    async def test_get_path_debug_logging(self, caplog) -> None:
+        """GET path logs the request/reply cycle at DEBUG."""
+        import logging
+
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        # StateLabel payload is a 32-byte label field.
+        payload = b"Test".ljust(32, b"\x00")
+        header = self._header(Device.StateLabel.PKT_TYPE, len(payload))
+
+        async def impl(packet, timeout=None, max_retries=None):
+            yield header, payload
+
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(conn, "_request_stream_impl", side_effect=impl),
+            caplog.at_level(logging.DEBUG, logger="lifx.network.connection"),
+        ):
+            results = [r async for r in conn.request_stream(Device.GetLabel())]
+
+        assert len(results) == 1
+        assert any(
+            isinstance(r.msg, dict) and r.msg.get("method") == "request_stream"
+            for r in caplog.records
+        )
+
+    async def test_set_path_debug_logging(self, caplog) -> None:
+        """SET path logs the request/ack cycle at DEBUG."""
+        import logging
+
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+
+        async def ack_impl(packet, timeout=None, max_retries=None):
+            yield True
+
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(conn, "_request_ack_stream_impl", side_effect=ack_impl),
+            caplog.at_level(logging.DEBUG, logger="lifx.network.connection"),
+        ):
+            results = [r async for r in conn.request_stream(Device.SetPower(level=0))]
+
+        assert results == [True]
+        assert any(
+            isinstance(r.msg, dict) and r.msg.get("method") == "request_stream"
+            for r in caplog.records
+        )
+
+    async def test_echo_path_debug_logging(self, caplog) -> None:
+        """Echo (OTHER) path logs the request/reply cycle at DEBUG."""
+        import logging
+
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        echo_payload = b"\x01\x02\x03\x04" + (b"\x00" * 60)
+        header = self._header(Device.EchoResponse.PKT_TYPE, len(echo_payload))
+
+        async def impl(packet, timeout=None, max_retries=None):
+            yield header, echo_payload
+
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(conn, "_request_stream_impl", side_effect=impl),
+            caplog.at_level(logging.DEBUG, logger="lifx.network.connection"),
+        ):
+            results = [
+                r
+                async for r in conn.request_stream(
+                    Device.EchoRequest(payload=echo_payload)
+                )
+            ]
+
+        assert len(results) == 1
+        assert isinstance(results[0], Device.EchoResponse)
+        assert any(
+            isinstance(r.msg, dict) and r.msg.get("method") == "request_stream"
+            for r in caplog.records
+        )
