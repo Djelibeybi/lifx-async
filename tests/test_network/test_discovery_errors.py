@@ -736,3 +736,40 @@ class TestNonUdpServiceHandling:
                 devices.append(device)
 
         assert len(devices) == 0
+
+
+class TestRemainingNonPositiveGuard:
+    """The defensive ``remaining() <= 0`` break terminates the loop cleanly.
+
+    This guard only fires in a clock race (time advancing between the expiry
+    property reads and the ``remaining()`` call), so it is driven here with a
+    mocked IdleDeadline reporting a contradictory state.
+    """
+
+    @pytest.mark.asyncio
+    async def test_remaining_nonpositive_breaks_before_receive(self) -> None:
+        from unittest.mock import MagicMock
+
+        fake = MagicMock()
+        fake.idle_expired = False
+        fake.overall_expired = False
+        fake.remaining.return_value = -1.0
+        fake._start = 0.0
+        fake._last_response = 0.0
+
+        with (
+            patch("lifx.network.discovery.IdleDeadline", return_value=fake),
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=42),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = AsyncMock()
+            mock_transport_cls.return_value = mock_transport
+
+            devices = [d async for d in discover_devices(timeout=0.5)]
+
+        assert devices == []
+        mock_transport.receive.assert_not_called()
