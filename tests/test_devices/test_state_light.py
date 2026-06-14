@@ -70,7 +70,9 @@ class TestLightStateManagement:
         assert isinstance(light._state, LightState)
         assert light._state.label == "Test Light"
         assert light._state.power == 65535
-        assert light._state.color.hue == 120.0  # 21845/65535 * 360
+        assert light._state.color.hue == pytest.approx(
+            120.0, abs=0.01
+        )  # 21845/65535 * 360
 
     @pytest.mark.asyncio
     async def test_state_property_after_init_returns_light_state(

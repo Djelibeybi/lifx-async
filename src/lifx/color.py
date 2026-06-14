@@ -265,21 +265,19 @@ class HSBK:
         self._kelvin = kelvin
 
     def __eq__(self, other: object) -> bool:
-        """Two colors are equal if they have the same HSBK values."""
-        if not isinstance(other, HSBK):  # pragma: no cover
+        """Two colors are equal if they share the same wire representation.
+
+        Equality is defined at uint16 (protocol) granularity rather than on the
+        raw floats. This keeps colors that round-trip through the protocol stable
+        under comparison despite sub-uint16 floating-point drift.
+        """
+        if not isinstance(other, HSBK):
             return NotImplemented
-        return (
-            other.hue == self.hue
-            and other.saturation == self.saturation
-            and other.brightness == self.brightness
-            and other.kelvin == self.kelvin
-        )
+        return self.as_tuple() == other.as_tuple()
 
     def __hash__(self) -> int:
-        """Returns a hash of this color as an integer."""
-        return hash(
-            (self.hue, self.saturation, self.brightness, self.kelvin)
-        )  # pragma: no cover
+        """Return a hash consistent with uint16 equality."""
+        return hash(self.as_tuple())
 
     def __str__(self) -> str:
         """Return a string representation of the HSBK values for this color."""
@@ -299,18 +297,18 @@ class HSBK:
 
     @property
     def hue(self) -> float:
-        """Return hue (rounded to nearest integer degree for display)."""
-        return round(self._hue)
+        """Return the raw hue in degrees (0-360)."""
+        return self._hue
 
     @property
     def saturation(self) -> float:
-        """Return saturation (rounded to 2 decimal places for display)."""
-        return round(self._saturation, 2)
+        """Return the raw saturation (0.0-1.0)."""
+        return self._saturation
 
     @property
     def brightness(self) -> float:
-        """Return brightness (rounded to 2 decimal places for display)."""
-        return round(self._brightness, 2)
+        """Return the raw brightness (0.0-1.0)."""
+        return self._brightness
 
     @property
     def kelvin(self) -> int:
@@ -426,10 +424,11 @@ class HSBK:
             print(f"Hue: {color.hue}°, Brightness: {color.brightness * 100}%")
             ```
         """
-        # Convert from uint16 ranges to user-friendly ranges
-        hue = round(float(protocol.hue) * 360 / 0x10000)
-        saturation = round(float(protocol.saturation) / 0xFFFF, 2)
-        brightness = round(float(protocol.brightness) / 0xFFFF, 2)
+        # Convert from uint16 ranges to user-friendly ranges, preserving the
+        # full precision of the device value (no rounding).
+        hue = float(protocol.hue) * 360 / 0x10000
+        saturation = float(protocol.saturation) / 0xFFFF
+        brightness = float(protocol.brightness) / 0xFFFF
 
         return cls(
             hue=hue,
