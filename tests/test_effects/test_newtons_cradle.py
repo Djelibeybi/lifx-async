@@ -549,12 +549,13 @@ class TestShading:
             assert 0.0 <= color.brightness <= 1.0
             assert 1500 <= color.kelvin <= 9000
 
-    def test_hue_is_int(self) -> None:
-        """Test that hue is always an integer."""
+    def test_hue_is_raw_unrounded(self) -> None:
+        """Test that hue is a raw, unrounded numeric value in range."""
         effect = EffectNewtonsCradle(hue=200, saturation=0.5, brightness=0.8)
         for x in range(-9, 10):
             color = effect._shade(x / 10.0)
-            assert isinstance(color.hue, int)
+            assert isinstance(color.hue, (int, float))
+            assert 0 <= color.hue <= 360
 
     def test_specular_blend_toward_white(self) -> None:
         """Test specular bloom reduces saturation (blends toward white)."""
