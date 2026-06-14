@@ -305,7 +305,7 @@ class TestStateInitialization:
         assert isinstance(light._state, LightState)
         assert light._state.label == "Kitchen Light"
         assert light._state.power == 65535
-        assert light._state.color.hue == 120.0  # 21845/65535 * 360
+        assert light._state.color.hue == pytest.approx(120.0, abs=0.01)
         assert light._state.host_firmware.version_major == 2
         assert light._state.wifi_firmware.version_minor == 80
         assert light._state.location.label == b"Home"
@@ -416,7 +416,7 @@ class TestRefreshState:
         # Verify volatile fields updated
         assert light._state.power == 65535
         assert light._state.color.kelvin == 4000
-        assert light._state.color.brightness == 0.5  # 32768/65535
+        assert light._state.color.brightness == pytest.approx(0.5, abs=0.001)
 
     @pytest.mark.asyncio
     async def test_refresh_state_updates_timestamp(self, light, mock_product_info):

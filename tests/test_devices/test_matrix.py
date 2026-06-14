@@ -400,7 +400,7 @@ class TestMatrixLight:
 
             # Verify the copy worked
             copied_colors = await matrix.get64()
-            assert copied_colors[0].hue == 240  # Blue
+            assert copied_colors[0].hue == pytest.approx(240, abs=0.01)  # Blue
             assert copied_colors[0].saturation == 1.0
             assert copied_colors[0].brightness == 1.0
 

@@ -183,13 +183,7 @@ class Theme:
                 print("Red is in the theme")
             ```
         """
-        return any(
-            c.hue == color.hue
-            and c.saturation == color.saturation
-            and c.brightness == color.brightness
-            and c.kelvin == color.kelvin
-            for c in self.colors
-        )
+        return any(c == color for c in self.colors)
 
     def __repr__(self) -> str:
         """Return a string representation of the theme."""

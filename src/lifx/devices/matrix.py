@@ -810,15 +810,9 @@ class MatrixLight(Light):
                 f"Color count mismatch: expected {tile.total_zones}, got {len(colors)}"
             )
 
-        # Check if all colors are the same
+        # Check if all colors are the same (uint16 wire equality)
         first_color = colors[0]
-        all_same = all(
-            c.hue == first_color.hue
-            and c.saturation == first_color.saturation
-            and c.brightness == first_color.brightness
-            and c.kelvin == first_color.kelvin
-            for c in colors
-        )
+        all_same = all(c == first_color for c in colors)
 
         if all_same:
             # All zones same color - use SetColor packet (much faster!)
