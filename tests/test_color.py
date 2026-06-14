@@ -386,6 +386,68 @@ class TestHSBKThemeMethods:
             HSBK.average([])
 
 
+class TestHSBKRawValues:
+    """The getters and from_protocol expose raw, unrounded values."""
+
+    def test_getters_return_unrounded_values(self) -> None:
+        """Hue, saturation and brightness are returned without rounding."""
+        color = HSBK(hue=180.7, saturation=0.123, brightness=0.456, kelvin=3500)
+
+        # Previously these rounded to 181, 0.12 and 0.46 respectively.
+        assert color.hue == 180.7
+        assert color.saturation == 0.123
+        assert color.brightness == 0.456
+
+    def test_from_protocol_preserves_raw_precision(self) -> None:
+        """from_protocol no longer quantises to integer hue / 2dp sat-bri."""
+        # uint16 values that do not map cleanly to an integer degree or 2dp.
+        protocol = LightHsbk(hue=12345, saturation=12345, brightness=54321, kelvin=4000)
+        color = HSBK.from_protocol(protocol)
+
+        assert color.hue == pytest.approx(12345 * 360 / 0x10000)
+        assert color.saturation == pytest.approx(12345 / 0xFFFF)
+        assert color.brightness == pytest.approx(54321 / 0xFFFF)
+        # The raw values are explicitly NOT the old rounded forms.
+        assert color.saturation != round(12345 / 0xFFFF, 2)
+
+
+class TestHSBKEquality:
+    """Equality and hashing are defined at uint16 (wire) granularity."""
+
+    def test_equal_when_wire_representation_matches(self) -> None:
+        """Colors differing only below uint16 resolution are equal."""
+        color = HSBK(hue=34, saturation=0.75, brightness=0.902, kelvin=3500)
+        roundtrip = HSBK.from_protocol(color.to_protocol())
+
+        # Raw values now differ slightly, but the wire representation matches.
+        assert roundtrip is not color
+        assert roundtrip == color
+        assert hash(roundtrip) == hash(color)
+
+    def test_membership_uses_wire_equality(self) -> None:
+        """A protocol round-tripped color is still found in a set/list."""
+        color = HSBK(hue=39, saturation=0.75, brightness=0.902, kelvin=3500)
+        roundtrip = HSBK.from_protocol(color.to_protocol())
+
+        assert roundtrip in {color}
+        assert roundtrip in [color]
+
+    def test_not_equal_when_wire_representation_differs(self) -> None:
+        """Distinct colors remain unequal."""
+        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        assert red != blue
+        assert hash(red) != hash(blue)
+
+    def test_eq_returns_not_implemented_for_non_hsbk(self) -> None:
+        """Comparing against a non-HSBK object is not equal, not an error."""
+        color = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        assert color != "not a color"
+        assert (color == 42) is False
+
+
 class TestHSBKLerpHsb:
     """Tests for HSBK.lerp_hsb shortest-path HSB interpolation."""
 
