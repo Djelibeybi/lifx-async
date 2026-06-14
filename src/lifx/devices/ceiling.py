@@ -37,6 +37,21 @@ from lifx.products import get_ceiling_layout, is_ceiling_product
 _LOGGER = logging.getLogger(__name__)
 
 
+def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
+    """Compare hue/saturation/kelvin at uint16 (wire) granularity.
+
+    Brightness is intentionally ignored. Comparing the decoded uint16 values
+    rather than the raw floats keeps stored-state validity stable across a
+    protocol round-trip, which exposes slightly different raw H/S/B floats for
+    the same wire representation.
+    """
+    sp = stored.to_protocol()
+    cp = current.to_protocol()
+    return (
+        sp.hue == cp.hue and sp.saturation == cp.saturation and sp.kelvin == cp.kelvin
+    )
+
+
 @dataclass
 class CeilingLightState(MatrixLightState):
     """Ceiling light device state with uplight/downlight component control.
@@ -1205,11 +1220,7 @@ class CeilingLight(MatrixLight):
                 return False
 
             stored = state.stored_uplight_color
-            return (
-                stored.hue == current.hue
-                and stored.saturation == current.saturation
-                and stored.kelvin == current.kelvin
-            )
+            return _hsk_matches(stored, current)
 
         if component == "downlight":
             if state.stored_downlight_colors is None or not isinstance(current, list):
@@ -1218,9 +1229,9 @@ class CeilingLight(MatrixLight):
             if len(state.stored_downlight_colors) != len(current):
                 return False
 
-            # Check if all zones match (H, S, K)
+            # Check if all zones match (H, S, K at wire granularity)
             return all(
-                s.hue == c.hue and s.saturation == c.saturation and s.kelvin == c.kelvin
+                _hsk_matches(s, c)
                 for s, c in zip(state.stored_downlight_colors, current)
             )
 

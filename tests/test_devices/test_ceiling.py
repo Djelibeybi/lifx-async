@@ -1257,6 +1257,42 @@ class TestCeilingLightIsStoredStateValid:
 
         assert ceiling_176._is_stored_state_valid("unknown", current) is False
 
+    def test_uplight_valid_match_after_roundtrip(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Uplight stays valid when current came back via a protocol round-trip.
+
+        The same wire tuple decodes to slightly different raw H/S floats, so a
+        raw-float comparison would wrongly fail. Wire-granularity comparison
+        keeps it valid (brightness still ignored).
+        """
+        stored = HSBK(hue=34, saturation=0.75, brightness=0.902, kelvin=3500)
+        ceiling_176.state.stored_uplight_color = stored
+        # Same H/S/K read back from the device, with a different brightness.
+        current = HSBK.from_protocol(
+            HSBK(hue=34, saturation=0.75, brightness=0.3, kelvin=3500).to_protocol()
+        )
+
+        # Raw floats genuinely differ after the round-trip.
+        assert current.hue != stored.hue
+        assert ceiling_176._is_stored_state_valid("uplight", current) is True
+
+    def test_downlight_valid_match_after_roundtrip(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Downlight zones stay valid after a protocol round-trip."""
+        stored = HSBK(hue=34, saturation=0.75, brightness=0.902, kelvin=3500)
+        ceiling_176.state.stored_downlight_colors = [stored for _ in range(63)]
+        current = [
+            HSBK.from_protocol(
+                HSBK(hue=34, saturation=0.75, brightness=0.3, kelvin=3500).to_protocol()
+            )
+            for _ in range(63)
+        ]
+
+        assert current[0].saturation != stored.saturation
+        assert ceiling_176._is_stored_state_valid("downlight", current) is True
+
 
 class TestCeilingLightStateFileEdgeCases:
     """Tests for state file edge cases."""
