@@ -410,6 +410,43 @@ class TestHSBKRawValues:
         # The raw values are explicitly NOT the old rounded forms.
         assert color.saturation != round(12345 / 0xFFFF, 2)
 
+    def test_lerp_hsb_returns_unrounded(self) -> None:
+        """lerp_hsb keeps full precision instead of rounding to 2dp."""
+        start = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+        end = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        mid = start.lerp_hsb(end, 1 / 3)
+
+        assert mid.saturation == pytest.approx(1 / 3, abs=1e-6)
+        assert mid.brightness == pytest.approx(1 / 3, abs=1e-6)
+        assert mid.saturation != round(1 / 3, 2)
+
+    def test_lerp_oklab_returns_unrounded(self) -> None:
+        """lerp_oklab keeps full precision instead of rounding to 2dp."""
+        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+        blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        mid = red.lerp_oklab(blue, 0.5)
+
+        # At least one channel carries more than 2 decimal places of precision.
+        assert any(
+            round(v, 2) != v for v in (mid.hue / 360, mid.saturation, mid.brightness)
+        )
+
+    def test_average_returns_unrounded(self) -> None:
+        """average keeps full precision for hue/saturation/brightness."""
+        colors = [
+            HSBK(hue=0, saturation=0.1, brightness=0.1, kelvin=3500),
+            HSBK(hue=0, saturation=0.1, brightness=0.1, kelvin=3500),
+            HSBK(hue=0, saturation=0.2, brightness=0.2, kelvin=3500),
+        ]
+
+        avg = HSBK.average(colors)
+
+        assert avg.saturation == pytest.approx(0.4 / 3, abs=1e-6)
+        assert avg.brightness == pytest.approx(0.4 / 3, abs=1e-6)
+        assert avg.saturation != round(0.4 / 3, 2)
+
 
 class TestHSBKEquality:
     """Equality and hashing are defined at uint16 (wire) granularity."""
