@@ -517,13 +517,13 @@ class HSBK:
             diff -= 360
         elif diff < -180:
             diff += 360
-        hue = round(self._hue + diff * blend) % 360
+        hue = (self._hue + diff * blend) % 360
         sat = self._saturation + (other._saturation - self._saturation) * blend
         bri = self._brightness + (other._brightness - self._brightness) * blend
         return HSBK(
             hue=hue,
-            saturation=round(sat, 2),
-            brightness=round(bri, 2),
+            saturation=sat,
+            brightness=bri,
             kelvin=self._kelvin,
         )
 
@@ -555,9 +555,9 @@ class HSBK:
         r, g, b = _oklab_to_srgb(l_interp, a_interp, ob_interp)
         h, s, v = colorsys.rgb_to_hsv(r, g, b)
         return HSBK(
-            hue=round(h * 360) % 360,
-            saturation=round(s, 2),
-            brightness=round(v, 2),
+            hue=(h * 360) % 360,
+            saturation=s,
+            brightness=v,
             kelvin=self._kelvin,
         )
 
@@ -692,9 +692,8 @@ class HSBK:
         if hue < 0.0:
             hue += 1.0
         hue *= 360
-        hue = round(hue)
-        saturation = round(saturation_total / len(colors), 2)
-        brightness = round(brightness_total / len(colors), 2)
+        saturation = saturation_total / len(colors)
+        brightness = brightness_total / len(colors)
         kelvin = round(kelvin_total / len(colors))
 
         return cls(hue, saturation, brightness, kelvin)

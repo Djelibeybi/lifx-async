@@ -221,7 +221,7 @@ class TestPlasma2DGenerateFrame:
         )
         colors = effect.generate_frame(ctx)
         for color in colors:
-            assert isinstance(color.hue, int)
+            assert isinstance(color.hue, (int, float))
             assert 0 <= color.hue <= 360
 
     def test_kelvin_matches_configured(self) -> None:
