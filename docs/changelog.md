@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v5.5.1 (2026-06-14)
+
+### Bug Fixes
+
+- **ceiling**: Compare stored state at uint16 wire granularity
+  ([`08b7e8d`](https://github.com/Djelibeybi/lifx-async/commit/08b7e8d9c23708b10aa2ebde27e7765a3f487dd1))
+
+- **color**: Expose raw HSBK values instead of rounded ones
+  ([`80b0b2f`](https://github.com/Djelibeybi/lifx-async/commit/80b0b2f3a0289b7c635461dd5ae3b53cb8ca8f19))
+
+- **color**: Stop rounding computed lerp/average outputs
+  ([`515dd91`](https://github.com/Djelibeybi/lifx-async/commit/515dd91d018ee5481602ee0ad9b270e0fe1eef8f))
+
+
 ## v5.5.0 (2026-06-13)
 
 ### Bug Fixes
