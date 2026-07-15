@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
-import struct
 from asyncio import DatagramTransport
 
 from lifx.const import MDNS_ADDRESS, MDNS_PORT, TIMEOUT_ERRORS
@@ -72,52 +71,19 @@ class MdnsTransport:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-            # Try to set SO_REUSEPORT if available (Linux/macOS)
-            try:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            except (AttributeError, OSError):
-                pass
-
-            # Bind to mDNS port (or ephemeral if busy)
-            try:
-                sock.bind(("", MDNS_PORT))
-                _LOGGER.debug(
-                    {
-                        "class": "MdnsTransport",
-                        "method": "open",
-                        "action": "bound_to_mdns_port",
-                        "port": MDNS_PORT,
-                    }
-                )
-            except OSError as e:
-                _LOGGER.debug(
-                    {
-                        "class": "MdnsTransport",
-                        "method": "open",
-                        "action": "mdns_port_busy",
-                        "error": str(e),
-                    }
-                )
-                # Fall back to ephemeral port
-                sock.bind(("", 0))
-                _LOGGER.debug(
-                    {
-                        "class": "MdnsTransport",
-                        "method": "open",
-                        "action": "bound_to_ephemeral_port",
-                        "port": sock.getsockname()[1],
-                    }
-                )
-
-            # Join mDNS multicast group
-            mreq = struct.pack("4sl", socket.inet_aton(MDNS_ADDRESS), socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+            # Bind to an ephemeral port: per RFC 6762 §6.7, queries sent from
+            # a port other than 5353 are "legacy unicast" queries and
+            # responders reply directly to our port. Binding to 5353 instead
+            # would share the port (via SO_REUSEPORT) with any system mDNS
+            # daemon (mDNSResponder, Avahi), which silently steals unicast
+            # responses and causes devices to be missed.
+            sock.bind(("", 0))
             _LOGGER.debug(
                 {
                     "class": "MdnsTransport",
                     "method": "open",
-                    "action": "joined_multicast_group",
-                    "group": MDNS_ADDRESS,
+                    "action": "bound_to_ephemeral_port",
+                    "port": sock.getsockname()[1],
                 }
             )
 
@@ -241,18 +207,6 @@ class MdnsTransport:
                     "action": "closing",
                 }
             )
-
-            # Leave multicast group
-            if self._socket is not None:
-                try:
-                    mreq = struct.pack(
-                        "4sl", socket.inet_aton(MDNS_ADDRESS), socket.INADDR_ANY
-                    )
-                    self._socket.setsockopt(
-                        socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq
-                    )
-                except OSError:
-                    pass  # Ignore errors when leaving group
 
             self._transport.close()
             self._transport = None
