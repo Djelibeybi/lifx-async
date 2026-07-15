@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
 from lifx.const import (
+    DEFAULT_IP_ADDRESS,
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
@@ -228,8 +229,12 @@ class DeviceConnection:
             # Create shutdown event for receiver task
             self._receiver_shutdown = asyncio.Event()
 
-            # Open transport
-            self._transport = UdpTransport(port=0, broadcast=False, peer=self._peer)
+            # Open transport, binding to the address family that matches the
+            # device: IPv6 for Thread devices, IPv4 otherwise
+            local_ip = "::" if ":" in self.ip else DEFAULT_IP_ADDRESS
+            self._transport = UdpTransport(
+                ip_address=local_ip, port=0, broadcast=False, peer=self._peer
+            )
             await self._transport.open()
             self._is_open = True
 
