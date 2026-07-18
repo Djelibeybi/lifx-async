@@ -331,9 +331,11 @@ class MatrixLight(Light):
     discontinued LIFX Tile product supported up to 5 tiles in a chain (has_chain).
 
     Zone Addressing:
+
     - Colors are applied row-by-row starting at top-left (0,0)
     - For tiles ≤64 zones: Single set64() call to frame buffer 0
     - For tiles >64 zones (e.g., 16x8 = 128 zones):
+
       1. First set64(): rect=(0,0), 64 colors, frame buffer 1
       2. Second set64(): rect=(0,4), 64 colors, frame buffer 1
       3. copy_frame_buffer(): Copy buffer 1 → buffer 0

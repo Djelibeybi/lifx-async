@@ -1,0 +1,349 @@
+{
+  "timestamp": "2026-07-17T03:28:57",
+  "tiles_ip": "192.168.19.243",
+  "fallback_ip": "192.168.18.62",
+  "arms_run": [
+    "control",
+    "shipped",
+    "replica",
+    "sweep",
+    "fallback"
+  ],
+  "devices": {
+    "primary": {
+      "ip": "192.168.19.243",
+      "label": "System Test Tiles I",
+      "chain_width": 8,
+      "chain_height": 8
+    },
+    "fallback": {
+      "ip": "192.168.18.62",
+      "label": "System Test Tiles II",
+      "chain_width": 8,
+      "chain_height": 8
+    }
+  },
+  "protocol_constants": {
+    "round_seconds": 30.0,
+    "stream_fps": 20.0,
+    "shipped_rounds": 4,
+    "replica_rounds": 4,
+    "sweep_fps": [
+      10.0,
+      15.0
+    ],
+    "sweep_rounds_per_fps": 2,
+    "control_seconds": 120.0,
+    "fallback_control_seconds": 60.0,
+    "fallback_shipped_rounds": 2,
+    "query_rate": 2.0,
+    "query_timeout": 2.0,
+    "replica_query_timeout": 1.0,
+    "replica_query_interval": 0.5,
+    "inter_arm_rest_seconds": 10.0,
+    "photons_inflight_limit": 2,
+    "photons_ack_expiry": 1.0
+  },
+  "reference": {
+    "spike_003_photons": {
+      "queries": 50,
+      "lost": 0,
+      "rounds": 1,
+      "source": ".planning/spikes/003-ack-paced-frames/results-20260716-210408.jsonl"
+    },
+    "uat_04_06_pooled": {
+      "queries": 267,
+      "lost": 9,
+      "loss_pct": 3.37,
+      "source": "04-UAT-TILES-run1-FAIL.json + 04-UAT-TILES.json"
+    }
+  },
+  "arms": {
+    "control": {
+      "rounds": [
+        {
+          "round": 0,
+          "duration_s": 120.0,
+          "queries_ok": 227,
+          "queries_lost": 0,
+          "query_loss_pct": 0.0,
+          "query_latency_median_ms": 13.5
+        }
+      ],
+      "pooled": {
+        "queries_ok": 227,
+        "queries_lost": 0,
+        "query_loss_pct": 0.0
+      }
+    },
+    "shipped": {
+      "rounds": [
+        {
+          "round": 0,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 522,
+          "gated": 78,
+          "delivered_ratio": 0.87,
+          "queries_ok": 47,
+          "queries_lost": 0,
+          "query_loss_pct": 0.0,
+          "query_latency_median_ms": 91.2,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 150.3,
+          "ack_rtt_samples": 518,
+          "ack_expiries": 2
+        },
+        {
+          "round": 1,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 527,
+          "gated": 73,
+          "delivered_ratio": 0.8783,
+          "queries_ok": 45,
+          "queries_lost": 1,
+          "query_loss_pct": 2.17,
+          "query_latency_median_ms": 101.7,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 150.8,
+          "ack_rtt_samples": 524,
+          "ack_expiries": 1
+        },
+        {
+          "round": 2,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 546,
+          "gated": 54,
+          "delivered_ratio": 0.91,
+          "queries_ok": 50,
+          "queries_lost": 0,
+          "query_loss_pct": 0.0,
+          "query_latency_median_ms": 103.1,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 150.3,
+          "ack_rtt_samples": 543,
+          "ack_expiries": 1
+        },
+        {
+          "round": 3,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 483,
+          "gated": 117,
+          "delivered_ratio": 0.805,
+          "queries_ok": 45,
+          "queries_lost": 1,
+          "query_loss_pct": 2.17,
+          "query_latency_median_ms": 97.6,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 150.3,
+          "ack_rtt_samples": 475,
+          "ack_expiries": 6
+        }
+      ],
+      "pooled": {
+        "queries_ok": 187,
+        "queries_lost": 2,
+        "query_loss_pct": 1.06
+      }
+    },
+    "replica": {
+      "rounds": [
+        {
+          "round": 0,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 549,
+          "gated": 51,
+          "delivered_ratio": 0.915,
+          "queries_ok": 47,
+          "queries_lost": 2,
+          "query_loss_pct": 4.08,
+          "query_latency_median_ms": 85.8,
+          "ack_rtt_median_ms": 98.4,
+          "ack_rtt_p95_ms": 148.3,
+          "ack_rtt_samples": 546,
+          "ack_expiries": 3
+        },
+        {
+          "round": 1,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 494,
+          "gated": 106,
+          "delivered_ratio": 0.8233,
+          "queries_ok": 45,
+          "queries_lost": 2,
+          "query_loss_pct": 4.26,
+          "query_latency_median_ms": 85.7,
+          "ack_rtt_median_ms": 98.4,
+          "ack_rtt_p95_ms": 149.3,
+          "ack_rtt_samples": 487,
+          "ack_expiries": 7
+        },
+        {
+          "round": 2,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 518,
+          "gated": 82,
+          "delivered_ratio": 0.8633,
+          "queries_ok": 45,
+          "queries_lost": 1,
+          "query_loss_pct": 2.17,
+          "query_latency_median_ms": 102.6,
+          "ack_rtt_median_ms": 98.5,
+          "ack_rtt_p95_ms": 148.9,
+          "ack_rtt_samples": 516,
+          "ack_expiries": 2
+        },
+        {
+          "round": 3,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 491,
+          "gated": 109,
+          "delivered_ratio": 0.8183,
+          "queries_ok": 39,
+          "queries_lost": 4,
+          "query_loss_pct": 9.3,
+          "query_latency_median_ms": 94.3,
+          "ack_rtt_median_ms": 98.4,
+          "ack_rtt_p95_ms": 149.1,
+          "ack_rtt_samples": 485,
+          "ack_expiries": 6
+        }
+      ],
+      "pooled": {
+        "queries_ok": 176,
+        "queries_lost": 9,
+        "query_loss_pct": 4.86
+      }
+    },
+    "sweep": {
+      "rounds": [
+        {
+          "round": 0,
+          "fps": 10.0,
+          "offered": 300,
+          "sent": 282,
+          "gated": 18,
+          "delivered_ratio": 0.94,
+          "queries_ok": 52,
+          "queries_lost": 0,
+          "query_loss_pct": 0.0,
+          "query_latency_median_ms": 47.6,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 200.3,
+          "ack_rtt_samples": 279,
+          "ack_expiries": 2
+        },
+        {
+          "round": 1,
+          "fps": 10.0,
+          "offered": 300,
+          "sent": 296,
+          "gated": 4,
+          "delivered_ratio": 0.9867,
+          "queries_ok": 56,
+          "queries_lost": 0,
+          "query_loss_pct": 0.0,
+          "query_latency_median_ms": 32.6,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 101.5,
+          "ack_rtt_samples": 295,
+          "ack_expiries": 0
+        },
+        {
+          "round": 0,
+          "fps": 15.0,
+          "offered": 450,
+          "sent": 400,
+          "gated": 50,
+          "delivered_ratio": 0.8889,
+          "queries_ok": 51,
+          "queries_lost": 0,
+          "query_loss_pct": 0.0,
+          "query_latency_median_ms": 40.8,
+          "ack_rtt_median_ms": 67.0,
+          "ack_rtt_p95_ms": 134.6,
+          "ack_rtt_samples": 398,
+          "ack_expiries": 1
+        },
+        {
+          "round": 1,
+          "fps": 15.0,
+          "offered": 450,
+          "sent": 432,
+          "gated": 18,
+          "delivered_ratio": 0.96,
+          "queries_ok": 50,
+          "queries_lost": 1,
+          "query_loss_pct": 1.96,
+          "query_latency_median_ms": 46.8,
+          "ack_rtt_median_ms": 67.3,
+          "ack_rtt_p95_ms": 134.5,
+          "ack_rtt_samples": 431,
+          "ack_expiries": 0
+        }
+      ],
+      "pooled": {
+        "queries_ok": 209,
+        "queries_lost": 1,
+        "query_loss_pct": 0.48
+      }
+    },
+    "fallback": {
+      "arm_status": "measured",
+      "control": {
+        "round": 0,
+        "duration_s": 60.0,
+        "queries_ok": 114,
+        "queries_lost": 0,
+        "query_loss_pct": 0.0,
+        "query_latency_median_ms": 11.4
+      },
+      "shipped_rounds": [
+        {
+          "round": 0,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 469,
+          "gated": 131,
+          "delivered_ratio": 0.7817,
+          "queries_ok": 34,
+          "queries_lost": 3,
+          "query_loss_pct": 8.11,
+          "query_latency_median_ms": 120.0,
+          "ack_rtt_median_ms": 100.4,
+          "ack_rtt_p95_ms": 151.0,
+          "ack_rtt_samples": 466,
+          "ack_expiries": 2
+        },
+        {
+          "round": 1,
+          "fps": 20.0,
+          "offered": 600,
+          "sent": 530,
+          "gated": 70,
+          "delivered_ratio": 0.8833,
+          "queries_ok": 46,
+          "queries_lost": 1,
+          "query_loss_pct": 2.13,
+          "query_latency_median_ms": 105.3,
+          "ack_rtt_median_ms": 100.3,
+          "ack_rtt_p95_ms": 150.6,
+          "ack_rtt_samples": 527,
+          "ack_expiries": 1
+        }
+      ],
+      "pooled": {
+        "queries_ok": 194,
+        "queries_lost": 4,
+        "query_loss_pct": 2.02
+      }
+    }
+  }
+}

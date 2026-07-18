@@ -6,6 +6,7 @@ import struct
 
 import pytest
 
+from lifx.animation import packets
 from lifx.animation.packets import (
     HEADER_SIZE,
     LightPacketGenerator,
@@ -344,6 +345,162 @@ class TestMatrixPacketGeneratorLargeTile:
         assert templates[2].color_count == 0
 
 
+class TestMatrixPacketGeneratorRowAlignedChunking:
+    """RED: pins the row-aligned large-tile chunking contract (ANIM-04, D4-04).
+
+    The Ceiling 13x26 (product 201, width=13 does not divide 64) exposes a
+    latent bug: colours are sliced at raw 64-pixel boundaries while rect
+    y-offsets are stamped in whole rows, so packet colours and rect geometry
+    disagree whenever tile_width does not divide 64. These tests pin the
+    row-aligned fix: rows_per_packet = 64 // width; packets_per_tile =
+    ceil(height / rows_per_packet); colours advance y_offset * width per
+    packet, matching the device's row-major Set64 fill order.
+    """
+
+    SET64_PKT_TYPE = 715
+    COPY_FB_PKT_TYPE = 716
+
+    def test_packets_per_tile_13x26(self) -> None:
+        """rows_per_packet = 64 // 13 = 4; packets_per_tile = ceil(26/4) = 7.
+        RED today: raw pixel-based math (ceil(338/64)) gives 6."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        assert gen.packets_per_tile == 7
+
+    def test_template_count_13x26(self) -> None:
+        """7 Set64 + 1 CopyFrameBuffer = 8 templates. RED today (7 templates)."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        assert len(templates) == 8
+
+    def test_color_counts_13x26(self) -> None:
+        """Each Set64 covers whole rows: 6 full 4-row batches (52 colours each)
+        plus a final partial 2-row batch (26 colours). RED today ([64]*5+[18])."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        set64_templates = templates[:-1]
+        color_counts = [t.color_count for t in set64_templates]
+        assert color_counts == [52, 52, 52, 52, 52, 52, 26]
+
+    def test_y_offsets_13x26(self) -> None:
+        """Rect y byte (payload offset 4) must advance in whole rows:
+        0, 4, 8, 12, 16, 20, 24. RED today (only 6 packets exist)."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        set64_templates = templates[:-1]
+        y_offsets = [get_payload(t)[4] for t in set64_templates]
+        assert y_offsets == [0, 4, 8, 12, 16, 20, 24]
+
+    def test_hsbk_start_row_aligned_13x26(self) -> None:
+        """hsbk_start must equal y_offset * width (row-aligned), not
+        pkt_idx * 64 (raw pixel slicing). RED today (multiples of 64)."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        set64_templates = templates[:-1]
+        hsbk_starts = [t.hsbk_start for t in set64_templates]
+        assert hsbk_starts == [0, 52, 104, 156, 208, 260, 312]
+
+    def test_final_partial_row_batch_13x26(self) -> None:
+        """The final Set64 covers exactly the last 2 rows (24-25): y_offset=24,
+        color_count=26. RED today (no packet stamps y_offset=24)."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        last_set64 = templates[-2]  # last Set64, before the CopyFrameBuffer
+        assert get_payload(last_set64)[4] == 24  # y offset
+        assert last_set64.color_count == 26
+
+    def test_rect_geometry_13x26(self) -> None:
+        """Invariance: every Set64 rect writes to fb_index=1 with the tile's
+        width, regardless of how many packets the row-aligned fix produces."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        set64_templates = templates[: gen.packets_per_tile]
+        for tmpl in set64_templates:
+            payload = get_payload(tmpl)
+            assert payload[2] == 1  # fb_index (temp buffer)
+            assert payload[5] == 13  # width
+
+    def test_copy_fb_last_13x26(self) -> None:
+        """Invariance: the final template is always the CopyFrameBuffer
+        (pkt_type 716, color_count 0, width/height stamped), regardless of how
+        many Set64 packets precede it."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        copy_template = templates[-1]
+        (pkt_type,) = struct.unpack_from("<H", copy_template.data, 32)
+        assert pkt_type == self.COPY_FB_PKT_TYPE
+        assert copy_template.color_count == 0
+        payload = get_payload(copy_template)
+        assert payload[8] == 13  # width
+        assert payload[9] == 26  # height
+
+    def test_update_colors_lands_row_aligned_13x26(self) -> None:
+        """Row-aligned rule in action: a marker colour at linear index 52
+        (row 4, col 0) must land as the FIRST colour of the SECOND Set64
+        template, and the first template must contain only the first 52
+        colours. RED today: raw-64 slicing puts index 52 inside template 0
+        (which spans indices 0-63 under the bug)."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        black = (0, 0, 0, 3500)
+        marker = (11111, 22222, 33333, 4444)
+        hsbk: list[tuple[int, int, int, int]] = [black] * 338
+        hsbk[52] = marker
+
+        gen.update_colors(templates, hsbk)
+
+        # Template 0 covers rows 0-3 (pixels 0-51) — must be marker-free.
+        template0_flat = struct.unpack_from(
+            templates[0].fmt, templates[0].data, templates[0].color_offset
+        )
+        template0_colors = [
+            tuple(template0_flat[i : i + 4]) for i in range(0, len(template0_flat), 4)
+        ]
+        assert marker not in template0_colors
+
+        # Template 1 covers rows 4-7 (pixels 52-103) — marker is the FIRST slot.
+        h, s, b, k = struct.unpack_from(
+            "<HHHH", templates[1].data, templates[1].color_offset
+        )
+        assert (h, s, b, k) == marker
+
+    def test_divisible_width_unchanged_16x8(self) -> None:
+        """No-regression guard: the existing Ceiling 16x8 shape is unaffected
+        by the row-aligned fix because 64 divides evenly by 16. Passes today
+        AND after the fix."""
+        gen = MatrixPacketGenerator(tile_count=1, tile_width=16, tile_height=8)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        assert gen.packets_per_tile == 2
+
+        set64_templates = templates[:2]
+        color_counts = [t.color_count for t in set64_templates]
+        hsbk_starts = [t.hsbk_start for t in set64_templates]
+        y_offsets = [get_payload(t)[4] for t in set64_templates]
+
+        assert color_counts == [64, 64]
+        assert hsbk_starts == [0, 64]
+        assert y_offsets == [0, 4]
+
+    def test_multi_tile_large_13x26(self) -> None:
+        """Multi-tile 13x26 must produce 16 templates (8 per tile); the second
+        tile's Set64 hsbk_start values are offset by the first tile's pixel
+        count (338), and the two CopyFrameBuffer templates sit at indices 7
+        and 15. RED today (packet count and offsets both wrong)."""
+        gen = MatrixPacketGenerator(tile_count=2, tile_width=13, tile_height=26)
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        assert len(templates) == 16
+
+        tile1_set64 = templates[8:15]
+        expected_starts = [338 + y * 13 for y in (0, 4, 8, 12, 16, 20, 24)]
+        assert [t.hsbk_start for t in tile1_set64] == expected_starts
+
+        for idx in (7, 15):
+            (pkt_type,) = struct.unpack_from("<H", templates[idx].data, 32)
+            assert pkt_type == self.COPY_FB_PKT_TYPE
+
+
 class TestMultiZonePacketGenerator:
     """Tests for MultiZonePacketGenerator (extended multizone only)."""
 
@@ -674,3 +831,106 @@ class TestMultiZonePacketGeneratorDuration:
         payload = get_payload(templates[0])
         (duration,) = struct.unpack_from("<I", payload, 0)
         assert duration == 150
+
+
+class TestHeaderFlagConstants:
+    """RED: pins FLAGS_OFFSET/ACK_REQUIRED_FLAG module constants (D4-03) that
+    the Animator bakes the ack-required probe flag through, plus the
+    invariant that generators never set the flag themselves at
+    template-creation time.
+    """
+
+    def test_flags_offset_constant(self) -> None:
+        """FLAGS_OFFSET must be 22 — offset of the flags byte in the LIFX
+        header (Frame Address: target 8B + reserved 6B = offset 8+8+6=22)."""
+        assert getattr(packets, "FLAGS_OFFSET", None) == 22
+
+    def test_ack_required_flag_constant(self) -> None:
+        """ACK_REQUIRED_FLAG must be 0x02 — bit 1 of the flags byte."""
+        assert getattr(packets, "ACK_REQUIRED_FLAG", None) == 0x02
+
+    def test_templates_flags_byte_zero_at_creation(self) -> None:
+        """Invariance: generators never set the ack flag themselves — the
+        Animator bakes it once at init via probe_template_index (D4-03)."""
+        generators: list[packets.PacketGenerator] = [
+            MatrixPacketGenerator(tile_count=1, tile_width=8, tile_height=8),
+            MatrixPacketGenerator(tile_count=1, tile_width=13, tile_height=26),
+            MultiZonePacketGenerator(zone_count=82),
+            LightPacketGenerator(),
+        ]
+        for gen in generators:
+            templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+            for tmpl in templates:
+                assert tmpl.data[22] == 0
+
+
+class TestProbeTemplateIndex:
+    """RED: pins the full probe_template_index matrix (D4-04) — the property
+    does not exist yet on any generator. Accessed via getattr with a sentinel
+    (mirrors TestHeaderFlagConstants) so absence is a plain assertion failure
+    rather than a pyright static-typing error on a not-yet-existing attribute.
+    """
+
+    SET64_PKT_TYPE = 715
+    COPY_FB_PKT_TYPE = 716
+
+    def test_default_zero_light(self) -> None:
+        """Flow control is uniform across families (research Q5): the probe
+        sits on the first (only) packet for single lights."""
+        gen = LightPacketGenerator()
+        assert getattr(gen, "probe_template_index", None) == 0
+
+    def test_default_zero_multizone(self) -> None:
+        """Multizone probes the first packet — the exact arm spike 003
+        measured (0.0% loss)."""
+        gen = MultiZonePacketGenerator(zone_count=82)
+        assert getattr(gen, "probe_template_index", None) == 0
+
+    def test_standard_matrix_zero(self) -> None:
+        """Standard (<=64px) tiles probe their single Set64 packet."""
+        gen = MatrixPacketGenerator(1, 8, 8)
+        assert getattr(gen, "probe_template_index", None) == 0
+
+    def test_large_tile_13x26_is_final_copyfb(self) -> None:
+        """D4-04 decision: large-tile mode probes the final CopyFrameBuffer,
+        the frame-commit packet (Glowup-style, hardware-validated in the
+        ANIM-04 UAT, plan 04-07). With row-aligned chunking (7 Set64 +
+        CopyFB) the last index is 7. Falls back to index 0 with a one-line
+        generator change if hardware disagrees. Depends on the Task 1
+        row-aligned packet count fix."""
+        gen = MatrixPacketGenerator(1, 13, 26)
+        assert getattr(gen, "probe_template_index", None) == 7
+
+    def test_large_tile_16x8_is_final_copyfb(self) -> None:
+        """16x8 (2 Set64 + CopyFB): the final CopyFB sits at index 2."""
+        gen = MatrixPacketGenerator(1, 16, 8)
+        assert getattr(gen, "probe_template_index", None) == 2
+
+    def test_multi_tile_large_is_last_copyfb(self) -> None:
+        """Multi-tile large chains: probe sits on the LAST tile's CopyFB —
+        tile_count * (packets_per_tile + 1) - 1. Depends on the Task 1
+        row-aligned packet count fix."""
+        gen = MatrixPacketGenerator(2, 13, 26)
+        assert getattr(gen, "probe_template_index", None) == 15
+
+    def test_probe_index_points_at_copyfb_template(self) -> None:
+        """The probe index must resolve to the frame-commit packet: CopyFB
+        (pkt_type 716, color_count 0) in large-tile mode, the single Set64
+        (pkt_type 715) in standard mode. Depends on the Task 1 row-aligned
+        packet count fix."""
+        large_gen = MatrixPacketGenerator(1, 13, 26)
+        large_templates = large_gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        probe_idx = getattr(large_gen, "probe_template_index", None)
+        assert probe_idx is not None
+        probe_tmpl = large_templates[probe_idx]
+        (pkt_type,) = struct.unpack_from("<H", probe_tmpl.data, 32)
+        assert pkt_type == self.COPY_FB_PKT_TYPE
+        assert probe_tmpl.color_count == 0
+
+        standard_gen = MatrixPacketGenerator(1, 8, 8)
+        standard_templates = standard_gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        standard_probe_idx = getattr(standard_gen, "probe_template_index", None)
+        assert standard_probe_idx is not None
+        probe_tmpl2 = standard_templates[standard_probe_idx]
+        (pkt_type2,) = struct.unpack_from("<H", probe_tmpl2.data, 32)
+        assert pkt_type2 == self.SET64_PKT_TYPE

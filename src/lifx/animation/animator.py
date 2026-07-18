@@ -2,6 +2,11 @@
 
 This module provides the Animator class, which sends animation frames
 directly via UDP for maximum throughput - no connection layer overhead.
+Frame delivery is paced internally by ack-gated flow control (ANIM-01):
+one packet per frame carries the `ack_required` flag, and `send_frame()`
+non-blockingly sweeps the animator's own socket for arrived acks each call,
+dropping (never queuing) a frame while too many probes are outstanding.
+See `lifx.animation.flow` for the `AckGate` facility itself.
 
 The factory methods query the device once for configuration (tile info,
 zone count), then the Animator sends frames via raw UDP packets with
@@ -31,8 +36,11 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from lifx.animation.flow import AckGate
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.packets import (
+    ACK_REQUIRED_FLAG,
+    FLAGS_OFFSET,
     SEQUENCE_OFFSET,
     LightPacketGenerator,
     MatrixPacketGenerator,
@@ -57,21 +65,43 @@ class AnimatorStats:
     Attributes:
         packets_sent: Number of packets sent
         total_time_ms: Total time for the operation in milliseconds
+        gated: Whether this frame was dropped by ack-gated flow control.
+            A gated frame sends nothing, consumes no sequence
+            numbers, and skips framebuffer work entirely -- latest-frame-wins
+            means the caller should simply send its next frame rather than
+            queue or retry this one.
+        acks_outstanding: The number of probe acks outstanding immediately
+            after this call (for a gated frame, the count that caused the
+            gate; for a sent frame, the count including this frame's own
+            probe). Purely for observability -- consumers cannot configure
+            flow control.
     """
 
     packets_sent: int
     total_time_ms: float
+    gated: bool = False
+    acks_outstanding: int = 0
 
 
 class Animator:
     """High-level animator for LIFX devices.
 
-    Sends animation frames directly via UDP for maximum throughput.
-    No connection layer, no ACKs, no waiting - just fire packets as
-    fast as possible.
+    Sends animation frames directly via UDP for maximum throughput. No
+    connection layer overhead -- frames are paced internally by ack-gated
+    flow control rather than fired blind: delivery is paced against device
+    acknowledgements, and when a device falls behind, new frames are
+    dropped, never queued (latest-frame-wins). If a device stops
+    acknowledging entirely, throughput degrades to a slow floor rather
+    than stalling forever. This is entirely internal behaviour -- there is
+    no flow-control toggle; consumers keep calling `send_frame()` exactly
+    as before.
 
     All packets are prebaked at initialization time. Per-frame, only
-    color data and sequence numbers are updated in place before sending.
+    color data, the sequence number, and (for the probe template) the
+    `AckGate`'s tracked-probe bookkeeping are updated -- the hot path
+    remains a non-blocking `recvfrom_into` sweep on the animator's own
+    socket plus one dict write, so `send_frame()` stays synchronous with no
+    event-loop coupling.
 
     Attributes:
         pixel_count: Total number of pixels/zones
@@ -128,6 +158,14 @@ class Animator:
             source=self._source,
             target=serial.value,
         )
+
+        # Ack-gated flow control (ANIM-01/ANIM-02, D4-03): bake the
+        # ack_required flag once into the template that carries the probe
+        # (default: first packet; large-tile matrix: final CopyFrameBuffer,
+        # D4-04). The hot send loop never touches the flags byte again.
+        self._ack_gate = AckGate()
+        self._probe_index = packet_generator.probe_template_index
+        self._templates[self._probe_index].data[FLAGS_OFFSET] |= ACK_REQUIRED_FLAG
 
         # UDP socket (created lazily)
         self._socket: socket.socket | None = None
@@ -186,7 +224,7 @@ class Animator:
             duration_ms=duration_ms,
         )
 
-        return cls(ip, serial, framebuffer, packet_generator)
+        return cls(ip, serial, framebuffer, packet_generator, port=device.port)
 
     @classmethod
     async def for_multizone(
@@ -252,7 +290,7 @@ class Animator:
             zone_count=zone_count, duration_ms=duration_ms
         )
 
-        return cls(ip, serial, framebuffer, packet_generator)
+        return cls(ip, serial, framebuffer, packet_generator, port=device.port)
 
     @classmethod
     def for_light(
@@ -289,7 +327,7 @@ class Animator:
         framebuffer = FrameBuffer.for_light(device)
         packet_generator = LightPacketGenerator(duration_ms=duration_ms)
 
-        return cls(ip, serial, framebuffer, packet_generator)
+        return cls(ip, serial, framebuffer, packet_generator, port=device.port)
 
     @property
     def pixel_count(self) -> int:
@@ -315,11 +353,18 @@ class Animator:
         """Send a frame to the device via direct UDP.
 
         Applies orientation mapping (for matrix devices), updates colors
-        in prebaked packets, and sends them directly via UDP. No ACKs,
-        no waiting - maximum throughput.
+        in prebaked packets, and sends them directly via UDP -- unless
+        ack-gated flow control drops the frame first. Each call first
+        sweeps the animator's own socket for arrived acks; if the device
+        is still behind on acknowledgements after the sweep, the frame is
+        dropped entirely (no framebuffer work, no packets sent, no
+        sequence numbers consumed) and the caller should simply send its
+        next frame rather than retry or queue this one (latest-frame-wins).
 
         This is a synchronous method for minimum overhead. UDP sendto()
-        is non-blocking for datagrams.
+        is non-blocking for datagrams, and the ack sweep is a non-blocking
+        `recvfrom_into` loop on the same socket -- no event loop is
+        required.
 
         Args:
             hsbk: Protocol-ready HSBK data for all pixels.
@@ -327,12 +372,36 @@ class Animator:
                   H/S/B are 0-65535 and K is 1500-9000.
 
         Returns:
-            AnimatorStats with operation statistics
+            AnimatorStats with operation statistics. `gated=True` means the
+            frame was dropped by flow control.
 
         Raises:
-            ValueError: If hsbk length doesn't match pixel_count
+            ValueError: If hsbk length doesn't match pixel_count. This
+                validation always runs, even when the gate is saturated --
+                a full gate must never suppress input validation.
         """
         start_time = time.perf_counter()
+
+        if len(hsbk) != self._framebuffer.canvas_size:
+            raise ValueError(
+                f"HSBK length ({len(hsbk)}) must match "
+                f"pixel_count ({self._framebuffer.canvas_size})"
+            )
+
+        # Ensure socket exists
+        if self._socket is None:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self._socket.setblocking(False)
+
+        now = time.monotonic()
+        self._ack_gate.sweep(self._socket, self._source, now)
+        if self._ack_gate.gated:
+            return AnimatorStats(
+                packets_sent=0,
+                total_time_ms=(time.perf_counter() - start_time) * 1000,
+                gated=True,
+                acks_outstanding=self._ack_gate.outstanding_count,
+            )
 
         # Apply orientation mapping
         device_data = self._framebuffer.apply(hsbk)
@@ -340,14 +409,11 @@ class Animator:
         # Update colors in prebaked templates
         self._packet_generator.update_colors(self._templates, device_data)
 
-        # Ensure socket exists
-        if self._socket is None:
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self._socket.setblocking(False)
-
         # Send each packet, updating sequence number
-        for tmpl in self._templates:
+        for i, tmpl in enumerate(self._templates):
             tmpl.data[SEQUENCE_OFFSET] = self._sequence
+            if i == self._probe_index:
+                self._ack_gate.track(self._sequence, now)
             self._sequence = (self._sequence + 1) % 256
             self._socket.sendto(tmpl.data, self._addr)
 
@@ -356,16 +422,20 @@ class Animator:
         return AnimatorStats(
             packets_sent=len(self._templates),
             total_time_ms=(end_time - start_time) * 1000,
+            acks_outstanding=self._ack_gate.outstanding_count,
         )
 
     def close(self) -> None:
         """Close the UDP socket.
 
-        Call this when done with the animator to free resources.
+        Call this when done with the animator to free resources. Also
+        resets the ack gate, so a fresh animator session (new socket, new
+        gate) starts ungated.
         """
         if self._socket is not None:
             self._socket.close()
             self._socket = None
+        self._ack_gate.reset()
 
     def __del__(self) -> None:
         """Clean up socket on garbage collection."""

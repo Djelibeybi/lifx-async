@@ -1,0 +1,320 @@
+{
+  "timestamp": "2026-07-17T00:45:47",
+  "trials": [
+    {
+      "tx_count": 1,
+      "latency_ms": 8.216082991566509,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.274417005944997,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.87120801396668,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.6917080180719495,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.595791994594038,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.418374996632338,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.101375016849488,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 16.033624997362494,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 97.95350005151704,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 36.35004197712988,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.510917017702013,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.863917012698948,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 11.899999983143061,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.188999999314547,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 12.201083009131253,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.619499985594302,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 5.236624972894788,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 20.340333983767778,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.6255000052042305,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.70987500436604,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 34.39520898973569,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 5.653167027048767,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 16.97674999013543,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 24.39204102847725,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 16.820791992358863,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.558249958790839,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.924083038233221,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.732375001069158,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 20.514999981969595,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 19.690625020302832,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 20.691375015303493,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.754749967716634,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.844416017178446,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 6.333833036478609,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 6.608708004932851,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 4.520833026617765,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.911082997452468,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.101582992821932,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 23.345749999862164,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 22.45316602056846,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 14.498000033199787,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.83416599733755,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.202332955785096,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 6.275458028540015,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 11.589874979108572,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.914917019661516,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.554209023714066,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 7.628499995917082,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 28.673625027295202,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 25.87491599842906,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 6.962541025131941,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.008374948985875,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 5.690624995622784,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.367250033188611,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 6.9214170216582716,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 16.002166958060116,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 8.024416980333626,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 31.90112503943965,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 10.451000009197742,
+      "ok": true
+    },
+    {
+      "tx_count": 1,
+      "latency_ms": 5.366791971027851,
+      "ok": true
+    }
+  ],
+  "trials_run": 60,
+  "failures": 0,
+  "packets_per_trial_mean": 1,
+  "packets_per_trial_median": 1.0,
+  "latency_ms_median": 8.01639596465975,
+  "thresholds": {
+    "median_packets_per_trial": 1.0,
+    "mean_packets_per_trial_max": 1.05
+  },
+  "baseline": {
+    "lifx-async_packets_per_trial": 1.37,
+    "photons_packets_per_trial": 1.08,
+    "gen4_median_latency_ms": 62.0
+  },
+  "pass": true
+}

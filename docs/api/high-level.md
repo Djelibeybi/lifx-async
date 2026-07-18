@@ -10,6 +10,11 @@ recommended entry points for most users.
       show_root_heading: true
       heading_level: 3
 
+::: lifx.api.discover_mdns
+    options:
+      show_root_heading: true
+      heading_level: 3
+
 ::: lifx.api.find_by_serial
     options:
       show_root_heading: true

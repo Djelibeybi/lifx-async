@@ -1,34 +1,59 @@
-# lifx-async — Ceiling save-on-exit
+# lifx-async — Wire Reliability
 
 ## Current State (post-v1.0)
 
+**v1.1 Wire Reliability: all four phases complete (2026-07-18) — ready to close.**
+Phases 2–5 delivered and verified; all 13 requirements (DISC-01..03, RETRY-01..04,
+ANIM-01..04, DOCS-01..02) trace to Complete. Measured outcomes: discovery re-broadcast
+took a single call from a median 48/73 devices to 73/73; the retry reshape cut
+packets-per-request from 1.37 to 1.017 and latency from 62 ms to 12.6 ms; ack-gated
+animation pacing won directionally on every device ever measured (1.28×–5.25×), accepted
+by operator ruling over a recorded statistical FAIL rather than a statistical pass
+(`04-RULING.md`). Milestone close carries known verification debt — see STATE.md
+Blockers.
+
 **Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) — see `.planning/MILESTONES.md`.
+**Also shipped post-v1.0:** Phase 1 discovery unification (verified 2026-06-13) — rebuilt
+`discover_devices()` on `_discover_with_packet()` with hoisted DoS serial validation and
+first-wins per-serial dedup.
 
-`CeilingLight.__aexit__` now persists in-memory state to `state_file` (when set) before the
-inherited `close()` runs. The save is executed via `asyncio.to_thread`, writes atomically
-(temp file + `os.replace`), merges the on-disk per-serial entry rather than replacing the
-whole file, never raises out of `__aexit__`, and never masks an exception propagating from
-the `async with` body. Proven by three emulator-backed tests (`TestCeilingLightSaveOnExit`).
+**Spike series completed 2026-07-16** (`.planning/spikes/`, packaged as the
+`spike-findings-lifx-async` skill): five real-hardware experiments that disproved the
+"switch to threading" hypothesis and located the actual reliability levers.
 
-## Next Milestone Goals
+## Current Milestone: v1.1 Wire Reliability
 
-Not yet defined — run `/gsd-new-milestone`. Candidate carried forward:
+**Goal:** Close the empirically-measured reliability gap between lifx-async and the
+reference clients (Glowup, Photons) using the spike-validated blueprints, without changing
+the asyncio core or public API.
 
-- **PERS-01** (deferred from v1.0): extract `state_file` save/load into a reusable mixin so
-  other device types (Matrix, MultiZone) can opt into persistence + save-on-exit
+**Target features:**
+
+- **Discovery re-broadcast** — re-send `GetService` on an escalating schedule inside the
+  discovery window. Spike 005: single broadcast finds median 48/73 devices on a multi-AP
+  network; re-broadcast schedules find 73/73.
+- **Animation flow control** — the Animation layer owns delivery strategy internally
+  (Photons-style ack-gated pacing); **decided by the animation library, not downstream
+  consumers**. Spike 003: eliminates the 14.6% concurrent-query loss during streaming and
+  produced the best visual smoothness.
+- **Retry schedule reshape** — floor the 31 ms first-attempt window (~200 ms), keep
+  listening during backoff instead of sleeping blind, count sleeps against the caller's
+  timeout. Spike 002: kills duplicate-firing on healthy networks and 29 s wall-time
+  overruns of the 16 s budget.
+- **Docs** — gen4 power-save wake-tail footnote; guidance for streaming consumers (LedFx).
 
 ## What This Is
 
 `lifx-async` is a mature, zero-dependency, type-safe async Python library for controlling
-LIFX smart devices over the local network (published on PyPI as `lifx-async`). This milestone
-adds a **save-on-exit guarantee** to `CeilingLight`'s async context-manager lifecycle so that
-exiting an `async with` block always persists the device's latest in-memory state to its
-`state_file`.
+LIFX smart devices over the local network (published on PyPI as `lifx-async`). This
+milestone makes its wire behaviour — discovery coverage, request retries, and animation
+frame delivery — measurably as reliable as the best reference clients, keeping the async
+API untouched.
 
 ## Core Value
 
-Exiting a `CeilingLight` `async with` block reliably persists current state to disk — no
-uplight/downlight state is silently lost on context exit.
+Commands stick, devices are found, and streaming never starves control traffic — the
+library is reliable enough that "bulb didn't respond" stops being a lifx-async problem.
 
 ## Requirements
 
@@ -36,64 +61,76 @@ uplight/downlight state is silently lost on context exit.
 
 <!-- Inferred from existing code — already shipped and relied upon. -->
 
-- ✓ Base `Device.__aenter__`/`__aexit__` async context managers (`devices/base.py:639`) inherited by all device subclasses via `Generic[StateT]` with `Self` return — existing
-- ✓ `CeilingLight.__aenter__` override (`devices/ceiling.py:191`): product-ID validation + load persisted state from `state_file` on entry — existing
-- ✓ `CeilingLight` state persistence: `_save_state_to_file()` / `_load_state_from_file()` writing per-serial uplight/downlight colours to JSON (`devices/ceiling.py:1196`, `:1263`) — existing
-- ✓ State saved after each mutating operation (set colour, power-off, etc.) when `state_file` is set — existing
-- ✓ Async context managers on `DeviceGroup`, `UdpTransport`, `MdnsTransport`, `DeviceConnection` — existing
-- ✓ `CeilingLight.__aexit__` override saves state to `state_file` (when set) before the inherited `close()`, with belt-and-braces error swallowing — Validated in Phase 1: Ceiling Save-on-Exit (`devices/ceiling.py:207`)
-- ✓ Save-on-exit never raises: I/O failures logged and swallowed; body exceptions propagate unchanged — Validated in Phase 1 (TEST-03)
-- ✓ Emulator tests cover save-on-exit with `state_file`, no-op when `None`, and exit-during-exception (`TestCeilingLightSaveOnExit`) — Validated in Phase 1
+- ✓ v1.0 Ceiling save-on-exit lifecycle (see MILESTONES.md) — shipped
+- ✓ Unified discovery generator with serial validation and first-wins dedup
+  (`_discover_with_packet()`, post-v1.0 Phase 1) — shipped
+- ✓ Request/response correlation on (source, sequence, serial) with shared response queue
+  across retry attempts (`connection.py`) — existing; retry reshape must preserve it
+- ✓ Zero-allocation prebaked packet templates for animation (`animation/packets.py`) —
+  existing; flow control must preserve this send path
+- ✓ Discovery re-broadcast on an escalating schedule (DISC-01..03) — Phase 2
+- ✓ Retry schedule reshape (RETRY-01..04) — Phase 3
+- ✓ Animation-layer-owned ack-gated flow control (ANIM-01..04) — Phase 4
+- ✓ Reliability documentation (DOCS-01..02) — Phase 5
 
 ### Active
 
-<!-- This milestone's scope. -->
+<!-- This milestone's scope — REQ-IDs defined in REQUIREMENTS.md. -->
 
-_None — all milestone requirements validated in Phase 1._
+None — every v1.1 requirement is validated. Next scope is set at the v1.1 close.
 
 ### Out of Scope
 
-- Generalising `state_file` persistence into a reusable mixin for other device types (Matrix, MultiZone, etc.) — only `CeilingLight` persists state today; deferred until a second class actually needs it
-- New async-context-manager support on non-device classes (`Animator`, effect `StateManager`, running-effect handles) — separate concern, not requested
-- Changing the load/save JSON schema or the per-operation save points — exit save reuses the existing mechanism unchanged
-- Renaming `CeilingLight` to `LIFXCeiling` — no such class exists; `CeilingLight` is the established name
+- **Switching from asyncio to threading** — disproven by Spike 004: wire-equivalent at
+  idle, threading collapses under CPU load
+- **Keepalive daemon** — disproven by Spike 001: zero idle-related loss on healthy
+  networks; gen4-only sub-250 ms wake tail warrants a docs footnote, not a feature
+- **Glowup-style query retries (3× fresh 2 s deadlines)** — disproven by Spike 002:
+  40% failure at 50% loss
+- **Downstream-facing flow-control toggles** — delivery strategy is the animation
+  library's decision (user decision, 2026-07-16)
+- Generalising `state_file` persistence into a reusable mixin (PERS-01) — still deferred;
+  unrelated to this milestone
+- mDNS discovery changes — Spike 005's finding applies to UDP broadcast discovery
 
 ## Context
 
-- Brownfield: full codebase map exists in `.planning/codebase/` (refreshed 2026-06-11).
-- `CeilingLight` extends `MatrixLight` and is the only device class with disk-backed state
-  persistence (`state_file` parameter). `state_file` stores per-serial stored uplight colour and
-  stored downlight colours so a Ceiling can restore its "remembered" colours across restarts.
-- Today, state is written after each mutating call, but the `async with` exit path inherits the
-  base `__aexit__` (which only calls `close()`), so there is no explicit final save tied to the
-  context-manager lifecycle. Any code path that mutates `state` without an intervening save would
-  lose that change on exit.
-- Library convention: device subclasses that need extra entry/exit behaviour override
-  `__aenter__`/`__aexit__` and chain to `super()` (see `CeilingLight.__aenter__`).
+- Brownfield: full codebase map in `.planning/codebase/` (refreshed 2026-06-11).
+- Implementation blueprints with working reference code live in
+  `./.claude/skills/spike-findings-lifx-async/` (references/ + sources/); raw spike data
+  in `.planning/spikes/*/results-*.jsonl`.
+- Reference clients studied: Glowup (threaded,
+  `/Volumes/External/Developer/pkivolowitz/glowup/`) and Photons (asyncio,
+  insider-authored, `/Volumes/External/Developer/Djelibeybi/photons`). Techniques port;
+  dependencies don't.
+- Real-hardware validation available: 7 quiesced test devices across gen2/3/4 plus a
+  73-device production fleet (see auto-memory `project_test_fleet`). Repeated rounds are
+  mandatory for discovery/loss claims — single rounds mislead.
+- lifx-async is the LIFX provider for LedFx — the streaming + concurrent-control pattern
+  Spike 003 measured is LedFx's exact workload.
 
 ## Constraints
 
 - **Tech stack**: Python 3.10–3.14, `asyncio`, zero runtime dependencies — no new deps.
-- **Compatibility**: Must not change the public API surface or `state_file` JSON schema; purely
-  additive exit behaviour.
-- **Error handling**: Save-on-exit must never raise — I/O errors are logged (existing
-  `_save_state_to_file` behaviour) and must not suppress or replace an exception propagating
-  out of the `async with` body.
+- **Compatibility**: Public async API unchanged. Additive/internal changes only; existing
+  callers of `discover_devices()`, `DeviceConnection.request()`, and the Animation layer
+  must work unmodified.
+- **Emulator limits**: the emulator cannot model per-AP broadcast delivery, WiFi loss, or
+  power-save — hardware validation runs complement, not replace, the test suite.
 - **Quality gates**: `uv run pyright` (strict) clean, `uv run ruff check`/`format` clean,
-  `uv run pytest` green across all supported Python versions.
+  `uv run pytest` green across supported versions; CI requires 100% branch patch coverage.
 - **Spelling**: Australian English in all prose/comments.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Save-on-exit persists current state before `close()` | Guarantees the `async with` lifecycle never drops in-memory state, even via paths that didn't already save | ✓ Shipped (Phase 1) |
-| Always save on exit (not only clean exit) | User chose "Final save then close"; per-operation saves already write valid state, so a final save is a safe superset | ✓ Shipped (Phase 1) |
-| Ceiling-only scope (no mixin generalisation) | `CeilingLight` is the only class persisting state; premature abstraction adds risk with no consumer | ✓ Held (PERS-01 deferred to v2) |
-| Reuse existing `_save_state_to_file()` unchanged | Keeps JSON schema and graceful error handling intact; minimises blast radius | ✓ Shipped (Phase 1) |
-| D-01 revised: exit-save runs via `asyncio.to_thread` | Code review (IN-02) flagged blocking file I/O on the event loop; original "synchronous like the other 8 call sites" decision reversed for the exit path | ✓ Shipped (review fix) |
-| Atomic state-file writes (temp file + `os.replace`) | Code review (WR-03) — a crash mid-write must not corrupt the state file | ✓ Shipped (review fix) |
-| Merge on-disk device entry instead of replacing file | Code review (WR-01) — multiple devices sharing one `state_file` must not clobber each other's entries | ✓ Shipped (review fix) |
+| v1.0 decisions | See MILESTONES.md and git history | ✓ Shipped |
+| Investigate wire behaviour instead of porting to threading | Bulbs can only observe packets/timing, not the concurrency model | ✓ Validated (Spikes 001–005) |
+| Adopt Photons-shaped schedules (discovery + retries) | Best measured balance: full coverage / 1-in-180 failure at moderate packet cost | ✓ Validated — Phases 2–3. Discovery: median 48/73 → 73/73 on one call. Retries: 1.37 → 1.017 packets/request, 62 ms → 12.6 ms, no 29 s overruns of the 16 s budget |
+| Animation flow control owned by the library, not downstream | Consumers (LedFx) shouldn't need to choose delivery strategy; the layer that sends frames decides | ✓ Shipped — Phase 4. No consumer-facing toggle. Gated arm won directionally in every measured session (1.28×–5.25×); certified by operator ruling over a recorded FAIL, never a statistical pass (`04-RULING.md`) |
+| Publish behaviour, not tuning constants (D5-09 as written) | Rendered docstrings state the behavioural contract; thresholds/expiries stay in `flow.py` and comments where they can change without a docs lie | ✓ Applied — Phase 5. **The rule itself is disputed by the operator and remains an OPEN decision** in `05-CONTEXT.md`, with spike candidate 006 (cap-impact measurement) linked. Phase 5 complied with it as written; its future is unsettled |
+| Drop the 8-warning docs baseline instead of pinning it | The "pre-existing" warnings were a defect set (5 annotations parsed as link refs; 3 anchors to never-rendered mDNS symbols), not a constant | ✓ Shipped — Phase 5 (D5-23). Zero warnings under `--strict`, gated in CI so the class cannot drift back |
 
 ## Evolution
 
@@ -113,4 +150,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-12 after v1.0 milestone*
+*Last updated: 2026-07-18 after Phase 5 (v1.1 final phase — milestone ready to close)*

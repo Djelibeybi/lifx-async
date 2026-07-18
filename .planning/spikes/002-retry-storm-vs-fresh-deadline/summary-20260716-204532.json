@@ -1,0 +1,323 @@
+{
+  "192.168.19.132 (Test Downlight 5)": {
+    "loss=0": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.1,
+        "success_ms": {
+          "median": 3.1,
+          "p95": 82.5,
+          "max": 90.2
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.0,
+        "success_ms": {
+          "median": 2.9,
+          "p95": 38.3,
+          "max": 48.0
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.0,
+        "success_ms": {
+          "median": 6.0,
+          "p95": 29.3,
+          "max": 56.6
+        }
+      }
+    },
+    "loss=0.25": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.85,
+        "success_ms": {
+          "median": 11.4,
+          "p95": 586.8,
+          "max": 918.2
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.35,
+        "success_ms": {
+          "median": 8.8,
+          "p95": 4004.4,
+          "max": 4009.6
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.5,
+        "success_ms": {
+          "median": 20.2,
+          "p95": 504.8,
+          "max": 907.6
+        }
+      }
+    },
+    "loss=0.5": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 3,
+        "fail_pct": 15.0,
+        "avg_packets_per_trial": 3.95,
+        "success_ms": {
+          "median": 133.0,
+          "p95": 23382.9,
+          "max": 23382.9
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 11,
+        "fail_pct": 55.0,
+        "avg_packets_per_trial": 2.6,
+        "success_ms": {
+          "median": 2015.0,
+          "p95": 4016.4,
+          "max": 4016.4
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 2.05,
+        "success_ms": {
+          "median": 17.8,
+          "p95": 906.3,
+          "max": 2127.5
+        }
+      }
+    }
+  },
+  "192.168.19.243 (System Test Tiles I)": {
+    "loss=0": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.25,
+        "success_ms": {
+          "median": 15.2,
+          "p95": 95.6,
+          "max": 334.9
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.0,
+        "success_ms": {
+          "median": 29.6,
+          "p95": 90.5,
+          "max": 135.7
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.25,
+        "success_ms": {
+          "median": 20.3,
+          "p95": 640.6,
+          "max": 887.2
+        }
+      }
+    },
+    "loss=0.25": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.4,
+        "success_ms": {
+          "median": 19.4,
+          "p95": 146.3,
+          "max": 254.9
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 2,
+        "fail_pct": 10.0,
+        "avg_packets_per_trial": 1.75,
+        "success_ms": {
+          "median": 32.5,
+          "p95": 4062.0,
+          "max": 4062.0
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.5,
+        "success_ms": {
+          "median": 50.3,
+          "p95": 507.7,
+          "max": 518.5
+        }
+      }
+    },
+    "loss=0.5": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 3.7,
+        "success_ms": {
+          "median": 286.1,
+          "p95": 4891.1,
+          "max": 5639.3
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 9,
+        "fail_pct": 45.0,
+        "avg_packets_per_trial": 2.2,
+        "success_ms": {
+          "median": 73.3,
+          "p95": 4037.2,
+          "max": 4037.2
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 1,
+        "fail_pct": 5.0,
+        "avg_packets_per_trial": 4.4,
+        "success_ms": {
+          "median": 933.6,
+          "p95": 6024.2,
+          "max": 6024.2
+        }
+      }
+    }
+  },
+  "192.168.18.95 (Test Downlight 2)": {
+    "loss=0": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.75,
+        "success_ms": {
+          "median": 62.0,
+          "p95": 112.7,
+          "max": 1378.5
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.0,
+        "success_ms": {
+          "median": 31.9,
+          "p95": 723.9,
+          "max": 869.1
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.0,
+        "success_ms": {
+          "median": 26.4,
+          "p95": 95.8,
+          "max": 106.3
+        }
+      }
+    },
+    "loss=0.25": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 2.65,
+        "success_ms": {
+          "median": 143.1,
+          "p95": 1221.2,
+          "max": 1641.0
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.8,
+        "success_ms": {
+          "median": 2013.2,
+          "p95": 4013.8,
+          "max": 4140.0
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 1.95,
+        "success_ms": {
+          "median": 193.1,
+          "p95": 910.3,
+          "max": 1413.3
+        }
+      }
+    },
+    "loss=0.5": {
+      "lifx-async": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 3.45,
+        "success_ms": {
+          "median": 277.0,
+          "p95": 3346.5,
+          "max": 6791.6
+        }
+      },
+      "glowup": {
+        "n": 20,
+        "failures": 4,
+        "fail_pct": 20.0,
+        "avg_packets_per_trial": 2.0,
+        "success_ms": {
+          "median": 1029.5,
+          "p95": 4413.4,
+          "max": 4413.4
+        }
+      },
+      "photons": {
+        "n": 20,
+        "failures": 0,
+        "fail_pct": 0.0,
+        "avg_packets_per_trial": 2.85,
+        "success_ms": {
+          "median": 459.2,
+          "p95": 2118.2,
+          "max": 2200.3
+        }
+      }
+    }
+  }
+}

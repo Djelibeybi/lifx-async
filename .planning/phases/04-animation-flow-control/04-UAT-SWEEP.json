@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-07-17T07:47:46",
+  "devices": [
+    {
+      "serial": "d073d5893c04",
+      "label": "Playroom Luna",
+      "role": "gate",
+      "outcome": "FAIL"
+    },
+    {
+      "serial": "d073d55956e8",
+      "label": "Dining Room Table Candle",
+      "role": "gate",
+      "outcome": "INCONCLUSIVE"
+    },
+    {
+      "serial": "d073d582bff4",
+      "label": "Makerspace Candle",
+      "role": "gate",
+      "outcome": "FAIL"
+    },
+    {
+      "serial": "d073d5866777",
+      "label": "Makerspace Tube",
+      "role": "gate",
+      "outcome": "FAIL"
+    },
+    {
+      "serial": "d073d5a132d9",
+      "label": "Makerspace Ceiling",
+      "role": "gate",
+      "outcome": "FAIL"
+    },
+    {
+      "serial": "d073d5a132b8",
+      "label": "Playroom Ceiling",
+      "role": "gate",
+      "outcome": "FAIL"
+    },
+    {
+      "serial": "d073d587daab",
+      "label": "My Office Ceiling Capsule",
+      "role": "gate",
+      "outcome": "INCONCLUSIVE"
+    },
+    {
+      "serial": "d073d53e11be",
+      "label": "System Test Tiles II",
+      "role": "reference",
+      "outcome": "FAIL"
+    }
+  ],
+  "aggregation": {
+    "k": 4,
+    "n_valid": 5,
+    "quorum": 5,
+    "allowed_fails": 1,
+    "counts": {
+      "PASS": 0,
+      "FAIL": 5,
+      "INCONCLUSIVE": 2,
+      "ENV-ERROR": 0
+    }
+  },
+  "rules": {
+    "quorum": 5,
+    "max_allowed_fails": 1,
+    "ambient_control_seconds": 60.0,
+    "max_ambient_loss_pct": 2.5,
+    "min_ambient_queries": 100,
+    "min_gated_delivered_sanity": 0.5,
+    "fisher_alpha": 0.05,
+    "min_improvement_ratio": 2.0,
+    "clean_gated_loss_pct": 2.5,
+    "max_gated_pooled_loss_pct": 9.0,
+    "inter_round_rest_seconds": 10.0,
+    "ceiling_expected_packets_per_frame": 8,
+    "ceiling_min_ack_rtt_samples": 1
+  },
+  "outcome": "FAIL"
+}

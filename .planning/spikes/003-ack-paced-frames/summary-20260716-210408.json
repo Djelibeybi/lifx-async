@@ -1,0 +1,78 @@
+[
+  {
+    "ts": "2026-07-16T21:04:12.655",
+    "category": "run_start",
+    "host": "192.168.19.243",
+    "label": "System Test Tiles I",
+    "pixels": 684,
+    "packets_per_frame": 4,
+    "fps": 20,
+    "seconds": 30.0
+  },
+  {
+    "ts": "2026-07-16T21:04:22.657",
+    "category": "baseline",
+    "query_median_ms": 16.1,
+    "query_p95_ms": 30.9,
+    "losses": 0,
+    "n": 20
+  },
+  {
+    "ts": "2026-07-16T21:04:53.265",
+    "category": "arm",
+    "arm": "blind",
+    "frames_target": 600,
+    "frames_sent": 600,
+    "frames_skipped": 0,
+    "ack_timeouts": 0,
+    "query_n": 41,
+    "query_loss_pct": 14.6,
+    "query_ms": {
+      "median": 102.1,
+      "p95": 350.5,
+      "max": 448.4
+    }
+  },
+  {
+    "ts": "2026-07-16T21:05:28.363",
+    "category": "arm",
+    "arm": "glowup",
+    "frames_target": 600,
+    "frames_sent": 404,
+    "frames_skipped": 194,
+    "ack_timeouts": 23,
+    "query_n": 49,
+    "query_loss_pct": 6.1,
+    "ack_ms": {
+      "median": 0.0,
+      "p95": 0.0,
+      "max": 98.5
+    },
+    "query_ms": {
+      "median": 51.1,
+      "p95": 115.2,
+      "max": 152.9
+    }
+  },
+  {
+    "ts": "2026-07-16T21:06:03.451",
+    "category": "arm",
+    "arm": "photons",
+    "frames_target": 600,
+    "frames_sent": 530,
+    "frames_skipped": 70,
+    "ack_timeouts": 2,
+    "query_n": 50,
+    "query_loss_pct": 0.0,
+    "ack_ms": {
+      "median": 98.3,
+      "p95": 148.8,
+      "max": 449.5
+    },
+    "query_ms": {
+      "median": 101.7,
+      "p95": 198.0,
+      "max": 368.7
+    }
+  }
+]

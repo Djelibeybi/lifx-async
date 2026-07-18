@@ -154,10 +154,11 @@ gh workflow run docs.yml
 5. **Animation Layer** (`src/lifx/animation/`)
 
    - `animator.py`: High-level `Animator` class with direct UDP sending
+   - `flow.py`: Ack-gated flow control
    - `framebuffer.py`: Multi-tile canvas mapping and orientation correction
    - `packets.py`: Prebaked packet templates (`MatrixPacketGenerator`, `MultiZonePacketGenerator`)
    - `orientation.py`: Tile orientation remapping with LRU-cached lookup tables
-   - Optimized for high-frequency frame delivery (30+ FPS) for real-time effects
+   - Optimised for high-frequency frame delivery (up to ~20 FPS) for real-time effects
    - Uses protocol-ready uint16 HSBK values (no conversion overhead)
    - Multi-tile canvas support using `user_x`/`user_y` tile positions
 
@@ -241,7 +242,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 
 ### Concurrency Considerations
 
-- Requests on a single connection are serialized via `_request_lock` (asyncio.Lock) to prevent response mixing on the same UDP socket
+- Concurrent requests on a single connection are supported: a background receiver task routes each response to its request via per-request queues keyed by (source, sequence, serial), so responses never mix
 - Different devices have different connections, so operations on multiple devices execute in parallel via `asyncio.TaskGroup`
 - Request/response uses async generators: single-response requests break after first response, multi-response requests stream until timeout or early exit
 - Sequence numbers (0-255, uint8) are atomically allocated per request for response correlation
@@ -252,8 +253,8 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 The `discover_devices()` function implements DoS protection through:
 - **Source ID validation** - Rejects responses with mismatched source IDs
 - **Serial validation** - Rejects invalid/broadcast serial numbers
-- **Overall timeout** - Discovery stops after timeout seconds (default: 5.0)
-- **Idle timeout** - Discovery stops when no responses received for 2 seconds
+- **Overall timeout** - Discovery stops after timeout seconds (default: 15.0)
+- **Idle timeout** - Discovery stops when no responses are received for ~4 seconds (max_response_time × idle_timeout_multiplier)
 
 ## Testing Strategy
 
@@ -380,3 +381,7 @@ Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 - Button/Relay/Switch devices are explicitly out of scope (library focuses on lighting devices)
 - Never update docs/changelog.md manually as it is auto-generated during the release process by the CI/CD workflow.
 - If a field is user-visible, it must never be bytes. This means things like serial, label, location and group must always be converted to a string prior to storing it anywhere a user would be able to access it. Conversion to and from bytes should happen either as close to sending or receiving the packet as possible.
+
+## Spike Findings
+
+- **Spike findings for lifx-async** (implementation patterns, constraints, gotchas) → `Skill("spike-findings-lifx-async")`
