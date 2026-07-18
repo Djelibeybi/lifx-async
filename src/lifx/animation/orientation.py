@@ -37,6 +37,7 @@ class Orientation(IntEnum):
     but use integer enum for efficient comparison and caching.
 
     Physical mounting positions:
+
         - RIGHT_SIDE_UP: Normal position, no rotation needed
         - ROTATED_90: Rotated 90 degrees clockwise (RotatedRight)
         - ROTATED_180: Upside down (UpsideDown)

@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-07-17T04:15:27",
+  "profile": "tiles",
+  "ip": "192.168.19.243",
+  "fps": 20.0,
+  "duration_s": 30.0,
+  "rounds_requested": 3,
+  "chain_width": 8,
+  "chain_height": 8,
+  "ceiling_power_confirmed": null,
+  "rounds": [
+    {
+      "round": 0,
+      "offered": 600,
+      "sent": 362,
+      "gated": 238,
+      "delivered_ratio": 0.6033,
+      "packet_shape_ok": true,
+      "queries_ok": 30,
+      "queries_lost": 4,
+      "query_loss_pct": 11.76,
+      "query_latency_median_ms": 88.9,
+      "ack_rtt_median_ms": 100.2,
+      "ack_rtt_p95_ms": 150.2,
+      "ack_rtt_samples": 339,
+      "ack_expiries": 21
+    },
+    {
+      "round": 1,
+      "offered": 600,
+      "sent": 477,
+      "gated": 123,
+      "delivered_ratio": 0.795,
+      "packet_shape_ok": true,
+      "queries_ok": 24,
+      "queries_lost": 6,
+      "query_loss_pct": 20.0,
+      "query_latency_median_ms": 105.5,
+      "ack_rtt_median_ms": 100.2,
+      "ack_rtt_p95_ms": 150.4,
+      "ack_rtt_samples": 470,
+      "ack_expiries": 5
+    },
+    {
+      "round": 2,
+      "offered": 600,
+      "sent": 524,
+      "gated": 76,
+      "delivered_ratio": 0.8733,
+      "packet_shape_ok": true,
+      "queries_ok": 41,
+      "queries_lost": 2,
+      "query_loss_pct": 4.65,
+      "query_latency_median_ms": 103.5,
+      "ack_rtt_median_ms": 100.2,
+      "ack_rtt_p95_ms": 150.3,
+      "ack_rtt_samples": 522,
+      "ack_expiries": 0
+    }
+  ],
+  "pooled_query_loss_pct": 11.21,
+  "thresholds": {
+    "max_query_loss_pct": 9.0,
+    "max_pooled_query_loss_pct": 5.0,
+    "min_delivered_ratio": 0.85,
+    "ceiling_expected_packets_per_frame": 8,
+    "ceiling_min_ack_rtt_samples": 1
+  },
+  "baseline": {
+    "blind_fire_query_loss_pct": 14.6,
+    "ack_gated_query_loss_pct": 0.0,
+    "ack_gated_delivered": "530/600",
+    "ack_rtt_median_ms": 98.0,
+    "ack_rtt_p95_ms": 150.0
+  },
+  "outcome": "FAIL",
+  "pass": false
+}

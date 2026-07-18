@@ -97,8 +97,10 @@ class EffectPulse(LIFXEffect):
             mode: Pulse mode: 'blink', 'strobe', 'breathe', 'ping', 'solid'
                   (default 'blink')
             period: Effect period in seconds. Defaults depend on mode:
+
                     - strobe: 0.1s, others: 1.0s
             cycles: Number of cycles. Defaults:
+
                     - strobe: 10, others: 1
             color: Optional color override. If provided, this color
                    overrides the automatic color selection logic.

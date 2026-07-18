@@ -14,6 +14,10 @@ The `CeilingLight` class provides high-level control over these components while
 | LIFX Ceiling (US/Intl) | 64 | 8x8 grid, zone 63 = uplight |
 | LIFX Ceiling Capsule (US/Intl) | 128 | 16x8 grid, zone 127 = uplight |
 
+All LIFX Ceiling devices are gen4, so the first command after a period of idle may
+arrive with a short wake-up delay — see
+[Gen4 Power-Save Wake Tail](troubleshooting.md#gen4-power-save-wake-tail) for details.
+
 ## Quick Start
 
 ```python
@@ -163,7 +167,7 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
 | `uplight_zone` | `int` | Zone index for uplight (63 or 127) |
 | `downlight_zones` | `slice` | Slice for downlight zones |
 
-Plus all attributes inherited from `MatrixLightState`: `chain`, `tile_colors`, `tile_count`, `effect`, and from `LightState`: `color`, `power`, `label`, `model`, `serial`, `mac_address`, `capabilities`, etc.
+Plus all attributes inherited from `MatrixLightState`: `chain`, `tile_orientations`, `tile_colors`, `tile_count`, `effect`, and from `LightState`: `color`, `power`, `label`, `model`, `serial`, `mac_address`, `capabilities`, etc.
 
 ## Zone Layout
 
@@ -255,16 +259,16 @@ CeilingLight extends `MatrixLight`, so all matrix operations are available:
 async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
     # Use MatrixLight methods directly
     all_colors = await ceiling.get_all_tile_colors()
-    tile_chain = await ceiling.get_tile_chain()
+    device_chain = await ceiling.get_device_chain()
 
     # Set raw matrix colors (bypasses component abstraction)
     await ceiling.set_matrix_colors(0, colors)
 
     # Apply effects
-    from lifx.protocol.protocol_types import TileEffectType
-    await ceiling.set_tile_effect(
-        effect_type=TileEffectType.MORPH,
-        speed=5000,
+    from lifx.protocol.protocol_types import FirmwareEffect
+    await ceiling.set_effect(
+        effect_type=FirmwareEffect.MORPH,
+        speed=5.0,  # seconds
     )
 ```
 

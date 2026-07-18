@@ -11,7 +11,7 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 - [Error Handling](#error-handling)
 - [Device Capabilities](#device-capabilities)
 - [Custom Effects](#custom-effects)
-- [Performance Optimization](#performance-optimization)
+- [Performance Optimisation](#performance-optimisation)
 
 ## Discovery Methods
 
@@ -226,7 +226,7 @@ async def main():
 - Simple lifecycle: one connection per device
 - Lazy opening: connection opens only when needed
 - Automatic cleanup on context exit
-- Requests are serialized to prevent response mixing
+- Concurrent requests are supported: responses are correlated to each request, so they never mix
 
 ## Concurrency Patterns
 
@@ -277,30 +277,10 @@ async def multi_device_control():
     await asyncio.gather(*tasks)
 ```
 
-### Batched Discovery
-
-Discover devices in batches for large networks:
-
-```python
-from lifx.network.discovery import discover_devices
-
-async def discover_in_batches():
-    # First batch: quick discovery
-    devices_quick = await discover_devices(
-        timeout=1.0,
-        broadcast_address="255.255.255.255"
-    )
-
-    # Second batch: thorough discovery
-    if len(devices_quick) < expected_count:
-        devices_full = await discover_devices(
-            timeout=5.0,
-            broadcast_address="255.255.255.255"
-        )
-        return devices_full
-
-    return devices_quick
-```
+There is no need to run discovery multiple times on large or lossy networks: a
+single `discover_devices()` call already re-broadcasts its discovery request on
+an escalating schedule within the discovery window. If devices are still missed
+on slow networks, increase the `timeout` argument instead.
 
 ## Error Handling
 
@@ -319,6 +299,12 @@ from lifx import (
 ```
 
 ### Robust Error Handling
+
+The library already retransmits each request on an escalating schedule within
+that request's timeout, so transient packet loss is handled for you. An
+application-level wrapper like the one below is for retrying whole operations
+that have genuinely failed (for example, a device that was briefly offline) —
+not for per-packet reliability.
 
 ```python
 import asyncio
@@ -349,7 +335,7 @@ async def resilient_control():
 ### Graceful Degradation
 
 ```python
-from lifx import discover, DeviceGroup, LifxError
+from lifx import discover, DeviceGroup, Colors, LifxError
 
 async def best_effort_control():
     devices = []
@@ -380,7 +366,7 @@ async def best_effort_control():
 Light capabilities are automatically populated:
 
 ```python
-from lifx import Light
+from lifx import Colors, Light
 from lifx.products.registry import ProductCapability
 
 async def check_capabilities():
@@ -390,20 +376,20 @@ async def check_capabilities():
         print(f"Capabilities: {light.capabilities}")
 
         # Check specific capabilities
-        if ProductCapability.COLOR in light.capabilities:
+        if light.capabilities and light.capabilities.has_capability(ProductCapability.COLOR):
             await light.set_color(Colors.BLUE)
 
-        if ProductCapability.MULTIZONE in light.capabilities:
+        if light.capabilities and light.capabilities.has_capability(ProductCapability.MULTIZONE):
             print("This is a multizone device!")
 
-        if ProductCapability.INFRARED in light.capabilities:
+        if light.capabilities and light.capabilities.has_capability(ProductCapability.INFRARED):
             print("Supports infrared!")
 ```
 
 ### Capability-Based Logic
 
 ```python
-from lifx import discover, DeviceGroup
+from lifx import discover, DeviceGroup, Colors
 from lifx.products.registry import ProductCapability
 
 async def capability_aware_control():
@@ -415,11 +401,11 @@ async def capability_aware_control():
     for device in group.devices:
 
         # Color devices
-        if ProductCapability.COLOR in device.capabilities:
+        if device.capabilities and device.capabilities.has_capability(ProductCapability.COLOR):
             await device.set_color(Colors.PURPLE)
 
         # Multizone devices
-        if ProductCapability.MULTIZONE in device.capabilities:
+        if device.capabilities and device.capabilities.has_capability(ProductCapability.MULTIZONE):
             await device.set_color_zones(0, 8, Colors.RED)
 ```
 
@@ -441,7 +427,7 @@ async def smooth_color_cycle():
             await asyncio.sleep(2.0)
 ```
 
-### Synchronized Multi-Device Effects
+### Synchronised Multi-Device Effects
 
 ```python
 import asyncio
@@ -473,18 +459,19 @@ async def wave_effect():
         devices.append(device)
     group = DeviceGroup(devices)
 
-    for i, device in enumerate(group.devices):
-        # Each device changes color with a delay
-        asyncio.create_task(
-            delayed_color_change(device, Colors.BLUE, delay=i * 0.3)
-        )
+    # Each device changes colour with a delay
+    tasks = [
+        delayed_color_change(device, Colors.BLUE, delay=i * 0.3)
+        for i, device in enumerate(group.devices)
+    ]
+    await asyncio.gather(*tasks)
 
 async def delayed_color_change(device, color, delay):
     await asyncio.sleep(delay)
     await device.set_color(color, duration=1.0)
 ```
 
-## Performance Optimization
+## Performance Optimisation
 
 ### Minimize Network Requests
 
@@ -550,22 +537,20 @@ async def with_reuse():
         # Connection closed once at end
 ```
 
-### Fire-and-Forget Mode for High-Frequency Animations
+### Fire-and-Forget Mode for Low-Latency One-Shots
 
-For animations sending more than 20 updates per second, waiting for device acknowledgement creates unacceptable latency. Use the `fast=True` parameter to enable fire-and-forget mode:
+For sustained streaming (animations, music sync, real-time visualisations), use the [Animation layer](animation.md) instead — it paces frame delivery against device acknowledgements internally, so you get high frame rates without per-call latency. The `fast=True` parameter remains useful for occasional low-latency one-shot updates where no confirmation is needed:
 
 ```python
 import asyncio
 from lifx import MultiZoneLight, HSBK
 
-async def rainbow_animation():
+async def rainbow_sweep():
     async with await MultiZoneLight.from_ip("192.168.1.100") as light:
         zone_count = await light.get_zone_count()
 
-        # Animation loop at ~30 FPS
-        offset = 0
-        while True:
-            # Generate rainbow colors
+        # A short colour sweep at ~20 FPS
+        for offset in range(0, 360, 5):
             colors = [
                 HSBK(hue=(i * 360 / zone_count + offset) % 360,
                      saturation=1.0, brightness=1.0, kelvin=3500)
@@ -575,19 +560,20 @@ async def rainbow_animation():
             # Fire-and-forget: no waiting for response
             await light.set_extended_color_zones(0, colors, fast=True)
 
-            offset = (offset + 5) % 360
-            await asyncio.sleep(0.033)  # ~30 FPS
+            await asyncio.sleep(0.05)  # ~20 FPS
 ```
 
 **When to use `fast=True`:**
 
-- High-frequency animations (>20 updates/second)
-- Real-time visualizations (music sync, games)
-- Smooth color transitions requiring rapid updates
+- Occasional low-latency one-shot updates where confirmation is unnecessary
+- Short bursts of rapid updates, like the sweep above
+- Situations where a dropped update is harmless
+
+For sustained high-frame-rate streaming, prefer the [Animation Guide](animation.md).
 
 **Trade-offs:**
 
-- No confirmation that the device received or applied the colors
+- No confirmation that the device received or applied the colours
 - No error detection (timeouts, unsupported commands)
 - Best for visual effects where occasional dropped frames are acceptable
 

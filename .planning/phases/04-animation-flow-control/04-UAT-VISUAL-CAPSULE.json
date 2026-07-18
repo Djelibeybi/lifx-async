@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-07-17T10:03:57",
+  "ip": "192.168.19.231",
+  "ceiling_power_confirmed": true,
+  "restoration": {
+    "attempted": true,
+    "succeeded": true,
+    "reason": null
+  },
+  "profile": "ceiling",
+  "fps": 20.0,
+  "duration_s": 60.0,
+  "rounds_per_arm": 1,
+  "chain_width": 16,
+  "chain_height": 8,
+  "expected_packets_per_frame": 3,
+  "ambient": {
+    "duration_s": 60.0,
+    "queries_ok": 111,
+    "queries_lost": 0,
+    "query_loss_pct": 0.0,
+    "query_latency_median_ms": 14.4
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "arm": "gated",
+      "offered": 1200,
+      "sent": 628,
+      "gated": 572,
+      "delivered_ratio": 0.5233,
+      "packet_shape_ok": true,
+      "expected_packets_per_frame": 3,
+      "queries_ok": 19,
+      "queries_lost": 20,
+      "query_loss_pct": 51.28,
+      "query_latency_median_ms": 101.4,
+      "ack_rtt_median_ms": 150.3,
+      "ack_rtt_p95_ms": 202.0,
+      "ack_rtt_samples": 602,
+      "ack_expiries": 24
+    },
+    {
+      "round": 0,
+      "arm": "blind",
+      "offered": 1200,
+      "sent": 1200,
+      "queries_ok": 1,
+      "queries_lost": 24,
+      "query_loss_pct": 96.0,
+      "query_latency_median_ms": 57.1
+    }
+  ],
+  "gated_pooled": {
+    "lost": 20,
+    "n": 39,
+    "loss_pct": 51.28
+  },
+  "blind_pooled": {
+    "lost": 24,
+    "n": 25,
+    "loss_pct": 96.0
+  },
+  "fisher_one_sided_p": 9.133689708571732e-05,
+  "improvement_ratio": 1.87,
+  "session_valid": true,
+  "validity_reasons": [],
+  "thresholds": {
+    "ambient_control_seconds": 60.0,
+    "max_ambient_loss_pct": 2.5,
+    "min_ambient_queries": 100,
+    "min_gated_delivered_sanity": 0.5,
+    "fisher_alpha": 0.05,
+    "min_improvement_ratio": 2.0,
+    "clean_gated_loss_pct": 2.5,
+    "max_gated_pooled_loss_pct": 9.0,
+    "inter_round_rest_seconds": 10.0,
+    "ceiling_expected_packets_per_frame": 8,
+    "ceiling_min_ack_rtt_samples": 1
+  },
+  "baseline": {
+    "blind_fire_query_loss_pct": 14.6,
+    "ack_gated_query_loss_pct": 0.0,
+    "ack_gated_delivered": "530/600",
+    "ack_rtt_median_ms": 98.0,
+    "ack_rtt_p95_ms": 150.0
+  },
+  "outcome": "FAIL",
+  "reasons": [
+    "gated pooled loss 51.28% exceeds the absolute ceiling 9.0%",
+    "relative rule missed: blind/gated improvement 1.87 below 2.0",
+    "no clean escape: gated pooled loss 51.28% > 2.5%"
+  ],
+  "pass": false
+}

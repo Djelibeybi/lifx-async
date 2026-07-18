@@ -617,7 +617,7 @@ class DeviceGroup:
                 devices.append(device)
             group = DeviceGroup(devices)
             bedroom = await group.filter_by_group("Bedroom Lights")
-            await bedroom.set_color(Colors.WARM_WHITE)
+            await bedroom.set_color(Colors.WARM)
             ```
         """
         groups = await self.organize_by_group(include_unassigned=False)
@@ -678,6 +678,7 @@ class DeviceGroup:
         """Apply a theme to all devices in the group.
 
         Each device applies the theme according to its capabilities:
+
         - Light: Selects random color from theme
         - MultiZoneLight: Distributes colors evenly across zones
         - MatrixLight: Uses interpolation for smooth gradients
@@ -755,7 +756,7 @@ async def discover(
     """Discover LIFX devices and yield them as they are found.
 
     Args:
-        timeout: Discovery timeout in seconds (default 3.0)
+        timeout: Discovery timeout in seconds (default 15.0)
         broadcast_address: Broadcast address to use (default "255.255.255.255")
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses

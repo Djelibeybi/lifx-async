@@ -218,46 +218,31 @@ class TestAsyncGeneratorRequests:
 
 @pytest.mark.emulator
 class TestRetryTimeoutBudget:
-    """Test that retry sleep time doesn't consume the timeout budget.
+    """Test that the caller's timeout is honoured as wall time (RETRY-03).
 
-    This test class verifies the fix for the issue where retry sleep time
-    was being counted against the overall timeout budget, causing later
-    retry attempts to have insufficient time to wait for responses.
+    All waiting -- transmissions, retransmit gaps, and the final listen
+    window -- counts against the caller's timeout budget. A request can
+    never take materially longer than the timeout it was given, and a
+    failing request completes AT the budget rather than overrunning it.
     """
 
-    async def test_retry_sleep_excluded_from_timeout_budget(
-        self, emulator_server_with_scenarios, monkeypatch
+    async def test_wall_time_budget_honoured_under_total_loss(
+        self, emulator_server_with_scenarios
     ):
-        """Test that retry sleep time is excluded from timeout budget.
+        """Wall time is honoured exactly under total packet loss.
 
-        This test verifies that when retries occur with exponential backoff sleep,
-        the sleep time doesn't consume the overall timeout budget. Each retry
-        attempt should get a fair timeout window.
-
-        Without the fix, this would fail because later attempts would have
-        very short timeouts (e.g., 0.613s on attempt 4) due to accumulated sleep time.
+        Cumulative retransmit offsets from REQUEST_RETRANSMIT_GAPS (0.2,
+        0.3, 0.4, ...) place transmissions at 0, 0.2, 0.5, 0.9, 1.4s -- all
+        five fit inside the 2.0s budget; the sixth (due at 2.1s) does not.
+        max_retries=5 (not 3) is deliberate: the old code's message reads
+        "after 6 attempts" (max_retries + 1) regardless of jitter, so the
+        message assertion is deterministic RED independent of randomness.
         """
         import time
 
         from lifx.network.connection import DeviceConnection
 
-        # Mock the jitter calculation to return predictable values
-        # This removes randomness so we can assert exact timing
-        # Returns max exponential delay: 0.1 * 2^attempt
-        sleep_times: list[float] = []
-
-        def predictable_sleep(attempt: int) -> float:
-            sleep_time = 0.1 * (2**attempt)
-            sleep_times.append(sleep_time)
-            return sleep_time
-
-        monkeypatch.setattr(
-            DeviceConnection,
-            "_calculate_retry_sleep_with_jitter",
-            staticmethod(predictable_sleep),
-        )
-
-        # Create a scenario that drops all packets to force retries
+        # Create a scenario that drops all packets to force full timeout
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
             serial="d073d5000001",
@@ -268,9 +253,8 @@ class TestRetryTimeoutBudget:
             },
         )
 
-        # Set up connection with specific timeout and retries
-        timeout = 2.0  # 2 second total timeout budget
-        max_retries = 3  # 4 total attempts (0, 1, 2, 3)
+        timeout = 2.0  # 2 second wall-time budget
+        max_retries = 5
 
         conn = DeviceConnection(
             serial="d073d5000001",
@@ -280,52 +264,21 @@ class TestRetryTimeoutBudget:
             max_retries=max_retries,
         )
 
-        # Calculate expected timeout distribution with exponential backoff
-        # total_weight = (2^(n+1) - 1) = (2^4 - 1) = 15
-        # base_timeout = 2.0 / 15 = 0.133s
-        # Attempt 0: 0.133 * 2^0 = 0.133s
-        # Attempt 1: 0.133 * 2^1 = 0.266s
-        # Attempt 2: 0.133 * 2^2 = 0.533s
-        # Attempt 3: 0.133 * 2^3 = 1.066s
-        # Total: 0.133 + 0.266 + 0.533 + 1.066 = ~2.0s
-
         start_time = time.monotonic()
 
-        # This should timeout after all retries are exhausted
         with pytest.raises(LifxTimeoutError) as exc_info:
             await conn.request(Device.GetPower(), timeout=timeout)
 
         elapsed = time.monotonic() - start_time
 
-        # Verify the timeout message
-        assert "after 4 attempts" in str(exc_info.value)
-
-        # Calculate actual total sleep from our mock
-        # 3 sleeps: after attempts 0, 1, 2 (not after final attempt 3)
-        # Sleep 0: 0.1 * 2^0 = 0.1s
-        # Sleep 1: 0.1 * 2^1 = 0.2s
-        # Sleep 2: 0.1 * 2^2 = 0.4s
-        # Total: 0.7s
-        expected_total_sleep = sum(sleep_times)
-        assert len(sleep_times) == 3, "Should have 3 sleeps between 4 attempts"
-        assert expected_total_sleep == pytest.approx(0.7), (
-            "Expected sleep times: 0.1 + 0.2 + 0.4"
+        # RETRY-03: the wall deadline is honoured -- never overshoots by
+        # more than a small CI-tolerant margin.
+        assert 2.0 <= elapsed < 2.3, (
+            f"Elapsed {elapsed}s should stay within the wall-time budget"
         )
 
-        # Allow some tolerance for timing variations
-        assert elapsed >= timeout, "Should use at least the timeout budget"
-        assert elapsed < timeout + expected_total_sleep + 0.5, (
-            f"Elapsed {elapsed}s should not exceed timeout + sleep + tolerance"
-        )
-
-        # Key assertion: If sleep was counted against timeout budget,
-        # the elapsed time would be close to just the timeout (2.0s)
-        # because later attempts would fail immediately.
-        # With the fix, we should see elapsed > timeout + sleep time.
-        assert elapsed > timeout + expected_total_sleep - 0.1, (
-            f"Sleep time ({expected_total_sleep}s) should be added on top of "
-            f"timeout budget, but elapsed was only {elapsed}s"
-        )
+        # The error reports transmissions actually sent, not sleeps.
+        assert "after 5 attempts" in str(exc_info.value)
 
         await conn.close()
 
@@ -335,7 +288,8 @@ class TestRetryTimeoutBudget:
         """Test that timeout calculation is consistent between GET and SET requests.
 
         Both _request_stream_impl (GET) and _request_ack_stream_impl (SET)
-        should use the same timeout calculation formula.
+        delegate to the same retransmit/wall-deadline engine, so both paths
+        honour the wall budget within the same bounds.
         """
         import time
 
@@ -383,19 +337,24 @@ class TestRetryTimeoutBudget:
             f"GET and SET timeout behavior should be consistent (diff: {time_diff}s)"
         )
 
-        # Both should respect the timeout budget
+        # Both should respect the timeout budget -- lower bound (never
+        # returns early) and upper bound (never materially overruns it).
         assert elapsed_get >= timeout
         assert elapsed_set >= timeout
+        assert elapsed_get < timeout + 0.3
+        assert elapsed_set < timeout + 0.3
 
         await conn.close()
 
     async def test_retry_all_attempts_get_fair_timeout(
         self, emulator_server_with_scenarios
     ):
-        """Test that all retry attempts get adequate timeout windows.
+        """Test that all retransmits fit inside the wall-time budget.
 
-        This verifies that later retry attempts aren't starved of timeout
-        due to accumulated sleep time from earlier attempts.
+        timeout=2.0, max_retries=2 -> transmissions at cumulative offsets
+        0, 0.2, 0.5s (3 total), then the request keeps listening to the
+        2.0s wall deadline. The "after 3 attempts" message stays truthful
+        because it reports transmissions actually sent.
         """
         # Create a scenario that drops packets to force retries
         server, _device = await emulator_server_with_scenarios(

@@ -18,6 +18,18 @@ Functions for discovering LIFX devices on the local network.
       heading_level: 3
       members_order: source
 
+::: lifx.network.mdns.discover_lifx_services
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+
+::: lifx.network.mdns.LifxServiceRecord
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+
 ### DiscoveryResponse
 
 Response dataclass from custom discovery broadcasts (using packets other than GetService).
@@ -52,19 +64,17 @@ from lifx.network.discovery import discover_devices
 
 async def main():
     # Discover all devices on the network
-    devices = await discover_devices(timeout=3.0)
-
-    for device in devices:
-        print(f"Found: {device.label} at {device.ip}")
-        print(f"  Serial: {device.serial}")
+    async for device in discover_devices():
+        print(f"Found: {device.serial} at {device.ip}")
+        print(f"  Port: {device.port}")
 ```
 
 
 ## Concurrency
 
-### Request Serialization on Single Connection
+### Requests on a Single Connection
 
-Each `DeviceConnection` serializes requests using a lock to prevent response mixing:
+Each `DeviceConnection` correlates responses to their requests — a background receiver routes each reply to the request that sent it, so requests on one connection never mix:
 
 ```python
 import asyncio
@@ -75,7 +85,7 @@ from lifx.protocol.packets import Light, Device
 async def main():
     conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
 
-    # Sequential requests (serialized by internal lock)
+    # Requests on the same connection (responses correlated per request)
     state = await conn.request(Light.GetColor())
     power = await conn.request(Light.GetPower())
     label = await conn.request(Device.GetLabel())

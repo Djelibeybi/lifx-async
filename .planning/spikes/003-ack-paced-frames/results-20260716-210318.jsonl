@@ -1,0 +1,2 @@
+{"ts": "2026-07-16T21:03:19.110", "category": "run_start", "host": "192.168.19.243", "label": "System Test Tiles I", "pixels": 684, "packets_per_frame": 4, "fps": 20, "seconds": 30.0}
+{"ts": "2026-07-16T21:03:29.156", "category": "baseline", "query_median_ms": 12.6, "query_p95_ms": 65.0, "losses": 0, "n": 20}

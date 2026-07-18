@@ -96,13 +96,26 @@ graph TB
 
 ## Layer Responsibilities
 
-### Layer 1: Protocol Layer
+### Layer 1: Utilities
+
+**Purpose**: Provide shared colour and product-capability helpers used by every layer above
+
+- **User-Facing Colour**: `HSBK` class with float values and RGB conversion, plus `Colors` presets
+- **Product Registry**: Auto-generated database mapping product IDs to capabilities
+- **Zero Runtime Dependencies**: Pure standard-library code, like the rest of the library
+
+**Key Files**:
+
+- `color.py` - HSBK class and Colors presets
+- `products/registry.py` - Auto-generated product capability database
+
+### Layer 2: Protocol Layer
 
 **Purpose**: Handle LIFX binary protocol
 
 - **Auto-Generated**: All code generated from `protocol.yml`
 - **Type-Safe**: Full type hints for all structures
-- **Binary Serialization**: Pack/unpack protocol messages
+- **Binary Serialisation**: Pack/unpack protocol messages
 - **No Business Logic**: Pure data structures
 
 **Key Files**:
@@ -115,25 +128,26 @@ graph TB
 
 ```python
 from lifx.protocol.packets import Light
-from lifx import HSBK
+from lifx.protocol.protocol_types import LightHsbk
 
 # Create a packet
 packet = Light.SetColor(
-    color=HSBK(hue=180, saturation=1.0, brightness=0.8, kelvin=3500), duration=1.0
+    color=LightHsbk(hue=32768, saturation=65535, brightness=52428, kelvin=3500),
+    duration=1000,  # milliseconds (uint32)
 )
 
-# Serialize to bytes
+# Serialise to bytes
 data = packet.pack()
 ```
 
-### Layer 2: Network Layer
+### Layer 3: Network Layer
 
 **Purpose**: Handle network communication
 
 - **UDP Transport**: Async socket operations
 - **Discovery**: Broadcast-based device discovery
 - **Lazy Connections**: Auto-open on first request
-- **Retry Logic**: Automatic retry with exponential backoff
+- **Retry Logic**: Automatic retransmits on an escalating schedule within each request's timeout
 
 **Key Files**:
 
@@ -152,11 +166,11 @@ conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
 response = await conn.request(packet)
 ```
 
-### Layer 3: Device Layer
+### Layer 4: Device Layer
 
 **Purpose**: Device abstractions with high-level operations
 
-- **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight
+- **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, CeilingLight
 - **State Caching**: Cached state properties for efficient access
 - **Type Detection**: Automatic capability detection
 - **Async Context Managers**: Automatic resource cleanup
@@ -169,6 +183,7 @@ response = await conn.request(packet)
 - `infrared.py` - InfraredLight class
 - `multizone.py` - MultiZoneLight class
 - `matrix.py` - MatrixLight class
+- `ceiling.py` - CeilingLight class
 
 **Example**:
 
@@ -183,9 +198,10 @@ async with Light(serial, ip) as light:
 
 ### Layer 5: Animation Layer
 
-**Purpose**: High-frequency frame delivery for real-time effects (30+ FPS)
+**Purpose**: High-frequency frame delivery for real-time effects (up to ~20 FPS over WiFi)
 
 - **Direct UDP**: Bypasses request/response for low-latency frame delivery
+- **Ack-Gated Pacing**: Frame delivery is paced against device acknowledgements with latest-frame-wins semantics — internal behaviour, no consumer configuration required
 - **Multi-Tile Canvas**: Maps tiles using `user_x`/`user_y` positions
 - **Orientation Correction**: LRU-cached tile rotation lookup tables
 - **Protocol-Ready Values**: Uses uint16 HSBK directly (no conversion overhead)
@@ -193,6 +209,7 @@ async with Light(serial, ip) as light:
 **Key Files**:
 
 - `animation/animator.py` - High-level `Animator` class
+- `animation/flow.py` - Ack-gated flow control
 - `animation/framebuffer.py` - Multi-tile canvas mapping
 - `animation/packets.py` - Prebaked packet templates
 - `animation/orientation.py` - Tile orientation remapping
@@ -233,7 +250,7 @@ async with Light(serial, ip) as light:
 
 - **Simplified Discovery**: One-line device discovery via UDP or mDNS
 - **Batch Operations**: Control multiple devices with `DeviceGroup`
-- **Direct Connection**: Connect by IP without discovery
+- **Direct Connection**: Connect by serial and IP with no discovery, or by IP alone via a one-off unicast discovery round-trip
 - **Filtered Discovery**: Find devices by label, serial, or IP
 
 **Key Files**:
@@ -269,12 +286,12 @@ sequenceDiagram
     User->>Light: set_color(Colors.BLUE)
     Light->>Light: Convert to HSBK
     Light->>Connection: send_packet(SetColor)
-    Connection->>Connection: Serialize packet
+    Connection->>Connection: Serialise packet
     Connection->>Transport: send_message(bytes)
     Transport->>Device: UDP packet
-    Device-->>Transport: UDP acknowledgment
+    Device-->>Transport: UDP acknowledgement
     Transport-->>Connection: Response
-    Connection-->>Connection: Deserialize packet
+    Connection-->>Connection: Deserialise packet
     Connection-->>Light: Reply
     Light-->>User: Success
 ```

@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-07-17T07:40:29",
+  "serial": "d073d587daab",
+  "label": "My Office Ceiling Capsule",
+  "role": "gate",
+  "profile": "ceiling",
+  "resolution": {
+    "method": "roster-ip",
+    "ip": "192.168.19.231"
+  },
+  "ip": "192.168.19.231",
+  "ceiling_power_confirmed": true,
+  "restoration": {
+    "attempted": true,
+    "succeeded": true,
+    "reason": null
+  },
+  "fps": 20.0,
+  "duration_s": 30.0,
+  "rounds_per_arm": 3,
+  "chain_width": 16,
+  "chain_height": 8,
+  "expected_packets_per_frame": 3,
+  "ambient": {
+    "duration_s": 60.0,
+    "queries_ok": 107,
+    "queries_lost": 0,
+    "query_loss_pct": 0.0,
+    "query_latency_median_ms": 13.4
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "arm": "gated",
+      "offered": 600,
+      "sent": 298,
+      "gated": 302,
+      "delivered_ratio": 0.4967,
+      "packet_shape_ok": true,
+      "expected_packets_per_frame": 3,
+      "queries_ok": 19,
+      "queries_lost": 8,
+      "query_loss_pct": 29.63,
+      "query_latency_median_ms": 47.1,
+      "ack_rtt_median_ms": 150.2,
+      "ack_rtt_p95_ms": 200.3,
+      "ack_rtt_samples": 278,
+      "ack_expiries": 18
+    },
+    {
+      "round": 0,
+      "arm": "blind",
+      "offered": 600,
+      "sent": 600,
+      "queries_ok": 0,
+      "queries_lost": 12,
+      "query_loss_pct": 100.0,
+      "query_latency_median_ms": null
+    },
+    {
+      "round": 1,
+      "arm": "gated",
+      "offered": 600,
+      "sent": 258,
+      "gated": 342,
+      "delivered_ratio": 0.43,
+      "packet_shape_ok": true,
+      "expected_packets_per_frame": 3,
+      "queries_ok": 22,
+      "queries_lost": 7,
+      "query_loss_pct": 24.14,
+      "query_latency_median_ms": 58.8,
+      "ack_rtt_median_ms": 150.0,
+      "ack_rtt_p95_ms": 200.3,
+      "ack_rtt_samples": 230,
+      "ack_expiries": 26
+    },
+    {
+      "round": 1,
+      "arm": "blind",
+      "offered": 600,
+      "sent": 600,
+      "queries_ok": 1,
+      "queries_lost": 12,
+      "query_loss_pct": 92.31,
+      "query_latency_median_ms": 62.5
+    },
+    {
+      "round": 2,
+      "arm": "gated",
+      "offered": 600,
+      "sent": 315,
+      "gated": 285,
+      "delivered_ratio": 0.525,
+      "packet_shape_ok": true,
+      "expected_packets_per_frame": 3,
+      "queries_ok": 18,
+      "queries_lost": 8,
+      "query_loss_pct": 30.77,
+      "query_latency_median_ms": 81.1,
+      "ack_rtt_median_ms": 150.2,
+      "ack_rtt_p95_ms": 200.3,
+      "ack_rtt_samples": 297,
+      "ack_expiries": 16
+    },
+    {
+      "round": 2,
+      "arm": "blind",
+      "offered": 600,
+      "sent": 600,
+      "queries_ok": 1,
+      "queries_lost": 12,
+      "query_loss_pct": 92.31,
+      "query_latency_median_ms": 48.9
+    }
+  ],
+  "gated_pooled": {
+    "lost": 23,
+    "n": 82,
+    "loss_pct": 28.05
+  },
+  "blind_pooled": {
+    "lost": 36,
+    "n": 38,
+    "loss_pct": 94.74
+  },
+  "fisher_one_sided_p": 1.0013569691153795e-12,
+  "improvement_ratio": 3.38,
+  "session_valid": false,
+  "validity_reasons": [
+    "gated round 0 delivered_ratio 0.4967 below the sanity floor 0.5 (validity V3)",
+    "gated round 1 delivered_ratio 0.43 below the sanity floor 0.5 (validity V3)"
+  ],
+  "thresholds": {
+    "ambient_control_seconds": 60.0,
+    "max_ambient_loss_pct": 2.5,
+    "min_ambient_queries": 100,
+    "min_gated_delivered_sanity": 0.5,
+    "fisher_alpha": 0.05,
+    "min_improvement_ratio": 2.0,
+    "clean_gated_loss_pct": 2.5,
+    "max_gated_pooled_loss_pct": 9.0,
+    "inter_round_rest_seconds": 10.0,
+    "ceiling_expected_packets_per_frame": 8,
+    "ceiling_min_ack_rtt_samples": 1
+  },
+  "baseline": {
+    "blind_fire_query_loss_pct": 14.6,
+    "ack_gated_query_loss_pct": 0.0,
+    "ack_gated_delivered": "530/600",
+    "ack_rtt_median_ms": 98.0,
+    "ack_rtt_p95_ms": 150.0
+  },
+  "outcome": "INCONCLUSIVE",
+  "reasons": [
+    "gated round 0 delivered_ratio 0.4967 below the sanity floor 0.5 (validity V3)",
+    "gated round 1 delivered_ratio 0.43 below the sanity floor 0.5 (validity V3)"
+  ],
+  "pass": false
+}

@@ -1,0 +1,39 @@
+{
+  "host": "192.168.18.95",
+  "probes": 300,
+  "rate": 20.0,
+  "seconds": 30.0,
+  "load": 0,
+  "threaded": {
+    "rtt_ms": {
+      "median": 9.98,
+      "p95": 77.38,
+      "p99": 196.29,
+      "max": 494.85
+    },
+    "losses": 0,
+    "probe_n": 300,
+    "send_jitter_ms": {
+      "median": 4.76,
+      "p95": 5.05,
+      "p99": 5.08,
+      "max": 5.8
+    }
+  },
+  "asyncio": {
+    "rtt_ms": {
+      "median": 11.25,
+      "p95": 73.06,
+      "p99": 230.59,
+      "max": 499.89
+    },
+    "losses": 0,
+    "probe_n": 300,
+    "send_jitter_ms": {
+      "median": 1.12,
+      "p95": 1.23,
+      "p99": 1.3,
+      "max": 5.73
+    }
+  }
+}

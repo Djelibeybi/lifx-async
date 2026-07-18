@@ -180,6 +180,7 @@ class MultiZoneLight(Light):
     """LIFX MultiZone light device (strips, beams).
 
     Extends the Light class with zone-specific functionality:
+
     - Individual zone color control
     - Multi-zone effects (move, etc.)
     - Extended color zone support for efficient bulk updates

@@ -6,7 +6,7 @@
     "provider": "anthropic-fable",
     "budget": "high"
   },
-  "mode": "yolo",
+  "mode": "interactive",
   "git": {
     "create_tag": false
   },
@@ -19,8 +19,10 @@
     "plan_check": true,
     "verifier": true,
     "nyquist_validation": true,
-    "auto_advance": true,
-    "_auto_chain_active": true
+    "auto_advance": false,
+    "_auto_chain_active": false,
+    "code_review": true,
+    "code_review_depth": "deep"
   },
   "plan_review": {
     "source_grounding": true

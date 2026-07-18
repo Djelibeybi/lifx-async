@@ -53,6 +53,7 @@ class Light(Device[LightState]):
     """LIFX light device with color control.
 
     Extends the base Device class with light-specific functionality:
+
     - Color control (HSBK)
     - Brightness control
     - Color temperature control
@@ -104,6 +105,7 @@ class Light(Device[LightState]):
         Always fetches from device. Use the `color` property to access stored value.
 
         Returns a tuple containing:
+
         - color: HSBK color
         - power: Power level as integer (0 for off, 65535 for on)
         - label: Device label/name

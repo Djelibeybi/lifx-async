@@ -57,7 +57,7 @@ Captures current light state, powers on if needed, and launches the effect. Stat
 **Parameters:**
 
 - `effect` (LIFXEffect): The effect instance to execute
-- `participants` (list[Light]): List of Light instances to apply effect to
+- `participants` (`list[Light]`): List of Light instances to apply effect to
 
 **Raises:**
 
@@ -79,7 +79,7 @@ Halts any running effects on the specified lights and restores them to their pre
 
 **Parameters:**
 
-- `lights` (list[Light]): List of lights to stop
+- `lights` (`list[Light]`): List of lights to stop
 
 **Example:**
 
@@ -98,7 +98,7 @@ Add lights to a running effect without restarting it. Captures state, creates an
 **Parameters:**
 
 - `effect` (LIFXEffect): The effect to add lights to (must already be running)
-- `lights` (list[Light]): List of lights to add
+- `lights` (`list[Light]`): List of lights to add
 
 **Example:**
 
@@ -112,7 +112,7 @@ Remove lights from their running effect without stopping other participants. Clo
 
 **Parameters:**
 
-- `lights` (list[Light]): List of lights to remove
+- `lights` (`list[Light]`): List of lights to remove
 - `restore_state` (bool): Whether to restore pre-effect state (default `True`)
 
 **Example:**
@@ -191,7 +191,7 @@ Whether to power on devices during effect.
 
 Reference to the conductor managing this effect. Set automatically by conductor.
 
-#### `participants` (list[Light])
+#### `participants` (`list[Light]`)
 
 List of lights participating in the effect. Set automatically by conductor.
 

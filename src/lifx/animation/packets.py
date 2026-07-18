@@ -41,6 +41,10 @@ from typing import ClassVar
 
 # Header constants
 HEADER_SIZE = 36
+FLAGS_OFFSET = 22  # Offset of flags byte in header (Frame Address: 8-byte
+# target + 6-byte reserved = offset 8+8+6=22)
+ACK_REQUIRED_FLAG = 0x02  # Bit 1 of the flags byte, matching the
+# (ACK_REQUIRED & 0b1) << 1 packing in _build_header
 SEQUENCE_OFFSET = 23  # Offset of sequence byte in header
 
 # Header field values for animation packets
@@ -150,6 +154,22 @@ class PacketGenerator(ABC):
     def pixel_count(self) -> int:
         """Get the total pixel count this generator expects."""
 
+    # Traceability: single baked probe D4-03; first-packet arm D4-01 (spike
+    # 003 measured it at 0.0% concurrent-query loss); uniform application
+    # D4-02; large-tile override D4-04.
+    @property
+    def probe_template_index(self) -> int:
+        """Template index that carries the ack-required flow-control probe.
+
+        The Animator bakes the `ack_required` flag into exactly one
+        prebaked template at initialisation time -- this property names
+        which one. Default is the first packet of the frame. Flow control
+        applies uniformly to all generator families with no per-family
+        carve-outs; `MatrixPacketGenerator` overrides this for large-tile
+        mode.
+        """
+        return 0
+
 
 class MatrixPacketGenerator(PacketGenerator):
     """Packet generator for MatrixLight devices.
@@ -158,13 +178,27 @@ class MatrixPacketGenerator(PacketGenerator):
     with complete headers for maximum performance.
 
     For standard tiles (≤64 pixels):
+
         - Single Set64 packet directly to display buffer (fb_index=0)
 
-    For large tiles (>64 pixels, e.g., Ceiling 16x8=128):
+    For large tiles (>64 pixels), colours are chunked row-aligned — each
+    Set64 packet covers whole rows of the tile (rows_per_packet = 64 //
+    tile_width), matching the device's row-major Set64 fill order from
+    (x=0, y=y_offset). The colour slice offset (hsbk_start = y_offset *
+    tile_width) therefore always matches the rect's y offset, even on
+    widths that do not evenly divide 64:
+
+        - Ceiling 16x8 (128 pixels, divides evenly): 2 Set64 packets of 64
+          colours each (rows 0-3, 4-7) + 1 CopyFrameBuffer = 3 packets/tile.
+        - Ceiling 13x26 (338 pixels, does not divide evenly): 7 Set64
+          packets of 52 colours each for the first 6 (4 rows x 13 width)
+          plus a final partial batch of 26 colours (2 rows x 13 width) +
+          1 CopyFrameBuffer = 8 packets/tile.
         - Multiple Set64 packets to temp buffer (fb_index=1)
         - CopyFrameBuffer packet to copy fb_index=1 → fb_index=0
 
     Set64 Payload Layout (522 bytes):
+
         - Offset 0: tile_index (uint8)
         - Offset 1: length (uint8, always 1)
         - Offset 2-5: TileBufferRect (fb_index, x, y, width - 4 x uint8)
@@ -172,6 +206,7 @@ class MatrixPacketGenerator(PacketGenerator):
         - Offset 10-521: colors (64 x HSBK, each 8 bytes)
 
     CopyFrameBuffer Payload Layout (15 bytes):
+
         - Offset 0: tile_index (uint8)
         - Offset 1: length (uint8, always 1)
         - Offset 2: src_fb_index (uint8, 1 = temp buffer)
@@ -219,11 +254,13 @@ class MatrixPacketGenerator(PacketGenerator):
         # Determine if we need large tile mode (>64 pixels per tile)
         self._is_large_tile = self._pixels_per_tile > self._MAX_COLORS_PER_PACKET
 
-        # Calculate packets needed per tile
+        # Calculate packets needed per tile. Chunking is row-aligned to match
+        # the device's row-major Set64 fill order (mirrors the hardware-proven
+        # MatrixLight.set_matrix_colors batching in devices/matrix.py): each
+        # packet covers whole rows, never a raw 64-pixel slice that could
+        # straddle a row boundary on widths that do not divide 64 (D4-05).
         self._rows_per_packet = self._MAX_COLORS_PER_PACKET // tile_width
-        self._packets_per_tile = (
-            self._pixels_per_tile + self._MAX_COLORS_PER_PACKET - 1
-        ) // self._MAX_COLORS_PER_PACKET
+        self._packets_per_tile = -(-tile_height // self._rows_per_packet)
 
     @property
     def is_large_tile(self) -> bool:
@@ -234,6 +271,29 @@ class MatrixPacketGenerator(PacketGenerator):
     def packets_per_tile(self) -> int:
         """Get number of Set64 packets needed per tile."""
         return self._packets_per_tile
+
+    # Traceability: D4-04 (probe on the frame-commit CopyFB, matching
+    # Glowup's proven field behaviour on >64-zone ceilings);
+    # hardware-validated in the ANIM-04 UAT (plan 04-07); the single-Set64
+    # arm is the one spike 003 measured (0.0% loss).
+    @property
+    def probe_template_index(self) -> int:
+        """Template index that carries the ack-required flow-control probe.
+
+        In large-tile mode the probe attaches to the FINAL CopyFrameBuffer
+        -- the frame-commit packet, since nothing is visible until the
+        buffer swap. The CopyFB's ack RTT includes the device's drain of
+        the preceding Set64 burst, a strictly better congestion signal
+        than acking the first Set64 of a multi-packet frame. This property
+        is the one-line fallback seam to index 0 (first Set64) should
+        hardware disagree.
+
+        For standard (≤64px) tiles, the probe sits on the single Set64
+        packet.
+        """
+        if self._is_large_tile:
+            return self._tile_count * (self._packets_per_tile + 1) - 1
+        return 0
 
     def pixel_count(self) -> int:
         """Get total pixel count."""
@@ -304,20 +364,19 @@ class MatrixPacketGenerator(PacketGenerator):
         for tile_idx in range(self._tile_count):
             tile_pixel_start = tile_idx * self._pixels_per_tile
 
-            # Create Set64 packets for this tile
+            # Create Set64 packets for this tile. Row-aligned: each packet
+            # covers whole rows of the tile, so the colour slice offset
+            # (color_start) and the rect's y offset both advance by
+            # rows_per_packet rows per packet — they can never disagree, even
+            # when tile_width does not evenly divide 64 (Pitfall 1, D4-04).
+            # Ceiling division on packets_per_tile guarantees the final
+            # packet always covers at least one row, so no zero-count guard
+            # is needed here.
             for pkt_idx in range(self._packets_per_tile):
-                color_start = pkt_idx * self._MAX_COLORS_PER_PACKET
-                color_end = min(
-                    color_start + self._MAX_COLORS_PER_PACKET,
-                    self._pixels_per_tile,
-                )
-                color_count = color_end - color_start
-
-                if color_count == 0:  # pragma: no cover
-                    continue
-
-                # Calculate y offset for this chunk
                 y_offset = pkt_idx * self._rows_per_packet
+                rows = min(self._rows_per_packet, self._tile_height - y_offset)
+                color_count = rows * self._tile_width
+                color_start = y_offset * self._tile_width
 
                 # Build header
                 header = _build_header(
@@ -423,6 +482,7 @@ class MultiZonePacketGenerator(PacketGenerator):
     with >82 zones, multiple packets are generated.
 
     SetExtendedColorZones Payload Layout (664 bytes):
+
         - Offset 0-3: duration (uint32)
         - Offset 4: apply (uint8, 1 = APPLY)
         - Offset 5-6: zone_index (uint16)

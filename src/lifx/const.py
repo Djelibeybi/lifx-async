@@ -33,12 +33,36 @@ MAX_RESPONSE_TIME: Final[float] = 1.0  # 1 second
 # Idle timeout multiplier - wait this many times MAX_RESPONSE_TIME after last response
 IDLE_TIMEOUT_MULTIPLIER: Final[float] = 4.0  # 4 seconds (1.0 x 4.0)
 
+# Photons-shaped gaps in seconds between successive discovery re-broadcasts
+# after the first send (cumulative offsets 0.6, 1.8, 3.6, 5.6, 7.6), capped
+# by DISCOVERY_TIMEOUT.
+DISCOVERY_REBROADCAST_GAPS: Final[tuple[float, ...]] = (0.6, 1.2, 1.8, 2.0, 2.0)
+
 # Default timeout for device requests in seconds
 DEFAULT_REQUEST_TIMEOUT: Final[float] = 16.0
 STATE_REFRESH_DEBOUNCE_MS: Final[int] = 300
 
 # Default maximum number of retry attempts for failed requests
 DEFAULT_MAX_RETRIES: Final[int] = 8
+
+# Photons-shaped gaps in seconds between successive request transmissions;
+# the first gap floors the first-attempt window (an acked bulb answers
+# within 200 ms); after exhaustion the final gap repeats; retransmits are
+# capped by max_retries and by the caller's wall-time budget, whichever
+# binds first.
+REQUEST_RETRANSMIT_GAPS: Final[tuple[float, ...]] = (
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.7,
+    0.9,
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+)
 
 # ============================================================================
 # mDNS Constants

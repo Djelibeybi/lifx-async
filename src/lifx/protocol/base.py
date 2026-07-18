@@ -72,6 +72,7 @@ class Packet:
     """Base class for all LIFX protocol packets.
 
     Each packet subclass defines:
+
     - PKT_TYPE: ClassVar[int] - The packet type number
     - _fields: ClassVar[list[dict]] - Field metadata from protocol.yml
     - Actual field attributes as dataclass fields

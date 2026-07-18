@@ -53,7 +53,7 @@ jobs:
 
     - name: Build documentation
       run: |
-        uv run zensical build --clean
+        uv run zensical build --clean --strict
         uv run llmstxt-standalone validate
         uv run llmstxt-standalone build
 
@@ -111,6 +111,6 @@ jobs:
 
     - name: Build documentation
       run: |
-        uv run zensical build --clean
+        uv run zensical build --clean --strict
         uv run llmstxt-standalone validate
         uv run llmstxt-standalone build

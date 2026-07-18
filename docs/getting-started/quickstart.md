@@ -92,9 +92,11 @@ asyncio.run(main())
 
 ## Common Patterns
 
-### Direct Connection (No Discovery)
+### Direct Connection
 
-If you know the IP:
+If you only know the IP address, `from_ip()` first performs a unicast
+discovery round-trip: it sends `GetService` to that address to learn the
+device's serial number, then connects using both:
 
 ```python
 import asyncio
@@ -103,6 +105,22 @@ from lifx import Light, Colors
 
 async def main():
     async with await Light.from_ip("192.168.1.100") as light:
+        await light.set_color(Colors.RED)
+
+
+asyncio.run(main())
+```
+
+If you know both the serial and the IP address, no discovery of any kind is
+needed — the library connects straight to the device:
+
+```python
+import asyncio
+from lifx import Light, Colors
+
+
+async def main():
+    async with Light(serial="d073d5010203", ip="192.168.1.100") as light:
         await light.set_color(Colors.RED)
 
 

@@ -2,7 +2,7 @@
 
 > **Looking for usage examples?** See the [Animation Guide](../user-guide/animation.md) for tutorials, multi-tile canvas usage, HSBK format details, and troubleshooting. This page covers the API surface only.
 
-The animation module provides efficient high-frequency frame delivery for LIFX devices, optimized for real-time effects at 30+ FPS.
+The animation module provides efficient high-frequency frame delivery for LIFX devices, optimised for real-time effects at up to ~20 FPS.
 
 ## Animator
 
@@ -126,16 +126,15 @@ Pixel remapping for rotated tiles.
 
 ### Direct UDP Delivery
 
-The animation module bypasses the connection layer entirely:
+The animation module uses a purpose-built network stack with the following characteristics:
 
-- No ACKs, no waiting, no retries
-- Packets sent via raw UDP socket
-- Maximum throughput for real-time effects
-- Some packet loss is acceptable (visual artifacts are brief)
+- Frame packets are sent via a raw UDP socket; `send_frame()` never blocks
+- Delivery is paced against device acknowledgements internally — when a device falls behind, new frames are dropped, never queued (latest-frame-wins)
+- A dropped frame is never retried; occasional frame loss under saturation is expected (visual artefacts are brief)
 
 ### Prebaked Packet Templates
 
-Packets are constructed once at initialization:
+Packets are constructed once at initialisation:
 
 - Header and payload structure prebaked as `bytearray`
 - Per-frame: only color data and sequence number updated

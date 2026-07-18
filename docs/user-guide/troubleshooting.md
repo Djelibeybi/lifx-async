@@ -24,7 +24,9 @@ Common issues and solutions when working with lifx.
    import asyncio
    from lifx.network.discovery import discover_devices
 
-   devices = await discover_devices(timeout=5.0)
+   devices = []
+   async for device in discover_devices(timeout=5.0):
+       devices.append(device)
    print(f"Found {len(devices)} devices")
    ```
 
@@ -67,10 +69,12 @@ async def diagnose_discovery():
     print("Attempting discovery...")
 
     # Try with extended timeout
-    devices = await discover_devices(
+    devices = []
+    async for device in discover_devices(
         timeout=10.0,
         broadcast_address="255.255.255.255"
-    )
+    ):
+        devices.append(device)
 
     if not devices:
         print("No devices found. Check:")
@@ -98,18 +102,18 @@ asyncio.run(diagnose_discovery())
 
 **Solution:**
 
+A single `discover_devices()` call already re-broadcasts `GetService` on an
+escalating schedule within the discovery window, so devices that miss the
+first broadcast get several more chances to respond. There is no need to call
+discovery multiple times.
+
+If some devices are still missed on a slow or congested network, increase the
+`timeout` to widen the discovery window:
+
 ```python
-async def thorough_discovery():
-    # Multiple discovery passes with different timeouts
-    all_devices = set()
-
-    for timeout in [3.0, 5.0, 10.0]:
-        devices = await discover_devices(timeout=timeout)
-        for device in devices:
-            all_devices.add((device.serial, device.ip))
-
-    print(f"Total devices found: {len(all_devices)}")
-    return all_devices
+devices = []
+async for device in discover_devices(timeout=30.0):
+    devices.append(device)
 ```
 
 ## Connection Problems
@@ -160,6 +164,11 @@ asyncio.run(test_connection("192.168.1.100"))
 - Device overloaded
 
 **Solution:**
+
+The library itself retransmits within each request's timeout, so transient
+packet loss is handled for you. An application-level wrapper like the one
+below is for retrying whole operations that failed — not for per-packet
+reliability.
 
 ```python
 import asyncio
@@ -216,9 +225,12 @@ async with await Light.from_ip(ip, timeout=5.0) as light:
 ```python
 from lifx import discover
 
-# Increase discovery timeout
-async with discover(timeout=10.0) as group:  # Default is 3.0
-    print(f"Found {len(group.devices)} devices")
+# Increase the discovery timeout (the default is 15.0 seconds)
+devices = []
+async for device in discover(timeout=30.0):
+    devices.append(device)
+
+print(f"Found {len(devices)} devices")
 ```
 
 ## Performance Issues
@@ -230,6 +242,7 @@ async with discover(timeout=10.0) as group:  # Default is 3.0
 **Diagnosis:**
 
 ```python
+import asyncio
 import time
 from lifx import Light
 
@@ -278,14 +291,14 @@ async def measure_latency():
    ```python
    for i in range(10):
        async with await Light.from_ip(ip) as light:
-           await light.set_color(HSBK(hue=(360/10)*i), saturation=1.0, brightness=1.0, kelvin=3500)
+           await light.set_color(HSBK(hue=(360 / 10) * i, saturation=1.0, brightness=1.0, kelvin=3500))
    ```
 
    Efficient (reuses connection):
    ```python
    async with await Light.from_ip(ip) as light:
        for i in range(10):
-           await light.set_color(HSBK(hue=(360/10)*i), saturation=1.0, brightness=1.0, kelvin=3500)
+           await light.set_color(HSBK(hue=(360 / 10) * i, saturation=1.0, brightness=1.0, kelvin=3500))
    ```
 
 3. **Need fresh data?**
@@ -300,6 +313,73 @@ async def measure_latency():
    # Or fetch other device info
    version = await light.get_version()
    ```
+
+### Gen4 Power-Save Wake Tail
+
+**Symptom:** The first command after a device has been idle for roughly a
+minute or more is slower than usual — up to ~250 ms instead of the single-digit
+milliseconds a busy device answers in. Subsequent commands respond at full
+speed.
+
+**Causes:**
+
+- Gen4 devices use WiFi power-save while idle, so the radio takes a moment to
+  wake for the first packet
+- Affects gen4 devices only — gen2 and gen3 devices show no wake tail
+
+This is a latency effect, not a reliability problem: on healthy networks, an
+idle device loses zero packets. Every command still succeeds; the first one
+after idle just takes a little longer.
+
+**Identifying gen4 devices:**
+
+Gen4 devices report a host firmware major version of 4 or later:
+
+```python
+firmware = await device.get_host_firmware()
+if firmware.version_major >= 4:
+    print("Gen4 device: expect a sub-250 ms wake tail after idle")
+```
+
+Inside `async with`, the cached `device.host_firmware` property is already
+populated, so you can check `device.host_firmware.version_major` directly. Do
+not try to identify gen4 devices by product ID — the products registry has no
+generation field.
+
+**Solution:**
+
+Most applications can ignore the wake tail entirely. If your application is
+latency-sensitive and cannot tolerate a slower first command, an optional
+periodic poll keeps the device's radio awake:
+
+```python
+import asyncio
+from lifx import Light
+
+async def keep_awake(light: Light) -> None:
+    """Optional: poll periodically so a gen4 device's radio stays awake."""
+    while True:
+        # Any request works; get_color() returns colour, power and label
+        # in a single request/response pair.
+        await light.get_color()
+        await asyncio.sleep(15)  # 10-15 s keeps the wake tail away
+```
+
+Run it alongside your application with `asyncio.create_task()` or
+`asyncio.TaskGroup` — no extra coordination is needed, because the library
+serialises requests per connection. The poll is read-only, so it is safe to
+run continuously, and one request every 15 seconds stays far below the
+~20 msg/sec a device can handle.
+
+!!! note "lifx-async deliberately ships no keepalive daemon"
+    Measured on real hardware, idle devices lose zero packets on healthy
+    networks — the wake tail is a small, bounded latency cost, not a
+    reliability problem. Whether to spend a packet every 10–15 seconds to
+    avoid it is the application's choice, so the library does not make it
+    for you.
+
+Streaming frames to a device? See the [Animation Guide](animation.md) for how
+sustained streaming interacts with gen4 power-save.
 
 ### Docker / Container Networking
 
@@ -349,10 +429,9 @@ logging.getLogger('lifx.devices').setLevel(logging.DEBUG)
 ```python
 from lifx.products import get_product, get_registry
 
-# List all known products
+# Check how many products the registry knows
 registry = get_registry()
-for product_id, product in registry.items():
-    print(f"{product_id}: {product.name}")
+print(f"Registry contains {len(registry)} products")
 
 # Check specific product
 product = get_product(27)  # LIFX A19
@@ -402,6 +481,6 @@ If you're still experiencing issues:
 ## Next Steps
 
 - [Effects Troubleshooting](effects-troubleshooting.md) — Issues specific to the effects framework
-- [Advanced Usage](advanced-usage.md) — Optimization patterns
+- [Advanced Usage](advanced-usage.md) — Optimisation patterns
 - [API Reference](../api/index.md) — Complete API documentation
 - [FAQ](../faq.md) — Frequently asked questions

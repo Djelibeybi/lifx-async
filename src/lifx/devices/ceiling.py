@@ -553,6 +553,7 @@ class CeilingLight(MatrixLight):
 
         Args:
             colors: Either:
+
                 - Single HSBK: sets all downlight zones to same color
                 - List[HSBK]: sets each zone individually (must match zone count)
             duration: Transition duration in seconds (default 0.0)
@@ -619,8 +620,10 @@ class CeilingLight(MatrixLight):
 
         Args:
             color: Optional HSBK color. If provided:
+
                 - Uses this color immediately
                 - Updates stored state
+
                 If None, uses brightness determination logic
             duration: Transition duration in seconds (default 0.0)
 
@@ -759,9 +762,11 @@ class CeilingLight(MatrixLight):
 
         Args:
             colors: Optional colors. Can be:
+
                 - None: uses brightness determination logic
                 - Single HSBK: sets all downlight zones to same color
                 - List[HSBK]: sets each zone individually (must match zone count)
+
                 If provided, updates stored state.
             duration: Transition duration in seconds (default 0.0)
 
@@ -997,9 +1002,11 @@ class CeilingLight(MatrixLight):
 
         Args:
             colors: Optional colors to store for future turn_on. Can be:
+
                 - None: stores current colors from device
                 - Single HSBK: stores this color for all zones
                 - List[HSBK]: stores individual colors (must match zone count)
+
                 If provided, stores these colors (with brightness=0 on device).
             duration: Transition duration in seconds (default 0.0)
 

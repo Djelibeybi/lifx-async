@@ -18,6 +18,9 @@ repos:
   - id: check-json
   - id: check-added-large-files
     args: [--maxkb=1000]
+    # Per-event hardware evidence logs (measurement artefacts, committed
+    # verbatim) legitimately exceed the source-file cap.
+    exclude: ^\.planning/phases/.*-EVENTS\.jsonl$
   - id: check-case-conflict
   - id: check-merge-conflict
   - id: detect-private-key
