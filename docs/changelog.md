@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v5.6.0 (2026-07-18)
+
+### Features
+
+- Wire reliability improvements (v1.1)
+  ([`d99a501`](https://github.com/Djelibeybi/lifx-async/commit/d99a501b2f896a596e45e71b57e1e06e1d3fa15c))
+
+
 ## v5.5.1 (2026-06-14)
 
 ### Bug Fixes
