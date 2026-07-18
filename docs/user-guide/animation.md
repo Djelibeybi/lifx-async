@@ -1,15 +1,16 @@
 # Animation Guide
 
 This guide covers how to use the animation module for high-frequency frame delivery to LIFX devices.
-The animation system is designed for real-time effects and applications that need to push color data at 30+ FPS.
+The animation system is designed for real-time effects at up to ~20 FPS over WiFi — a platform
+ceiling of the WiFi/Set64 wire path, not a client limitation.
 
 ## When to Use Animation
 
 Use the animation module when you need:
 
-- **High frame rates** (20+ FPS)
+- **High frame rates** (up to ~20 FPS)
 - **Real-time effects** from external sources
-- **Integration with music visualizers**
+- **Integration with music visualisers**
 - **Continuous animations** that run for extended periods
 
 For simple, one-time color changes, use the device methods directly (`set_color()`, `set_tile_colors()`, etc.) instead.
@@ -41,7 +42,7 @@ async def main():
             stats = animator.send_frame(frame)
             print(f"Sent {stats.packets_sent} packets")
 
-            await asyncio.sleep(1 / 30)  # 30 FPS
+            await asyncio.sleep(1 / 20)  # 20 FPS
     finally:
         animator.close()
 
@@ -68,7 +69,7 @@ async def main():
             frame = [(0, 65535, 65535, 3500)] * animator.pixel_count
 
             stats = animator.send_frame(frame)
-            await asyncio.sleep(1 / 30)
+            await asyncio.sleep(1 / 20)
     finally:
         animator.close()
 
@@ -182,7 +183,7 @@ def rgb_to_protocol_hsbk(
     kelvin: int = 3500,
 ) -> tuple[int, int, int, int]:
     """Convert RGB to protocol HSBK."""
-    # Normalize to 0-1
+    # Normalise to 0-1
     r_norm = r / 255
     g_norm = g / 255
     b_norm = b / 255
@@ -273,7 +274,7 @@ for i in range(100):
 # Play back at consistent rate
 for frame in frames:
     animator.send_frame(frame)
-    await asyncio.sleep(1 / 30)
+    await asyncio.sleep(1 / 20)
 ```
 
 ### Use NumPy for Large Canvases
@@ -304,7 +305,7 @@ def generate_gradient_numpy(width: int, height: int, hue_offset: int) -> list:
     return [tuple(p) for p in frame.reshape(-1, 4)]
 ```
 
-For a complete example including vectorized RGB to HSBK conversion, see
+For a complete example including vectorised RGB to HSBK conversion, see
 [examples/animation_numpy.py](https://github.com/Djelibeybi/lifx-async/blob/main/examples/animation_numpy.py).
 
 ### Monitor Statistics
@@ -326,18 +327,76 @@ print(f"Total packets: {total_packets}")
 print(f"Avg packets/frame: {total_packets / frame_count:.1f}")
 ```
 
+## Streaming and Flow Control
+
+The animation layer paces frame delivery against device acknowledgements
+internally. When a device falls behind, new frames are dropped, never queued —
+latest-frame-wins. There is no consumer-facing configuration: you call the same
+`Animator` API and the library decides the delivery strategy.
+
+### What Not to Reimplement
+
+If you are building a streaming consumer (a music visualiser, a LedFx-style
+integration, or any continuous frame source), the library already owns delivery
+pacing. Do **not** add:
+
+- **Your own acknowledgement tracking** — delivery is already paced against
+  device acknowledgements.
+- **Keepalive daemons** — a continuous stream keeps the device awake by itself.
+- **Frame-retry wrappers** — retrying a dropped frame is actively wrong.
+  Latest-frame-wins means the correct recovery is simply the next frame.
+
+### Minimal Streaming Loop
+
+Your whole job is to produce frames and send them at your chosen FPS:
+
+```python
+async with await MatrixLight.from_ip("192.168.1.100") as device:
+    animator = await Animator.for_matrix(device)
+
+target_fps = 20  # platform ceiling over WiFi; large matrix devices sustain less
+try:
+    while running:
+        frame = generate_frame()          # your only job: produce frames
+        animator.send_frame(frame)        # the library paces delivery
+        await asyncio.sleep(1 / target_fps)
+finally:
+    animator.close()
+```
+
+### Choosing an FPS per Device Class
+
+~20 FPS is the platform ceiling over WiFi/Set64. Larger multi-packet matrix devices
+saturate sooner: the LIFX Ceiling Capsule (16×8 zones — 128 zones — at 3 packets per
+frame) sustains ~10 FPS.
+
+Oversending is safe but visible: when the frame rate exceeds what the device sustains,
+latest-frame-wins drops frames and the animation stutters. This is degradation by
+design — never a backlog or freeze. If you see stutter, reduce your FPS toward the
+device's sustainable rate.
+
+To observe gating, check the `AnimatorStats` returned by `send_frame()`: `stats.gated`
+reports whether that frame was dropped, and `stats.acks_outstanding` shows how far the
+device is behind.
+
+Gen4 devices add a small wake-up latency to the first packet after idle — if a stream
+starts sluggishly, see
+[Gen4 Power-Save Wake Tail](troubleshooting.md#gen4-power-save-wake-tail).
+
 ## Troubleshooting
 
 ### Flickering or Glitches
 
-**Cause:** Packet loss on the network
+**Primary cause (by design):** Device saturation — the frame rate exceeds what the device
+sustains, so latest-frame-wins drops frames and the animation stutters. This is never a
+backlog or freeze.
 
-**Solutions:**
+**Solution:** Reduce FPS toward the device's sustainable rate (see the Streaming and Flow
+Control section above). `stats.gated` from `send_frame()` shows when frames are being dropped.
 
-1. Reduce frame rate (try 20 FPS instead of 30)
-2. Ensure good WiFi signal to the device
-3. Consider wired connection if possible
-4. Accept that some packet loss is normal for UDP
+**Secondary cause (genuine):** Network loss — weak WiFi signal to the device.
+
+**Solution:** Improve the signal or use a stronger access point.
 
 ### Animation Appears on Each Tile Separately
 

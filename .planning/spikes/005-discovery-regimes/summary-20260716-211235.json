@@ -1,0 +1,45 @@
+{
+  "roster_size": 73,
+  "lifx-async": {
+    "rounds": 1,
+    "broadcasts_per_round": 1,
+    "found_min_med_max": [
+      71,
+      71,
+      71
+    ],
+    "native_rule_found_med": 71,
+    "t90_ms_med": 668.1,
+    "responses_per_round_med": 142,
+    "devices_missed_in_any_round": {
+      "d073d5fe0ef9": 1,
+      "d073d5745b28": 1
+    }
+  },
+  "glowup": {
+    "rounds": 1,
+    "broadcasts_per_round": 22,
+    "found_min_med_max": [
+      73,
+      73,
+      73
+    ],
+    "native_rule_found_med": 73,
+    "t90_ms_med": 340.0,
+    "responses_per_round_med": 2133,
+    "devices_missed_in_any_round": {}
+  },
+  "photons": {
+    "rounds": 1,
+    "broadcasts_per_round": 6,
+    "found_min_med_max": [
+      73,
+      73,
+      73
+    ],
+    "native_rule_found_med": 73,
+    "t90_ms_med": 603.0,
+    "responses_per_round_med": 836,
+    "devices_missed_in_any_round": {}
+  }
+}

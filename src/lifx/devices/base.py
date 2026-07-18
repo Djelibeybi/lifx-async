@@ -275,6 +275,7 @@ class Device(Generic[StateT]):
     """Base class for LIFX devices.
 
     This class provides common functionality for all LIFX devices:
+
     - Connection management
     - Basic device queries (label, power, version, info)
     - State caching for reduced network traffic
@@ -746,6 +747,7 @@ class Device(Generic[StateT]):
         """Get device product capabilities.
 
         Returns product information including supported features like:
+
         - color, infrared, multizone, extended_multizone
         - matrix (for tiles), chain, relays, buttons, hev
         - temperature_range

@@ -50,13 +50,17 @@ Common issues:
 
 1. **Same Network**: Ensure your computer and LIFX devices are on the same network
 1. **Firewall**: Check firewall settings allow UDP broadcasts
-1. **Timeout**: Try increasing timeout: `discover(timeout=10.0)`
+1. **Timeout**: Try increasing timeout: `discover(timeout=30.0)`
 1. **Router**: Some routers block broadcast packets - try direct connection
+
+A single discovery call already re-broadcasts automatically on an escalating
+schedule, so increasing `timeout` — not calling discovery repeatedly — is the
+right fix for devices that are slow to respond.
 
 **Workaround** - Connect directly using IP and serial:
 
 ```python
-async with await Light(serial="d073d5000000",  ip="192.168.1.100") as light:
+async with Light(serial="d073d5000000", ip="192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 ```
 
@@ -192,7 +196,7 @@ Yes! Key performance features:
 - **Lazy Connections**: Auto-open on first request, reuse for all operations
 - **Non-volatile State Caching**: Reduces redundant network requests
 - **Concurrent Devices**: Operations on different devices run in parallel
-- **Request Serialization**: Prevents response mixing on same connection
+- **Response Correlation**: Per-request response routing prevents response mixing on the same connection
 
 ### How is state stored?
 
@@ -228,7 +232,7 @@ If you use a light as an async context manager, it will automatically populate
 all of the non-volatile properties:
 
 ```python
-async with Light(serial="d073d5000000",  ip="192.168.1.100") as light:
+async with Light(serial="d073d5000000", ip="192.168.1.100") as light:
     print(f"{light.label} is a {light.model} and is in the {light.group} group.")
 ```
 
@@ -236,6 +240,18 @@ async with Light(serial="d073d5000000",  ip="192.168.1.100") as light:
 
 Yes! lifx-async doesn't require exclusive access. Multiple instances (even on different computers) can
 control the same devices.
+
+### Why is the first command after idle slower on newer devices?
+
+Gen4 devices use WiFi power-save while idle, which adds a sub-250 ms wake tail
+to the first command after roughly a minute or more of inactivity.
+On healthy networks, zero packets are lost — it is a small, bounded latency
+cost, not a reliability problem.
+lifx-async deliberately ships no keepalive daemon: whether to poll periodically
+to avoid the wake tail is your application's choice. See
+[Gen4 Power-Save Wake Tail](user-guide/troubleshooting.md#gen4-power-save-wake-tail)
+for the full guidance, including how to identify gen4 devices and an optional
+polling recipe.
 
 ## Troubleshooting
 
@@ -319,11 +335,12 @@ No.
 
 ```python
 from lifx.protocol.packets import Light
-from lifx.protocol.protocol_types import HSBK
+from lifx.protocol.protocol_types import LightHsbk
 
 # Create a packet directly
 packet = Light.SetColor(
-    color=HSBK(hue=180, saturation=1.0, brightness=0.8, kelvin=3500), duration=1.0
+    color=LightHsbk(hue=32768, saturation=65535, brightness=52428, kelvin=3500),
+    duration=1000,  # milliseconds (uint32)
 )
 
 # Send via connection

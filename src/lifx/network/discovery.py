@@ -6,11 +6,13 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
+from itertools import accumulate
 from typing import TYPE_CHECKING, Any
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
+    DISCOVERY_REBROADCAST_GAPS,
     DISCOVERY_TIMEOUT,
     IDLE_TIMEOUT_MULTIPLIER,
     LIFX_UDP_PORT,
@@ -42,7 +44,9 @@ class DiscoveredDevice:
         ip: Device IP address
         port: Device UDP port
         first_seen: Timestamp when device was first discovered
-        response_time: Response time in seconds
+        response_time: Response time in seconds, anchored at the first
+            broadcast (time since discovery began). A device answering a
+            later re-broadcast reports a proportionally larger value.
     """
 
     serial: str
@@ -74,9 +78,10 @@ class DiscoveredDevice:
 
         Example:
             ```python
-            devices = await discover_devices()
-            for discovered in devices:
+            async for discovered in discover_devices():
                 device = await discovered.create_device()
+                if device is None:
+                    continue  # unsupported product or transient failure
                 print(f"Created {type(device).__name__}: {await device.get_label()}")
             ```
         """
@@ -138,7 +143,9 @@ class DiscoveryResponse:
         port: UDP source port the device responded from (``addr[1]``), not a
             device-reported service port. For GetService discovery the
             authoritative service port is in ``response_payload["port"]``.
-        response_time: Response time in seconds
+        response_time: Response time in seconds, anchored at the first
+            broadcast (time since discovery began). A device answering a
+            later re-broadcast reports a proportionally larger value.
         response_payload: Unpacked State packet fields as key/value dict
     """
 
@@ -161,6 +168,11 @@ async def _discover_with_packet(
 
     Broadcasts the specified packet and collects all State* responses.
     Uses the packet's STATE_TYPE attribute to validate expected responses.
+    The packet is re-broadcast on an escalating Photons-shaped schedule
+    (``DISCOVERY_REBROADCAST_GAPS``, cumulative offsets 0.6, 1.8, 3.6, 5.6,
+    7.6 s from the first send), capped by the discovery window, so devices
+    behind a lossy access point that miss the first broadcast are still
+    found within a single discovery call.
 
     This is a powerful protocol trick that allows targeted discovery:
     - GetLabel: Find devices by label
@@ -235,6 +247,13 @@ async def _discover_with_packet(
         idle_timeout = max_response_time * idle_timeout_multiplier
         deadline = IdleDeadline(timeout, idle_timeout)
 
+        # Escalating re-broadcast schedule (DISC-01, D2-01): cumulative
+        # offsets from request_time at which the same message is re-sent.
+        # Read the module constant at runtime (not as a def-time default)
+        # so tests can patch it for fast schedule-exhaustion coverage.
+        tx_offsets = accumulate(DISCOVERY_REBROADCAST_GAPS)
+        next_tx: float | None = next(tx_offsets, None)
+
         while True:
             if deadline.idle_expired:
                 _LOGGER.debug(
@@ -256,15 +275,34 @@ async def _discover_with_packet(
                 )
                 break
 
+            now = time.monotonic()
+            while next_tx is not None and now - request_time >= next_tx:
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_with_packet",
+                        "method": "discover",
+                        "action": "rebroadcast_sent",
+                        "offset": next_tx,
+                        "broadcast_address": broadcast_address,
+                        "port": port,
+                    }
+                )
+                await transport.send(message, (broadcast_address, port))
+                next_tx = next(tx_offsets, None)
+                now = time.monotonic()
+
             remaining = deadline.remaining()
             if remaining <= 0:
                 break
+
+            if next_tx is not None:
+                remaining = min(remaining, request_time + next_tx - now)
 
             try:
                 data, addr = await transport.receive(timeout=remaining)
                 response_timestamp = time.monotonic()
             except LifxTimeoutError:
-                break
+                continue
             except LifxProtocolError as e:
                 # Size-invalid datagram from a hostile or broken sender — skip
                 # it, never abort discovery (DoS protection contract). DEBUG
@@ -449,9 +487,24 @@ async def discover_devices(
     """Discover LIFX devices on the local network.
 
     Sends a broadcast DeviceGetService packet and yields devices as they respond.
-    Implements DoS protection via timeout, source validation, and serial validation.
-    Serial validation and per-serial deduplication are enforced inside
-    ``_discover_with_packet``, so every caller of that shared generator benefits.
+    The packet is re-broadcast several times on an escalating schedule within
+    the discovery window, so devices behind a lossy access point that miss
+    the first broadcast are still found. Implements DoS protection via
+    timeout, source validation, and serial validation. Serial validation and
+    per-serial deduplication are enforced inside ``_discover_with_packet``,
+    so every caller of that shared generator benefits.
+
+    Note:
+        On a populated network, generator *completion* now typically takes
+        longer than a single broadcast alone would: re-broadcasts continue
+        for several seconds into the window, and the generator then waits
+        out the ~4 s idle window (``max_response_time`` ×
+        ``idle_timeout_multiplier``) after the last response -- still well
+        inside ``DISCOVERY_TIMEOUT`` (15 s). Streaming consumers
+        (``async for``) see the first devices at unchanged latency; only
+        overall completion moves later, because later re-broadcasts
+        legitimately keep finding new devices and resetting the idle
+        window.
 
     Args:
         timeout: Discovery timeout in seconds

@@ -380,6 +380,7 @@ class HSBK:
         """Convert to protocol HSBK for packet serialization.
 
         LIFX protocol uses uint16 values for all HSBK components:
+
         - Hue: 0-65535 (represents 0-360 degrees)
         - Saturation: 0-65535 (represents 0-100%)
         - Brightness: 0-65535 (represents 0-100%)

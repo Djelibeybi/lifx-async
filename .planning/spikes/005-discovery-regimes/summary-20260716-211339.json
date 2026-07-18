@@ -1,0 +1,95 @@
+{
+  "roster_size": 73,
+  "lifx-async": {
+    "rounds": 6,
+    "broadcasts_per_round": 1,
+    "found_min_med_max": [
+      27,
+      48.0,
+      73
+    ],
+    "native_rule_found_med": 48.0,
+    "t90_ms_med": 189.3,
+    "responses_per_round_med": 96.0,
+    "devices_missed_in_any_round": {
+      "d073d5fe0ef9": 2,
+      "d073d53848ed": 5,
+      "d073d574348d": 5,
+      "d073d5745b28": 2,
+      "d073d56bf0f8": 4,
+      "d073d550d219": 5,
+      "d073d5815ffe": 5,
+      "d073d5381fd8": 2,
+      "d073d551cd90": 3,
+      "d073d56d6b63": 3,
+      "d073d587daab": 2,
+      "d073d57446f1": 3,
+      "d073d5303b3c": 3,
+      "d073d5302052": 2,
+      "d073d55627ff": 3,
+      "d073d589bcf5": 3,
+      "d073d5745a82": 3,
+      "d073d5641ab1": 3,
+      "d073d53dd3d1": 3,
+      "d073d5d48086": 3,
+      "d073d5743322": 3,
+      "d073d534ef8a": 3,
+      "d073d56e6ab3": 3,
+      "d073d5d47a9f": 4,
+      "d073d589befe": 3,
+      "d073d5744188": 3,
+      "d073d5a21eb8": 3,
+      "d073d56ce005": 3,
+      "d073d56e137b": 3,
+      "d073d5818881": 4,
+      "d073d5a25bc8": 3,
+      "d073d5893c04": 3,
+      "d073d5a132d9": 3,
+      "d073d5384285": 3,
+      "d073d53c20bf": 3,
+      "d073d5641c79": 3,
+      "d073d5d4809b": 3,
+      "d073d537e698": 2,
+      "d073d5a28c5f": 2,
+      "d073d582bff4": 3,
+      "d073d5394670": 3,
+      "d073d55956e8": 3,
+      "d073d580e3d9": 3,
+      "d073d5a132b8": 3,
+      "d073d56d1b1e": 3,
+      "d073d530a552": 3,
+      "d073d5742ebd": 1,
+      "d073d5745cdd": 2,
+      "d073d5871637": 1,
+      "d073d5302fdd": 1
+    }
+  },
+  "glowup": {
+    "rounds": 6,
+    "broadcasts_per_round": 22,
+    "found_min_med_max": [
+      73,
+      73.0,
+      73
+    ],
+    "native_rule_found_med": 73.0,
+    "t90_ms_med": 385.55,
+    "responses_per_round_med": 2146.0,
+    "devices_missed_in_any_round": {}
+  },
+  "photons": {
+    "rounds": 6,
+    "broadcasts_per_round": 6,
+    "found_min_med_max": [
+      72,
+      73.0,
+      73
+    ],
+    "native_rule_found_med": 73.0,
+    "t90_ms_med": 710.25,
+    "responses_per_round_med": 615.0,
+    "devices_missed_in_any_round": {
+      "d073d550d219": 1
+    }
+  }
+}

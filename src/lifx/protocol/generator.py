@@ -146,6 +146,7 @@ def apply_field_name_quirks(python_name: str) -> str:
         Quirk-adjusted field name
 
     Quirks applied:
+
         - "type" -> "effect_type" (avoids Python built-in)
     """
     if python_name == "type":
@@ -169,6 +170,7 @@ def apply_extended_multizone_packet_quirks(
         Quirk-adjusted packet name
 
     Quirks applied:
+
         - "ExtendedGetColorZones" -> "GetExtendedColorZones"
         - "ExtendedSetColorZones" -> "SetExtendedColorZones"
         - "ExtendedStateMultiZone" -> "StateExtendedColorZones"
@@ -190,6 +192,7 @@ def apply_tile_effect_parameter_quirk(
 
     The upstream protocol.yml doesn't provide enough detail for TileEffectParameter.
     This quirk replaces it with the correct structure:
+
     - TileEffectSkyType (enum, uint8)
     - 3 reserved bytes
     - cloudSaturationMin (uint8)
@@ -266,6 +269,7 @@ def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
     by LIFX devices with ambient light sensors.
 
     Quirks applied:
+
         - SensorGetAmbientLight (401): Request packet with no parameters
         - SensorStateAmbientLight (402): Response packet with lux field (float)
 
@@ -303,6 +307,7 @@ def apply_firmware_effect_enum_quirk(
 
     Both MultiZone and Tile effects use the same firmware effect protocol values,
     so they should share a single enum. This quirk:
+
     - Creates FirmwareEffect enum combining values from both
     - Removes MultiZoneEffectType and TileEffectType
     - Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
