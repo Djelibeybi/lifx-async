@@ -15,131 +15,296 @@ from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.discovery import (
-    _extract_lifx_info,
+    _LifxRecordCache,
     create_device_from_record,
 )
 from lifx.network.mdns.dns import DnsResourceRecord, SrvData, TxtData
 from lifx.network.mdns.types import LifxServiceRecord
 
 
-class TestExtractLifxInfo:
-    """Tests for _extract_lifx_info helper function."""
+def _txt(serial: str = "d073d5123456", product: str = "27") -> TxtData:
+    pairs = {"id": serial, "p": product, "fw": "4.112"}
+    return TxtData(
+        strings=[f"{k}={v}" for k, v in pairs.items() if v],
+        pairs={k: v for k, v in pairs.items() if v},
+    )
 
-    def test_extract_with_all_records(self) -> None:
-        """Test extraction with TXT, SRV, and A records."""
-        txt_data = TxtData(
-            strings=["id=d073d5123456", "p=27", "fw=4.112"],
-            pairs={"id": "d073d5123456", "p": "27", "fw": "4.112"},
-        )
+
+def _receive_script(*packets: tuple[bytes, tuple[str, int]]):
+    """Build a receive() mock yielding the given packets, then timing out.
+
+    Discovery may call receive() any number of times (query retransmissions
+    keep the loop going), so exhaustible side-effect lists are not suitable.
+    """
+    queue = list(packets)
+
+    async def receive(timeout: float = 5.0) -> tuple[bytes, tuple[str, int]]:
+        if queue:
+            return queue.pop(0)
+        raise LifxTimeoutError("timeout")
+
+    return receive
+
+
+class TestLifxRecordCache:
+    """Tests for the _LifxRecordCache mDNS record accumulator."""
+
+    def test_resolve_with_all_records(self) -> None:
+        """Test resolution with TXT, SRV, and A records in one packet."""
         srv_data = SrvData(priority=0, weight=0, port=56700, target="host.local")
 
         records = [
-            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", txt_data),
+            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", _txt()),
             DnsResourceRecord("test._lifx._udp.local", 33, 1, 120, b"", srv_data),
             DnsResourceRecord("host.local", 1, 1, 120, b"", "192.168.1.100"),
         ]
 
-        result = _extract_lifx_info(records, "192.168.1.50")
+        cache = _LifxRecordCache()
+        assert cache.add_packet(records, "192.168.1.50") is True
+        results = cache.resolve()
 
-        assert result is not None
+        assert len(results) == 1
+        result = results[0]
         assert result.serial == "d073d5123456"
         assert result.ip == "192.168.1.100"  # From A record
         assert result.port == 56700  # From SRV record
         assert result.product_id == 27
         assert result.firmware == "4.112"
 
-    def test_extract_with_txt_only(self) -> None:
-        """Test extraction with only TXT record."""
-        txt_data = TxtData(
-            strings=["id=d073d5123456", "p=27", "fw=4.112"],
-            pairs={"id": "d073d5123456", "p": "27", "fw": "4.112"},
-        )
+    def test_resolve_with_txt_only(self) -> None:
+        """Test resolution falls back to source IP with only a TXT record."""
+        records = [
+            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", _txt()),
+        ]
 
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
+        results = cache.resolve()
+
+        assert len(results) == 1
+        assert results[0].serial == "d073d5123456"
+        assert results[0].ip == "192.168.1.50"  # From source IP
+        assert results[0].port == 56700  # Default
+
+    def test_resolve_missing_serial(self) -> None:
+        """Test resolution fails without serial."""
+        txt_data = TxtData(strings=["p=27"], pairs={"p": "27"})
         records = [
             DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", txt_data),
         ]
 
-        result = _extract_lifx_info(records, "192.168.1.50")
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
 
-        assert result is not None
-        assert result.serial == "d073d5123456"
-        assert result.ip == "192.168.1.50"  # From source IP
-        assert result.port == 56700  # Default
-        assert result.product_id == 27
+        assert cache.resolve() == []
 
-    def test_extract_missing_serial(self) -> None:
-        """Test extraction fails without serial."""
-        txt_data = TxtData(
-            strings=["p=27", "fw=4.112"],
-            pairs={"p": "27", "fw": "4.112"},
-        )
-
+    def test_resolve_missing_product_id(self) -> None:
+        """Test resolution fails without product ID."""
+        txt_data = TxtData(strings=["id=d073d5123456"], pairs={"id": "d073d5123456"})
         records = [
             DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", txt_data),
         ]
 
-        result = _extract_lifx_info(records, "192.168.1.50")
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
 
-        assert result is None
+        assert cache.resolve() == []
 
-    def test_extract_missing_product_id(self) -> None:
-        """Test extraction fails without product ID."""
-        txt_data = TxtData(
-            strings=["id=d073d5123456", "fw=4.112"],
-            pairs={"id": "d073d5123456", "fw": "4.112"},
-        )
-
+    def test_resolve_invalid_product_id(self) -> None:
+        """Test resolution fails with non-numeric product ID."""
         records = [
-            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", txt_data),
+            DnsResourceRecord(
+                "test._lifx._udp.local", 16, 1, 120, b"", _txt(product="abc")
+            ),
         ]
 
-        result = _extract_lifx_info(records, "192.168.1.50")
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
 
-        assert result is None
+        assert cache.resolve() == []
 
-    def test_extract_invalid_product_id(self) -> None:
-        """Test extraction fails with non-numeric product ID."""
-        txt_data = TxtData(
-            strings=["id=d073d5123456", "p=abc", "fw=4.112"],
-            pairs={"id": "d073d5123456", "p": "abc", "fw": "4.112"},
-        )
-
-        records = [
-            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", txt_data),
-        ]
-
-        result = _extract_lifx_info(records, "192.168.1.50")
-
-        assert result is None
-
-    def test_extract_no_txt_record(self) -> None:
-        """Test extraction fails without TXT record."""
+    def test_resolve_no_txt_record(self) -> None:
+        """Test resolution fails without TXT record."""
         srv_data = SrvData(priority=0, weight=0, port=56700, target="host.local")
-
         records = [
             DnsResourceRecord("test._lifx._udp.local", 33, 1, 120, b"", srv_data),
             DnsResourceRecord("host.local", 1, 1, 120, b"", "192.168.1.100"),
         ]
 
-        result = _extract_lifx_info(records, "192.168.1.50")
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
 
-        assert result is None
+        assert cache.resolve() == []
 
-    def test_extract_serial_lowercase(self) -> None:
+    def test_resolve_serial_lowercase(self) -> None:
         """Test that serial is lowercased."""
-        txt_data = TxtData(
-            strings=["id=D073D5AABBCC", "p=27"],
-            pairs={"id": "D073D5AABBCC", "p": "27"},
-        )
-
         records = [
-            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", txt_data),
+            DnsResourceRecord(
+                "test._lifx._udp.local", 16, 1, 120, b"", _txt(serial="D073D5AABBCC")
+            ),
         ]
 
-        result = _extract_lifx_info(records, "192.168.1.50")
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
+        results = cache.resolve()
 
-        assert result is not None
-        assert result.serial == "d073d5aabbcc"
+        assert len(results) == 1
+        assert results[0].serial == "d073d5aabbcc"
+
+    def test_resolve_ipv6_aaaa_record(self) -> None:
+        """Test resolution via AAAA record (Thread device)."""
+        srv_data = SrvData(priority=0, weight=0, port=56700, target="host.local")
+        records = [
+            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", _txt()),
+            DnsResourceRecord("test._lifx._udp.local", 33, 1, 120, b"", srv_data),
+            DnsResourceRecord("host.local", 28, 1, 120, b"", "fd00::1234"),
+        ]
+
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
+        results = cache.resolve()
+
+        assert len(results) == 1
+        assert results[0].ip == "fd00::1234"
+
+    def test_resolve_prefers_routable_ipv6_over_link_local(self) -> None:
+        """Test that a routable AAAA is preferred over a link-local one."""
+        srv_data = SrvData(priority=0, weight=0, port=56700, target="host.local")
+        records = [
+            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", _txt()),
+            DnsResourceRecord("test._lifx._udp.local", 33, 1, 120, b"", srv_data),
+            DnsResourceRecord("host.local", 28, 1, 120, b"", "fe80::1"),
+            DnsResourceRecord("host.local", 28, 1, 120, b"", "fd00::1234"),
+        ]
+
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
+        results = cache.resolve()
+
+        assert len(results) == 1
+        assert results[0].ip == "fd00::1234"
+
+    def test_resolve_prefers_ipv4_over_ipv6(self) -> None:
+        """Test that an A record is preferred over AAAA records."""
+        srv_data = SrvData(priority=0, weight=0, port=56700, target="host.local")
+        records = [
+            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", _txt()),
+            DnsResourceRecord("test._lifx._udp.local", 33, 1, 120, b"", srv_data),
+            DnsResourceRecord("host.local", 28, 1, 120, b"", "fd00::1234"),
+            DnsResourceRecord("host.local", 1, 1, 120, b"", "192.168.1.100"),
+        ]
+
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
+        results = cache.resolve()
+
+        assert len(results) == 1
+        assert results[0].ip == "192.168.1.100"
+
+    def test_resolve_multi_instance_packet(self) -> None:
+        """Test a single packet advertising multiple devices (border router)."""
+        records = []
+        for n in (1, 2):
+            instance = f"bulb{n}._lifx._udp.local"
+            host = f"host{n}.local"
+            records.extend(
+                [
+                    DnsResourceRecord(
+                        instance, 16, 1, 120, b"", _txt(serial=f"d073d500000{n}")
+                    ),
+                    DnsResourceRecord(
+                        instance,
+                        33,
+                        1,
+                        120,
+                        b"",
+                        SrvData(priority=0, weight=0, port=56700, target=host),
+                    ),
+                    DnsResourceRecord(host, 28, 1, 120, b"", f"fd00::{n}"),
+                ]
+            )
+
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.1")
+        results = {r.serial: r.ip for r in cache.resolve()}
+
+        assert results == {
+            "d073d5000001": "fd00::1",
+            "d073d5000002": "fd00::2",
+        }
+
+    def test_multi_instance_unresolvable_not_misattributed(self) -> None:
+        """An instance without address records must not get the proxy's IP."""
+        records = []
+        for n in (1, 2):
+            instance = f"bulb{n}._lifx._udp.local"
+            records.extend(
+                [
+                    DnsResourceRecord(
+                        instance, 16, 1, 120, b"", _txt(serial=f"d073d500000{n}")
+                    ),
+                    DnsResourceRecord(
+                        instance,
+                        33,
+                        1,
+                        120,
+                        b"",
+                        SrvData(
+                            priority=0, weight=0, port=56700, target=f"host{n}.local"
+                        ),
+                    ),
+                ]
+            )
+        # Address record for instance 1 only
+        records.append(DnsResourceRecord("host1.local", 28, 1, 120, b"", "fd00::1"))
+
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.1")
+        results = cache.resolve()
+
+        assert [r.serial for r in results] == ["d073d5000001"]
+        # The unresolved instance's target is reported for a follow-up query
+        assert cache.pending_targets() == ["host2.local"]
+
+    def test_resolve_across_packets(self) -> None:
+        """Records split across packets are joined once the address arrives."""
+        instance = "bulb2._lifx._udp.local"
+        packet1 = [
+            DnsResourceRecord(instance, 16, 1, 120, b"", _txt()),
+            DnsResourceRecord(
+                instance,
+                33,
+                1,
+                120,
+                b"",
+                SrvData(priority=0, weight=0, port=56700, target="host2.local"),
+            ),
+        ]
+        packet2 = [
+            DnsResourceRecord("host2.local", 28, 1, 120, b"", "fd00::2"),
+        ]
+
+        cache = _LifxRecordCache()
+        cache.add_packet(packet1, "192.168.1.1")
+        assert cache.resolve() == []
+
+        assert cache.add_packet(packet2, "192.168.1.1") is False
+        results = cache.resolve()
+
+        assert len(results) == 1
+        assert results[0].ip == "fd00::2"
+
+    def test_resolve_emits_each_instance_once(self) -> None:
+        """A resolved instance is not returned again by later resolve calls."""
+        records = [
+            DnsResourceRecord("test._lifx._udp.local", 16, 1, 120, b"", _txt()),
+        ]
+
+        cache = _LifxRecordCache()
+        cache.add_packet(records, "192.168.1.50")
+
+        assert len(cache.resolve()) == 1
+        assert cache.resolve() == []
 
 
 class TestCreateDeviceFromRecord:
@@ -379,11 +544,9 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            # First receive returns data, second raises LifxTimeoutError (clean end)
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (mock_response_data, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 mock_parse.return_value = mock_parsed_response
@@ -484,10 +647,9 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 mock_parse.return_value = mock_query_response
@@ -515,10 +677,9 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 mock_parse.return_value = mock_response
@@ -552,10 +713,9 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 mock_parse.return_value = mock_response
@@ -564,7 +724,7 @@ class TestDiscoverLifxServices:
                 async for record in discover_lifx_services(timeout=0.1):
                     records.append(record)
 
-                # Should be empty because _extract_lifx_info returns None
+                # Should be empty because the TXT record has no id/p fields
                 assert len(records) == 0
 
     @pytest.mark.asyncio
@@ -576,10 +736,9 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 # Parsing fails with an exception
@@ -612,10 +771,9 @@ class TestDiscoverLifxServices:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 mock_parse.return_value = mock_response
@@ -652,11 +810,10 @@ class TestDiscoverLifxServices:
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
             # Return same device twice, then timeout
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 100, ("192.168.1.100", 5353)),
                 (b"\x00" * 100, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
                 mock_parse.return_value = mock_parsed_response
@@ -699,11 +856,10 @@ class TestDiscoverLifxServices:
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
             # Same device twice (duplicate), then timeout
-            mock_transport.receive.side_effect = [
+            mock_transport.receive.side_effect = _receive_script(
                 (b"\x00" * 100, ("192.168.1.100", 5353)),
                 (b"\x00" * 100, ("192.168.1.100", 5353)),
-                LifxTimeoutError("timeout"),
-            ]
+            )
 
             with (
                 patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse,

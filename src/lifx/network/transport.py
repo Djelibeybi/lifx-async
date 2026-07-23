@@ -137,12 +137,15 @@ class UdpTransport:
             protocol = _UdpProtocol()
             self._protocol = protocol
 
-            # Create datagram endpoint
+            # Create datagram endpoint. The socket family follows the local
+            # bind address: "::" selects IPv6, which is required to reach
+            # Thread devices that have no IPv4 address.
+            family = socket.AF_INET6 if ":" in self._ip_address else socket.AF_INET
             self._transport, _ = await loop.create_datagram_endpoint(
                 lambda: protocol,
                 local_addr=(self._ip_address, self._port),
                 reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
-                family=socket.AF_INET,
+                family=family,
             )
 
             # Get actual port assigned

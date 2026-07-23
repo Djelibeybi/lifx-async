@@ -330,6 +330,14 @@ def parse_dns_response(data: bytes) -> ParsedDnsResponse:
     return ParsedDnsResponse(header, records)
 
 
+def _encode_name(name: str) -> bytes:
+    """Encode a DNS name as length-prefixed labels."""
+    encoded = b""
+    for label in name.split("."):
+        encoded += bytes([len(label)]) + label.encode("utf-8")
+    return encoded + b"\x00"  # Root label
+
+
 def build_ptr_query(service: str) -> bytes:
     """Build an mDNS PTR query for a service type.
 
@@ -347,10 +355,30 @@ def build_ptr_query(service: str) -> bytes:
     header = struct.pack("!HHHHHH", 0, 0, 1, 0, 0, 0)
 
     # Question: service name, PTR type, IN class
-    question = b""
-    for label in service.split("."):
-        question += bytes([len(label)]) + label.encode("utf-8")
-    question += b"\x00"  # Root label
-    question += struct.pack("!HH", DNS_TYPE_PTR, DNS_CLASS_IN)
+    question = _encode_name(service) + struct.pack("!HH", DNS_TYPE_PTR, DNS_CLASS_IN)
 
     return header + question
+
+
+def build_address_query(hostname: str) -> bytes:
+    """Build an mDNS query for a host's A and AAAA records.
+
+    Used to resolve an SRV target hostname whose address records were not
+    included in the service response — e.g. when a Thread border router's
+    single legacy-unicast reply had room for every instance's TXT/SRV
+    records but not all of their AAAA records.
+
+    Args:
+        hostname: Hostname to resolve (e.g., "d073d5123456.local")
+
+    Returns:
+        DNS query packet bytes ready to send
+    """
+    # Header: ID=0 (mDNS), standard query, 2 questions (A + AAAA)
+    header = struct.pack("!HHHHHH", 0, 0, 2, 0, 0, 0)
+
+    name = _encode_name(hostname)
+    questions = name + struct.pack("!HH", DNS_TYPE_A, DNS_CLASS_IN)
+    questions += name + struct.pack("!HH", DNS_TYPE_AAAA, DNS_CLASS_IN)
+
+    return header + questions

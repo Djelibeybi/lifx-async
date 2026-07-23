@@ -395,9 +395,21 @@ class Device(Generic[StateT]):
                 }
             )
 
-        # LIFX uses IPv4 only (protocol limitation)
-        if addr.version != 4:
-            raise ValueError("Only IPv4 addresses are supported")  # pragma: no cover
+        # Both IPv4 (WiFi) and IPv6 (Thread) devices are supported. IPv6
+        # link-local addresses need a zone/scope ID to be reachable.
+        if (
+            addr.version == 6
+            and addr.is_link_local
+            and getattr(addr, "scope_id", None) is None
+        ):
+            _LOGGER.warning(
+                {
+                    "class": "Device",
+                    "method": "__init__",
+                    "action": "link_local_without_scope",
+                    "ip": ip,
+                }
+            )
 
         # Validate port
         if not (1024 <= port <= 65535):

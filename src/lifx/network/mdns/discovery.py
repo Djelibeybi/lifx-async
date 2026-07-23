@@ -20,6 +20,7 @@ Example:
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -36,11 +37,12 @@ from lifx.const import (
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.dns import (
     DNS_TYPE_A,
-    DNS_TYPE_PTR,
+    DNS_TYPE_AAAA,
     DNS_TYPE_SRV,
     DNS_TYPE_TXT,
     SrvData,
     TxtData,
+    build_address_query,
     build_ptr_query,
     parse_dns_response,
 )
@@ -54,63 +56,180 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def _extract_lifx_info(
-    records: list,
-    source_ip: str,
-) -> LifxServiceRecord | None:
-    """Extract LIFX device info from mDNS records.
+def _pick_address(a_ip: str | None, aaaa_ips: list[str]) -> str | None:
+    """Pick the best address for a host from its A and AAAA records.
 
-    Args:
-        records: List of DnsResourceRecord from the response
-        source_ip: IP address the response came from
-
-    Returns:
-        LifxServiceRecord if valid LIFX device info found, None otherwise
+    Prefers an IPv4 A record, then an IPv6 AAAA record (Thread devices are
+    IPv6-only). Among AAAA records, routable addresses (ULA/GUA) are
+    preferred over link-local, which would need a zone/scope ID to be
+    reachable.
     """
-    # Find records of each type
-    srv_data: SrvData | None = None
-    txt_data: TxtData | None = None
-    a_record_ip: str | None = None
+    if a_ip is not None:
+        return a_ip
+    if aaaa_ips:
+        routable = [
+            addr for addr in aaaa_ips if not ipaddress.ip_address(addr).is_link_local
+        ]
+        return routable[0] if routable else aaaa_ips[0]
+    return None
 
-    for record in records:
-        if record.rtype == DNS_TYPE_SRV and isinstance(record.parsed_data, SrvData):
-            srv_data = record.parsed_data
-        elif record.rtype == DNS_TYPE_TXT and isinstance(record.parsed_data, TxtData):
-            txt_data = record.parsed_data
-        elif record.rtype == DNS_TYPE_A and isinstance(record.parsed_data, str):
-            a_record_ip = record.parsed_data
 
-    # Need at least TXT record to identify the device
-    if txt_data is None:
-        return None
+class _LifxRecordCache:
+    """Accumulates mDNS records across response packets during discovery.
 
-    # Extract required fields from TXT record
-    serial = txt_data.pairs.get("id", "").lower()
-    product_id_str = txt_data.pairs.get("p", "")
-    firmware = txt_data.pairs.get("fw", "")
+    Responders may split the records for a service instance across multiple
+    packets (e.g. TXT in one packet, the AAAA for its SRV target in a later
+    one), and a Thread border router advertises every device on its mesh at
+    once. Records are therefore cached for the whole discovery window and
+    each instance is emitted as soon as it can be fully resolved.
+    """
 
-    # Validate required fields
-    if not serial or not product_id_str:
-        return None
+    # Bound on entries per record table — guards against multicast floods
+    # filling memory during the discovery window
+    _MAX_ENTRIES = 1024
 
-    try:
-        product_id = int(product_id_str)
-    except ValueError:
-        return None
+    def __init__(self) -> None:
+        self._srv_by_instance: dict[str, SrvData] = {}
+        self._txt_by_instance: dict[str, TxtData] = {}
+        self._a_by_host: dict[str, str] = {}
+        self._aaaa_by_host: dict[str, list[str]] = {}
+        self._fallback_ip_by_instance: dict[str, str] = {}
+        self._resolved_instances: set[str] = set()
 
-    # Get port from SRV record or use default
-    port = srv_data.port if srv_data else 56700
+    @staticmethod
+    def _add(table: dict, key: str, value: object) -> None:
+        if len(table) < _LifxRecordCache._MAX_ENTRIES or key in table:
+            table[key] = value
 
-    # Get IP from A record or use source IP
-    ip = a_record_ip if a_record_ip else source_ip
+    def add_packet(self, records: list, source_ip: str) -> bool:
+        """Merge one packet's records into the cache.
 
-    return LifxServiceRecord(
-        serial=serial,
-        ip=ip,
-        port=port,
-        product_id=product_id,
-        firmware=firmware,
-    )
+        Args:
+            records: List of DnsResourceRecord from the response
+            source_ip: IP address the packet came from
+
+        Returns:
+            True if the packet contained LIFX-related records
+        """
+        packet_instances: list[str] = []
+        has_lifx = False
+
+        for record in records:
+            name = record.name.lower()
+            if LIFX_MDNS_SERVICE in name:
+                has_lifx = True
+            if record.rtype == DNS_TYPE_SRV and isinstance(record.parsed_data, SrvData):
+                self._add(self._srv_by_instance, name, record.parsed_data)
+            elif record.rtype == DNS_TYPE_TXT and isinstance(
+                record.parsed_data, TxtData
+            ):
+                self._add(self._txt_by_instance, name, record.parsed_data)
+                packet_instances.append(name)
+                # A TXT record in LIFX format marks the packet as LIFX even
+                # without a service name match, so that duplicate
+                # re-announcements keep resetting the caller's idle deadline
+                if "id" in record.parsed_data.pairs and "p" in record.parsed_data.pairs:
+                    has_lifx = True
+            elif record.rtype == DNS_TYPE_A and isinstance(record.parsed_data, str):
+                self._add(self._a_by_host, name, record.parsed_data)
+            elif record.rtype == DNS_TYPE_AAAA and isinstance(record.parsed_data, str):
+                addrs = self._aaaa_by_host.setdefault(name, [])
+                if record.parsed_data not in addrs and len(addrs) < 16:
+                    addrs.append(record.parsed_data)
+
+        # A packet advertising exactly one instance came from the device
+        # itself (not an advertising proxy), so its source address can serve
+        # as the device address if no A/AAAA record ever resolves.
+        if len(packet_instances) == 1:
+            self._fallback_ip_by_instance.setdefault(packet_instances[0], source_ip)
+
+        return has_lifx
+
+    def resolve(self) -> list[LifxServiceRecord]:
+        """Return service records for instances that can now be resolved.
+
+        Each instance is returned at most once across the lifetime of the
+        cache.
+        """
+        results: list[LifxServiceRecord] = []
+
+        for instance, txt_data in self._txt_by_instance.items():
+            if instance in self._resolved_instances:
+                continue
+
+            # Extract required fields from TXT record
+            serial = txt_data.pairs.get("id", "").lower()
+            product_id_str = txt_data.pairs.get("p", "")
+            firmware = txt_data.pairs.get("fw", "")
+
+            # Validate required fields
+            if not serial or not product_id_str:
+                continue
+
+            try:
+                product_id = int(product_id_str)
+            except ValueError:
+                continue
+
+            # Get port from SRV record or use default
+            srv_data = self._srv_by_instance.get(instance)
+            port = srv_data.port if srv_data else 56700
+
+            # Resolve the instance's SRV target hostname to an address. An
+            # instance advertised without any SRV record falls back to the
+            # source address of its own single-instance response packet. An
+            # instance WITH an SRV record but no address records yet stays
+            # pending — its target is reported by pending_targets() for a
+            # follow-up query — because guessing the packet's source address
+            # would misattribute devices advertised by a border router.
+            ip: str | None = None
+            if srv_data is not None:
+                target = srv_data.target.lower()
+                ip = _pick_address(
+                    self._a_by_host.get(target), self._aaaa_by_host.get(target, [])
+                )
+            else:
+                ip = self._fallback_ip_by_instance.get(instance)
+            if ip is None:
+                continue
+
+            self._resolved_instances.add(instance)
+            results.append(
+                LifxServiceRecord(
+                    serial=serial,
+                    ip=ip,
+                    port=port,
+                    product_id=product_id,
+                    firmware=firmware,
+                )
+            )
+
+        return results
+
+    def pending_targets(self) -> list[str]:
+        """Return SRV target hostnames still needed to resolve instances.
+
+        These are hostnames of valid LIFX instances whose address records
+        have not been seen — e.g. when a border router's single reply packet
+        had room for every instance's TXT/SRV records but not all of their
+        AAAA records. The caller can query these hosts directly.
+        """
+        targets: list[str] = []
+
+        for instance, txt_data in self._txt_by_instance.items():
+            if instance in self._resolved_instances:
+                continue
+            if not txt_data.pairs.get("id") or not txt_data.pairs.get("p"):
+                continue
+            srv_data = self._srv_by_instance.get(instance)
+            if srv_data is None:
+                continue
+            target = srv_data.target.lower()
+            if target in self._a_by_host or target in self._aaaa_by_host:
+                continue
+            targets.append(target)
+
+        return targets
 
 
 def create_device_from_record(
@@ -204,6 +323,8 @@ async def discover_lifx_services(
         ```
     """
     seen_serials: set[str] = set()
+    record_cache = _LifxRecordCache()
+    queried_targets: set[str] = set()
     start_time = time.monotonic()
 
     async with MdnsTransport() as transport:
@@ -221,6 +342,11 @@ async def discover_lifx_services(
         )
 
         await transport.send(query)
+
+        # Per RFC 6762 §5.2, queriers should re-send their query to catch
+        # responders whose (randomly delayed) answers were lost or deferred.
+        # Responses are deduplicated by serial, so re-answers are harmless.
+        retransmit_delays = [1.0, 3.0]
 
         idle_timeout = max_response_time * idle_timeout_multiplier
         deadline = IdleDeadline(timeout, idle_timeout)
@@ -255,9 +381,29 @@ async def discover_lifx_services(
             if remaining <= 0:
                 break
 
+            # Cap the receive timeout at the next scheduled retransmission
+            elapsed = time.monotonic() - start_time
+            if retransmit_delays and elapsed >= retransmit_delays[0]:
+                retransmit_delays.pop(0)
+                _LOGGER.debug(
+                    {
+                        "class": "discover_lifx_services",
+                        "method": "discover",
+                        "action": "retransmitting_query",
+                        "elapsed": elapsed,
+                    }
+                )
+                await transport.send(query)
+            if retransmit_delays:
+                remaining = min(remaining, retransmit_delays[0] - elapsed)
+
             try:
-                data, addr = await transport.receive(timeout=remaining)
+                data, addr = await transport.receive(timeout=max(remaining, 0.01))
             except LifxTimeoutError:
+                if retransmit_delays:
+                    # Timed out waiting for the retransmission slot, not the
+                    # deadline — loop to re-send the query
+                    continue
                 # Clean end of collection — no more responses within the deadline
                 break
             except LifxNetworkError as e:
@@ -288,29 +434,32 @@ async def discover_lifx_services(
                 if not response.header.is_response:
                     continue
 
-                # Check if this is a LIFX response (has PTR for _lifx._udp.local)
-                has_lifx_ptr = any(
-                    r.rtype == DNS_TYPE_PTR and LIFX_MDNS_SERVICE in r.name
-                    for r in response.records
-                )
+                # Merge every response packet into the cache: a packet
+                # carrying only A/AAAA records may complete an instance whose
+                # SRV/TXT arrived in an earlier packet. A packet may also
+                # advertise multiple instances at once (e.g. a Thread border
+                # router answering for its whole mesh).
+                had_lifx = record_cache.add_packet(response.records, addr[0])
+                extracted = record_cache.resolve()
 
-                if not has_lifx_ptr:
-                    # Might still be a LIFX device responding without PTR
-                    # Check TXT records for LIFX format
-                    has_lifx_txt = any(
-                        r.rtype == DNS_TYPE_TXT
-                        and isinstance(r.parsed_data, TxtData)
-                        and "id" in r.parsed_data.pairs
-                        and "p" in r.parsed_data.pairs
-                        for r in response.records
-                    )
-                    if not has_lifx_txt:
+                # Query address records the responses did not include (a
+                # single reply packet may not have room for every AAAA
+                # record). Capped to bound traffic on hostile networks.
+                for target in record_cache.pending_targets():
+                    if target in queried_targets or len(queried_targets) >= 64:
                         continue
+                    queried_targets.add(target)
+                    _LOGGER.debug(
+                        {
+                            "class": "discover_lifx_services",
+                            "method": "discover",
+                            "action": "querying_addresses",
+                            "target": target,
+                        }
+                    )
+                    await transport.send(build_address_query(target))
 
-                # Extract device info from records
-                record = _extract_lifx_info(response.records, addr[0])
-
-                if record is None:
+                if not had_lifx and not extracted:
                     continue
 
                 # Reset idle timer on every valid LIFX response, before the
@@ -320,25 +469,26 @@ async def discover_lifx_services(
                 # _discover_with_packet).
                 deadline.mark_response()
 
-                # Deduplicate by serial
-                if record.serial in seen_serials:
-                    continue
+                for record in extracted:
+                    # Deduplicate by serial
+                    if record.serial in seen_serials:
+                        continue
 
-                seen_serials.add(record.serial)
+                    seen_serials.add(record.serial)
 
-                _LOGGER.debug(
-                    {
-                        "class": "discover_lifx_services",
-                        "method": "discover",
-                        "action": "device_found",
-                        "serial": record.serial,
-                        "ip": record.ip,
-                        "port": record.port,
-                        "product_id": record.product_id,
-                    }
-                )
+                    _LOGGER.debug(
+                        {
+                            "class": "discover_lifx_services",
+                            "method": "discover",
+                            "action": "device_found",
+                            "serial": record.serial,
+                            "ip": record.ip,
+                            "port": record.port,
+                            "product_id": record.product_id,
+                        }
+                    )
 
-                yield record
+                    yield record
 
             except Exception as e:
                 _LOGGER.debug(
