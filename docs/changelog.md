@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v5.6.1 (2026-07-25)
+
+### Bug Fixes
+
+- **devices**: Narrow the MAC offset to firmware 3.70+ and add the audit script
+  ([`bdb84f7`](https://github.com/Djelibeybi/lifx-async/commit/bdb84f7739311291bf5f36b315211bf65e51b5a5))
+
+### Documentation
+
+- **quick-260726-42c**: Ship quick task — PR #175 [ci skip]
+  ([`786ad34`](https://github.com/Djelibeybi/lifx-async/commit/786ad344909a1192d8cebc46de5062005c681510))
+
+
 ## v5.6.0 (2026-07-18)
 
 ### Features
