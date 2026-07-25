@@ -2,9 +2,9 @@
 phase: 4
 slug: animation-flow-control
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-07-17
 ---
 
@@ -39,13 +39,13 @@ created: 2026-07-17
 
 | Req ID | Behaviour | Test Type | Automated Command | File Exists | Status |
 |--------|-----------|-----------|-------------------|-------------|--------|
-| ANIM-01 | AckGate sweep/track/expiry/gated branch matrix; gated frame returns `gated=True`, sends nothing, skips framebuffer work; seq-wrap overwrite | unit | `uv run pytest tests/test_animation/test_flow.py tests/test_animation/test_animator.py -x` | ❌ W0 (test_flow.py; plans 04-02→04-04) | ⬜ pending |
-| ANIM-01 | Deterministic gating end-to-end (emulator drops all acks via scenario `{45: 1.0}`; expiry reopens gate) | emulator | `uv run pytest tests/test_animation/test_animator.py -m emulator -x` | ❌ W0 (plan 04-02) | ⬜ pending |
-| ANIM-02 | Probe flag baked once on `probe_template_index` (standard→0, large→last CopyFB, multizone/light→0); other templates' flags byte 0; `AnimatorStats` additive fields | unit + static | `uv run pytest tests/test_animation/test_packets.py tests/test_animation/test_animator.py -x && uv run pyright && uv run ruff check .` | partial W0 (plans 04-01/04-03/04-04) | ⬜ pending |
-| ANIM-04 | Row-aligned 13×26 templates (7 Set64: 52×6+26 colours, y offsets 0,4,…,24, fb_index=1, row-aligned hsbk_start; + CopyFB); 16×8 shape unchanged | unit | `uv run pytest tests/test_animation/test_packets.py -x` | partial W0 (plans 04-01/04-03) | ⬜ pending |
-| ANIM-04 | Large-tile streaming vs emulated 13×26 device (product 201); probe on CopyFB acked; gating engages under ack-drop | emulator | `uv run pytest tests/test_animation/ -m emulator -x` | ❌ W0 fixture (plan 04-02) | ⬜ pending |
-| ANIM-03 | 0% concurrent-query loss + ≥85% delivered frames + operator visual verdict, Tiles @ 20 FPS | manual UAT + human checkpoint | `uat_ack_stream.py` (plan 04-05; runs in 04-06) | ❌ W0 | ⬜ pending |
-| ANIM-04 | Same flow control on Ceiling Capsule 192.168.19.231; probe-attachment decision validated; power-on before visual runs; CopyFB ack RTT evidence | manual UAT + human checkpoint | `uat_ack_stream.py` (ceiling host; plan 04-07) | ❌ W0 | ⬜ pending |
+| ANIM-01 | AckGate sweep/track/expiry/gated branch matrix; gated frame returns `gated=True`, sends nothing, skips framebuffer work; seq-wrap overwrite | unit | `uv run pytest tests/test_animation/test_flow.py tests/test_animation/test_animator.py -x` | ✅ `tests/test_animation/test_flow.py` | ✅ COVERED |
+| ANIM-01 | Deterministic gating end-to-end (emulator drops all acks via scenario `{45: 1.0}`; expiry reopens gate) | emulator | `uv run pytest tests/test_animation/test_animator.py -m emulator -x` | ✅ `tests/test_animation/test_animator.py` (emulator) | ✅ COVERED |
+| ANIM-02 | Probe flag baked once on `probe_template_index` (standard→0, large→last CopyFB, multizone/light→0); other templates' flags byte 0; `AnimatorStats` additive fields | unit + static | `uv run pytest tests/test_animation/test_packets.py tests/test_animation/test_animator.py -x && uv run pyright && uv run ruff check .` | ✅ `test_packets.py` + `test_animator.py` | ✅ COVERED |
+| ANIM-04 | Row-aligned 13×26 templates (7 Set64: 52×6+26 colours, y offsets 0,4,…,24, fb_index=1, row-aligned hsbk_start; + CopyFB); 16×8 shape unchanged | unit | `uv run pytest tests/test_animation/test_packets.py -x` | ✅ `tests/test_animation/test_packets.py` | ✅ COVERED |
+| ANIM-04 | Large-tile streaming vs emulated 13×26 device (product 201); probe on CopyFB acked; gating engages under ack-drop | emulator | `uv run pytest tests/test_animation/ -m emulator -x` | ✅ `tests/test_animation/` (emulator fixture) | ✅ COVERED |
+| ANIM-03 | 0% concurrent-query loss + ≥85% delivered frames + operator visual verdict, Tiles @ 20 FPS | manual UAT + human checkpoint | `uat_ack_stream.py` (plan 04-05; ran in 04-06) | ✅ harness + operator sign-off | ✅ COVERED (manual) |
+| ANIM-04 | Same flow control on the Ceiling Capsule host; probe-attachment decision validated; power-on before visual runs; CopyFB ack RTT evidence | manual UAT + human checkpoint | `uat_ack_stream.py` (ceiling host; ran in 04-07) | ✅ harness + operator sign-off | ✅ COVERED (manual) |
 
 Enumerated existing-test changes (6 mocked-socket, 3 emulator-loop, per 04-RESEARCH.md
 §Validation Architecture) are scheduled in plan 04-02 and must not be weakened.
@@ -54,10 +54,10 @@ Enumerated existing-test changes (6 mocked-socket, 3 emulator-loop, per 04-RESEA
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_animation/test_flow.py` — AckGate branch-matrix stubs (plan 04-02)
-- [ ] `test_packets.py` row-aligned 13×26 geometry matrix + probe seam tests (plan 04-01)
-- [ ] Shared `mock_udp_socket` fixture with `recvfrom_into` BlockingIOError default + `make_ack_datagram` helper + 13×26 emulator fixture (plan 04-02)
-- [ ] `uat_ack_stream.py` harness with fixed 0/1/2 exit contract (plan 04-05)
+- [x] `tests/test_animation/test_flow.py` — AckGate branch-matrix stubs (plan 04-02)
+- [x] `test_packets.py` row-aligned 13×26 geometry matrix + probe seam tests (plan 04-01)
+- [x] Shared `mock_udp_socket` fixture with `recvfrom_into` BlockingIOError default + `make_ack_datagram` helper + 13×26 emulator fixture (plan 04-02)
+- [x] `uat_ack_stream.py` harness with fixed 0/1/2 exit contract (plan 04-05)
 
 ---
 
@@ -72,11 +72,39 @@ Enumerated existing-test changes (6 mocked-socket, 3 emulator-loop, per 04-RESEA
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 120s
+- [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## Validation Audit 2026-07-26
+
+Retroactive audit run by `/gsd-validate-phase 4` at v1.1 milestone close. The file had
+never been reconciled after execution, so it still carried the plan-time seed
+(`status: draft`) and its map still read as pending.
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+Every Wave 0 artefact exists and every automated row is green:
+
+- `tests/test_animation/` — 185 passed, of which 12 are `-m emulator`
+- `tests/test_animation/conftest.py` provides `mock_udp_socket` and `make_ack_datagram`
+- `test_animator.py` covers the gate-before-framebuffer drop, gated frames consuming no
+  sequence numbers, and the probe seam asserting the flag on exactly
+  `probe_template_index` (7 for the large-tile generator)
+- `test_packets.py` covers the 13×26 geometry (`rows_per_packet = 64 // 13 = 4`,
+  `packets_per_tile = ceil(26/4) = 7`)
+- `uat_ack_stream.py` carries the fixed 0/1/2 exit contract; both hardware verdicts were
+  signed off by the operator at the 04-06 and 04-07 checkpoints
+
+No auditor subagent was needed — the gap analysis found nothing to fill.
