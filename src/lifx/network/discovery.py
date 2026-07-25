@@ -188,10 +188,13 @@ async def _discover_with_packet(
         idle_timeout_multiplier: Idle timeout multiplier
 
     Note:
-        The idle timer is reset before each response is yielded, so time the
-        consumer spends processing a yielded response counts against the idle
-        window. Slow consumers (e.g. performing network round trips per
-        response) should pass a larger ``idle_timeout_multiplier``.
+        The idle timer is reset both before a response is yielded and again
+        once the consumer resumes the generator, so time the consumer spends
+        processing a response does not count against the idle window. A
+        consumer that performs network round trips per response (as
+        ``discover()`` does, constructing a Device each time) therefore cannot
+        expire discovery early. The overall ``timeout`` is unaffected and still
+        bounds the sweep.
 
     Yields:
         DiscoveryResponse objects with unpacked response payloads, one per
@@ -431,6 +434,16 @@ async def _discover_with_packet(
                 seen_serials.add(device_serial)
 
                 yield discovery_resp
+
+                # Control has come back from the consumer. Reset the idle timer
+                # again so the consumer's own work does not count against the
+                # idle window: api.discover() constructs a Device per yielded
+                # response, and those requests carry a wall deadline several
+                # times the idle window, so one slow or dead device would
+                # otherwise expire discovery before later re-broadcast
+                # responses are read (DISC-03). The overall deadline is
+                # untouched and still bounds the sweep.
+                deadline.mark_response()
 
                 _LOGGER.debug(
                     {
