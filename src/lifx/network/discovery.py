@@ -190,11 +190,23 @@ async def _discover_with_packet(
     Note:
         The idle timer is reset both before a response is yielded and again
         once the consumer resumes the generator, so time the consumer spends
-        processing a response does not count against the idle window. A
+        processing a response does not count against the *idle* window. A
         consumer that performs network round trips per response (as
-        ``discover()`` does, constructing a Device each time) therefore cannot
-        expire discovery early. The overall ``timeout`` is unaffected and still
-        bounds the sweep.
+        ``discover()`` does, constructing a Device each time) therefore does
+        not expire the idle window.
+
+        The overall ``timeout`` is unaffected and remains the real bound. With
+        the default constants a single stalled request
+        (``DEFAULT_REQUEST_TIMEOUT``, 16 s) outlasts the whole discovery window
+        (``DISCOVERY_TIMEOUT``, 15 s), so one unreachable device can still end
+        the sweep early -- via the overall deadline rather than the idle one.
+        Raise ``timeout`` if per-device consumer work can approach the request
+        timeout.
+
+        Re-broadcast offsets that fall due while the consumer holds the
+        generator are all sent when it resumes (see
+        ``test_multiple_sends_due_in_one_loop_pass``), so a long stall
+        compresses the remaining schedule rather than deferring it.
 
     Yields:
         DiscoveryResponse objects with unpacked response payloads, one per
@@ -441,8 +453,22 @@ async def _discover_with_packet(
                 # response, and those requests carry a wall deadline several
                 # times the idle window, so one slow or dead device would
                 # otherwise expire discovery before later re-broadcast
-                # responses are read (DISC-03). The overall deadline is
-                # untouched and still bounds the sweep.
+                # responses are read.
+                #
+                # This is the second non-receive trigger for a reset (sends are
+                # deliberately NOT one -- see the module's re-broadcast
+                # rationale and test_send_does_not_reset_idle_window). The
+                # invariant is "time we spend, not time the network spends,
+                # never counts against the idle window".
+                #
+                # The overall deadline is untouched, and it -- not the idle
+                # window -- is what bounds a slow consumer. Note that with the
+                # default constants a single stalled request
+                # (DEFAULT_REQUEST_TIMEOUT, 16 s) outlasts the whole discovery
+                # window (DISCOVERY_TIMEOUT, 15 s), so a consumer that blocks
+                # for a full request timeout still ends the sweep -- via the
+                # overall deadline. Callers whose per-device work can approach
+                # the request timeout should raise ``timeout`` accordingly.
                 deadline.mark_response()
 
                 _LOGGER.debug(
@@ -518,6 +544,11 @@ async def discover_devices(
         overall completion moves later, because later re-broadcasts
         legitimately keep finding new devices and resetting the idle
         window.
+
+        The idle window measures network silence, not elapsed wall time:
+        time the consumer spends inside the ``async for`` body is excluded,
+        so a slow consumer no longer shortens the sweep. ``timeout``
+        (default 15 s) is the bound that still applies to it.
 
     Args:
         timeout: Discovery timeout in seconds

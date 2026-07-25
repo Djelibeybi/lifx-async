@@ -254,7 +254,7 @@ The `discover_devices()` function implements DoS protection through:
 - **Source ID validation** - Rejects responses with mismatched source IDs
 - **Serial validation** - Rejects invalid/broadcast serial numbers
 - **Overall timeout** - Discovery stops after timeout seconds (default: 15.0)
-- **Idle timeout** - Discovery stops when no responses are received for ~4 seconds (max_response_time × idle_timeout_multiplier)
+- **Idle timeout** - Discovery stops when no responses are received for ~4 seconds (max_response_time × idle_timeout_multiplier). The window measures network silence, not wall time: it is reset again when the consumer resumes the generator, so time spent inside the `async for` body is excluded. The overall timeout bounds a slow consumer — and since one request's wall deadline (16 s) exceeds the default discovery window (15 s), an unreachable device can still end a default-timeout sweep via that overall deadline.
 
 ## Testing Strategy
 

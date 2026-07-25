@@ -45,6 +45,15 @@ def _make_recording_send(send_times: list[float]) -> AsyncMock:
     return _recording_send
 
 
+def _make_ignoring_send() -> AsyncMock:
+    """Build a send mock for tests that make no claim about broadcast timing."""
+
+    async def _ignoring_send(data: bytes, address: tuple[str, int]) -> None:
+        return None
+
+    return _ignoring_send
+
+
 def _build_mock_transport(send: AsyncMock, receive: AsyncMock) -> AsyncMock:
     """Build an AsyncMock UdpTransport with the given send/receive callables."""
     mock_transport = AsyncMock()
@@ -311,7 +320,7 @@ class TestRebroadcastDedup:
 
 
 class TestConsumerIdleWindow:
-    """DISC-03: consumer time between yields must not expire the idle window."""
+    """Consumer time between yields must not expire the idle window."""
 
     @pytest.mark.asyncio
     async def test_consumer_time_does_not_consume_idle_window(self) -> None:
@@ -323,25 +332,29 @@ class TestConsumerIdleWindow:
         against the idle timer.
 
         Idle window is 0.3 s (max_response_time 0.15 x multiplier 2.0). The
-        consumer sleeps 0.5 s after the first device -- longer than the window
-        -- and a second device answers afterwards. Resetting the idle timer
-        only *before* the yield strands that second device.
+        second device's datagram is queued BEFORE the consumer stalls, so the
+        test exercises the production path -- a response that arrived during
+        the stall and must survive to be read after it -- rather than one
+        synthesised on demand afterwards.
         """
         known_source = 42
-        first_serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
-        second_serial = b"\xd0\x73\xd5\x0a\x0b\x0c\x00\x00"
-        first = _build_state_service_packet(source=known_source, target=first_serial)
-        second = _build_state_service_packet(source=known_source, target=second_serial)
-        call_count = 0
+        first = _build_state_service_packet(
+            source=known_source, target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        )
+        second = _build_state_service_packet(
+            source=known_source, target=b"\xd0\x73\xd5\x0a\x0b\x0c\x00\x00"
+        )
+        # Both datagrams are queued up front: the second is "in the socket"
+        # for the whole stall, exactly as it would be on a real network.
+        queued = [
+            (first, ("192.168.1.100", 56700)),
+            (second, ("192.168.1.101", 56700)),
+        ]
 
         async def mock_receive(timeout: float = 2.0):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return first, ("192.168.1.100", 56700)
-            if call_count == 2:
-                await asyncio.sleep(0.05)
-                return second, ("192.168.1.101", 56700)
+            if queued:
+                await asyncio.sleep(0)  # always yield to the event loop
+                return queued.pop(0)
             await asyncio.sleep(timeout)
             raise LifxTimeoutError("timeout")
 
@@ -351,7 +364,7 @@ class TestConsumerIdleWindow:
             patch("lifx.network.discovery.allocate_source", return_value=known_source),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
-                _make_recording_send([]), mock_receive
+                _make_ignoring_send(), mock_receive
             )
 
             serials: list[str] = []
@@ -369,27 +382,32 @@ class TestConsumerIdleWindow:
         assert serials == ["d073d5010203", "d073d50a0b0c"]
 
     @pytest.mark.asyncio
-    async def test_overall_deadline_still_bounds_a_slow_consumer(self) -> None:
-        """Resetting on resume must not let a slow consumer run forever.
+    async def test_consumer_time_excluded_through_the_public_api(self) -> None:
+        """The exclusion must survive both wrapper generators.
 
-        The overall timeout is untouched by the fix, so a consumer that sleeps
-        past it ends discovery even though the idle timer keeps being reset.
+        The benefit is claimed for `discover_devices()` -> `api.discover()`, so
+        a wrapper that materialised responses eagerly would break the
+        user-visible behaviour while a test against the private generator
+        stayed green.
         """
         known_source = 42
-        packet = _build_state_service_packet(
+        first = _build_state_service_packet(
             source=known_source, target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
         )
         second = _build_state_service_packet(
             source=known_source, target=b"\xd0\x73\xd5\x0a\x0b\x0c\x00\x00"
         )
-        call_count = 0
+        queued = [
+            (first, ("192.168.1.100", 56700)),
+            (second, ("192.168.1.101", 56700)),
+        ]
 
         async def mock_receive(timeout: float = 2.0):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return packet, ("192.168.1.100", 56700)
-            return second, ("192.168.1.101", 56700)
+            if queued:
+                await asyncio.sleep(0)
+                return queued.pop(0)
+            await asyncio.sleep(timeout)
+            raise LifxTimeoutError("timeout")
 
         with (
             patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
@@ -397,7 +415,56 @@ class TestConsumerIdleWindow:
             patch("lifx.network.discovery.allocate_source", return_value=known_source),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
-                _make_recording_send([]), mock_receive
+                _make_ignoring_send(), mock_receive
+            )
+
+            serials: list[str] = []
+            async for device in discover_devices(
+                timeout=3.0,
+                max_response_time=0.15,
+                idle_timeout_multiplier=2.0,
+            ):
+                serials.append(device.serial)
+                if len(serials) == 1:
+                    await asyncio.sleep(0.5)
+
+        assert serials == ["d073d5010203", "d073d50a0b0c"]
+
+    @pytest.mark.asyncio
+    async def test_overall_deadline_still_bounds_a_slow_consumer(self) -> None:
+        """Resetting on resume must not let a slow consumer run forever.
+
+        The overall timeout is untouched, so it -- not the idle window -- is
+        what ends a sweep whose consumer keeps stalling. Every device answers
+        with a distinct serial, so the loop is held open by the resume reset
+        under test rather than by the pre-yield reset via the dedup path.
+        """
+        known_source = 42
+        queued = [
+            (
+                _build_state_service_packet(
+                    source=known_source,
+                    target=bytes([0xD0, 0x73, 0xD5, 0x01, 0x02, index, 0x00, 0x00]),
+                ),
+                (f"192.168.1.{100 + index}", 56700),
+            )
+            for index in range(20)
+        ]
+
+        async def mock_receive(timeout: float = 2.0):
+            if queued:
+                await asyncio.sleep(0)
+                return queued.pop(0)
+            await asyncio.sleep(timeout)
+            raise LifxTimeoutError("timeout")
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport_cls.return_value = _build_mock_transport(
+                _make_ignoring_send(), mock_receive
             )
 
             start = time.monotonic()
@@ -409,11 +476,15 @@ class TestConsumerIdleWindow:
                 idle_timeout_multiplier=2.0,
             ):
                 serials.append(resp.serial)
-                await asyncio.sleep(0.3)
+                # Each stall resets the idle window; only the overall deadline
+                # can stop this loop.
+                await asyncio.sleep(0.15)
             elapsed = time.monotonic() - start
 
-        assert serials[0] == "d073d5010203"
-        assert elapsed < 2.0
+        assert serials, "at least one device must be yielded before the deadline"
+        assert serials[0] == "d073d5010200"
+        # Tight bound: the 0.4 s budget plus one consumer stall, not a 5x margin.
+        assert elapsed < 0.75, f"overall deadline overrun: {elapsed:.3f}s"
 
 
 @pytest.mark.emulator
