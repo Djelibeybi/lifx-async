@@ -39,6 +39,21 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+#: Firmware whose MAC address is the serial with the final octet incremented:
+#: ``version_major == 3 and version_minor >= 70``. Both components are compared
+#: as integers -- minor 9 is *below* minor 70, not above it, so treating the
+#: version as a decimal would classify 3.9 incorrectly. Firmware outside this
+#: range -- including earlier 3.x builds such as 3.50 -- reports a MAC identical
+#: to its serial.
+#:
+#: The 3.70 boundary is stated by LIFX, not inferred from a network sweep, so
+#: it does not need corroborating observations in the 3.5x-3.6x range. A fleet
+#: audit is what exposed the earlier major-only rule as wrong (Tiles on 3.50
+#: whose real MAC matched their serial); the replacement bound came from the
+#: vendor.
+_MAC_OFFSET_MAJOR = 3
+_MAC_OFFSET_MIN_MINOR = 70
+
 
 @dataclass
 class DeviceVersion:
@@ -441,6 +456,9 @@ class Device(Generic[StateT]):
         self._location: CollectionInfo | None = None
         self._group: CollectionInfo | None = None
         self._mac_address: str | None = None
+        # (version_major, version_minor) the cached MAC was derived from, so a
+        # firmware update across the offset boundary invalidates it.
+        self._mac_address_firmware: tuple[int, int] | None = None
 
         # Product capabilities for device features (populated on first use)
         self._capabilities: ProductInfo | None = None
@@ -664,21 +682,43 @@ class Device(Generic[StateT]):
         )
 
     async def get_mac_address(self) -> str:
-        """Calculate and return the MAC address for this device."""
-        if self._mac_address is None:
-            firmware = (
-                self._host_firmware
-                if self._host_firmware is not None
-                else await self.get_host_firmware()
-            )
+        """Calculate and return the MAC address for this device.
+
+        The MAC usually equals the serial. Firmware with
+        ``version_major == 3 and version_minor >= 70`` is the exception: its MAC
+        is the serial with the final octet incremented by one (wrapping at 256).
+
+        The bound is deliberately narrower than "major version 3" and comes
+        from LIFX. Devices on earlier 3.x firmware report a MAC identical to
+        their serial -- consistent with LIFX Tiles on 3.50, whose real ARP MAC
+        matched the serial while a major-only rule predicted serial + 1.
+
+        The result is memoised against the firmware it was derived from. Because
+        the rule now turns on the minor version, an ordinary in-place update
+        across the 3.70 boundary changes the correct answer -- so a cache keyed
+        on nothing but "already computed" would hand a long-lived caller a MAC
+        the device no longer has.
+        """
+        firmware = (
+            self._host_firmware
+            if self._host_firmware is not None
+            else await self.get_host_firmware()
+        )
+        firmware_key = (firmware.version_major, firmware.version_minor)
+
+        if self._mac_address is None or self._mac_address_firmware != firmware_key:
             octets = [
                 int(self.serial[i : i + 2], 16) for i in range(0, len(self.serial), 2)
             ]
 
-            if firmware.version_major == 3:
+            if (
+                firmware.version_major == _MAC_OFFSET_MAJOR
+                and firmware.version_minor >= _MAC_OFFSET_MIN_MINOR
+            ):
                 octets[5] = (octets[5] + 1) % 256
 
             self._mac_address = ":".join(f"{octet:02x}" for octet in octets)
+            self._mac_address_firmware = firmware_key
 
         return self._mac_address
 
@@ -1106,9 +1146,10 @@ class Device(Generic[StateT]):
 
         self._host_firmware = firmware
 
-        # Calculate MAC address now that we have firmware info
-        if self.mac_address is None:
-            await self.get_mac_address()
+        # Recalculate the MAC now that we have firmware info. Unconditional:
+        # get_mac_address() re-derives only when the firmware it cached against
+        # has changed, and an update across the 3.70 boundary changes the answer.
+        await self.get_mac_address()
 
         _LOGGER.debug(
             {

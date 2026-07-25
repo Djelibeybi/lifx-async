@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-18 after Phase 5)
 Phase: 05
 Plan: Not started
 Status: All phases complete
-Last activity: 2026-07-18 — Phase 05 learnings extracted
+Last activity: 2026-07-26 — Quick task 260726-42c complete: serial/MAC audit script; found and fixed get_mac_address() rule for firmware < 3.70
 
 Progress: [████████████████████] 24/24 plans (100%) — all 4 v1.1 phases complete and verified
 
@@ -225,6 +225,23 @@ None yet.
 - Hardware validation (DISC-03, ANIM-03, ANIM-04) cannot run in CI — treat as UAT-style steps against the quiesced test devices / 73-device production fleet; automated emulator-backed tests must independently reach 100% branch patch coverage
 - Repeated rounds are mandatory for discovery/loss claims — single rounds mislead (Spike 005: shakedown found 71/73 by luck; 6-round median was 48/73)
 - **[RESOLVED — historical, retained for the milestone record] UAT sequencing gate (cleared 2026-07-17):** ANIM-03/ANIM-04 are complete. Resolution: by operator ruling (verbatim reply "2", 2026-07-17, `04-RULING.md`) the cross-device directional dossier from the 04-12 sweep (aggregate statistical FAIL, 5/5 valid sessions FAIL, gated arm winning directionally in every session ever measured, ratios 1.28x–5.25x) was accepted as satisfying the requirements' intent — an acceptance over a recorded FAIL, never a statistical pass — and the operator gave an explicit dual approval verdict (smoothness + geometry) on My Office Ceiling Capsule's gated streaming round at 04-13 Task 4. Verbatim verdict: "Geometry was fine. It was as smooth as the tiles. No multi-second freezes but it stuttered throughout." The operator approved with the observation recorded (verbatim "1" of 3 presented options): geometry PASS; the stutter is the documented latest-frame-wins degradation under device saturation at 20 FPS (not a freeze/crawl failure mode) — the Capsule's sustainable rate is ~10 FPS at its 16×8/3-packets-per-frame chain shape, carried forward as a Phase 5 documentation recommendation (choose streaming FPS per device class). The headless round outcome (FAIL, gated pooled loss 51.28% vs 9.0% ceiling) is recorded as non-gating context per the ruling — certification was resolved by the ruling, not this round's statistics. The Capsule's dims are corrected everywhere they govern (16×8 zones, 128 zones, 26 in × 13 in physical). No gate remains open for Phase 4.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260726-42c | Serial/MAC correlation audit script (`scripts/serial_mac_audit.py`) — enumerates serial, derived MAC, real ARP MAC, product and firmware to test the `get_mac_address()` off-by-one rule | 2026-07-26 | f625afd | Verified | [260726-42c-create-a-script-that-enumerates-mac-addr](./quick/260726-42c-create-a-script-that-enumerates-mac-addr/) |
+
+**260726-42c outcome:** Fleet sweep run and signed off 2026-07-26. The audit found
+`get_mac_address()` wrong for LIFX Tiles on firmware 3.50 — their real ARP MAC equals their serial,
+while the `version_major == 3` rule predicted serial + 1. Rule narrowed to
+`version_major == 3 and version_minor >= 70` in `f625afd` (parametrised boundary test; 2625 tests
+pass). Two rendering defects found by the run were fixed in `0f5b228`.
+
+**Closed:** the 3.70 boundary is stated by LIFX, not inferred from the sweep, so the absence of
+sub-3.70 devices other than the two Tiles is not an evidence gap. The audit's job was exposing the
+old major-only rule as wrong; the replacement bound is vendor-authoritative. GitHub issue #174,
+which tracked this as an open question, is closed for the same reason.
 
 ## Deferred Items
 
