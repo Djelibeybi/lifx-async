@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Wire Reliability
-current_phase: 05
-status: completed
-stopped_at: Completed 05-06-PLAN.md (UAT gap closure G-05-2..G-05-7)
-last_updated: "2026-07-26T00:00:00.000Z"
+status: Awaiting next milestone
+stopped_at: Phase 5 complete — v1.1 has no phases left; milestone ready to close
+last_updated: "2026-07-25T19:56:22.192Z"
 last_activity: 2026-07-26
-last_activity_desc: Quick task 260726-42c shipped (PR #175)
+last_activity_desc: Milestone v1.1 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 24
   completed_plans: 24
   percent: 100
+current_phase: 05
 current_phase_name: reliability-documentation
 ---
 
@@ -28,12 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-18 after Phase 5)
 
 ## Current Position
 
-Phase: 05
-Plan: Not started
-Status: All phases complete — quick task 260726-42c shipped (PR #175, merged as bdb84f7)
-Last activity: 2026-07-26 — Quick task 260726-42c shipped: serial/MAC audit script; found and fixed the get_mac_address() rule for firmware below 3.70. Reviewed at max effort (15 findings: 14 fixed, 1 invalid — the 3.70 bound is vendor-stated, not inferred), squashed to one commit and merged.
-
-Progress: [████████████████████] 24/24 plans (100%) — all 4 v1.1 phases complete and verified
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-26 — Milestone v1.1 completed and archived
 
 ## Performance Metrics
 
@@ -252,6 +250,9 @@ Items acknowledged and carried forward from previous milestone close:
 |----------|------|--------|-------------|
 | Persistence | PERS-01: extract `state_file` save/load into reusable mixin | Deferred to v2 | 2026-06-11 |
 | Thread/IPv6 | THREAD-01 (SEED-001): revalidate wire behaviour over Thread/IPv6 when LIFX Thread firmware lands | Future requirement | 2026-07-16 |
+| Seed | SEED-001-thread-ipv6-revalidation [dormant] — the same Thread/IPv6 revalidation, still unimplemented at the v1.1 close | Acknowledged, deferred | 2026-07-26 |
+| Docs | 02-01-SUMMARY.md carries no `requirements-completed` frontmatter; DISC-01/DISC-02 are evidenced only in 02-VERIFICATION.md (cross-checked manually during the v1.1 audit) | Acknowledged, deferred | 2026-07-26 |
+| Decision | D5-09 "publish behaviour, not tuning constants" is disputed by the operator and remains OPEN; spike candidate 006 would measure the cap impact | Open decision | 2026-07-26 |
 
 ## Session Continuity
 
@@ -261,12 +262,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- **v1.1 is 100% complete (24/24 plans, 4/4 phases, 13/13 requirements).** Next action is
-  `/gsd-complete-milestone v1.1` — but read the verification-status blocker below first: it
-  requires `verification_status === 'passed'` for **every** phase, and Phases 2/3/4 do not
-  currently return it. Phase 5 does (verified 2026-07-18, UAT 6/6, nyquist validated).
-- **Unpushed work:** local `main` is several commits ahead of `origin/main`. Phase 5's
-  execution, verification, UAT and validation commits are all local only.
-- Phase 5 closed the 04-13 Capsule FPS observation as planned — the ~10 FPS per-device-class
-  streaming guidance is now published in DOCS-02 (`docs/user-guide/animation.md`), so this
-  item needs no further carry-forward.
+- Start the next milestone with /gsd-new-milestone

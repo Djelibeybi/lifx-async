@@ -2,15 +2,22 @@
 
 ## Current State (post-v1.0)
 
-**v1.1 Wire Reliability: all four phases complete (2026-07-18) — ready to close.**
-Phases 2–5 delivered and verified; all 13 requirements (DISC-01..03, RETRY-01..04,
-ANIM-01..04, DOCS-01..02) trace to Complete. Measured outcomes: discovery re-broadcast
-took a single call from a median 48/73 devices to 73/73; the retry reshape cut
-packets-per-request from 1.37 to 1.017 and latency from 62 ms to 12.6 ms; ack-gated
-animation pacing won directionally on every device ever measured (1.28×–5.25×), accepted
-by operator ruling over a recorded statistical FAIL rather than a statistical pass
-(`04-RULING.md`). Milestone close carries known verification debt — see STATE.md
-Blockers.
+**v1.1 Wire Reliability shipped 2026-07-26.** Phases 2–5 delivered and verified; all 13
+requirements (DISC-01..03, RETRY-01..04, ANIM-01..04, DOCS-01..02) satisfied. Measured
+outcomes: discovery re-broadcast took a single call from a median 48/73 devices to 73/73;
+the retry reshape cut packets-per-request from 1.37 to 1.017 and latency from 62 ms to
+12.6 ms; ack-gated animation pacing won directionally on every device ever measured
+(1.28×–5.25×), accepted by operator ruling over a recorded statistical FAIL rather than a
+statistical pass (`04-RULING.md`).
+
+The close-out audit found no unsatisfied requirements, no orphans, and no blocking
+integration gaps across 7 verified cross-phase connections. Two items it raised were
+fixed before archiving: phase 4's VALIDATION.md was reconciled (all four phases are now
+Nyquist-compliant), and `api.discover()` no longer lets a slow or dead device expire the
+discovery idle window (quick task 260726-824). See
+`milestones/v1.1-MILESTONE-AUDIT.md`.
+
+**Next milestone:** not yet defined — run `/gsd-new-milestone`.
 
 **Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) — see `.planning/MILESTONES.md`.
 **Also shipped post-v1.0:** Phase 1 discovery unification (verified 2026-06-13) — rebuilt
@@ -21,13 +28,13 @@ first-wins per-serial dedup.
 `spike-findings-lifx-async` skill): five real-hardware experiments that disproved the
 "switch to threading" hypothesis and located the actual reliability levers.
 
-## Current Milestone: v1.1 Wire Reliability
+## Shipped Milestone: v1.1 Wire Reliability (2026-07-26)
 
 **Goal:** Close the empirically-measured reliability gap between lifx-async and the
 reference clients (Glowup, Photons) using the spike-validated blueprints, without changing
 the asyncio core or public API.
 
-**Target features:**
+**Delivered:**
 
 - **Discovery re-broadcast** — re-send `GetService` on an escalating schedule inside the
   discovery window. Spike 005: single broadcast finds median 48/73 devices on a multi-AP
@@ -68,16 +75,26 @@ library is reliable enough that "bulb didn't respond" stops being a lifx-async p
   across retry attempts (`connection.py`) — existing; retry reshape must preserve it
 - ✓ Zero-allocation prebaked packet templates for animation (`animation/packets.py`) —
   existing; flow control must preserve this send path
-- ✓ Discovery re-broadcast on an escalating schedule (DISC-01..03) — Phase 2
-- ✓ Retry schedule reshape (RETRY-01..04) — Phase 3
-- ✓ Animation-layer-owned ack-gated flow control (ANIM-01..04) — Phase 4
-- ✓ Reliability documentation (DOCS-01..02) — Phase 5
+- ✓ Discovery re-broadcast on an escalating schedule (DISC-01..03) — v1.1
+- ✓ Retry schedule reshape (RETRY-01..04) — v1.1
+- ✓ Animation-layer-owned ack-gated flow control (ANIM-01..04) — v1.1
+- ✓ Reliability documentation (DOCS-01..02) — v1.1
+- ✓ Consumer time cannot expire the discovery idle window — v1.1 close-out
+  (quick task 260726-824)
 
 ### Active
 
-<!-- This milestone's scope — REQ-IDs defined in REQUIREMENTS.md. -->
+<!-- Next milestone's scope. REQ-IDs are defined in a fresh REQUIREMENTS.md by
+     /gsd-new-milestone; these are carried-forward candidates, not commitments. -->
 
-None — every v1.1 requirement is validated. Next scope is set at the v1.1 close.
+None committed — v1.1 is closed and the next milestone is undefined. Candidates:
+
+- [ ] PERS-01: generalise `state_file` persistence into a reusable mixin (deferred since
+      2026-06-11)
+- [ ] THREAD-01 / SEED-001: revalidate wire behaviour over Thread/IPv6 when LIFX Thread
+      firmware lands (dormant; acknowledged as deferred at the v1.1 close)
+- [ ] Spike 006: measure the impact of publishing tuning constants vs behaviour only —
+      the D5-09 rule is disputed and remains an OPEN decision
 
 ### Out of Scope
 
@@ -131,6 +148,8 @@ None — every v1.1 requirement is validated. Next scope is set at the v1.1 clos
 | Animation flow control owned by the library, not downstream | Consumers (LedFx) shouldn't need to choose delivery strategy; the layer that sends frames decides | ✓ Shipped — Phase 4. No consumer-facing toggle. Gated arm won directionally in every measured session (1.28×–5.25×); certified by operator ruling over a recorded FAIL, never a statistical pass (`04-RULING.md`) |
 | Publish behaviour, not tuning constants (D5-09 as written) | Rendered docstrings state the behavioural contract; thresholds/expiries stay in `flow.py` and comments where they can change without a docs lie | ✓ Applied — Phase 5. **The rule itself is disputed by the operator and remains an OPEN decision** in `05-CONTEXT.md`, with spike candidate 006 (cap-impact measurement) linked. Phase 5 complied with it as written; its future is unsettled |
 | Drop the 8-warning docs baseline instead of pinning it | The "pre-existing" warnings were a defect set (5 annotations parsed as link refs; 3 anchors to never-rendered mDNS symbols), not a constant | ✓ Shipped — Phase 5 (D5-23). Zero warnings under `--strict`, gated in CI so the class cannot drift back |
+| Discovery keeps its own re-broadcast schedule rather than reusing the Phase 3 retransmit engine | `_transmit_and_listen()` stops retransmitting after its first yield, which would defeat DISC-01's requirement to keep broadcasting after early responders answer | ✓ Validated at the v1.1 close audit — disjoint sockets, packets and sources, so the two schedules cannot double-send |
+| Reset the discovery idle timer on consumer resume, not just before the yield | `api.discover()` constructs a Device per response; those round trips would otherwise spend the idle window and truncate the sweep | ✓ Shipped — v1.1 close-out (260726-824). Overall timeout untouched, so a slow consumer still cannot extend discovery indefinitely |
 
 ## Evolution
 
@@ -150,4 +169,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 5 (v1.1 final phase — milestone ready to close)*
+*Last updated: 2026-07-26 after the v1.1 Wire Reliability milestone*
