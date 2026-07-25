@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v5.6.2 (2026-07-25)
+
+### Bug Fixes
+
+- **discovery**: Stop consumer time from expiring the discovery idle window
+  ([`dca9e39`](https://github.com/Djelibeybi/lifx-async/commit/dca9e39e3dc1a1fc684b8638597ff8219d1dbf2c))
+
+
 ## v5.6.1 (2026-07-25)
 
 ### Bug Fixes
