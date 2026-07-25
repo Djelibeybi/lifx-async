@@ -290,11 +290,17 @@ The `mac_address` property provides the device's MAC address, calculated from th
 and host firmware version. The calculation is performed automatically when the device is used
 as a context manager or when `get_host_firmware()` is called.
 
-**Calculation Logic** (based on host firmware major version):
+**Calculation Logic** (based on the host firmware major *and* minor version):
 
-- **Version 2 or 4**: MAC address matches the serial number
-- **Version 3**: MAC address is the serial number with the least significant byte incremented by 1 (with wraparound from 0xFF to 0x00)
-- **Unknown versions**: Defaults to the serial number
+- **Firmware 3.70 and above, below 4.0**: MAC address is the serial number with the least significant byte incremented by 1 (with wraparound from 0xFF to 0x00)
+- **Every other firmware** — including earlier 3.x builds such as 3.50, verified against LIFX Tiles whose real MAC matched their serial — MAC address matches the serial number
+
+Both version components are compared as integers, so firmware 3.9 is *below* the 3.70
+boundary, not above it: reading the version as a decimal misclassifies it.
+
+Devices never report their MAC on the wire and are always addressed by serial, so this value is
+a convenience derivation only. It is recalculated whenever `get_host_firmware()` reports a
+different firmware version, so it stays consistent with the rule above after an update.
 
 The MAC address is returned in colon-separated lowercase hexadecimal format (e.g., `d0:73:d5:01:02:03`)
 to visually distinguish it from the serial number format.
