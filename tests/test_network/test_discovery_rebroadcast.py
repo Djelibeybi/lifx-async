@@ -310,6 +310,112 @@ class TestRebroadcastDedup:
         assert len(send_times) == 2
 
 
+class TestConsumerIdleWindow:
+    """DISC-03: consumer time between yields must not expire the idle window."""
+
+    @pytest.mark.asyncio
+    async def test_consumer_time_does_not_consume_idle_window(self) -> None:
+        """A consumer slower than the idle window still receives later devices.
+
+        `api.discover()` constructs a Device per yielded response, and those
+        requests carry a wall deadline several times the idle window, so one
+        slow or dead device would truncate the sweep if consumer time counted
+        against the idle timer.
+
+        Idle window is 0.3 s (max_response_time 0.15 x multiplier 2.0). The
+        consumer sleeps 0.5 s after the first device -- longer than the window
+        -- and a second device answers afterwards. Resetting the idle timer
+        only *before* the yield strands that second device.
+        """
+        known_source = 42
+        first_serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        second_serial = b"\xd0\x73\xd5\x0a\x0b\x0c\x00\x00"
+        first = _build_state_service_packet(source=known_source, target=first_serial)
+        second = _build_state_service_packet(source=known_source, target=second_serial)
+        call_count = 0
+
+        async def mock_receive(timeout: float = 2.0):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return first, ("192.168.1.100", 56700)
+            if call_count == 2:
+                await asyncio.sleep(0.05)
+                return second, ("192.168.1.101", 56700)
+            await asyncio.sleep(timeout)
+            raise LifxTimeoutError("timeout")
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport_cls.return_value = _build_mock_transport(
+                _make_recording_send([]), mock_receive
+            )
+
+            serials: list[str] = []
+            async for resp in _discover_with_packet(
+                DevicePackets.GetService(),
+                timeout=3.0,
+                max_response_time=0.15,
+                idle_timeout_multiplier=2.0,
+            ):
+                serials.append(resp.serial)
+                if len(serials) == 1:
+                    # Stand in for create_device()'s network round trips.
+                    await asyncio.sleep(0.5)
+
+        assert serials == ["d073d5010203", "d073d50a0b0c"]
+
+    @pytest.mark.asyncio
+    async def test_overall_deadline_still_bounds_a_slow_consumer(self) -> None:
+        """Resetting on resume must not let a slow consumer run forever.
+
+        The overall timeout is untouched by the fix, so a consumer that sleeps
+        past it ends discovery even though the idle timer keeps being reset.
+        """
+        known_source = 42
+        packet = _build_state_service_packet(
+            source=known_source, target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        )
+        second = _build_state_service_packet(
+            source=known_source, target=b"\xd0\x73\xd5\x0a\x0b\x0c\x00\x00"
+        )
+        call_count = 0
+
+        async def mock_receive(timeout: float = 2.0):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return packet, ("192.168.1.100", 56700)
+            return second, ("192.168.1.101", 56700)
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport_cls.return_value = _build_mock_transport(
+                _make_recording_send([]), mock_receive
+            )
+
+            start = time.monotonic()
+            serials: list[str] = []
+            async for resp in _discover_with_packet(
+                DevicePackets.GetService(),
+                timeout=0.4,
+                max_response_time=0.15,
+                idle_timeout_multiplier=2.0,
+            ):
+                serials.append(resp.serial)
+                await asyncio.sleep(0.3)
+            elapsed = time.monotonic() - start
+
+        assert serials[0] == "d073d5010203"
+        assert elapsed < 2.0
+
+
 @pytest.mark.emulator
 @pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
 class TestRebroadcastEmulator:
