@@ -10,6 +10,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
+from lifx.exceptions import LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import Direction, FirmwareEffect
 
@@ -221,6 +222,30 @@ class TestMultiZoneLight:
         assert len(result_colors) >= 8
         assert all(isinstance(color, HSBK) for color in result_colors)
 
+    async def test_get_color_zones_caps_response_to_learned_count(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """A partial final chunk excludes padded protocol colour slots."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        real_colors = [
+            HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500),
+            HSBK(hue=225, saturation=0.5, brightness=0.75, kelvin=3500),
+        ]
+        padded_colors = [
+            HSBK(hue=0, saturation=0, brightness=0, kelvin=3500) for _ in range(6)
+        ]
+        mock_state = packets.MultiZone.StateMultiZone(
+            count=10,
+            index=8,
+            colors=[color.to_protocol() for color in real_colors + padded_colors],
+        )
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_color_zones(start=8)
+
+        assert result == real_colors
+        assert multizone_light.zone_count == 10
+
     async def test_get_extended_color_zones(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
@@ -299,10 +324,11 @@ class TestMultiZoneLight:
     async def test_get_extended_color_zones_handles_empty_stream(
         self, multizone_light: MultiZoneLight
     ) -> None:
-        """An empty response stream returns no colours without a cached count."""
+        """An empty response stream preserves the request timeout contract."""
         multizone_light.connection.request_stream = async_generator_mock([])
 
-        assert await multizone_light.get_extended_color_zones() == []
+        with pytest.raises(LifxTimeoutError, match="No extended color-zone response"):
+            await multizone_light.get_extended_color_zones(start=4)
 
     async def test_get_extended_color_zones_large_device(
         self, multizone_light: MultiZoneLight, mock_product_info

@@ -8,6 +8,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+#: Firmware whose MAC address is the serial with the final octet incremented:
+#: ``version_major == 3 and version_minor >= 70``. Both components are compared
+#: as integers -- minor 9 is *below* minor 70, not above it, so treating the
+#: version as a decimal would classify 3.9 incorrectly. Firmware outside this
+#: range -- including earlier 3.x builds such as 3.50 -- reports a MAC identical
+#: to its serial.
+#:
+#: The 3.70 boundary is stated by LIFX, not inferred from a network sweep, so
+#: it does not need corroborating observations in the 3.5x-3.6x range. A fleet
+#: audit is what exposed the earlier major-only rule as wrong (Tiles on 3.50
+#: whose real MAC matched their serial); the replacement bound came from the
+#: vendor. Keep the gate beside candidate derivation so device callers share
+#: one source of truth for this protocol quirk.
+MAC_OFFSET_FIRMWARE_MAJOR = 3
+MAC_OFFSET_FIRMWARE_MIN_MINOR = 70
+
 
 def mac_candidates_for_serial(serial: str) -> tuple[str, str]:
     """Return both MAC addresses a LIFX serial number may represent.

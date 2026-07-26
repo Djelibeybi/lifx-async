@@ -557,7 +557,8 @@ class Light(Device[LightState]):
 
         Args:
             color: Target color for the waveform
-            period: Period of one cycle in seconds
+            period: Period of one cycle in seconds. Zero requests an immediate
+                transition.
             cycles: Number of cycles
             waveform: Waveform type (SAW, SINE, HALF_SINE, TRIANGLE, PULSE)
             transient: If True, return to original color after effect (default True)
@@ -662,7 +663,8 @@ class Light(Device[LightState]):
 
         Args:
             color: Target color for the waveform
-            period: Period of one cycle in seconds
+            period: Period of one cycle in seconds. Zero requests an immediate
+                transition.
             cycles: Number of cycles
             waveform: Waveform type (SAW, SINE, HALF_SINE, TRIANGLE, PULSE)
             transient: If True, return to original color after effect (default True)

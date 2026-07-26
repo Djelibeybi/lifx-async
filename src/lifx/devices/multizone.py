@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.devices.light import Light, LightState
+from lifx.exceptions import LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     Direction,
@@ -350,7 +351,11 @@ class MultiZoneLight(Light):
                 self._store_zone_count(zone_count)
                 end = min(zone_count - 1, end)
                 # Extract colors from response (up to 8 colors)
-                zones_in_response = min(8, current_end - current_start + 1)
+                zones_in_response = min(
+                    8,
+                    current_end - current_start + 1,
+                    max(0, end - current_start + 1),
+                )
                 for i in range(zones_in_response):
                     if i >= len(state.colors):
                         break
@@ -432,12 +437,14 @@ class MultiZoneLight(Light):
 
         colors: list[HSBK] = []
         zone_count = self._zone_count
+        response_received = False
 
         # The network stack owns both the configured wall-time request budget
         # and the post-response idle timeout for multi-response streams.
         async for packet in self.connection.request_stream(
             packets.MultiZone.GetExtendedColorZones()
         ):
+            response_received = True
             self._raise_if_unhandled(packet)
             zone_count = packet.count
             self._store_zone_count(zone_count)
@@ -452,9 +459,15 @@ class MultiZoneLight(Light):
             if len(colors) >= zone_count:
                 break
 
+        # DeviceConnection.request_stream() raises LifxTimeoutError before an
+        # empty stream can occur. Preserve that contract for custom connection
+        # implementations and test doubles instead of inventing a zero-zone
+        # device from the absence of a response.
+        if not response_received:
+            raise LifxTimeoutError(f"No extended color-zone response from {self.ip}")
+
         # Return only the requested range to caller
-        if zone_count is None:
-            zone_count = len(colors)
+        assert zone_count is not None
         end = min(zone_count - 1, end)
         result = colors[start : end + 1]
 
