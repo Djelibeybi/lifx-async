@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v5.6.3 (2026-07-26)
+
+### Bug Fixes
+
+- **discovery**: Correct the idle-window docs and harden its tests
+  ([`9afe8df`](https://github.com/Djelibeybi/lifx-async/commit/9afe8df68260c6940173a765306441f2568c5fa7))
+
+### Documentation
+
+- Curate the v1.1 milestone entry
+  ([`fe8effc`](https://github.com/Djelibeybi/lifx-async/commit/fe8effcd3d714bcf80347f90d207d4acce34707d))
+
+- **phase-04**: Reconcile validation strategy and add the v1.1 milestone audit
+  ([`f9929c3`](https://github.com/Djelibeybi/lifx-async/commit/f9929c3d7dc4b6192871a97407edbeee0f5b6680))
+
+- **planning**: Refresh the discovery idle-window commit refs
+  ([`83f3d25`](https://github.com/Djelibeybi/lifx-async/commit/83f3d256da5d179faf17ba97011b2659e07c7593))
+
+- **quick-260726-824**: Record the discovery idle-window fix and close two audit items
+  ([`7337d0a`](https://github.com/Djelibeybi/lifx-async/commit/7337d0aee4bc1ec2804f5c7ae3c3dd4296dc2234))
+
+
 ## v5.6.2 (2026-07-25)
 
 ### Bug Fixes
