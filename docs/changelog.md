@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v5.6.4 (2026-07-26)
+
+### Bug Fixes
+
+- Address Home Assistant migration issues
+  ([`5507c41`](https://github.com/Djelibeybi/lifx-async/commit/5507c41b87bd27ab7f159666c28cb7ebf779b1ca))
+
+- **devices**: Address multizone review feedback
+  ([`55de0d2`](https://github.com/Djelibeybi/lifx-async/commit/55de0d247a5de2355104f28faaaa94053cedd2b3))
+
+
 ## v5.6.3 (2026-07-26)
 
 ### Bug Fixes
