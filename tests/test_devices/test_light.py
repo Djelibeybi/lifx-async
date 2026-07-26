@@ -276,13 +276,27 @@ class TestLight:
 
     async def test_set_waveform_invalid_period(self, light: Light) -> None:
         """Test setting waveform with invalid period."""
-        with pytest.raises(ValueError, match="Period must be positive"):
+        with pytest.raises(ValueError, match="Period must be non-negative"):
             await light.set_waveform(
                 color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
                 period=-1.0,
                 cycles=1,
                 waveform=LightWaveform.SINE,
             )
+
+    async def test_set_waveform_zero_period(self, light: Light) -> None:
+        """Test setting waveform with a zero period."""
+        light.connection.request.return_value = True
+
+        await light.set_waveform(
+            color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+            period=0,
+            cycles=1,
+            waveform=LightWaveform.SINE,
+        )
+
+        packet = light.connection.request.call_args.args[0]
+        assert packet.period == 0
 
     async def test_set_waveform_invalid_cycles(self, light: Light) -> None:
         """Test setting waveform with invalid cycles."""
@@ -386,13 +400,27 @@ class TestLight:
 
     async def test_set_waveform_optional_invalid_period(self, light: Light) -> None:
         """Test setting waveform_optional with invalid period."""
-        with pytest.raises(ValueError, match="Period must be positive"):
+        with pytest.raises(ValueError, match="Period must be non-negative"):
             await light.set_waveform_optional(
                 color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
                 period=-1.0,
                 cycles=1,
                 waveform=LightWaveform.SINE,
             )
+
+    async def test_set_waveform_optional_zero_period(self, light: Light) -> None:
+        """Test setting waveform_optional with a zero period."""
+        light.connection.request.return_value = True
+
+        await light.set_waveform_optional(
+            color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+            period=0,
+            cycles=1,
+            waveform=LightWaveform.SINE,
+        )
+
+        packet = light.connection.request.call_args.args[0]
+        assert packet.period == 0
 
     async def test_set_waveform_optional_invalid_cycles(self, light: Light) -> None:
         """Test setting waveform_optional with invalid cycles."""

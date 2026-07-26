@@ -201,11 +201,40 @@ class TestDevice:
         mock_state = MagicMock()
         mock_state.signal = 7.943283890199382e-06
         device.connection.request.return_value = mock_state
+        device._host_firmware = FirmwareInfo(
+            build=1234567890, version_major=3, version_minor=90
+        )
 
         wifi_info = await device.get_wifi_info()
 
         assert isinstance(wifi_info, WifiInfo)
         assert wifi_info.rssi == -51
+        assert wifi_info.rssi_unit == "dBm"
+
+    async def test_get_wifi_info_fetches_firmware_for_rssi_unit(
+        self, device: Device
+    ) -> None:
+        """An uncached firmware version is fetched to classify the RSSI unit."""
+        wifi_state = packets.Device.StateWifiInfo(signal=7.943283890199382e-06)
+        firmware_state = packets.Device.StateHostFirmware(
+            build=1234567890, version_minor=77, version_major=2
+        )
+
+        async def request(packet):
+            if isinstance(packet, packets.Device.GetWifiInfo):
+                return wifi_state
+            return firmware_state
+
+        device.connection.request.side_effect = request
+
+        wifi_info = await device.get_wifi_info()
+
+        assert wifi_info.rssi == -51
+        assert wifi_info.rssi_unit == "dB"
+        assert device.host_firmware == FirmwareInfo(
+            build=1234567890, version_major=2, version_minor=77
+        )
+        assert device.connection.request.await_count == 2
 
     @pytest.mark.parametrize("signal", [-1.0, -0.001, 0.0])
     async def test_get_wifi_info_returns_minimum_rssi_for_non_positive_signal(
@@ -215,11 +244,37 @@ class TestDevice:
         mock_state = MagicMock()
         mock_state.signal = signal
         device.connection.request.return_value = mock_state
+        device._host_firmware = FirmwareInfo(
+            build=1234567890, version_major=3, version_minor=90
+        )
 
         wifi_info = await device.get_wifi_info()
 
         assert isinstance(wifi_info, WifiInfo)
         assert wifi_info.rssi == -100
+
+    @pytest.mark.parametrize(
+        ("version_major", "version_minor", "expected_unit"),
+        [
+            (2, 76, "dB"),
+            (2, 77, "dB"),
+            (2, 78, "dBm"),
+            (3, 1, "dBm"),
+        ],
+    )
+    def test_wifi_info_rssi_unit_follows_firmware_boundary(
+        self, version_major: int, version_minor: int, expected_unit: str
+    ) -> None:
+        wifi_info = WifiInfo(
+            signal=7.943283890199382e-06,
+            host_firmware=FirmwareInfo(
+                build=1234567890,
+                version_major=version_major,
+                version_minor=version_minor,
+            ),
+        )
+
+        assert wifi_info.rssi_unit == expected_unit
 
     async def test_get_host_firmware(self, device: Device) -> None:
         """Test getting host firmware info."""

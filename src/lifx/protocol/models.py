@@ -9,6 +9,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def mac_candidates_for_serial(serial: str) -> tuple[str, str]:
+    """Return both MAC addresses a LIFX serial number may represent.
+
+    Most devices use their serial number as their MAC address. Firmware in the
+    known offset range increments the final octet, wrapping from ``ff`` to
+    ``00``. This helper deliberately returns both candidates because callers
+    matching registry or network data may not yet know the device firmware.
+
+    Args:
+        serial: A 12-digit LIFX serial, with or without common separators.
+
+    Returns:
+        The direct and offset MAC candidates in lower-case colon notation.
+    """
+    serial_value = Serial.from_string(serial).value
+    direct = ":".join(f"{octet:02x}" for octet in serial_value)
+    offset_value = serial_value[:-1] + bytes(((serial_value[-1] + 1) % 256,))
+    offset = ":".join(f"{octet:02x}" for octet in offset_value)
+    return direct, offset
+
+
 @dataclass(frozen=True)
 class Serial:
     """LIFX device serial number.
