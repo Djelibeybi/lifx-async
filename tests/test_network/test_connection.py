@@ -341,6 +341,33 @@ class TestAsyncGeneratorStreaming:
 class TestDeviceConnectionRequestStream:
     """Test DeviceConnection.request_stream() wrapper functionality."""
 
+    async def test_uses_configured_timeout_by_default(self) -> None:
+        """The stream inherits the connection's wall-time request budget."""
+        conn = DeviceConnection(
+            serial="d073d5001234",
+            ip="192.168.1.100",
+            timeout=7.5,
+        )
+        received_timeouts: list[float | None] = []
+
+        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
+            received_timeouts.append(timeout)
+            if False:
+                yield packet
+
+        with (
+            patch.object(conn, "_ensure_open", return_value=None),
+            patch.object(
+                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
+            ),
+        ):
+            responses = [
+                response async for response in conn.request_stream(Device.GetLabel())
+            ]
+
+        assert responses == []
+        assert received_timeouts == [7.5]
+
     async def test_echo_request_handling(self) -> None:
         """Test EchoRequest special case in request_stream()."""
         from lifx.protocol.packets import Device as DevicePackets
