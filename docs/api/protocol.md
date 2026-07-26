@@ -138,6 +138,19 @@ Type-safe, immutable serial number handling:
       members_order: source
       show_if_no_docstring: false
 
+### MAC Candidates
+
+Use `mac_candidates_for_serial()` when matching a serial number against registry
+or network MAC data before the device firmware is known. It returns both the
+ordinary MAC and the known final-octet-offset candidate.
+
+```python
+from lifx import mac_candidates_for_serial
+
+mac_candidates_for_serial("d073d5010203")
+# ("d0:73:d5:01:02:03", "d0:73:d5:01:02:04")
+```
+
 ### HEV Cycle State
 
 HEV (High Energy Visible) cleaning cycle state:

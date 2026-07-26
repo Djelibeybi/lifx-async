@@ -42,7 +42,8 @@ Device runtime information returned by `Device.get_info()`.
 
 ### WifiInfo
 
-WiFi module information returned by `Device.get_wifi_info()`.
+WiFi module information returned by `Device.get_wifi_info()`, including the
+firmware-aware `rssi_unit` (`dB` through firmware 2.77, otherwise `dBm`).
 
 ::: lifx.devices.base.WifiInfo
     options:

@@ -9,7 +9,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from math import floor, log10
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeVar, cast
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -23,7 +23,7 @@ from lifx.exceptions import LifxDeviceNotFoundError, LifxUnsupportedCommandError
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
-from lifx.protocol.models import Serial
+from lifx.protocol.models import Serial, mac_candidates_for_serial
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -89,11 +89,20 @@ class WifiInfo:
 
     Attributes:
         signal: WiFi signal strength
+        host_firmware: Firmware used to determine whether RSSI is dB or dBm
         rssi: WiFi RSSI
+        rssi_unit: Unit reported by the firmware (``dB`` or ``dBm``)
     """
 
     signal: float
+    host_firmware: FirmwareInfo | None = None
     rssi: int = field(init=False)
+    rssi_unit: Literal["dB", "dBm"] | None = field(init=False)
+
+    #: Firmware through 2.77 reports signal strength in dB. Later firmware
+    #: reports dBm. Keep this protocol quirk with the value object that exposes
+    #: the converted RSSI instead of requiring every consumer to reimplement it.
+    RSSI_DBM_FW: ClassVar[tuple[int, int]] = (2, 77)
 
     def __post_init__(self) -> None:
         """Calculate RSSI from signal."""
@@ -102,6 +111,16 @@ class WifiInfo:
         else:
             # Minimum RSSI value if signal is ever less than or equal to zero
             self.rssi = -100
+
+        if self.host_firmware is None:
+            self.rssi_unit = None
+        elif (
+            self.host_firmware.version_major,
+            self.host_firmware.version_minor,
+        ) <= self.RSSI_DBM_FW:
+            self.rssi_unit = "dB"
+        else:
+            self.rssi_unit = "dBm"
 
 
 @dataclass
@@ -469,6 +488,19 @@ class Device(Generic[StateT]):
         self._refresh_lock = asyncio.Lock()
         self._is_closed = False
 
+    def adopt_cached_metadata(self, source: Device) -> None:
+        """Adopt metadata already fetched by a temporary device instance.
+
+        Device factories use a base ``Device`` to identify the correct concrete
+        class. This transfers only immutable or firmware-keyed metadata; live
+        state and connection lifecycle remain owned by the new instance.
+        """
+        self._version = source._version
+        self._host_firmware = source._host_firmware
+        self._capabilities = source._capabilities
+        self._mac_address = source._mac_address
+        self._mac_address_firmware = source._mac_address_firmware
+
     @classmethod
     async def from_ip(
         cls,
@@ -707,17 +739,14 @@ class Device(Generic[StateT]):
         firmware_key = (firmware.version_major, firmware.version_minor)
 
         if self._mac_address is None or self._mac_address_firmware != firmware_key:
-            octets = [
-                int(self.serial[i : i + 2], 16) for i in range(0, len(self.serial), 2)
-            ]
-
+            direct_mac, offset_mac = mac_candidates_for_serial(self.serial)
             if (
                 firmware.version_major == _MAC_OFFSET_MAJOR
                 and firmware.version_minor >= _MAC_OFFSET_MIN_MINOR
             ):
-                octets[5] = (octets[5] + 1) % 256
-
-            self._mac_address = ":".join(f"{octet:02x}" for octet in octets)
+                self._mac_address = offset_mac
+            else:
+                self._mac_address = direct_mac
             self._mac_address_firmware = firmware_key
 
         return self._mac_address
@@ -1097,19 +1126,31 @@ class Device(Generic[StateT]):
             print(f"WiFi RSSI: {wifi_info.rssi}")
             ```
         """
-        # Request WiFi info from device
-        state = await self.connection.request(packets.Device.GetWifiInfo())
+        # Fetch firmware alongside WiFi info when it has not already been cached.
+        # Firmware determines whether the RSSI unit is dB or dBm.
+        wifi_request = self.connection.request(packets.Device.GetWifiInfo())
+        if self._host_firmware is None:
+            state, host_firmware = await asyncio.gather(
+                wifi_request, self.get_host_firmware()
+            )
+        else:
+            state = await wifi_request
+            host_firmware = self._host_firmware
         self._raise_if_unhandled(state)
 
         # Extract WiFi info from response
-        wifi_info = WifiInfo(signal=state.signal)
+        wifi_info = WifiInfo(signal=state.signal, host_firmware=host_firmware)
 
         _LOGGER.debug(
             {
                 "class": "Device",
                 "method": "get_wifi_info",
                 "action": "query",
-                "reply": {"signal": state.signal},
+                "reply": {
+                    "signal": state.signal,
+                    "rssi": wifi_info.rssi,
+                    "rssi_unit": wifi_info.rssi_unit,
+                },
             }
         )
         return wifi_info

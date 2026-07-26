@@ -239,8 +239,8 @@ class MultiZoneLight(Light):
     async def get_zone_count(self) -> int:
         """Get the number of zones in the device.
 
-        Always fetches from device.
-        Use the `zone_count` property to access stored value.
+        Always fetches from the device. Use the ``zone_count`` property to
+        access the most recently stored value without a network request.
 
         Returns:
             Number of zones
@@ -257,20 +257,16 @@ class MultiZoneLight(Light):
             print(f"Device has {zone_count} zones")
             ```
         """
-        # Request automatically unpacks response
-        if self.capabilities and self.capabilities.has_extended_multizone:
-            state = await self.connection.request(
-                packets.MultiZone.GetExtendedColorZones()
-            )
-        else:
-            state = await self.connection.request(
-                packets.MultiZone.GetColorZones(start_index=0, end_index=0)
-            )
+        # The legacy one-zone request is supported by extended multizone devices
+        # too and avoids transferring an entire 82-colour extended response when
+        # only the count is needed.
+        state = await self.connection.request(
+            packets.MultiZone.GetColorZones(start_index=0, end_index=0)
+        )
         self._raise_if_unhandled(state)
 
         count = state.count
-
-        self._zone_count = count
+        self._store_zone_count(count)
 
         _LOGGER.debug(
             {
@@ -284,6 +280,12 @@ class MultiZoneLight(Light):
         )
 
         return count
+
+    def _store_zone_count(self, count: int) -> None:
+        """Store a zone count learned from any multizone response."""
+        self._zone_count = count
+        if self._state is not None:
+            self._state.zone_count = count
 
     async def get_color_zones(
         self,
@@ -327,10 +329,11 @@ class MultiZoneLight(Light):
         if self.capabilities is None:
             await self._ensure_capabilities()
 
-        zone_count = await self.get_zone_count()
-        end = min(zone_count - 1, end)
+        zone_count = self._zone_count
+        if zone_count is not None:
+            end = min(zone_count - 1, end)
 
-        colors = []
+        colors: list[HSBK] = []
         current_start = start
 
         while current_start <= end:
@@ -343,6 +346,9 @@ class MultiZoneLight(Light):
                 )
             ):
                 self._raise_if_unhandled(state)
+                zone_count = state.count
+                self._store_zone_count(zone_count)
+                end = min(zone_count - 1, end)
                 # Extract colors from response (up to 8 colors)
                 zones_in_response = min(8, current_end - current_start + 1)
                 for i in range(zones_in_response):
@@ -358,31 +364,33 @@ class MultiZoneLight(Light):
 
         # Update state if it exists and we fetched all zones
         if self._state is not None and hasattr(self._state, "zones"):
-            if start == 0 and len(result) == zone_count:
+            if start == 0 and zone_count is not None and len(result) == zone_count:
                 self._state.zones = result
                 self._state.last_updated = time.time()
 
-        _LOGGER.debug(
-            {
-                "class": "Device",
-                "method": "get_color_zones",
-                "action": "query",
-                "reply": {
-                    "start": start,
-                    "end": end,
-                    "zone_count": len(result),
-                    "colors": [
-                        {
-                            "hue": c.hue,
-                            "saturation": c.saturation,
-                            "brightness": c.brightness,
-                            "kelvin": c.kelvin,
-                        }
-                        for c in result
-                    ],
-                },
-            }
-        )
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            debug_colors = [
+                {
+                    "hue": color.hue,
+                    "saturation": color.saturation,
+                    "brightness": color.brightness,
+                    "kelvin": color.kelvin,
+                }
+                for color in result
+            ]
+            _LOGGER.debug(
+                {
+                    "class": "Device",
+                    "method": "get_color_zones",
+                    "action": "query",
+                    "reply": {
+                        "start": start,
+                        "end": end,
+                        "zone_count": len(result),
+                        "colors": debug_colors,
+                    },
+                }
+            )
 
         return result
 
@@ -422,17 +430,17 @@ class MultiZoneLight(Light):
         if start < 0 or end < start:
             raise ValueError(f"Invalid zone range: {start}-{end}")
 
-        zone_count = await self.get_zone_count()
-        end = min(zone_count - 1, end)
-
         colors: list[HSBK] = []
+        zone_count = self._zone_count
 
-        # Stream all responses until timeout
+        # The network stack owns both the configured wall-time request budget
+        # and the post-response idle timeout for multi-response streams.
         async for packet in self.connection.request_stream(
-            packets.MultiZone.GetExtendedColorZones(),
-            timeout=2.0,  # Allow time for multiple responses
+            packets.MultiZone.GetExtendedColorZones()
         ):
             self._raise_if_unhandled(packet)
+            zone_count = packet.count
+            self._store_zone_count(zone_count)
             # Only process valid colors based on colors_count
             for i in range(packet.colors_count):
                 if i >= len(packet.colors):
@@ -445,6 +453,9 @@ class MultiZoneLight(Light):
                 break
 
         # Return only the requested range to caller
+        if zone_count is None:
+            zone_count = len(colors)
+        end = min(zone_count - 1, end)
         result = colors[start : end + 1]
 
         # Update state if it exists and we fetched all zones
@@ -670,29 +681,31 @@ class MultiZoneLight(Light):
             result = await self.connection.request(packet)
             self._raise_if_unhandled(result)
 
-        _LOGGER.debug(
-            {
-                "class": "Device",
-                "method": "set_extended_color_zones",
-                "action": "change",
-                "values": {
-                    "zone_index": zone_index,
-                    "colors_count": len(colors),
-                    "colors": [
-                        {
-                            "hue": c.hue,
-                            "saturation": c.saturation,
-                            "brightness": c.brightness,
-                            "kelvin": c.kelvin,
-                        }
-                        for c in colors
-                    ],
-                    "duration": duration_ms,
-                    "apply": apply.name,
-                    "fast": fast,
-                },
-            }
-        )
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            debug_colors = [
+                {
+                    "hue": color.hue,
+                    "saturation": color.saturation,
+                    "brightness": color.brightness,
+                    "kelvin": color.kelvin,
+                }
+                for color in colors
+            ]
+            _LOGGER.debug(
+                {
+                    "class": "Device",
+                    "method": "set_extended_color_zones",
+                    "action": "change",
+                    "values": {
+                        "zone_index": zone_index,
+                        "colors_count": len(colors),
+                        "colors": debug_colors,
+                        "duration": duration_ms,
+                        "apply": apply.name,
+                        "fast": fast,
+                    },
+                }
+            )
 
     async def get_effect(self) -> MultiZoneEffect:
         """Get current multizone effect.

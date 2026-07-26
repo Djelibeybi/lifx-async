@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lifx.devices.base import Device, DeviceVersion
+from lifx.devices.base import Device, DeviceVersion, FirmwareInfo
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
@@ -220,3 +220,34 @@ class TestCreateDeviceUnsupported:
             result = await disc.create_device()
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_create_device_preserves_detection_metadata(self) -> None:
+        """Metadata fetched for detection is adopted by the concrete device."""
+        color_product = ProductInfo(
+            pid=27,
+            name="LIFX A19",
+            vendor=1,
+            capabilities=ProductCapability.COLOR,
+            temperature_range=None,
+            min_ext_mz_firmware=None,
+        )
+        version = DeviceVersion(vendor=1, product=27)
+        firmware = FirmwareInfo(build=123, version_major=3, version_minor=90)
+        disc = DiscoveredDevice(serial="d073d5010203", ip="192.168.1.100")
+
+        async def fake_ensure(self: Device) -> None:
+            self._capabilities = color_product
+            self._version = version
+            self._host_firmware = firmware
+            self._mac_address = "d0:73:d5:01:02:04"
+            self._mac_address_firmware = (3, 90)
+
+        with patch.object(Device, "ensure_capabilities", fake_ensure):
+            result = await disc.create_device()
+
+        assert isinstance(result, Light)
+        assert result.version is version
+        assert result.host_firmware is firmware
+        assert result.capabilities is color_product
+        assert result.mac_address == "d0:73:d5:01:02:04"

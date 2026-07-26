@@ -591,8 +591,8 @@ class Light(Device[LightState]):
             )
             ```
         """
-        if period <= 0:
-            raise ValueError(f"Period must be positive, got {period}")
+        if period < 0:
+            raise ValueError(f"Period must be non-negative, got {period}")
         if cycles < 1:
             raise ValueError(f"Cycles must be 1 or higher, got {cycles}")
         if not (0.0 <= skew_ratio <= 1.0):
@@ -707,8 +707,8 @@ class Light(Device[LightState]):
             )
             ```
         """
-        if period <= 0:
-            raise ValueError(f"Period must be positive, got {period}")
+        if period < 0:
+            raise ValueError(f"Period must be non-negative, got {period}")
         if cycles < 0:
             raise ValueError(f"Cycles must be non-negative, got {cycles}")
         if not (0.0 <= skew_ratio <= 1.0):

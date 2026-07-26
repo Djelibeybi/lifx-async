@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock
+from typing import cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -64,6 +65,79 @@ class TestMultiZoneLight:
         zone_count = await multizone_light.get_zone_count()
 
         assert zone_count == 16
+        multizone_light.connection.request.assert_awaited_once()
+
+    async def test_get_zone_count_always_refreshes_stored_count(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Each call queries the device and replaces the stored zone count."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+        first_state = packets.MultiZone.StateMultiZone(
+            count=16,
+            index=0,
+            colors=[HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()],
+        )
+        updated_state = packets.MultiZone.StateMultiZone(
+            count=32,
+            index=0,
+            colors=[HSBK(hue=0, saturation=0, brightness=0, kelvin=3500).to_protocol()],
+        )
+        multizone_light.connection.request.side_effect = [first_state, updated_state]
+
+        assert await multizone_light.get_zone_count() == 16
+        assert multizone_light.zone_count == 16
+        assert await multizone_light.get_zone_count() == 32
+        assert multizone_light.zone_count == 32
+        assert multizone_light.connection.request.await_count == 2
+        for call in multizone_light.connection.request.await_args_list:
+            packet = call.args[0]
+            assert isinstance(packet, packets.MultiZone.GetColorZones)
+            assert packet.start_index == 0
+            assert packet.end_index == 0
+
+    async def test_get_color_zones_learns_count_without_count_request(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """The colour response supplies count without a separate round trip."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        colors = [
+            HSBK(hue=i * 45, saturation=0.5, brightness=0.75, kelvin=3500).to_protocol()
+            for i in range(8)
+        ]
+        mock_state = packets.MultiZone.StateMultiZone(count=8, index=0, colors=colors)
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_color_zones()
+
+        assert len(result) == 8
+        assert multizone_light.zone_count == 8
+        multizone_light.connection.request.assert_not_awaited()
+
+    async def test_zone_debug_payload_is_lazy_when_debug_disabled(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """Per-zone debug fields must not be read unless DEBUG is enabled."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        protocol_color = HSBK(
+            hue=0, saturation=0.5, brightness=0.75, kelvin=3500
+        ).to_protocol()
+        mock_state = packets.MultiZone.StateMultiZone(
+            count=1, index=0, colors=[protocol_color]
+        )
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        class LazyColor:
+            @property
+            def hue(self) -> float:
+                raise AssertionError("debug payload was built eagerly")
+
+        with (
+            patch.object(HSBK, "from_protocol", return_value=LazyColor()),
+            patch("lifx.devices.multizone._LOGGER.isEnabledFor", return_value=False),
+        ):
+            result = await multizone_light.get_color_zones()
+
+        assert len(result) == 1
 
     async def test_get_color_zones(
         self, multizone_light: MultiZoneLight, mock_product_info
@@ -141,7 +215,9 @@ class TestMultiZoneLight:
         )
         multizone_light.connection.request.return_value = mock_state
         # Mock request_stream to yield the state once
-        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+        multizone_light.connection.request_stream = MagicMock(
+            side_effect=async_generator_mock([mock_state])
+        )
 
         result_colors = await multizone_light.get_extended_color_zones(0, 9)
 
@@ -151,6 +227,9 @@ class TestMultiZoneLight:
         assert result_colors[1].hue == pytest.approx(36, abs=1)
         assert result_colors[9].hue == pytest.approx(324, abs=1)
         assert result_colors[0].saturation == pytest.approx(0.8, abs=0.01)
+        request_call = multizone_light.connection.request_stream.call_args
+        assert isinstance(request_call.args[0], packets.MultiZone.GetExtendedColorZones)
+        assert request_call.kwargs == {}
 
     async def test_get_extended_color_zones_default_params(
         self, multizone_light: MultiZoneLight, mock_product_info
@@ -177,7 +256,6 @@ class TestMultiZoneLight:
         mock_state = packets.MultiZone.StateExtendedColorZones(
             count=16, index=0, colors_count=16, colors=colors
         )
-        multizone_light.connection.request.return_value = mock_state
         # Mock request_stream to yield the state once
         multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
@@ -242,15 +320,17 @@ class TestMultiZoneLight:
         mock_state = packets.MultiZone.StateExtendedColorZones(
             count=5, index=0, colors_count=5, colors=colors
         )
-        multizone_light.connection.request.return_value = mock_state
+        multizone_light.connection.request_stream = MagicMock(
+            side_effect=async_generator_mock([mock_state])
+        )
 
         # First call should hit the device and store the result
         result1 = await multizone_light.get_extended_color_zones(0, 4)
-        call_count_after_first = multizone_light.connection.request.call_count
+        call_count_after_first = multizone_light.connection.request_stream.call_count
 
         # Each call hits the device (no automatic caching for range queries)
         result2 = await multizone_light.get_extended_color_zones(0, 4)
-        call_count_after_second = multizone_light.connection.request.call_count
+        call_count_after_second = multizone_light.connection.request_stream.call_count
 
         assert result1 == result2
         assert (
@@ -291,12 +371,13 @@ class TestMultiZoneLight:
         mock_state = packets.MultiZone.StateExtendedColorZones(
             count=16, index=0, colors_count=16, colors=colors
         )
-        multizone_light.connection.request.return_value = mock_state
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
 
         result_colors = await multizone_light.get_extended_color_zones(0, 99)
 
         # Should return colors up to the actual zone count
-        assert len(result_colors) <= 82  # Limited by response
+        assert len(result_colors) == 16
+        assert multizone_light.zone_count == 16
 
     async def test_get_all_color_zones_with_extended(
         self, multizone_light: MultiZoneLight, mock_product_info
@@ -418,6 +499,26 @@ class TestMultiZoneLight:
         assert packet.colors_count == 10
         assert packet.duration == 500  # 0.5 seconds in ms
         assert len(packet.colors) == 82  # Padded to 82
+
+    async def test_set_extended_zone_debug_payload_is_lazy_when_debug_disabled(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Debug-only colour fields must not be read unless DEBUG is enabled."""
+        multizone_light.connection.request.return_value = True
+
+        class ProtocolOnlyColor:
+            def to_protocol(self):
+                return HSBK(0, 0.5, 0.75, 3500).to_protocol()
+
+            @property
+            def hue(self) -> float:
+                raise AssertionError("debug payload was built eagerly")
+
+        colors = [cast(HSBK, ProtocolOnlyColor())]
+        with patch("lifx.devices.multizone._LOGGER.isEnabledFor", return_value=False):
+            await multizone_light.set_extended_color_zones(0, colors)
+
+        multizone_light.connection.request.assert_awaited_once()
 
     async def test_set_extended_color_zones_too_many(
         self, multizone_light: MultiZoneLight
