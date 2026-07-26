@@ -4,7 +4,34 @@ from __future__ import annotations
 
 import pytest
 
+from lifx import mac_candidates_for_serial
 from lifx.protocol.models import Serial
+
+
+class TestMacCandidatesForSerial:
+    """Test serial-to-MAC candidate derivation."""
+
+    @pytest.mark.parametrize(
+        ("serial", "expected"),
+        [
+            (
+                "d073d5010203",
+                ("d0:73:d5:01:02:03", "d0:73:d5:01:02:04"),
+            ),
+            (
+                "D0:73:D5:01:02:FF",
+                ("d0:73:d5:01:02:ff", "d0:73:d5:01:02:00"),
+            ),
+        ],
+    )
+    def test_returns_direct_and_offset_candidates(
+        self, serial: str, expected: tuple[str, str]
+    ) -> None:
+        assert mac_candidates_for_serial(serial) == expected
+
+    def test_rejects_invalid_serial(self) -> None:
+        with pytest.raises(ValueError, match="must be 12 hex characters"):
+            mac_candidates_for_serial("d073d5")
 
 
 class TestSerialFromString:

@@ -108,7 +108,13 @@ class DiscoveredDevice:
                     temp_device.version.product,
                     temp_device.capabilities,
                 )
-                return device_class(**kwargs)
+                device = device_class(**kwargs)
+
+                # Capability detection already fetched and derived this metadata.
+                # Preserve it on the correctly typed instance so callers do not
+                # immediately repeat the same network work.
+                device.adopt_cached_metadata(temp_device)
+                return device
 
         except LifxUnsupportedDeviceError:
             return None

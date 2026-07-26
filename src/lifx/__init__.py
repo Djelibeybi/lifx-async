@@ -72,6 +72,7 @@ from lifx.exceptions import (
 from lifx.network.discovery import DiscoveredDevice, discover_devices
 from lifx.network.mdns import LifxServiceRecord, discover_lifx_services
 from lifx.products import ProductCapability, ProductInfo, ProductRegistry
+from lifx.protocol.models import mac_candidates_for_serial
 from lifx.protocol.protocol_types import (
     Direction,
     FirmwareEffect,
@@ -106,6 +107,7 @@ __all__ = [
     "DeviceVersion",
     "FirmwareInfo",
     "WifiInfo",
+    "mac_candidates_for_serial",
     # MultiZone
     "MultiZoneEffect",
     # Matrix (Tile)
