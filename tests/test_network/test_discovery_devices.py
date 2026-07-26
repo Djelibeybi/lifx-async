@@ -7,7 +7,7 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 from __future__ import annotations
 
 import sys
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -243,7 +243,13 @@ class TestCreateDeviceUnsupported:
             self._mac_address = "d0:73:d5:01:02:04"
             self._mac_address_firmware = (3, 90)
 
-        with patch.object(Device, "ensure_capabilities", fake_ensure):
+        with (
+            patch.object(Device, "ensure_capabilities", fake_ensure),
+            patch(
+                "lifx.network.connection.DeviceConnection.close",
+                new_callable=AsyncMock,
+            ) as close,
+        ):
             result = await disc.create_device()
 
         assert isinstance(result, Light)
@@ -251,3 +257,4 @@ class TestCreateDeviceUnsupported:
         assert result.host_firmware is firmware
         assert result.capabilities is color_product
         assert result.mac_address == "d0:73:d5:01:02:04"
+        close.assert_awaited_once_with()

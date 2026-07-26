@@ -23,7 +23,12 @@ from lifx.exceptions import LifxDeviceNotFoundError, LifxUnsupportedCommandError
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
-from lifx.protocol.models import Serial, mac_candidates_for_serial
+from lifx.protocol.models import (
+    MAC_OFFSET_FIRMWARE_MAJOR,
+    MAC_OFFSET_FIRMWARE_MIN_MINOR,
+    Serial,
+    mac_candidates_for_serial,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -38,21 +43,6 @@ if TYPE_CHECKING:
     )
 
 _LOGGER = logging.getLogger(__name__)
-
-#: Firmware whose MAC address is the serial with the final octet incremented:
-#: ``version_major == 3 and version_minor >= 70``. Both components are compared
-#: as integers -- minor 9 is *below* minor 70, not above it, so treating the
-#: version as a decimal would classify 3.9 incorrectly. Firmware outside this
-#: range -- including earlier 3.x builds such as 3.50 -- reports a MAC identical
-#: to its serial.
-#:
-#: The 3.70 boundary is stated by LIFX, not inferred from a network sweep, so
-#: it does not need corroborating observations in the 3.5x-3.6x range. A fleet
-#: audit is what exposed the earlier major-only rule as wrong (Tiles on 3.50
-#: whose real MAC matched their serial); the replacement bound came from the
-#: vendor.
-_MAC_OFFSET_MAJOR = 3
-_MAC_OFFSET_MIN_MINOR = 70
 
 
 @dataclass
@@ -102,7 +92,7 @@ class WifiInfo:
     #: Firmware through 2.77 reports signal strength in dB. Later firmware
     #: reports dBm. Keep this protocol quirk with the value object that exposes
     #: the converted RSSI instead of requiring every consumer to reimplement it.
-    RSSI_DBM_FW: ClassVar[tuple[int, int]] = (2, 77)
+    _RSSI_DB_FW_BOUNDARY: ClassVar[tuple[int, int]] = (2, 77)
 
     def __post_init__(self) -> None:
         """Calculate RSSI from signal."""
@@ -117,7 +107,7 @@ class WifiInfo:
         elif (
             self.host_firmware.version_major,
             self.host_firmware.version_minor,
-        ) <= self.RSSI_DBM_FW:
+        ) <= self._RSSI_DB_FW_BOUNDARY:
             self.rssi_unit = "dB"
         else:
             self.rssi_unit = "dBm"
@@ -492,8 +482,9 @@ class Device(Generic[StateT]):
         """Adopt metadata already fetched by a temporary device instance.
 
         Device factories use a base ``Device`` to identify the correct concrete
-        class. This transfers only immutable or firmware-keyed metadata; live
-        state and connection lifecycle remain owned by the new instance.
+        class. This transfers only registry-derived or firmware-keyed metadata,
+        which the library treats as read-only; live state and connection
+        lifecycle remain owned by the new instance.
         """
         self._version = source._version
         self._host_firmware = source._host_firmware
@@ -741,8 +732,8 @@ class Device(Generic[StateT]):
         if self._mac_address is None or self._mac_address_firmware != firmware_key:
             direct_mac, offset_mac = mac_candidates_for_serial(self.serial)
             if (
-                firmware.version_major == _MAC_OFFSET_MAJOR
-                and firmware.version_minor >= _MAC_OFFSET_MIN_MINOR
+                firmware.version_major == MAC_OFFSET_FIRMWARE_MAJOR
+                and firmware.version_minor >= MAC_OFFSET_FIRMWARE_MIN_MINOR
             ):
                 self._mac_address = offset_mac
             else:
@@ -1109,6 +1100,9 @@ class Device(Generic[StateT]):
         """Get device WiFi module information.
 
         Always fetches from device.
+        If host firmware has not already been fetched, this also requests and
+        caches it because the firmware version determines whether RSSI is
+        reported in dB or dBm.
 
         Returns:
             WifiInfo with signal strength and RSSI
