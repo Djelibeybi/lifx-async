@@ -139,6 +139,37 @@ class TestMultiZoneLight:
 
         assert len(result) == 1
 
+    async def test_zone_debug_payload_is_emitted_when_debug_enabled(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """DEBUG logging includes the fetched per-zone colour values."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        multizone_light._state = MagicMock()
+        protocol_color = HSBK(
+            hue=180, saturation=0.5, brightness=0.75, kelvin=3500
+        ).to_protocol()
+        mock_state = packets.MultiZone.StateMultiZone(
+            count=2, index=1, colors=[protocol_color]
+        )
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        with (
+            patch("lifx.devices.multizone._LOGGER.isEnabledFor", return_value=True),
+            patch("lifx.devices.multizone._LOGGER.debug") as debug_mock,
+        ):
+            result = await multizone_light.get_color_zones(1, 1)
+
+        assert len(result) == 1
+        debug_payload = debug_mock.call_args.args[0]
+        assert debug_payload["reply"]["colors"] == [
+            {
+                "hue": result[0].hue,
+                "saturation": result[0].saturation,
+                "brightness": result[0].brightness,
+                "kelvin": result[0].kelvin,
+            }
+        ]
+
     async def test_get_color_zones(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
@@ -264,6 +295,14 @@ class TestMultiZoneLight:
 
         assert len(result_colors) == 16
         assert all(isinstance(color, HSBK) for color in result_colors)
+
+    async def test_get_extended_color_zones_handles_empty_stream(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """An empty response stream returns no colours without a cached count."""
+        multizone_light.connection.request_stream = async_generator_mock([])
+
+        assert await multizone_light.get_extended_color_zones() == []
 
     async def test_get_extended_color_zones_large_device(
         self, multizone_light: MultiZoneLight, mock_product_info
@@ -519,6 +558,29 @@ class TestMultiZoneLight:
             await multizone_light.set_extended_color_zones(0, colors)
 
         multizone_light.connection.request.assert_awaited_once()
+
+    async def test_set_extended_zone_debug_payload_is_emitted_when_enabled(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """DEBUG logging includes the outgoing per-zone colour values."""
+        multizone_light.connection.request.return_value = True
+        colors = [HSBK(180, 0.5, 0.75, 3500)]
+
+        with (
+            patch("lifx.devices.multizone._LOGGER.isEnabledFor", return_value=True),
+            patch("lifx.devices.multizone._LOGGER.debug") as debug_mock,
+        ):
+            await multizone_light.set_extended_color_zones(0, colors)
+
+        debug_payload = debug_mock.call_args.args[0]
+        assert debug_payload["values"]["colors"] == [
+            {
+                "hue": colors[0].hue,
+                "saturation": colors[0].saturation,
+                "brightness": colors[0].brightness,
+                "kelvin": colors[0].kelvin,
+            }
+        ]
 
     async def test_set_extended_color_zones_too_many(
         self, multizone_light: MultiZoneLight
