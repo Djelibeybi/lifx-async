@@ -229,7 +229,7 @@ None yet.
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
 | 260726-42c | Serial/MAC correlation audit script (`scripts/serial_mac_audit.py`) — enumerates serial, derived MAC, real ARP MAC, product and firmware to test the `get_mac_address()` off-by-one rule | 2026-07-26 | f625afd | Verified | [260726-42c-create-a-script-that-enumerates-mac-addr](./quick/260726-42c-create-a-script-that-enumerates-mac-addr/) |
-| 260726-824 | Consumer time no longer expires the discovery idle window — `_discover_with_packet()` re-marks a response once the consumer resumes, so `api.discover()`'s per-device `create_device()` round trips cannot truncate a sweep (DISC-03, v1.1 audit follow-up) | 2026-07-26 | 3d16822 | Verified | [260726-824-fix-discover-idle-window-consumer-time](./quick/260726-824-fix-discover-idle-window-consumer-time/) |
+| 260726-824 | Consumer time no longer expires the discovery idle window — `_discover_with_packet()` re-marks a response once the consumer resumes, so `api.discover()`'s per-device `create_device()` round trips cannot truncate a sweep (DISC-03, v1.1 audit follow-up); docs corrected and tests hardened in the `9afe8df` follow-up | 2026-07-26 | dca9e39 | Verified | [260726-824-fix-discover-idle-window-consumer-time](./quick/260726-824-fix-discover-idle-window-consumer-time/) |
 
 **260726-42c outcome:** Fleet sweep run and signed off 2026-07-26. The audit found
 `get_mac_address()` wrong for LIFX Tiles on firmware 3.50 — their real ARP MAC equals their serial,

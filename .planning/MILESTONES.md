@@ -33,7 +33,8 @@ the asyncio core and public API untouched.
   build taken from an 8-warning "baseline" to zero warnings under `--strict`, gated in CI.
 - **Close-out fixes:** phase 4's validation strategy reconciled (`049902b`) and
   `api.discover()` stopped letting a slow or dead device expire the discovery idle window
-  (`3d16822`), both found by the milestone audit's cross-phase integration check.
+  (`dca9e39`, with docs and tests corrected in the `9afe8df` follow-up), both found by the
+  milestone audit's cross-phase integration check.
 
 **Deferred:** SEED-001 Thread/IPv6 revalidation (dormant), PERS-01 persistence mixin,
 02-01-SUMMARY.md's missing requirements frontmatter (cross-checked manually), and the
