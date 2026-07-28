@@ -58,14 +58,32 @@ color = HSBK(hue=240.0, saturation=1.0, brightness=0.5, kelvin=3500)
 print(f"Hue: {color.hue}°")
 
 # Saturation: 0.0-1.0 (0=white, 1=full color)
-print(f"Saturation: {color.saturation * 100}%")
+print(f"Saturation: {color.saturation_pct}%")
 
 # Brightness: 0.0-1.0 (0=off, 1=full brightness)
-print(f"Brightness: {color.brightness * 100}%")
+print(f"Brightness: {color.brightness_pct}%")
 
 # Kelvin: 1500-9000 (warm white to cool white)
 print(f"Temperature: {color.kelvin}K")
 ```
+
+### Scaled Components
+
+Saturation and brightness are also available pre-scaled, for consumers that
+expect percentages or 8-bit values rather than the 0.0-1.0 fractions:
+
+```python
+from lifx import HSBK
+
+color = HSBK(hue=240.0, saturation=1.0, brightness=0.5, kelvin=3500)
+
+color.saturation_pct  # 100.0  (0.0-100.0)
+color.brightness_pct  # 50.0   (0.0-100.0)
+color.brightness_uint8  # 128  (0-255)
+```
+
+Home Assistant wants `(color.hue, color.saturation_pct)` for a light's
+`hs_color` and `color.brightness_uint8` for its `brightness`.
 
 ### Color Manipulation
 
@@ -78,6 +96,16 @@ async def cycle_hue(light: Light):
     for hue in range(0, 360, 10):
         color = HSBK(hue=float(hue), saturation=1.0, brightness=0.8, kelvin=3500)
         await light.set_color(color, duration=0.1)
+```
+
+Use `replace()` to override some components while keeping the rest, instead
+of chaining the single-component `with_*` methods:
+
+```python
+color = HSBK(hue=180.0, saturation=0.5, brightness=0.75, kelvin=3500)
+
+# Shift the hue and dim it; saturation and kelvin are carried over
+dimmed = color.replace(hue=200.0, brightness=0.2)
 ```
 
 ### White Balance
