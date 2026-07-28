@@ -253,8 +253,7 @@ class FrameBuffer:
         # Convert tile center positions to pixel coordinates
         # user_x/user_y are in "tile width" units, representing tile centers
         tile_centers = [
-            (int(round(t.user_x * tile_width)), int(round(t.user_y * tile_height)))
-            for t in tiles
+            (round(t.user_x * tile_width), round(t.user_y * tile_height)) for t in tiles
         ]
 
         # Calculate bounding box of all tile centers
