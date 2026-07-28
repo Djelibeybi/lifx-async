@@ -150,6 +150,8 @@ class MultiZoneLightState(LightState):
         """Return MultiZoneLightState as dict."""
         state = super().as_dict
         state["zones"] = [zone.as_dict for zone in self.zones]
+        state["zone_count"] = self.zone_count
+        state["effect"] = self.effect
         return state
 
     @classmethod
@@ -986,11 +988,21 @@ class MultiZoneLight(Light):
             duration: Transition duration in seconds (default 0.0)
             apply: Application mode for the final packet (default APPLY). Pass
                 NO_APPLY to buffer this write and apply it with a later call.
+                APPLY_ONLY is rejected: it tells the device to discard the
+                colors carried by the message and flush only what is already
+                buffered, which would silently drop part of this write.
+
+        The window is checked against the zone count only when that count is
+        already cached; it is never fetched just to validate. A device that
+        went through ``connect()`` or the async context manager always has it,
+        so the unchecked case is a hand-constructed light whose first zone
+        operation is a write — there the device itself ignores zones it does
+        not have.
 
         Raises:
             ValueError: If colors is empty, the window is invalid or falls
-                outside the list, or the window exceeds what the device can
-                address
+                outside the list, the window exceeds the cached zone count, or
+                apply is APPLY_ONLY
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
             LifxUnsupportedCommandError: If device doesn't support this command
@@ -1009,6 +1021,12 @@ class MultiZoneLight(Light):
         if not colors:
             raise ValueError("Colors list cannot be empty")
 
+        if apply is MultiZoneApplicationRequest.APPLY_ONLY:
+            raise ValueError(
+                "APPLY_ONLY discards the colors carried by the message, so it "
+                "cannot be used to write zones; use APPLY or NO_APPLY"
+            )
+
         if end is None:
             end = len(colors) - 1
 
@@ -1020,6 +1038,9 @@ class MultiZoneLight(Light):
                 f"Zone range {start}-{end} extends past the {len(colors)}-color list"
             )
 
+        # Deliberately validated against the cached count only: a round trip
+        # purely to validate is never warranted, and any device that went
+        # through connect() already has the count. See the design spec.
         if self._zone_count is not None and end >= self._zone_count:
             raise ValueError(
                 f"Zone range {start}-{end} exceeds the device's "

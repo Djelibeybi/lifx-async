@@ -291,11 +291,19 @@ class MatrixLightState(LightState):
     def as_dict(self) -> Any:
         """Return MatrixLightState as dict.
 
-        ``chain`` needs no handling: TileInfo is a dataclass, so
-        ``dataclasses.asdict`` already recurses into it.
+        ``tile_orientations`` is keyed by tile index. JSON object keys are
+        always strings, so the keys are stringified here rather than letting
+        ``json.dumps`` coerce them and break lookups after a round trip.
         """
         state = super().as_dict
+        state["chain"] = [tile.as_dict for tile in self.chain]
+        state["tile_orientations"] = {
+            str(index): orientation
+            for index, orientation in self.tile_orientations.items()
+        }
         state["tile_colors"] = [color.as_dict for color in self.tile_colors]
+        state["tile_count"] = self.tile_count
+        state["effect"] = self.effect
         return state
 
     @classmethod
