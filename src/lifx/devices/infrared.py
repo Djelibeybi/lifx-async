@@ -176,7 +176,7 @@ class InfraredLight(Light):
             )
 
         # Convert from float (0.0-1.0) to uint16 (0-65535)
-        brightness_u16 = max(0, min(65535, int(round(brightness * 65535))))
+        brightness_u16 = max(0, min(65535, round(brightness * 65535)))
 
         # Request automatically handles acknowledgement
         result = await self.connection.request(
