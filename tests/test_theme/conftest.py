@@ -10,6 +10,7 @@ from lifx.devices.base import DeviceVersion
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.products import get_product
 
 
 @pytest.fixture
@@ -25,6 +26,7 @@ def mock_device_factory():
         serial: str = "d073d5010203",
         ip: str = "192.168.1.100",
         port: int = 56700,
+        product: int = 27,
     ):
         device = device_class(serial=serial, ip=ip, port=port)
         # Replace device's connection with mock
@@ -32,7 +34,10 @@ def mock_device_factory():
         mock_conn.request = AsyncMock()
         mock_conn.request_ack = AsyncMock()
         device.connection = mock_conn
-        device._version = DeviceVersion(vendor=1, product=27)
+        device._version = DeviceVersion(vendor=1, product=product)
+        # A connected device populates this from the registry during setup;
+        # set it directly so capability checks do not hit the mocked connection.
+        device._capabilities = get_product(product)
         return device
 
     return _create_device
@@ -50,8 +55,12 @@ def light(mock_device_factory) -> Light:
 
 @pytest.fixture
 def multizone_light(mock_device_factory) -> MultiZoneLight:
-    """Create a test multizone light with mocked theme methods."""
-    light = mock_device_factory(MultiZoneLight)
+    """Create a test multizone light with mocked theme methods.
+
+    Product 32 is a LIFX Z with extended multizone, so apply_theme takes the
+    SetExtendedColorZones path.
+    """
+    light = mock_device_factory(MultiZoneLight, product=32)
     light.set_color = AsyncMock()
     light.set_extended_color_zones = AsyncMock()
     light.set_power = AsyncMock()
