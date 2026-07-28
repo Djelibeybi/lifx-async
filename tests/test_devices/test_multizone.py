@@ -988,21 +988,25 @@ class TestMultiZoneEffect:
             effect.direction = Direction.FORWARD
 
 
-class TestWriteZoneColors:
-    """_write_zone_colors picks a packet path and batches the apply."""
+class TestSetAllColorZones:
+    """set_all_color_zones writes a window of a full-length color list."""
+
+    RED = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+    BLUE = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
 
     @staticmethod
-    def _light(*, extended: bool) -> MultiZoneLight:
+    def _light(*, extended: bool, zone_count: int | None = None) -> MultiZoneLight:
         """Return a light with mocked setters and a fixed capability."""
         light = MultiZoneLight(serial="d073d5010203", ip="192.168.1.100")
         light._capabilities = MagicMock()
         light._capabilities.has_extended_multizone = extended
+        light._zone_count = zone_count
         light.set_color_zones = AsyncMock()
         light.set_extended_color_zones = AsyncMock()
         return light
 
-    @staticmethod
-    def _colors(count: int, *, gradient: bool) -> list[HSBK]:
+    @classmethod
+    def _colors(cls, count: int, *, gradient: bool) -> list[HSBK]:
         """Return count colors, either all identical or all distinct."""
         return [
             HSBK(
@@ -1014,6 +1018,8 @@ class TestWriteZoneColors:
             for i in range(count)
         ]
 
+    # -- run-length encoding --------------------------------------------
+
     def test_encode_zone_runs_collapses_identical_colors(self) -> None:
         """Test a flat color list becomes a single run."""
         colors = self._colors(60, gradient=False)
@@ -1022,12 +1028,17 @@ class TestWriteZoneColors:
 
     def test_encode_zone_runs_splits_on_change(self) -> None:
         """Test runs break wherever the color changes."""
-        red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
-        blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+        runs = MultiZoneLight._encode_zone_runs(
+            [self.RED, self.RED, self.BLUE, self.RED]
+        )
 
-        runs = MultiZoneLight._encode_zone_runs([red, red, blue, red])
+        assert runs == [(0, 1, self.RED), (2, 2, self.BLUE), (3, 3, self.RED)]
 
-        assert runs == [(0, 1, red), (2, 2, blue), (3, 3, red)]
+    def test_encode_zone_runs_applies_offset(self) -> None:
+        """Test the offset shifts runs into device zone numbering."""
+        runs = MultiZoneLight._encode_zone_runs([self.RED, self.BLUE], offset=10)
+
+        assert runs == [(10, 10, self.RED), (11, 11, self.BLUE)]
 
     def test_encode_zone_runs_gradient_yields_one_run_per_zone(self) -> None:
         """Test a gradient cannot be collapsed; this is the packet-count cliff."""
@@ -1035,15 +1046,17 @@ class TestWriteZoneColors:
 
         assert len(MultiZoneLight._encode_zone_runs(colors)) == 60
 
-    async def test_extended_single_chunk_applies(self) -> None:
-        """Test a short strip is one extended packet with APPLY."""
+    # -- extended path ---------------------------------------------------
+
+    async def test_extended_writes_whole_list_by_default(self) -> None:
+        """Test omitting end writes every color in the list."""
         light = self._light(extended=True)
         colors = self._colors(16, gradient=True)
 
-        await light._write_zone_colors(colors, duration=1.0)
+        await light.set_all_color_zones(colors, duration=1.0)
 
         light.set_extended_color_zones.assert_awaited_once_with(
-            0, colors, duration=1.0, apply=ExtendedAppReq.APPLY
+            0, colors, duration=1.0, apply=MultiZoneApplicationRequest.APPLY
         )
         light.set_color_zones.assert_not_awaited()
 
@@ -1052,7 +1065,7 @@ class TestWriteZoneColors:
         light = self._light(extended=True)
         colors = self._colors(200, gradient=True)
 
-        await light._write_zone_colors(colors, duration=0.0)
+        await light.set_all_color_zones(colors)
 
         calls = light.set_extended_color_zones.await_args_list
         assert [call.args[0] for call in calls] == [0, 82, 164]
@@ -1060,15 +1073,54 @@ class TestWriteZoneColors:
         assert [call.kwargs["apply"] for call in calls] == [
             ExtendedAppReq.NO_APPLY,
             ExtendedAppReq.NO_APPLY,
-            ExtendedAppReq.APPLY,
+            MultiZoneApplicationRequest.APPLY,
         ]
+
+    async def test_extended_window_writes_only_the_window(self) -> None:
+        """Test a window sends just its slice, at its own start index."""
+        light = self._light(extended=True)
+        colors = self._colors(64, gradient=True)
+
+        await light.set_all_color_zones(colors, start=10, end=19)
+
+        light.set_extended_color_zones.assert_awaited_once_with(
+            10,
+            colors[10:20],
+            duration=0.0,
+            apply=MultiZoneApplicationRequest.APPLY,
+        )
+
+    async def test_extended_window_chunks_offset_from_start(self) -> None:
+        """Test chunk indices are offset by start, not from zero."""
+        light = self._light(extended=True)
+        colors = self._colors(300, gradient=True)
+
+        await light.set_all_color_zones(colors, start=100, end=280)
+
+        calls = light.set_extended_color_zones.await_args_list
+        assert [call.args[0] for call in calls] == [100, 182, 264]
+        assert [len(call.args[1]) for call in calls] == [82, 82, 17]
+
+    async def test_read_modify_write_round_trip(self) -> None:
+        """Test changing one zone addresses only that zone."""
+        light = self._light(extended=True)
+        colors = self._colors(64, gradient=False)
+        colors[5] = self.BLUE
+
+        await light.set_all_color_zones(colors, start=5, end=5)
+
+        light.set_extended_color_zones.assert_awaited_once_with(
+            5, [self.BLUE], duration=0.0, apply=MultiZoneApplicationRequest.APPLY
+        )
+
+    # -- legacy path -----------------------------------------------------
 
     async def test_legacy_flat_color_is_one_packet(self) -> None:
         """Test legacy firmware sends a single range for a flat color."""
         light = self._light(extended=False)
         colors = self._colors(60, gradient=False)
 
-        await light._write_zone_colors(colors, duration=2.0)
+        await light.set_all_color_zones(colors, duration=2.0)
 
         light.set_color_zones.assert_awaited_once_with(
             0,
@@ -1084,7 +1136,7 @@ class TestWriteZoneColors:
         light = self._light(extended=False)
         colors = self._colors(60, gradient=True)
 
-        await light._write_zone_colors(colors, duration=0.0)
+        await light.set_all_color_zones(colors)
 
         calls = light.set_color_zones.await_args_list
         assert len(calls) == 60
@@ -1093,16 +1145,111 @@ class TestWriteZoneColors:
         ] * 59
         assert calls[-1].kwargs["apply"] == MultiZoneApplicationRequest.APPLY
 
-    async def test_legacy_rejects_more_than_256_zones(self) -> None:
+    async def test_legacy_window_offsets_run_indices(self) -> None:
+        """Test legacy runs are numbered from start, not from zero."""
+        light = self._light(extended=False)
+        colors = self._colors(64, gradient=False)
+
+        await light.set_all_color_zones(colors, start=10, end=19)
+
+        light.set_color_zones.assert_awaited_once_with(
+            10,
+            19,
+            colors[10],
+            duration=0.0,
+            apply=MultiZoneApplicationRequest.APPLY,
+        )
+
+    async def test_legacy_rle_does_not_merge_across_window_boundary(self) -> None:
+        """Test identical colors outside the window do not extend a run.
+
+        Merging across the boundary would spill the write onto zones the
+        caller asked to leave alone.
+        """
+        light = self._light(extended=False)
+        colors = [self.RED] * 64
+
+        await light.set_all_color_zones(colors, start=10, end=19)
+
+        light.set_color_zones.assert_awaited_once_with(
+            10, 19, self.RED, duration=0.0, apply=MultiZoneApplicationRequest.APPLY
+        )
+
+    async def test_legacy_rejects_window_past_zone_255(self) -> None:
         """Test the uint8 index limit is reported rather than silently wrapping."""
         light = self._light(extended=False)
 
-        with pytest.raises(ValueError, match="limit is 256"):
-            await light._write_zone_colors(self._colors(300, gradient=True), 0.0)
+        with pytest.raises(ValueError, match="limit is 255"):
+            await light.set_all_color_zones(self._colors(300, gradient=True))
+
+    async def test_legacy_accepts_long_list_with_low_window(self) -> None:
+        """Test the uint8 bound applies to the window, not the list length."""
+        light = self._light(extended=False)
+        colors = self._colors(300, gradient=False)
+
+        await light.set_all_color_zones(colors, start=0, end=50)
+
+        light.set_color_zones.assert_awaited_once_with(
+            0, 50, colors[0], duration=0.0, apply=MultiZoneApplicationRequest.APPLY
+        )
+
+    # -- apply composition -----------------------------------------------
+
+    async def test_apply_no_apply_buffers_every_packet(self) -> None:
+        """Test NO_APPLY means no packet applies, so writes can compose."""
+        light = self._light(extended=True)
+        colors = self._colors(200, gradient=True)
+
+        await light.set_all_color_zones(
+            colors, apply=MultiZoneApplicationRequest.NO_APPLY
+        )
+
+        calls = light.set_extended_color_zones.await_args_list
+        assert [call.kwargs["apply"] for call in calls] == [ExtendedAppReq.NO_APPLY] * 3
+
+    # -- validation ------------------------------------------------------
 
     async def test_rejects_empty_colors(self) -> None:
         """Test an empty color list is rejected."""
         light = self._light(extended=True)
 
         with pytest.raises(ValueError, match="cannot be empty"):
-            await light._write_zone_colors([], 0.0)
+            await light.set_all_color_zones([])
+
+    @pytest.mark.parametrize(("start", "end"), [(-1, 5), (5, 4)])
+    async def test_rejects_invalid_window(self, start: int, end: int) -> None:
+        """Test a negative start or an end below start is rejected."""
+        light = self._light(extended=True)
+
+        with pytest.raises(ValueError, match="Invalid zone range"):
+            await light.set_all_color_zones(
+                self._colors(16, gradient=True), start=start, end=end
+            )
+
+    async def test_rejects_window_past_end_of_list(self) -> None:
+        """Test the window must lie inside the color list."""
+        light = self._light(extended=True)
+
+        with pytest.raises(ValueError, match="extends past"):
+            await light.set_all_color_zones(
+                self._colors(16, gradient=True), start=0, end=20
+            )
+
+    async def test_rejects_window_past_cached_zone_count(self) -> None:
+        """Test a cached zone count is enforced rather than clamped."""
+        light = self._light(extended=True, zone_count=8)
+
+        with pytest.raises(ValueError, match="exceeds the device's 8 zones"):
+            await light.set_all_color_zones(self._colors(16, gradient=True))
+
+        light.set_extended_color_zones.assert_not_awaited()
+
+    async def test_uncached_zone_count_sends_no_extra_request(self) -> None:
+        """Test an unknown zone count skips the check without a round trip."""
+        light = self._light(extended=True, zone_count=None)
+        light.get_zone_count = AsyncMock()
+
+        await light.set_all_color_zones(self._colors(16, gradient=True))
+
+        light.get_zone_count.assert_not_awaited()
+        light.set_extended_color_zones.assert_awaited_once()
