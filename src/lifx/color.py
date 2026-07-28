@@ -311,6 +311,33 @@ class HSBK:
         return self._brightness
 
     @property
+    def saturation_pct(self) -> float:
+        """Return saturation as a percentage (0.0-100.0).
+
+        Home Assistant expresses the saturation half of ``hs_color`` as a
+        percentage rather than this class's 0.0-1.0 fraction.
+        """
+        return self._saturation * 100
+
+    @property
+    def brightness_pct(self) -> float:
+        """Return brightness as a percentage (0.0-100.0).
+
+        Provided for symmetry with :attr:`saturation_pct`; Home Assistant
+        itself wants :attr:`brightness_uint8` for a light's brightness.
+        """
+        return self._brightness * 100
+
+    @property
+    def brightness_uint8(self) -> int:
+        """Return brightness as an 8-bit value (0-255).
+
+        Home Assistant and most RGB tooling express brightness as a uint8
+        rather than the protocol's uint16 or this class's 0.0-1.0 float.
+        """
+        return round(self._brightness * 255)
+
+    @property
     def kelvin(self) -> int:
         """Return kelvin."""
         return self._kelvin
@@ -396,9 +423,9 @@ class HSBK:
             # Use in packet: LightSetColor(color=protocol_color, ...)
             ```
         """
-        hue_u16 = int(round(0x10000 * self._hue) / 360) % 0x10000
-        saturation_u16 = int(round(0xFFFF * self._saturation))
-        brightness_u16 = int(round(0xFFFF * self._brightness))
+        hue_u16 = round(0x10000 * self._hue / 360) % 0x10000
+        saturation_u16 = round(0xFFFF * self._saturation)
+        brightness_u16 = round(0xFFFF * self._brightness)
 
         return LightHsbk(
             hue=hue_u16,
@@ -500,6 +527,49 @@ class HSBK:
             saturation=self._saturation,
             brightness=self._brightness,
             kelvin=kelvin,
+        )
+
+    def replace(
+        self,
+        hue: float | None = None,
+        saturation: float | None = None,
+        brightness: float | None = None,
+        kelvin: int | None = None,
+    ) -> HSBK:
+        """Create a new HSBK, replacing only the components that were supplied.
+
+        Each component defaults to the value held by this color, so any subset
+        can be overridden in a single call rather than chaining ``with_*``
+        methods. Supplying nothing returns an equivalent color.
+
+        Args:
+            hue: New hue in degrees (0-360), or None to keep the current hue
+            saturation: New saturation (0.0-1.0), or None to keep the current
+                saturation
+            brightness: New brightness (0.0-1.0), or None to keep the current
+                brightness
+            kelvin: New color temperature (1500-9000), or None to keep the
+                current kelvin
+
+        Returns:
+            New HSBK instance
+
+        Raises:
+            ValueError: If any supplied value is out of range
+
+        Example:
+            ```python
+            color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+
+            # Dim it and shift the hue, keeping saturation and kelvin
+            dimmed = color.replace(hue=200, brightness=0.2)
+            ```
+        """
+        return HSBK(
+            hue=self._hue if hue is None else hue,
+            saturation=self._saturation if saturation is None else saturation,
+            brightness=self._brightness if brightness is None else brightness,
+            kelvin=self._kelvin if kelvin is None else kelvin,
         )
 
     def lerp_hsb(self, other: HSBK, blend: float) -> HSBK:

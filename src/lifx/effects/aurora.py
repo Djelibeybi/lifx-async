@@ -243,9 +243,9 @@ class EffectAurora(FrameEffect):
             saturation = 0.7 + 0.3 * sin(position * 2 * pi)
 
             # Convert directly to uint16 protocol values
-            hue_u16 = int(round(0x10000 * hue) / 360) % 0x10000
-            sat_u16 = int(round(0xFFFF * saturation))
-            bri_u16 = int(round(0xFFFF * pixel_brightness))
+            hue_u16 = round(0x10000 * hue / 360) % 0x10000
+            sat_u16 = round(0xFFFF * saturation)
+            bri_u16 = round(0xFFFF * pixel_brightness)
 
             result.append((hue_u16, sat_u16, bri_u16, KELVIN_NEUTRAL))
 
