@@ -2447,75 +2447,8 @@ class TestCeilingLightStateCoverage:
         ceiling._version.product = 176
         return ceiling
 
-    def test_as_dict_property(self) -> None:
-        """Test CeilingLightState.as_dict returns a dict via dataclasses.asdict."""
-        from lifx.devices.ceiling import CeilingLightState
-
-        state = MagicMock(spec=CeilingLightState)
-        state.downlight_zones = slice(1, 64, 2)
-        mock_dict = {"key": "value"}
-        with patch(
-            "lifx.devices.ceiling.asdict", return_value=mock_dict
-        ) as mock_asdict:
-            # Call the real property implementation
-            result = CeilingLightState.as_dict.fget(state)  # type: ignore[union-attr]
-            mock_asdict.assert_called_once_with(state)
-        assert result == {
-            "key": "value",
-            "downlight_zones": {"start": 1, "stop": 64, "step": 2},
-        }
-
-    @pytest.mark.parametrize("stop", [63, 127])
-    def test_as_dict_expands_downlight_zones_slice(self, stop: int) -> None:
-        """Test as_dict replaces the downlight_zones slice with a mapping.
-
-        The layouts in quirks.py build slice(0, 63) and slice(0, 127), leaving
-        step as None, so as_dict normalises it to 1.
-        """
-        from lifx.devices.ceiling import CeilingLightState
-
-        state = MagicMock(spec=CeilingLightState)
-        state.downlight_zones = slice(0, stop)
-
-        with patch("lifx.devices.ceiling.asdict", return_value={}):
-            result = CeilingLightState.as_dict.fget(state)  # type: ignore[union-attr]
-
-        assert result["downlight_zones"] == {"start": 0, "stop": stop, "step": 1}
-        assert not isinstance(result["downlight_zones"], slice)
-
-    def test_as_dict_downlight_zones_can_rebuild_the_slice(self) -> None:
-        """Test the mapping carries enough detail to recreate the slice.
-
-        slice() takes no keyword arguments, so a consumer must pass the three
-        values positionally.
-        """
-        from lifx.devices.ceiling import CeilingLightState
-
-        original = slice(0, 63)
-        state = MagicMock(spec=CeilingLightState)
-        state.downlight_zones = original
-
-        with patch("lifx.devices.ceiling.asdict", return_value={}):
-            result = CeilingLightState.as_dict.fget(state)  # type: ignore[union-attr]
-
-        zones = result["downlight_zones"]
-        rebuilt = slice(zones["start"], zones["stop"], zones["step"])
-
-        # Not == to the original, whose step is None, but indexes identically.
-        assert rebuilt.indices(64) == original.indices(64)
-        assert list(range(64))[rebuilt] == list(range(64))[original]
-
-    def test_as_dict_preserves_explicit_downlight_zones_step(self) -> None:
-        """Test as_dict keeps a step that was set explicitly."""
-        from lifx.devices.ceiling import CeilingLightState
-
-        state = MagicMock(spec=CeilingLightState)
-        state.downlight_zones = slice(0, 63, 2)
-
-        with patch("lifx.devices.ceiling.asdict", return_value={}):
-            result = CeilingLightState.as_dict.fget(state)  # type: ignore[union-attr]
-
-        assert result["downlight_zones"] == {"start": 0, "stop": 63, "step": 2}
+    # as_dict serialisation is covered in test_state_serialisation.py, against
+    # real state instances rather than a patched dataclasses.asdict.
 
     def test_state_property_raises_when_uninitialised(self) -> None:
         """Test state property raises RuntimeError when _state is None."""
