@@ -8,6 +8,7 @@ from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.models import PreState
 from lifx.effects.state_manager import DeviceStateManager
+from lifx.protocol.protocol_types import MultiZoneApplicationRequest
 
 
 @pytest.fixture
@@ -198,61 +199,68 @@ async def test_restore_state_powered_off_light(state_manager, mock_light) -> Non
 
 
 @pytest.mark.asyncio
-async def test_restore_state_multizone_extended(
-    state_manager, mock_multizone_light
+@pytest.mark.parametrize("extended", [True, False])
+async def test_restore_state_multizone_delegates_to_set_all_color_zones(
+    state_manager, mock_multizone_light, extended: bool
 ) -> None:
-    """Test restoring state to multizone light with extended support."""
-    # Setup mock methods
-    mock_multizone_light.set_extended_color_zones = AsyncMock()
+    """Test the restore hands the whole list to set_all_color_zones.
+
+    Choosing the packet type and chunking past the 82-color extended limit is
+    set_all_color_zones' job, so the restore no longer branches on
+    capabilities itself.
+    """
+    mock_multizone_light.set_all_color_zones = AsyncMock()
     mock_multizone_light.set_color = AsyncMock()
     mock_multizone_light.set_power = AsyncMock()
+    mock_multizone_light.capabilities.has_extended_multizone = extended
 
-    # Setup extended multizone
-    mock_multizone_light.capabilities.has_extended_multizone = True
-
-    # Create multizone prestate
     color = HSBK(hue=180, saturation=0.8, brightness=0.7, kelvin=4000)
     zone_colors = [
         HSBK(hue=i * 20, saturation=1.0, brightness=0.8, kelvin=3500) for i in range(16)
     ]
     prestate = PreState(power=True, color=color, zone_colors=zone_colors)
 
-    # Restore state
     await state_manager.restore_state(mock_multizone_light, prestate)
 
-    # Verify zones restored
-    mock_multizone_light.set_extended_color_zones.assert_called_once()
-    call_kwargs = mock_multizone_light.set_extended_color_zones.call_args.kwargs
-    assert call_kwargs["zone_index"] == 0
-    assert call_kwargs["colors"] == zone_colors
-    assert call_kwargs["duration"] == 0.0
+    mock_multizone_light.set_all_color_zones.assert_awaited_once_with(
+        zone_colors,
+        duration=0.0,
+        apply=MultiZoneApplicationRequest.APPLY,
+    )
 
 
-@pytest.mark.asyncio
-async def test_restore_state_multizone_standard(
-    state_manager, mock_multizone_light
+async def test_restore_state_multizone_chunks_past_the_extended_limit(
+    state_manager,
 ) -> None:
-    """Test restoring state to multizone light without extended support."""
-    # Setup mock methods
-    mock_multizone_light.set_color_zones = AsyncMock()
-    mock_multizone_light.set_color = AsyncMock()
-    mock_multizone_light.set_power = AsyncMock()
+    """Test a strip longer than 82 zones restores instead of raising.
 
-    # Setup standard multizone
-    mock_multizone_light.capabilities.has_extended_multizone = False
+    The old restore called set_extended_color_zones with every captured zone,
+    which raised ValueError past 82 colors — swallowed by the broad handler,
+    so the strip silently stayed on the effect's last frame.
+    """
+    light = MultiZoneLight(serial="d073d5abcdef", ip="192.168.1.100")
+    light._capabilities = MagicMock()
+    light._capabilities.has_extended_multizone = True
+    light._zone_count = 128
+    light.set_extended_color_zones = AsyncMock()
+    light.set_color = AsyncMock()
+    light.set_power = AsyncMock()
 
-    # Create multizone prestate with fewer zones
-    color = HSBK(hue=240, saturation=0.9, brightness=0.6, kelvin=2700)
+    color = HSBK(hue=180, saturation=0.8, brightness=0.7, kelvin=4000)
     zone_colors = [
-        HSBK(hue=i * 45, saturation=1.0, brightness=0.8, kelvin=3500) for i in range(8)
+        HSBK(hue=i * 2, saturation=1.0, brightness=0.8, kelvin=3500) for i in range(128)
     ]
     prestate = PreState(power=True, color=color, zone_colors=zone_colors)
 
-    # Restore state
-    await state_manager.restore_state(mock_multizone_light, prestate)
+    await state_manager.restore_state(light, prestate)
 
-    # Verify zones restored individually
-    assert mock_multizone_light.set_color_zones.call_count == 8
+    assert light.set_extended_color_zones.await_count == 2
+    assert [
+        call.args[0] for call in light.set_extended_color_zones.await_args_list
+    ] == [
+        0,
+        82,
+    ]
 
 
 @pytest.mark.asyncio
@@ -297,7 +305,7 @@ async def test_restore_zones_failure_handling(
 ) -> None:
     """Test restore handles zone setting failures gracefully."""
     # Setup mock to fail on zones
-    mock_multizone_light.set_extended_color_zones = AsyncMock(
+    mock_multizone_light.set_all_color_zones = AsyncMock(
         side_effect=Exception("Zone error")
     )
     mock_multizone_light.set_color = AsyncMock()
