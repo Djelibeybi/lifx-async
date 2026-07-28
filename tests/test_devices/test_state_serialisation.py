@@ -155,17 +155,72 @@ class TestStateSerialisation:
 
         assert state.as_dict["tile_colors"] == [COLOR_DICT]
 
-    def test_matrix_chain_is_expanded_by_asdict(self) -> None:
-        """Test the chain becomes dicts without explicit handling.
-
-        TileInfo is a dataclass, so dataclasses.asdict recurses into it. This
-        pins that behaviour, since as_dict relies on it.
-        """
+    def test_matrix_chain_is_expanded(self) -> None:
+        """Test the chain becomes dicts rather than TileInfo objects."""
         state = _all_states()["matrix"]
 
         chain = state.as_dict["chain"]
         assert chain == [_tile().as_dict]
         assert not isinstance(chain[0], TileInfo)
+
+    def test_matrix_tile_orientations_survive_a_json_round_trip(self) -> None:
+        """Test orientation keys are strings so JSON does not change them.
+
+        JSON object keys are always strings. Leaving the int keys in place
+        made json.dumps succeed while silently coercing them, so a consumer
+        that persisted the state lost every orientation lookup on restore.
+        """
+        result = _all_states()["matrix"].as_dict
+
+        assert result["tile_orientations"] == {"0": "rotate_right"}
+        assert json.loads(json.dumps(result))["tile_orientations"] == {
+            "0": "rotate_right"
+        }
+
+    @pytest.mark.parametrize("name", list(_all_states()))
+    def test_capabilities_are_curated(self, name: str) -> None:
+        """Test every state gets DeviceState's capability expansion.
+
+        LightState used to call dataclasses.asdict, which bypassed
+        DeviceState.as_dict entirely, so light states were missing
+        has_variable_color_temp and kept None kelvin bounds.
+        """
+        capabilities = _all_states()[name].as_dict["capabilities"]
+
+        assert capabilities["has_variable_color_temp"] is True
+        assert capabilities["kelvin_min"] == 1500
+        assert capabilities["kelvin_max"] == 9000
+
+    @pytest.mark.parametrize("name", list(_all_states()))
+    def test_firmware_omits_build(self, name: str) -> None:
+        """Test the firmware expansion drops build, as DeviceState intends."""
+        result = _all_states()[name].as_dict
+
+        assert result["host_firmware"] == {"version_major": 3, "version_minor": 0}
+        assert result["wifi_firmware"] == {"version_major": 3, "version_minor": 0}
+
+    def test_subclass_fields_are_all_present(self) -> None:
+        """Test building field-by-field did not drop any subclass field."""
+        states = _all_states()
+
+        assert states["infrared"].as_dict["infrared"] == 0.5
+        assert states["hev"].as_dict["hev_cycle"] == {
+            "duration_s": 7200,
+            "remaining_s": 0,
+            "last_power": 0,
+        }
+        assert states["hev"].as_dict["hev_config"] == {
+            "indication": False,
+            "duration_s": 7200,
+        }
+        assert states["hev"].as_dict["hev_result"] == LightLastHevCycleResult.SUCCESS
+        assert states["multizone"].as_dict["zone_count"] == 1
+        assert states["multizone"].as_dict["effect"] == FirmwareEffect.OFF
+        assert states["matrix"].as_dict["tile_count"] == 1
+        assert states["matrix"].as_dict["effect"] == FirmwareEffect.OFF
+        assert states["ceiling"].as_dict["uplight_is_on"] is True
+        assert states["ceiling"].as_dict["downlight_is_on"] is True
+        assert states["ceiling"].as_dict["uplight_zone"] == 63
 
     def test_ceiling_expands_component_colors(self) -> None:
         """Test CeilingLightState expands uplight and downlight colors."""

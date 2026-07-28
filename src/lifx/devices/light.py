@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
@@ -47,12 +47,16 @@ class LightState(DeviceState):
     def as_dict(self) -> Any:
         """Return LightState as a dict.
 
-        HSBK is not a dataclass, so ``dataclasses.asdict`` leaves colors as
-        objects; ``color`` is expanded via :attr:`HSBK.as_dict` to keep the
-        result serialisable. Subclasses extend this rather than calling
-        ``asdict`` again, so the expansion applies to every light state.
+        Extends :attr:`DeviceState.as_dict` so the curated capability and
+        firmware expansion applies to light states too. HSBK is not a
+        dataclass, so ``color`` is expanded via :attr:`HSBK.as_dict` to keep
+        the result serialisable.
+
+        Subclasses extend this and add their own fields explicitly rather than
+        calling ``dataclasses.asdict``, which would both bypass that curation
+        and deep-copy every HSBK just for the override to discard it.
         """
-        state = asdict(self)
+        state: dict[str, Any] = super().as_dict
         state["color"] = self.color.as_dict
         return state
 
