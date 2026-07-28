@@ -662,6 +662,7 @@ class HSBK:
         protocol = self.to_protocol()
         return (protocol.hue, protocol.saturation, protocol.brightness, protocol.kelvin)
 
+    @property
     def as_dict(self) -> dict[str, float | int]:
         """Return HSBK values as a dictionary of user-friendly values.
 
@@ -672,7 +673,7 @@ class HSBK:
         Example:
             ```python
             color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
-            color_dict = color.as_dict()
+            color_dict = color.as_dict
             # {'hue': 180.0, 'saturation': 0.5, 'brightness': 0.75, 'kelvin': 3500}
             ```
         """
