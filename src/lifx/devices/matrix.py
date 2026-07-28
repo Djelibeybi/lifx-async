@@ -289,8 +289,14 @@ class MatrixLightState(LightState):
 
     @property
     def as_dict(self) -> Any:
-        """Return MatrixLightState as dict."""
-        return asdict(self)
+        """Return MatrixLightState as dict.
+
+        ``chain`` needs no handling: TileInfo is a dataclass, so
+        ``dataclasses.asdict`` already recurses into it.
+        """
+        state = super().as_dict
+        state["tile_colors"] = [color.as_dict for color in self.tile_colors]
+        return state
 
     @classmethod
     def from_light_state(

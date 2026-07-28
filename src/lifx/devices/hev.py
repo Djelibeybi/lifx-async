@@ -8,8 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
 
 from lifx.devices.light import Light, LightState
 from lifx.protocol import packets
@@ -33,10 +32,7 @@ class HevLightState(LightState):
     hev_config: HevConfig
     hev_result: LightLastHevCycleResult
 
-    @property
-    def as_dict(self) -> Any:
-        """Return HevLightState as dict."""
-        return asdict(self)
+    # as_dict is inherited from LightState, which expands the HSBK color.
 
     @classmethod
     def from_light_state(

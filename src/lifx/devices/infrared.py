@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
 
 from lifx.devices.light import Light, LightState
 from lifx.protocol import packets
@@ -23,10 +22,7 @@ class InfraredLightState(LightState):
 
     infrared: float
 
-    @property
-    def as_dict(self) -> Any:
-        """Return InfraredLightState as dict."""
-        return asdict(self)
+    # as_dict is inherited from LightState, which expands the HSBK color.
 
     @classmethod
     def from_light_state(

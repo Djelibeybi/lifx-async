@@ -24,7 +24,7 @@ import logging
 import os
 import tempfile
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
@@ -50,6 +50,18 @@ def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
     return (
         sp.hue == cp.hue and sp.saturation == cp.saturation and sp.kelvin == cp.kelvin
     )
+
+
+def _color_as_dict(color: HSBK | None) -> dict[str, float | int] | None:
+    """Expand an optional HSBK for serialisation, preserving None."""
+    return None if color is None else color.as_dict
+
+
+def _colors_as_dict(
+    colors: list[HSBK] | None,
+) -> list[dict[str, float | int]] | None:
+    """Expand an optional list of HSBK for serialisation, preserving None."""
+    return None if colors is None else [color.as_dict for color in colors]
 
 
 @dataclass
@@ -97,14 +109,23 @@ class CeilingLightState(MatrixLightState):
         Ceiling layouts define the zones as ``slice(0, N)``, which leaves
         ``slice.step`` set to None even though it steps by one, so the step is
         normalised to 1 here.
+
+        The uplight/downlight colors are expanded via :attr:`HSBK.as_dict`;
+        the stored and last-known fields stay None when unset.
         """
         zones = self.downlight_zones
-        state = asdict(self)
+        state = super().as_dict
         state["downlight_zones"] = {
             "start": zones.start,
             "stop": zones.stop,
             "step": 1 if zones.step is None else zones.step,
         }
+        state["uplight_color"] = self.uplight_color.as_dict
+        state["downlight_colors"] = _colors_as_dict(self.downlight_colors)
+        state["stored_uplight_color"] = _color_as_dict(self.stored_uplight_color)
+        state["stored_downlight_colors"] = _colors_as_dict(self.stored_downlight_colors)
+        state["last_uplight_color"] = _color_as_dict(self.last_uplight_color)
+        state["last_downlight_colors"] = _colors_as_dict(self.last_downlight_colors)
         return state
 
     @classmethod
