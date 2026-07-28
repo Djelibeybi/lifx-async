@@ -120,6 +120,9 @@ class CeilingLightState(MatrixLightState):
             "stop": zones.stop,
             "step": 1 if zones.step is None else zones.step,
         }
+        state["uplight_is_on"] = self.uplight_is_on
+        state["downlight_is_on"] = self.downlight_is_on
+        state["uplight_zone"] = self.uplight_zone
         state["uplight_color"] = self.uplight_color.as_dict
         state["downlight_colors"] = _colors_as_dict(self.downlight_colors)
         state["stored_uplight_color"] = _color_as_dict(self.stored_uplight_color)
