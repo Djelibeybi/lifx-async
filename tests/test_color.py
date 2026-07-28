@@ -448,6 +448,172 @@ class TestHSBKRawValues:
         assert avg.saturation != round(0.4 / 3, 2)
 
 
+class TestHSBKReplace:
+    """replace overrides only the components that were supplied."""
+
+    BASE = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+
+    def test_no_arguments_preserves_every_component(self) -> None:
+        """Supplying nothing returns an equivalent color."""
+        replaced = self.BASE.replace()
+
+        assert replaced.hue == 180
+        assert replaced.saturation == 0.5
+        assert replaced.brightness == 0.75
+        assert replaced.kelvin == 3500
+
+    @pytest.mark.parametrize(
+        ("component", "value"),
+        [
+            ("hue", 200.0),
+            ("saturation", 0.25),
+            ("brightness", 0.1),
+            ("kelvin", 2700),
+        ],
+    )
+    def test_single_component_replaced_others_kept(
+        self, component: str, value: float
+    ) -> None:
+        """Overriding one component leaves the other three untouched."""
+        replaced = self.BASE.replace(**{component: value})
+
+        assert getattr(replaced, component) == value
+        for other in ("hue", "saturation", "brightness", "kelvin"):
+            if other != component:
+                assert getattr(replaced, other) == getattr(self.BASE, other)
+
+    def test_multiple_components_replaced(self) -> None:
+        """Several components can be overridden in one call."""
+        replaced = self.BASE.replace(hue=200, brightness=0.2)
+
+        assert replaced.hue == 200
+        assert replaced.brightness == 0.2
+        assert replaced.saturation == 0.5
+        assert replaced.kelvin == 3500
+
+    def test_all_components_replaced(self) -> None:
+        """Overriding everything ignores the original entirely."""
+        replaced = self.BASE.replace(
+            hue=90, saturation=0.1, brightness=0.2, kelvin=9000
+        )
+
+        assert replaced.as_dict() == {
+            "hue": 90,
+            "saturation": 0.1,
+            "brightness": 0.2,
+            "kelvin": 9000,
+        }
+
+    def test_returns_new_instance(self) -> None:
+        """The original color is not mutated."""
+        replaced = self.BASE.replace(brightness=0.0)
+
+        assert replaced is not self.BASE
+        assert self.BASE.brightness == 0.75
+
+    def test_zero_values_are_not_treated_as_omitted(self) -> None:
+        """Falsy overrides still replace the current value."""
+        replaced = self.BASE.replace(hue=0, saturation=0.0, brightness=0.0)
+
+        assert replaced.hue == 0
+        assert replaced.saturation == 0.0
+        assert replaced.brightness == 0.0
+
+    def test_out_of_range_value_raises(self) -> None:
+        """Supplied values are validated by the constructor."""
+        with pytest.raises(ValueError, match="Hue must be"):
+            self.BASE.replace(hue=400)
+
+        with pytest.raises(ValueError, match="Kelvin must be"):
+            self.BASE.replace(kelvin=1000)
+
+
+class TestHSBKSaturationPct:
+    """saturation_pct exposes saturation as an unrounded percentage."""
+
+    def test_endpoints(self) -> None:
+        """Zero and full saturation map onto the percentage endpoints."""
+        assert (
+            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500).saturation_pct
+            == 0.0
+        )
+        assert (
+            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500).saturation_pct
+            == 100.0
+        )
+
+    def test_keeps_full_precision(self) -> None:
+        """The percentage is not rounded to a whole number."""
+        color = HSBK(hue=0, saturation=0.1234, brightness=1.0, kelvin=3500)
+
+        assert color.saturation_pct == pytest.approx(12.34)
+        assert color.saturation_pct != round(color.saturation_pct)
+
+
+class TestHSBKBrightnessPct:
+    """brightness_pct exposes brightness as an unrounded percentage."""
+
+    def test_endpoints(self) -> None:
+        """Zero and full brightness map onto the percentage endpoints."""
+        assert (
+            HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500).brightness_pct
+            == 0.0
+        )
+        assert (
+            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500).brightness_pct
+            == 100.0
+        )
+
+    def test_keeps_full_precision(self) -> None:
+        """The percentage is not rounded to a whole number."""
+        color = HSBK(hue=0, saturation=0.0, brightness=0.1234, kelvin=3500)
+
+        assert color.brightness_pct == pytest.approx(12.34)
+        assert color.brightness_pct != round(color.brightness_pct)
+
+
+class TestHSBKBrightnessUint8:
+    """brightness_uint8 exposes brightness as an 8-bit value."""
+
+    def test_endpoints(self) -> None:
+        """Zero and full brightness map exactly onto the uint8 endpoints."""
+        assert (
+            HSBK(hue=0, saturation=0, brightness=0.0, kelvin=3500).brightness_uint8 == 0
+        )
+        assert (
+            HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500).brightness_uint8
+            == 255
+        )
+
+    def test_midpoint_rounds_to_nearest(self) -> None:
+        """Half brightness rounds to the nearest uint8 rather than truncating."""
+        assert (
+            HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500).brightness_uint8
+            == 128
+        )
+
+    def test_returns_int(self) -> None:
+        """The value is an int, not a float."""
+        value = HSBK(hue=0, saturation=0, brightness=0.42, kelvin=3500).brightness_uint8
+        assert isinstance(value, int)
+
+    @pytest.mark.parametrize("expected", range(256))
+    def test_round_trips_every_uint8_value(self, expected: int) -> None:
+        """Every uint8 brightness survives a trip through the float form."""
+        color = HSBK(hue=0, saturation=0, brightness=expected / 255, kelvin=3500)
+
+        assert color.brightness_uint8 == expected
+
+    @pytest.mark.parametrize("brightness", [0.0, 0.001, 0.25, 0.333, 0.9999, 1.0])
+    def test_stays_within_uint8_range(self, brightness: float) -> None:
+        """The result never escapes the 0-255 range."""
+        value = HSBK(
+            hue=0, saturation=0, brightness=brightness, kelvin=3500
+        ).brightness_uint8
+
+        assert 0 <= value <= 255
+
+
 class TestHSBKEquality:
     """Equality and hashing are defined at uint16 (wire) granularity."""
 
