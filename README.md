@@ -27,4 +27,4 @@ A modern, type-safe, async Python library for controlling LIFX smart devices ove
 
 Licensed under the [Universal Permissive License v1.0](https://opensource.org/license/UPL).
 
-Copyright &copy; 2025 Avi Miller &lt;me@dje.li&gt;
+Copyright &copy; 2025, 2026 Avi Miller &lt;me@dje.li&gt;
