@@ -254,7 +254,8 @@ class TestCeilingLightStateDataclass:
         assert result["model"] == "LIFX Ceiling"
         assert result["label"] == "Test"
         assert result["uplight_zone"] == 63
-        assert result["downlight_zones"] == slice(0, 1)
+        # The slice is expanded into a mapping; an unset step normalises to 1.
+        assert result["downlight_zones"] == {"start": 0, "stop": 1, "step": 1}
         assert result["uplight_is_on"] is True
         assert result["downlight_is_on"] is True
 
