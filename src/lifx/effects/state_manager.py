@@ -169,30 +169,14 @@ class DeviceStateManager:
                 }
             )
 
-            # Use extended multizone if available (more efficient)
-            if light.capabilities and light.capabilities.has_extended_multizone:
-                await light.set_extended_color_zones(
-                    zone_index=0,
-                    colors=zone_colors,
-                    duration=0.0,
-                    apply=MultiZoneApplicationRequest.APPLY,
-                )
-            else:
-                # Restore zones individually, applying only on last update
-                for i, color in enumerate(zone_colors):
-                    is_last = i == len(zone_colors) - 1
-                    apply = (
-                        MultiZoneApplicationRequest.APPLY
-                        if is_last
-                        else MultiZoneApplicationRequest.NO_APPLY
-                    )
-                    await light.set_color_zones(
-                        start=i,
-                        end=i,
-                        color=color,
-                        duration=0.0,
-                        apply=apply,
-                    )
+            # set_all_color_zones picks the extended or legacy packet based on
+            # capabilities and chunks past the 82-color extended limit, so a
+            # strip longer than that restores instead of raising ValueError.
+            await light.set_all_color_zones(
+                zone_colors,
+                duration=0.0,
+                apply=MultiZoneApplicationRequest.APPLY,
+            )
 
             # Small delay to let zones update
             await asyncio.sleep(ZONE_UPDATE_SETTLE_DELAY)
