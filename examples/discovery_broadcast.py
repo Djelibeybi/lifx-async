@@ -31,7 +31,7 @@ async def main():
             color, power, label = await light.get_color()
             print(f"  Label: {label}")
             print(f"  Power: {'ON' if power else 'OFF'}")
-            print(f"  Color: {color.as_dict()}")
+            print(f"  Color: {color.as_dict}")
 
         print()
 
