@@ -88,8 +88,24 @@ class CeilingLightState(MatrixLightState):
 
     @property
     def as_dict(self) -> Any:
-        """Return CeilingLightState as dict."""
-        return asdict(self)
+        """Return CeilingLightState as dict.
+
+        ``downlight_zones`` is expanded from a :class:`slice` into a
+        ``{"start": ..., "stop": ..., "step": ...}`` mapping so the result is
+        serialisable.
+
+        Ceiling layouts define the zones as ``slice(0, N)``, which leaves
+        ``slice.step`` set to None even though it steps by one, so the step is
+        normalised to 1 here.
+        """
+        zones = self.downlight_zones
+        state = asdict(self)
+        state["downlight_zones"] = {
+            "start": zones.start,
+            "stop": zones.stop,
+            "step": 1 if zones.step is None else zones.step,
+        }
+        return state
 
     @classmethod
     def from_matrix_state(
