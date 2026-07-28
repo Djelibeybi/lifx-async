@@ -298,13 +298,20 @@ class TestHSBKThemeMethods:
     def test_as_dict(self) -> None:
         """Test converting color to dictionary."""
         color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
-        color_dict = color.as_dict()
+        color_dict = color.as_dict
 
         assert isinstance(color_dict, dict)
         assert color_dict["hue"] == 180
         assert color_dict["saturation"] == 0.5
         assert color_dict["brightness"] == 0.75
         assert color_dict["kelvin"] == 3500
+
+    def test_as_dict_is_a_property(self) -> None:
+        """Test as_dict is a property, matching every other class in the tree."""
+        color = HSBK(hue=180, saturation=0.5, brightness=0.75, kelvin=3500)
+
+        assert isinstance(type(color).as_dict, property)
+        assert not callable(color.as_dict)
 
     def test_limit_distance_to_no_adjustment_needed(self) -> None:
         """Test limit_distance_to when hue is already within range."""
@@ -497,7 +504,7 @@ class TestHSBKReplace:
             hue=90, saturation=0.1, brightness=0.2, kelvin=9000
         )
 
-        assert replaced.as_dict() == {
+        assert replaced.as_dict == {
             "hue": 90,
             "saturation": 0.1,
             "brightness": 0.2,
