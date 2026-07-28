@@ -113,6 +113,36 @@ class TestLightApplyTheme:
 class TestMultiZoneLightApplyTheme:
     """Tests for MultiZoneLight.apply_theme method."""
 
+    async def test_apply_theme_chunks_past_82_zones(self, mock_device_factory) -> None:
+        """Test a strip longer than one extended packet is chunked, not rejected."""
+        light = mock_device_factory(MultiZoneLight, product=32)
+        light.set_extended_color_zones = AsyncMock()
+        light.set_power = AsyncMock()
+        light.get_power = AsyncMock(return_value=True)
+        light.get_zone_count = AsyncMock(return_value=128)
+
+        await light.apply_theme(Theme([Colors.RED, Colors.GREEN, Colors.BLUE]))
+
+        calls = light.set_extended_color_zones.await_args_list
+        assert [call.args[0] for call in calls] == [0, 82]
+        assert [len(call.args[1]) for call in calls] == [82, 46]
+
+    async def test_apply_theme_falls_back_to_legacy_zones(
+        self, mock_device_factory
+    ) -> None:
+        """Test firmware without extended multizone uses SetColorZones."""
+        light = mock_device_factory(MultiZoneLight, product=31)
+        light.set_color_zones = AsyncMock()
+        light.set_extended_color_zones = AsyncMock()
+        light.set_power = AsyncMock()
+        light.get_power = AsyncMock(return_value=True)
+        light.get_zone_count = AsyncMock(return_value=16)
+
+        await light.apply_theme(Theme([Colors.RED, Colors.GREEN, Colors.BLUE]))
+
+        assert light.set_color_zones.await_count > 0
+        light.set_extended_color_zones.assert_not_awaited()
+
     def test_apply_theme_basic(self, multizone_light: MultiZoneLight) -> None:
         """Test creating a multizone light for apply_theme tests."""
         assert multizone_light.serial == "d073d5010203"
