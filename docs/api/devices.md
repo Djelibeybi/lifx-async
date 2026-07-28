@@ -431,6 +431,17 @@ async def main():
         colors = await light.get_all_color_zones()
         print(f"Device has {len(colors)} zones")
 
+        # Write zones back the same way. set_all_color_zones picks the
+        # extended or legacy packet based on device capabilities, chunks
+        # past the 82-colour extended packet limit, and run-length encodes
+        # legacy writes, so it works on any strip or beam.
+        colors[0] = Colors.RED
+        await light.set_all_color_zones(colors, duration=1.0)
+
+        # Only write part of the strip: zones outside start..end keep
+        # whatever they were showing.
+        await light.set_all_color_zones(colors, start=10, end=19)
+
         # Set a MOVE effect
         await light.set_effect(
             effect_type=FirmwareEffect.MOVE,
