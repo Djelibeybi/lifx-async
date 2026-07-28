@@ -926,7 +926,9 @@ class MultiZoneLight(Light):
         return self._multizone_effect
 
     @staticmethod
-    def _encode_zone_runs(colors: list[HSBK]) -> list[tuple[int, int, HSBK]]:
+    def _encode_zone_runs(
+        colors: list[HSBK], offset: int = 0
+    ) -> list[tuple[int, int, HSBK]]:
         """Collapse a per-zone color list into (start, end, color) runs.
 
         SetColorZones carries a single color for a range, so a legacy write
@@ -936,74 +938,153 @@ class MultiZoneLight(Light):
 
         Args:
             colors: One color per zone, in zone order
+            offset: Zone index that ``colors[0]`` corresponds to
 
         Returns:
             List of (start_index, end_index, color) tuples, inclusive of both
-            indices
+            indices and offset into device zone numbering
         """
         runs: list[tuple[int, int, HSBK]] = []
         run_start = 0
         for index in range(1, len(colors) + 1):
             if index == len(colors) or colors[index] != colors[run_start]:
-                runs.append((run_start, index - 1, colors[run_start]))
+                runs.append((run_start + offset, index - 1 + offset, colors[run_start]))
                 run_start = index
         return runs
 
-    async def _write_zone_colors(self, colors: list[HSBK], duration: float) -> None:
-        """Write one color per zone using whichever packet the device supports.
+    async def set_all_color_zones(
+        self,
+        colors: list[HSBK],
+        start: int = 0,
+        end: int | None = None,
+        duration: float = 0.0,
+        apply: MultiZoneApplicationRequest = MultiZoneApplicationRequest.APPLY,
+    ) -> None:
+        """Set zone colors from a full-length color list.
+
+        Automatically chooses between SetExtendedColorZones and SetColorZones
+        based on device capabilities, the counterpart to
+        :meth:`get_all_color_zones`.
+
+        ``colors`` is indexed by absolute zone number, so ``colors[i]`` is the
+        color for zone ``i``. ``start`` and ``end`` select which zones are
+        actually written; zones outside that window are never addressed and
+        keep whatever they were showing. This makes read-modify-write natural:
+        fetch every zone, change the ones you care about, and write back only
+        those.
 
         Extended writes are chunked at 82 colors per packet; legacy writes are
-        run-length encoded into ranges. Either way every packet but the last is
-        sent with NO_APPLY so the device buffers the whole update and applies
-        it in one step.
+        run-length encoded into ranges, so a flat color costs one packet but a
+        gradient costs one packet per zone. Either way every packet but the
+        last is sent with NO_APPLY, so the device buffers the whole update and
+        applies it in a single step.
 
         Args:
-            colors: One color per zone, starting at zone 0
-            duration: Transition duration in seconds
+            colors: One color per zone, indexed by zone number
+            start: First zone to write (inclusive, default 0)
+            end: Last zone to write (inclusive, defaults to the last color)
+            duration: Transition duration in seconds (default 0.0)
+            apply: Application mode for the final packet (default APPLY). Pass
+                NO_APPLY to buffer this write and apply it with a later call.
 
         Raises:
-            ValueError: If colors is empty, or exceeds what the device can
+            ValueError: If colors is empty, the window is invalid or falls
+                outside the list, or the window exceeds what the device can
                 address
-            LifxUnsupportedCommandError: If the device rejects the write
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxUnsupportedCommandError: If device doesn't support this command
+
+        Example:
+            ```python
+            # Recolor zones 10-19, leaving every other zone untouched
+            colors = await light.get_all_color_zones()
+            colors[10:20] = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 10
+            await light.set_all_color_zones(colors, start=10, end=19)
+
+            # Write the whole strip
+            await light.set_all_color_zones(colors, duration=2.0)
+            ```
         """
         if not colors:
             raise ValueError("Colors list cannot be empty")
 
+        if end is None:
+            end = len(colors) - 1
+
+        if start < 0 or end < start:
+            raise ValueError(f"Invalid zone range: {start}-{end}")
+
+        if end >= len(colors):
+            raise ValueError(
+                f"Zone range {start}-{end} extends past the {len(colors)}-color list"
+            )
+
+        if self._zone_count is not None and end >= self._zone_count:
+            raise ValueError(
+                f"Zone range {start}-{end} exceeds the device's "
+                f"{self._zone_count} zones"
+            )
+
         if self.capabilities is None:
             await self._ensure_capabilities()
 
+        # Only the window is transmitted. Note the run-length encoding below
+        # runs over the window rather than the whole list, so colors just
+        # outside it cannot extend a run and spill the write onto zones the
+        # caller asked to leave alone.
+        window = colors[start : end + 1]
+
         if self.capabilities and self.capabilities.has_extended_multizone:
-            chunks = [colors[i : i + 82] for i in range(0, len(colors), 82)]
+            chunks = [window[i : i + 82] for i in range(0, len(window), 82)]
             for chunk_index, chunk in enumerate(chunks):
                 is_last = chunk_index == len(chunks) - 1
                 await self.set_extended_color_zones(
-                    chunk_index * 82,
+                    start + chunk_index * 82,
                     chunk,
                     duration=duration,
-                    apply=ExtendedAppReq.APPLY if is_last else ExtendedAppReq.NO_APPLY,
+                    apply=apply if is_last else ExtendedAppReq.NO_APPLY,
                 )
-            return
+            packet_count = len(chunks)
+            path = "extended"
+        else:
+            # SetColorZones indices are uint8, so legacy firmware cannot
+            # address beyond zone 255. The bound is on the window, not the
+            # list: a longer list with a low window is fine.
+            if end > 255:
+                raise ValueError(
+                    f"Device does not support extended multizone and cannot "
+                    f"address zone {end} (limit is 255)"
+                )
 
-        # SetColorZones indices are uint8, so legacy firmware cannot address
-        # beyond zone 255.
-        if len(colors) > 256:
-            raise ValueError(
-                f"Device does not support extended multizone and cannot address "
-                f"{len(colors)} zones (limit is 256)"
-            )
+            runs = self._encode_zone_runs(window, offset=start)
+            for run_index, (run_start, run_end, color) in enumerate(runs):
+                is_last = run_index == len(runs) - 1
+                await self.set_color_zones(
+                    run_start,
+                    run_end,
+                    color,
+                    duration=duration,
+                    apply=apply if is_last else MultiZoneApplicationRequest.NO_APPLY,
+                )
+            packet_count = len(runs)
+            path = "legacy"
 
-        runs = self._encode_zone_runs(colors)
-        for run_index, (start, end, color) in enumerate(runs):
-            is_last = run_index == len(runs) - 1
-            await self.set_color_zones(
-                start,
-                end,
-                color,
-                duration=duration,
-                apply=MultiZoneApplicationRequest.APPLY
-                if is_last
-                else MultiZoneApplicationRequest.NO_APPLY,
-            )
+        _LOGGER.debug(
+            {
+                "class": "MultiZoneLight",
+                "method": "set_all_color_zones",
+                "action": "change",
+                "values": {
+                    "start": start,
+                    "end": end,
+                    "path": path,
+                    "packets": packet_count,
+                    "duration": duration,
+                    "apply": apply.name,
+                },
+            }
+        )
 
     async def apply_theme(
         self,
@@ -1048,11 +1129,11 @@ class MultiZoneLight(Light):
         # without extended multizone.
         # If light is off and we're turning it on, set colors immediately then fade on
         if power_on and not is_on:
-            await self._write_zone_colors(colors, duration=0)
+            await self.set_all_color_zones(colors, duration=0)
             await self.set_power(True, duration=duration)
         else:
             # Light is already on, or we're not turning it on - apply with duration
-            await self._write_zone_colors(colors, duration=duration)
+            await self.set_all_color_zones(colors, duration=duration)
 
     def __repr__(self) -> str:
         """String representation of multizone light."""
