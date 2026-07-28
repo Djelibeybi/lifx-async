@@ -334,8 +334,16 @@ class HSBK:
 
         Home Assistant and most RGB tooling express brightness as a uint8
         rather than the protocol's uint16 or this class's 0.0-1.0 float.
+
+        Any non-zero brightness returns at least 1: rounding alone maps
+        everything below 0.5/255 to 0, and a light reporting brightness 0
+        while powered on reads as off to Home Assistant, which then writes
+        that 0 back and switches the light off.
         """
-        return round(self._brightness * 255)
+        scaled = round(self._brightness * 255)
+        if scaled == 0 and self._brightness > 0:
+            return 1
+        return scaled
 
     @property
     def kelvin(self) -> int:
