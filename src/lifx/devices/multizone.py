@@ -925,6 +925,86 @@ class MultiZoneLight(Light):
         """
         return self._multizone_effect
 
+    @staticmethod
+    def _encode_zone_runs(colors: list[HSBK]) -> list[tuple[int, int, HSBK]]:
+        """Collapse a per-zone color list into (start, end, color) runs.
+
+        SetColorZones carries a single color for a range, so a legacy write
+        needs one packet per run of identical colors rather than one per zone.
+        HSBK equality is defined at uint16 (wire) granularity, so colors that
+        serialise identically collapse into the same run.
+
+        Args:
+            colors: One color per zone, in zone order
+
+        Returns:
+            List of (start_index, end_index, color) tuples, inclusive of both
+            indices
+        """
+        runs: list[tuple[int, int, HSBK]] = []
+        run_start = 0
+        for index in range(1, len(colors) + 1):
+            if index == len(colors) or colors[index] != colors[run_start]:
+                runs.append((run_start, index - 1, colors[run_start]))
+                run_start = index
+        return runs
+
+    async def _write_zone_colors(self, colors: list[HSBK], duration: float) -> None:
+        """Write one color per zone using whichever packet the device supports.
+
+        Extended writes are chunked at 82 colors per packet; legacy writes are
+        run-length encoded into ranges. Either way every packet but the last is
+        sent with NO_APPLY so the device buffers the whole update and applies
+        it in one step.
+
+        Args:
+            colors: One color per zone, starting at zone 0
+            duration: Transition duration in seconds
+
+        Raises:
+            ValueError: If colors is empty, or exceeds what the device can
+                address
+            LifxUnsupportedCommandError: If the device rejects the write
+        """
+        if not colors:
+            raise ValueError("Colors list cannot be empty")
+
+        if self.capabilities is None:
+            await self._ensure_capabilities()
+
+        if self.capabilities and self.capabilities.has_extended_multizone:
+            chunks = [colors[i : i + 82] for i in range(0, len(colors), 82)]
+            for chunk_index, chunk in enumerate(chunks):
+                is_last = chunk_index == len(chunks) - 1
+                await self.set_extended_color_zones(
+                    chunk_index * 82,
+                    chunk,
+                    duration=duration,
+                    apply=ExtendedAppReq.APPLY if is_last else ExtendedAppReq.NO_APPLY,
+                )
+            return
+
+        # SetColorZones indices are uint8, so legacy firmware cannot address
+        # beyond zone 255.
+        if len(colors) > 256:
+            raise ValueError(
+                f"Device does not support extended multizone and cannot address "
+                f"{len(colors)} zones (limit is 256)"
+            )
+
+        runs = self._encode_zone_runs(colors)
+        for run_index, (start, end, color) in enumerate(runs):
+            is_last = run_index == len(runs) - 1
+            await self.set_color_zones(
+                start,
+                end,
+                color,
+                duration=duration,
+                apply=MultiZoneApplicationRequest.APPLY
+                if is_last
+                else MultiZoneApplicationRequest.NO_APPLY,
+            )
+
     async def apply_theme(
         self,
         theme: Theme,
@@ -963,14 +1043,16 @@ class MultiZoneLight(Light):
         # Check if light is on
         is_on = await self.get_power()
 
-        # Apply colors to zones using extended format for efficiency
+        # Write the colors using whichever packet the device supports; this
+        # chunks past 82 zones and falls back to SetColorZones on firmware
+        # without extended multizone.
         # If light is off and we're turning it on, set colors immediately then fade on
         if power_on and not is_on:
-            await self.set_extended_color_zones(0, colors, duration=0)
+            await self._write_zone_colors(colors, duration=0)
             await self.set_power(True, duration=duration)
         else:
             # Light is already on, or we're not turning it on - apply with duration
-            await self.set_extended_color_zones(0, colors, duration=duration)
+            await self._write_zone_colors(colors, duration=duration)
 
     def __repr__(self) -> str:
         """String representation of multizone light."""
