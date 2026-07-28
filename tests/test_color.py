@@ -166,6 +166,29 @@ class TestHSBK:
         assert protocol.brightness == pytest.approx(49151, abs=1)
         assert protocol.kelvin == 3500
 
+    @pytest.mark.parametrize(
+        ("hue", "expected"),
+        [
+            (0, 0),
+            (17, 3095),
+            (100, 18204),
+            (180, 32768),
+            (359.9, 65518),
+            (360, 0),
+        ],
+    )
+    def test_to_protocol_hue_quantisation(self, hue: float, expected: int) -> None:
+        """Test hue scales before rounding, not after.
+
+        Rounding the 0-65536 scale factor first and dividing afterwards biases
+        every arbitrary hue one LSB low (17 degrees gives 3094 instead of
+        3095). The values here are exact so the correct expression cannot be
+        swapped back for the biased one without a failure.
+        """
+        color = HSBK(hue=hue, saturation=1.0, brightness=1.0, kelvin=3500)
+
+        assert color.to_protocol().hue == expected
+
     def test_from_protocol(self) -> None:
         """Test conversion from protocol HSBK."""
         protocol = LightHsbk(hue=32768, saturation=32768, brightness=49151, kelvin=3500)
@@ -610,6 +633,18 @@ class TestHSBKBrightnessUint8:
         color = HSBK(hue=0, saturation=0, brightness=expected / 255, kelvin=3500)
 
         assert color.brightness_uint8 == expected
+
+    @pytest.mark.parametrize("wire", [1, 64, 128])
+    def test_dim_but_lit_never_reports_zero(self, wire: int) -> None:
+        """Any non-zero brightness reports at least 1.
+
+        Rounding alone maps every wire brightness below 129/65535 to 0, and a
+        light that is on but reporting brightness 0 reads as off to Home
+        Assistant, which then writes that 0 back and switches it off.
+        """
+        color = HSBK(hue=0, saturation=0, brightness=wire / 65535, kelvin=3500)
+
+        assert color.brightness_uint8 == 1
 
     @pytest.mark.parametrize("brightness", [0.0, 0.001, 0.25, 0.333, 0.9999, 1.0])
     def test_stays_within_uint8_range(self, brightness: float) -> None:
