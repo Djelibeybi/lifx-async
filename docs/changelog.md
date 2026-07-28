@@ -2,6 +2,55 @@
 
 <!-- version list -->
 
+## v6.0.0 (2026-07-28)
+
+### Bug Fixes
+
+- **color**: Report at least brightness 1 for a lit light
+  ([`f712d68`](https://github.com/Djelibeybi/lifx-async/commit/f712d681a1220427d4ca225ab18177c61982595f))
+
+- **devices**: Build light state dicts from DeviceState.as_dict
+  ([`71d47e1`](https://github.com/Djelibeybi/lifx-async/commit/71d47e13b3cdef11e07f15ac93c49ec32e4bed89))
+
+- **devices**: Expand HSBK colors in every state's as_dict
+  ([`b491339`](https://github.com/Djelibeybi/lifx-async/commit/b4913394f681733f15dd18a853cd1ab1cb04144e))
+
+- **effects**: Restore zones via set_all_color_zones
+  ([`4f561e2`](https://github.com/Djelibeybi/lifx-async/commit/4f561e2857d0a9cb3e31c566bcec3d42b8a9871c))
+
+- **examples**: Call HSBK.as_dict as a property
+  ([`c006899`](https://github.com/Djelibeybi/lifx-async/commit/c006899f8c904c3f18f97a5a196457bbbb7b78a8))
+
+- **multizone**: Make apply_theme work on legacy and long strips
+  ([`8101d99`](https://github.com/Djelibeybi/lifx-async/commit/8101d991cd8756a1b6b362ea910e16769549b888))
+
+- **multizone**: Reject APPLY_ONLY in set_all_color_zones
+  ([`632bb82`](https://github.com/Djelibeybi/lifx-async/commit/632bb82814cc7ff727051a67571bf3f9f8991c39))
+
+### Documentation
+
+- **devices**: Show set_all_color_zones in the multizone example
+  ([`d73a530`](https://github.com/Djelibeybi/lifx-async/commit/d73a5302661bde33a3e3d5cb65587a38073bd471))
+
+### Features
+
+- **color**: Add scaled HSBK accessors and replace()
+  ([`815f037`](https://github.com/Djelibeybi/lifx-async/commit/815f037fdee995f52b6ae06d8980ffb6768d6e43))
+
+- **multizone**: Add set_all_color_zones
+  ([`9cc7258`](https://github.com/Djelibeybi/lifx-async/commit/9cc7258e54f607cf0deb278f40a51c6423efb297))
+
+### Refactoring
+
+- **color**: Make HSBK.as_dict a property
+  ([`626f688`](https://github.com/Djelibeybi/lifx-async/commit/626f688fab353c2218731583dae6ee73c1ba8c8c))
+
+### Breaking Changes
+
+- **color**: HSBK.as_dict is now a property. Callers using `color.as_dict()` must drop the
+  parentheses; calling it raises `TypeError: 'dict' object is not callable`.
+
+
 ## v5.6.4 (2026-07-26)
 
 ### Bug Fixes
