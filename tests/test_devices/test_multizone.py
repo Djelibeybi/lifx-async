@@ -1226,6 +1226,24 @@ class TestSetAllColorZones:
                 self._colors(16, gradient=True), start=start, end=end
             )
 
+    async def test_rejects_apply_only(self) -> None:
+        """Test APPLY_ONLY is rejected before any packet is sent.
+
+        APPLY_ONLY tells the device to ignore the colors carried by the
+        message and flush only what is already buffered, so on a split write
+        it would silently drop a chunk.
+        """
+        light = self._light(extended=True, zone_count=200)
+
+        with pytest.raises(ValueError, match="APPLY_ONLY"):
+            await light.set_all_color_zones(
+                self._colors(200, gradient=True),
+                apply=MultiZoneApplicationRequest.APPLY_ONLY,
+            )
+
+        light.set_extended_color_zones.assert_not_awaited()
+        light.set_color_zones.assert_not_awaited()
+
     async def test_rejects_window_past_end_of_list(self) -> None:
         """Test the window must lie inside the color list."""
         light = self._light(extended=True)
