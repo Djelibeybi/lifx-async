@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
@@ -148,7 +148,9 @@ class MultiZoneLightState(LightState):
     @property
     def as_dict(self) -> Any:
         """Return MultiZoneLightState as dict."""
-        return asdict(self)
+        state = super().as_dict
+        state["zones"] = [zone.as_dict for zone in self.zones]
+        return state
 
     @classmethod
     def from_light_state(

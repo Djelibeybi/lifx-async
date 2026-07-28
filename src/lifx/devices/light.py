@@ -45,8 +45,16 @@ class LightState(DeviceState):
 
     @property
     def as_dict(self) -> Any:
-        """Return LightState as a dict."""
-        return asdict(self)
+        """Return LightState as a dict.
+
+        HSBK is not a dataclass, so ``dataclasses.asdict`` leaves colors as
+        objects; ``color`` is expanded via :attr:`HSBK.as_dict` to keep the
+        result serialisable. Subclasses extend this rather than calling
+        ``asdict`` again, so the expansion applies to every light state.
+        """
+        state = asdict(self)
+        state["color"] = self.color.as_dict
+        return state
 
 
 class Light(Device[LightState]):
