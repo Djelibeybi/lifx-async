@@ -19,178 +19,28 @@ Product IDs:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-import tempfile
-import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component_state import (
+    color_as_dict,
+    colors_as_dict,
+    decode_color,
+    encode_color,
+    hsk_matches,
+    read_state_file,
+    write_state_file,
+    zones_as_dict,
+)
 from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
 
 _LOGGER = logging.getLogger(__name__)
-
-# Locks serialising read-modify-write cycles per state file, keyed on the
-# resolved path so every spelling of one file shares a lock. Bounded by the
-# number of distinct state files an application opens.
-#
-# These are ``threading.Lock`` rather than ``asyncio.Lock`` because the file
-# I/O runs in worker threads: an asyncio.Lock binds to whichever event loop
-# first contends for it, so two loops sharing a file would deadlock, and it
-# would be released the instant a pending ``asyncio.to_thread`` is cancelled —
-# while the worker thread carried on writing. Taking the lock inside the
-# thread avoids both. ``_STATE_FILE_LOCKS_GUARD`` makes the get-or-create
-# atomic; without it two threads can install two locks for one file.
-_STATE_FILE_LOCKS_GUARD = threading.Lock()
-_STATE_FILE_LOCKS: dict[str, threading.Lock] = {}
-
-
-def _resolve_state_path(path: Path) -> Path:
-    """Normalise a state file path so every spelling maps to one lock.
-
-    Expands ``~`` and resolves relative segments and symlinks. Case-only
-    differences on case-insensitive filesystems are left alone: folding them
-    would be wrong on a case-sensitive one.
-
-    Args:
-        path: State file path as supplied by the caller
-
-    Returns:
-        The resolved path
-    """
-    return path.expanduser().resolve()
-
-
-def _state_file_lock(path: Path) -> threading.Lock:
-    """Get the lock guarding a state file.
-
-    Several devices can share one state file, and saving is a read-merge-write
-    cycle. That I/O runs in worker threads, so without this lock two saves
-    could interleave and drop one device's entry — running on the event loop
-    used to serialise them for free.
-
-    Args:
-        path: Resolved path to the state file
-
-    Returns:
-        The lock guarding that path
-    """
-    key = str(path)
-    with _STATE_FILE_LOCKS_GUARD:
-        lock = _STATE_FILE_LOCKS.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _STATE_FILE_LOCKS[key] = lock
-        return lock
-
-
-def _read_state_file(path: Path) -> tuple[bool, Any]:
-    """Read and parse the state file. Blocking — call via asyncio.to_thread.
-
-    Takes the file's lock so a read cannot observe a half-finished merge.
-
-    Args:
-        path: Path to the state file; resolved here
-
-    Returns:
-        ``(exists, contents)``. The flag distinguishes an absent file from one
-        that parses to JSON ``null``, which is corruption rather than absence.
-    """
-    resolved = _resolve_state_path(path)
-    with _state_file_lock(resolved):
-        if not resolved.exists():
-            return False, None
-
-        with resolved.open("r") as f:
-            return True, json.load(f)
-
-
-def _write_state_file(path: Path, serial: str, device_state: dict[str, Any]) -> None:
-    """Merge one device's state into the state file and write it back.
-
-    Blocking — call via asyncio.to_thread. Takes the file's lock for the whole
-    read-merge-write cycle, so devices sharing a file cannot drop each other's
-    entries. The lock is process-local: it does not coordinate with a separate
-    process pointed at the same file.
-
-    The on-disk entry is merged rather than replaced so absent in-memory values
-    (e.g. state that failed to load in ``__aenter__``) are not clobbered.
-
-    Args:
-        path: Path to the state file; resolved here
-        serial: Serial number of the device whose entry is being updated
-        device_state: Serialisable state to merge into that device's entry
-
-    Raises:
-        ValueError: If the existing file does not contain a JSON object, which
-            would otherwise be silently overwritten along with every device's
-            stored state
-    """
-    resolved = _resolve_state_path(path)
-    with _state_file_lock(resolved):
-        if resolved.exists():
-            with resolved.open("r") as f:
-                data = json.load(f)
-            if not isinstance(data, dict):
-                raise ValueError(
-                    f"State file {resolved} does not contain a JSON object "
-                    f"(found {type(data).__name__}); refusing to overwrite it"
-                )
-        else:
-            data = {}
-
-        entry = data.get(serial, {})
-        entry.update(device_state)
-        data[serial] = entry
-
-        # Ensure directory exists
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write atomically: dump to a temp file in the same directory, then
-        # replace, so a crash mid-write cannot leave a truncated file that
-        # loses every device's stored state
-        fd, tmp = tempfile.mkstemp(dir=resolved.parent, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(data, f, indent=2)
-            os.replace(tmp, resolved)
-        except BaseException:
-            os.unlink(tmp)
-            raise
-
-
-def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
-    """Compare hue/saturation/kelvin at uint16 (wire) granularity.
-
-    Brightness is intentionally ignored. Comparing the decoded uint16 values
-    rather than the raw floats keeps stored-state validity stable across a
-    protocol round-trip, which exposes slightly different raw H/S/B floats for
-    the same wire representation.
-    """
-    sp = stored.to_protocol()
-    cp = current.to_protocol()
-    return (
-        sp.hue == cp.hue and sp.saturation == cp.saturation and sp.kelvin == cp.kelvin
-    )
-
-
-def _color_as_dict(color: HSBK | None) -> dict[str, float | int] | None:
-    """Expand an optional HSBK for serialisation, preserving None."""
-    return None if color is None else color.as_dict
-
-
-def _colors_as_dict(
-    colors: list[HSBK] | None,
-) -> list[dict[str, float | int]] | None:
-    """Expand an optional list of HSBK for serialisation, preserving None."""
-    return None if colors is None else [color.as_dict for color in colors]
 
 
 @dataclass
@@ -242,22 +92,17 @@ class CeilingLightState(MatrixLightState):
         The uplight/downlight colors are expanded via :attr:`HSBK.as_dict`;
         the stored and last-known fields stay None when unset.
         """
-        zones = self.downlight_zones
         state = super().as_dict
-        state["downlight_zones"] = {
-            "start": zones.start,
-            "stop": zones.stop,
-            "step": 1 if zones.step is None else zones.step,
-        }
+        state["downlight_zones"] = zones_as_dict(self.downlight_zones)
         state["uplight_is_on"] = self.uplight_is_on
         state["downlight_is_on"] = self.downlight_is_on
         state["uplight_zone"] = self.uplight_zone
         state["uplight_color"] = self.uplight_color.as_dict
-        state["downlight_colors"] = _colors_as_dict(self.downlight_colors)
-        state["stored_uplight_color"] = _color_as_dict(self.stored_uplight_color)
-        state["stored_downlight_colors"] = _colors_as_dict(self.stored_downlight_colors)
-        state["last_uplight_color"] = _color_as_dict(self.last_uplight_color)
-        state["last_downlight_colors"] = _colors_as_dict(self.last_downlight_colors)
+        state["downlight_colors"] = colors_as_dict(self.downlight_colors)
+        state["stored_uplight_color"] = color_as_dict(self.stored_uplight_color)
+        state["stored_downlight_colors"] = colors_as_dict(self.stored_downlight_colors)
+        state["last_uplight_color"] = color_as_dict(self.last_uplight_color)
+        state["last_downlight_colors"] = colors_as_dict(self.last_downlight_colors)
         return state
 
     @classmethod
@@ -1517,7 +1362,7 @@ class CeilingLight(MatrixLight):
                 return False
 
             stored = state.stored_uplight_color
-            return _hsk_matches(stored, current)
+            return hsk_matches(stored, current)
 
         if component == "downlight":
             if state.stored_downlight_colors is None or not isinstance(current, list):
@@ -1528,7 +1373,7 @@ class CeilingLight(MatrixLight):
 
             # Check if all zones match (H, S, K at wire granularity)
             return all(
-                _hsk_matches(s, c)
+                hsk_matches(s, c)
                 for s, c in zip(state.stored_downlight_colors, current)
             )
 
@@ -1546,11 +1391,10 @@ class CeilingLight(MatrixLight):
             return
 
         try:
-            state_path = Path(self._state_file).expanduser()
-            exists, data = await asyncio.to_thread(_read_state_file, state_path)
+            exists, data = await asyncio.to_thread(read_state_file, self._state_file)
 
             if not exists:
-                _LOGGER.debug("State file does not exist: %s", state_path)
+                _LOGGER.debug("State file does not exist: %s", self._state_file)
                 return
 
             if not isinstance(data, dict):
@@ -1558,7 +1402,7 @@ class CeilingLight(MatrixLight):
                 # truncated write, a bare list) is corruption, not absence
                 _LOGGER.warning(
                     "State file %s does not contain a JSON object (found %s)",
-                    state_path,
+                    self._state_file,
                     type(data).__name__,
                 )
                 return
@@ -1572,26 +1416,11 @@ class CeilingLight(MatrixLight):
             # Load uplight state
             state = self.state
             if "uplight" in device_state:
-                uplight_data = device_state["uplight"]
-                state.stored_uplight_color = HSBK(
-                    hue=uplight_data["hue"],
-                    saturation=uplight_data["saturation"],
-                    brightness=uplight_data["brightness"],
-                    kelvin=uplight_data["kelvin"],
-                )
+                state.stored_uplight_color = decode_color(device_state["uplight"])
 
             # Load downlight state (validate zone count if version is available)
             if "downlight" in device_state:
-                downlight_data = device_state["downlight"]
-                loaded_colors = [
-                    HSBK(
-                        hue=c["hue"],
-                        saturation=c["saturation"],
-                        brightness=c["brightness"],
-                        kelvin=c["kelvin"],
-                    )
-                    for c in downlight_data
-                ]
+                loaded_colors = [decode_color(c) for c in device_state["downlight"]]
                 try:
                     expected = self.downlight_zone_count
                 except LifxError:
@@ -1608,7 +1437,9 @@ class CeilingLight(MatrixLight):
                             len(loaded_colors),
                         )
 
-            _LOGGER.debug("Loaded state from %s for device %s", state_path, self.serial)
+            _LOGGER.debug(
+                "Loaded state from %s for device %s", self._state_file, self.serial
+            )
 
         except Exception as e:
             _LOGGER.warning("Failed to load state from %s: %s", self._state_file, e)
@@ -1627,37 +1458,26 @@ class CeilingLight(MatrixLight):
             return
 
         try:
-            state_path = Path(self._state_file).expanduser()
-
-            # Build this device's entry; _write_state_file merges it into any
+            # Build this device's entry; write_state_file merges it into any
             # existing on-disk entry
             device_state: dict[str, Any] = {}
             state = self.state
 
             if state.stored_uplight_color:
-                device_state["uplight"] = {
-                    "hue": state.stored_uplight_color.hue,
-                    "saturation": state.stored_uplight_color.saturation,
-                    "brightness": state.stored_uplight_color.brightness,
-                    "kelvin": state.stored_uplight_color.kelvin,
-                }
+                device_state["uplight"] = encode_color(state.stored_uplight_color)
 
             if state.stored_downlight_colors:
                 device_state["downlight"] = [
-                    {
-                        "hue": c.hue,
-                        "saturation": c.saturation,
-                        "brightness": c.brightness,
-                        "kelvin": c.kelvin,
-                    }
-                    for c in state.stored_downlight_colors
+                    encode_color(c) for c in state.stored_downlight_colors
                 ]
 
             await asyncio.to_thread(
-                _write_state_file, state_path, self.serial, device_state
+                write_state_file, self._state_file, self.serial, device_state
             )
 
-            _LOGGER.debug("Saved state to %s for device %s", state_path, self.serial)
+            _LOGGER.debug(
+                "Saved state to %s for device %s", self._state_file, self.serial
+            )
 
         except Exception as e:
             _LOGGER.warning("Failed to save state to %s: %s", self._state_file, e)

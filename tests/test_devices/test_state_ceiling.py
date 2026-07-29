@@ -618,7 +618,7 @@ class TestCeilingLightSaveOnExit:
                 color=HSBK(hue=120.0, saturation=1.0, brightness=0.8, kelvin=3500)
             )
             # Force the write to fail after the temp file has been created.
-            monkeypatch.setattr("lifx.devices.ceiling.json.dump", _boom)
+            monkeypatch.setattr("lifx.devices.component_state.json.dump", _boom)
             # The outer guard swallows the error — must not raise.
             await ceiling._save_state_to_file()
 

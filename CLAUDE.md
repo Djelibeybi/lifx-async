@@ -139,6 +139,8 @@ gh workflow run docs.yml
    - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
    - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
    - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
+   - `mirror.py`: `MirrorLight` class (extends `MatrixLight` with independent front/back component control for LIFX Mirror products; both components are multi-zone rings)
+   - `component_state.py`: Shared helpers for component-based devices (colour comparison, serialisation, atomic state-file I/O)
    - State caching with configurable TTL to reduce network traffic
 
 4. **High-Level API** (`src/lifx/api.py`)
@@ -192,15 +194,16 @@ gh workflow run docs.yml
 
 Different LIFX device types support different features:
 
-| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature | Ceiling Components |
-|-------------|-------|-----------|--------|----------|-----|----------------------|--------------------|
-| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   | ❌                 |
-| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   | ❌                 |
-| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   | ❌                 |
-| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   | ❌                 |
-| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   | ❌                 |
-| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   | ❌                 |
-| CeilingLight | ✅   | ❌        | ✅     | ❌       | ❌  | ✅                   | ✅                 |
+| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature | Components |
+|-------------|-------|-----------|--------|----------|-----|----------------------|------------|
+| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   | ❌         |
+| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   | ❌         |
+| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   | ❌         |
+| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   | ❌         |
+| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   | ❌         |
+| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   | ❌         |
+| CeilingLight | ✅   | ❌        | ✅     | ❌       | ❌  | ✅                   | uplight/downlight |
+| MirrorLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   | front/back |
 
 **Device Detection**: The `products` registry automatically detects device capabilities based on
 product ID and instantiates the appropriate device class.
@@ -380,14 +383,15 @@ Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 - **Auto-generated**: `src/lifx/products/registry.py` — update with `uv run python -m lifx.products.generator`
 - **Key functions**: `get_product(product_id)` → `ProductInfo`, `get_device_class_name(product_id)` → class name string
 
-**Device Type Detection** (`DiscoveredDevice.create_device()` is the single source of truth):
+**Device Type Detection** (`devices/detection.py` is the single source of truth, used by both `Device.connect()` and `DiscoveredDevice.create_device()`):
 1. Ceiling product ID → `CeilingLight`
-2. Matrix capability → `MatrixLight`
-3. Multizone → `MultiZoneLight`
-4. Infrared → `InfraredLight`
-5. HEV → `HevLight`
-6. Color → `Light`
-7. Relay/Button-only → `None` (filtered out)
+2. Mirror product ID → `MirrorLight`
+3. Matrix capability → `MatrixLight`
+4. Multizone → `MultiZoneLight`
+5. Infrared → `InfraredLight`
+6. HEV → `HevLight`
+7. Color → `Light`
+8. Relay/Button-only → `None` (filtered out)
 
 ## Known Limitations
 

@@ -15,12 +15,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.ceiling import (
-    CeilingLight,
-    CeilingLightState,
+from lifx.devices.ceiling import CeilingLight, CeilingLightState
+from lifx.devices.component_state import (
     _resolve_state_path,
     _state_file_lock,
-    _write_state_file,
+    write_state_file,
 )
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
@@ -931,11 +930,11 @@ class TestCeilingLightStatePersistence:
             real_replace(src, dst)  # type: ignore[arg-type]
             order.append("done")
 
-        monkeypatch.setattr("lifx.devices.ceiling.os.replace", _slow_replace)
+        monkeypatch.setattr("lifx.devices.component_state.os.replace", _slow_replace)
 
         threads = [
             threading.Thread(
-                target=_write_state_file,
+                target=write_state_file,
                 args=(state_file, serial, {"uplight": {"brightness": 0.5}}),
             )
             for serial in ("d073d5010203", "d073d5040506")
