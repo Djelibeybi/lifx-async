@@ -681,8 +681,11 @@ class DeviceGroup:
 
         - Light: Selects random color from theme
         - MultiZoneLight: Distributes colors evenly across zones
-        - MatrixLight: Uses interpolation for smooth gradients
+        - MatrixLight (and CeilingLight): Uses interpolation for smooth gradients
         - Other devices: No action (themes only apply to color devices)
+
+        Each device is painted exactly once, using the most specific
+        `apply_theme()` implementation for its class.
 
         Args:
             theme: Theme to apply
@@ -701,19 +704,12 @@ class DeviceGroup:
             await group.apply_theme(evening, power_on=True, duration=1.0)
             ```
         """
+        # self.lights holds every Light subclass, including multizone, matrix
+        # and ceiling devices. Dispatch is polymorphic, so each device runs its
+        # own apply_theme() override: painting per-class as well would race a
+        # single random colour against the zone/tile gradient.
         await asyncio.gather(
-            # Apply theme to all lights
-            *(light.apply_theme(theme, power_on, duration) for light in self.lights),
-            # Apply theme to all multizone lights
-            *(
-                multizone.apply_theme(theme, power_on, duration)
-                for multizone in self.multizone_lights
-            ),
-            # Apply theme to all matrix light devices
-            *(
-                matrix.apply_theme(theme, power_on, duration)
-                for matrix in self.matrix_lights
-            ),
+            *(light.apply_theme(theme, power_on, duration) for light in self.lights)
         )
 
     def invalidate_metadata_cache(self) -> None:
