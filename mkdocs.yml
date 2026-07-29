@@ -126,6 +126,7 @@ plugins:
       User Guide:
       - user-guide/themes.md
       - user-guide/ceiling-lights.md
+      - user-guide/mirror-lights.md
       - user-guide/animation.md
       - user-guide/advanced-usage.md
       - user-guide/effects-custom.md
@@ -202,6 +203,7 @@ nav:
   - Themes: user-guide/themes.md
   - Animation: user-guide/animation.md
   - Ceiling Lights: user-guide/ceiling-lights.md
+  - Mirror Lights: user-guide/mirror-lights.md
   - Advanced Usage: user-guide/advanced-usage.md
   - Troubleshooting: user-guide/troubleshooting.md
   - Effects Troubleshooting: user-guide/effects-troubleshooting.md

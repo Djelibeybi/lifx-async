@@ -33,6 +33,8 @@ from lifx.devices import (
     MatrixEffect,
     MatrixLight,
     MatrixLightState,
+    MirrorLight,
+    MirrorLightState,
     MultiZoneEffect,
     MultiZoneLight,
     MultiZoneLightState,
@@ -97,6 +99,8 @@ __all__ = [
     "MultiZoneLightState",
     "MatrixLight",
     "MatrixLightState",
+    "MirrorLight",
+    "MirrorLightState",
     "CeilingLight",
     "CeilingLightState",
     # Color

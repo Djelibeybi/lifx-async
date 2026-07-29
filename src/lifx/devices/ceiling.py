@@ -19,49 +19,28 @@ Product IDs:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-import tempfile
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component_state import (
+    color_as_dict,
+    colors_as_dict,
+    decode_color,
+    encode_color,
+    hsk_matches,
+    read_state_document,
+    write_state_document,
+    zones_as_dict,
+)
 from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
-    """Compare hue/saturation/kelvin at uint16 (wire) granularity.
-
-    Brightness is intentionally ignored. Comparing the decoded uint16 values
-    rather than the raw floats keeps stored-state validity stable across a
-    protocol round-trip, which exposes slightly different raw H/S/B floats for
-    the same wire representation.
-    """
-    sp = stored.to_protocol()
-    cp = current.to_protocol()
-    return (
-        sp.hue == cp.hue and sp.saturation == cp.saturation and sp.kelvin == cp.kelvin
-    )
-
-
-def _color_as_dict(color: HSBK | None) -> dict[str, float | int] | None:
-    """Expand an optional HSBK for serialisation, preserving None."""
-    return None if color is None else color.as_dict
-
-
-def _colors_as_dict(
-    colors: list[HSBK] | None,
-) -> list[dict[str, float | int]] | None:
-    """Expand an optional list of HSBK for serialisation, preserving None."""
-    return None if colors is None else [color.as_dict for color in colors]
 
 
 @dataclass
@@ -113,22 +92,17 @@ class CeilingLightState(MatrixLightState):
         The uplight/downlight colors are expanded via :attr:`HSBK.as_dict`;
         the stored and last-known fields stay None when unset.
         """
-        zones = self.downlight_zones
         state = super().as_dict
-        state["downlight_zones"] = {
-            "start": zones.start,
-            "stop": zones.stop,
-            "step": 1 if zones.step is None else zones.step,
-        }
+        state["downlight_zones"] = zones_as_dict(self.downlight_zones)
         state["uplight_is_on"] = self.uplight_is_on
         state["downlight_is_on"] = self.downlight_is_on
         state["uplight_zone"] = self.uplight_zone
         state["uplight_color"] = self.uplight_color.as_dict
-        state["downlight_colors"] = _colors_as_dict(self.downlight_colors)
-        state["stored_uplight_color"] = _color_as_dict(self.stored_uplight_color)
-        state["stored_downlight_colors"] = _colors_as_dict(self.stored_downlight_colors)
-        state["last_uplight_color"] = _color_as_dict(self.last_uplight_color)
-        state["last_downlight_colors"] = _colors_as_dict(self.last_downlight_colors)
+        state["downlight_colors"] = colors_as_dict(self.downlight_colors)
+        state["stored_uplight_color"] = color_as_dict(self.stored_uplight_color)
+        state["stored_downlight_colors"] = colors_as_dict(self.stored_downlight_colors)
+        state["last_uplight_color"] = color_as_dict(self.last_uplight_color)
+        state["last_downlight_colors"] = colors_as_dict(self.last_downlight_colors)
         return state
 
     @classmethod
@@ -1268,7 +1242,7 @@ class CeilingLight(MatrixLight):
                 return False
 
             stored = state.stored_uplight_color
-            return _hsk_matches(stored, current)
+            return hsk_matches(stored, current)
 
         if component == "downlight":
             if state.stored_downlight_colors is None or not isinstance(current, list):
@@ -1279,7 +1253,7 @@ class CeilingLight(MatrixLight):
 
             # Check if all zones match (H, S, K at wire granularity)
             return all(
-                _hsk_matches(s, c)
+                hsk_matches(s, c)
                 for s, c in zip(state.stored_downlight_colors, current)
             )
 
@@ -1294,13 +1268,7 @@ class CeilingLight(MatrixLight):
             return
 
         try:
-            state_path = Path(self._state_file).expanduser()
-            if not state_path.exists():
-                _LOGGER.debug("State file does not exist: %s", state_path)
-                return
-
-            with state_path.open("r") as f:
-                data = json.load(f)
+            data = read_state_document(self._state_file)
 
             # Get state for this device
             device_state = data.get(self.serial)
@@ -1311,26 +1279,11 @@ class CeilingLight(MatrixLight):
             # Load uplight state
             state = self.state
             if "uplight" in device_state:
-                uplight_data = device_state["uplight"]
-                state.stored_uplight_color = HSBK(
-                    hue=uplight_data["hue"],
-                    saturation=uplight_data["saturation"],
-                    brightness=uplight_data["brightness"],
-                    kelvin=uplight_data["kelvin"],
-                )
+                state.stored_uplight_color = decode_color(device_state["uplight"])
 
             # Load downlight state (validate zone count if version is available)
             if "downlight" in device_state:
-                downlight_data = device_state["downlight"]
-                loaded_colors = [
-                    HSBK(
-                        hue=c["hue"],
-                        saturation=c["saturation"],
-                        brightness=c["brightness"],
-                        kelvin=c["kelvin"],
-                    )
-                    for c in downlight_data
-                ]
+                loaded_colors = [decode_color(c) for c in device_state["downlight"]]
                 try:
                     expected = self.downlight_zone_count
                 except LifxError:
@@ -1347,7 +1300,9 @@ class CeilingLight(MatrixLight):
                             len(loaded_colors),
                         )
 
-            _LOGGER.debug("Loaded state from %s for device %s", state_path, self.serial)
+            _LOGGER.debug(
+                "Loaded state from %s for device %s", self._state_file, self.serial
+            )
 
         except Exception as e:
             _LOGGER.warning("Failed to load state from %s: %s", self._state_file, e)
@@ -1361,14 +1316,7 @@ class CeilingLight(MatrixLight):
             return
 
         try:
-            state_path = Path(self._state_file).expanduser()
-
-            # Load existing data or create new
-            if state_path.exists():
-                with state_path.open("r") as f:
-                    data = json.load(f)
-            else:
-                data = {}
+            data = read_state_document(self._state_file)
 
             # Update state for this device, merging with any existing on-disk
             # entry so absent in-memory values (e.g. state that failed to load
@@ -1377,42 +1325,20 @@ class CeilingLight(MatrixLight):
             state = self.state
 
             if state.stored_uplight_color:
-                device_state["uplight"] = {
-                    "hue": state.stored_uplight_color.hue,
-                    "saturation": state.stored_uplight_color.saturation,
-                    "brightness": state.stored_uplight_color.brightness,
-                    "kelvin": state.stored_uplight_color.kelvin,
-                }
+                device_state["uplight"] = encode_color(state.stored_uplight_color)
 
             if state.stored_downlight_colors:
                 device_state["downlight"] = [
-                    {
-                        "hue": c.hue,
-                        "saturation": c.saturation,
-                        "brightness": c.brightness,
-                        "kelvin": c.kelvin,
-                    }
-                    for c in state.stored_downlight_colors
+                    encode_color(c) for c in state.stored_downlight_colors
                 ]
 
             data[self.serial] = device_state
 
-            # Ensure directory exists
-            state_path.parent.mkdir(parents=True, exist_ok=True)
+            write_state_document(self._state_file, data)
 
-            # Write atomically: dump to a temp file in the same directory,
-            # then replace, so a crash mid-write cannot leave a truncated
-            # file that loses every device's stored state
-            fd, tmp = tempfile.mkstemp(dir=state_path.parent, suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w") as f:
-                    json.dump(data, f, indent=2)
-                os.replace(tmp, state_path)
-            except BaseException:
-                os.unlink(tmp)
-                raise
-
-            _LOGGER.debug("Saved state to %s for device %s", state_path, self.serial)
+            _LOGGER.debug(
+                "Saved state to %s for device %s", self._state_file, self.serial
+            )
 
         except Exception as e:
             _LOGGER.warning("Failed to save state to %s: %s", self._state_file, e)
