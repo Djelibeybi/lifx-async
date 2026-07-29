@@ -13,6 +13,7 @@ The `CeilingLight` class provides high-level control over these components while
 |---------|-------|--------|
 | LIFX Ceiling (US/Intl) | 64 | 8x8 grid, zone 63 = uplight |
 | LIFX Ceiling Capsule (US/Intl) | 128 | 16x8 grid, zone 127 = uplight |
+| LIFX Ceiling 13" (US/Intl) | 64 | 8x8 grid, zone 63 = uplight |
 
 All LIFX Ceiling devices are gen4, so the first command after a period of idle may
 arrive with a short wake-up delay — see

@@ -90,6 +90,40 @@ class TestCeilingLightComponentDetection:
         assert layout.uplight_zone == 127
         assert layout.downlight_zones == slice(0, 127)
 
+    def test_create_ceiling_light_265(self) -> None:
+        """Test creating Ceiling 13" (product 265 - US)."""
+        ceiling = CeilingLight(
+            serial="d073d5010207",
+            ip="192.168.1.104",
+        )
+        assert ceiling.serial == "d073d5010207"
+        assert ceiling.ip == "192.168.1.104"
+
+        # Verify component layout for 8x8 ceiling (product 265)
+        layout = get_ceiling_layout(265)
+        assert layout is not None
+        assert layout.width == 8
+        assert layout.height == 8
+        assert layout.uplight_zone == 63
+        assert layout.downlight_zones == slice(0, 63)
+
+    def test_create_ceiling_light_266(self) -> None:
+        """Test creating Ceiling 13" (product 266 - Intl)."""
+        ceiling = CeilingLight(
+            serial="d073d5010208",
+            ip="192.168.1.105",
+        )
+        assert ceiling.serial == "d073d5010208"
+        assert ceiling.ip == "192.168.1.105"
+
+        # Verify component layout for 8x8 ceiling (product 266)
+        layout = get_ceiling_layout(266)
+        assert layout is not None
+        assert layout.width == 8
+        assert layout.height == 8
+        assert layout.uplight_zone == 63
+        assert layout.downlight_zones == slice(0, 63)
+
     def test_uplight_zone_property(self) -> None:
         """Test uplight_zone property returns correct zone index."""
         ceiling_176 = CeilingLight(serial="d073d5010203", ip="192.168.1.100")

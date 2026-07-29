@@ -64,6 +64,18 @@ CEILING_LAYOUTS: dict[int, CeilingComponentLayout] = {
         uplight_zone=127,
         downlight_zones=slice(0, 127),
     ),
+    265: CeilingComponentLayout(  # Ceiling 13" (US)
+        width=8,
+        height=8,
+        uplight_zone=63,
+        downlight_zones=slice(0, 63),
+    ),
+    266: CeilingComponentLayout(  # Ceiling 13" (Intl)
+        width=8,
+        height=8,
+        uplight_zone=63,
+        downlight_zones=slice(0, 63),
+    ),
 }
 
 
