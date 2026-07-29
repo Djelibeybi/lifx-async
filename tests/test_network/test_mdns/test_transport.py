@@ -76,13 +76,15 @@ class TestMdnsTransportOpen:
         assert transport._protocol is not None
 
     @pytest.mark.asyncio
-    async def test_open_ephemeral_port_fallback(self) -> None:
-        """Test that open() falls back to ephemeral port if MDNS_PORT is busy."""
+    async def test_open_binds_ephemeral_port(self) -> None:
+        """Test that open() binds to an ephemeral port (legacy unicast mode).
+
+        Binding to 5353 would share the port with a system mDNS daemon
+        (mDNSResponder, Avahi), which steals unicast responses.
+        """
         transport = MdnsTransport()
 
         mock_socket = MagicMock(spec=socket.socket)
-        # First bind fails, second succeeds
-        mock_socket.bind.side_effect = [OSError("Address in use"), None]
         mock_socket.getsockname.return_value = ("", 12345)
 
         mock_datagram_transport = MagicMock()
@@ -95,42 +97,10 @@ class TestMdnsTransportOpen:
 
                 await transport.open()
 
-                # Verify bind was called twice (once for MDNS_PORT, once for ephemeral)
-                assert mock_socket.bind.call_count == 2
-                # First call should be to MDNS_PORT
-                assert mock_socket.bind.call_args_list[0][0][0] == ("", MDNS_PORT)
-                # Second call should be to ephemeral port
-                assert mock_socket.bind.call_args_list[1][0][0] == ("", 0)
+                # Verify bind was called once, to an ephemeral port
+                assert mock_socket.bind.call_count == 1
+                assert mock_socket.bind.call_args_list[0][0][0] == ("", 0)
 
-                assert transport.is_open is True
-
-        await transport.close()
-
-    @pytest.mark.asyncio
-    async def test_open_reuseport_not_available(self) -> None:
-        """Test that open() handles SO_REUSEPORT not being available."""
-        transport = MdnsTransport()
-
-        mock_socket = MagicMock(spec=socket.socket)
-
-        # Make SO_REUSEPORT fail (common on some systems)
-        def mock_setsockopt(level: int, opt: int, value: int) -> None:
-            if hasattr(socket, "SO_REUSEPORT") and opt == socket.SO_REUSEPORT:
-                raise OSError("Protocol not available")
-
-        mock_socket.setsockopt.side_effect = mock_setsockopt
-        mock_socket.getsockname.return_value = ("", MDNS_PORT)
-
-        mock_datagram_transport = MagicMock()
-
-        with patch("socket.socket", return_value=mock_socket):
-            with patch("asyncio.get_running_loop") as mock_loop:
-                mock_loop.return_value.create_datagram_endpoint = AsyncMock(
-                    return_value=(mock_datagram_transport, None)
-                )
-
-                # Should not raise - SO_REUSEPORT failure is ignored
-                await transport.open()
                 assert transport.is_open is True
 
         await transport.close()
@@ -147,19 +117,12 @@ class TestMdnsTransportOpen:
         assert transport.is_open is False
 
     @pytest.mark.asyncio
-    async def test_open_multicast_join_fails(self) -> None:
-        """Test that open() raises LifxNetworkError if multicast join fails."""
+    async def test_open_bind_fails(self) -> None:
+        """Test that open() raises LifxNetworkError if bind fails."""
         transport = MdnsTransport()
 
         mock_socket = MagicMock(spec=socket.socket)
-        mock_socket.getsockname.return_value = ("", MDNS_PORT)
-
-        # Make IP_ADD_MEMBERSHIP fail
-        def mock_setsockopt(level: int, opt: int, value: object) -> None:
-            if level == socket.IPPROTO_IP and opt == socket.IP_ADD_MEMBERSHIP:
-                raise OSError("Cannot join multicast group")
-
-        mock_socket.setsockopt.side_effect = mock_setsockopt
+        mock_socket.bind.side_effect = OSError("Cannot bind")
 
         with patch("socket.socket", return_value=mock_socket):
             with pytest.raises(LifxNetworkError, match="Failed to open mDNS socket"):
@@ -337,38 +300,6 @@ class TestMdnsTransportClose:
         assert transport._transport is None
         assert transport._socket is None
         assert transport.is_open is False
-
-    @pytest.mark.asyncio
-    async def test_close_leaves_multicast_group(self) -> None:
-        """Test that close leaves the multicast group."""
-        transport = MdnsTransport()
-        transport._protocol = MagicMock()
-        transport._transport = MagicMock()
-        mock_socket = MagicMock(spec=socket.socket)
-        transport._socket = mock_socket
-
-        await transport.close()
-
-        # Should have called setsockopt to drop membership
-        mock_socket.setsockopt.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_close_ignores_multicast_leave_error(self) -> None:
-        """Test that close ignores errors when leaving multicast group."""
-        transport = MdnsTransport()
-        transport._protocol = MagicMock()
-        transport._transport = MagicMock()
-        mock_socket = MagicMock(spec=socket.socket)
-        # Make leaving multicast group fail
-        mock_socket.setsockopt.side_effect = OSError("Cannot leave group")
-        transport._socket = mock_socket
-
-        # Should not raise despite OSError
-        await transport.close()
-
-        # Transport should still be closed
-        assert transport.is_open is False
-        assert transport._socket is None
 
 
 class TestMdnsTransportIsOpen:
