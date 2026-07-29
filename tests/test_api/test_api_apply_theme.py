@@ -9,9 +9,14 @@ This module tests high-level theme application on DeviceGroup:
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import AsyncMock
 
 from lifx.api import DeviceGroup
 from lifx.const import TIMEOUT_ERRORS
+from lifx.devices.ceiling import CeilingLight
+from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
 from lifx.theme import ThemeLibrary
 
 
@@ -288,3 +293,32 @@ class TestDeviceGroupApplyTheme:
             device = group.lights[0]
             color, _, _ = await device.get_color()
             assert color in theme
+
+
+class TestDeviceGroupApplyThemeDispatch:
+    """Test that each device is painted once by its own apply_theme()."""
+
+    async def test_each_device_painted_once(self) -> None:
+        """Subclasses must not be painted by both Light and their own override.
+
+        MultiZoneLight, MatrixLight and CeilingLight are all Light subclasses,
+        so a per-class fan-out would race a single random colour against the
+        zone/tile gradient on the same device.
+        """
+        devices = [
+            Light(serial="d073d5000001", ip="127.0.0.1"),
+            MultiZoneLight(serial="d073d5000002", ip="127.0.0.1"),
+            MatrixLight(serial="d073d5000003", ip="127.0.0.1"),
+            CeilingLight(serial="d073d5000004", ip="127.0.0.1"),
+        ]
+        for device in devices:
+            # Instance attribute shadows the class method, so no packets are sent.
+            device.apply_theme = AsyncMock()  # type: ignore[method-assign]
+
+        theme = ThemeLibrary.get("evening")
+        await DeviceGroup(list(devices)).apply_theme(theme, power_on=True, duration=1.5)
+
+        for device in devices:
+            mock = device.apply_theme
+            assert isinstance(mock, AsyncMock)
+            mock.assert_awaited_once_with(theme, True, 1.5)
