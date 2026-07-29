@@ -7,6 +7,7 @@ generates optimized Python code with pre-built product definitions.
 from __future__ import annotations
 
 import json
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,34 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 
 from lifx.const import PRODUCTS_URL
+
+
+def format_generated_files(*paths: Path) -> None:
+    """Run `ruff format` and `ruff check --fix` over the generated files.
+
+    The generator emits valid but unformatted Python: string quoting and line
+    wrapping differ from the repository style, so an unformatted regeneration
+    shows up as a large spurious diff. This mirrors the "Format and lint
+    generated files" step in the CI generated-files job.
+
+    Args:
+        paths: Files to format in place.
+    """
+    print("Formatting generated code with ruff...")
+    targets = [str(path) for path in paths]
+
+    for command in (["format"], ["check", "--fix"]):
+        result = subprocess.run(  # nosec B603
+            [sys.executable, "-m", "ruff", *command, *targets],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(
+                f"Warning: ruff {command[0]} failed, generated code may not match"
+                f" the committed style:\n{result.stderr.strip()}",
+                file=sys.stderr,
+            )
 
 
 def download_products() -> dict[str, Any] | list[dict[str, Any]] | None:
@@ -487,6 +516,9 @@ def main() -> None:
         f.write(registry_code)
 
     print(f"Generated {output_path}")
+
+    format_generated_files(output_path)
+
     print("✓ Generation complete!")
 
 
