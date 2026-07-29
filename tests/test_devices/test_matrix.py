@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from lifx.color import HSBK, Colors
+from lifx.devices.base import FirmwareInfo
 from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
+from lifx.exceptions import LifxUnsupportedCommandError
+from lifx.products import (
+    SKY_EFFECT_MIN_FIRMWARE_MAJOR,
+    get_product,
+    supports_sky_effect,
+)
 from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
 
 
@@ -241,9 +250,8 @@ class TestMatrixLight:
     async def test_set_effect_sky_sunrise(self, ceiling_device) -> None:
         """Test setting SKY effect with SUNRISE.
 
-        SKY effects are only supported on LIFX Ceiling devices
-        (product IDs 176, 177, 201, 202) with firmware 4.4+.
-        This test uses a Ceiling device created via the emulator API.
+        SKY requires host firmware 4.x or later, so this test uses a
+        Ceiling device created via the emulator API.
         """
         matrix = ceiling_device
         async with matrix:
@@ -261,9 +269,8 @@ class TestMatrixLight:
     async def test_set_effect_sky_sunset(self, ceiling_device) -> None:
         """Test setting SKY effect with SUNSET.
 
-        SKY effects are only supported on LIFX Ceiling devices
-        (product IDs 176, 177, 201, 202) with firmware 4.4+.
-        This test uses a Ceiling device created via the emulator API.
+        SKY requires host firmware 4.x or later, so this test uses a
+        Ceiling device created via the emulator API.
         """
         matrix = ceiling_device
         async with matrix:
@@ -281,9 +288,8 @@ class TestMatrixLight:
     async def test_set_effect_sky_clouds(self, ceiling_device) -> None:
         """Test setting SKY effect with CLOUDS and saturation parameters.
 
-        SKY effects are only supported on LIFX Ceiling devices
-        (product IDs 176, 177, 201, 202) with firmware 4.4+.
-        This test uses a Ceiling device created via the emulator API.
+        SKY requires host firmware 4.x or later, so this test uses a
+        Ceiling device created via the emulator API.
         """
         matrix = ceiling_device
         async with matrix:
@@ -731,6 +737,111 @@ class TestMatrixEffect:
                 speed=3000,
                 cloud_saturation_max=-1,
             )
+
+
+class TestSkyEffectFirmwareGate:
+    """Tests for the SKY effect firmware requirement."""
+
+    # Product 176 (Ceiling) has the matrix capability, product 27 (A19) does not.
+    MATRIX_PRODUCT = 176
+    NON_MATRIX_PRODUCT = 27
+
+    @staticmethod
+    def _matrix_light(
+        mock_device_factory, product: int, major: int, minor: int
+    ) -> MatrixLight:
+        """Build a MatrixLight with the given product and host firmware."""
+        matrix = mock_device_factory(MatrixLight)
+        matrix._capabilities = get_product(product)
+        matrix.get_host_firmware = AsyncMock(
+            return_value=FirmwareInfo(build=0, version_major=major, version_minor=minor)
+        )
+        matrix.connection.send_packet = AsyncMock()
+        return matrix
+
+    def test_quirk_requires_matrix_and_firmware(self) -> None:
+        """Test the quirk helper gates on both capability and firmware."""
+        assert supports_sky_effect(True, SKY_EFFECT_MIN_FIRMWARE_MAJOR) is True
+        assert supports_sky_effect(True, SKY_EFFECT_MIN_FIRMWARE_MAJOR + 1) is True
+        assert supports_sky_effect(True, SKY_EFFECT_MIN_FIRMWARE_MAJOR - 1) is False
+        assert supports_sky_effect(False, SKY_EFFECT_MIN_FIRMWARE_MAJOR) is False
+
+    async def test_supports_sky_effect_matrix_firmware_4(
+        self, mock_device_factory
+    ) -> None:
+        """Test that a matrix device on firmware 4.x reports SKY support."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        assert await matrix.supports_sky_effect() is True
+
+    async def test_supports_sky_effect_matrix_firmware_3(
+        self, mock_device_factory
+    ) -> None:
+        """Test that a matrix device on firmware 3.x reports no SKY support."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=3, minor=90
+        )
+
+        assert await matrix.supports_sky_effect() is False
+
+    async def test_supports_sky_effect_without_matrix_capability(
+        self, mock_device_factory
+    ) -> None:
+        """Test that firmware 4.x alone is not enough without matrix capability."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.NON_MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        assert await matrix.supports_sky_effect() is False
+
+    async def test_set_effect_sky_rejected_on_old_firmware(
+        self, mock_device_factory
+    ) -> None:
+        """Test that SKY on firmware 3.x raises before any packet is sent."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=3, minor=90
+        )
+
+        with pytest.raises(
+            LifxUnsupportedCommandError,
+            match=(
+                r"does not support the SKY effect: it is running firmware 3\.90 "
+                r"and the SKY effect needs firmware 4\.0 or later"
+            ),
+        ):
+            await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
+
+        matrix.connection.send_packet.assert_not_called()
+
+    async def test_set_effect_sky_rejected_without_matrix_capability(
+        self, mock_device_factory
+    ) -> None:
+        """Test that SKY on a non-matrix product raises even on firmware 4.x."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.NON_MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        with pytest.raises(
+            LifxUnsupportedCommandError,
+            match=r"does not support the SKY effect: it is not a matrix device",
+        ):
+            await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
+
+        matrix.connection.send_packet.assert_not_called()
+
+    async def test_set_effect_other_effects_skip_the_gate(
+        self, mock_device_factory
+    ) -> None:
+        """Test that non-SKY effects are unaffected by the SKY check."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=3, minor=90
+        )
+
+        await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=2.0)
+
+        matrix.connection.send_packet.assert_awaited_once()
 
 
 class TestTileInfo:
