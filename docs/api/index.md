@@ -118,7 +118,7 @@ Error handling:
 All device classes support async context managers for automatic resource cleanup:
 
 ```python
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 # Connection automatically closed
 ```
@@ -145,7 +145,7 @@ Connections open lazily on first request and reuse the same socket:
 
 ```python
 # Multiple operations reuse the same connection
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
     await light.set_color(Colors.RED)
     await light.set_brightness(0.5)
     await light.get_label()
@@ -158,7 +158,7 @@ Devices support concurrent requests via asyncio.gather:
 
 ```python
 # Execute multiple operations concurrently
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
     # Note: get_color() returns (color, power, label) tuple
     (color, power, label), version = await asyncio.gather(
         light.get_color(),
@@ -249,7 +249,7 @@ async def set_custom_color(light: Light, hue: float) -> None:
 
 ```python
 # ✅ Good - automatic cleanup
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 
 # ❌ Bad - no context manager, no state initialization

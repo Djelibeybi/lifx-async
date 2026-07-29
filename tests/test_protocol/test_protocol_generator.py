@@ -1,11 +1,16 @@
 """Tests for protocol code generator."""
 
+from pathlib import Path
+
+import pytest
+
 from lifx.protocol.generator import (
     TypeRegistry,
     apply_sensor_packet_quirks,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
+    format_generated_files,
     format_long_import,
     format_long_list,
     generate_enum_code,
@@ -1101,3 +1106,24 @@ class TestSensorPacketQuirks:
         assert len(result2["sensor"]) == 2
         assert "SensorGetAmbientLight" in result2["sensor"]
         assert "SensorStateAmbientLight" in result2["sensor"]
+
+
+class TestFormatGeneratedFiles:
+    """Tests for the ruff formatting step."""
+
+    def test_formats_generated_file_in_place(self, tmp_path: Path) -> None:
+        """Test that a valid but unformatted file is rewritten."""
+        target = tmp_path / "generated.py"
+        target.write_text("x = {'a':1}\n")
+
+        format_generated_files(target)
+
+        assert target.read_text() == 'x = {"a": 1}\n'
+
+    def test_raises_with_diagnostics_on_unparsable_output(self, tmp_path: Path) -> None:
+        """Test that unparsable generated code fails loudly, not silently."""
+        target = tmp_path / "broken.py"
+        target.write_text("def broken(:\n")
+
+        with pytest.raises(RuntimeError, match=r"ruff format failed"):
+            format_generated_files(target)

@@ -22,11 +22,12 @@ arrive with a short wake-up delay — see
 ## Quick Start
 
 ```python
-from lifx import CeilingLight
+from lifx import CeilingLight, Device
 from lifx.color import HSBK
 
 async def main():
-    async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+    async with await Device.connect("192.168.1.100") as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         # Set downlight to warm white
         await ceiling.set_downlight_colors(
             HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3000)
@@ -138,9 +139,10 @@ if ceiling.downlight_is_on:
 After connecting to a CeilingLight, you can access the complete device state via the `state` property, which returns a `CeilingLightState` dataclass:
 
 ```python
-from lifx import CeilingLight, CeilingLightState
+from lifx import CeilingLight, CeilingLightState, Device
 
-async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+async with await Device.connect("192.168.1.100") as ceiling:
+    assert isinstance(ceiling, CeilingLight)
     state: CeilingLightState = ceiling.state
 
     # Access ceiling-specific state
@@ -175,7 +177,8 @@ Plus all attributes inherited from `MatrixLightState`: `chain`, `tile_orientatio
 Access the component zone indices directly:
 
 ```python
-async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+async with await Device.connect("192.168.1.100") as ceiling:
+    assert isinstance(ceiling, CeilingLight)
     # Get uplight zone index (63 or 127 depending on model)
     uplight_idx = ceiling.uplight_zone
     print(f"Uplight zone: {uplight_idx}")
@@ -191,7 +194,9 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
 
 ## State Persistence
 
-CeilingLight supports optional state persistence to preserve component colors across sessions:
+CeilingLight supports optional state persistence to preserve component colors across sessions.
+The state file is set through `CeilingLight.from_ip()`, which is the one case where naming the
+class directly is required — `Device.connect()` has no `state_file` parameter:
 
 ```python
 async with await CeilingLight.from_ip(
@@ -257,7 +262,8 @@ await ceiling.set_downlight_colors(
 CeilingLight extends `MatrixLight`, so all matrix operations are available:
 
 ```python
-async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+async with await Device.connect("192.168.1.100") as ceiling:
+    assert isinstance(ceiling, CeilingLight)
     # Use MatrixLight methods directly
     all_colors = await ceiling.get_all_tile_colors()
     device_chain = await ceiling.get_device_chain()
@@ -278,11 +284,12 @@ async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
 Create a subtle night light with dim uplight and downlight off:
 
 ```python
-from lifx import CeilingLight
+from lifx import CeilingLight, Device
 from lifx.color import HSBK
 
 async def night_mode(ip: str):
-    async with await CeilingLight.from_ip(ip) as ceiling:
+    async with await Device.connect(ip) as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         # Store current colors before turning off
         await ceiling.turn_downlight_off()
 
@@ -299,7 +306,8 @@ Bright, cool white for focus:
 
 ```python
 async def daytime_mode(ip: str):
-    async with await CeilingLight.from_ip(ip) as ceiling:
+    async with await Device.connect(ip) as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         # Bright cool downlight for task lighting
         await ceiling.set_downlight_colors(
             HSBK(hue=0, saturation=0, brightness=1.0, kelvin=5500),
@@ -316,7 +324,8 @@ Warm tones with accent uplight:
 
 ```python
 async def evening_mode(ip: str):
-    async with await CeilingLight.from_ip(ip) as ceiling:
+    async with await Device.connect(ip) as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         # Dimmed warm downlight
         await ceiling.set_downlight_colors(
             HSBK(hue=30, saturation=0.1, brightness=0.4, kelvin=2700),
@@ -335,12 +344,13 @@ async def evening_mode(ip: str):
 LIFX Ceiling lights have a round or oval shape, making them ideal candidates for the sunrise and sunset effects with the `origin="center"` setting. This makes the sun expand outward from the center of the light rather than rising from the bottom edge.
 
 ```python
-from lifx import CeilingLight
+from lifx import CeilingLight, Device
 from lifx.effects import Conductor, EffectSunrise, EffectSunset
 
 async def wake_up_light(ip: str):
     """Simulate a sunrise on a Ceiling light."""
-    async with await CeilingLight.from_ip(ip) as ceiling:
+    async with await Device.connect(ip) as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         conductor = Conductor()
 
         # 30-minute sunrise expanding from the center
@@ -355,7 +365,8 @@ async def wake_up_light(ip: str):
 
 async def goodnight_light(ip: str):
     """Simulate a sunset on a Ceiling light, then power off."""
-    async with await CeilingLight.from_ip(ip) as ceiling:
+    async with await Device.connect(ip) as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         conductor = Conductor()
 
         # 30-minute sunset contracting to center, then off

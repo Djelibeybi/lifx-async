@@ -213,7 +213,8 @@ class MultiZoneLight(Light):
 
         Using the simplified connect method:
         ```python
-        async with await MultiZoneLight.from_ip(ip="192.168.1.100") as light:
+        async with await Device.connect(ip="192.168.1.100") as light:
+            assert isinstance(light, MultiZoneLight)
             await light.set_move_effect(speed=5.0, direction="forward")
         ```
     """

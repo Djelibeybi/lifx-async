@@ -88,7 +88,7 @@ class Light(Device[LightState]):
 
         Using the simplified connect method (without knowing the serial):
         ```python
-        async with await Light.from_ip(ip="192.168.1.100") as light:
+        async with await Device.connect(ip="192.168.1.100") as light:
             await light.set_color(HSBK.from_rgb(1.0, 0.0, 0.0))
         ```
     """

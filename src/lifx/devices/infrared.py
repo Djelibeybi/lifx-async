@@ -74,7 +74,8 @@ class InfraredLight(Light):
 
         Using the simplified connect method:
         ```python
-        async with await InfraredLight.from_ip(ip="192.168.1.100") as light:
+        async with await Device.connect(ip="192.168.1.100") as light:
+            assert isinstance(light, InfraredLight)
             await light.set_infrared(0.8)
         ```
     """

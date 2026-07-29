@@ -206,7 +206,8 @@ class CeilingLight(MatrixLight):
         from lifx.devices import CeilingLight
         from lifx.color import HSBK
 
-        async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+        async with await Device.connect("192.168.1.100") as ceiling:
+            assert isinstance(ceiling, CeilingLight)
             # Independent component control
             await ceiling.set_downlight_colors(HSBK(hue=0, sat=0, bri=1.0, kelvin=3500))
             await ceiling.set_uplight_color(HSBK(hue=30, sat=0.2, bri=0.3, kelvin=2700))

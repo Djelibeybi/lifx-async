@@ -88,12 +88,12 @@ async def main():
 ### Specific Exception Handling
 
 ```python
-from lifx import Light, LifxConnectionError, LifxUnsupportedCommandError
+from lifx import Device, LifxConnectionError, LifxUnsupportedCommandError
 
 
 async def main():
     try:
-        async with await Light.from_ip("192.168.1.100") as light:
+        async with await Device.connect("192.168.1.100") as light:
             await light.set_color(Colors.BLUE)
     except LifxConnectionError:
         print("Failed to connect to device")
@@ -139,12 +139,12 @@ async def main():
 ### Protocol Error Handling
 
 ```python
-from lifx import Light, LifxProtocolError
+from lifx import Device, LifxProtocolError
 
 
 async def main():
     try:
-        async with await Light.from_ip("192.168.1.100") as light:
+        async with await Device.connect("192.168.1.100") as light:
             await light.set_color(Colors.BLUE)
     except LifxProtocolError:
         print("Protocol-level error occurred")
@@ -209,7 +209,7 @@ except LifxError:
 ```python
 # ✅ Good - resources cleaned up even on exception
 try:
-    async with await Light.from_ip(ip) as light:
+    async with await Device.connect(ip) as light:
         await light.set_color(Colors.BLUE)
 except LifxError:
     print("Error occurred but connection was closed properly")
@@ -267,7 +267,7 @@ async def main():
 
 ```python
 # Usually raises: LifxTimeoutError
-async with await Light.from_ip("192.168.1.100", timeout=5.0) as light:
+async with await Device.connect("192.168.1.100", timeout=5.0) as light:
     await light.set_color(Colors.BLUE)
 ```
 
@@ -315,7 +315,7 @@ Causes:
 
 ```python
 # Raises: LifxUnsupportedCommandError
-async with await Light.from_ip(ip) as light:
+async with await Device.connect(ip) as light:
     await light.set_color_zones(0, 5, Colors.RED)  # Not a multizone device
 ```
 
