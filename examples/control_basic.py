@@ -6,14 +6,16 @@ Demonstrates basic operations: turning lights on/off and changing colors.
 import argparse
 import asyncio
 
-from lifx import Colors, Light
+from lifx import Colors, Device
 
 
-async def main(ip: str):
+async def main(ip: str, serial: str | None = None):
     """Control a single light."""
     print(f"Connecting to light at {ip}...")
 
-    async with await Light.from_ip(ip) as light:
+    # connect() asks the device what it is and returns the matching class.
+    # Passing a known serial skips the extra GetService round trip.
+    async with await Device.connect(ip, serial) as light:
         # Get device state
         color, power, label = await light.get_color()
         print(f"Connected to: {label}\n")
@@ -67,6 +69,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ip", required=True, help="IP address of the light (e.g., 192.168.1.100)"
     )
+    parser.add_argument(
+        "--serial",
+        help="Serial number, e.g. d073d5123456 (skips the serial lookup)",
+    )
     args = parser.parse_args()
 
-    asyncio.run(main(args.ip))
+    asyncio.run(main(args.ip, args.serial))

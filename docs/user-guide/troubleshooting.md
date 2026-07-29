@@ -131,12 +131,12 @@ async for device in discover_devices(timeout=30.0):
 **Solution:**
 
 ```python
-from lifx import Light, LifxConnectionError
+from lifx import Device, LifxConnectionError
 import asyncio
 
 async def test_connection(ip: str):
     try:
-        async with await Light.from_ip(ip) as light:
+        async with await Device.connect(ip) as light:
             label = await light.get_label()
             print(f"Connected to: {label}")
             return True
@@ -172,11 +172,11 @@ reliability.
 
 ```python
 import asyncio
-from lifx import Light, LifxError
+from lifx import Device, LifxError
 
 async def resilient_operation(ip: str, max_retries: int = 3):
     """Retry operations with exponential backoff"""
-    async with await Light.from_ip(ip) as light:
+    async with await Device.connect(ip) as light:
         for attempt in range(max_retries):
             try:
                 await light.set_power(True)
@@ -208,10 +208,10 @@ async def resilient_operation(ip: str, max_retries: int = 3):
 **Solution:**
 
 ```python
-from lifx import Light
+from lifx import Device
 
 # Increase timeout for slow devices
-async with await Light.from_ip(ip, timeout=5.0) as light:
+async with await Device.connect(ip, timeout=5.0) as light:
     # get_color() returns (color, power, label)
     color, power, label = await light.get_color()
 ```
@@ -244,10 +244,10 @@ print(f"Found {len(devices)} devices")
 ```python
 import asyncio
 import time
-from lifx import Light
+from lifx import Device
 
 async def measure_latency():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Measure single request
         start = time.time()
         await light.get_label()
@@ -290,13 +290,13 @@ async def measure_latency():
    Inefficient (creates new connection each time):
    ```python
    for i in range(10):
-       async with await Light.from_ip(ip) as light:
+       async with await Device.connect(ip) as light:
            await light.set_color(HSBK(hue=(360 / 10) * i, saturation=1.0, brightness=1.0, kelvin=3500))
    ```
 
    Efficient (reuses connection):
    ```python
-   async with await Light.from_ip(ip) as light:
+   async with await Device.connect(ip) as light:
        for i in range(10):
            await light.set_color(HSBK(hue=(360 / 10) * i, saturation=1.0, brightness=1.0, kelvin=3500))
    ```
@@ -400,9 +400,9 @@ Or use manual device specification:
 
 ```python
 # Don't rely on discovery
-from lifx import Light
+from lifx import Colors, Device
 
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 ```
 

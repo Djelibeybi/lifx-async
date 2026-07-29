@@ -6,15 +6,18 @@ Demonstrates using built-in tile effects: MORPH, FLAME, and SKY with various par
 import argparse
 import asyncio
 
-from lifx import HSBK, Colors, MatrixLight
+from lifx import HSBK, Colors, Device, MatrixLight
 from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
 
 
-async def main(ip: str):
+async def main(ip: str, serial: str | None = None):
     """Demonstrate MatrixLight tile effects."""
     print(f"Connecting to MatrixLight at {ip}...\n")
 
-    async with await MatrixLight.from_ip(ip) as matrix:
+    # connect() asks the device what it is and returns the matching class.
+    # Passing a known serial skips the extra GetService round trip.
+    async with await Device.connect(ip, serial) as matrix:
+        assert isinstance(matrix, MatrixLight), f"{ip} is not a matrix device"
         # Get device info
         _, power, label = await matrix.get_color()
         print(f"Connected to: {label}\n")
@@ -57,29 +60,34 @@ async def main(ip: str):
         print("  Running for 10 seconds...")
         await asyncio.sleep(10)
 
-        # Demonstrate SKY effect with SUNRISE
-        print("\nStarting SKY effect with SUNRISE...")
-        print("  (sunrise color progression)")
-        await matrix.set_effect(
-            effect_type=FirmwareEffect.SKY,
-            speed=10,
-            sky_type=TileEffectSkyType.SUNRISE,
-        )
-        print("  Running for 10 seconds...")
-        await asyncio.sleep(10)
+        # SKY needs the matrix capability plus recent host firmware, so skip
+        # the two SKY demos on devices that cannot run them.
+        if await matrix.supports_sky_effect():
+            # Demonstrate SKY effect with SUNRISE
+            print("\nStarting SKY effect with SUNRISE...")
+            print("  (sunrise color progression)")
+            await matrix.set_effect(
+                effect_type=FirmwareEffect.SKY,
+                speed=10,
+                sky_type=TileEffectSkyType.SUNRISE,
+            )
+            print("  Running for 10 seconds...")
+            await asyncio.sleep(10)
 
-        # Demonstrate SKY effect with CLOUDS
-        print("\nStarting SKY effect with CLOUDS...")
-        print("  (moving cloud patterns)")
-        await matrix.set_effect(
-            effect_type=FirmwareEffect.SKY,
-            speed=5,
-            sky_type=TileEffectSkyType.CLOUDS,
-            cloud_saturation_min=50,
-            cloud_saturation_max=180,
-        )
-        print("  Running for 10 seconds...")
-        await asyncio.sleep(10)
+            # Demonstrate SKY effect with CLOUDS
+            print("\nStarting SKY effect with CLOUDS...")
+            print("  (moving cloud patterns)")
+            await matrix.set_effect(
+                effect_type=FirmwareEffect.SKY,
+                speed=5,
+                sky_type=TileEffectSkyType.CLOUDS,
+                cloud_saturation_min=50,
+                cloud_saturation_max=180,
+            )
+            print("  Running for 10 seconds...")
+            await asyncio.sleep(10)
+        else:
+            print("\nSkipping the SKY demos: this device does not support them.")
 
         # Demonstrate custom palette effect
         print("\nStarting MORPH effect with custom ocean palette...")
@@ -122,6 +130,10 @@ if __name__ == "__main__":
         required=True,
         help="IP address of the MatrixLight (e.g., 192.168.1.100)",
     )
+    parser.add_argument(
+        "--serial",
+        help="Serial number, e.g. d073d5123456 (skips the serial lookup)",
+    )
     args = parser.parse_args()
 
-    asyncio.run(main(args.ip))
+    asyncio.run(main(args.ip, args.serial))

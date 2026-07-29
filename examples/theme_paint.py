@@ -71,9 +71,6 @@ def parse_hex_colors(spec: str) -> Theme:
         red, green, blue = (int(value[i : i + 2], 16) / 255 for i in (0, 2, 4))
         colors.append(HSBK.from_rgb(red, green, blue))
 
-    if not colors:
-        raise ValueError("No colours supplied")
-
     return Theme(colors)
 
 
@@ -106,7 +103,9 @@ async def resolve_devices(targets: list[str]) -> list[Light]:
                 " not a colour-capable light, skipping"
             )
         else:
-            print(f"  Resolved: {device.label} [{device.serial}] -> {device.ip}")
+            # Discovery does not fetch labels, so ask the device for its own.
+            label = await device.get_label()
+            print(f"  Resolved: {label} [{device.serial}] -> {device.ip}")
             lights.append(device)
 
     return lights
@@ -149,6 +148,20 @@ async def describe(light: Light) -> str:
     return "single zone (one random palette colour)"
 
 
+async def summarise(light: Light) -> str:
+    """Build the one-line summary printed for a light before painting.
+
+    Args:
+        light: Device to summarise.
+
+    Returns:
+        Label, serial and paint geometry as a single line.
+    """
+    # Discovery does not fetch labels, so ask the device for its own.
+    label, description = await asyncio.gather(light.get_label(), describe(light))
+    return f"  {label} [{light.serial}] - {description}"
+
+
 async def main(
     targets: list[str],
     theme: Theme,
@@ -179,8 +192,10 @@ async def main(
         return 1
 
     print(f"\nPainting '{theme_name}' ({len(theme.colors)} colours) onto:")
-    for light in lights:
-        print(f"  {light.label} [{light.serial}] - {await describe(light)}")
+    # Summarise every light concurrently: serialising it would cost one round
+    # trip per device before any painting starts.
+    for summary in await asyncio.gather(*(summarise(light) for light in lights)):
+        print(summary)
 
     async with DeviceGroup(list(lights)) as group:
         await group.apply_theme(theme, power_on=power_on, duration=duration)
@@ -238,7 +253,9 @@ if __name__ == "__main__":
             print(f"  {name}")
         sys.exit(0)
 
-    if args.colors:
+    # `is not None`, not truthiness: an explicitly empty --colors must fail
+    # loudly rather than silently painting the default theme.
+    if args.colors is not None:
         try:
             selected_theme = parse_hex_colors(args.colors)
         except ValueError as err:

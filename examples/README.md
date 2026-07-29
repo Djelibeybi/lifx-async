@@ -66,12 +66,13 @@ Connects to a single light and demonstrates basic operations: power on/off, sett
 adjusting hue, saturation, brightness, and kelvin individually. Restores original state when done.
 
 ```bash
-uv run python examples/control_basic.py --ip 192.168.1.100
+uv run python examples/control_basic.py --ip 192.168.1.100 --serial d073d5123456
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--ip` | yes | IP address of the light |
+| `--serial` | no | Serial number; supplying it skips the serial lookup |
 
 ### control_waveforms
 
@@ -79,12 +80,13 @@ Demonstrates the five built-in waveform types: PULSE, SINE (breathe), SAW, TRIAN
 HALF_SINE. Each waveform transitions between two colors for two cycles.
 
 ```bash
-uv run python examples/control_waveforms.py --ip 192.168.1.100
+uv run python examples/control_waveforms.py --ip 192.168.1.100 --serial d073d5123456
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--ip` | yes | IP address of the light |
+| `--serial` | no | Serial number; supplying it skips the serial lookup |
 
 ### control_device_groups
 
@@ -268,12 +270,13 @@ Connects to a MatrixLight (Tile, Candle, Path) and demonstrates getting device c
 reading tile colors, and setting a blue gradient pattern.
 
 ```bash
-uv run python examples/matrix_basic.py --ip 192.168.1.100
+uv run python examples/matrix_basic.py --ip 192.168.1.100 --serial d073d5123456
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--ip` | yes | IP address of the MatrixLight |
+| `--serial` | no | Serial number; supplying it skips the serial lookup |
 
 ### matrix_effects
 
@@ -281,12 +284,15 @@ Demonstrates the built-in firmware tile effects: MORPH, FLAME, SKY (sunrise and 
 custom palette MORPH. These effects run on the device firmware itself.
 
 ```bash
-uv run python examples/matrix_effects.py --ip 192.168.1.100
+uv run python examples/matrix_effects.py --ip 192.168.1.100 --serial d073d5123456
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--ip` | yes | IP address of the MatrixLight |
+| `--serial` | no | Serial number; supplying it skips the serial lookup |
+
+The SKY demos are skipped on devices that do not support the effect.
 
 ### matrix_large_tiles
 
@@ -295,12 +301,13 @@ Shows rainbow, vertical stripe, and checkerboard patterns. The library automatic
 frame buffer strategy for large tiles.
 
 ```bash
-uv run python examples/matrix_large_tiles.py --ip 192.168.1.100
+uv run python examples/matrix_large_tiles.py --ip 192.168.1.100 --serial d073d5123456
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--ip` | yes | IP address of the MatrixLight |
+| `--serial` | no | Serial number; supplying it skips the serial lookup |
 
 ## Animation
 
@@ -372,3 +379,16 @@ Many effect examples share the same device targeting pattern:
 - **Mixed**: `192.168.1.100 d073d5123456`
 
 The scripts auto-detect whether each argument is an IP address (contains `.`) or a serial number.
+
+## Connecting to a Known Device
+
+Examples that target one device by IP use `Device.connect()`:
+
+```python
+async with await Device.connect(ip, serial) as light:
+    await light.set_power(True)
+```
+
+`connect()` asks the device what it is, so a Ceiling comes back as a `CeilingLight` and a strip as
+a `MultiZoneLight` — you get the right class without having to know it in advance. Adding the
+serial saves a round trip; leave it out and the library looks it up.

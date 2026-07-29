@@ -194,7 +194,8 @@ class FrameBuffer:
 
         Example:
             ```python
-            async with await MatrixLight.from_ip("192.168.1.100") as matrix:
+            async with await Device.connect("192.168.1.100") as matrix:
+                assert isinstance(matrix, MatrixLight)
                 fb = await FrameBuffer.for_matrix(matrix)
                 print(f"Canvas: {fb.canvas_width}x{fb.canvas_height}")
             ```
@@ -320,7 +321,8 @@ class FrameBuffer:
 
         Example:
             ```python
-            async with await MultiZoneLight.from_ip("192.168.1.100") as strip:
+            async with await Device.connect("192.168.1.100") as strip:
+                assert isinstance(strip, MultiZoneLight)
                 fb = await FrameBuffer.for_multizone(strip)
             ```
         """

@@ -339,7 +339,7 @@ await asyncio.gather(
 
 ```python
 # Connection opens lazily on first request
-async with await Light.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
     await light.set_color(Colors.RED)  # Opens connection here
     await light.set_brightness(0.5)  # Reuses same connection
     await light.get_label()  # Reuses same connection
