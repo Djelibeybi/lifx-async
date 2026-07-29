@@ -2,6 +2,26 @@
 
 <!-- version list -->
 
+## v6.0.1 (2026-07-29)
+
+### Bug Fixes
+
+- Switch all examples to use Device.connect() instead of from_ip()
+  ([`6377cc2`](https://github.com/Djelibeybi/lifx-async/commit/6377cc2ad3e61064902b9411e9ecc23e91c233f2))
+
+- **api**: Apply themes once per device
+  ([`2ee2f4c`](https://github.com/Djelibeybi/lifx-async/commit/2ee2f4cf4df053751633092bca7723d3f6e2309a))
+
+- **examples**: Add a theme painting example
+  ([`f4cf623`](https://github.com/Djelibeybi/lifx-async/commit/f4cf62326183e010f98d4c55999145bb550c7c82))
+
+- **matrix**: Gate the SKY effect on capability and firmware
+  ([`be28976`](https://github.com/Djelibeybi/lifx-async/commit/be2897610c6539e8f0feb5642e6ecc0d6453487d))
+
+- **products**: Add the Ceiling 13" component layout
+  ([`04405be`](https://github.com/Djelibeybi/lifx-async/commit/04405bebbd49fe6c69f3012c001d182ded8331fd))
+
+
 ## v6.0.0 (2026-07-28)
 
 ### Bug Fixes
