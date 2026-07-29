@@ -79,6 +79,29 @@ CEILING_LAYOUTS: dict[int, CeilingComponentLayout] = {
 }
 
 
+# Minimum host firmware major version that implements the SKY tile effect.
+# SKY requires the matrix capability plus firmware 4.x: matrix devices still on
+# firmware 3.x and earlier reject or ignore it. Confirmed on Ceiling, Luna,
+# Tube, Path and the E26 Candle, and assumed on Spot. Support on the LIFX
+# Mirror is unconfirmed pending an answer from LIFX. The discontinued LIFX Tile
+# is permanently excluded: its terminal firmware is 3.50.
+# TODO: Remove once LIFX publishes per-effect support in products.json
+SKY_EFFECT_MIN_FIRMWARE_MAJOR = 4
+
+
+def supports_sky_effect(has_matrix: bool, firmware_major: int) -> bool:
+    """Check whether a device can run the SKY tile effect.
+
+    Args:
+        has_matrix: Whether the product has the matrix capability
+        firmware_major: Host firmware major version number
+
+    Returns:
+        True if the device supports the SKY tile effect
+    """
+    return has_matrix and firmware_major >= SKY_EFFECT_MIN_FIRMWARE_MAJOR
+
+
 def get_ceiling_layout(pid: int) -> CeilingComponentLayout | None:
     """Get component layout for a Ceiling product.
 

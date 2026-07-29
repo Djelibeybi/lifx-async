@@ -248,6 +248,8 @@ Information dataclass for a single tile in the device chain. Returned as part of
 
 Configuration dataclass for matrix effects (MORPH, FLAME, SKY). Used with `MatrixLight.set_effect()` and returned by `MatrixLight.get_effect()`.
 
+SKY requires the matrix capability plus host firmware 4.x or later — confirmed on Ceiling, Luna, Tube, Path and the E26 Candle. Check with `await matrix.supports_sky_effect()`; `set_effect()` raises `LifxUnsupportedCommandError` when either requirement is unmet.
+
 ::: lifx.devices.matrix.MatrixEffect
     options:
       show_root_heading: true

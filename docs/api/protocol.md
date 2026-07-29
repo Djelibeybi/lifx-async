@@ -328,7 +328,7 @@ FirmwareEffect.OFF
 FirmwareEffect.MOVE       # MultiZone only
 FirmwareEffect.MORPH      # Tile/Matrix only
 FirmwareEffect.FLAME      # Tile/Matrix only
-FirmwareEffect.SKY        # Tile/Matrix only
+FirmwareEffect.SKY        # Tile/Matrix with host firmware 4.x or later
 
 # Direction for MOVE effects
 Direction.FORWARD   # Move forward through zones
