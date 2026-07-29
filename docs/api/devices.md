@@ -312,7 +312,7 @@ to visually distinguish it from the serial number format.
 from lifx import Device
 
 async def main():
-    async with await Device.from_ip("192.168.1.100") as device:
+    async with await Device.connect("192.168.1.100") as device:
         # MAC address is automatically calculated during setup
         if device.mac_address:
             print(f"Serial: {device.serial}")
@@ -327,11 +327,11 @@ async def main():
 ### Basic Light Control
 
 ```python
-from lifx import Light, Colors
+from lifx import Colors, Device
 
 
 async def main():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Turn on and set color
         await light.set_power(True)
         await light.set_color(Colors.BLUE, duration=1.0)
@@ -344,11 +344,11 @@ async def main():
 ### Light Effects
 
 ```python
-from lifx import Light, Colors
+from lifx import Colors, Device
 
 
 async def main():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Pulse effect
         await light.pulse(Colors.RED, period=1.0, cycles=5)
 
@@ -359,11 +359,12 @@ async def main():
 ### HEV Light Control (Anti-Bacterial Cleaning)
 
 ```python
-from lifx import HevLight
+from lifx import Device, HevLight
 
 
 async def main():
-    async with await HevLight.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
+        assert isinstance(light, HevLight)
         # Start a 2-hour cleaning cycle
         await light.set_hev_cycle(enable=True, duration_seconds=7200)
 
@@ -379,11 +380,12 @@ async def main():
 ### Infrared Light Control (Night Vision)
 
 ```python
-from lifx import InfraredLight
+from lifx import Device, InfraredLight
 
 
 async def main():
-    async with await InfraredLight.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
+        assert isinstance(light, InfraredLight)
         # Set infrared brightness to 50%
         await light.set_infrared(0.5)
 
@@ -397,11 +399,11 @@ async def main():
 Light devices with ambient light sensors can measure the current ambient light level in lux:
 
 ```python
-from lifx import Light
+from lifx import Device
 
 
 async def main():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Ensure light is off for accurate reading
         await light.set_power(False)
 
@@ -424,11 +426,12 @@ async def main():
 ### MultiZone Control
 
 ```python
-from lifx import MultiZoneLight, Colors, FirmwareEffect, Direction
+from lifx import Colors, Device, Direction, FirmwareEffect, MultiZoneLight
 
 
 async def main():
-    async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
+        assert isinstance(light, MultiZoneLight)
         # Get all zones - automatically uses best method
         colors = await light.get_all_color_zones()
         print(f"Device has {len(colors)} zones")
@@ -464,11 +467,12 @@ async def main():
 ### Tile Control
 
 ```python
-from lifx import MatrixLight, HSBK, FirmwareEffect
+from lifx import HSBK, Device, FirmwareEffect, MatrixLight
 
 
 async def main():
-    async with await MatrixLight.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
+        assert isinstance(light, MatrixLight)
         # Set a gradient across the tile
         colors = [
             HSBK(hue=h, saturation=1.0, brightness=0.5, kelvin=3500)
@@ -493,11 +497,12 @@ async def main():
 ### Ceiling Light Control
 
 ```python
-from lifx import CeilingLight, HSBK
+from lifx import HSBK, CeilingLight, Device
 
 
 async def main():
-    async with await CeilingLight.from_ip("192.168.1.100") as ceiling:
+    async with await Device.connect("192.168.1.100") as ceiling:
+        assert isinstance(ceiling, CeilingLight)
         # Set downlight to warm white
         await ceiling.set_downlight_colors(
             HSBK(hue=0, saturation=0, brightness=0.8, kelvin=3000)

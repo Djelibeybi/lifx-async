@@ -7,14 +7,17 @@ The library automatically uses the frame buffer strategy for these devices.
 import argparse
 import asyncio
 
-from lifx import HSBK, MatrixLight
+from lifx import HSBK, Device, MatrixLight
 
 
-async def main(ip: str):
+async def main(ip: str, serial: str | None = None):
     """Demonstrate handling large MatrixLight tiles (>64 zones)."""
     print(f"Connecting to MatrixLight at {ip}...\n")
 
-    async with await MatrixLight.from_ip(ip) as matrix:
+    # connect() asks the device what it is and returns the matching class.
+    # Passing a known serial skips the extra GetService round trip.
+    async with await Device.connect(ip, serial) as matrix:
+        assert isinstance(matrix, MatrixLight), f"{ip} is not a matrix device"
         # Get device info
         _, power, label = await matrix.get_color()
         print(f"Connected to: {label}\n")
@@ -164,6 +167,10 @@ if __name__ == "__main__":
         required=True,
         help="IP address of the MatrixLight (e.g., 192.168.1.100)",
     )
+    parser.add_argument(
+        "--serial",
+        help="Serial number, e.g. d073d5123456 (skips the serial lookup)",
+    )
     args = parser.parse_args()
 
-    asyncio.run(main(args.ip))
+    asyncio.run(main(args.ip, args.serial))

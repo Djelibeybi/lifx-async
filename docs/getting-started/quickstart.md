@@ -94,17 +94,18 @@ asyncio.run(main())
 
 ### Direct Connection
 
-If you only know the IP address, `from_ip()` first performs a unicast
+If you only know the IP address, `connect()` first performs a unicast
 discovery round-trip: it sends `GetService` to that address to learn the
-device's serial number, then connects using both:
+device's serial number, then connects using both. It also returns the class
+that matches the product, so a strip comes back as a `MultiZoneLight`:
 
 ```python
 import asyncio
-from lifx import Light, Colors
+from lifx import Colors, Device
 
 
 async def main():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         await light.set_color(Colors.RED)
 
 
@@ -116,11 +117,11 @@ needed — the library connects straight to the device:
 
 ```python
 import asyncio
-from lifx import Light, Colors
+from lifx import Colors, Device
 
 
 async def main():
-    async with Light(serial="d073d5010203", ip="192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100", "d073d5010203") as light:
         await light.set_color(Colors.RED)
 
 
@@ -200,11 +201,11 @@ Create visual effects:
 
 ```python
 import asyncio
-from lifx import Light, Colors
+from lifx import Colors, Device
 
 
 async def main():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Pulse effect
         await light.pulse(Colors.RED, period=1.0, cycles=5)
 

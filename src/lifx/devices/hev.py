@@ -99,7 +99,8 @@ class HevLight(Light):
 
         Using the simplified connect method:
         ```python
-        async with await HevLight.from_ip(ip="192.168.1.100") as light:
+        async with await Device.connect(ip="192.168.1.100") as light:
+            assert isinstance(light, HevLight)
             await light.set_hev_cycle(enable=True, duration_seconds=3600)
         ```
     """

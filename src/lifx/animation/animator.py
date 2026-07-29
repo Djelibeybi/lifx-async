@@ -16,7 +16,8 @@ Example:
     ```python
     from lifx.animation import Animator
 
-    async with await MatrixLight.from_ip("192.168.1.100") as device:
+    async with await Device.connect("192.168.1.100") as device:
+        assert isinstance(device, MatrixLight)
         # Query device once for tile info
         animator = await Animator.for_matrix(device)
 
@@ -108,7 +109,8 @@ class Animator:
 
     Example:
         ```python
-        async with await MatrixLight.from_ip("192.168.1.100") as device:
+        async with await Device.connect("192.168.1.100") as device:
+            assert isinstance(device, MatrixLight)
             animator = await Animator.for_matrix(device)
 
         # No connection needed after this - direct UDP
@@ -192,7 +194,8 @@ class Animator:
 
         Example:
             ```python
-            async with await MatrixLight.from_ip("192.168.1.100") as device:
+            async with await Device.connect("192.168.1.100") as device:
+                assert isinstance(device, MatrixLight)
                 animator = await Animator.for_matrix(device)
 
             # Device connection closed, animator still works via UDP
@@ -252,7 +255,8 @@ class Animator:
 
         Example:
             ```python
-            async with await MultiZoneLight.from_ip("192.168.1.100") as device:
+            async with await Device.connect("192.168.1.100") as device:
+                assert isinstance(device, MultiZoneLight)
                 animator = await Animator.for_multizone(device)
 
             # Device connection closed, animator still works via UDP
@@ -313,7 +317,7 @@ class Animator:
 
         Example:
             ```python
-            async with await Light.from_ip("192.168.1.100") as device:
+            async with await Device.connect("192.168.1.100") as device:
                 animator = Animator.for_light(device)
 
             # Device connection closed, animator still works via UDP

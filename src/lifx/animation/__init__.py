@@ -16,7 +16,8 @@ Quick Start:
     ```python
     from lifx import Animator, MatrixLight
 
-    async with await MatrixLight.from_ip("192.168.1.100") as device:
+    async with await Device.connect("192.168.1.100") as device:
+        assert isinstance(device, MatrixLight)
         # Query device once for tile info
         animator = await Animator.for_matrix(device)
 

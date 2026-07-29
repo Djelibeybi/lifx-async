@@ -9,7 +9,7 @@ import pytest
 from lifx.color import HSBK, Colors
 from lifx.devices.base import FirmwareInfo
 from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
-from lifx.exceptions import LifxUnsupportedCommandError
+from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
 from lifx.products import (
     SKY_EFFECT_MIN_FIRMWARE_MAJOR,
     get_product,
@@ -745,6 +745,8 @@ class TestSkyEffectFirmwareGate:
     # Product 176 (Ceiling) has the matrix capability, product 27 (A19) does not.
     MATRIX_PRODUCT = 176
     NON_MATRIX_PRODUCT = 27
+    # Not in the registry: get_product() answers with a pid 0 stub.
+    UNKNOWN_PRODUCT = 99999
 
     @staticmethod
     def _matrix_light(
@@ -840,6 +842,54 @@ class TestSkyEffectFirmwareGate:
         )
 
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=2.0)
+
+        matrix.connection.send_packet.assert_awaited_once()
+
+    async def test_supports_sky_effect_without_capabilities_fails_closed(
+        self, mock_device_factory
+    ) -> None:
+        """Test that a device with no capabilities loaded is refused SKY."""
+        # connect(), discovery and __aenter__ all populate capabilities, so
+        # this only happens on a bare constructor call.
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+        matrix._capabilities = None
+
+        assert await matrix.supports_sky_effect() is False
+
+    async def test_supports_sky_effect_unknown_product_fails_closed(
+        self, mock_device_factory
+    ) -> None:
+        """Test that a product missing from the registry is refused SKY."""
+        # get_product() returns a capability-less stub with pid 0 for any
+        # product ID newer than the bundled registry snapshot.
+        matrix = self._matrix_light(
+            mock_device_factory, self.UNKNOWN_PRODUCT, major=4, minor=4
+        )
+        assert matrix.capabilities is not None
+        assert matrix.capabilities.pid == 0
+
+        assert await matrix.supports_sky_effect() is False
+
+        with pytest.raises(
+            LifxUnsupportedCommandError,
+            match=r"does not support the SKY effect: it is not a matrix device",
+        ):
+            await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
+
+        matrix.connection.send_packet.assert_not_called()
+
+    async def test_set_effect_sky_sends_when_support_probe_times_out(
+        self, mock_device_factory
+    ) -> None:
+        """Test that an unanswered support probe does not block the effect."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+        matrix.get_host_firmware = AsyncMock(side_effect=LifxTimeoutError("no reply"))
+
+        await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
 
         matrix.connection.send_packet.assert_awaited_once()
 

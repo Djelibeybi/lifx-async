@@ -27,6 +27,9 @@ def format_generated_files(*paths: Path) -> None:
 
     Args:
         paths: Files to format in place.
+
+    Raises:
+        RuntimeError: If ruff cannot format or lint the generated files.
     """
     print("Formatting generated code with ruff...")
     targets = [str(path) for path in paths]
@@ -38,10 +41,17 @@ def format_generated_files(*paths: Path) -> None:
             text=True,
         )
         if result.returncode != 0:
-            print(
-                f"Warning: ruff {command[0]} failed, generated code may not match"
-                f" the committed style:\n{result.stderr.strip()}",
-                file=sys.stderr,
+            # ruff writes diagnostics to stdout and internal errors to stderr,
+            # so both are needed to explain the failure. `ruff format` only
+            # fails on unparsable Python, which means the generator emitted
+            # broken code: never let that pass as a successful generation.
+            diagnostics = "\n".join(
+                stream.strip()
+                for stream in (result.stdout, result.stderr)
+                if stream.strip()
+            )
+            raise RuntimeError(
+                f"ruff {command[0]} failed on the generated files:\n{diagnostics}"
             )
 
 

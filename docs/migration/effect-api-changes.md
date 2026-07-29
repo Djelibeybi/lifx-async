@@ -116,9 +116,10 @@ await light.set_extended_color_zones(..., apply=MultiZoneApplicationRequest.APPL
 
 **Old Code:**
 ```python
-from lifx import MultiZoneLight, MultiZoneEffectType
+from lifx import Device, MultiZoneLight, MultiZoneEffectType
 
-async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
+    assert isinstance(light, MultiZoneLight)
     # Old API
     await light.set_multizone_effect(
         effect_type=MultiZoneEffectType.MOVE,
@@ -133,9 +134,10 @@ async with await MultiZoneLight.from_ip("192.168.1.100") as light:
 
 **New Code:**
 ```python
-from lifx import MultiZoneLight, FirmwareEffect, Direction
+from lifx import Device, Direction, FirmwareEffect, MultiZoneLight
 
-async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
+    assert isinstance(light, MultiZoneLight)
     # New unified API
     await light.set_effect(
         effect_type=FirmwareEffect.MOVE,
@@ -152,9 +154,10 @@ async with await MultiZoneLight.from_ip("192.168.1.100") as light:
 
 **Old Code:**
 ```python
-from lifx import MatrixLight, TileEffectType
+from lifx import Device, MatrixLight, TileEffectType
 
-async with await MatrixLight.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
+    assert isinstance(light, MatrixLight)
     # Old API
     await light.set_tile_effect(
         effect_type=TileEffectType.FLAME,
@@ -166,9 +169,10 @@ async with await MatrixLight.from_ip("192.168.1.100") as light:
 
 **New Code:**
 ```python
-from lifx import MatrixLight, FirmwareEffect
+from lifx import Device, FirmwareEffect, MatrixLight
 
-async with await MatrixLight.from_ip("192.168.1.100") as light:
+async with await Device.connect("192.168.1.100") as light:
+    assert isinstance(light, MatrixLight)
     # New unified API
     await light.set_effect(
         effect_type=FirmwareEffect.FLAME,

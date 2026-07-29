@@ -302,8 +302,9 @@ class TestDeviceGroupApplyThemeDispatch:
         """Subclasses must not be painted by both Light and their own override.
 
         MultiZoneLight, MatrixLight and CeilingLight are all Light subclasses,
-        so a per-class fan-out would race a single random colour against the
-        zone/tile gradient on the same device.
+        so the group.lights leg already dispatches to their own override. A
+        per-class fan-out on top of it would paint those devices twice, racing
+        two independently generated gradients on the same device.
         """
         devices = [
             Light(serial="d073d5000001", ip="127.0.0.1"),

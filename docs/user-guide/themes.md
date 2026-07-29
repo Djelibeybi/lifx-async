@@ -19,7 +19,13 @@ async def apply_evening_mode():
     await group.apply_theme(theme, power_on=True, duration=2.0)
 ```
 
-### Apply Different Themes to Different Device Types
+### One Theme, Per-Device-Type Rendering
+
+`group.lights` holds every colour-capable device, including strips and matrix
+devices, and `apply_theme()` dispatches polymorphically: single-zone lights get
+a random colour, multizone lights get distributed colours, and matrix and
+ceiling devices get a smooth interpolation. Painting `group.multizone_lights`
+or `group.matrix_lights` as well would paint those devices a second time.
 
 ```python
 from lifx import discover, DeviceGroup, ThemeLibrary
@@ -32,17 +38,9 @@ async def themed_lighting():
 
     theme = ThemeLibrary.get("christmas")
 
-    # Single-zone lights get a random color
+    # Each device renders the theme according to its own geometry
     for light in group.lights:
         await light.apply_theme(theme)
-
-    # Multi-zone lights get distributed colors
-    for strip in group.multizone_lights:
-        await strip.apply_theme(theme)
-
-    # Tile devices get smooth interpolation
-    for tile in group.tiles:
-        await tile.apply_theme(theme)
 ```
 
 ## Time-Based Lighting
@@ -130,14 +128,11 @@ async def decorate_house_for_christmas():
         if "bedroom" in light.label.lower():
             dim_theme = ThemeLibrary.get("peaceful")
             await light.apply_theme(dim_theme, power_on=True, duration=1.0)
-
-    # Strips and tiles throughout
-    for strip in group.multizone_lights:
-        await strip.apply_theme(theme, power_on=True, duration=1.5)
-
-    for tile in group.tiles:
-        await tile.apply_theme(theme, power_on=True, duration=1.5)
 ```
+
+Strips and matrix devices are already in `group.lights`, so they are painted by
+the loops above. Iterating `group.multizone_lights` or `group.matrix_lights` as
+well would paint them twice.
 
 ## Dynamic Theme Transitions
 
@@ -214,11 +209,8 @@ async def set_room_theme(room_name: str, theme_name: str):
     if room_name in groups:
         room_lights = groups["room_name"]
 
-    for light in room_lights.lights:
-        await light.apply_theme(theme, power_on=True)
-
-    for strip in room_lights.multizone_lights:
-        await strip.apply_theme(theme, power_on=True)
+    # room_lights.lights already includes the strips and matrix devices
+    await room_lights.apply_theme(theme, power_on=True)
 
 # Usage:
 # await set_room_theme("bedroom", "peaceful")
@@ -270,11 +262,8 @@ async def activate_scene(scene: str):
         room_lights = groups["room"]
         theme = ThemeLibrary.get(theme_name)
 
-        for light in room_lights.lights:
-            await light.apply_theme(theme, power_on=True, duration=1.5)
-
-        for strip in room_lights.multizone_lights:
-            await strip.apply_theme(theme, power_on=True, duration=1.5)
+        # Every colour-capable device in the room, painted exactly once
+        await room_lights.apply_theme(theme, power_on=True, duration=1.5)
 
 # Usage:
 # await activate_scene("movie_night")

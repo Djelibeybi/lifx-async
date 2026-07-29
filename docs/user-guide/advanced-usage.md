@@ -94,10 +94,10 @@ lifx-async automatically populates initial state values when a device is used as
 All device state properties return cached values or `None` if not yet fetched:
 
 ```python
-from lifx import Light
+from lifx import Device
 
 async def check_stored_state():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Property returns cached value or None
         label = light.label
         if label:
@@ -114,7 +114,7 @@ Use the `get_*()` methods to always fetch from the device:
 
 ```python
 async def always_fresh():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Always fetches from device
         # Note: get_color() returns a tuple of (color, power, label)
         color, power, label = await light.get_color()
@@ -132,7 +132,7 @@ Use cached values when available for semi-static data, always fetch volatile sta
 
 ```python
 async def use_cached_or_fetch():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Check if we have cached label (semi-static)
         label = light.label
         if label:
@@ -209,10 +209,10 @@ All cached properties return `None` if no data has been cached yet, or the cache
 Each device owns its own connection that opens lazily on first request:
 
 ```python
-from lifx import Light
+from lifx import Device
 
 async def main():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # Connection opens automatically on first request
         await light.set_power(True)
         # All subsequent operations reuse the same connection
@@ -236,10 +236,10 @@ Send multiple requests concurrently to one device:
 
 ```python
 import asyncio
-from lifx import Light
+from lifx import Device
 
 async def concurrent_operations():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         # These execute concurrently!
         # get_color() returns (color, power, label)
         (color, power, label), version = await asyncio.gather(
@@ -308,14 +308,14 @@ not for per-packet reliability.
 
 ```python
 import asyncio
-from lifx import Light, Colors, LifxTimeoutError, LifxConnectionError
+from lifx import Colors, Device, LifxTimeoutError, LifxConnectionError
 
 async def resilient_control():
     max_retries = 3
 
     for attempt in range(max_retries):
         try:
-            async with await Light.from_ip("192.168.1.100") as light:
+            async with await Device.connect("192.168.1.100") as light:
                 await light.set_color(Colors.BLUE)
                 print("Success!")
                 return
@@ -366,11 +366,11 @@ async def best_effort_control():
 Light capabilities are automatically populated:
 
 ```python
-from lifx import Colors, Light
+from lifx import Colors, Device
 from lifx.products.registry import ProductCapability
 
 async def check_capabilities():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
 
         print(f"Product: {light.model}")
         print(f"Capabilities: {light.capabilities}")
@@ -415,10 +415,10 @@ async def capability_aware_control():
 
 ```python
 import asyncio
-from lifx import Light, HSBK
+from lifx import HSBK, Device
 
 async def smooth_color_cycle():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         hues = [0, 60, 120, 180, 240, 300, 360]
 
         for hue in hues:
@@ -478,7 +478,7 @@ async def delayed_color_change(device, color, delay):
 ```python
 # ❌ Inefficient: Multiple round-trips
 async def inefficient():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         await light.set_power(True)
         await asyncio.sleep(0.1)
         await light.set_color(Colors.BLUE)
@@ -487,7 +487,7 @@ async def inefficient():
 
 # ✅ Efficient: Set color and brightness together
 async def efficient():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         await light.set_power(True)
         # Set color includes brightness
         color = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
@@ -525,13 +525,13 @@ async def parallel():
 # ❌ Creates new connection each time
 async def no_reuse():
     for _ in range(10):
-        async with await Light.from_ip("192.168.1.100") as light:
+        async with await Device.connect("192.168.1.100") as light:
             await light.set_brightness(0.5)
         # Connection closed here
 
 # ✅ Reuses connection
 async def with_reuse():
-    async with await Light.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
         for _ in range(10):
             await light.set_brightness(0.5)
         # Connection closed once at end
@@ -543,10 +543,11 @@ For sustained streaming (animations, music sync, real-time visualisations), use 
 
 ```python
 import asyncio
-from lifx import MultiZoneLight, HSBK
+from lifx import HSBK, Device, MultiZoneLight
 
 async def rainbow_sweep():
-    async with await MultiZoneLight.from_ip("192.168.1.100") as light:
+    async with await Device.connect("192.168.1.100") as light:
+        assert isinstance(light, MultiZoneLight)
         zone_count = await light.get_zone_count()
 
         # A short colour sweep at ~20 FPS

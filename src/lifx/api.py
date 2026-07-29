@@ -94,15 +94,20 @@ class DeviceGroup:
             devices: List of Device instances
         """
         self._devices = devices
+        # isinstance, not type(): CeilingLight subclasses MatrixLight, so an
+        # exact-type filter would silently drop every Ceiling product from
+        # matrix_lights. The same holds for any future device subclass.
         self._lights = [light for light in devices if isinstance(light, Light)]
-        self._hev_lights = [light for light in devices if type(light) is HevLight]
+        self._hev_lights = [light for light in devices if isinstance(light, HevLight)]
         self._infrared_lights = [
-            light for light in devices if type(light) is InfraredLight
+            light for light in devices if isinstance(light, InfraredLight)
         ]
         self._multizone_lights = [
-            light for light in devices if type(light) is MultiZoneLight
+            light for light in devices if isinstance(light, MultiZoneLight)
         ]
-        self._matrix_lights = [light for light in devices if type(light) is MatrixLight]
+        self._matrix_lights = [
+            light for light in devices if isinstance(light, MatrixLight)
+        ]
         self._locations_cache: dict[str, DeviceGroup] | None = None
         self._groups_cache: dict[str, DeviceGroup] | None = None
         self._location_metadata: dict[str, LocationGrouping] | None = None
@@ -705,9 +710,10 @@ class DeviceGroup:
             ```
         """
         # self.lights holds every Light subclass, including multizone, matrix
-        # and ceiling devices. Dispatch is polymorphic, so each device runs its
-        # own apply_theme() override: painting per-class as well would race a
-        # single random colour against the zone/tile gradient.
+        # and ceiling devices, and dispatch is polymorphic: each device already
+        # runs its own apply_theme() override from this one leg. Fanning out
+        # over multizone_lights/matrix_lights as well would paint those devices
+        # a second time, racing two independently generated gradients.
         await asyncio.gather(
             *(light.apply_theme(theme, power_on, duration) for light in self.lights)
         )

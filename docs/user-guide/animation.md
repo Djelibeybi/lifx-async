@@ -21,10 +21,11 @@ For simple, one-time color changes, use the device methods directly (`set_color(
 
 ```python
 import asyncio
-from lifx import Animator, MatrixLight
+from lifx import Animator, Device, MatrixLight
 
 async def main():
-    async with await MatrixLight.from_ip("192.168.1.100") as device:
+    async with await Device.connect("192.168.1.100") as device:
+        assert isinstance(device, MatrixLight)
         # Create animator (queries device for tile info)
         animator = await Animator.for_matrix(device)
 
@@ -53,10 +54,11 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from lifx import Animator, MultiZoneLight
+from lifx import Animator, Device, MultiZoneLight
 
 async def main():
-    async with await MultiZoneLight.from_ip("192.168.1.100") as device:
+    async with await Device.connect("192.168.1.100") as device:
+        assert isinstance(device, MultiZoneLight)
         # Create animator
         animator = await Animator.for_multizone(device)
 
@@ -93,7 +95,8 @@ as one continuous image, rather than each tile showing a mirrored copy.
 ### Example: 5 Horizontal Tiles
 
 ```python
-async with await MatrixLight.from_ip("192.168.1.100") as device:
+async with await Device.connect("192.168.1.100") as device:
+    assert isinstance(device, MatrixLight)
     animator = await Animator.for_matrix(device)
 
 # For 5 tiles arranged horizontally:
@@ -225,7 +228,8 @@ For matrix devices with the `has_chain` capability (like the original LIFX Tile)
 physically rotated. The animator automatically handles orientation correction:
 
 ```python
-async with await MatrixLight.from_ip("192.168.1.100") as device:
+async with await Device.connect("192.168.1.100") as device:
+    assert isinstance(device, MatrixLight)
     # Orientation is detected from device accelerometer data
     animator = await Animator.for_matrix(device)
 
@@ -248,7 +252,8 @@ animator.send_frame(logical_frame)
 ### The Animation Loop Pattern
 
 ```python
-async with await MatrixLight.from_ip("192.168.1.100") as device:
+async with await Device.connect("192.168.1.100") as device:
+    assert isinstance(device, MatrixLight)
     animator = await Animator.for_matrix(device)
 
 # Device connection closed here - animator works via direct UDP
@@ -351,7 +356,8 @@ pacing. Do **not** add:
 Your whole job is to produce frames and send them at your chosen FPS:
 
 ```python
-async with await MatrixLight.from_ip("192.168.1.100") as device:
+async with await Device.connect("192.168.1.100") as device:
+    assert isinstance(device, MatrixLight)
     animator = await Animator.for_matrix(device)
 
 target_fps = 20  # platform ceiling over WiFi; large matrix devices sustain less

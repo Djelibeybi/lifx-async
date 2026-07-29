@@ -112,7 +112,7 @@ If discovery doesn't find devices:
 1. Ensure LIFX devices are on the same network
 1. Check firewall settings allow UDP broadcasts
 1. Try increasing the timeout: `discover(timeout=10.0)`
-1. Use direct connection if you know the IP: `Light.from_ip("192.168.1.100")`
+1. Use direct connection if you know the IP: `Device.connect("192.168.1.100")`
 
 ### Permission Errors
 

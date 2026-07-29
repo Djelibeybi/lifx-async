@@ -21,6 +21,7 @@ import pytest
 
 from lifx.products.generator import (
     download_products,
+    format_generated_files,
     generate_product_definitions,
     generate_registry_file,
     main,
@@ -549,24 +550,26 @@ class TestMain:
         """Test successful main execution."""
         json.dumps(minimal_products_data)
 
-        # Mock the download and file system operations
-        with patch("lifx.products.generator.download_products") as mock_download:
-            with patch("lifx.products.generator.Path") as mock_path_class:
-                mock_download.return_value = minimal_products_data
+        # Mock the download and file system operations. `open` is mocked, so
+        # nothing lands on disk for ruff to format.
+        with patch("lifx.products.generator.format_generated_files"):
+            with patch("lifx.products.generator.download_products") as mock_download:
+                with patch("lifx.products.generator.Path") as mock_path_class:
+                    mock_download.return_value = minimal_products_data
 
-                # Mock file writing
-                mock_file = mock_open()
-                with patch("builtins.open", mock_file):
-                    # Create a mock path instance
-                    mock_path_instance = Mock()
-                    mock_path_instance.parent = tmp_path
-                    mock_path_class.return_value = mock_path_instance
+                    # Mock file writing
+                    mock_file = mock_open()
+                    with patch("builtins.open", mock_file):
+                        # Create a mock path instance
+                        mock_path_instance = Mock()
+                        mock_path_instance.parent = tmp_path
+                        mock_path_class.return_value = mock_path_instance
 
-                    # Should not raise
-                    main()
+                        # Should not raise
+                        main()
 
-                # Verify file was written
-                mock_file.assert_called()
+                    # Verify file was written
+                    mock_file.assert_called()
 
     def test_main_download_failure(self) -> None:
         """Test main handles download failures gracefully."""
@@ -582,25 +585,27 @@ class TestMain:
         self, capsys, tmp_path: Path, minimal_products_data: dict
     ) -> None:
         """Test that main prints progress messages."""
-        with patch("lifx.products.generator.download_products") as mock_download:
-            with patch("lifx.products.generator.Path") as mock_path_class:
-                mock_download.return_value = minimal_products_data
+        # `open` is mocked, so nothing lands on disk for ruff to format.
+        with patch("lifx.products.generator.format_generated_files"):
+            with patch("lifx.products.generator.download_products") as mock_download:
+                with patch("lifx.products.generator.Path") as mock_path_class:
+                    mock_download.return_value = minimal_products_data
 
-                mock_file = mock_open()
-                with patch("builtins.open", mock_file):
-                    mock_path_instance = Mock()
-                    mock_path_instance.parent = tmp_path
-                    mock_path_class.return_value = mock_path_instance
+                    mock_file = mock_open()
+                    with patch("builtins.open", mock_file):
+                        mock_path_instance = Mock()
+                        mock_path_instance.parent = tmp_path
+                        mock_path_class.return_value = mock_path_instance
 
-                    main()
+                        main()
 
-                captured = capsys.readouterr()
-                # Should have progress messages
-                assert (
-                    "Downloading" in captured.out
-                    or "Parsing" in captured.out
-                    or "Generated" in captured.out
-                )
+                    captured = capsys.readouterr()
+                    # Should have progress messages
+                    assert (
+                        "Downloading" in captured.out
+                        or "Parsing" in captured.out
+                        or "Generated" in captured.out
+                    )
 
 
 # ============================================================================
@@ -932,3 +937,24 @@ class TestConsistency:
 
         # Both should have same products
         assert code_dict.count("ProductInfo(") == code_array.count("ProductInfo(")
+
+
+class TestFormatGeneratedFiles:
+    """Tests for the ruff formatting step."""
+
+    def test_formats_generated_file_in_place(self, tmp_path: Path) -> None:
+        """Test that a valid but unformatted file is rewritten."""
+        target = tmp_path / "generated.py"
+        target.write_text("x = {'a':1}\n")
+
+        format_generated_files(target)
+
+        assert target.read_text() == 'x = {"a": 1}\n'
+
+    def test_raises_with_diagnostics_on_unparsable_output(self, tmp_path: Path) -> None:
+        """Test that unparsable generated code fails loudly, not silently."""
+        target = tmp_path / "broken.py"
+        target.write_text("def broken(:\n")
+
+        with pytest.raises(RuntimeError, match=r"ruff format failed"):
+            format_generated_files(target)

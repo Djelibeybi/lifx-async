@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxUnsupportedCommandError
+from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
 from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
 from lifx.products import supports_sky_effect as firmware_supports_sky_effect
 from lifx.protocol import packets
@@ -358,7 +358,8 @@ class MatrixLight(Light):
       3. copy_frame_buffer(): Copy buffer 1 → buffer 0
 
     Example:
-        >>> async with await MatrixLight.from_ip("192.168.1.100") as matrix:
+        >>> async with await Device.connect("192.168.1.100") as matrix:
+        ...     assert isinstance(matrix, MatrixLight)
         ...     # Get device chain info
         ...     chain = await matrix.get_device_chain()
         ...     print(f"Device has {len(chain)} tile(s)")
@@ -942,12 +943,48 @@ class MatrixLight(Light):
 
         return effect
 
+    async def _resolve_sky_support(self) -> tuple[bool, str | None]:
+        """Resolve SKY support and the reason when it is unsupported.
+
+        Returns:
+            Tuple of (supported, reason). `reason` is None when supported, and
+            otherwise describes why the device cannot run the effect.
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+        """
+        # connect(), discovery and __aenter__ all populate capabilities and
+        # host firmware, so any device that got here through a supported path
+        # has both. Anything built without them fails closed.
+        capabilities = self.capabilities
+        has_matrix = capabilities is not None and capabilities.has_matrix
+
+        if not has_matrix:
+            return False, "it is not a matrix device"
+
+        firmware = self._host_firmware or await self.get_host_firmware()
+
+        if firmware_supports_sky_effect(has_matrix, firmware.version_major):
+            return True, None
+
+        return False, (
+            f"it is running firmware "
+            f"{firmware.version_major}.{firmware.version_minor} and the "
+            f"SKY effect needs firmware "
+            f"{SKY_EFFECT_MIN_FIRMWARE_MAJOR}.0 or later"
+        )
+
     async def supports_sky_effect(self) -> bool:
         """Check whether this device can run the SKY firmware effect.
 
-        SKY requires both the matrix capability and host firmware 4.x or
-        later: matrix devices on earlier firmware reject or ignore it.
-        Confirmed on Ceiling, Luna, Tube and the E26 Candle.
+        SKY requires both the matrix capability and a host firmware major
+        version of at least `SKY_EFFECT_MIN_FIRMWARE_MAJOR`: matrix devices on
+        earlier firmware reject or ignore it. See `lifx.products.quirks` for
+        the products this has been confirmed on.
+
+        Products missing from the bundled registry snapshot have no known
+        capabilities, so they are reported as unsupported.
 
         Returns:
             True if the device has matrix capability and its host firmware
@@ -963,13 +1000,8 @@ class MatrixLight(Light):
                 await matrix.set_effect(FirmwareEffect.SKY)
             ```
         """
-        if self.capabilities is None:
-            await self._ensure_capabilities()
-
-        has_matrix = self.capabilities is not None and self.capabilities.has_matrix
-        firmware = await self.get_host_firmware()
-
-        return firmware_supports_sky_effect(has_matrix, firmware.version_major)
+        supported, _ = await self._resolve_sky_support()
+        return supported
 
     async def set_effect(
         self,
@@ -993,8 +1025,9 @@ class MatrixLight(Light):
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
 
         Raises:
-            LifxUnsupportedCommandError: If SKY is requested on a device whose
-                host firmware predates 4.x
+            LifxUnsupportedCommandError: If SKY is requested on a device that
+                is known not to support it, either because it lacks the matrix
+                capability or because its host firmware is too old
 
         Example:
             >>> # Set MORPH effect with rainbow palette
@@ -1016,21 +1049,23 @@ class MatrixLight(Light):
             ...     speed=3.0,
             ... )
         """
-        if effect_type == FirmwareEffect.SKY and not await self.supports_sky_effect():
-            if self.capabilities is None or not self.capabilities.has_matrix:
-                reason = "it is not a matrix device"
-            else:
-                firmware = await self.get_host_firmware()
-                reason = (
-                    f"it is running firmware "
-                    f"{firmware.version_major}.{firmware.version_minor} and the "
-                    f"SKY effect needs firmware "
-                    f"{SKY_EFFECT_MIN_FIRMWARE_MAJOR}.0 or later"
+        if effect_type == FirmwareEffect.SKY:
+            try:
+                supported, reason = await self._resolve_sky_support()
+            except LifxTimeoutError:
+                # The support probe is best-effort. A device that fails to
+                # answer is not evidence of missing support, and refusing here
+                # would turn a fire-and-forget send into a hard failure.
+                _LOGGER.debug(
+                    "SKY support probe timed out for %s, sending the effect anyway",
+                    self.label or self.serial,
                 )
-
-            raise LifxUnsupportedCommandError(
-                f"{self.label or self.serial} does not support the SKY effect: {reason}"
-            )
+            else:
+                if not supported:
+                    raise LifxUnsupportedCommandError(
+                        f"{self.label or self.serial} does not support the SKY"
+                        f" effect: {reason}"
+                    )
 
         _LOGGER.debug(
             "Setting matrix effect %s (speed=%d) for %s",
