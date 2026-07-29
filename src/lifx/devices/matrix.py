@@ -21,6 +21,9 @@ from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.devices.light import Light, LightState
+from lifx.exceptions import LifxUnsupportedCommandError
+from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
+from lifx.products import supports_sky_effect as firmware_supports_sky_effect
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     FirmwareEffect,
@@ -939,6 +942,35 @@ class MatrixLight(Light):
 
         return effect
 
+    async def supports_sky_effect(self) -> bool:
+        """Check whether this device can run the SKY firmware effect.
+
+        SKY requires both the matrix capability and host firmware 4.x or
+        later: matrix devices on earlier firmware reject or ignore it.
+        Confirmed on Ceiling, Luna, Tube and the E26 Candle.
+
+        Returns:
+            True if the device has matrix capability and its host firmware
+            supports the SKY effect
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+
+        Example:
+            ```python
+            if await matrix.supports_sky_effect():
+                await matrix.set_effect(FirmwareEffect.SKY)
+            ```
+        """
+        if self.capabilities is None:
+            await self._ensure_capabilities()
+
+        has_matrix = self.capabilities is not None and self.capabilities.has_matrix
+        firmware = await self.get_host_firmware()
+
+        return firmware_supports_sky_effect(has_matrix, firmware.version_major)
+
     async def set_effect(
         self,
         effect_type: FirmwareEffect,
@@ -960,6 +992,10 @@ class MatrixLight(Light):
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
 
+        Raises:
+            LifxUnsupportedCommandError: If SKY is requested on a device whose
+                host firmware predates 4.x
+
         Example:
             >>> # Set MORPH effect with rainbow palette
             >>> rainbow = [
@@ -980,6 +1016,22 @@ class MatrixLight(Light):
             ...     speed=3.0,
             ... )
         """
+        if effect_type == FirmwareEffect.SKY and not await self.supports_sky_effect():
+            if self.capabilities is None or not self.capabilities.has_matrix:
+                reason = "it is not a matrix device"
+            else:
+                firmware = await self.get_host_firmware()
+                reason = (
+                    f"it is running firmware "
+                    f"{firmware.version_major}.{firmware.version_minor} and the "
+                    f"SKY effect needs firmware "
+                    f"{SKY_EFFECT_MIN_FIRMWARE_MAJOR}.0 or later"
+                )
+
+            raise LifxUnsupportedCommandError(
+                f"{self.label or self.serial} does not support the SKY effect: {reason}"
+            )
+
         _LOGGER.debug(
             "Setting matrix effect %s (speed=%d) for %s",
             effect_type,

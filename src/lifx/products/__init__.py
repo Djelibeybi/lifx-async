@@ -10,9 +10,11 @@ To update: run `uv run python -m lifx.products.generator`
 """
 
 from lifx.products.quirks import (
+    SKY_EFFECT_MIN_FIRMWARE_MAJOR,
     CeilingComponentLayout,
     get_ceiling_layout,
     is_ceiling_product,
+    supports_sky_effect,
 )
 from lifx.products.registry import (
     ProductCapability,
@@ -24,6 +26,7 @@ from lifx.products.registry import (
 )
 
 __all__ = [
+    "SKY_EFFECT_MIN_FIRMWARE_MAJOR",
     "CeilingComponentLayout",
     "ProductCapability",
     "ProductInfo",
@@ -33,4 +36,5 @@ __all__ = [
     "get_product",
     "get_registry",
     "is_ceiling_product",
+    "supports_sky_effect",
 ]
