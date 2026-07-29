@@ -235,6 +235,31 @@ uv run python examples/effects_sunrise_sunset.py --show-hsbk 192.168.1.100
 | `--show-hsbk` | no | Print brightness and kelvin values every 2 seconds while animating |
 | positional args | no | IP addresses and/or serial numbers of target devices |
 
+## Themes
+
+### theme_paint
+
+Paints a theme (colour palette) onto bulbs, multizone strips and matrix devices in one call. Each
+device uses its own geometry: bulbs get one random palette colour, strips get the palette blended
+across their zones, and matrix/ceiling devices get the palette interpolated across their pixel
+grid. Supports the 57 built-in themes or a custom palette of hex RGB colours.
+
+```bash
+uv run python examples/theme_paint.py --list
+uv run python examples/theme_paint.py --theme exciting
+uv run python examples/theme_paint.py --theme fire 192.168.1.100 d073d5123456
+uv run python examples/theme_paint.py --colors ff0000,00ff00,0000ff --duration 2.0
+```
+
+| Parameter | Short | Required | Default | Description |
+|-----------|-------|----------|---------|-------------|
+| `--theme` | `-t` | no | `evening` | Name of a built-in theme |
+| `--colors` | `-c` | no | | Custom palette as comma-separated hex RGB (mutually exclusive with `--theme`) |
+| `--duration` | `-d` | no | `1.0` | Transition duration in seconds |
+| `--no-power-on` | | no | | Leave powered-off devices off instead of turning them on |
+| `--list` | `-l` | no | | List the built-in themes and exit |
+| positional args | | no | | IP addresses and/or serial numbers of target devices |
+
 ## Matrix Devices
 
 ### matrix_basic
