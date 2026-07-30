@@ -18,7 +18,12 @@ class TestCeilingLightStateDataclass:
     def test_from_matrix_state_creates_ceiling_state(self) -> None:
         """Test from_matrix_state creates CeilingLightState from MatrixLightState."""
         # Create a minimal MatrixLightState for testing
-        from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
+        from lifx.devices.base import (
+            CollectionInfo,
+            DeviceCapabilities,
+            FirmwareInfo,
+            WifiInfo,
+        )
 
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
@@ -39,6 +44,10 @@ class TestCeilingLightStateDataclass:
             ),
             host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
             wifi_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            wifi_info=WifiInfo(
+                signal=7.943283890199382e-06,
+                host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            ),
             location=CollectionInfo(
                 uuid="00000000-0000-0000-0000-000000000000",
                 label="Home",
@@ -94,7 +103,12 @@ class TestCeilingLightStateDataclass:
 
     def test_uplight_is_on_false_when_brightness_zero(self) -> None:
         """Test uplight_is_on is False when uplight brightness is 0."""
-        from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
+        from lifx.devices.base import (
+            CollectionInfo,
+            DeviceCapabilities,
+            FirmwareInfo,
+            WifiInfo,
+        )
 
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
@@ -115,6 +129,10 @@ class TestCeilingLightStateDataclass:
             ),
             host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
             wifi_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            wifi_info=WifiInfo(
+                signal=7.943283890199382e-06,
+                host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            ),
             location=CollectionInfo(
                 uuid="00000000-0000-0000-0000-000000000000", label="", updated_at=0
             ),
@@ -147,7 +165,12 @@ class TestCeilingLightStateDataclass:
 
     def test_downlight_is_on_false_when_all_zero_brightness(self) -> None:
         """Test downlight_is_on is False when all zones have zero brightness."""
-        from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
+        from lifx.devices.base import (
+            CollectionInfo,
+            DeviceCapabilities,
+            FirmwareInfo,
+            WifiInfo,
+        )
 
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
@@ -168,6 +191,10 @@ class TestCeilingLightStateDataclass:
             ),
             host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
             wifi_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            wifi_info=WifiInfo(
+                signal=7.943283890199382e-06,
+                host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            ),
             location=CollectionInfo(
                 uuid="00000000-0000-0000-0000-000000000000", label="", updated_at=0
             ),
@@ -202,7 +229,12 @@ class TestCeilingLightStateDataclass:
 
     def test_as_dict_returns_dictionary(self) -> None:
         """Test as_dict property returns a dictionary representation."""
-        from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
+        from lifx.devices.base import (
+            CollectionInfo,
+            DeviceCapabilities,
+            FirmwareInfo,
+            WifiInfo,
+        )
 
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
@@ -223,6 +255,10 @@ class TestCeilingLightStateDataclass:
             ),
             host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
             wifi_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            wifi_info=WifiInfo(
+                signal=7.943283890199382e-06,
+                host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+            ),
             location=CollectionInfo(
                 uuid="00000000-0000-0000-0000-000000000000", label="", updated_at=0
             ),

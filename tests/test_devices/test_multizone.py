@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lifx.color import HSBK
+from lifx.devices.base import WifiInfo
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
 from lifx.exceptions import LifxTimeoutError
 from lifx.protocol import packets
@@ -690,6 +691,7 @@ class TestMultiZoneStateUpdates:
             capabilities=mock_product_info(has_extended_multizone=False),
             host_firmware=None,
             wifi_firmware=None,
+            wifi_info=WifiInfo(signal=None),
             location=None,
             group=None,
             color=HSBK(hue=0, saturation=0, brightness=0, kelvin=3500),
@@ -740,6 +742,7 @@ class TestMultiZoneStateUpdates:
             capabilities=mock_product_info(has_extended_multizone=True),
             host_firmware=None,
             wifi_firmware=None,
+            wifi_info=WifiInfo(signal=None),
             location=None,
             group=None,
             color=HSBK(hue=0, saturation=0, brightness=0, kelvin=3500),
