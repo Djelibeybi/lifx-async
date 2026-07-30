@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from dataclasses import fields
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -281,6 +282,44 @@ class TestDevice:
         wifi_info = WifiInfo(signal=7.943283890199382e-06)
 
         assert wifi_info.rssi_unit is None
+
+    def test_wifi_info_without_signal_has_no_rssi(self) -> None:
+        """An unfetched signal yields no RSSI but still classifies the unit."""
+        wifi_info = WifiInfo(
+            signal=None,
+            host_firmware=FirmwareInfo(
+                build=1234567890, version_major=3, version_minor=90
+            ),
+        )
+
+        assert wifi_info.signal is None
+        assert wifi_info.rssi is None
+        assert wifi_info.rssi_unit == "dBm"
+
+    def test_wifi_info_does_not_retain_host_firmware(self) -> None:
+        """host_firmware is init-only: DeviceState owns the firmware version."""
+        wifi_info = WifiInfo(
+            signal=None,
+            host_firmware=FirmwareInfo(
+                build=1234567890, version_major=3, version_minor=90
+            ),
+        )
+
+        assert "host_firmware" not in vars(wifi_info)
+        assert "host_firmware" not in {f.name for f in fields(wifi_info)}
+
+    def test_wifi_info_as_dict(self) -> None:
+        """as_dict exposes signal, RSSI and unit only."""
+        wifi_info = WifiInfo(
+            signal=7.943283890199382e-06,
+            host_firmware=FirmwareInfo(build=1, version_major=2, version_minor=77),
+        )
+
+        assert wifi_info.as_dict == {
+            "signal": 7.943283890199382e-06,
+            "rssi": -51,
+            "rssi_unit": "dB",
+        }
 
     async def test_get_host_firmware(self, device: Device) -> None:
         """Test getting host firmware info."""

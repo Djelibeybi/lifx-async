@@ -7,9 +7,9 @@ import ipaddress
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from math import floor, log10
-from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -78,15 +78,17 @@ class WifiInfo:
     """Device WiFi module information.
 
     Attributes:
-        signal: WiFi signal strength
-        host_firmware: Firmware used to determine whether RSSI is dB or dBm
-        rssi: WiFi RSSI
+        signal: WiFi signal strength, or None when the signal was not fetched
+        host_firmware: Init-only firmware version used to determine whether
+            RSSI is reported in dB or dBm. It is not retained on the instance:
+            :class:`DeviceState` already carries the host firmware.
+        rssi: WiFi RSSI derived from signal, or None when signal is None
         rssi_unit: Unit reported by the firmware (``dB`` or ``dBm``)
     """
 
-    signal: float
-    host_firmware: FirmwareInfo | None = None
-    rssi: int = field(init=False)
+    signal: float | None
+    host_firmware: InitVar[FirmwareInfo | None] = None
+    rssi: int | None = field(init=False)
     rssi_unit: Literal["dB", "dBm"] | None = field(init=False)
 
     #: Firmware through 2.77 reports signal strength in dB. Later firmware
@@ -94,23 +96,35 @@ class WifiInfo:
     #: the converted RSSI instead of requiring every consumer to reimplement it.
     _RSSI_DB_FW_BOUNDARY: ClassVar[tuple[int, int]] = (2, 77)
 
-    def __post_init__(self) -> None:
-        """Calculate RSSI from signal."""
-        if self.signal > 0:
+    def __post_init__(self, host_firmware: FirmwareInfo | None) -> None:
+        """Calculate RSSI from signal and classify the RSSI unit."""
+        if self.signal is None:
+            # Signal was never fetched, so there is no RSSI to derive.
+            self.rssi = None
+        elif self.signal > 0:
             self.rssi = int(floor(10 * log10(self.signal) + 0.5))
         else:
             # Minimum RSSI value if signal is ever less than or equal to zero
             self.rssi = -100
 
-        if self.host_firmware is None:
+        if host_firmware is None:
             self.rssi_unit = None
         elif (
-            self.host_firmware.version_major,
-            self.host_firmware.version_minor,
+            host_firmware.version_major,
+            host_firmware.version_minor,
         ) <= self._RSSI_DB_FW_BOUNDARY:
             self.rssi_unit = "dB"
         else:
             self.rssi_unit = "dBm"
+
+    @property
+    def as_dict(self) -> dict[str, float | int | str | None]:
+        """Return WifiInfo as a dict."""
+        return {
+            "signal": self.signal,
+            "rssi": self.rssi,
+            "rssi_unit": self.rssi_unit,
+        }
 
 
 @dataclass
@@ -221,6 +235,9 @@ class DeviceState:
         power: Power level (0 = off, 65535 = on)
         host_firmware: Host firmware version
         wifi_firmware: WiFi firmware version
+        wifi_info: WiFi signal and RSSI. Signal and RSSI are None unless the
+            device was created with ``fetch_wifi_info=True``; ``rssi_unit`` is
+            always populated from the host firmware version.
         location: Location tuple (UUID bytes, label, updated_at)
         group: Group tuple (UUID bytes, label, updated_at)
         last_updated: Timestamp of last state refresh
@@ -234,14 +251,13 @@ class DeviceState:
     power: int
     host_firmware: FirmwareInfo
     wifi_firmware: FirmwareInfo
+    wifi_info: WifiInfo
     location: CollectionInfo
     group: CollectionInfo
     last_updated: float
 
     @property
-    def as_dict(
-        self,
-    ) -> dict[str, str | int | float | dict[str, bool | int] | dict[str, str | int]]:
+    def as_dict(self) -> dict[str, Any]:
         """Return DeviceState as a dictionary."""
         return {
             "model": self.model,
@@ -252,6 +268,7 @@ class DeviceState:
             "power": self.power,
             "host_firmware": self.host_firmware.as_dict,
             "wifi_firmware": self.wifi_firmware.as_dict,
+            "wifi_info": self.wifi_info.as_dict,
             "location": self.location.as_dict,
             "group": self.group.as_dict,
             "last_updated": self.last_updated,
@@ -352,6 +369,7 @@ class Device(Generic[StateT]):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        fetch_wifi_info: bool = False,
     ) -> None:
         """Initialize device.
 
@@ -361,6 +379,10 @@ class Device(Generic[StateT]):
             port: Device UDP port
             timeout: Overall timeout for network requests in seconds
             max_retries: Maximum number of retry attempts for network requests
+            fetch_wifi_info: Query the device for WiFi signal strength when state
+                is initialized. When False (the default), ``state.wifi_info`` has
+                None for signal and rssi, but rssi_unit is still populated from
+                the host firmware version.
 
         Raises:
             ValueError: If any parameter is invalid
@@ -447,6 +469,7 @@ class Device(Generic[StateT]):
         self.port = port
         self._timeout = timeout
         self._max_retries = max_retries
+        self._fetch_wifi_info = fetch_wifi_info
 
         # Create lightweight connection handle - connection pooling is internal
         self.connection = DeviceConnection(
@@ -500,6 +523,7 @@ class Device(Generic[StateT]):
         serial: str | None = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        fetch_wifi_info: bool = False,
     ) -> Self:
         """Create and return an instance for the given IP address.
 
@@ -512,6 +536,7 @@ class Device(Generic[StateT]):
             serial: Serial number as 12-digit hex string
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retry attempts
+            fetch_wifi_info: Query WiFi signal strength during state initialization
 
         Returns:
             Device instance ready to use with async context manager
@@ -542,6 +567,7 @@ class Device(Generic[StateT]):
                             port=port,
                             timeout=timeout,
                             max_retries=max_retries,
+                            fetch_wifi_info=fetch_wifi_info,
                         )
             finally:
                 # Always close the temporary connection to prevent resource leaks
@@ -553,6 +579,7 @@ class Device(Generic[StateT]):
                 port=port,
                 timeout=timeout,
                 max_retries=max_retries,
+                fetch_wifi_info=fetch_wifi_info,
             )
 
         raise LifxDeviceNotFoundError()
@@ -565,6 +592,7 @@ class Device(Generic[StateT]):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        fetch_wifi_info: bool = False,
     ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
         """Create a device instance with the correct type for the given IP.
 
@@ -582,6 +610,7 @@ class Device(Generic[StateT]):
             port: Port number (default LIFX_UDP_PORT)
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retry attempts
+            fetch_wifi_info: Query WiFi signal strength during state initialization
 
         Returns:
             Device instance of the correct subclass, ready to use with
@@ -667,6 +696,7 @@ class Device(Generic[StateT]):
                 port=port,
                 timeout=timeout,
                 max_retries=max_retries,
+                fetch_wifi_info=fetch_wifi_info,
             )
 
             # Type system note: device._state is guaranteed non-None after
@@ -1729,6 +1759,23 @@ class Device(Generic[StateT]):
             ),
         )
 
+    async def _resolve_wifi_info(self, host_firmware: FirmwareInfo) -> WifiInfo:
+        """Return WiFi info for state initialization.
+
+        Queries the device only when the instance was created with
+        ``fetch_wifi_info=True``. Otherwise returns a WifiInfo with no signal
+        or RSSI, but with the RSSI unit resolved from the host firmware.
+
+        Args:
+            host_firmware: Host firmware fetched during state initialization
+
+        Returns:
+            WifiInfo for the device state
+        """
+        if self._fetch_wifi_info:
+            return await self.get_wifi_info()
+        return WifiInfo(signal=None, host_firmware=host_firmware)
+
     async def _initialize_state(self) -> StateT:
         """Initialize device state transactionally.
 
@@ -1796,6 +1843,10 @@ class Device(Generic[StateT]):
         # Get MAC address (already calculated in get_host_firmware)
         mac_address = await self.get_mac_address()
 
+        # Query WiFi signal only when enabled; firmware is cached by now so
+        # get_wifi_info() costs a single request.
+        wifi_info = await self._resolve_wifi_info(host_firmware)
+
         # Get model name
         assert self._capabilities is not None
         model = self._capabilities.name
@@ -1814,6 +1865,7 @@ class Device(Generic[StateT]):
                 power=power,
                 host_firmware=host_firmware,
                 wifi_firmware=wifi_firmware,
+                wifi_info=wifi_info,
                 location=location_info,
                 group=group_info,
                 last_updated=time.time(),

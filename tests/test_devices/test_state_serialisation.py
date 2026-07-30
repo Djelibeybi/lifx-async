@@ -12,7 +12,12 @@ from typing import Any
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
+from lifx.devices.base import (
+    CollectionInfo,
+    DeviceCapabilities,
+    FirmwareInfo,
+    WifiInfo,
+)
 from lifx.devices.ceiling import CeilingLightState
 from lifx.devices.hev import HevLightState
 from lifx.devices.infrared import InfraredLightState
@@ -47,6 +52,10 @@ def _base_fields() -> dict[str, Any]:
         ),
         "host_firmware": FirmwareInfo(build=1, version_minor=0, version_major=3),
         "wifi_firmware": FirmwareInfo(build=1, version_minor=0, version_major=3),
+        "wifi_info": WifiInfo(
+            signal=7.943283890199382e-06,
+            host_firmware=FirmwareInfo(build=1, version_minor=0, version_major=3),
+        ),
         "location": CollectionInfo(uuid="u", label="", updated_at=0),
         "group": CollectionInfo(uuid="u", label="", updated_at=0),
         "color": COLOR,

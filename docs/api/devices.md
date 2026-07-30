@@ -45,6 +45,17 @@ Device runtime information returned by `Device.get_info()`.
 WiFi module information returned by `Device.get_wifi_info()`, including the
 firmware-aware `rssi_unit` (`dB` through firmware 2.77, otherwise `dBm`).
 
+Also available as `device.state.wifi_info`. State initialisation does not query
+the device for WiFi signal strength unless the device was created with
+`fetch_wifi_info=True`, so `signal` and `rssi` are `None` by default while
+`rssi_unit` is always populated from the host firmware version:
+
+```python
+device = await Device.connect(ip="192.168.1.100", fetch_wifi_info=True)
+async with device:
+    print(f"{device.state.wifi_info.rssi} {device.state.wifi_info.rssi_unit}")
+```
+
 ::: lifx.devices.base.WifiInfo
     options:
       show_root_heading: true
