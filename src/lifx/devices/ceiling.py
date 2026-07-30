@@ -168,6 +168,7 @@ class CeilingLightState(MatrixLightState):
             capabilities=matrix_state.capabilities,
             host_firmware=matrix_state.host_firmware,
             wifi_firmware=matrix_state.wifi_firmware,
+            wifi_info=matrix_state.wifi_info,
             location=matrix_state.location,
             group=matrix_state.group,
             color=matrix_state.color,
@@ -229,6 +230,7 @@ class CeilingLight(MatrixLight):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        fetch_wifi_info: bool = False,
         state_file: str | None = None,
     ):
         """Initialize CeilingLight.
@@ -239,12 +241,13 @@ class CeilingLight(MatrixLight):
             port: Device UDP port (default: 56700)
             timeout: Overall timeout for network requests in seconds
             max_retries: Maximum number of retry attempts for network requests
+            fetch_wifi_info: Query WiFi signal strength during state initialization
             state_file: Optional path to JSON file for state persistence
 
         Raises:
             LifxError: If device is not a supported Ceiling product
         """
-        super().__init__(serial, ip, port, timeout, max_retries)
+        super().__init__(serial, ip, port, timeout, max_retries, fetch_wifi_info)
         self._state_file = state_file
 
     async def __aenter__(self) -> CeilingLight:
@@ -370,6 +373,7 @@ class CeilingLight(MatrixLight):
         serial: str | None = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        fetch_wifi_info: bool = False,
         *,
         state_file: str | None = None,
     ) -> CeilingLight:
@@ -381,6 +385,7 @@ class CeilingLight(MatrixLight):
             serial: Serial number as 12-digit hex string
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retries for requests
+            fetch_wifi_info: Query WiFi signal strength during state initialization
             state_file: Optional path to JSON file for state persistence
 
         Returns:
@@ -393,7 +398,9 @@ class CeilingLight(MatrixLight):
         """
         # Parent factory constructs via cls(...), so this is already a fully
         # configured CeilingLight — only state_file needs setting
-        device = await super().from_ip(ip, port, serial, timeout, max_retries)
+        device = await super().from_ip(
+            ip, port, serial, timeout, max_retries, fetch_wifi_info
+        )
         device._state_file = state_file
         return device
 

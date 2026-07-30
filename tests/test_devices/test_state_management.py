@@ -16,11 +16,45 @@ from lifx.devices.base import (
     DeviceState,
     DeviceVersion,
     FirmwareInfo,
+    WifiInfo,
 )
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import LifxUnsupportedDeviceError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
+
+
+def _state_request_handler(signal: float = 7.943283890199382e-06):
+    """Return a request side effect covering every _initialize_state() query."""
+
+    async def mock_request(packet):
+        if isinstance(packet, packets.Light.GetColor):
+            state = MagicMock()
+            state.color = LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500)
+            state.power = 65535
+            state.label = "Test"
+            return state
+        if isinstance(packet, packets.Device.GetHostFirmware):
+            return packets.Device.StateHostFirmware(
+                build=0, version_major=2, version_minor=80
+            )
+        if isinstance(packet, packets.Device.GetWifiFirmware):
+            return packets.Device.StateWifiFirmware(
+                build=0, version_major=2, version_minor=80
+            )
+        if isinstance(packet, packets.Device.GetWifiInfo):
+            return packets.Device.StateWifiInfo(signal=signal)
+        if isinstance(packet, packets.Device.GetLocation):
+            return packets.Device.StateLocation(
+                location=b"\x00" * 16, label=b"Location", updated_at=0
+            )
+        if isinstance(packet, packets.Device.GetGroup):
+            return packets.Device.StateGroup(
+                group=b"\x00" * 16, label=b"Group", updated_at=0
+            )
+        raise AssertionError(f"Unexpected packet: {packet!r}")
+
+    return mock_request
 
 
 class TestDeviceConnectFactory:
@@ -351,6 +385,43 @@ class TestStateInitialization:
 
         assert light._state is not None
         assert before <= light._state.last_updated <= after
+
+    @pytest.mark.asyncio
+    async def test_initialize_state_skips_wifi_info_by_default(
+        self, light, mock_product_info
+    ):
+        """Signal and RSSI stay None, but the RSSI unit follows the firmware."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state is not None
+        assert light._state.wifi_info.signal is None
+        assert light._state.wifi_info.rssi is None
+        assert light._state.wifi_info.rssi_unit == "dBm"
+        assert not any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_initialize_state_fetches_wifi_info_when_enabled(
+        self, mock_device_factory, mock_product_info
+    ):
+        """fetch_wifi_info=True populates signal and RSSI from the device."""
+        light = mock_device_factory(Light, fetch_wifi_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler(
+            signal=7.943283890199382e-06
+        )
+
+        await light._initialize_state()
+
+        assert light._state is not None
+        assert light._state.wifi_info.signal == pytest.approx(7.943283890199382e-06)
+        assert light._state.wifi_info.rssi == -51
+        assert light._state.wifi_info.rssi_unit == "dBm"
 
 
 class TestRefreshState:
@@ -1090,6 +1161,10 @@ class TestStateDataclasses:
             power=0,
             host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
             wifi_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            wifi_info=WifiInfo(
+                signal=None,
+                host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            ),
             location=CollectionInfo("0000000000000000", "Location", 0),
             group=CollectionInfo("0000000000000000", "Group", 0),
             last_updated=time.time(),
@@ -1121,6 +1196,10 @@ class TestStateDataclasses:
             power=0,
             host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
             wifi_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            wifi_info=WifiInfo(
+                signal=None,
+                host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            ),
             location=CollectionInfo("0000000000000000", "Location", 0),
             group=CollectionInfo("0000000000000000", "Group", 0),
             last_updated=time.time() - 5.0,
@@ -1151,6 +1230,10 @@ class TestStateDataclasses:
             power=0,
             host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
             wifi_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            wifi_info=WifiInfo(
+                signal=None,
+                host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            ),
             location=CollectionInfo("0000000000000000", "Location", 0),
             group=CollectionInfo("0000000000000000", "Group", 0),
             last_updated=time.time(),

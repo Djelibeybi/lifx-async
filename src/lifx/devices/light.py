@@ -1021,6 +1021,10 @@ class Light(Device[LightState]):
             # Get MAC address (already calculated in get_host_firmware)
             mac_address = await self.get_mac_address()
 
+            # Query WiFi signal only when enabled; firmware is cached by now so
+            # get_wifi_info() costs a single request.
+            wifi_info = await self._resolve_wifi_info(host_firmware)
+
             # Get model name
             assert self._capabilities is not None
             model = self._capabilities.name
@@ -1035,6 +1039,7 @@ class Light(Device[LightState]):
                 power=power,
                 host_firmware=host_firmware,
                 wifi_firmware=wifi_firmware,
+                wifi_info=wifi_info,
                 location=location_info,
                 group=group_info,
                 color=color,

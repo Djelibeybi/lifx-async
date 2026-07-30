@@ -31,8 +31,11 @@ def mock_device_factory():
         serial: str = "d073d5010203",
         ip: str = "192.168.1.100",
         port: int = 56700,
+        fetch_wifi_info: bool = False,
     ) -> Device:
-        device = device_class(serial=serial, ip=ip, port=port)
+        device = device_class(
+            serial=serial, ip=ip, port=port, fetch_wifi_info=fetch_wifi_info
+        )
         # Replace device's connection with mock
         mock_conn = MagicMock()
         mock_conn.request = AsyncMock()

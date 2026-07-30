@@ -328,6 +328,7 @@ class MatrixLightState(LightState):
             capabilities=light_state.capabilities,
             host_firmware=light_state.host_firmware,
             wifi_firmware=light_state.wifi_firmware,
+            wifi_info=light_state.wifi_info,
             location=light_state.location,
             group=light_state.group,
             color=light_state.color,
