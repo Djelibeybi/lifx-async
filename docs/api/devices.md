@@ -56,6 +56,15 @@ async with device:
     print(f"{device.state.wifi_info.rssi} {device.state.wifi_info.rssi_unit}")
 ```
 
+`refresh_state()` accepts the same flag to override the instance setting for a
+single refresh, so an existing device can pick up a signal reading on demand:
+
+```python
+async with await Device.connect(ip="192.168.1.100") as device:
+    await device.refresh_state(fetch_wifi_info=True)
+    print(device.state.wifi_info.rssi)
+```
+
 ::: lifx.devices.base.WifiInfo
     options:
       show_root_heading: true
