@@ -34,6 +34,10 @@ def _state_request_handler(signal: float = 7.943283890199382e-06):
             state.power = 65535
             state.label = "Test"
             return state
+        if isinstance(packet, packets.Device.GetLabel):
+            return packets.Device.StateLabel(label=b"Test")
+        if isinstance(packet, packets.Device.GetPower):
+            return packets.Device.StatePower(level=65535)
         if isinstance(packet, packets.Device.GetHostFirmware):
             return packets.Device.StateHostFirmware(
                 build=0, version_major=2, version_minor=80
@@ -531,6 +535,121 @@ class TestRefreshState:
         await light.refresh_state()
 
         assert light._state.last_updated > old_timestamp
+
+    @pytest.mark.asyncio
+    async def test_refresh_state_skips_wifi_info_by_default(
+        self, light, mock_product_info
+    ):
+        """A refresh leaves wifi_info alone when fetching is disabled."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+
+        await light.refresh_state()
+
+        assert light._state.wifi_info.signal is None
+        assert not any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_refresh_state_fetches_wifi_info_when_overridden(
+        self, light, mock_product_info
+    ):
+        """fetch_wifi_info=True overrides the disabled instance default."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+
+        await light.refresh_state(fetch_wifi_info=True)
+
+        assert light._state.wifi_info.rssi == -51
+        assert light._state.wifi_info.rssi_unit == "dBm"
+
+    @pytest.mark.asyncio
+    async def test_refresh_state_override_applies_to_initialization(
+        self, light, mock_product_info
+    ):
+        """The override also covers the uninitialized-state path."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light.refresh_state(fetch_wifi_info=True)
+
+        assert light._state is not None
+        assert light._state.wifi_info.rssi == -51
+
+    @pytest.mark.asyncio
+    async def test_refresh_state_override_can_disable_wifi_fetch(
+        self, mock_device_factory, mock_product_info
+    ):
+        """fetch_wifi_info=False overrides an enabled instance default."""
+        light = mock_device_factory(Light, fetch_wifi_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        light.connection.request.reset_mock()
+
+        await light.refresh_state(fetch_wifi_info=False)
+
+        assert not any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_refresh_state_uses_enabled_instance_default(
+        self, mock_device_factory, mock_product_info
+    ):
+        """Without an override, a refresh follows the instance setting."""
+        light = mock_device_factory(Light, fetch_wifi_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        light.connection.request.reset_mock()
+
+        await light.refresh_state()
+
+        assert any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_base_device_refresh_state_honours_override(
+        self, device, mock_product_info
+    ):
+        """Device.refresh_state() applies the override on both state paths."""
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+
+        # Uninitialized: the override adds the query initialization skipped
+        await device.refresh_state(fetch_wifi_info=True)
+        assert device._state is not None
+        assert device._state.wifi_info.rssi == -51
+
+        # Initialized: the instance default (disabled) leaves wifi_info alone
+        device._state.wifi_info = WifiInfo(signal=None)
+        await device.refresh_state()
+        assert device._state.wifi_info.signal is None
+
+    @pytest.mark.asyncio
+    async def test_base_device_refresh_state_initializes_without_override(
+        self, device, mock_product_info
+    ):
+        """Without an override, initialization applies the instance default."""
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+
+        await device.refresh_state()
+
+        assert device._state is not None
+        assert device._state.wifi_info.signal is None
+        assert not any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in device.connection.request.await_args_list
+        )
 
 
 class TestOptimisticUpdates:

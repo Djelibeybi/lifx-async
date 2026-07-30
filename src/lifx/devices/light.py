@@ -935,10 +935,15 @@ class Light(Device[LightState]):
         """String representation of light."""
         return f"Light(serial={self.serial}, ip={self.ip}, port={self.port})"
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
         """Refresh light state from hardware.
 
         Fetches color (which includes power and label) and updates state.
+
+        Args:
+            fetch_wifi_info: Query WiFi signal strength for this refresh,
+                overriding the instance default set at construction. None
+                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
@@ -949,6 +954,10 @@ class Light(Device[LightState]):
 
         if self._state is None:
             await self._initialize_state()
+            # Initialization already applied the instance default, so only an
+            # override that enables the query needs an extra request.
+            if fetch_wifi_info and not self._fetch_wifi_info:
+                await self._refresh_wifi_info(True)
             return
 
         # GetColor returns color, power, and label in one request
@@ -957,6 +966,9 @@ class Light(Device[LightState]):
         self._state.color = color
         self._state.power = power
         self._state.label = label
+
+        await self._refresh_wifi_info(fetch_wifi_info)
+
         self._state.last_updated = time.time()
 
     async def _initialize_state(self) -> LightState:

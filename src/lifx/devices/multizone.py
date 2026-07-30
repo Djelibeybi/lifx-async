@@ -1162,17 +1162,22 @@ class MultiZoneLight(Light):
         """String representation of multizone light."""
         return f"MultiZoneLight(serial={self.serial}, ip={self.ip}, port={self.port})"
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
         """Refresh multizone light state from hardware.
 
         Fetches color, zones, and effect.
+
+        Args:
+            fetch_wifi_info: Query WiFi signal strength for this refresh,
+                overriding the instance default set at construction. None
+                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state()
+        await super().refresh_state(fetch_wifi_info)
 
         zones, effect = await asyncio.gather(
             self.get_all_color_zones(),

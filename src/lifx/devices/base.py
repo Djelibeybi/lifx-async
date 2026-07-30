@@ -1874,12 +1874,29 @@ class Device(Generic[StateT]):
 
         return self._state
 
-    async def refresh_state(self) -> None:
+    async def _refresh_wifi_info(self, fetch_wifi_info: bool | None) -> None:
+        """Update ``state.wifi_info`` when WiFi info should be queried.
+
+        Args:
+            fetch_wifi_info: Per-call override. None uses the instance default
+                set by the ``fetch_wifi_info`` constructor argument.
+        """
+        fetch = self._fetch_wifi_info if fetch_wifi_info is None else fetch_wifi_info
+        if fetch:
+            assert self._state is not None
+            self._state.wifi_info = await self.get_wifi_info()
+
+    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
         """Refresh device state from hardware.
 
         Fetches current state from device and updates the state instance.
         Base implementation fetches label, power, and updates timestamp.
         Subclasses override to add device-specific state updates.
+
+        Args:
+            fetch_wifi_info: Query WiFi signal strength for this refresh,
+                overriding the instance default set at construction. None
+                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
@@ -1888,7 +1905,13 @@ class Device(Generic[StateT]):
         """
         if not self._state:
             await self._initialize_state()
+            # Initialization already applied the instance default, so only an
+            # override that enables the query needs an extra request.
+            if fetch_wifi_info and not self._fetch_wifi_info:
+                await self._refresh_wifi_info(True)
             return
+
+        await self._refresh_wifi_info(fetch_wifi_info)
 
     async def _schedule_refresh(self) -> None:
         """Schedule debounced state refresh.
