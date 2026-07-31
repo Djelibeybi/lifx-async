@@ -65,7 +65,7 @@ uv run ruff format .
 # Lint with auto-fix
 uv run ruff check . --fix
 
-# Type check (strict Pyright validation)
+# Type check (Pyright, standard mode)
 uv run pyright
 ```
 
@@ -164,7 +164,7 @@ gh workflow run docs.yml
 
 6. **Effects Layer** (`src/lifx/effects/`)
 
-   - 30+ built-in effects (aurora, flame, plasma, rainbow, twinkle, etc.)
+   - 26 built-in effects (aurora, flame, plasma, rainbow, twinkle, etc.)
    - `base.py`: Base effect class with frame generation interface
    - `registry.py`: Effect registry for discovering available effects by name
    - `state_manager.py`: Effect state management for running effects on devices
@@ -212,7 +212,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 ### Key Design Patterns
 
 - **Async Context Managers**: All devices and connections use `async with` for automatic cleanup
-- **Type Safety**: Full type hints with strict Pyright validation
+- **Type Safety**: Full type hints, validated with Pyright (standard mode)
 - **Auto-Generation**: Protocol structures generated from YAML specification
 - **State Caching**: Device properties cache values to reduce network requests
 - **Lazy Connections**: Connections open automatically on first request
@@ -264,7 +264,7 @@ The `discover_devices()` function implements DoS protection through:
 - **Network Layer**: 183 tests (transport, discovery, connection, message, mDNS, async generator requests)
 - **Device Layer**: 375 tests (base, light, ceiling, hev, infrared, multizone, matrix, state management, MAC address)
 - **API Layer**: 63 tests (discovery, batch operations, organization, themes, error handling)
-- **Effects Layer**: 1249 tests (30+ built-in effects, registry, state manager, integration, capability filtering)
+- **Effects Layer**: 1249 tests (26 built-in effects, registry, state manager, integration, capability filtering)
 - **Theme Layer**: 146 tests (themes, canvas, generators, library, apply_theme)
 - **Animation Layer**: 123 tests (animator, framebuffer, packets, orientation)
 - **Utilities**: 127 tests (color conversion, product registry, RGB roundtrip)

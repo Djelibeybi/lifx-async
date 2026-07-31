@@ -29,6 +29,14 @@ classifiers = [
     "Typing :: Typed"
 ]
 
+[project.urls]
+Homepage = "https://djelibeybi.github.io/lifx-async/"
+Documentation = "https://djelibeybi.github.io/lifx-async/"
+Source = "https://github.com/Djelibeybi/lifx-async"
+Changelog = "https://djelibeybi.github.io/lifx-async/changelog/"
+Releasenotes = "https://github.com/Djelibeybi/lifx-async/releases"
+Issues = "https://github.com/Djelibeybi/lifx-async/issues"
+
 [dependency-groups]
 dev = [
     "hatchling>=1.27.0",

@@ -15,12 +15,14 @@ A modern, type-safe, async Python library for controlling LIFX smart devices ove
 ## Features
 
 - **📦 No Runtime Dependencies**: only Python standard libraries required
-- **🎯 Type-Safe**: Full type hints with strict Pyright validation
+- **🎯 Type-Safe**: Full type hints, validated with Pyright
 - **⚡ Async Context Managers**: Provides `async with` and `await` usage patterns
-- **🔌 Connection Pooling**: Efficient reuse with LRU cache
+- **🔍 Dual Discovery**: UDP broadcast plus zero-dependency mDNS/DNS-SD discovery
 - **🏗️ Layered Architecture**: Protocol → Network → Device → API
 - **🔄 Protocol Generator**: generates LIFX protocol `Packets`, `Fields` and `Enum` classes from LIFX public protocol definition
-- **🌈 Comprehensive Support**: supports all LIFX smart lighting products including Color, White, Warm to White, Filament, Clean, Night Vision, Z, Beam, String, Neon, Permanent Outdoor, Tile, Candle, Ceiling, Path, Spot, and Luna.
+- **✨ Built-in Effects**: 26 software effects plus 57 colour themes, filtered by device capability
+- **🎞️ Animation Layer**: high-frequency frame delivery for real-time multizone and matrix effects
+- **🌈 Comprehensive Support**: supports all LIFX smart lighting products — see the [device classes](https://djelibeybi.github.io/lifx-async/api/devices/) documentation
 
 
 ## License
