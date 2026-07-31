@@ -24,10 +24,12 @@ from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 
 
-def _state_request_handler(signal: float = 7.943283890199382e-06):
+def _state_request_handler(signal: float = 7.943283890199382e-06, lux: float = 12.5):
     """Return a request side effect covering every _initialize_state() query."""
 
     async def mock_request(packet):
+        if isinstance(packet, packets.Sensor.GetAmbientLight):
+            return packets.Sensor.StateAmbientLight(lux=lux)
         if isinstance(packet, packets.Light.GetColor):
             state = MagicMock()
             state.color = LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500)
@@ -427,6 +429,37 @@ class TestStateInitialization:
         assert light._state.wifi_info.rssi == -51
         assert light._state.wifi_info.rssi_unit == "dBm"
 
+    @pytest.mark.asyncio
+    async def test_initialize_state_skips_ambient_light_by_default(
+        self, light, mock_product_info
+    ):
+        """The ambient light sensor is not queried unless it is enabled."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state is not None
+        assert light._state.ambient_light is None
+        assert not any(
+            isinstance(call.args[0], packets.Sensor.GetAmbientLight)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_initialize_state_fetches_ambient_light_when_enabled(
+        self, mock_device_factory, mock_product_info
+    ):
+        """fetch_ambient_light=True populates the lux reading from the device."""
+        light = mock_device_factory(Light, fetch_ambient_light=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0)
+
+        await light._initialize_state()
+
+        assert light._state is not None
+        assert light._state.ambient_light == pytest.approx(42.0)
+
 
 class TestRefreshState:
     """Tests for refresh_state() method."""
@@ -554,44 +587,47 @@ class TestRefreshState:
         )
 
     @pytest.mark.asyncio
-    async def test_refresh_state_fetches_wifi_info_when_overridden(
+    async def test_refresh_state_fetches_wifi_info_once_property_is_set(
         self, light, mock_product_info
     ):
-        """fetch_wifi_info=True overrides the disabled instance default."""
+        """Setting fetch_wifi_info makes the next refresh collect a reading."""
         light._capabilities = mock_product_info(has_color=True)
         light.connection.request.side_effect = _state_request_handler()
         await light._initialize_state()
 
-        await light.refresh_state(fetch_wifi_info=True)
+        light.fetch_wifi_info = True
+        await light.refresh_state()
 
         assert light._state.wifi_info.rssi == -51
         assert light._state.wifi_info.rssi_unit == "dBm"
 
     @pytest.mark.asyncio
-    async def test_refresh_state_override_applies_to_initialization(
+    async def test_fetch_wifi_info_property_applies_to_initialization(
         self, light, mock_product_info
     ):
-        """The override also covers the uninitialized-state path."""
+        """The property also covers the uninitialized-state path."""
         light._capabilities = mock_product_info(has_color=True)
         light.connection.request.side_effect = _state_request_handler()
 
-        await light.refresh_state(fetch_wifi_info=True)
+        light.fetch_wifi_info = True
+        await light.refresh_state()
 
         assert light._state is not None
         assert light._state.wifi_info.rssi == -51
 
     @pytest.mark.asyncio
-    async def test_refresh_state_override_can_disable_wifi_fetch(
+    async def test_clearing_fetch_wifi_info_stops_the_query(
         self, mock_device_factory, mock_product_info
     ):
-        """fetch_wifi_info=False overrides an enabled instance default."""
+        """Clearing the property stops collecting readings from the next refresh."""
         light = mock_device_factory(Light, fetch_wifi_info=True)
         light._capabilities = mock_product_info(has_color=True)
         light.connection.request.side_effect = _state_request_handler()
         await light._initialize_state()
         light.connection.request.reset_mock()
 
-        await light.refresh_state(fetch_wifi_info=False)
+        light.fetch_wifi_info = False
+        await light.refresh_state()
 
         assert not any(
             isinstance(call.args[0], packets.Device.GetWifiInfo)
@@ -599,11 +635,12 @@ class TestRefreshState:
         )
 
     @pytest.mark.asyncio
-    async def test_refresh_state_uses_enabled_instance_default(
+    async def test_fetch_wifi_info_property_reflects_constructor_argument(
         self, mock_device_factory, mock_product_info
     ):
-        """Without an override, a refresh follows the instance setting."""
+        """The constructor argument is readable and refreshes keep following it."""
         light = mock_device_factory(Light, fetch_wifi_info=True)
+        assert light.fetch_wifi_info is True
         light._capabilities = mock_product_info(has_color=True)
         light.connection.request.side_effect = _state_request_handler()
         await light._initialize_state()
@@ -617,22 +654,108 @@ class TestRefreshState:
         )
 
     @pytest.mark.asyncio
-    async def test_base_device_refresh_state_honours_override(
+    async def test_refresh_state_skips_ambient_light_by_default(
+        self, light, mock_product_info
+    ):
+        """A refresh leaves ambient_light alone when fetching is disabled."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+
+        await light.refresh_state()
+
+        assert light._state.ambient_light is None
+        assert not any(
+            isinstance(call.args[0], packets.Sensor.GetAmbientLight)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_refresh_state_fetches_ambient_light_once_property_is_set(
+        self, light, mock_product_info
+    ):
+        """Setting fetch_ambient_light makes the next refresh read the sensor."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0)
+        await light._initialize_state()
+
+        light.fetch_ambient_light = True
+        await light.refresh_state()
+
+        assert light._state.ambient_light == pytest.approx(42.0)
+
+    @pytest.mark.asyncio
+    async def test_clearing_fetch_ambient_light_stops_the_query(
+        self, mock_device_factory, mock_product_info
+    ):
+        """Clearing the property stops reading the sensor from the next refresh."""
+        light = mock_device_factory(Light, fetch_ambient_light=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        light.connection.request.reset_mock()
+
+        light.fetch_ambient_light = False
+        await light.refresh_state()
+
+        assert not any(
+            isinstance(call.args[0], packets.Sensor.GetAmbientLight)
+            for call in light.connection.request.await_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_ambient_light_property_applies_to_initialization(
+        self, light, mock_product_info
+    ):
+        """The ambient property also covers the uninitialized-state path."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0)
+
+        light.fetch_ambient_light = True
+        await light.refresh_state()
+
+        assert light._state is not None
+        assert light._state.ambient_light == pytest.approx(42.0)
+
+    @pytest.mark.asyncio
+    async def test_base_device_refresh_state_honours_property(
         self, device, mock_product_info
     ):
-        """Device.refresh_state() applies the override on both state paths."""
+        """Device.refresh_state() applies the property on both state paths."""
         device._capabilities = mock_product_info(has_color=False)
         device.connection.request.side_effect = _state_request_handler()
 
-        # Uninitialized: the override adds the query initialization skipped
-        await device.refresh_state(fetch_wifi_info=True)
+        # Uninitialized: the property drives the query during initialization
+        device.fetch_wifi_info = True
+        await device.refresh_state()
         assert device._state is not None
         assert device._state.wifi_info.rssi == -51
 
-        # Initialized: the instance default (disabled) leaves wifi_info alone
-        device._state.wifi_info = WifiInfo(signal=None)
+        # Initialized: the property still applies on the already-initialized path
+        device._state.wifi_info = WifiInfo(signal=None, host_firmware=None)
+        await device.refresh_state()
+        assert device._state.wifi_info.rssi == -51
+
+        # Cleared: a refresh leaves wifi_info alone again
+        device.fetch_wifi_info = False
+        device._state.wifi_info = WifiInfo(signal=None, host_firmware=None)
         await device.refresh_state()
         assert device._state.wifi_info.signal is None
+
+    @pytest.mark.asyncio
+    async def test_base_device_refresh_state_updates_timestamp(
+        self, device, mock_product_info
+    ):
+        """Device.refresh_state() stamps last_updated so state reads as fresh."""
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+        await device._initialize_state()
+
+        device._state.last_updated = 0.0
+        await device.refresh_state()
+
+        assert device._state.last_updated > 0.0
+        assert device._state.is_fresh()
 
     @pytest.mark.asyncio
     async def test_base_device_refresh_state_initializes_without_override(

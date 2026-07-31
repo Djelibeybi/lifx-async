@@ -59,6 +59,7 @@ def _base_fields() -> dict[str, Any]:
         "location": CollectionInfo(uuid="u", label="", updated_at=0),
         "group": CollectionInfo(uuid="u", label="", updated_at=0),
         "color": COLOR,
+        "ambient_light": 12.5,
         "last_updated": 0,
     }
 
@@ -185,6 +186,27 @@ class TestStateSerialisation:
         assert json.loads(json.dumps(result))["tile_orientations"] == {
             "0": "rotate_right"
         }
+
+    @pytest.mark.parametrize("name", list(_all_states()))
+    def test_wifi_info_is_expanded(self, name: str) -> None:
+        """Test every state exposes wifi_info as a plain dict.
+
+        json.dumps still succeeds when a key is missing entirely, so without
+        this a subclass that rebuilt as_dict field-by-field would silently drop
+        wifi_info from every serialised light state.
+        """
+        wifi_info = _all_states()[name].as_dict["wifi_info"]
+
+        assert wifi_info == {
+            "signal": pytest.approx(7.943283890199382e-06),
+            "rssi": -51,
+            "rssi_unit": "dBm",
+        }
+
+    @pytest.mark.parametrize("name", list(_all_states()))
+    def test_ambient_light_is_present(self, name: str) -> None:
+        """Test the inherited LightState ambient reading survives every override."""
+        assert _all_states()[name].as_dict["ambient_light"] == pytest.approx(12.5)
 
     @pytest.mark.parametrize("name", list(_all_states()))
     def test_capabilities_are_curated(self, name: str) -> None:

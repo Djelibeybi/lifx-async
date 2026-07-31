@@ -7,6 +7,7 @@ import ipaddress
 import logging
 import time
 import uuid
+from collections.abc import Coroutine
 from dataclasses import InitVar, dataclass, field
 from math import floor, log10
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
@@ -81,13 +82,17 @@ class WifiInfo:
         signal: WiFi signal strength, or None when the signal was not fetched
         host_firmware: Init-only firmware version used to determine whether
             RSSI is reported in dB or dBm. It is not retained on the instance:
-            :class:`DeviceState` already carries the host firmware.
+            :class:`DeviceState` already carries the host firmware. It has no
+            default: an InitVar default stays bound as a class attribute, which
+            would leave ``wifi_info.host_firmware`` silently resolving to None
+            instead of raising, and would make ``dataclasses.replace()`` copy
+            that None back in and blank ``rssi_unit``.
         rssi: WiFi RSSI derived from signal, or None when signal is None
         rssi_unit: Unit reported by the firmware (``dB`` or ``dBm``)
     """
 
     signal: float | None
-    host_firmware: InitVar[FirmwareInfo | None] = None
+    host_firmware: InitVar[FirmwareInfo | None]
     rssi: int | None = field(init=False)
     rssi_unit: Literal["dB", "dBm"] | None = field(init=False)
 
@@ -311,6 +316,9 @@ class DeviceState:
 # TypeVar for generic state type, bound to DeviceState
 StateT = TypeVar("StateT", bound=DeviceState)
 
+#: Result type of a single scheduled state request.
+_T = TypeVar("_T")
+
 
 class Device(Generic[StateT]):
     """Base class for LIFX devices.
@@ -370,6 +378,7 @@ class Device(Generic[StateT]):
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
     ) -> None:
         """Initialize device.
 
@@ -379,10 +388,14 @@ class Device(Generic[StateT]):
             port: Device UDP port
             timeout: Overall timeout for network requests in seconds
             max_retries: Maximum number of retry attempts for network requests
-            fetch_wifi_info: Query the device for WiFi signal strength when state
-                is initialized. When False (the default), ``state.wifi_info`` has
-                None for signal and rssi, but rssi_unit is still populated from
-                the host firmware version.
+            fetch_wifi_info: Query the device for WiFi signal strength whenever
+                state is initialized or refreshed. When False (the default),
+                ``state.wifi_info`` has None for signal and rssi, but rssi_unit
+                is still populated from the host firmware version.
+            fetch_ambient_light: Query the ambient light sensor whenever state is
+                initialized or refreshed, leaving ``state.ambient_light`` None
+                when False (the default). Only lights expose the sensor, so this
+                is ignored by the base ``Device`` class.
 
         Raises:
             ValueError: If any parameter is invalid
@@ -470,6 +483,7 @@ class Device(Generic[StateT]):
         self._timeout = timeout
         self._max_retries = max_retries
         self._fetch_wifi_info = fetch_wifi_info
+        self._fetch_ambient_light = fetch_ambient_light
 
         # Create lightweight connection handle - connection pooling is internal
         self.connection = DeviceConnection(
@@ -524,6 +538,7 @@ class Device(Generic[StateT]):
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
     ) -> Self:
         """Create and return an instance for the given IP address.
 
@@ -537,6 +552,8 @@ class Device(Generic[StateT]):
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retry attempts
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_ambient_light: Query the ambient light sensor during state
+                initialization (lights only)
 
         Returns:
             Device instance ready to use with async context manager
@@ -568,6 +585,7 @@ class Device(Generic[StateT]):
                             timeout=timeout,
                             max_retries=max_retries,
                             fetch_wifi_info=fetch_wifi_info,
+                            fetch_ambient_light=fetch_ambient_light,
                         )
             finally:
                 # Always close the temporary connection to prevent resource leaks
@@ -580,6 +598,7 @@ class Device(Generic[StateT]):
                 timeout=timeout,
                 max_retries=max_retries,
                 fetch_wifi_info=fetch_wifi_info,
+                fetch_ambient_light=fetch_ambient_light,
             )
 
         raise LifxDeviceNotFoundError()
@@ -593,6 +612,7 @@ class Device(Generic[StateT]):
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
     ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
         """Create a device instance with the correct type for the given IP.
 
@@ -611,6 +631,8 @@ class Device(Generic[StateT]):
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retry attempts
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_ambient_light: Query the ambient light sensor during state
+                initialization (lights only)
 
         Returns:
             Device instance of the correct subclass, ready to use with
@@ -697,6 +719,7 @@ class Device(Generic[StateT]):
                 timeout=timeout,
                 max_retries=max_retries,
                 fetch_wifi_info=fetch_wifi_info,
+                fetch_ambient_light=fetch_ambient_light,
             )
 
             # Type system note: device._state is guaranteed non-None after
@@ -1759,22 +1782,99 @@ class Device(Generic[StateT]):
             ),
         )
 
-    async def _resolve_wifi_info(self, host_firmware: FirmwareInfo) -> WifiInfo:
-        """Return WiFi info for state initialization.
+    @property
+    def fetch_wifi_info(self) -> bool:
+        """Whether state fetches include the WiFi signal strength.
 
-        Queries the device only when the instance was created with
-        ``fetch_wifi_info=True``. Otherwise returns a WifiInfo with no signal
-        or RSSI, but with the RSSI unit resolved from the host firmware.
+        Toggle this to start or stop collecting ``state.wifi_info`` readings.
+        It takes effect from the next state initialization or refresh; the
+        current ``state.wifi_info`` is left as it was.
+
+        Example:
+            ```python
+            device.fetch_wifi_info = True
+            await device.refresh_state()
+            print(device.state.wifi_info.rssi)
+            ```
+        """
+        return self._fetch_wifi_info
+
+    @fetch_wifi_info.setter
+    def fetch_wifi_info(self, enabled: bool) -> None:
+        """Enable or disable the WiFi signal query."""
+        self._fetch_wifi_info = enabled
+
+    @property
+    def fetch_ambient_light(self) -> bool:
+        """Whether state fetches include the ambient light sensor.
+
+        Toggle this to start or stop collecting ``state.ambient_light``
+        readings. It takes effect from the next state initialization or
+        refresh; the current ``state.ambient_light`` is left as it was. Only
+        lights expose the sensor, so this is ignored by the base ``Device``
+        class.
+        """
+        return self._fetch_ambient_light
+
+    @fetch_ambient_light.setter
+    def fetch_ambient_light(self, enabled: bool) -> None:
+        """Enable or disable the ambient light query."""
+        self._fetch_ambient_light = enabled
+
+    @staticmethod
+    def _schedule_request(
+        coro: Coroutine[Any, Any, _T], pending: list[asyncio.Future[Any]]
+    ) -> asyncio.Task[_T]:
+        """Start a request immediately and record it for failure cleanup.
+
+        State initialization runs its requests as tasks rather than through
+        ``asyncio.gather``: a task keeps its own result type no matter how many
+        requests the batch grows to, while gather is only typed per-argument up
+        to six.
 
         Args:
-            host_firmware: Host firmware fetched during state initialization
+            coro: Request coroutine to schedule
+            pending: List collecting every scheduled task for cleanup
 
         Returns:
-            WifiInfo for the device state
+            The scheduled task
         """
-        if self._fetch_wifi_info:
-            return await self.get_wifi_info()
-        return WifiInfo(signal=None, host_firmware=host_firmware)
+        task = asyncio.ensure_future(coro)
+        pending.append(task)
+        return task
+
+    @staticmethod
+    async def _discard_pending(pending: list[asyncio.Future[Any]]) -> None:
+        """Cancel requests still in flight and consume their outcomes.
+
+        Without this, a failure part-way through awaiting the batch leaves the
+        remaining tasks unretrieved, which asyncio reports as "exception was
+        never retrieved" long after the original error surfaced.
+
+        Args:
+            pending: Tasks scheduled by :meth:`_schedule_request`
+        """
+        for task in pending:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    async def _fetch_wifi_signal(self) -> float | None:
+        """Query the WiFi signal strength when enabled, else return None.
+
+        Returns the raw signal rather than a :class:`WifiInfo` so the query can
+        join the state batch: the host firmware that classifies the RSSI unit
+        is fetched by that same batch.
+
+        Returns:
+            WiFi signal strength, or None when WiFi info is not fetched
+        """
+        if not self._fetch_wifi_info:
+            return None
+
+        state = await self.connection.request(packets.Device.GetWifiInfo())
+        self._raise_if_unhandled(state)
+        return state.signal
 
     async def _initialize_state(self) -> StateT:
         """Initialize device state transactionally.
@@ -1791,61 +1891,44 @@ class Device(Generic[StateT]):
             LifxDeviceNotFoundError: If device cannot be reached
             LifxProtocolError: If responses are invalid
         """
-        if self._capabilities is not None:
-            # Capabilities pre-loaded: skip get_version(), run 6 requests in parallel
-            capabilities = self._create_capabilities()
+        # Every request starts here and runs in parallel. The WiFi signal is
+        # one of them: it joins the batch when enabled and resolves to None
+        # when it is not. get_version() joins only when capabilities are not
+        # already loaded, saving that round-trip when they are.
+        pending: list[asyncio.Future[Any]] = []
+        label_task = self._schedule_request(self.get_label(), pending)
+        power_task = self._schedule_request(self.get_power(), pending)
+        host_firmware_task = self._schedule_request(self.get_host_firmware(), pending)
+        wifi_firmware_task = self._schedule_request(self.get_wifi_firmware(), pending)
+        location_task = self._schedule_request(self.get_location(), pending)
+        group_task = self._schedule_request(self.get_group(), pending)
+        wifi_signal_task = self._schedule_request(self._fetch_wifi_signal(), pending)
+        version_task = (
+            None
+            if self._capabilities is not None
+            else self._schedule_request(self.get_version(), pending)
+        )
 
-            (
-                label,
-                power,
-                host_firmware,
-                wifi_firmware,
-                location_info,
-                group_info,
-            ) = await asyncio.gather(
-                self.get_label(),
-                self.get_power(),
-                self.get_host_firmware(),
-                self.get_wifi_firmware(),
-                self.get_location(),
-                self.get_group(),
-            )
-        else:
-            # Capabilities not loaded: include get_version() in parallel batch
-            # Schedule get_version() concurrently alongside the 6-arg gather
-            version_task = asyncio.ensure_future(self.get_version())
-            try:
-                (
-                    label,
-                    power,
-                    host_firmware,
-                    wifi_firmware,
-                    location_info,
-                    group_info,
-                ) = await asyncio.gather(
-                    self.get_label(),
-                    self.get_power(),
-                    self.get_host_firmware(),
-                    self.get_wifi_firmware(),
-                    self.get_location(),
-                    self.get_group(),
-                )
-                version = await version_task
-            except Exception:
-                if not version_task.done():
-                    version_task.cancel()
-                # Await to consume cancellation and avoid leaked task warnings
-                await asyncio.gather(version_task, return_exceptions=True)
-                raise
-            self._process_capabilities(version, host_firmware)
-            capabilities = self._create_capabilities()
+        try:
+            label = await label_task
+            power = await power_task
+            host_firmware = await host_firmware_task
+            wifi_firmware = await wifi_firmware_task
+            location_info = await location_task
+            group_info = await group_task
+            wifi_signal = await wifi_signal_task
+            if version_task is not None:
+                self._process_capabilities(await version_task, host_firmware)
+        except BaseException:
+            await self._discard_pending(pending)
+            raise
+
+        capabilities = self._create_capabilities()
 
         # Get MAC address (already calculated in get_host_firmware)
         mac_address = await self.get_mac_address()
 
-        # Query WiFi signal only when enabled; firmware is cached by now so
-        # get_wifi_info() costs a single request.
-        wifi_info = await self._resolve_wifi_info(host_firmware)
+        wifi_info = WifiInfo(signal=wifi_signal, host_firmware=host_firmware)
 
         # Get model name
         assert self._capabilities is not None
@@ -1874,29 +1957,20 @@ class Device(Generic[StateT]):
 
         return self._state
 
-    async def _refresh_wifi_info(self, fetch_wifi_info: bool | None) -> None:
-        """Update ``state.wifi_info`` when WiFi info should be queried.
+    async def _refresh_wifi_info(self) -> None:
+        """Update ``state.wifi_info`` when the WiFi query is enabled."""
+        if not self._fetch_wifi_info:
+            return
 
-        Args:
-            fetch_wifi_info: Per-call override. None uses the instance default
-                set by the ``fetch_wifi_info`` constructor argument.
-        """
-        fetch = self._fetch_wifi_info if fetch_wifi_info is None else fetch_wifi_info
-        if fetch:
-            assert self._state is not None
-            self._state.wifi_info = await self.get_wifi_info()
+        assert self._state is not None
+        self._state.wifi_info = await self.get_wifi_info()
 
-    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
+    async def refresh_state(self) -> None:
         """Refresh device state from hardware.
 
         Fetches current state from device and updates the state instance.
         Base implementation fetches label, power, and updates timestamp.
         Subclasses override to add device-specific state updates.
-
-        Args:
-            fetch_wifi_info: Query WiFi signal strength for this refresh,
-                overriding the instance default set at construction. None
-                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
@@ -1905,13 +1979,11 @@ class Device(Generic[StateT]):
         """
         if not self._state:
             await self._initialize_state()
-            # Initialization already applied the instance default, so only an
-            # override that enables the query needs an extra request.
-            if fetch_wifi_info and not self._fetch_wifi_info:
-                await self._refresh_wifi_info(True)
             return
 
-        await self._refresh_wifi_info(fetch_wifi_info)
+        await self._refresh_wifi_info()
+
+        self._state.last_updated = time.time()
 
     async def _schedule_refresh(self) -> None:
         """Schedule debounced state refresh.

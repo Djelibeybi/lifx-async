@@ -68,6 +68,7 @@ class HevLightState(LightState):
             location=light_state.location,
             group=light_state.group,
             color=light_state.color,
+            ambient_light=light_state.ambient_light,
             hev_config=hev_config,
             hev_cycle=hev_cycle,
             hev_result=hev_result,
@@ -413,22 +414,17 @@ class HevLight(Light):
         """
         return self._hev_result
 
-    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
+    async def refresh_state(self) -> None:
         """Refresh HEV light state from hardware.
 
         Fetches color, HEV cycle, config, and last result.
-
-        Args:
-            fetch_wifi_info: Query WiFi signal strength for this refresh,
-                overriding the instance default set at construction. None
-                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state(fetch_wifi_info)
+        await super().refresh_state()
 
         # Fetch all HEV light state
         hev_cycle, hev_result = await asyncio.gather(
@@ -443,9 +439,6 @@ class HevLight(Light):
         """Initialize HEV light state transactionally.
 
         Extends Light implementation to fetch HEV-specific state.
-
-        Args:
-            timeout: Timeout for state initialization
 
         Raises:
             LifxTimeoutError: If device does not respond within timeout

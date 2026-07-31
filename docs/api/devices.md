@@ -45,10 +45,10 @@ Device runtime information returned by `Device.get_info()`.
 WiFi module information returned by `Device.get_wifi_info()`, including the
 firmware-aware `rssi_unit` (`dB` through firmware 2.77, otherwise `dBm`).
 
-Also available as `device.state.wifi_info`. State initialisation does not query
-the device for WiFi signal strength unless the device was created with
-`fetch_wifi_info=True`, so `signal` and `rssi` are `None` by default while
-`rssi_unit` is always populated from the host firmware version:
+Also available as `device.state.wifi_info`. Neither state initialisation nor
+`refresh_state()` queries the device for WiFi signal strength unless the device
+was created with `fetch_wifi_info=True`, so `signal` and `rssi` are `None` by
+default while `rssi_unit` is always populated from the host firmware version:
 
 ```python
 device = await Device.connect(ip="192.168.1.100", fetch_wifi_info=True)
@@ -56,13 +56,30 @@ async with device:
     print(f"{device.state.wifi_info.rssi} {device.state.wifi_info.rssi_unit}")
 ```
 
-`refresh_state()` accepts the same flag to override the instance setting for a
-single refresh, so an existing device can pick up a signal reading on demand:
+When enabled, the query joins the same parallel batch as the other state
+requests, so it costs no extra round trip.
+
+`fetch_wifi_info` is also a settable property, so a device can start or stop
+collecting readings at any point. It takes effect from the next state
+initialisation or refresh:
 
 ```python
 async with await Device.connect(ip="192.168.1.100") as device:
-    await device.refresh_state(fetch_wifi_info=True)
+    device.fetch_wifi_info = True
+    await device.refresh_state()
     print(device.state.wifi_info.rssi)
+
+    device.fetch_wifi_info = False  # stop collecting
+```
+
+For a one-off reading, call `get_wifi_info()` directly — it is a single
+request, where a refresh also re-fetches colour, power, label and every zone or
+tile:
+
+```python
+async with await Device.connect(ip="192.168.1.100") as device:
+    wifi_info = await device.get_wifi_info()
+    print(f"{wifi_info.rssi} {wifi_info.rssi_unit}")
 ```
 
 ::: lifx.devices.base.WifiInfo
@@ -134,6 +151,19 @@ The `Light` class provides color control and effects for standard LIFX lights.
 ### LightState
 
 Light device state dataclass returned by `Light.state`.
+
+`ambient_light` holds the most recent lux reading, or `None` when the sensor was
+not queried. Like `wifi_info`, it is only fetched when the device was created
+with `fetch_ambient_light=True`, or once the `fetch_ambient_light` property is
+set on the device:
+
+```python
+light = await Device.connect(ip="192.168.1.100", fetch_ambient_light=True)
+async with light:
+    print(f"Ambient light: {light.state.ambient_light} lux")
+
+    light.fetch_ambient_light = False  # stop collecting
+```
 
 ::: lifx.devices.light.LightState
     options:
@@ -435,11 +465,31 @@ async def main():
             print("No ambient light sensor or completely dark")
 ```
 
+The sensor can also be read as part of state instead of on demand. A light
+created with `fetch_ambient_light=True` — or one that has the property set later
+— queries it during state initialisation and on every `refresh_state()`, storing
+the result in `state.ambient_light`:
+
+```python
+async with await Device.connect(ip="192.168.1.100") as light:
+    light.fetch_ambient_light = True
+
+    await light.refresh_state()
+    print(f"Ambient light: {light.state.ambient_light} lux")
+
+    light.fetch_ambient_light = False  # stop collecting
+```
+
+The query joins the same parallel batch as the other state requests, so it costs
+no extra round trip. Toggling the property takes effect from the next state
+initialisation or refresh; the value already in `state.ambient_light` is left as
+it was.
+
 **Notes:**
 
 - Devices without ambient light sensors return 0.0 (not an error)
 - For accurate readings, the light should be turned off (otherwise the light's own illumination interferes with the sensor)
-- This is a volatile property - always fetched fresh from the device
+- `get_ambient_light_level()` always fetches fresh from the device; `state.ambient_light` is as fresh as the last state refresh, and is `None` until the sensor is queried at least once
 - A reading of 0.0 could mean either no sensor or complete darkness
 - Returns ambient light level in lux (higher values indicate brighter ambient light)
 
