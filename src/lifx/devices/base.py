@@ -20,7 +20,11 @@ from lifx.const import (
     LIFX_LOCATION_NAMESPACE,
     LIFX_UDP_PORT,
 )
-from lifx.exceptions import LifxDeviceNotFoundError, LifxUnsupportedCommandError
+from lifx.exceptions import (
+    LifxDeviceNotFoundError,
+    LifxError,
+    LifxUnsupportedCommandError,
+)
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
@@ -240,12 +244,13 @@ class DeviceState:
         power: Power level (0 = off, 65535 = on)
         host_firmware: Host firmware version
         wifi_firmware: WiFi firmware version
-        wifi_info: WiFi signal and RSSI. Signal and RSSI are None unless the
-            device was created with ``fetch_wifi_info=True``; ``rssi_unit`` is
-            always populated from the host firmware version.
         location: Location tuple (UUID bytes, label, updated_at)
         group: Group tuple (UUID bytes, label, updated_at)
         last_updated: Timestamp of last state refresh
+        wifi_info: WiFi signal and RSSI. Signal and RSSI are None unless the
+            device was created with ``fetch_wifi_info=True``; ``rssi_unit`` is
+            always populated from the host firmware version. Keyword-only with a
+            default so adding it stays additive for existing constructors.
     """
 
     model: str
@@ -256,13 +261,26 @@ class DeviceState:
     power: int
     host_firmware: FirmwareInfo
     wifi_firmware: FirmwareInfo
-    wifi_info: WifiInfo
     location: CollectionInfo
     group: CollectionInfo
     last_updated: float
+    wifi_info: WifiInfo = field(
+        kw_only=True,
+        default_factory=lambda: WifiInfo(signal=None, host_firmware=None),
+    )
 
     @property
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(
+        self,
+    ) -> dict[
+        str,
+        str
+        | int
+        | float
+        | dict[str, bool | int]
+        | dict[str, str | int]
+        | dict[str, float | int | str | None],
+    ]:
         """Return DeviceState as a dictionary."""
         return {
             "model": self.model,
@@ -309,6 +327,52 @@ class DeviceState:
             True if state age is less than max_age
         """
         return self.age < max_age
+
+
+@dataclass
+class _CommonStateRequests:
+    """In-flight requests for the state fields every device shares.
+
+    Attributes:
+        host_firmware: Host firmware request
+        wifi_firmware: WiFi firmware request
+        location: Location request
+        group: Group request
+        wifi_signal: Opt-in WiFi signal request, resolving to None when disabled
+        version: Version request, or None when capabilities are already loaded
+    """
+
+    host_firmware: asyncio.Task[FirmwareInfo]
+    wifi_firmware: asyncio.Task[FirmwareInfo]
+    location: asyncio.Task[CollectionInfo]
+    group: asyncio.Task[CollectionInfo]
+    wifi_signal: asyncio.Task[float | None]
+    version: asyncio.Task[DeviceVersion] | None
+
+
+@dataclass
+class _CommonState:
+    """Finished state fields every device shares.
+
+    Attributes:
+        model: Friendly product name
+        mac_address: Device MAC address
+        capabilities: Device capabilities from the product registry
+        host_firmware: Host firmware version
+        wifi_firmware: WiFi firmware version
+        wifi_info: WiFi signal and RSSI
+        location: Device location
+        group: Device group
+    """
+
+    model: str
+    mac_address: str
+    capabilities: DeviceCapabilities
+    host_firmware: FirmwareInfo
+    wifi_firmware: FirmwareInfo
+    wifi_info: WifiInfo
+    location: CollectionInfo
+    group: CollectionInfo
 
 
 # TypeVar for generic state type, bound to DeviceState
@@ -1670,9 +1734,9 @@ class Device(Generic[StateT]):
             )
 
         if result and self._state is not None:
-            self._state.location.uuid = group_uuid_to_use.hex()
-            self._state.location.label = label
-            self._state.location.updated_at = updated_at
+            self._state.group.uuid = group_uuid_to_use.hex()
+            self._state.group.label = label
+            self._state.group.updated_at = updated_at
             await self._schedule_refresh()
 
         _LOGGER.debug(
@@ -1788,8 +1852,9 @@ class Device(Generic[StateT]):
         """Whether state fetches include the WiFi signal strength.
 
         Toggle this to start or stop collecting ``state.wifi_info`` readings.
-        It takes effect from the next state initialization or refresh; the
-        current ``state.wifi_info`` is left as it was.
+        It takes effect from the next state initialization or refresh, which
+        stores None for signal and rssi while disabled rather than leaving an
+        unbounded-age reading behind a freshly stamped ``last_updated``.
 
         Example:
             ```python
@@ -1811,7 +1876,8 @@ class Device(Generic[StateT]):
 
         Toggle this to start or stop collecting ``state.ambient_light``
         readings. It takes effect from the next state initialization or
-        refresh; the current ``state.ambient_light`` is left as it was. Only
+        refresh, which stores None while disabled rather than leaving an
+        unbounded-age reading behind a freshly stamped ``last_updated``. Only
         lights expose the sensor, so this is ignored by the base ``Device``
         class.
         """
@@ -1860,6 +1926,58 @@ class Device(Generic[StateT]):
                 task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
 
+    @staticmethod
+    async def _await_batch(pending: list[asyncio.Future[Any]]) -> None:
+        """Wait for every scheduled request, surfacing the first failure.
+
+        Awaiting the tasks one at a time in a fixed order hides a fast failure
+        behind the full retry deadline of every request ahead of it, so a device
+        that answers StateUnhandled in milliseconds still takes the best part of
+        a minute to fail. Waiting on the batch as a whole restores the fail-fast
+        behaviour ``asyncio.gather`` had.
+
+        Args:
+            pending: Tasks scheduled by :meth:`_schedule_request`
+
+        Raises:
+            BaseException: Whatever the first failing request raised
+        """
+        done, _ = await asyncio.wait(pending, return_when=asyncio.FIRST_EXCEPTION)
+        for task in done:
+            if task.cancelled() or task.exception() is not None:
+                await task
+
+    async def _fetch_optional(
+        self, name: str, coro: Coroutine[Any, Any, float | None]
+    ) -> float | None:
+        """Run an opt-in telemetry query, returning None if the device refuses.
+
+        Opt-in readings are additive: a device that does not answer one must
+        still initialize and refresh its state, leaving that field None rather
+        than failing the whole batch.
+
+        Args:
+            name: Query name, for the warning logged when it fails
+            coro: Query coroutine to run
+
+        Returns:
+            The reading, or None when the device did not supply one
+        """
+        try:
+            return await coro
+        except LifxError as e:
+            _LOGGER.warning(
+                {
+                    "class": "Device",
+                    "method": "_fetch_optional",
+                    "action": "optional_query_failed",
+                    "query": name,
+                    "serial": self.serial,
+                    "error": str(e),
+                }
+            )
+            return None
+
     async def _fetch_wifi_signal(self) -> float | None:
         """Query the WiFi signal strength when enabled, else return None.
 
@@ -1868,58 +1986,87 @@ class Device(Generic[StateT]):
         is fetched by that same batch.
 
         Returns:
-            WiFi signal strength, or None when WiFi info is not fetched
+            WiFi signal strength, or None when WiFi info is not fetched or the
+            device did not answer the query
         """
         if not self._fetch_wifi_info:
             return None
 
+        return await self._fetch_optional("wifi_info", self._request_wifi_signal())
+
+    async def _request_wifi_signal(self) -> float | None:
+        """Request the WiFi signal strength from the device.
+
+        Returns:
+            WiFi signal strength
+        """
         state = await self.connection.request(packets.Device.GetWifiInfo())
         self._raise_if_unhandled(state)
         return state.signal
 
-    async def _initialize_state(self) -> StateT:
-        """Initialize device state transactionally.
+    def _schedule_common_requests(
+        self, pending: list[asyncio.Future[Any]]
+    ) -> _CommonStateRequests:
+        """Start the state requests every device shares.
 
-        Fetches all required device state in parallel and creates the state instance.
-        This is an all-or-nothing operation - either all state is fetched successfully
-        or an exception is raised.
+        Every request starts here and runs in parallel. The WiFi signal is one
+        of them: it joins the batch when enabled and resolves to None when it is
+        not. get_version() joins only when capabilities are not already loaded,
+        saving that round-trip when they are.
 
-        When capabilities are not pre-loaded, get_version() runs in parallel with the
-        other GET requests to save one network round-trip.
+        Subclasses add their own requests to the same ``pending`` list so those
+        run alongside these rather than costing another round-trip.
+
+        Args:
+            pending: List collecting every scheduled task for cleanup
+
+        Returns:
+            The scheduled tasks, to be resolved by :meth:`_resolve_common_requests`
+        """
+        return _CommonStateRequests(
+            host_firmware=self._schedule_request(self.get_host_firmware(), pending),
+            wifi_firmware=self._schedule_request(self.get_wifi_firmware(), pending),
+            location=self._schedule_request(self.get_location(), pending),
+            group=self._schedule_request(self.get_group(), pending),
+            wifi_signal=self._schedule_request(self._fetch_wifi_signal(), pending),
+            version=(
+                None
+                if self._capabilities is not None
+                else self._schedule_request(self.get_version(), pending)
+            ),
+        )
+
+    async def _resolve_common_requests(
+        self,
+        requests: _CommonStateRequests,
+        pending: list[asyncio.Future[Any]],
+    ) -> _CommonState:
+        """Wait for the whole batch and assemble the shared state fields.
+
+        This owns the parts every device gets wrong the same way - fail-fast
+        awaiting, cancelling the requests still in flight, deriving capabilities
+        from the version response - so a subclass only spells out the requests
+        and the state type that are actually its own. The batch as a whole is
+        awaited, so a caller's own tasks in ``pending`` have finished too and
+        their results can be read without awaiting again.
+
+        Args:
+            requests: Tasks from :meth:`_schedule_common_requests`
+            pending: Every task scheduled for this state fetch
+
+        Returns:
+            The finished shared state fields
 
         Raises:
             LifxTimeoutError: If device does not respond within timeout
             LifxDeviceNotFoundError: If device cannot be reached
             LifxProtocolError: If responses are invalid
         """
-        # Every request starts here and runs in parallel. The WiFi signal is
-        # one of them: it joins the batch when enabled and resolves to None
-        # when it is not. get_version() joins only when capabilities are not
-        # already loaded, saving that round-trip when they are.
-        pending: list[asyncio.Future[Any]] = []
-        label_task = self._schedule_request(self.get_label(), pending)
-        power_task = self._schedule_request(self.get_power(), pending)
-        host_firmware_task = self._schedule_request(self.get_host_firmware(), pending)
-        wifi_firmware_task = self._schedule_request(self.get_wifi_firmware(), pending)
-        location_task = self._schedule_request(self.get_location(), pending)
-        group_task = self._schedule_request(self.get_group(), pending)
-        wifi_signal_task = self._schedule_request(self._fetch_wifi_signal(), pending)
-        version_task = (
-            None
-            if self._capabilities is not None
-            else self._schedule_request(self.get_version(), pending)
-        )
-
         try:
-            label = await label_task
-            power = await power_task
-            host_firmware = await host_firmware_task
-            wifi_firmware = await wifi_firmware_task
-            location_info = await location_task
-            group_info = await group_task
-            wifi_signal = await wifi_signal_task
-            if version_task is not None:
-                self._process_capabilities(await version_task, host_firmware)
+            await self._await_batch(pending)
+            host_firmware = requests.host_firmware.result()
+            if requests.version is not None:
+                self._process_capabilities(requests.version.result(), host_firmware)
         except BaseException:
             await self._discard_pending(pending)
             raise
@@ -1929,11 +2076,40 @@ class Device(Generic[StateT]):
         # Get MAC address (already calculated in get_host_firmware)
         mac_address = await self.get_mac_address()
 
-        wifi_info = WifiInfo(signal=wifi_signal, host_firmware=host_firmware)
-
         # Get model name
         assert self._capabilities is not None
-        model = self._capabilities.name
+
+        return _CommonState(
+            model=self._capabilities.name,
+            mac_address=mac_address,
+            capabilities=capabilities,
+            host_firmware=host_firmware,
+            wifi_firmware=requests.wifi_firmware.result(),
+            wifi_info=WifiInfo(
+                signal=requests.wifi_signal.result(), host_firmware=host_firmware
+            ),
+            location=requests.location.result(),
+            group=requests.group.result(),
+        )
+
+    async def _initialize_state(self) -> StateT:
+        """Initialize device state transactionally.
+
+        Fetches all required device state in parallel and creates the state instance.
+        This is an all-or-nothing operation - either all state is fetched successfully
+        or an exception is raised.
+
+        Raises:
+            LifxTimeoutError: If device does not respond within timeout
+            LifxDeviceNotFoundError: If device cannot be reached
+            LifxProtocolError: If responses are invalid
+        """
+        pending: list[asyncio.Future[Any]] = []
+        requests = self._schedule_common_requests(pending)
+        label_task = self._schedule_request(self.get_label(), pending)
+        power_task = self._schedule_request(self.get_power(), pending)
+
+        common = await self._resolve_common_requests(requests, pending)
 
         # Create state instance
         # Cast is needed because when Device is used directly, StateT = DeviceState
@@ -1941,50 +2117,42 @@ class Device(Generic[StateT]):
         self._state = cast(
             StateT,
             DeviceState(
-                model=model,
-                label=label,
+                model=common.model,
+                label=label_task.result(),
                 serial=self.serial,
-                mac_address=mac_address,
-                capabilities=capabilities,
-                power=power,
-                host_firmware=host_firmware,
-                wifi_firmware=wifi_firmware,
-                wifi_info=wifi_info,
-                location=location_info,
-                group=group_info,
+                mac_address=common.mac_address,
+                capabilities=common.capabilities,
+                power=power_task.result(),
+                host_firmware=common.host_firmware,
+                wifi_firmware=common.wifi_firmware,
+                wifi_info=common.wifi_info,
+                location=common.location,
+                group=common.group,
                 last_updated=time.time(),
             ),
         )
 
         return self._state
 
-    async def _refresh_wifi_info(self) -> None:
-        """Update ``state.wifi_info`` when the WiFi query is enabled."""
-        if not self._fetch_wifi_info:
-            return
-
-        assert self._state is not None
-        self._state.wifi_info = await self.get_wifi_info()
-
     async def refresh_state(self) -> None:
         """Refresh device state from hardware.
 
         On a device whose state has not been initialized yet, this delegates to
         :meth:`_initialize_state`, which populates the whole state: the
-        semi-static fields (host and WiFi firmware versions, location, group,
-        label) alongside power, and the WiFi signal when
+        semi-static fields (host and WiFi firmware versions, location, group)
+        alongside label and power, and the WiFi signal when
         :attr:`fetch_wifi_info` is set.
 
-        On an already-initialized device the base implementation only re-queries
-        what can change without the library knowing: the opt-in WiFi reading.
-        The semi-static fields are deliberately left alone - they are cached
-        because a firmware version or group assignment does not change under a
-        running application - so this stamps ``last_updated`` and returns.
+        On an already-initialized device this re-queries what can change without
+        the library knowing - label and power, plus the opt-in WiFi reading -
+        and stamps ``last_updated`` from those readings. The semi-static fields
+        are deliberately left alone: they are cached because a firmware version
+        or group assignment does not change under a running application.
 
-        The real per-refresh work happens in :class:`~lifx.devices.light.Light`
-        and its subclasses, which re-fetch the volatile state their devices
-        expose: colour, power and label, plus zones, tiles, infrared, HEV and
-        ceiling components as applicable.
+        Subclasses extend this with the volatile state their devices expose:
+        :class:`~lifx.devices.light.Light` replaces the label and power queries
+        with a single colour request that returns all three, and its own
+        subclasses add zones, tiles, infrared, HEV and ceiling components.
 
         Raises:
             LifxTimeoutError: If device does not respond
@@ -1994,7 +2162,26 @@ class Device(Generic[StateT]):
             await self._initialize_state()
             return
 
-        await self._refresh_wifi_info()
+        pending: list[asyncio.Future[Any]] = []
+        label_task = self._schedule_request(self.get_label(), pending)
+        power_task = self._schedule_request(self.get_power(), pending)
+        wifi_signal_task = self._schedule_request(self._fetch_wifi_signal(), pending)
+
+        try:
+            await self._await_batch(pending)
+        except BaseException:
+            await self._discard_pending(pending)
+            raise
+
+        self._state.label = label_task.result()
+        self._state.power = power_task.result()
+        # Assigned unconditionally: with the query disabled the signal is None,
+        # so the field reports "not fetched" instead of an unbounded-age reading
+        # carried behind a freshly stamped last_updated.
+        self._state.wifi_info = WifiInfo(
+            signal=wifi_signal_task.result(),
+            host_firmware=self._state.host_firmware,
+        )
 
         self._state.last_updated = time.time()
 

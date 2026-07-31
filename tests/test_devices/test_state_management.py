@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lifx.color import HSBK
+from lifx.const import INVALID_AMBIENT_LIGHT_RESPONSE
 from lifx.devices.base import (
     CollectionInfo,
     Device,
@@ -19,13 +20,23 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxUnsupportedDeviceError
+from lifx.exceptions import (
+    LifxTimeoutError,
+    LifxUnsupportedCommandError,
+    LifxUnsupportedDeviceError,
+)
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 
 
-def _state_request_handler(signal: float = 7.943283890199382e-06, lux: float = 12.5):
-    """Return a request side effect covering every _initialize_state() query."""
+def _state_request_handler(
+    signal: float = 7.943283890199382e-06, lux: float = 12.5, power: int = 65535
+):
+    """Return a request side effect covering every _initialize_state() query.
+
+    ``power`` also decides whether an ambient light reading is usable: readings
+    taken while the light is on are stored as INVALID_AMBIENT_LIGHT_RESPONSE.
+    """
 
     async def mock_request(packet):
         if isinstance(packet, packets.Sensor.GetAmbientLight):
@@ -33,13 +44,13 @@ def _state_request_handler(signal: float = 7.943283890199382e-06, lux: float = 1
         if isinstance(packet, packets.Light.GetColor):
             state = MagicMock()
             state.color = LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500)
-            state.power = 65535
+            state.power = power
             state.label = "Test"
             return state
         if isinstance(packet, packets.Device.GetLabel):
             return packets.Device.StateLabel(label=b"Test")
         if isinstance(packet, packets.Device.GetPower):
-            return packets.Device.StatePower(level=65535)
+            return packets.Device.StatePower(level=power)
         if isinstance(packet, packets.Device.GetHostFirmware):
             return packets.Device.StateHostFirmware(
                 build=0, version_major=2, version_minor=80
@@ -453,7 +464,7 @@ class TestStateInitialization:
         """fetch_ambient_light=True populates the lux reading from the device."""
         light = mock_device_factory(Light, fetch_ambient_light=True)
         light._capabilities = mock_product_info(has_color=True)
-        light.connection.request.side_effect = _state_request_handler(lux=42.0)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0, power=0)
 
         await light._initialize_state()
 
@@ -676,7 +687,7 @@ class TestRefreshState:
     ):
         """Setting fetch_ambient_light makes the next refresh read the sensor."""
         light._capabilities = mock_product_info(has_color=True)
-        light.connection.request.side_effect = _state_request_handler(lux=42.0)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0, power=0)
         await light._initialize_state()
 
         light.fetch_ambient_light = True
@@ -709,7 +720,7 @@ class TestRefreshState:
     ):
         """The ambient property also covers the uninitialized-state path."""
         light._capabilities = mock_product_info(has_color=True)
-        light.connection.request.side_effect = _state_request_handler(lux=42.0)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0, power=0)
 
         light.fetch_ambient_light = True
         await light.refresh_state()
@@ -756,6 +767,215 @@ class TestRefreshState:
 
         assert device._state.last_updated > 0.0
         assert device._state.is_fresh()
+
+    @pytest.mark.asyncio
+    async def test_clearing_fetch_wifi_info_clears_the_reading(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A refresh with the query off reports None instead of a stale reading."""
+        light = mock_device_factory(Light, fetch_wifi_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        assert light._state.wifi_info.rssi == -51
+
+        light.fetch_wifi_info = False
+        await light.refresh_state()
+
+        assert light._state.wifi_info.signal is None
+        assert light._state.wifi_info.rssi is None
+
+    @pytest.mark.asyncio
+    async def test_clearing_fetch_ambient_light_clears_the_reading(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A refresh with the sensor off reports None instead of a stale reading."""
+        light = mock_device_factory(Light, fetch_ambient_light=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler(lux=42.0, power=0)
+        await light._initialize_state()
+        assert light._state.ambient_light == pytest.approx(42.0)
+
+        light.fetch_ambient_light = False
+        await light.refresh_state()
+
+        assert light._state.ambient_light is None
+
+    @pytest.mark.asyncio
+    async def test_ambient_light_read_while_light_is_on_is_marked_invalid(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A reading taken with the light on measures the light, not the room."""
+        light = mock_device_factory(Light, fetch_ambient_light=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler(
+            lux=42.0, power=65535
+        )
+
+        await light._initialize_state()
+        assert light._state.ambient_light == INVALID_AMBIENT_LIGHT_RESPONSE
+
+        light.connection.request.side_effect = _state_request_handler(lux=42.0, power=0)
+        await light.refresh_state()
+        assert light._state.ambient_light == pytest.approx(42.0)
+
+        light.connection.request.side_effect = _state_request_handler(
+            lux=42.0, power=65535
+        )
+        await light.refresh_state()
+        assert light._state.ambient_light == INVALID_AMBIENT_LIGHT_RESPONSE
+
+    @pytest.mark.asyncio
+    async def test_unsupported_ambient_sensor_does_not_fail_initialization(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A device that refuses the sensor query still initializes."""
+        light = mock_device_factory(Light, fetch_ambient_light=True)
+        light._capabilities = mock_product_info(has_color=True)
+        handler = _state_request_handler()
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Sensor.GetAmbientLight):
+                raise LifxUnsupportedCommandError("Device does not support packet 401")
+            return await handler(packet)
+
+        light.connection.request.side_effect = mock_request
+
+        await light._initialize_state()
+
+        assert light._state is not None
+        assert light._state.ambient_light is None
+
+    @pytest.mark.asyncio
+    async def test_failed_optional_query_keeps_the_colour_reading(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A refused opt-in query does not discard the colour/power/label reading."""
+        light = mock_device_factory(Light, fetch_wifi_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        light._state.label = "Stale"
+        handler = _state_request_handler()
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Device.GetWifiInfo):
+                raise LifxTimeoutError("Timed out")
+            return await handler(packet)
+
+        light.connection.request.side_effect = mock_request
+
+        await light.refresh_state()
+
+        assert light._state.label == "Test"
+        assert light._state.wifi_info.signal is None
+
+    @pytest.mark.asyncio
+    async def test_light_refresh_state_cancels_in_flight_requests(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A failed refresh cancels the requests still in flight beside it."""
+        light = mock_device_factory(Light, fetch_ambient_light=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+
+        cancelled = asyncio.Event()
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Light.GetColor):
+                raise LifxTimeoutError("Timed out")
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        light.connection.request.side_effect = mock_request
+
+        with pytest.raises(LifxTimeoutError):
+            await light.refresh_state()
+
+        assert cancelled.is_set()
+
+    @pytest.mark.asyncio
+    async def test_base_device_refresh_state_rereads_label_and_power(
+        self, device, mock_product_info
+    ):
+        """Device.refresh_state() re-queries what it stamps as fresh."""
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+        await device._initialize_state()
+
+        device._state.label = "Stale"
+        device._state.power = 0
+        device.connection.request.reset_mock()
+
+        await device.refresh_state()
+
+        requested = [call.args[0] for call in device.connection.request.await_args_list]
+        assert any(isinstance(packet, packets.Device.GetLabel) for packet in requested)
+        assert any(isinstance(packet, packets.Device.GetPower) for packet in requested)
+        assert device._state.label != "Stale"
+        assert device._state.power == 65535
+        assert device._state.is_fresh()
+
+    @pytest.mark.asyncio
+    async def test_base_device_refresh_state_cancels_in_flight_requests(
+        self, device, mock_product_info
+    ):
+        """A failed base refresh cancels the requests still in flight beside it."""
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+        await device._initialize_state()
+
+        cancelled = asyncio.Event()
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Device.GetLabel):
+                raise LifxTimeoutError("Timed out")
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        device.connection.request.side_effect = mock_request
+
+        with pytest.raises(LifxTimeoutError):
+            await device.refresh_state()
+
+        assert cancelled.is_set()
+
+    @pytest.mark.asyncio
+    async def test_set_group_updates_group_not_location(
+        self, device, mock_product_info
+    ):
+        """set_group() writes the new group into state.group, leaving location."""
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+        await device._initialize_state()
+        device._state.location = CollectionInfo(
+            uuid="0" * 32, label="Home", updated_at=0
+        )
+        device._state.group = CollectionInfo(uuid="1" * 32, label="Old", updated_at=0)
+
+        async def empty_async_gen(*args, **kwargs):
+            return
+            yield
+
+        device.connection.request.side_effect = None
+        device.connection.request.return_value = packets.Device.StateGroup(
+            group=b"\x00" * 16, label=b"Kitchen", updated_at=0
+        )
+
+        with patch("lifx.network.discovery.discover_devices", empty_async_gen):
+            with patch.object(Device, "_schedule_refresh", new_callable=AsyncMock):
+                await device.set_group("Kitchen")
+
+        assert device._state.group.label == "Kitchen"
+        assert device._state.location.label == "Home"
+        assert device._state.location.uuid == "0" * 32
 
     @pytest.mark.asyncio
     async def test_base_device_refresh_state_initializes_without_override(
@@ -1380,6 +1600,40 @@ class TestGetMethodsStateUpdates:
 
 class TestStateDataclasses:
     """Tests for state dataclass properties and functionality."""
+
+    def test_opt_in_fields_are_optional_keyword_arguments(self):
+        """State can be built without the opt-in fields, as before they existed."""
+        capabilities = DeviceCapabilities(
+            has_color=True,
+            has_multizone=False,
+            has_chain=False,
+            has_matrix=False,
+            has_infrared=False,
+            has_hev=False,
+            has_extended_multizone=False,
+            kelvin_min=1500,
+            kelvin_max=9000,
+        )
+        firmware = FirmwareInfo(build=0, version_major=2, version_minor=80)
+
+        state = LightState(
+            model="Test",
+            label="Test",
+            serial="000000000000",
+            mac_address="00:00:00:00:00:00",
+            capabilities=capabilities,
+            power=0,
+            host_firmware=firmware,
+            wifi_firmware=firmware,
+            location=CollectionInfo("0000000000000000", "Location", 0),
+            group=CollectionInfo("0000000000000000", "Group", 0),
+            last_updated=time.time(),
+            color=HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3500),
+        )
+
+        assert state.ambient_light is None
+        assert state.wifi_info.signal is None
+        assert state.wifi_info.rssi is None
 
     def test_device_state_is_on_property(self):
         """Test DeviceState.is_on property."""

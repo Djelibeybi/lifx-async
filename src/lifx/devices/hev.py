@@ -11,6 +11,7 @@ import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.light import Light, LightState
 from lifx.protocol import packets
 from lifx.protocol.models import HevConfig, HevCycleState
@@ -109,9 +110,32 @@ class HevLight(Light):
 
     _state: HevLightState
 
-    def __init__(self, *args, **kwargs) -> None:
-        """Initialize HevLight with additional state attributes."""
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        serial: str,
+        ip: str,
+        port: int = LIFX_UDP_PORT,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
+        fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
+    ) -> None:
+        """Initialize HevLight with additional state attributes.
+
+        See :class:`~lifx.devices.base.Device` for parameter documentation. The
+        signature is spelled out rather than forwarded as ``*args, **kwargs`` so
+        callers get the same type checking the base class offers.
+        """
+        super().__init__(
+            serial,
+            ip,
+            port,
+            timeout,
+            max_retries,
+            fetch_wifi_info=fetch_wifi_info,
+            fetch_ambient_light=fetch_ambient_light,
+        )
         # HEV-specific state storage
         self._hev_config: HevConfig | None = None
         self._hev_result: LightLastHevCycleResult | None = None

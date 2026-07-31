@@ -110,6 +110,16 @@ MIN_KELVIN: Final[int] = 1500
 MAX_KELVIN: Final[int] = 9000
 
 # ============================================================================
+# Ambient Light Sensor
+# ============================================================================
+
+# Stored in state.ambient_light when the reading was taken while the light was
+# on, where the sensor measures the light's own output instead of the room. The
+# sensor only ever reports zero or positive lux, so a negative value cannot be
+# mistaken for a genuine reading.
+INVALID_AMBIENT_LIGHT_RESPONSE: Final[float] = -1.0
+
+# ============================================================================
 # UUID Namespaces
 # ============================================================================
 
