@@ -172,6 +172,7 @@ class CeilingLightState(MatrixLightState):
             location=matrix_state.location,
             group=matrix_state.group,
             color=matrix_state.color,
+            ambient_light=matrix_state.ambient_light,
             chain=matrix_state.chain,
             tile_orientations=matrix_state.tile_orientations,
             tile_colors=matrix_state.tile_colors,
@@ -230,10 +231,16 @@ class CeilingLight(MatrixLight):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
-        fetch_wifi_info: bool = False,
         state_file: str | None = None,
+        *,
+        fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
     ):
         """Initialize CeilingLight.
+
+        ``state_file`` keeps its original position: inserting a parameter ahead
+        of it would silently rebind existing positional callers. New options are
+        keyword-only for the same reason.
 
         Args:
             serial: Device serial number
@@ -241,13 +248,23 @@ class CeilingLight(MatrixLight):
             port: Device UDP port (default: 56700)
             timeout: Overall timeout for network requests in seconds
             max_retries: Maximum number of retry attempts for network requests
-            fetch_wifi_info: Query WiFi signal strength during state initialization
             state_file: Optional path to JSON file for state persistence
+            fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_ambient_light: Query the ambient light sensor during state
+                initialization
 
         Raises:
             LifxError: If device is not a supported Ceiling product
         """
-        super().__init__(serial, ip, port, timeout, max_retries, fetch_wifi_info)
+        super().__init__(
+            serial,
+            ip,
+            port,
+            timeout,
+            max_retries,
+            fetch_wifi_info=fetch_wifi_info,
+            fetch_ambient_light=fetch_ambient_light,
+        )
         self._state_file = state_file
 
     async def __aenter__(self) -> CeilingLight:
@@ -336,22 +353,17 @@ class CeilingLight(MatrixLight):
 
         return ceiling_state
 
-    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
+    async def refresh_state(self) -> None:
         """Refresh ceiling light state from hardware.
 
         Fetches color, tiles, tile colors, effect, and ceiling component state.
-
-        Args:
-            fetch_wifi_info: Query WiFi signal strength for this refresh,
-                overriding the instance default set at construction. None
-                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state(fetch_wifi_info)
+        await super().refresh_state()
 
         # Extract ceiling component colors from already-fetched tile_colors
         # (parent refresh_state already called get_all_tile_colors)
@@ -379,6 +391,7 @@ class CeilingLight(MatrixLight):
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
         *,
         state_file: str | None = None,
     ) -> CeilingLight:
@@ -391,6 +404,8 @@ class CeilingLight(MatrixLight):
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retries for requests
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_ambient_light: Query the ambient light sensor during state
+                initialization
             state_file: Optional path to JSON file for state persistence
 
         Returns:
@@ -404,7 +419,7 @@ class CeilingLight(MatrixLight):
         # Parent factory constructs via cls(...), so this is already a fully
         # configured CeilingLight — only state_file needs setting
         device = await super().from_ip(
-            ip, port, serial, timeout, max_retries, fetch_wifi_info
+            ip, port, serial, timeout, max_retries, fetch_wifi_info, fetch_ambient_light
         )
         device._state_file = state_file
         return device

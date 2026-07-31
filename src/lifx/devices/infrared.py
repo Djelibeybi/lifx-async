@@ -48,6 +48,7 @@ class InfraredLightState(LightState):
             location=light_state.location,
             group=light_state.group,
             color=light_state.color,
+            ambient_light=light_state.ambient_light,
             infrared=infrared,
             last_updated=time.time(),
         )
@@ -217,22 +218,17 @@ class InfraredLight(Light):
         """
         return self._infrared
 
-    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
+    async def refresh_state(self) -> None:
         """Refresh infrared light state from hardware.
 
         Fetches color and infrared brightness.
-
-        Args:
-            fetch_wifi_info: Query WiFi signal strength for this refresh,
-                overriding the instance default set at construction. None
-                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state(fetch_wifi_info)
+        await super().refresh_state()
 
         infrared = await self.get_infrared()
         self._state.infrared = infrared
@@ -241,9 +237,6 @@ class InfraredLight(Light):
         """Initialize infrared light state transactionally.
 
         Extends Light implementation to fetch infrared brightness.
-
-        Args:
-            timeout: Timeout for state initialization
 
         Raises:
             LifxTimeoutError: If device does not respond within timeout

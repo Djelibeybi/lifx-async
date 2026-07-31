@@ -332,6 +332,7 @@ class MatrixLightState(LightState):
             location=light_state.location,
             group=light_state.group,
             color=light_state.color,
+            ambient_light=light_state.ambient_light,
             chain=chain,
             tile_orientations=tile_orientations,
             tile_colors=tile_colors,
@@ -1229,22 +1230,17 @@ class MatrixLight(Light):
             f"MatrixLight(label={self.label!r}, serial={self.serial!r}, ip={self.ip!r})"
         )
 
-    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
+    async def refresh_state(self) -> None:
         """Refresh matrix light state from hardware.
 
         Fetches color, tiles, tile colors for all tiles, and effect.
-
-        Args:
-            fetch_wifi_info: Query WiFi signal strength for this refresh,
-                overriding the instance default set at construction. None
-                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state(fetch_wifi_info)
+        await super().refresh_state()
 
         # Fetch all matrix light state sequentially to avoid overwhelming device
         all_tile_colors = await self.get_all_tile_colors()
@@ -1258,9 +1254,6 @@ class MatrixLight(Light):
         """Initialize matrix light state transactionally.
 
         Extends Light implementation to fetch tiles and effect.
-
-        Args:
-            timeout: Timeout for state initialization
 
         Raises:
             LifxTimeoutError: If device does not respond within timeout
