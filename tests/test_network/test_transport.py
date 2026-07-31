@@ -8,7 +8,7 @@ import pytest
 
 from lifx.exceptions import LifxNetworkError as NetworkError
 from lifx.exceptions import LifxTimeoutError as TimeoutError
-from lifx.network.transport import UdpTransport
+from lifx.network.transport import PeerInfo, UdpTransport, _UdpProtocol
 
 
 class TestUdpTransport:
@@ -114,8 +114,6 @@ class TestUdpProtocol:
 
     async def test_protocol_datagram_received(self) -> None:
         """Test protocol handles received datagrams."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
         test_data = b"\x00" * 36  # Minimum valid packet size
         test_addr = ("192.168.1.100", 56700)
@@ -133,8 +131,6 @@ class TestUdpProtocol:
         """Test protocol connection_made callback."""
         from unittest.mock import MagicMock
 
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
         mock_transport = MagicMock()
 
@@ -144,8 +140,6 @@ class TestUdpProtocol:
     async def test_protocol_connection_lost(self) -> None:
         """Test protocol connection_lost callback."""
         from unittest.mock import MagicMock
-
-        from lifx.network.transport import _UdpProtocol
 
         protocol = _UdpProtocol()
         mock_transport = MagicMock()
@@ -158,8 +152,6 @@ class TestUdpProtocol:
 
     async def test_protocol_error_received(self) -> None:
         """Test protocol error_received logs warning."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
 
         with patch("lifx.network.transport._LOGGER") as mock_logger:
@@ -169,48 +161,76 @@ class TestUdpProtocol:
             assert log_dict["class"] == "_UdpProtocol"
             assert log_dict["method"] == "error_received"
             assert "test error" in log_dict["error"]
-            assert "peer" not in log_dict
+            assert "serial" not in log_dict
 
     async def test_protocol_error_received_names_the_peer(self) -> None:
         """An unreachable-peer warning identifies which device went away."""
-        from lifx.network.transport import _UdpProtocol
-
-        protocol = _UdpProtocol(peer="d073d5d4809b@192.168.19.200")
+        protocol = _UdpProtocol(peer=PeerInfo("d073d5d4809b", "192.168.19.200", 56700))
 
         with patch("lifx.network.transport._LOGGER") as mock_logger:
             protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
             log_dict = mock_logger.warning.call_args[0][0]
-            assert log_dict["peer"] == "d073d5d4809b@192.168.19.200"
+            assert log_dict["serial"] == "d073d5d4809b"
+            assert log_dict["ip"] == "192.168.19.200"
+            assert log_dict["port"] == 56700
             assert log_dict["method"] == "error_received"
 
-    async def test_protocol_dropped_packet_names_the_peer(self) -> None:
-        """A queue-full warning identifies which device overran the queue."""
-        from lifx.network.transport import _UdpProtocol
+    async def test_protocol_log_follows_a_serial_learned_later(self) -> None:
+        """A serial learned after open() replaces the placeholder in logs."""
+        peer = PeerInfo("000000000000", "192.168.19.200", 56700)
+        protocol = _UdpProtocol(peer=peer)
 
-        protocol = _UdpProtocol(peer="d073d5d4809b@192.168.19.200")
+        peer.serial = "d073d5d4809b"
+
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
+            log_dict = mock_logger.warning.call_args[0][0]
+            assert log_dict["serial"] == "d073d5d4809b"
+
+    async def test_protocol_dropped_packet_names_peer_and_sender(self) -> None:
+        """A queue-full warning names both the peer and the actual sender."""
+        protocol = _UdpProtocol(peer=PeerInfo("d073d5d4809b", "192.168.19.200", 56700))
         for _ in range(protocol._MAX_QUEUE_SIZE):
             protocol.datagram_received(b"x", ("192.168.19.200", 56700))
 
         with patch("lifx.network.transport._LOGGER") as mock_logger:
-            protocol.datagram_received(b"x", ("192.168.19.200", 56700))
+            # A different host overruns the queue: the peer alone would blame
+            # the device that sent nothing.
+            protocol.datagram_received(b"x", ("192.168.19.7", 56700))
             log_dict = mock_logger.warning.call_args[0][0]
-            assert log_dict["peer"] == "d073d5d4809b@192.168.19.200"
+            assert log_dict["serial"] == "d073d5d4809b"
+            assert log_dict["sender"] == ("192.168.19.7", 56700)
             assert log_dict["action"] == "packet_dropped"
 
     async def test_transport_passes_peer_to_protocol(self) -> None:
         """UdpTransport hands its peer descriptor to the protocol it creates."""
-        transport = UdpTransport(peer="d073d5d4809b@192.168.19.200")
+        peer = PeerInfo("d073d5d4809b", "192.168.19.200", 56700)
+        transport = UdpTransport(peer=peer)
         await transport.open()
         try:
             assert transport._protocol is not None
-            assert transport._protocol._peer == "d073d5d4809b@192.168.19.200"
+            assert transport._protocol._peer is peer
         finally:
             await transport.close()
 
+    async def test_endpoint_lost_warning_names_the_peer(self) -> None:
+        """The socket-death warning identifies whose connection was torn down."""
+        transport = UdpTransport(peer=PeerInfo("d073d5d4809b", "192.168.19.200", 56700))
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            transport._endpoint_lost(protocol, OSError(errno.EBADF, "Bad fd"))
+            log_dict = mock_logger.warning.call_args[0][0]
+            assert log_dict["class"] == "UdpTransport"
+            assert log_dict["action"] == "endpoint_lost"
+            assert log_dict["serial"] == "d073d5d4809b"
+            assert log_dict["ip"] == "192.168.19.200"
+            assert log_dict["port"] == 56700
+
     async def test_protocol_queue_full_drops_packet(self) -> None:
         """Test datagram_received drops packets when queue is full."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
         test_addr = ("192.168.1.100", 56700)
         test_data = b"\x00" * 36
@@ -246,7 +266,6 @@ class TestPacketSizeValidation:
     async def test_receive_packet_too_large(self) -> None:
         """Test receive rejects packets larger than MAX_PACKET_SIZE."""
         from lifx.exceptions import LifxProtocolError
-        from lifx.network.transport import _UdpProtocol
 
         protocol = _UdpProtocol()
         # Create oversized packet (MAX_PACKET_SIZE is 1024)
@@ -262,7 +281,6 @@ class TestPacketSizeValidation:
     async def test_receive_packet_too_small(self) -> None:
         """Test receive rejects packets smaller than MIN_PACKET_SIZE."""
         from lifx.exceptions import LifxProtocolError
-        from lifx.network.transport import _UdpProtocol
 
         protocol = _UdpProtocol()
         # Create undersized packet (MIN_PACKET_SIZE is 36)
@@ -277,8 +295,6 @@ class TestPacketSizeValidation:
 
     async def test_receive_valid_packet_size(self) -> None:
         """Test receive accepts packets within valid size range."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
         # Create valid packet (exactly MIN_PACKET_SIZE)
         valid_data = b"\x00" * 36
@@ -294,8 +310,6 @@ class TestPacketSizeValidation:
 
     async def test_receive_many_drops_oversized_packets(self) -> None:
         """Test receive_many silently drops oversized packets."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
 
         # Add one valid and one oversized packet
@@ -316,8 +330,6 @@ class TestPacketSizeValidation:
 
     async def test_receive_many_drops_undersized_packets(self) -> None:
         """Test receive_many silently drops undersized packets."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
 
         # Add one valid and one undersized packet
@@ -338,8 +350,6 @@ class TestPacketSizeValidation:
 
     async def test_receive_many_max_packets_limit(self) -> None:
         """Test receive_many stops after max_packets."""
-        from lifx.network.transport import _UdpProtocol
-
         protocol = _UdpProtocol()
 
         # Add multiple valid packets
@@ -373,8 +383,6 @@ class TestErrorHandling:
 
     async def test_send_oserror_raises_network_error(self) -> None:
         """Test OSError during send raises NetworkError."""
-        from lifx.network.transport import _UdpProtocol
-
         transport = UdpTransport()
         protocol = _UdpProtocol()
         transport._protocol = protocol
@@ -390,8 +398,6 @@ class TestErrorHandling:
     async def test_receive_oserror_raises_network_error(self) -> None:
         """Test OSError during receive raises NetworkError."""
         import asyncio
-
-        from lifx.network.transport import _UdpProtocol
 
         protocol = _UdpProtocol()
         transport = UdpTransport()
@@ -431,8 +437,6 @@ class TestErrorHandling:
     async def test_receive_many_oserror_breaks_loop(self) -> None:
         """Test receive_many breaks on OSError during packet receive."""
         import asyncio
-
-        from lifx.network.transport import _UdpProtocol
 
         protocol = _UdpProtocol()
         transport = UdpTransport()
@@ -617,8 +621,6 @@ class TestEndpointLoss:
 
     async def test_loss_before_endpoint_is_assigned(self) -> None:
         """Loss reported while the endpoint is still being created is safe."""
-        from lifx.network.transport import _UdpProtocol
-
         transport = UdpTransport()
         protocol = _UdpProtocol(on_endpoint_lost=transport._endpoint_lost)
         # open() assigns _protocol before create_datagram_endpoint() returns.

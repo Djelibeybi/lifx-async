@@ -9,6 +9,7 @@ import socket
 import time
 import warnings
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from lifx.const import (
@@ -33,6 +34,57 @@ _LOGGER = logging.getLogger(__name__)
 _FATAL_SOCKET_ERRNOS: frozenset[int] = frozenset({errno.EBADF, errno.ENOTSOCK})
 
 
+@dataclass
+class PeerInfo:
+    """Identity of the device a per-device socket talks to.
+
+    Deliberately mutable and shared by reference with the socket's owner: a
+    connection opened without a serial (``Device.from_ip()`` and friends)
+    learns the real serial from the first reply, long after the transport was
+    built. A string snapshot taken at open() time would keep naming the
+    ``000000000000`` placeholder for the life of the socket.
+
+    Attributes:
+        serial: Device serial as a 12-digit hex string.
+        ip: Device IP address.
+        port: Device UDP port. Included because two connections to the same
+            host on different ports (several emulator devices on localhost, or
+            a port-mapped deployment) are otherwise indistinguishable in logs.
+    """
+
+    serial: str
+    ip: str
+    port: int
+
+
+def _peer_record(
+    class_name: str, peer: PeerInfo | None, **fields: object
+) -> dict[str, object]:
+    """Build a structured log record, tagged with the peer when known.
+
+    Send and receive errors name the errno but never the destination, so
+    without this a warning about an unreachable device cannot be traced back
+    to which device went away. The peer is emitted as discrete ``serial`` /
+    ``ip`` / ``port`` keys to match every other structured log in the library,
+    so a log pipeline selecting one device by serial sees transport records too.
+
+    Args:
+        class_name: Emitting class, used as the record's ``class`` field.
+        peer: Device this socket talks to, or None for the shared broadcast
+            socket used by discovery, which has no single peer.
+        **fields: Remaining record fields.
+
+    Returns:
+        The structured log record.
+    """
+    record: dict[str, object] = {"class": class_name, **fields}
+    if peer is not None:
+        record["serial"] = peer.serial
+        record["ip"] = peer.ip
+        record["port"] = peer.port
+    return record
+
+
 class _UdpProtocol(asyncio.DatagramProtocol):
     """Internal DatagramProtocol implementation for receiving UDP packets."""
 
@@ -44,7 +96,7 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         self,
         on_endpoint_lost: Callable[[_UdpProtocol, Exception | None], None]
         | None = None,
-        peer: str | None = None,
+        peer: PeerInfo | None = None,
     ) -> None:
         """Initialize the protocol.
 
@@ -54,8 +106,9 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                 endpoint was closed rather than failed). The owner uses it to
                 drop its references to a socket that can no longer send or
                 receive.
-            peer: Descriptor of the device this socket talks to, included in
-                warning logs. A per-device socket knows its peer; the
+            peer: Device this socket talks to, included in warning logs. Held
+                by reference so a serial learned after open() shows up in
+                later records. A per-device socket knows its peer; the
                 broadcast socket used for discovery does not, so it is
                 optional and omitted from the log when unset.
         """
@@ -70,16 +123,8 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         self._lost = False
 
     def _log(self, **fields: object) -> dict[str, object]:
-        """Build a structured log record, tagged with the peer when known.
-
-        Send and receive errors name the errno but never the destination, so
-        without this a warning about an unreachable device cannot be traced
-        back to which device went away.
-        """
-        record: dict[str, object] = {"class": "_UdpProtocol", **fields}
-        if self._peer is not None:
-            record["peer"] = self._peer
-        return record
+        """Build a structured log record, tagged with the peer when known."""
+        return _peer_record("_UdpProtocol", self._peer, **fields)
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Called when connection is established."""
@@ -103,6 +148,11 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                         method="datagram_received",
                         action="packet_dropped",
                         reason="queue_full",
+                        # The socket accepts datagrams from any host, so the
+                        # sender is not necessarily the configured peer: a
+                        # stray broadcaster can overrun the queue and the peer
+                        # alone would blame a device that sent nothing.
+                        sender=addr,
                         total_dropped=self._dropped_count,
                     )
                 )
@@ -168,17 +218,18 @@ class UdpTransport:
         ip_address: str = DEFAULT_IP_ADDRESS,
         port: int = 0,
         broadcast: bool = False,
-        peer: str | None = None,
+        peer: PeerInfo | None = None,
     ) -> None:
         """Initialize UDP transport.
 
         Args:
             port: Local port to bind to (0 for automatic assignment)
             broadcast: Enable broadcast mode for device discovery
-            peer: Descriptor of the device this socket talks to, included in
-                warning logs so an unreachable-peer error names the device.
-                Left unset for the shared broadcast socket, which has no
-                single peer.
+            peer: Device this socket talks to, included in warning logs so an
+                unreachable-peer error names the device. Held by reference, so
+                a serial learned after open() shows up in later records. Left
+                unset for the shared broadcast socket, which has no single
+                peer.
         """
         self._ip_address = ip_address
         self._port = port
@@ -186,6 +237,10 @@ class UdpTransport:
         self._peer = peer
         self._protocol: _UdpProtocol | None = None
         self._transport: DatagramTransport | None = None
+
+    def _log(self, **fields: object) -> dict[str, object]:
+        """Build a structured log record, tagged with the peer when known."""
+        return _peer_record("UdpTransport", self._peer, **fields)
 
     async def __aenter__(self) -> UdpTransport:
         """Enter async context manager."""
@@ -301,15 +356,15 @@ class UdpTransport:
             # connection_lost). Resetting here would tear down the live one.
             return
 
+        # The local bind values are deliberately left out: both callers bind
+        # 0.0.0.0 on an ephemeral port, so they are constants that name no
+        # device. The peer is what identifies whose socket just died.
         _LOGGER.warning(
-            {
-                "class": "UdpTransport",
-                "method": "_endpoint_lost",
-                "action": "endpoint_lost",
-                "ip_address": self._ip_address,
-                "port": self._port,
-                "reason": str(exc) if exc is not None else "closed",
-            }
+            self._log(
+                method="_endpoint_lost",
+                action="endpoint_lost",
+                reason=str(exc) if exc is not None else "closed",
+            )
         )
 
         transport, self._transport = self._transport, None
@@ -380,26 +435,19 @@ class UdpTransport:
         except TIMEOUT_ERRORS as e:
             raise LifxTimeoutError(f"No data received within {timeout}s") from e
         except OSError as e:
-            _LOGGER.error(
-                {
-                    "class": "UdpTransport",
-                    "method": "receive",
-                    "action": "failed",
-                    "reason": str(e),
-                }
-            )
+            _LOGGER.error(self._log(method="receive", action="failed", reason=str(e)))
             raise LifxNetworkError(f"Failed to receive data: {e}") from e
 
         # Validate packet size
         if len(data) > MAX_PACKET_SIZE:
             _LOGGER.error(
-                {
-                    "class": "UdpTransport",
-                    "method": "receive",
-                    "action": "packet_too_large",
-                    "packet_size": len(data),
-                    "max_size": MAX_PACKET_SIZE,
-                }
+                self._log(
+                    method="receive",
+                    action="packet_too_large",
+                    sender=addr,
+                    packet_size=len(data),
+                    max_size=MAX_PACKET_SIZE,
+                )
             )
             raise LifxProtocolError(
                 f"Packet too big: {len(data)} bytes > {MAX_PACKET_SIZE} bytes"
@@ -407,13 +455,13 @@ class UdpTransport:
 
         if len(data) < MIN_PACKET_SIZE:
             _LOGGER.error(
-                {
-                    "class": "UdpTransport",
-                    "method": "receive",
-                    "action": "packet_too_small",
-                    "packet_size": len(data),
-                    "min_size": MIN_PACKET_SIZE,
-                }
+                self._log(
+                    method="receive",
+                    action="packet_too_small",
+                    sender=addr,
+                    packet_size=len(data),
+                    min_size=MIN_PACKET_SIZE,
+                )
             )
             raise LifxProtocolError(
                 f"Packet too small: {len(data)} bytes < {MIN_PACKET_SIZE} bytes"
