@@ -1,5 +1,7 @@
 """Tests for UDP transport layer."""
 
+import errno
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -424,3 +426,168 @@ class TestErrorHandling:
         packets = await transport.receive_many(timeout=1.0)
         assert len(packets) == 1
         assert packets[0][0] == valid_data
+
+
+class TestEndpointLoss:
+    """A dead endpoint must report itself dead so it can be reopened.
+
+    asyncio only calls ``connection_lost`` on an unconnected datagram endpoint
+    for ``close()``, ``abort()`` and fatal (non-OSError) errors in its
+    read/write path; ordinary send and receive errors go to ``error_received``
+    and leave the endpoint usable. Both paths are covered here.
+    """
+
+    async def test_connection_lost_closes_transport_state(self) -> None:
+        """connection_lost clears the transport's own references."""
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        protocol.connection_lost(RuntimeError("fatal read error"))
+
+        assert not transport.is_open
+        assert transport._transport is None
+        assert transport._protocol is None
+
+    async def test_open_after_loss_creates_new_endpoint(self) -> None:
+        """open() must build a new endpoint, not early-return "already_open"."""
+        transport = UdpTransport()
+        await transport.open()
+        first_protocol = transport._protocol
+        first_transport = transport._transport
+        assert first_protocol is not None
+
+        first_protocol.connection_lost(RuntimeError("fatal read error"))
+        await transport.open()
+
+        try:
+            assert transport.is_open
+            assert transport._protocol is not first_protocol
+            assert transport._transport is not first_transport
+        finally:
+            await transport.close()
+
+    async def test_send_raises_after_loss(self) -> None:
+        """Sending on a dead endpoint fails loudly instead of being dropped."""
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+        protocol.connection_lost(None)
+
+        with pytest.raises(NetworkError):
+            await transport.send(b"x" * 36, ("127.0.0.1", 56700))
+
+    async def test_stale_loss_does_not_close_replacement(self) -> None:
+        """A late callback from a replaced endpoint must not kill the new one."""
+        transport = UdpTransport()
+        await transport.open()
+        old_protocol = transport._protocol
+        assert old_protocol is not None
+        await transport.close()
+        await transport.open()
+        new_protocol = transport._protocol
+
+        # asyncio delivers connection_lost after close() has already cleared
+        # the references and a replacement endpoint has been opened.
+        old_protocol.connection_lost(None)
+
+        try:
+            assert transport.is_open
+            assert transport._protocol is new_protocol
+        finally:
+            await transport.close()
+
+    @pytest.mark.parametrize(
+        "error_number",
+        [errno.EHOSTDOWN, errno.EHOSTUNREACH, errno.ENETUNREACH, errno.ECONNREFUSED],
+    )
+    async def test_unreachable_peer_errors_keep_endpoint_open(
+        self, error_number: int
+    ) -> None:
+        """Per-datagram ICMP errors describe the peer, not the socket."""
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        try:
+            for _ in range(50):
+                protocol.error_received(OSError(error_number, "peer unreachable"))
+
+            assert transport.is_open
+            assert transport._protocol is protocol
+        finally:
+            await transport.close()
+
+    @pytest.mark.parametrize("error_number", [errno.EBADF, errno.ENOTSOCK])
+    async def test_invalid_socket_errors_close_endpoint(
+        self, error_number: int
+    ) -> None:
+        """A structurally invalid socket is endpoint death, not a peer problem.
+
+        asyncio reports these to error_received and never calls
+        connection_lost, so without this the transport would claim to be open
+        forever while every datagram failed.
+        """
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        protocol.error_received(OSError(error_number, "Bad file descriptor"))
+
+        assert not transport.is_open
+
+    async def test_error_logging_is_rate_limited(self, caplog) -> None:
+        """A sustained error storm must not log once per datagram."""
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        try:
+            with caplog.at_level(logging.WARNING, logger="lifx.network.transport"):
+                for _ in range(250):
+                    protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
+
+            records = [
+                record
+                for record in caplog.records
+                if "error_received" in str(record.msg)
+            ]
+            assert len(records) == 3  # first, 100th, 200th
+        finally:
+            await transport.close()
+
+    async def test_received_datagram_resets_error_counter(self) -> None:
+        """Recovery restarts the rate-limited log for the next burst."""
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        try:
+            protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
+            assert protocol._error_count == 1
+
+            protocol.datagram_received(b"\x00" * 36, ("127.0.0.1", 56700))
+
+            assert protocol._error_count == 0
+        finally:
+            await transport.close()
+
+    async def test_loss_before_endpoint_is_assigned(self) -> None:
+        """Loss reported while the endpoint is still being created is safe."""
+        from lifx.network.transport import _UdpProtocol
+
+        transport = UdpTransport()
+        protocol = _UdpProtocol(on_endpoint_lost=transport._endpoint_lost)
+        # open() assigns _protocol before create_datagram_endpoint() returns.
+        transport._protocol = protocol
+
+        protocol.connection_lost(OSError("failed during setup"))
+
+        assert not transport.is_open
+        assert transport._transport is None
