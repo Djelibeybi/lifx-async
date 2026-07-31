@@ -133,6 +133,10 @@ async def main():
 - Each device owns its own connection (no shared pool)
 - Connections close explicitly via `close()` or context manager exit
 - Low memory overhead (one UDP socket per device)
+- A connection whose UDP endpoint dies is rebuilt on the next request. Only
+  genuine endpoint death triggers this: a device that is asleep, slow or off
+  the network produces per-datagram errors and ordinary request timeouts,
+  which leave the socket alone.
 
 ### Response Handling
 

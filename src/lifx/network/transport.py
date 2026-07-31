@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import logging
 import socket
 import time
 import warnings
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from lifx.const import (
@@ -23,18 +25,43 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+# Errnos that mean the endpoint itself is gone rather than one datagram
+# failing to reach one peer. Everything else reported to error_received --
+# EHOSTDOWN, EHOSTUNREACH, ENETUNREACH, ECONNREFUSED, EACCES -- describes the
+# destination, not the socket, and must never tear the endpoint down (a device
+# asleep or off the network would otherwise cause socket churn).
+_FATAL_SOCKET_ERRNOS: frozenset[int] = frozenset({errno.EBADF, errno.ENOTSOCK})
+
+
 class _UdpProtocol(asyncio.DatagramProtocol):
     """Internal DatagramProtocol implementation for receiving UDP packets."""
 
     _MAX_QUEUE_SIZE = 1000
     _DROP_LOG_INTERVAL = 100  # Log every Nth dropped packet
+    _ERROR_LOG_INTERVAL = 100  # Log every Nth per-datagram error
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        on_endpoint_lost: Callable[[_UdpProtocol, Exception | None], None]
+        | None = None,
+    ) -> None:
+        """Initialize the protocol.
+
+        Args:
+            on_endpoint_lost: Called once when the endpoint dies, with this
+                protocol instance and the causing exception (None when the
+                endpoint was closed rather than failed). The owner uses it to
+                drop its references to a socket that can no longer send or
+                receive.
+        """
         self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue(
             maxsize=self._MAX_QUEUE_SIZE
         )
         self.transport: DatagramTransport | None = None
         self._dropped_count: int = 0
+        self._error_count: int = 0
+        self._on_endpoint_lost = on_endpoint_lost
+        self._lost = False
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Called when connection is established."""
@@ -42,6 +69,9 @@ class _UdpProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         """Called when a datagram is received."""
+        # A received datagram proves the socket still works, so the
+        # rate-limited error log starts fresh on the next failure burst.
+        self._error_count = 0
         try:
             self.queue.put_nowait((data, addr))
         except asyncio.QueueFull:
@@ -61,14 +91,53 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                 )
 
     def error_received(self, exc: Exception) -> None:
-        """Called when an error is received."""
-        _LOGGER.warning(
-            {"class": "_UdpProtocol", "method": "error_received", "error": str(exc)}
-        )
+        """Called when a datagram could not be sent or received.
+
+        On an unconnected UDP socket asyncio reports every OSError from
+        ``sendto``/``recvfrom`` here, including the ICMP-derived errors seen
+        when a device drops off the network (EHOSTDOWN, EHOSTUNREACH,
+        ENETUNREACH). Those are per-datagram and routine: a sleeping or
+        unreachable device produces a sustained stream of them and must not be
+        treated as the endpoint dying, so they are logged (rate-limited) and
+        nothing else. Only errnos that mean the socket itself is invalid --
+        ``_FATAL_SOCKET_ERRNOS`` -- signal endpoint death, because asyncio
+        never calls ``connection_lost`` for them: a socket closed underneath
+        the loop keeps reporting EBADF here forever while the transport still
+        claims to be open.
+        """
+        self._error_count += 1
+        if self._error_count == 1 or self._error_count % self._ERROR_LOG_INTERVAL == 0:
+            _LOGGER.warning(
+                {
+                    "class": "_UdpProtocol",
+                    "method": "error_received",
+                    "error": str(exc),
+                    "total_errors": self._error_count,
+                }
+            )
+
+        if isinstance(exc, OSError) and exc.errno in _FATAL_SOCKET_ERRNOS:
+            self._notify_lost(exc)
 
     def connection_lost(self, exc: Exception | None) -> None:
-        """Called when connection is lost."""
+        """Called when the endpoint is closed or fails fatally.
+
+        For an unconnected datagram endpoint this fires on ``close()``,
+        ``abort()``, and fatal (non-OSError) errors in asyncio's read/write
+        path -- not on ordinary send or receive errors, which go to
+        :meth:`error_received`.
+        """
         self.transport = None
+        self._notify_lost(exc)
+
+    def _notify_lost(self, exc: Exception | None) -> None:
+        """Report endpoint death to the owner exactly once."""
+        if self._lost:
+            return
+        self._lost = True
+        self.transport = None
+        if self._on_endpoint_lost is not None:
+            self._on_endpoint_lost(self, exc)
 
 
 class UdpTransport:
@@ -134,7 +203,7 @@ class UdpTransport:
             )
 
             # Create protocol
-            protocol = _UdpProtocol()
+            protocol = _UdpProtocol(on_endpoint_lost=self._endpoint_lost)
             self._protocol = protocol
 
             # Create datagram endpoint
@@ -186,6 +255,54 @@ class UdpTransport:
                 }
             )
             raise LifxNetworkError(f"Failed to open UDP socket: {e}") from e
+
+    def _endpoint_lost(self, protocol: _UdpProtocol, exc: Exception | None) -> None:
+        """Drop references to an endpoint that has died.
+
+        Without this the asyncio transport can be closed while
+        ``_transport``/``_protocol`` stay populated: :attr:`is_open` keeps
+        returning True, :meth:`open` early-returns "already_open", and
+        :meth:`send` calls ``sendto`` on a dead transport, which asyncio logs
+        and drops rather than raising. Clearing both references makes
+        :attr:`is_open` report the truth and lets :meth:`open` build a genuinely
+        new endpoint.
+
+        Args:
+            protocol: Protocol reporting the loss.
+            exc: Exception that killed the endpoint, if any.
+        """
+        if protocol is not self._protocol:
+            # Stale notification from an endpoint that has already been
+            # replaced (close() clears the references before asyncio delivers
+            # connection_lost). Resetting here would tear down the live one.
+            return
+
+        _LOGGER.warning(
+            {
+                "class": "UdpTransport",
+                "method": "_endpoint_lost",
+                "action": "endpoint_lost",
+                "ip_address": self._ip_address,
+                "port": self._port,
+                "reason": str(exc) if exc is not None else "closed",
+            }
+        )
+
+        transport, self._transport = self._transport, None
+        self._protocol = None
+
+        if transport is not None:
+            try:
+                transport.close()
+            except OSError as e:  # pragma: no cover - defensive
+                _LOGGER.debug(
+                    {
+                        "class": "UdpTransport",
+                        "method": "_endpoint_lost",
+                        "action": "close_failed",
+                        "reason": str(e),
+                    }
+                )
 
     async def send(self, data: bytes, address: tuple[str, int]) -> None:
         """Send data to a specific address.

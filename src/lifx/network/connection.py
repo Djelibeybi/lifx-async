@@ -20,6 +20,7 @@ from lifx.const import (
 )
 from lifx.exceptions import (
     LifxConnectionError,
+    LifxNetworkError,
     LifxProtocolError,
     LifxTimeoutError,
     LifxUnsupportedCommandError,
@@ -238,6 +239,10 @@ class DeviceConnection:
                 except asyncio.CancelledError:
                     pass
 
+        # Cleared so _is_alive() cannot mistake a finished receiver from the
+        # previous session for a crashed one in the next.
+        self._receiver_task = None
+
         # Cancel all pending request queues
         for queue in self._pending_requests.values():
             # Drain queue
@@ -262,13 +267,46 @@ class DeviceConnection:
         )
         self._transport = None
 
+    def _is_alive(self) -> bool:
+        """Report whether the machinery behind an open connection still works.
+
+        ``_is_open`` records that :meth:`open` ran, not that the socket
+        survived. A transport whose endpoint died clears its own references
+        (see :meth:`UdpTransport._endpoint_lost`), and the background receiver
+        exits once it can no longer read from it, so both are checked here.
+
+        Ordinary request timeouts leave both intact: a sleeping or slow device
+        must never cause the socket to be torn down and rebuilt.
+        """
+        if self._transport is None or not self._transport.is_open:
+            return False
+        receiver = self._receiver_task
+        return receiver is None or not receiver.done()
+
     async def _ensure_open(self) -> None:
         """Ensure connection is open, opening it if necessary.
 
         Note: This relies on open() being idempotent. In rare race conditions,
         multiple concurrent calls might attempt to open, but open() checks
         _is_open at the start and returns early if already open.
+
+        A connection that was opened but has since lost its transport is torn
+        down first: open() early-returns while ``_is_open`` is True, so
+        without this every later request would retransmit into a dead socket
+        and time out at max_retries forever.
         """
+        if self._is_open and not self._is_alive():
+            _LOGGER.warning(
+                {
+                    "class": "DeviceConnection",
+                    "method": "_ensure_open",
+                    "action": "reopening_dead_connection",
+                    "serial": self.serial,
+                    "ip": self.ip,
+                }
+            )
+            await self.close()
+
         if not self._is_open:
             await self.open()
 
@@ -413,6 +451,34 @@ class DeviceConnection:
             except LifxTimeoutError:
                 # No packet available, continue loop (allows shutdown check)
                 continue
+
+            except (LifxConnectionError, LifxNetworkError) as e:
+                # The transport died underneath us: it reports itself closed
+                # while this connection still believes it is open. Stop
+                # reading; the next request rebuilds the connection via
+                # _ensure_open(). Genuine read failures on a live transport
+                # fall through to the generic handler below.
+                if self._transport is not None and self._transport.is_open:
+                    _LOGGER.error(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "_background_receiver",
+                            "action": "error",
+                            "error": str(e),
+                        },
+                        exc_info=True,
+                    )
+                elif self._is_open:
+                    _LOGGER.warning(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "_background_receiver",
+                            "action": "transport_lost",
+                            "serial": self.serial,
+                            "ip": self.ip,
+                        }
+                    )
+                break
 
             except Exception as e:
                 if self._is_open:

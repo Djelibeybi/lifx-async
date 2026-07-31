@@ -1,16 +1,19 @@
 """Tests for device connection management."""
 
 import asyncio
+import logging
 from unittest.mock import patch
 
 import pytest
 
-from lifx.exceptions import LifxConnectionError as ConnectionError
 from lifx.exceptions import (
+    LifxConnectionError,
+    LifxNetworkError,
     LifxProtocolError,
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
+from lifx.exceptions import LifxConnectionError as ConnectionError
 from lifx.network.connection import DeviceConnection
 from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
@@ -820,3 +823,164 @@ class TestDiscoveryConnectionSerialUpdate:
         results = await self._run(conn, header, payload)
         assert len(results) == 1
         assert conn.serial == "000000000000"
+
+
+class TestTransportDeathRecovery:
+    """A connection whose transport dies must rebuild it on the next request.
+
+    ``_is_open`` only records that ``open()`` ran. Without a liveness check the
+    dead transport is never noticed: ``open()`` early-returns, every send is
+    dropped by asyncio, and each request burns its full retransmit schedule
+    before timing out -- forever.
+    """
+
+    @staticmethod
+    def _kill_transport(conn: DeviceConnection) -> None:
+        """Kill the endpoint the way asyncio does on a fatal transport error."""
+        assert conn._transport is not None
+        protocol = conn._transport._protocol
+        assert protocol is not None
+        protocol.connection_lost(RuntimeError("fatal read error"))
+
+    async def test_ensure_open_rebuilds_dead_connection(self) -> None:
+        """The dead transport is replaced rather than reused."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        await conn.open()
+        dead_transport = conn._transport
+
+        self._kill_transport(conn)
+        assert dead_transport is not None
+        assert not dead_transport.is_open
+
+        await conn._ensure_open()
+
+        try:
+            assert conn.is_open
+            assert conn._transport is not dead_transport
+            assert conn._transport is not None
+            assert conn._transport.is_open
+        finally:
+            await conn.close()
+
+    async def test_ensure_open_rebuilds_after_receiver_death(self) -> None:
+        """A crashed background receiver also counts as a dead connection."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        await conn.open()
+        first_receiver = conn._receiver_task
+
+        # The receiver exits when it can no longer read from the transport.
+        self._kill_transport(conn)
+        await asyncio.sleep(0.2)
+        assert first_receiver is not None
+        assert first_receiver.done()
+
+        await conn._ensure_open()
+
+        try:
+            assert conn._receiver_task is not None
+            assert conn._receiver_task is not first_receiver
+            assert not conn._receiver_task.done()
+        finally:
+            await conn.close()
+
+    async def test_timeout_does_not_rebuild_connection(self) -> None:
+        """An unresponsive device must not cause socket churn."""
+        conn = DeviceConnection(
+            serial="d073d5001234",
+            ip="127.0.0.1",
+            port=56799,
+            timeout=0.3,
+            max_retries=1,
+        )
+        await conn.open()
+        transport = conn._transport
+        receiver = conn._receiver_task
+
+        try:
+            with pytest.raises(LifxTimeoutError):
+                await conn.request(Device.GetLabel())
+
+            await conn._ensure_open()
+
+            assert conn._transport is transport
+            assert conn._receiver_task is receiver
+        finally:
+            await conn.close()
+
+    @pytest.mark.emulator
+    async def test_request_succeeds_after_transport_death(
+        self, emulator_devices
+    ) -> None:
+        """The next request recovers instead of timing out at max_retries."""
+        from lifx.protocol import packets
+
+        lights = emulator_devices.lights
+        if not lights:
+            pytest.skip("No lights available in emulator")
+
+        conn = lights[0].connection
+        await conn.request(packets.Device.GetLabel(), timeout=2.0)
+        dead_transport = conn._transport
+
+        self._kill_transport(conn)
+
+        response = await conn.request(packets.Device.GetLabel(), timeout=2.0)
+
+        assert isinstance(response, packets.Device.StateLabel)
+        assert conn._transport is not dead_transport
+
+    async def test_receiver_reports_read_failure_on_live_transport(
+        self, caplog
+    ) -> None:
+        """A read failure that is not transport death is still an error."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        await conn.open()
+
+        try:
+            with (
+                caplog.at_level(logging.ERROR, logger="lifx.network.connection"),
+                patch.object(
+                    conn,
+                    "receive_packet",
+                    side_effect=LifxNetworkError("Failed to receive data"),
+                ),
+            ):
+                await conn._background_receiver()
+
+            assert any(
+                isinstance(record.msg, dict) and record.msg.get("action") == "error"
+                for record in caplog.records
+            )
+        finally:
+            await conn.close()
+
+    async def test_receiver_is_quiet_when_connection_already_closed(
+        self, caplog
+    ) -> None:
+        """Teardown racing the receiver must not log a lost transport."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        await conn.open()
+
+        try:
+            self._kill_transport(conn)
+            conn._is_open = False  # close() already ran on another task
+
+            with (
+                caplog.at_level(logging.WARNING, logger="lifx.network.connection"),
+                patch.object(
+                    conn,
+                    "receive_packet",
+                    side_effect=LifxConnectionError("Connection not open"),
+                ),
+            ):
+                await conn._background_receiver()
+
+            assert not [
+                record
+                for record in caplog.records
+                if isinstance(record.msg, dict)
+                and record.msg.get("action") == "transport_lost"
+            ]
+        finally:
+            conn._is_open = True
+            await conn.close()
