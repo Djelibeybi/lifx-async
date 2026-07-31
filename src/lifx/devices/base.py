@@ -1968,12 +1968,24 @@ class Device(Generic[StateT]):
     async def refresh_state(self) -> None:
         """Refresh device state from hardware.
 
-        Fetches current state from device and updates the state instance.
-        Base implementation fetches label, power, and updates timestamp.
-        Subclasses override to add device-specific state updates.
+        On a device whose state has not been initialized yet, this delegates to
+        :meth:`_initialize_state`, which populates the whole state: the
+        semi-static fields (host and WiFi firmware versions, location, group,
+        label) alongside power, and the WiFi signal when
+        :attr:`fetch_wifi_info` is set.
+
+        On an already-initialized device the base implementation only re-queries
+        what can change without the library knowing: the opt-in WiFi reading.
+        The semi-static fields are deliberately left alone - they are cached
+        because a firmware version or group assignment does not change under a
+        running application - so this stamps ``last_updated`` and returns.
+
+        The real per-refresh work happens in :class:`~lifx.devices.light.Light`
+        and its subclasses, which re-fetch the volatile state their devices
+        expose: colour, power and label, plus zones, tiles, infrared, HEV and
+        ceiling components as applicable.
 
         Raises:
-            RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """

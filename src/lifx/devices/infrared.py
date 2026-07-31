@@ -224,7 +224,6 @@ class InfraredLight(Light):
         Fetches color and infrared brightness.
 
         Raises:
-            RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
