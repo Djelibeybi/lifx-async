@@ -5,6 +5,12 @@ recommended entry points for most users.
 
 ## Discovery Functions
 
+All discovery functions return devices whose state has not been initialised
+yet — `async with device` does that. Devices start with `fetch_wifi_info` and
+`fetch_ambient_light` off, so set either property before entering the context
+manager for the reading to be included in the initial state. See
+[Opt-In State Fields on Discovered Devices](../user-guide/advanced-usage.md#opt-in-state-fields-on-discovered-devices).
+
 ::: lifx.api.discover
     options:
       show_root_heading: true
