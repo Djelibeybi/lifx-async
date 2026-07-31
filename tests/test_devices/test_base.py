@@ -26,6 +26,35 @@ from lifx.protocol import packets
 class TestDevice:
     """Tests for Device class."""
 
+    def test_fetch_flags_are_keyword_only(self) -> None:
+        """The fetch flags cannot be passed positionally.
+
+        Keeping them keyword-only stops a future parameter insertion from
+        silently rebinding an existing positional argument, which is exactly
+        how CeilingLight once swallowed its state_file path as a bool.
+        """
+        with pytest.raises(TypeError):
+            Device("d073d5010203", "192.168.1.100", 56700, 5.0, 3, True)  # type: ignore[misc]
+
+        device = Device(
+            "d073d5010203",
+            "192.168.1.100",
+            56700,
+            5.0,
+            3,
+            fetch_wifi_info=True,
+            fetch_ambient_light=True,
+        )
+        assert device.fetch_wifi_info is True
+        assert device.fetch_ambient_light is True
+
+    def test_fetch_flags_default_to_disabled(self) -> None:
+        """Both readings are opt-in, so a plain device collects neither."""
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+
+        assert device.fetch_wifi_info is False
+        assert device.fetch_ambient_light is False
+
     def test_create_device(self) -> None:
         """Test creating a device."""
         device = Device(

@@ -99,10 +99,6 @@ class Light(Device[LightState]):
         ```
     """
 
-    def __init__(self, *args, **kwargs) -> None:
-        """Initialize Light with additional state attributes."""
-        super().__init__(*args, **kwargs)
-
     @property
     def state(self) -> LightState:
         """Get light state (guaranteed to be initialized when using Device.connect()).
@@ -964,8 +960,6 @@ class Light(Device[LightState]):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        import time
-
         if self._state is None:
             await self._initialize_state()
             return
@@ -1003,8 +997,6 @@ class Light(Device[LightState]):
             LifxDeviceNotFoundError: If device cannot be reached
             LifxProtocolError: If responses are invalid
         """
-        import time
-
         try:
             # Every request starts here and runs in parallel. The optional WiFi
             # and ambient light queries join the batch when enabled and resolve

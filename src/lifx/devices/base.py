@@ -297,8 +297,6 @@ class DeviceState:
     @property
     def age(self) -> float:
         """Get age of state in seconds."""
-        import time
-
         return time.time() - self.last_updated
 
     def is_fresh(self, max_age: float = 5.0) -> bool:
@@ -377,6 +375,7 @@ class Device(Generic[StateT]):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
     ) -> None:
@@ -537,6 +536,7 @@ class Device(Generic[StateT]):
         serial: str | None = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
     ) -> Self:
@@ -611,6 +611,7 @@ class Device(Generic[StateT]):
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
     ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:

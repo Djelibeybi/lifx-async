@@ -303,6 +303,24 @@ class TestCeilingLightStateDataclass:
 class TestCeilingLightStateManagement:
     """Tests for CeilingLight state management using emulator."""
 
+    def test_state_file_keeps_its_positional_slot(self, ceiling_device) -> None:
+        """A positional state_file must not be swallowed by a newer parameter.
+
+        Inserting fetch_wifi_info ahead of state_file once bound the path to
+        the flag with no error, silently disabling state persistence.
+        """
+        ceiling_light = CeilingLight(
+            ceiling_device.serial,
+            ceiling_device.ip,
+            ceiling_device.port,
+            5.0,
+            3,
+            "/tmp/ceiling_state.json",
+        )
+
+        assert ceiling_light._state_file == "/tmp/ceiling_state.json"
+        assert ceiling_light.fetch_wifi_info is False
+
     @pytest.mark.asyncio
     async def test_ceiling_state_property_before_init_raises(
         self, ceiling_device
