@@ -72,6 +72,10 @@ async with await Device.connect(ip="192.168.1.100") as device:
     device.fetch_wifi_info = False  # stop collecting
 ```
 
+Turning it off is equally immediate: the next refresh stores `None` for
+`signal` and `rssi` rather than leaving the last reading behind a freshly
+stamped `last_updated`.
+
 For a one-off reading, call `get_wifi_info()` directly — it is a single
 request, where a refresh also re-fetches colour, power, label and every zone or
 tile:
@@ -152,10 +156,11 @@ The `Light` class provides color control and effects for standard LIFX lights.
 
 Light device state dataclass returned by `Light.state`.
 
-`ambient_light` holds the most recent lux reading, or `None` when the sensor was
-not queried. Like `wifi_info`, it is only fetched when the device was created
-with `fetch_ambient_light=True`, or once the `fetch_ambient_light` property is
-set on the device:
+`ambient_light` holds the most recent lux reading, `-1.0` when that reading was
+taken while the light was on (the sensor measures the light's own output, not
+the room), or `None` when the sensor was not queried. Like `wifi_info`, it is
+only fetched when the device was created with `fetch_ambient_light=True`, or
+once the `fetch_ambient_light` property is set on the device:
 
 ```python
 light = await Device.connect(ip="192.168.1.100", fetch_ambient_light=True)
@@ -482,15 +487,17 @@ async with await Device.connect(ip="192.168.1.100") as light:
 
 The query joins the same parallel batch as the other state requests, so it costs
 no extra round trip. Toggling the property takes effect from the next state
-initialisation or refresh; the value already in `state.ambient_light` is left as
-it was.
+initialisation or refresh: turning it off stores `None` rather than leaving the
+last reading behind a freshly stamped `last_updated`.
 
 **Notes:**
 
-- Devices without ambient light sensors return 0.0 (not an error)
+- Every product answers packet 401, so the query never fails on an unsupported device — it returns 0.0
+- **A reading of 0.0 is ambiguous**: no sensor, a sensor the device cannot read, and complete darkness all report 0.0, and nothing in the response or the product registry distinguishes them
+- `state.ambient_light` is captured whenever state refreshes, including the debounced refresh that follows `set_power()`/`set_color()`. A reading taken while the light is on measures the light's own output, so it is stored as `-1.0` (`lifx.INVALID_AMBIENT_LIGHT_RESPONSE`) rather than as a plausible-looking lux value
 - For accurate readings, the light should be turned off (otherwise the light's own illumination interferes with the sensor)
 - `get_ambient_light_level()` always fetches fresh from the device; `state.ambient_light` is as fresh as the last state refresh, and is `None` until the sensor is queried at least once
-- A reading of 0.0 could mean either no sensor or complete darkness
+- If a request does fail outright, `state.ambient_light` is left `None` and a warning is logged — state initialisation and refresh still succeed
 - Returns ambient light level in lux (higher values indicate brighter ambient light)
 
 ### MultiZone Control

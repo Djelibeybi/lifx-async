@@ -222,7 +222,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 
 - Cached (semi-static): `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
 - **Never cached** (volatile): `power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level` — always use `get_*()` methods
-- **Opt-in state fields**: `wifi_info` (signal/rssi) and `ambient_light` are only queried when the matching `fetch_wifi_info` / `fetch_ambient_light` flag is on. Both default to off, are settable as constructor arguments *and* as device properties (toggling applies from the next initialization or refresh), join the same parallel batch as the other state requests, and leave their field `None` while disabled. `get_wifi_info()` / `get_ambient_light_level()` remain the single-request way to read either on demand.
+- **Opt-in state fields**: `wifi_info` (signal/rssi) and `ambient_light` are only queried when the matching `fetch_wifi_info` / `fetch_ambient_light` flag is on. Both default to off, are settable as constructor arguments *and* as device properties (toggling applies from the next initialization or refresh), join the same parallel batch as the other state requests, and leave their field `None` while disabled (a refresh with the flag off clears the field rather than leaving a stale reading). Both are keyword-only dataclass fields with defaults, so adding them stayed additive for existing state constructors. An ambient reading taken while the light is on is stored as `INVALID_AMBIENT_LIGHT_RESPONSE` (-1.0) because the sensor measures the light's own output. A request that fails outright logs a warning and leaves the field `None` instead of failing state initialization. `get_wifi_info()` / `get_ambient_light_level()` remain the single-request way to read either on demand.
 - `get_color()` returns `(color, power, label)` in a single request/response pair — most efficient way to get color + power
 - No automatic expiration — application controls when to refresh
 
@@ -237,7 +237,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 - **Serial vs MAC**: Serial number usually matches MAC address. The one exception is firmware with `version_major == 3 and version_minor >= 70`, whose MAC is the serial with the final octet incremented (wrapping at 256). Both components are compared as integers — minor `9` is *below* minor `70`, so treating the version as a decimal misclassifies 3.9. Earlier 3.x builds (e.g. 3.50) match their serial. MAC calculation logic is in `devices/base.py`; `scripts/serial_mac_audit.py` audits the rule against real hardware via the ARP table.
 - **HSBK dual formats**: User-facing `HSBK` uses float (hue 0-360, sat/bright 0.0-1.0, kelvin 1500-9000). Protocol/animation layer uses raw uint16 (0-65535 for H/S/B). Don't mix them.
 - **`get_color()` returns a triple**: `(color, power, label)` — most efficient single-request way to get color + power state
-- **Ambient light sensor**: Returns 0.0 for both "no sensor" and "complete darkness". Light must be off for accurate readings.
+- **Ambient light sensor**: Every product answers `SensorGetAmbientLight` (401), so the query never fails on an unsupported device. It returns 0.0 for "no sensor", "sensor unreadable" *and* "complete darkness" — the three are indistinguishable from the response, and the product registry has no ambient-sensor capability flag either. Light must be off for accurate readings; state readings taken with the light on are stored as `INVALID_AMBIENT_LIGHT_RESPONSE` (-1.0).
 - **High-frequency updates**: Use the Animation Layer (`src/lifx/animation/`) for performance-critical frame delivery rather than calling device methods directly.
 - **Packet flow**: Create packet → `DeviceConnection.request()` → response auto-unpacked
 
@@ -355,10 +355,10 @@ Local generator quirks:
   - Unions starting with "Button" or "Relay" are excluded
   - All packets in "button" and "relay" categories are excluded
   - This keeps the library focused on LIFX lighting devices
-- **sensor packets**: Adds undocumented ambient light sensor packets:
-  - `SensorGetAmbientLight` (401): Request packet with no parameters
-  - `SensorStateAmbientLight` (402): Response packet with lux field (float32)
-  - These packets are not in the official protocol.yml but are supported by LIFX devices with ambient light sensors
+- **sensor packets**: Adds the ambient light sensor packets missing from protocol.yml:
+  - `SensorGetAmbientLight` (401): Request packet with no parameters — [documented here](https://lan.developer.lifx.com/docs/querying-the-device-for-data#sensorgetambientlight---packet-401)
+  - `SensorStateAmbientLight` (402): Response packet with lux field (float32) — [documented here](https://lan.developer.lifx.com/docs/information-messages#sensorstateambientlight---packet-402)
+  - Both are part of the published LAN protocol; they are simply absent from the official protocol.yml
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 
