@@ -302,10 +302,14 @@ def apply_tile_state_device_quirk(
 
 
 def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
-    """Add undocumented sensor packets for ambient light level reading.
+    """Add the sensor packets for ambient light level reading.
 
-    These packets are not documented in the official protocol.yml but are supported
-    by LIFX devices with ambient light sensors.
+    These packets are missing from the official protocol.yml, but they are part
+    of the published LAN protocol and are supported by LIFX devices with ambient
+    light sensors:
+
+        - https://lan.developer.lifx.com/docs/querying-the-device-for-data#sensorgetambientlight---packet-401
+        - https://lan.developer.lifx.com/docs/information-messages#sensorstateambientlight---packet-402
 
     Quirks applied:
 
