@@ -22,6 +22,7 @@ from lifx.const import (
 from lifx.devices.base import (
     Device,
     DeviceState,
+    WifiInfo,
 )
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
@@ -39,9 +40,13 @@ class LightState(DeviceState):
 
     Attributes:
         color: Current HSBK color
+        ambient_light: Ambient light level in lux, or None when the sensor was
+            not queried. Devices without a sensor report 0.0, as does a device
+            in complete darkness.
     """
 
     color: HSBK
+    ambient_light: float | None
 
     @property
     def as_dict(self) -> Any:
@@ -58,6 +63,7 @@ class LightState(DeviceState):
         """
         state: dict[str, Any] = super().as_dict
         state["color"] = self.color.as_dict
+        state["ambient_light"] = self.ambient_light
         return state
 
 
@@ -935,15 +941,21 @@ class Light(Device[LightState]):
         """String representation of light."""
         return f"Light(serial={self.serial}, ip={self.ip}, port={self.port})"
 
-    async def refresh_state(self, fetch_wifi_info: bool | None = None) -> None:
+    async def _fetch_ambient_light_level(self) -> float | None:
+        """Query the ambient light sensor when enabled, else return None.
+
+        Returns:
+            Ambient light level in lux, or None when the sensor is not queried
+        """
+        if not self._fetch_ambient_light:
+            return None
+
+        return await self.get_ambient_light_level()
+
+    async def refresh_state(self) -> None:
         """Refresh light state from hardware.
 
         Fetches color (which includes power and label) and updates state.
-
-        Args:
-            fetch_wifi_info: Query WiFi signal strength for this refresh,
-                overriding the instance default set at construction. None
-                (the default) keeps the instance setting.
 
         Raises:
             RuntimeError: If state has not been initialized
@@ -954,20 +966,26 @@ class Light(Device[LightState]):
 
         if self._state is None:
             await self._initialize_state()
-            # Initialization already applied the instance default, so only an
-            # override that enables the query needs an extra request.
-            if fetch_wifi_info and not self._fetch_wifi_info:
-                await self._refresh_wifi_info(True)
             return
 
-        # GetColor returns color, power, and label in one request
-        color, power, label = await self.get_color()
+        # GetColor returns color, power, and label in one request. The optional
+        # queries join the same batch when enabled.
+        (color, power, label), wifi_signal, ambient_light = await asyncio.gather(
+            self.get_color(),
+            self._fetch_wifi_signal(),
+            self._fetch_ambient_light_level(),
+        )
 
         self._state.color = color
         self._state.power = power
         self._state.label = label
 
-        await self._refresh_wifi_info(fetch_wifi_info)
+        if self._fetch_wifi_info:
+            self._state.wifi_info = WifiInfo(
+                signal=wifi_signal, host_firmware=self._state.host_firmware
+            )
+        if self._fetch_ambient_light:
+            self._state.ambient_light = ambient_light
 
         self._state.last_updated = time.time()
 
@@ -986,56 +1004,52 @@ class Light(Device[LightState]):
         import time
 
         try:
-            if self._capabilities is not None:
-                # Capabilities pre-loaded: skip get_version()
-                capabilities = self._create_capabilities()
+            # Every request starts here and runs in parallel. The optional WiFi
+            # and ambient light queries join the batch when enabled and resolve
+            # to None when they are not; get_version() joins only when
+            # capabilities are not already loaded.
+            pending: list[asyncio.Future[Any]] = []
+            color_task = self._schedule_request(self.get_color(), pending)
+            host_firmware_task = self._schedule_request(
+                self.get_host_firmware(), pending
+            )
+            wifi_firmware_task = self._schedule_request(
+                self.get_wifi_firmware(), pending
+            )
+            location_task = self._schedule_request(self.get_location(), pending)
+            group_task = self._schedule_request(self.get_group(), pending)
+            wifi_signal_task = self._schedule_request(
+                self._fetch_wifi_signal(), pending
+            )
+            ambient_light_task = self._schedule_request(
+                self._fetch_ambient_light_level(), pending
+            )
+            version_task = (
+                None
+                if self._capabilities is not None
+                else self._schedule_request(self.get_version(), pending)
+            )
 
-                (
-                    (color, power, label),
-                    host_firmware,
-                    wifi_firmware,
-                    location_info,
-                    group_info,
-                ) = await asyncio.gather(
-                    self.get_color(),
-                    self.get_host_firmware(),
-                    self.get_wifi_firmware(),
-                    self.get_location(),
-                    self.get_group(),
-                )
-            else:
-                # Capabilities not loaded: include get_version() in parallel batch
-                version_task = asyncio.ensure_future(self.get_version())
-                try:
-                    (
-                        (color, power, label),
-                        host_firmware,
-                        wifi_firmware,
-                        location_info,
-                        group_info,
-                    ) = await asyncio.gather(
-                        self.get_color(),
-                        self.get_host_firmware(),
-                        self.get_wifi_firmware(),
-                        self.get_location(),
-                        self.get_group(),
-                    )
-                    version = await version_task
-                except Exception:
-                    if not version_task.done():
-                        version_task.cancel()
-                    # Await to consume cancellation and avoid leaked task warnings
-                    await asyncio.gather(version_task, return_exceptions=True)
-                    raise
-                self._process_capabilities(version, host_firmware)
-                capabilities = self._create_capabilities()
+            try:
+                color, power, label = await color_task
+                host_firmware = await host_firmware_task
+                wifi_firmware = await wifi_firmware_task
+                location_info = await location_task
+                group_info = await group_task
+                wifi_signal = await wifi_signal_task
+                ambient_light = await ambient_light_task
+                if version_task is not None:
+                    self._process_capabilities(await version_task, host_firmware)
+            except BaseException:
+                await self._discard_pending(pending)
+                raise
+
+            capabilities = self._create_capabilities()
 
             # Get MAC address (already calculated in get_host_firmware)
             mac_address = await self.get_mac_address()
 
-            # Query WiFi signal only when enabled; firmware is cached by now so
-            # get_wifi_info() costs a single request.
-            wifi_info = await self._resolve_wifi_info(host_firmware)
+            wifi_info = WifiInfo(signal=wifi_signal, host_firmware=host_firmware)
 
             # Get model name
             assert self._capabilities is not None
@@ -1055,6 +1069,7 @@ class Light(Device[LightState]):
                 location=location_info,
                 group=group_info,
                 color=color,
+                ambient_light=ambient_light,
                 last_updated=time.time(),
             )
 

@@ -59,6 +59,7 @@ class TestCeilingLightStateDataclass:
                 updated_at=0,
             ),
             color=HSBK(hue=120, saturation=1.0, brightness=0.5, kelvin=3500),
+            ambient_light=None,
             chain=[],
             tile_orientations={},
             tile_colors=[],
@@ -140,6 +141,7 @@ class TestCeilingLightStateDataclass:
                 uuid="00000000-0000-0000-0000-000000000000", label="", updated_at=0
             ),
             color=HSBK(hue=0, saturation=0, brightness=0, kelvin=3500),
+            ambient_light=None,
             chain=[],
             tile_orientations={},
             tile_colors=[],
@@ -202,6 +204,7 @@ class TestCeilingLightStateDataclass:
                 uuid="00000000-0000-0000-0000-000000000000", label="", updated_at=0
             ),
             color=HSBK(hue=0, saturation=0, brightness=0, kelvin=3500),
+            ambient_light=None,
             chain=[],
             tile_orientations={},
             tile_colors=[],
@@ -266,6 +269,7 @@ class TestCeilingLightStateDataclass:
                 uuid="00000000-0000-0000-0000-000000000000", label="", updated_at=0
             ),
             color=HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500),
+            ambient_light=None,
             chain=[],
             tile_orientations={},
             tile_colors=[],

@@ -32,9 +32,14 @@ def mock_device_factory():
         ip: str = "192.168.1.100",
         port: int = 56700,
         fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
     ) -> Device:
         device = device_class(
-            serial=serial, ip=ip, port=port, fetch_wifi_info=fetch_wifi_info
+            serial=serial,
+            ip=ip,
+            port=port,
+            fetch_wifi_info=fetch_wifi_info,
+            fetch_ambient_light=fetch_ambient_light,
         )
         # Replace device's connection with mock
         mock_conn = MagicMock()

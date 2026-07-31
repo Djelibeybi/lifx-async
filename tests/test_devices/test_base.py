@@ -279,7 +279,7 @@ class TestDevice:
 
     def test_wifi_info_rssi_unit_unknown_without_firmware(self) -> None:
         """RSSI units remain unknown until host firmware is available."""
-        wifi_info = WifiInfo(signal=7.943283890199382e-06)
+        wifi_info = WifiInfo(signal=7.943283890199382e-06, host_firmware=None)
 
         assert wifi_info.rssi_unit is None
 
