@@ -196,7 +196,9 @@ class DeviceConnection:
             self._receiver_shutdown = asyncio.Event()
 
             # Open transport
-            self._transport = UdpTransport(port=0, broadcast=False)
+            self._transport = UdpTransport(
+                port=0, broadcast=False, peer=f"{self.serial}@{self.ip}"
+            )
             await self._transport.open()
             self._is_open = True
 

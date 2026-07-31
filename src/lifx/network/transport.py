@@ -44,6 +44,7 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         self,
         on_endpoint_lost: Callable[[_UdpProtocol, Exception | None], None]
         | None = None,
+        peer: str | None = None,
     ) -> None:
         """Initialize the protocol.
 
@@ -53,7 +54,12 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                 endpoint was closed rather than failed). The owner uses it to
                 drop its references to a socket that can no longer send or
                 receive.
+            peer: Descriptor of the device this socket talks to, included in
+                warning logs. A per-device socket knows its peer; the
+                broadcast socket used for discovery does not, so it is
+                optional and omitted from the log when unset.
         """
+        self._peer = peer
         self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue(
             maxsize=self._MAX_QUEUE_SIZE
         )
@@ -62,6 +68,18 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         self._error_count: int = 0
         self._on_endpoint_lost = on_endpoint_lost
         self._lost = False
+
+    def _log(self, **fields: object) -> dict[str, object]:
+        """Build a structured log record, tagged with the peer when known.
+
+        Send and receive errors name the errno but never the destination, so
+        without this a warning about an unreachable device cannot be traced
+        back to which device went away.
+        """
+        record: dict[str, object] = {"class": "_UdpProtocol", **fields}
+        if self._peer is not None:
+            record["peer"] = self._peer
+        return record
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Called when connection is established."""
@@ -81,13 +99,12 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                 or self._dropped_count % self._DROP_LOG_INTERVAL == 0
             ):
                 _LOGGER.warning(
-                    {
-                        "class": "_UdpProtocol",
-                        "method": "datagram_received",
-                        "action": "packet_dropped",
-                        "reason": "queue_full",
-                        "total_dropped": self._dropped_count,
-                    }
+                    self._log(
+                        method="datagram_received",
+                        action="packet_dropped",
+                        reason="queue_full",
+                        total_dropped=self._dropped_count,
+                    )
                 )
 
     def error_received(self, exc: Exception) -> None:
@@ -108,12 +125,11 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         self._error_count += 1
         if self._error_count == 1 or self._error_count % self._ERROR_LOG_INTERVAL == 0:
             _LOGGER.warning(
-                {
-                    "class": "_UdpProtocol",
-                    "method": "error_received",
-                    "error": str(exc),
-                    "total_errors": self._error_count,
-                }
+                self._log(
+                    method="error_received",
+                    error=str(exc),
+                    total_errors=self._error_count,
+                )
             )
 
         if isinstance(exc, OSError) and exc.errno in _FATAL_SOCKET_ERRNOS:
@@ -152,16 +168,22 @@ class UdpTransport:
         ip_address: str = DEFAULT_IP_ADDRESS,
         port: int = 0,
         broadcast: bool = False,
+        peer: str | None = None,
     ) -> None:
         """Initialize UDP transport.
 
         Args:
             port: Local port to bind to (0 for automatic assignment)
             broadcast: Enable broadcast mode for device discovery
+            peer: Descriptor of the device this socket talks to, included in
+                warning logs so an unreachable-peer error names the device.
+                Left unset for the shared broadcast socket, which has no
+                single peer.
         """
         self._ip_address = ip_address
         self._port = port
         self._broadcast = broadcast
+        self._peer = peer
         self._protocol: _UdpProtocol | None = None
         self._transport: DatagramTransport | None = None
 
@@ -203,7 +225,9 @@ class UdpTransport:
             )
 
             # Create protocol
-            protocol = _UdpProtocol(on_endpoint_lost=self._endpoint_lost)
+            protocol = _UdpProtocol(
+                on_endpoint_lost=self._endpoint_lost, peer=self._peer
+            )
             self._protocol = protocol
 
             # Create datagram endpoint
