@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v6.1.1 (2026-07-31)
+
+### Bug Fixes
+
+- **color**: Accept device-reported kelvin 0 on inbound reads
+  ([`7e33543`](https://github.com/Djelibeybi/lifx-async/commit/7e335439b90a4ea7296098d2d93d3bc195d59cd3))
+
+- **network**: Recover from UDP endpoint death instead of hanging forever
+  ([`0251e08`](https://github.com/Djelibeybi/lifx-async/commit/0251e08a21c1d6f20410e3166c7e3fbfe0f4dd0f))
+
+### Documentation
+
+- Add project URLs and correct stale feature claims
+  ([`8d9a666`](https://github.com/Djelibeybi/lifx-async/commit/8d9a666a8219040662eb61dea50530900938eaae))
+
+
 ## v6.1.0 (2026-07-31)
 
 ### Bug Fixes
