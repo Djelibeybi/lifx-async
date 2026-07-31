@@ -169,6 +169,43 @@ class TestUdpProtocol:
             assert log_dict["class"] == "_UdpProtocol"
             assert log_dict["method"] == "error_received"
             assert "test error" in log_dict["error"]
+            assert "peer" not in log_dict
+
+    async def test_protocol_error_received_names_the_peer(self) -> None:
+        """An unreachable-peer warning identifies which device went away."""
+        from lifx.network.transport import _UdpProtocol
+
+        protocol = _UdpProtocol(peer="d073d5d4809b@192.168.19.200")
+
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
+            log_dict = mock_logger.warning.call_args[0][0]
+            assert log_dict["peer"] == "d073d5d4809b@192.168.19.200"
+            assert log_dict["method"] == "error_received"
+
+    async def test_protocol_dropped_packet_names_the_peer(self) -> None:
+        """A queue-full warning identifies which device overran the queue."""
+        from lifx.network.transport import _UdpProtocol
+
+        protocol = _UdpProtocol(peer="d073d5d4809b@192.168.19.200")
+        for _ in range(protocol._MAX_QUEUE_SIZE):
+            protocol.datagram_received(b"x", ("192.168.19.200", 56700))
+
+        with patch("lifx.network.transport._LOGGER") as mock_logger:
+            protocol.datagram_received(b"x", ("192.168.19.200", 56700))
+            log_dict = mock_logger.warning.call_args[0][0]
+            assert log_dict["peer"] == "d073d5d4809b@192.168.19.200"
+            assert log_dict["action"] == "packet_dropped"
+
+    async def test_transport_passes_peer_to_protocol(self) -> None:
+        """UdpTransport hands its peer descriptor to the protocol it creates."""
+        transport = UdpTransport(peer="d073d5d4809b@192.168.19.200")
+        await transport.open()
+        try:
+            assert transport._protocol is not None
+            assert transport._protocol._peer == "d073d5d4809b@192.168.19.200"
+        finally:
+            await transport.close()
 
     async def test_protocol_queue_full_drops_packet(self) -> None:
         """Test datagram_received drops packets when queue is full."""
