@@ -92,7 +92,7 @@ async def discover_with_signal():
 ```
 
 Setting it inside the body leaves `state.wifi_info` unpopulated until the next
-refresh, which re-fetches the whole state rather than just the signal:
+refresh, which re-fetches the volatile state rather than just the signal:
 
 ```python
 async for device in discover(timeout=5.0):
@@ -100,7 +100,10 @@ async for device in discover(timeout=5.0):
         device.fetch_wifi_info = True
         print(device.state.wifi_info.rssi)  # None - initialisation already ran
 
-        await device.refresh_state()  # re-fetches everything
+        # Re-fetches the volatile state: label, power, colour and the opt-in
+        # readings, plus zones or tiles. The semi-static fields (firmware
+        # versions, location, group) stay as initialisation left them.
+        await device.refresh_state()
         print(device.state.wifi_info.rssi)  # populated
 
         # For a single reading, skip the flag entirely:
