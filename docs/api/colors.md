@@ -67,6 +67,14 @@ print(f"Brightness: {color.brightness_pct}%")
 print(f"Temperature: {color.kelvin}K")
 ```
 
+!!! note "Kelvin 0 on device reads"
+
+    1500-9000 is the white-mode range of the product, not the range of the
+    protocol field. Devices report kelvin `0` for a colour with no white
+    component — commonly seen on saturated zones of a Tile, Beam or Z. That
+    value is accepted by `HSBK`, survives `replace()` and the `with_*` helpers,
+    and is written back to the device unchanged rather than clamped to 1500.
+
 ### Scaled Components
 
 Saturation and brightness are also available pre-scaled, for consumers that

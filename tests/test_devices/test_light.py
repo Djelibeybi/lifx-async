@@ -7,9 +7,10 @@ import time
 import pytest
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_SATURATED
 from lifx.devices.light import Light
 from lifx.protocol import packets
-from lifx.protocol.protocol_types import LightWaveform
+from lifx.protocol.protocol_types import LightHsbk, LightWaveform
 
 
 class TestLight:
@@ -48,6 +49,19 @@ class TestLight:
         assert color.kelvin == 3500
         assert power == 65535
         assert label == "Test Light"
+
+    async def test_get_color_accepts_saturated_kelvin(self, light: Light) -> None:
+        """A StateColor carrying kelvin 0 parses and survives read/modify/write."""
+        light.connection.request.return_value = packets.Light.StateColor(
+            color=LightHsbk(hue=0, saturation=65535, brightness=65535, kelvin=0),
+            power=65535,
+            label="Saturated Light",
+        )
+
+        color, _power, _label = await light.get_color()
+
+        assert color.kelvin == KELVIN_SATURATED
+        assert color.replace(brightness=0.5).to_protocol().kelvin == KELVIN_SATURATED
 
     async def test_set_color(self, light: Light) -> None:
         """Test setting light color."""

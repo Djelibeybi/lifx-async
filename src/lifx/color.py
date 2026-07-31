@@ -24,6 +24,7 @@ from lifx.const import (
     KELVIN_NEUTRAL,
     KELVIN_NEUTRAL_WARM,
     KELVIN_NOON_DAYLIGHT,
+    KELVIN_SATURATED,
     KELVIN_SOFT_DAYLIGHT,
     KELVIN_SUNSET,
     KELVIN_ULTRA_WARM,
@@ -211,7 +212,14 @@ def validate_brightness(value: float) -> None:
 
 
 def validate_kelvin(value: int) -> None:
-    """Validate kelvin temperature is in range 1500-9000.
+    """Validate kelvin temperature is in range 1500-9000, or exactly 0.
+
+    ``MIN_KELVIN``-``MAX_KELVIN`` is the white-mode range of the product, not
+    the range of the protocol field. Devices report ``KELVIN_SATURATED`` (0)
+    for a colour with no white component, so that value is accepted here and
+    preserved verbatim: rejecting it breaks reads of device state, and clamping
+    it to ``MIN_KELVIN`` would write a different colour back to the device on
+    the next read/modify/write round-trip.
 
     Args:
         value: Kelvin temperature to validate
@@ -219,8 +227,13 @@ def validate_kelvin(value: int) -> None:
     Raises:
         ValueError: If kelvin is out of range
     """
+    if value == KELVIN_SATURATED:
+        return
     if not (MIN_KELVIN <= value <= MAX_KELVIN):
-        raise ValueError(f"Kelvin must be 1500-9000, got {value}")
+        raise ValueError(
+            f"Kelvin must be {MIN_KELVIN}-{MAX_KELVIN} "
+            f"or {KELVIN_SATURATED}, got {value}"
+        )
 
 
 class HSBK:
@@ -234,7 +247,9 @@ class HSBK:
         hue: Hue value in degrees (0-360)
         saturation: Saturation (0.0-1.0, where 0 is white and 1 is fully saturated)
         brightness: Brightness (0.0-1.0, where 0 is off and 1 is full brightness)
-        kelvin: Color temperature in Kelvin (1500-9000, typically 2500-9000 for LIFX)
+        kelvin: Color temperature in Kelvin (1500-9000, typically 2500-9000 for
+            LIFX). Devices also report 0 for a colour with no white component;
+            that value is accepted and round-trips unchanged.
 
     Example:
         ```python
@@ -347,7 +362,11 @@ class HSBK:
 
     @property
     def kelvin(self) -> int:
-        """Return kelvin."""
+        """Return kelvin.
+
+        Usually 1500-9000, but 0 when the device reports a colour with no
+        white component (a fully saturated zone).
+        """
         return self._kelvin
 
     @classmethod
@@ -461,7 +480,9 @@ class HSBK:
             ```
         """
         # Convert from uint16 ranges to user-friendly ranges, preserving the
-        # full precision of the device value (no rounding).
+        # full precision of the device value (no rounding). Kelvin is passed
+        # through verbatim, including the 0 devices report for a fully
+        # saturated colour.
         hue = float(protocol.hue) * 360 / 0x10000
         saturation = float(protocol.saturation) / 0xFFFF
         brightness = float(protocol.brightness) / 0xFFFF
@@ -525,7 +546,7 @@ class HSBK:
         """Create a new HSBK with modified color temperature.
 
         Args:
-            kelvin: New kelvin value (1500-9000)
+            kelvin: New kelvin value (1500-9000, or 0 for no white component)
 
         Returns:
             New HSBK instance
@@ -556,8 +577,8 @@ class HSBK:
                 saturation
             brightness: New brightness (0.0-1.0), or None to keep the current
                 brightness
-            kelvin: New color temperature (1500-9000), or None to keep the
-                current kelvin
+            kelvin: New color temperature (1500-9000, or 0 for no white
+                component), or None to keep the current kelvin
 
         Returns:
             New HSBK instance
