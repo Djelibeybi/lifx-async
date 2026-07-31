@@ -17,10 +17,13 @@ from lifx.api import (
     find_by_serial,
 )
 from lifx.color import HSBK, Colors
+from lifx.const import INVALID_AMBIENT_LIGHT_RESPONSE, STATE_REFRESH_DEBOUNCE_MS
 from lifx.devices import (
     CeilingLight,
     CeilingLightState,
+    CollectionInfo,
     Device,
+    DeviceCapabilities,
     DeviceInfo,
     DeviceVersion,
     FirmwareInfo,
@@ -72,11 +75,13 @@ from lifx.exceptions import (
 from lifx.network.discovery import DiscoveredDevice, discover_devices
 from lifx.network.mdns import LifxServiceRecord, discover_lifx_services
 from lifx.products import ProductCapability, ProductInfo, ProductRegistry
-from lifx.protocol.models import mac_candidates_for_serial
+from lifx.protocol.models import HevConfig, HevCycleState, mac_candidates_for_serial
 from lifx.protocol.protocol_types import (
     Direction,
     FirmwareEffect,
+    LightLastHevCycleResult,
     LightWaveform,
+    TileEffectSkyType,
 )
 from lifx.theme import Theme, ThemeLibrary, get_theme
 
@@ -103,15 +108,22 @@ __all__ = [
     "HSBK",
     "Colors",
     # Device info
+    "CollectionInfo",
+    "DeviceCapabilities",
     "DeviceInfo",
     "DeviceVersion",
     "FirmwareInfo",
     "WifiInfo",
     "mac_candidates_for_serial",
+    # HEV
+    "HevConfig",
+    "HevCycleState",
+    "LightLastHevCycleResult",
     # MultiZone
     "MultiZoneEffect",
     # Matrix (Tile)
     "MatrixEffect",
+    "TileEffectSkyType",
     "TileInfo",
     # Effects
     "Conductor",
@@ -160,6 +172,9 @@ __all__ = [
     "LightWaveform",
     "FirmwareEffect",
     "Direction",
+    # State management
+    "INVALID_AMBIENT_LIGHT_RESPONSE",
+    "STATE_REFRESH_DEBOUNCE_MS",
     # Exceptions
     "LifxError",
     "LifxDeviceNotFoundError",
