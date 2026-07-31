@@ -1,5 +1,6 @@
 """Tests for UDP transport layer."""
 
+import asyncio
 import errno
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lifx.exceptions import LifxNetworkError as NetworkError
+from lifx.exceptions import LifxProtocolError
 from lifx.exceptions import LifxTimeoutError as TimeoutError
 from lifx.network.transport import PeerInfo, UdpTransport, _UdpProtocol
 
@@ -129,7 +131,6 @@ class TestUdpProtocol:
 
     async def test_protocol_connection_made(self) -> None:
         """Test protocol connection_made callback."""
-        from unittest.mock import MagicMock
 
         protocol = _UdpProtocol()
         mock_transport = MagicMock()
@@ -139,7 +140,6 @@ class TestUdpProtocol:
 
     async def test_protocol_connection_lost(self) -> None:
         """Test protocol connection_lost callback."""
-        from unittest.mock import MagicMock
 
         protocol = _UdpProtocol()
         mock_transport = MagicMock()
@@ -199,7 +199,8 @@ class TestUdpProtocol:
             protocol.datagram_received(b"x", ("192.168.19.7", 56700))
             log_dict = mock_logger.warning.call_args[0][0]
             assert log_dict["serial"] == "d073d5d4809b"
-            assert log_dict["sender"] == ("192.168.19.7", 56700)
+            assert log_dict["sender_ip"] == "192.168.19.7"
+            assert log_dict["sender_port"] == 56700
             assert log_dict["action"] == "packet_dropped"
 
     async def test_transport_passes_peer_to_protocol(self) -> None:
@@ -265,7 +266,6 @@ class TestPacketSizeValidation:
 
     async def test_receive_packet_too_large(self) -> None:
         """Test receive rejects packets larger than MAX_PACKET_SIZE."""
-        from lifx.exceptions import LifxProtocolError
 
         protocol = _UdpProtocol()
         # Create oversized packet (MAX_PACKET_SIZE is 1024)
@@ -280,7 +280,6 @@ class TestPacketSizeValidation:
 
     async def test_receive_packet_too_small(self) -> None:
         """Test receive rejects packets smaller than MIN_PACKET_SIZE."""
-        from lifx.exceptions import LifxProtocolError
 
         protocol = _UdpProtocol()
         # Create undersized packet (MIN_PACKET_SIZE is 36)
@@ -397,7 +396,6 @@ class TestErrorHandling:
 
     async def test_receive_oserror_raises_network_error(self) -> None:
         """Test OSError during receive raises NetworkError."""
-        import asyncio
 
         protocol = _UdpProtocol()
         transport = UdpTransport()
@@ -436,7 +434,6 @@ class TestErrorHandling:
 
     async def test_receive_many_oserror_breaks_loop(self) -> None:
         """Test receive_many breaks on OSError during packet receive."""
-        import asyncio
 
         protocol = _UdpProtocol()
         transport = UdpTransport()
