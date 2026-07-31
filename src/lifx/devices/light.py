@@ -955,10 +955,12 @@ class Light(Device[LightState]):
     async def refresh_state(self) -> None:
         """Refresh light state from hardware.
 
-        Fetches color (which includes power and label) and updates state.
+        Fetches color (which includes power and label), plus the WiFi signal
+        and ambient light reading when :attr:`fetch_wifi_info` and
+        :attr:`fetch_ambient_light` are set, and updates state. Initializes
+        state first when the device has none yet.
 
         Raises:
-            RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """

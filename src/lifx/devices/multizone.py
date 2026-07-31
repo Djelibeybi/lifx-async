@@ -1169,7 +1169,6 @@ class MultiZoneLight(Light):
         Fetches color, zones, and effect.
 
         Raises:
-            RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """

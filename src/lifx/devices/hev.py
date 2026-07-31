@@ -420,7 +420,6 @@ class HevLight(Light):
         Fetches color, HEV cycle, config, and last result.
 
         Raises:
-            RuntimeError: If state has not been initialized
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
