@@ -26,7 +26,7 @@ from lifx.exceptions import (
     LifxUnsupportedCommandError,
 )
 from lifx.network.message import create_message, parse_message
-from lifx.network.transport import UdpTransport
+from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
@@ -117,7 +117,10 @@ class DeviceConnection:
                 listen window -- counts against it, so a request can never
                 take materially longer than the timeout it was given.
         """
-        self.serial = serial
+        # Normalise the serial so separator-formatted input (a form
+        # Serial.from_string() accepts) logs and compares identically to the
+        # 12-digit form a Device instance stores for the same hardware.
+        self.serial = Serial.from_string(serial).to_string()
         self.ip = ip
         self.port = port
         self.max_retries = max_retries
@@ -132,11 +135,17 @@ class DeviceConnection:
         # across per-test event loops).
         self._is_opening = False
 
+        # Identity handed to the transport for its warning logs. Mutated in
+        # place when discovery learns the real serial, so records emitted
+        # after that name the device rather than the placeholder.
+        self._peer = PeerInfo(serial=self.serial, ip=self.ip, port=self.port)
+
         # Pre-compute serial bytes for fast comparison in background receiver
-        self._is_discovery = serial == "000000000000"
+        self._is_discovery = self.serial == "000000000000"
         if not self._is_discovery:
-            serial_obj = Serial.from_string(serial)
-            self._target_bytes: bytes | None = serial_obj.to_protocol()
+            self._target_bytes: bytes | None = Serial.from_string(
+                self.serial
+            ).to_protocol()
         else:
             self._target_bytes = None
 
@@ -196,9 +205,7 @@ class DeviceConnection:
             self._receiver_shutdown = asyncio.Event()
 
             # Open transport
-            self._transport = UdpTransport(
-                port=0, broadcast=False, peer=f"{self.serial}@{self.ip}"
-            )
+            self._transport = UdpTransport(port=0, broadcast=False, peer=self._peer)
             await self._transport.open()
             self._is_open = True
 
@@ -914,6 +921,7 @@ class DeviceConnection:
                     if serial != self.serial:
                         self.serial = serial
                         # Refresh cached fields now that we know the real serial
+                        self._peer.serial = serial
                         self._is_discovery = False
                         self._target_bytes = Serial.from_string(serial).to_protocol()
                         self._send_target = self._target_bytes
