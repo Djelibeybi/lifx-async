@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import random
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from lifx.animation.orientation import Orientation, build_orientation_lut
 from lifx.api import DeviceGroup
 from lifx.color import HSBK, Colors
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.theme import Theme
+from lifx.theme import MatrixGenerator, Theme
+from tests.test_theme.conftest import make_tile
 
 
 @pytest.mark.emulator
@@ -239,14 +243,8 @@ class TestMatrixLightApplyTheme:
         """Test that apply_theme uses Canvas for interpolation."""
         theme = Theme([Colors.RED, Colors.BLUE])
 
-        # Create mock tile info
-        tile_info = MagicMock()
-        tile_info.width = 8
-        tile_info.height = 8
-        tile_info.tile_index = 0
-
         # Mock methods
-        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.get_device_chain = AsyncMock(return_value=[make_tile(0)])
 
         await matrix_light.apply_theme(theme)
 
@@ -277,12 +275,7 @@ class TestMatrixLightApplyTheme:
         """Test apply_theme with transition duration."""
         theme = Theme([Colors.RED, Colors.BLUE])
 
-        tile_info = MagicMock()
-        tile_info.width = 8
-        tile_info.height = 8
-        tile_info.tile_index = 0
-
-        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.get_device_chain = AsyncMock(return_value=[make_tile(0)])
 
         await matrix_light.apply_theme(theme, duration=3.0)
 
@@ -294,12 +287,7 @@ class TestMatrixLightApplyTheme:
         """Test apply_theme with power_on=True."""
         theme = Theme([Colors.RED])
 
-        tile_info = MagicMock()
-        tile_info.width = 8
-        tile_info.height = 8
-        tile_info.tile_index = 0
-
-        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.get_device_chain = AsyncMock(return_value=[make_tile(0)])
 
         await matrix_light.apply_theme(theme, power_on=True)
 
@@ -313,18 +301,9 @@ class TestMatrixLightApplyTheme:
         """Test apply_theme with multiple tiles in chain."""
         theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
 
-        # Create multiple mock tile infos
-        tile_info1 = MagicMock()
-        tile_info1.width = 8
-        tile_info1.height = 8
-        tile_info1.tile_index = 0
-
-        tile_info2 = MagicMock()
-        tile_info2.width = 8
-        tile_info2.height = 8
-        tile_info2.tile_index = 1
-
-        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info1, tile_info2])
+        matrix_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, user_x=0.0), make_tile(1, user_x=1.0)]
+        )
 
         await matrix_light.apply_theme(theme)
 
@@ -335,3 +314,207 @@ class TestMatrixLightApplyTheme:
         calls = matrix_light.set_matrix_colors.call_args_list
         assert calls[0][0][0] == 0  # First call uses tile index 0
         assert calls[1][0][0] == 1  # Second call uses tile index 1
+
+    async def test_apply_theme_candle_geometry(self, matrix_light: MatrixLight) -> None:
+        """Test a 5x6 Candle gets 30 colours, not 64.
+
+        The Candle is the counter-example to the old hardcoded 8x8 assumption.
+        """
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+
+        matrix_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=5, height=6)]
+        )
+
+        await matrix_light.apply_theme(theme)
+
+        colors = matrix_light.set_matrix_colors.call_args[0][1]
+        assert len(colors) == 30
+        assert all(isinstance(c, HSBK) for c in colors)
+
+    async def test_apply_theme_chain_tiles_get_distinct_colours(
+        self, tile_light: MatrixLight
+    ) -> None:
+        """Test a 5-tile chain renders a different slice of canvas per tile.
+
+        With user_x treated as pixels, every tile landed within a few pixels of
+        the origin and read back nearly the same colours. Set inequality alone
+        cannot see that: the buggy origins (0, 1, 2, 3, 4) also produced five
+        distinct windows, just overlapping ones. So this pins apply_theme to the
+        colours MatrixGenerator.from_tiles() produces — from_tiles is separately
+        pinned to 8-pixel spacing by
+        TestMatrixThemeGeometry.test_chain_tile_origins_are_eight_pixels_apart —
+        and additionally requires adjacent tiles to share almost nothing.
+        """
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        tiles = [make_tile(i, user_x=float(i)) for i in range(5)]
+
+        random.seed(20260731)
+        expected = MatrixGenerator.from_tiles(tiles).get_theme_colors(theme)
+
+        random.seed(20260731)
+        tile_light.get_device_chain = AsyncMock(return_value=tiles)
+        await tile_light.apply_theme(theme)
+
+        assert tile_light.set_matrix_colors.call_count == 5
+
+        sent = [call[0][1] for call in tile_light.set_matrix_colors.call_args_list]
+        assert sent == expected
+
+        # Tiles 8 pixels apart read disjoint canvas windows. Under the old
+        # one-pixel-apart origins adjacent tiles shared most of their colours.
+        colour_sets = [
+            {(c.hue, c.saturation, c.brightness, c.kelvin) for c in colors}
+            for colors in sent
+        ]
+        for first, second in zip(colour_sets, colour_sets[1:], strict=False):
+            overlap = len(first & second) / len(first | second)
+            assert overlap < 0.25
+
+    async def test_apply_theme_remaps_a_rotated_tile(
+        self, tile_light: MatrixLight
+    ) -> None:
+        """Test a physically rotated Tile gets its colours remapped.
+
+        The canvas renders in row-major screen order. FrameBuffer applies an
+        orientation LUT for the animation path; apply_theme must do the same or
+        a rotated panel renders its slice of the theme sideways.
+        """
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        tiles = [make_tile(0, accel=(1, 0, 0))]  # RotatedRight
+
+        assert tiles[0].nearest_orientation == "RotatedRight"
+
+        random.seed(20260801)
+        expected_canvas = MatrixGenerator.from_tiles(tiles).get_theme_colors(theme)[0]
+        lut = build_orientation_lut(8, 8, Orientation.ROTATED_90)
+
+        random.seed(20260801)
+        tile_light.get_device_chain = AsyncMock(return_value=tiles)
+        await tile_light.apply_theme(theme)
+
+        sent = tile_light.set_matrix_colors.call_args[0][1]
+        assert sent == [expected_canvas[src_idx] for src_idx in lut]
+        assert sent != expected_canvas
+
+    async def test_apply_theme_leaves_an_upright_tile_alone(
+        self, tile_light: MatrixLight
+    ) -> None:
+        """Test an upright Tile is sent the canvas order unchanged."""
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        tiles = [make_tile(0)]
+
+        random.seed(20260801)
+        expected = MatrixGenerator.from_tiles(tiles).get_theme_colors(theme)[0]
+
+        random.seed(20260801)
+        tile_light.get_device_chain = AsyncMock(return_value=tiles)
+        await tile_light.apply_theme(theme)
+
+        assert tile_light.set_matrix_colors.call_args[0][1] == expected
+
+    async def test_apply_theme_ignores_orientation_without_a_chain(
+        self, ceiling_light: CeilingLight
+    ) -> None:
+        """Test a fixed device is never remapped, whatever its accel fields say.
+
+        Only the LIFX Tile has an accelerometer. Every other matrix device is
+        mounted in one position and returns whatever its firmware leaves in the
+        accel fields; reading that as a rotation would scramble the output.
+        """
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        # accel reads as UpsideDown, which would reverse all 128 colours
+        tiles = [make_tile(0, width=16, height=8, accel=(0, 1, 0))]
+
+        assert tiles[0].nearest_orientation == "UpsideDown"
+
+        random.seed(20260801)
+        expected = MatrixGenerator.from_tiles(tiles).get_theme_colors(theme)[0]
+
+        random.seed(20260801)
+        ceiling_light.get_device_chain = AsyncMock(return_value=tiles)
+        await ceiling_light.apply_theme(theme)
+
+        assert ceiling_light.set_matrix_colors.call_args[0][1] == expected
+
+    async def test_apply_theme_ceiling_uses_reported_geometry(
+        self, ceiling_light: CeilingLight
+    ) -> None:
+        """Test CeilingLight inherits apply_theme and keeps its own geometry.
+
+        A Ceiling reports a single 16x8 tile covering both the downlight pixels
+        and the uplight zone, so the colour list must match the reported
+        width * height exactly.
+        """
+        theme = Theme([Colors.RED, Colors.BLUE])
+
+        ceiling_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=16, height=8)]
+        )
+
+        await ceiling_light.apply_theme(theme)
+
+        colors = ceiling_light.set_matrix_colors.call_args[0][1]
+        assert len(colors) == 128
+
+
+class TestMatrixThemeGeometry:
+    """Tests for how tile positions map onto the theme canvas."""
+
+    def test_chain_tile_origins_are_eight_pixels_apart(self) -> None:
+        """Test user_x 0.0..4.0 produces origins 8 pixels apart."""
+        tiles = [make_tile(i, user_x=float(i)) for i in range(5)]
+
+        generator = MatrixGenerator.from_tiles(tiles)
+
+        assert generator.coords_and_sizes == [
+            ((0, 0), (8, 8)),
+            ((8, 0), (8, 8)),
+            ((16, 0), (8, 8)),
+            ((24, 0), (8, 8)),
+            ((32, 0), (8, 8)),
+        ]
+
+    def test_mixed_geometry_chain_keeps_the_same_scale(self) -> None:
+        """Test a mixed-geometry chain still advances 8 pixels per unit.
+
+        Real chains ship as one product type, but the protocol reports width
+        and height per tile, and photons lays parts out with
+        ``user_x += part.width / 8`` — so the scale is the constant 8 and only
+        the region size varies per tile.
+        """
+        tiles = [
+            make_tile(0, user_x=0.0),
+            make_tile(1, user_x=1.0, width=5, height=6),
+            make_tile(2, user_x=1.625),
+        ]
+
+        generator = MatrixGenerator.from_tiles(tiles)
+
+        assert generator.coords_and_sizes == [
+            ((0, 0), (8, 8)),
+            ((8, 0), (5, 6)),
+            ((13, 0), (8, 8)),
+        ]
+
+    def test_vertical_positions_are_inverted(self) -> None:
+        """Test a tile higher in the chain sits higher on the canvas."""
+        tiles = [make_tile(0, user_y=0.0), make_tile(1, user_y=1.0)]
+
+        generator = MatrixGenerator.from_tiles(tiles)
+
+        assert generator.coords_and_sizes == [
+            ((0, 0), (8, 8)),
+            ((0, -8), (8, 8)),
+        ]
+
+    def test_generated_tiles_match_reported_geometry(self) -> None:
+        """Test each rendered tile holds width * height colours."""
+        random.seed(20260731)
+        tiles = [make_tile(0), make_tile(1, user_x=1.0, width=5, height=6)]
+
+        rendered = MatrixGenerator.from_tiles(tiles).get_theme_colors(
+            Theme([Colors.RED, Colors.GREEN])
+        )
+
+        assert [len(colors) for colors in rendered] == [64, 30]

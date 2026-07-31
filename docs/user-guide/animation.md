@@ -87,8 +87,10 @@ as one continuous image, rather than each tile showing a mirrored copy.
 ### How It Works
 
 1. The animator reads each tile's position (`user_x`, `user_y`) from the device
-2. Positions are in "tile-width units" (1.0 = one tile width)
-3. A canvas is created that encompasses all tiles
+2. Positions are in tile-position units, not pixels: 1.0 is always 8 pixels, whatever the
+   tile's own size, and `user_y` grows upwards while canvas rows grow downwards. The
+   animator converts them for you
+3. A canvas is created that encompasses all tiles, using each tile's own width and height
 4. Your input frame is interpreted as a 2D row-major image
 5. Each tile extracts its region from the canvas based on its position
 
