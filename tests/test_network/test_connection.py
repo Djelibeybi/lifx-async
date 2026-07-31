@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from unittest.mock import patch
 
 import pytest
@@ -18,6 +19,20 @@ from lifx.network.connection import DeviceConnection
 from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
+
+
+async def _wait_for(predicate, deadline: float = 2.0) -> None:
+    """Poll ``predicate`` until true, or fail. Bounded -- never spins forever."""
+    start = time.monotonic()
+    while not predicate():
+        if time.monotonic() - start > deadline:
+            raise AssertionError("Timed out waiting for condition")
+        await asyncio.sleep(0.001)
+
+
+async def _wait_for_pending(conn: DeviceConnection, count: int = 1) -> None:
+    """Wait until ``conn`` has registered ``count`` correlation keys."""
+    await _wait_for(lambda: len(conn._pending_requests) >= count)
 
 
 class TestDeviceConnection:
@@ -571,36 +586,37 @@ class TestDeviceConnectionRequestStream:
             serial="000000000000",  # Unknown serial
             ip="192.168.1.100",
         )
-
-        async def mock_request_stream_impl(packet, timeout=None, max_retries=None):
-            # Return response with device's actual serial
+        task: asyncio.Task[object] | None = None
+        try:
+            await conn.open()
+            task = asyncio.create_task(
+                conn.request(DevicePackets.GetLabel(), timeout=2.0)
+            )
+            await _wait_for_pending(conn)
+            (key,) = conn._pending_requests.keys()
+            source, sequence, _serial = key
             header = LifxHeader(
                 size=36 + 32,
                 protocol=1024,
-                source=12345,
-                target=bytes.fromhex("d073d5001234"),  # Actual serial
+                source=source,
+                target=bytes.fromhex("d073d5001234").ljust(8, b"\x00"),  # Actual serial
                 tagged=False,
                 ack_required=False,
                 res_required=False,
-                sequence=1,
+                sequence=sequence,
                 pkt_type=25,  # StateLabel
             )
             payload = b"TestLight\x00" + (b"\x00" * 23)
-            yield header, payload
+            conn._pending_requests[key].put_nowait((header, payload))
+            await asyncio.wait_for(task, timeout=1.0)
+            task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
 
-        with (
-            patch.object(conn, "_ensure_open", return_value=None),
-            patch.object(
-                conn, "_request_stream_impl", side_effect=mock_request_stream_impl
-            ),
-        ):
-            get_packet = DevicePackets.GetLabel()
-
-            async for _ in conn.request_stream(get_packet):
-                break
-
-            # Serial should be updated from response
-            assert conn.serial == "d073d5001234"
+        # Serial should be updated from response
+        assert conn.serial == "d073d5001234"
 
     async def test_request_no_response_error(self) -> None:
         """Test request() raises error when no response received."""
@@ -776,53 +792,272 @@ class TestRequestStreamDebugLogging:
 
 
 class TestDiscoveryConnectionSerialUpdate:
-    """A discovery connection refreshes its serial from the GET response header.
+    """A discovery connection refreshes its serial from a response header.
 
-    Covers both sides of the ``serial != self.serial`` guard: the response
-    serial differing from the placeholder (update) and matching it (no-op).
+    Driven through the real ``_transmit_and_listen`` by injecting into the
+    pending-request queue, because the learning happens there (so every
+    request path benefits, not just GET) and only takes effect once the
+    request that learned it has released its correlation keys.
     """
 
     @staticmethod
-    def _response(target_hex: str):
-        payload = b"x".ljust(32, b"\x00")  # 32-byte StateLabel payload
-        header = LifxHeader(
-            size=36 + len(payload),
+    def _header(*, source: int, sequence: int, target_hex: str) -> LifxHeader:
+        return LifxHeader(
+            size=36 + 32,
             protocol=1024,
-            source=1,
-            target=bytes.fromhex(target_hex),
+            source=source,
+            target=bytes.fromhex(target_hex).ljust(8, b"\x00"),
             tagged=False,
             ack_required=False,
             res_required=False,
-            sequence=1,
+            sequence=sequence,
             pkt_type=Device.StateLabel.PKT_TYPE,
         )
-        return header, payload
 
-    async def _run(self, conn, header, payload):
-        async def impl(packet, timeout=None, max_retries=None):
-            yield header, payload
+    async def _run(self, conn: DeviceConnection, target_hex: str) -> None:
+        """Run one GET against ``conn``, answering it with ``target_hex``."""
+        task: asyncio.Task[object] | None = None
+        try:
+            await conn.open()
+            task = asyncio.create_task(conn.request(Device.GetLabel(), timeout=2.0))
+            await _wait_for_pending(conn)
+            (key,) = conn._pending_requests.keys()
+            source, sequence, _serial = key
+            header = self._header(
+                source=source, sequence=sequence, target_hex=target_hex
+            )
+            payload = b"x".ljust(32, b"\x00")  # 32-byte StateLabel payload
+            conn._pending_requests[key].put_nowait((header, payload))
+            await asyncio.wait_for(task, timeout=1.0)
+            task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
 
-        with (
-            patch.object(conn, "_ensure_open", return_value=None),
-            patch.object(conn, "_request_stream_impl", side_effect=impl),
-        ):
-            return [r async for r in conn.request_stream(Device.GetLabel())]
-
-    async def test_serial_updated_when_response_differs(self) -> None:
+    async def test_serial_reported_as_soon_as_it_is_learned(self) -> None:
+        """The public serial updates immediately; correlation state waits."""
         conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
         assert conn._is_discovery is True
-        header, payload = self._response("d073d5001234")
-        results = await self._run(conn, header, payload)
-        assert len(results) == 1
+        await self._run(conn, "d073d5001234")
+
+        # What callers (Device.from_ip) read straight after their request.
         assert conn.serial == "d073d5001234"
-        assert conn._is_discovery is False
+        assert conn._peer.serial == "d073d5001234"
+        # Correlation identity still the placeholder until the next request.
+        assert conn._serial == "000000000000"
+        assert conn._is_discovery is True
+
+    async def test_correlation_identity_adopted_on_next_request(self) -> None:
+        """_ensure_open() adopts the learned serial before registering keys."""
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        await self._run(conn, "d073d5001234")
+
+        await conn._ensure_open()
+        try:
+            assert conn._serial == "d073d5001234"
+            assert conn._is_discovery is False
+            assert conn._target_bytes == bytes.fromhex("d073d5001234").ljust(8, b"\x00")
+            assert conn._send_target == conn._target_bytes
+            assert conn._learned_serial is None
+            assert conn.serial == "d073d5001234"
+        finally:
+            await conn.close()
 
     async def test_serial_unchanged_when_response_matches(self) -> None:
         conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
-        header, payload = self._response("000000000000")
-        results = await self._run(conn, header, payload)
-        assert len(results) == 1
+        await self._run(conn, "000000000000")
         assert conn.serial == "000000000000"
+        assert conn._is_discovery is True
+
+    async def test_serial_learned_from_ack_only_traffic(self) -> None:
+        """A SET-driven connection learns its serial too, not just GETs."""
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        task: asyncio.Task[object] | None = None
+        try:
+            await conn.open()
+            task = asyncio.create_task(
+                conn.request(Device.SetPower(level=65535), timeout=2.0)
+            )
+            await _wait_for_pending(conn)
+            (key,) = conn._pending_requests.keys()
+            source, sequence, _serial = key
+            header = LifxHeader(
+                size=36,
+                protocol=1024,
+                source=source,
+                target=bytes.fromhex("d073d5001234").ljust(8, b"\x00"),
+                tagged=False,
+                ack_required=False,
+                res_required=False,
+                sequence=sequence,
+                pkt_type=45,  # Acknowledgement
+            )
+            conn._pending_requests[key].put_nowait((header, b""))
+            await asyncio.wait_for(task, timeout=1.0)
+            task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+
+        assert conn.serial == "d073d5001234"
+        assert conn._peer.serial == "d073d5001234"
+
+    async def test_adoption_waits_for_a_concurrent_request(self) -> None:
+        """A second in-flight request holds the placeholder identity in place.
+
+        That request registered its keys under ``000000000000``; adopting the
+        learned serial while it is still pending would orphan them.
+        """
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        other: asyncio.Task[object] | None = None
+        first: asyncio.Task[object] | None = None
+        try:
+            await conn.open()
+            # A request that is never answered, holding a placeholder key.
+            other = asyncio.create_task(conn.request(Device.GetPower(), timeout=5.0))
+            await _wait_for_pending(conn, 1)
+            other_keys = set(conn._pending_requests)
+
+            first = asyncio.create_task(conn.request(Device.GetLabel(), timeout=2.0))
+            await _wait_for_pending(conn, 2)
+            (key,) = set(conn._pending_requests) - other_keys
+            source, sequence, _serial = key
+            conn._pending_requests[key].put_nowait(
+                (
+                    self._header(
+                        source=source, sequence=sequence, target_hex="d073d5001234"
+                    ),
+                    b"x".ljust(32, b"\x00"),
+                )
+            )
+            await asyncio.wait_for(first, timeout=1.0)
+            first = None
+
+            # Learned and visible in logs, but not yet adopted: the other
+            # request is still correlating on the placeholder.
+            assert conn._learned_serial == "d073d5001234"
+            assert conn._peer.serial == "d073d5001234"
+            assert conn.serial == "d073d5001234"
+            # Correlation identity held back while the other request runs.
+            assert conn._serial == "000000000000"
+            assert conn._is_discovery is True
+
+            # Even an explicit adoption attempt is refused while it is pending.
+            conn._adopt_learned_serial()
+            assert conn._serial == "000000000000"
+
+            other.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await other
+            other = None
+        finally:
+            for task in (first, other):
+                if task is not None and not task.done():
+                    task.cancel()
+            await conn.close()
+
+    async def test_multi_response_stream_survives_learned_serial(self) -> None:
+        """Adopting the learned serial must not orphan the in-flight keys.
+
+        Applying it on the first response would re-key the background
+        receiver's correlation while the request is still registered under
+        the placeholder, dropping every later response in the stream.
+        """
+        conn = DeviceConnection(serial="000000000000", ip="192.168.1.100")
+        received: list[object] = []
+        task: asyncio.Task[None] | None = None
+        try:
+            await conn.open()
+
+            async def _drive() -> None:
+                async for response in conn.request_stream(
+                    Device.GetLabel(), timeout=2.0
+                ):
+                    received.append(response)
+
+            with patch("lifx.network.connection._STREAM_IDLE_TIMEOUT", 0.1):
+                task = asyncio.create_task(_drive())
+                await _wait_for_pending(conn)
+                (key,) = conn._pending_requests.keys()
+                source, sequence, _serial = key
+                payload = b"x".ljust(32, b"\x00")
+
+                for index, target_hex in enumerate(
+                    ("d073d5001234", "d073d5005678"), start=1
+                ):
+                    # The receiver routes on the connection's *current*
+                    # serial, so a mid-stream flip would strand the second
+                    # response.
+                    assert conn._is_discovery is True
+                    conn._pending_requests[key].put_nowait(
+                        (
+                            self._header(
+                                source=source, sequence=sequence, target_hex=target_hex
+                            ),
+                            payload,
+                        )
+                    )
+                    await _wait_for(lambda n=index: len(received) >= n)
+
+                await asyncio.wait_for(task, timeout=3.0)
+                task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+
+        assert len(received) == 2
+        assert conn.serial == "d073d5001234"
+
+
+class TestMalformedDatagramHandling:
+    """A stray datagram must not kill the connection's background receiver.
+
+    The socket accepts traffic from any host, so an unrelated sender can put
+    an unparsable packet in the queue. Treating that as a dead socket would
+    strand every in-flight request until its timeout expires.
+    """
+
+    async def test_receiver_survives_malformed_datagram(self) -> None:
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        try:
+            await conn.open()
+            assert conn._transport is not None
+            protocol = conn._transport._protocol
+            assert protocol is not None
+
+            # Too small to be a LIFX header: receive() raises LifxProtocolError.
+            protocol.datagram_received(b"\x00" * 4, ("192.168.1.9", 1234))
+            await _wait_for(protocol.queue.empty)
+            # Let the receiver run its handler before asserting.
+            await asyncio.sleep(0.01)
+
+            assert conn._receiver_task is not None
+            assert not conn._receiver_task.done()
+            assert conn._is_alive()
+
+            # The receiver still routes real responses afterwards.
+            task = asyncio.create_task(conn.request(Device.GetLabel(), timeout=2.0))
+            await _wait_for_pending(conn)
+            (key,) = conn._pending_requests.keys()
+            source, sequence, _serial = key
+            header = LifxHeader(
+                size=36 + 32,
+                protocol=1024,
+                source=source,
+                target=bytes.fromhex(conn.serial).ljust(8, b"\x00"),
+                tagged=False,
+                ack_required=False,
+                res_required=False,
+                sequence=sequence,
+                pkt_type=Device.StateLabel.PKT_TYPE,
+            )
+            conn._pending_requests[key].put_nowait((header, b"x".ljust(32, b"\x00")))
+            assert await asyncio.wait_for(task, timeout=1.0) is not None
+        finally:
+            await conn.close()
 
 
 class TestTransportDeathRecovery:

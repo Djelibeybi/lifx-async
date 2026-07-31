@@ -151,8 +151,12 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                         # The socket accepts datagrams from any host, so the
                         # sender is not necessarily the configured peer: a
                         # stray broadcaster can overrun the queue and the peer
-                        # alone would blame a device that sent nothing.
-                        sender=addr,
+                        # alone would blame a device that sent nothing. Split
+                        # into discrete keys for the same reason the peer is:
+                        # a tuple JSON-encodes to a positional array no log
+                        # pipeline can filter on by host.
+                        sender_ip=addr[0],
+                        sender_port=addr[1],
                         total_dropped=self._dropped_count,
                     )
                 )
@@ -324,14 +328,13 @@ class UdpTransport:
 
         except OSError as e:
             _LOGGER.debug(
-                {
-                    "class": "UdpTransport",
-                    "method": "open",
-                    "action": "failed",
-                    "ip_address": self._ip_address,
-                    "port": self._port,
-                    "reason": str(e),
-                }
+                self._log(
+                    method="open",
+                    action="failed",
+                    bind_address=self._ip_address,
+                    bind_port=self._port,
+                    reason=str(e),
+                )
             )
             raise LifxNetworkError(f"Failed to open UDP socket: {e}") from e
 
@@ -400,14 +403,14 @@ class UdpTransport:
             self._transport.sendto(data, address)
         except OSError as e:
             _LOGGER.debug(
-                {
-                    "class": "UdpTransport",
-                    "method": "send",
-                    "action": "failed",
-                    "destination": address,
-                    "packet_size": len(data),
-                    "reason": str(e),
-                }
+                self._log(
+                    method="send",
+                    action="failed",
+                    destination_ip=address[0],
+                    destination_port=address[1],
+                    packet_size=len(data),
+                    reason=str(e),
+                )
             )
             raise LifxNetworkError(f"Failed to send data: {e}") from e
 
@@ -444,7 +447,8 @@ class UdpTransport:
                 self._log(
                     method="receive",
                     action="packet_too_large",
-                    sender=addr,
+                    sender_ip=addr[0],
+                    sender_port=addr[1],
                     packet_size=len(data),
                     max_size=MAX_PACKET_SIZE,
                 )
@@ -458,7 +462,8 @@ class UdpTransport:
                 self._log(
                     method="receive",
                     action="packet_too_small",
-                    sender=addr,
+                    sender_ip=addr[0],
+                    sender_port=addr[1],
                     packet_size=len(data),
                     min_size=MIN_PACKET_SIZE,
                 )
