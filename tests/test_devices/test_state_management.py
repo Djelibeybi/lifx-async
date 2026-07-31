@@ -1751,3 +1751,38 @@ class TestDeviceInitializeStateParallel:
 
         with pytest.raises(LifxTimeoutError):
             await device._initialize_state()
+
+    @pytest.mark.asyncio
+    async def test_device_initialize_state_cancels_in_flight_requests(
+        self, device, mock_product_info
+    ):
+        """Requests still in flight are cancelled when one of them fails.
+
+        Every state request is scheduled up front, so a failure part-way
+        through awaiting them leaves the rest pending. Without the cancel they
+        would surface later as "exception was never retrieved".
+        """
+        from lifx.exceptions import LifxTimeoutError
+
+        device._capabilities = mock_product_info(has_color=False)
+        cancelled = asyncio.Event()
+        handler = _state_request_handler()
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Device.GetLabel):
+                raise LifxTimeoutError("Timed out")
+            if isinstance(packet, packets.Device.GetGroup):
+                try:
+                    await asyncio.sleep(10)
+                except asyncio.CancelledError:
+                    cancelled.set()
+                    raise
+            return await handler(packet)
+
+        device.connection.request.side_effect = mock_request
+
+        with pytest.raises(LifxTimeoutError):
+            await device._initialize_state()
+
+        assert cancelled.is_set()
+        assert device._state is None
