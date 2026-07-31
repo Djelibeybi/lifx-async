@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.const import (
+    INVALID_AMBIENT_LIGHT_RESPONSE,
     MAX_BRIGHTNESS,
     MAX_HUE,
     MAX_KELVIN,
@@ -42,11 +43,15 @@ class LightState(DeviceState):
         color: Current HSBK color
         ambient_light: Ambient light level in lux, or None when the sensor was
             not queried. Devices without a sensor report 0.0, as does a device
-            in complete darkness.
+            in complete darkness. A reading taken while the light is on measures
+            the light's own output rather than the room, and is stored as
+            :data:`~lifx.const.INVALID_AMBIENT_LIGHT_RESPONSE` (-1.0) to mark it
+            unusable. Keyword-only with a default so adding it stays additive
+            for existing constructors.
     """
 
     color: HSBK
-    ambient_light: float | None
+    ambient_light: float | None = field(kw_only=True, default=None)
 
     @property
     def as_dict(self) -> Any:
@@ -940,13 +945,48 @@ class Light(Device[LightState]):
     async def _fetch_ambient_light_level(self) -> float | None:
         """Query the ambient light sensor when enabled, else return None.
 
+        Every product answers packet 401, whether or not it has a sensor: one
+        without reports 0.0, which is also what a device in complete darkness
+        reports and what a device that cannot read its sensor reports. There is
+        no way to tell those three apart from the response, so this returns the
+        reading as-is. The None result is reserved for the query not running -
+        the flag is off, or the request failed outright, which leaves the field
+        None rather than failing every state fetch it takes part in.
+
         Returns:
             Ambient light level in lux, or None when the sensor is not queried
+            or the request failed
         """
         if not self._fetch_ambient_light:
             return None
 
-        return await self.get_ambient_light_level()
+        return await self._fetch_optional(
+            "ambient_light", self.get_ambient_light_level()
+        )
+
+    @staticmethod
+    def _ambient_light_reading(lux: float | None, power: int) -> float | None:
+        """Mark a reading taken while the light was on as invalid.
+
+        The sensor sits behind the light's own LEDs, so a reading taken while
+        the light is on measures the light rather than the room. State fetches
+        happen whenever the library refreshes - including the debounced refresh
+        that follows ``set_power()`` and ``set_color()`` - so those readings are
+        stored as :data:`INVALID_AMBIENT_LIGHT_RESPONSE`, a level the sensor cannot
+        report, rather than as a plausible-looking lux value.
+
+        Args:
+            lux: Reading from the sensor, or None when it was not queried
+            power: Power level the same state fetch read from the device
+
+        Returns:
+            The reading, :data:`INVALID_AMBIENT_LIGHT_RESPONSE` if the light was on, or
+            None when the sensor was not queried
+        """
+        if lux is None:
+            return None
+
+        return INVALID_AMBIENT_LIGHT_RESPONSE if power > 0 else lux
 
     async def refresh_state(self) -> None:
         """Refresh light state from hardware.
@@ -966,22 +1006,35 @@ class Light(Device[LightState]):
 
         # GetColor returns color, power, and label in one request. The optional
         # queries join the same batch when enabled.
-        (color, power, label), wifi_signal, ambient_light = await asyncio.gather(
-            self.get_color(),
-            self._fetch_wifi_signal(),
-            self._fetch_ambient_light_level(),
+        pending: list[asyncio.Future[Any]] = []
+        color_task = self._schedule_request(self.get_color(), pending)
+        wifi_signal_task = self._schedule_request(self._fetch_wifi_signal(), pending)
+        ambient_light_task = self._schedule_request(
+            self._fetch_ambient_light_level(), pending
         )
 
+        try:
+            await self._await_batch(pending)
+        except BaseException:
+            await self._discard_pending(pending)
+            raise
+
+        color, power, label = color_task.result()
         self._state.color = color
         self._state.power = power
         self._state.label = label
 
-        if self._fetch_wifi_info:
-            self._state.wifi_info = WifiInfo(
-                signal=wifi_signal, host_firmware=self._state.host_firmware
-            )
-        if self._fetch_ambient_light:
-            self._state.ambient_light = ambient_light
+        # Both are assigned unconditionally: with the query disabled the value
+        # is None, so the field reports "not fetched" instead of carrying an
+        # unbounded-age reading behind a freshly stamped last_updated. The flags
+        # are read once, by the queries themselves, so a concurrent toggle
+        # cannot blank a reading the device did return.
+        self._state.wifi_info = WifiInfo(
+            signal=wifi_signal_task.result(), host_firmware=self._state.host_firmware
+        )
+        self._state.ambient_light = self._ambient_light_reading(
+            ambient_light_task.result(), power
+        )
 
         self._state.last_updated = time.time()
 
@@ -998,72 +1051,37 @@ class Light(Device[LightState]):
             LifxProtocolError: If responses are invalid
         """
         try:
-            # Every request starts here and runs in parallel. The optional WiFi
-            # and ambient light queries join the batch when enabled and resolve
-            # to None when they are not; get_version() joins only when
-            # capabilities are not already loaded.
+            # The colour and ambient light requests join the batch the base
+            # class schedules, so they cost no extra round-trip. GetColor
+            # returns colour, power and label together, replacing the separate
+            # label and power requests the base state fetch makes.
             pending: list[asyncio.Future[Any]] = []
+            requests = self._schedule_common_requests(pending)
             color_task = self._schedule_request(self.get_color(), pending)
-            host_firmware_task = self._schedule_request(
-                self.get_host_firmware(), pending
-            )
-            wifi_firmware_task = self._schedule_request(
-                self.get_wifi_firmware(), pending
-            )
-            location_task = self._schedule_request(self.get_location(), pending)
-            group_task = self._schedule_request(self.get_group(), pending)
-            wifi_signal_task = self._schedule_request(
-                self._fetch_wifi_signal(), pending
-            )
             ambient_light_task = self._schedule_request(
                 self._fetch_ambient_light_level(), pending
             )
-            version_task = (
-                None
-                if self._capabilities is not None
-                else self._schedule_request(self.get_version(), pending)
-            )
 
-            try:
-                color, power, label = await color_task
-                host_firmware = await host_firmware_task
-                wifi_firmware = await wifi_firmware_task
-                location_info = await location_task
-                group_info = await group_task
-                wifi_signal = await wifi_signal_task
-                ambient_light = await ambient_light_task
-                if version_task is not None:
-                    self._process_capabilities(await version_task, host_firmware)
-            except BaseException:
-                await self._discard_pending(pending)
-                raise
-
-            capabilities = self._create_capabilities()
-
-            # Get MAC address (already calculated in get_host_firmware)
-            mac_address = await self.get_mac_address()
-
-            wifi_info = WifiInfo(signal=wifi_signal, host_firmware=host_firmware)
-
-            # Get model name
-            assert self._capabilities is not None
-            model = self._capabilities.name
+            common = await self._resolve_common_requests(requests, pending)
+            color, power, label = color_task.result()
 
             # Create state instance with color
             self._state = LightState(
-                model=model,
+                model=common.model,
                 label=label,
                 serial=self.serial,
-                mac_address=mac_address,
-                capabilities=capabilities,
+                mac_address=common.mac_address,
+                capabilities=common.capabilities,
                 power=power,
-                host_firmware=host_firmware,
-                wifi_firmware=wifi_firmware,
-                wifi_info=wifi_info,
-                location=location_info,
-                group=group_info,
+                host_firmware=common.host_firmware,
+                wifi_firmware=common.wifi_firmware,
+                wifi_info=common.wifi_info,
+                location=common.location,
+                group=common.group,
                 color=color,
-                ambient_light=ambient_light,
+                ambient_light=self._ambient_light_reading(
+                    ambient_light_task.result(), power
+                ),
                 last_updated=time.time(),
             )
 

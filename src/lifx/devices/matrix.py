@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
+from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
 from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
@@ -373,12 +374,32 @@ class MatrixLight(Light):
 
     _state: MatrixLightState
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        serial: str,
+        ip: str,
+        port: int = LIFX_UDP_PORT,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
+        fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
+    ) -> None:
         """Initialize MatrixLight device.
 
-        See :class:`Light` for parameter documentation.
+        See :class:`~lifx.devices.base.Device` for parameter documentation. The
+        signature is spelled out rather than forwarded as ``*args, **kwargs`` so
+        callers get the same type checking the base class offers.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            serial,
+            ip,
+            port,
+            timeout,
+            max_retries,
+            fetch_wifi_info=fetch_wifi_info,
+            fetch_ambient_light=fetch_ambient_light,
+        )
         # Matrix specific properties
         self._device_chain: list[TileInfo] | None = None
         self._tile_effect: MatrixEffect | None = None
