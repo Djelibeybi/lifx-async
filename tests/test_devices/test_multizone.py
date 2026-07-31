@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lifx.color import HSBK
+from lifx.const import KELVIN_SATURATED
 from lifx.devices.base import WifiInfo
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
 from lifx.exceptions import LifxTimeoutError
@@ -16,6 +17,7 @@ from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     Direction,
     FirmwareEffect,
+    LightHsbk,
     MultiZoneApplicationRequest,
 )
 from lifx.protocol.protocol_types import (
@@ -121,6 +123,50 @@ class TestMultiZoneLight:
         assert len(result) == 8
         assert multizone_light.zone_count == 8
         multizone_light.connection.request.assert_not_awaited()
+
+    async def test_get_color_zones_accepts_saturated_kelvin(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """A StateMultiZone carrying kelvin 0 parses instead of raising."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        mock_state = packets.MultiZone.StateMultiZone(
+            count=8,
+            index=0,
+            colors=[
+                LightHsbk(hue=0, saturation=65535, brightness=65535, kelvin=0)
+                for _ in range(8)
+            ],
+        )
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_color_zones()
+
+        assert len(result) == 8
+        assert all(zone.kelvin == KELVIN_SATURATED for zone in result)
+        assert result[0].replace(brightness=0.5).to_protocol().kelvin == (
+            KELVIN_SATURATED
+        )
+
+    async def test_get_extended_color_zones_accepts_saturated_kelvin(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """A StateExtendedColorZones carrying kelvin 0 parses instead of raising."""
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=True)
+        mock_state = packets.MultiZone.StateExtendedColorZones(
+            count=16,
+            index=0,
+            colors_count=16,
+            colors=[
+                LightHsbk(hue=0, saturation=65535, brightness=65535, kelvin=0)
+                for _ in range(16)
+            ],
+        )
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_color_zones()
+
+        assert len(result) == 16
+        assert all(zone.kelvin == KELVIN_SATURATED for zone in result)
 
     async def test_zone_debug_payload_is_lazy_when_debug_disabled(
         self, multizone_light: MultiZoneLight, mock_product_info

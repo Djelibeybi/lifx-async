@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 
 from lifx.color import HSBK, Colors
-from lifx.const import KELVIN_COOL, KELVIN_DAYLIGHT, KELVIN_NEUTRAL, KELVIN_WARM
+from lifx.const import (
+    KELVIN_COOL,
+    KELVIN_DAYLIGHT,
+    KELVIN_NEUTRAL,
+    KELVIN_SATURATED,
+    KELVIN_WARM,
+)
 from lifx.protocol.protocol_types import LightHsbk
 
 
@@ -786,3 +792,60 @@ class TestHSBKLerpOklab:
         # Should produce a valid color with some brightness
         assert result.brightness > 0.0
         assert result.kelvin == 3500
+
+
+class TestSaturatedKelvin:
+    """Kelvin 0 is device-reported wire state, not invalid user input."""
+
+    def test_constructor_accepts_zero(self) -> None:
+        """A fully saturated colour carries kelvin 0."""
+        color = HSBK(hue=180, saturation=1.0, brightness=1.0, kelvin=KELVIN_SATURATED)
+
+        assert color.kelvin == KELVIN_SATURATED
+
+    def test_from_protocol_accepts_zero(self) -> None:
+        """A device response carrying kelvin 0 parses instead of raising."""
+        protocol = LightHsbk(hue=21845, saturation=65535, brightness=65535, kelvin=0)
+
+        color = HSBK.from_protocol(protocol)
+
+        assert color.kelvin == KELVIN_SATURATED
+        assert color.saturation == pytest.approx(1.0)
+
+    def test_replace_preserves_zero(self) -> None:
+        """Changing one component must not re-reject the untouched kelvin."""
+        color = HSBK.from_protocol(
+            LightHsbk(hue=0, saturation=65535, brightness=65535, kelvin=0)
+        )
+
+        replaced = color.replace(brightness=0.25)
+
+        assert replaced.brightness == pytest.approx(0.25)
+        assert replaced.kelvin == KELVIN_SATURATED
+
+    def test_with_methods_preserve_zero(self) -> None:
+        """The with_* helpers carry kelvin 0 through unchanged."""
+        color = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=KELVIN_SATURATED)
+
+        assert color.with_hue(90).kelvin == KELVIN_SATURATED
+        assert color.with_saturation(0.5).kelvin == KELVIN_SATURATED
+        assert color.with_brightness(0.5).kelvin == KELVIN_SATURATED
+
+    def test_round_trip_writes_zero_back_unchanged(self) -> None:
+        """Kelvin 0 is not clamped to MIN_KELVIN on the way back out."""
+        protocol = LightHsbk(hue=0, saturation=65535, brightness=65535, kelvin=0)
+
+        written = HSBK.from_protocol(protocol).replace(brightness=0.5).to_protocol()
+
+        assert written.kelvin == KELVIN_SATURATED
+
+    @pytest.mark.parametrize("kelvin", [500, 1499, 9001, 12000])
+    def test_out_of_range_still_raises(self, kelvin: int) -> None:
+        """Genuinely bad user input is still rejected."""
+        with pytest.raises(ValueError, match="Kelvin must be"):
+            HSBK(hue=180, saturation=0.5, brightness=0.5, kelvin=kelvin)
+
+    def test_negative_kelvin_raises(self) -> None:
+        """Only exactly 0 is accepted below MIN_KELVIN."""
+        with pytest.raises(ValueError, match="Kelvin must be"):
+            HSBK(hue=180, saturation=0.5, brightness=0.5, kelvin=-1)
