@@ -119,8 +119,15 @@ class DeviceConnection:
         """
         # Normalise the serial so separator-formatted input (a form
         # Serial.from_string() accepts) logs and compares identically to the
-        # 12-digit form a Device instance stores for the same hardware.
-        self.serial = Serial.from_string(serial).to_string()
+        # 12-digit form a Device instance stores for the same hardware. Parsed
+        # once: the protocol bytes below come from the same object rather than
+        # a second from_string() call, so the two forms cannot drift apart.
+        serial_obj = Serial.from_string(serial)
+        # Correlation identity. Read it through the `serial` property unless
+        # you specifically need the value responses are being keyed on right
+        # now -- a serial learned mid-flight is visible on the property before
+        # this field adopts it.
+        self._serial = serial_obj.to_string()
         self.ip = ip
         self.port = port
         self.max_retries = max_retries
@@ -138,16 +145,21 @@ class DeviceConnection:
         # Identity handed to the transport for its warning logs. Mutated in
         # place when discovery learns the real serial, so records emitted
         # after that name the device rather than the placeholder.
-        self._peer = PeerInfo(serial=self.serial, ip=self.ip, port=self.port)
+        self._peer = PeerInfo(serial=self._serial, ip=self.ip, port=self.port)
 
         # Pre-compute serial bytes for fast comparison in background receiver
-        self._is_discovery = self.serial == "000000000000"
+        self._is_discovery = self._serial == "000000000000"
         if not self._is_discovery:
-            self._target_bytes: bytes | None = Serial.from_string(
-                self.serial
-            ).to_protocol()
+            self._target_bytes: bytes | None = serial_obj.to_protocol()
         else:
             self._target_bytes = None
+
+        # Serial learned from a reply on a connection opened without one.
+        # Reported by the `serial` property immediately; adopted as the
+        # correlation identity only at the start of a later request, because
+        # switching it while a request is registered under the placeholder
+        # would orphan that request's keys (see _adopt_learned_serial).
+        self._learned_serial: str | None = None
 
         # Pre-compute target bytes for send_packet() to avoid
         # re-parsing on every send
@@ -163,6 +175,18 @@ class DeviceConnection:
         ] = {}
         self._receiver_task: asyncio.Task[None] | None = None
         self._receiver_shutdown: asyncio.Event | None = None
+
+    @property
+    def serial(self) -> str:
+        """Serial of the device this connection talks to.
+
+        A connection opened without a serial (``000000000000``) reports the
+        real one as soon as a reply carries it, which is what callers such as
+        ``Device.from_ip()`` read straight after their first request. That is
+        deliberately sooner than the connection adopts it as its *correlation*
+        identity: see :meth:`_adopt_learned_serial`.
+        """
+        return self._learned_serial or self._serial
 
     async def __aenter__(self) -> Self:
         """Enter async context manager."""
@@ -303,7 +327,13 @@ class DeviceConnection:
         down first: open() early-returns while ``_is_open`` is True, so
         without this every later request would retransmit into a dead socket
         and time out at max_retries forever.
+
+        Also the point at which a serial learned by an earlier request becomes
+        the correlation identity -- the one moment where doing so is provably
+        safe, since it runs before this request registers any key.
         """
+        self._adopt_learned_serial()
+
         if self._is_open and not self._is_alive():
             _LOGGER.warning(
                 {
@@ -421,7 +451,7 @@ class DeviceConnection:
                         self._target_bytes is not None
                         and header.target == self._target_bytes
                     ):
-                        serial = self.serial
+                        serial = self._serial
                     else:
                         serial = Serial.from_protocol(header.target).to_string()
                 key = (header.source, header.sequence, serial)
@@ -459,6 +489,25 @@ class DeviceConnection:
 
             except LifxTimeoutError:
                 # No packet available, continue loop (allows shutdown check)
+                continue
+
+            except LifxProtocolError as e:
+                # One unparsable datagram, not a dead socket. The socket
+                # accepts traffic from any host, so a stray or truncated
+                # packet from an unrelated sender would otherwise fall
+                # through to the catch-all below and break the loop, killing
+                # the receiver for the whole connection and stranding every
+                # in-flight request until its timeout expires.
+                _LOGGER.debug(
+                    {
+                        "class": "DeviceConnection",
+                        "method": "_background_receiver",
+                        "action": "malformed_packet",
+                        "serial": self.serial,
+                        "ip": self.ip,
+                        "error": str(e),
+                    }
+                )
                 continue
 
             except (LifxConnectionError, LifxNetworkError) as e:
@@ -501,6 +550,58 @@ class DeviceConnection:
                         exc_info=True,
                     )
                 break
+
+    def _note_learned_serial(self, header: LifxHeader) -> None:
+        """Record the real serial of a connection opened without one.
+
+        Only the peer record is updated immediately: it feeds the transport's
+        warning logs and is not part of any correlation key, so naming the
+        device early is free. Everything that *is* correlation state
+        (:attr:`serial`, :attr:`_is_discovery`, the target bytes) is deferred
+        to :meth:`_adopt_learned_serial`.
+
+        Args:
+            header: Response header carrying the device's own serial.
+        """
+        # First reply wins. A connection opened without a serial can still be
+        # answered by several devices (a broadcast-target request), and the
+        # pre-deferral code adopted the first response's serial and stopped
+        # looking; keeping that avoids the identity drifting to whichever
+        # device happened to answer last.
+        if not self._is_discovery or self._learned_serial is not None:
+            return
+
+        serial = Serial(value=header.target_serial).to_string()
+        if serial == self._serial or serial == "000000000000":
+            return
+
+        self._learned_serial = serial
+        # Shared by reference with the transport, so transport warnings
+        # emitted from here on name the device rather than the placeholder.
+        self._peer.serial = serial
+
+    def _adopt_learned_serial(self) -> None:
+        """Switch the connection's correlation identity to the learned serial.
+
+        ``_background_receiver`` keys responses on the connection's current
+        serial, while an in-flight request registered its keys under the
+        serial in force when it was sent. Adopting a new serial mid-request
+        would therefore orphan those keys and silently drop every response
+        after the first, so this runs only once no request is registered --
+        in practice at the start of the next request, via
+        :meth:`_ensure_open`. Until then the connection keeps correlating on
+        the ``000000000000`` placeholder, which is what any request still
+        running was registered under; the :attr:`serial` property already
+        reports the learned value, so nothing user-facing waits for this.
+        """
+        if self._learned_serial is None or self._pending_requests:
+            return
+
+        serial, self._learned_serial = self._learned_serial, None
+        self._serial = serial
+        self._is_discovery = False
+        self._target_bytes = Serial.from_string(serial).to_protocol()
+        self._send_target = self._target_bytes
 
     async def _transmit_and_listen(
         self,
@@ -605,7 +706,7 @@ class DeviceConnection:
         try:
             # Transmission #0 (sequence 0), key registered BEFORE send so a
             # response cannot arrive before its key exists.
-            key = (request_source, 0, self.serial)
+            key = (request_source, 0, self._serial)
             self._pending_requests[key] = response_queue
             correlation_keys.append(key)
             await self.send_packet(
@@ -650,7 +751,7 @@ class DeviceConnection:
                 # whole multi-response set.
                 if next_tx_at is not None and not has_yielded and now >= next_tx_at:
                     sequence = tx_count  # fresh sequence per retransmit
-                    key = (request_source, sequence, self.serial)
+                    key = (request_source, sequence, self._serial)
                     self._pending_requests[key] = response_queue  # SAME queue
                     correlation_keys.append(key)
                     await self.send_packet(
@@ -723,6 +824,12 @@ class DeviceConnection:
                         f"Response sequence out of range: "
                         f"got {header.sequence}, max expected {max_expected}"
                     )
+
+                # Learn the serial of a connection opened without one. Done
+                # here rather than in request_stream() so ACK-only traffic
+                # (SET, Echo) names its device too: a connection driven purely
+                # by SETs would otherwise log the placeholder forever.
+                self._note_learned_serial(header)
 
                 # Yield response (can be from any transmission)
                 has_yielded = True
@@ -915,16 +1022,9 @@ class DeviceConnection:
                         f"Unknown packet type {header.pkt_type} in response"
                     )
 
-                # Update unknown serial with value from response header
-                if self._is_discovery:
-                    serial = Serial(value=header.target_serial).to_string()
-                    if serial != self.serial:
-                        self.serial = serial
-                        # Refresh cached fields now that we know the real serial
-                        self._peer.serial = serial
-                        self._is_discovery = False
-                        self._target_bytes = Serial.from_string(serial).to_protocol()
-                        self._send_target = self._target_bytes
+                # Note: the serial of a connection opened without one is
+                # learned in _transmit_and_listen (every request path, not
+                # just GET) and adopted once no request is in flight.
 
                 # Unpack (labels are automatically decoded by Packet.unpack())
                 response_packet = packet_class.unpack(payload)
