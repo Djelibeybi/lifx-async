@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from lifx.color import HSBK, Colors
+from lifx.const import KELVIN_SATURATED
 from lifx.devices.base import FirmwareInfo
 from lifx.devices.matrix import MatrixEffect, MatrixLight, TileInfo
 from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
@@ -15,7 +16,15 @@ from lifx.products import (
     get_product,
     supports_sky_effect,
 )
-from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
+from lifx.protocol import packets
+from lifx.protocol.protocol_types import (
+    FirmwareEffect,
+    LightHsbk,
+    TileBufferRect,
+    TileEffectParameter,
+    TileEffectSettings,
+    TileEffectSkyType,
+)
 
 
 class TestMatrixLight:
@@ -100,6 +109,69 @@ class TestMatrixLight:
             assert isinstance(colors, list)
             assert len(colors) == 64  # Returns actual number of zones
             assert all(isinstance(color, HSBK) for color in colors)
+
+    async def test_get_effect_reports_device_values_verbatim(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """A device response is not re-validated or defaulted as user input.
+
+        The firmware reports a running CLOUDS effect with speed 0 and cloud
+        saturation 0. Applying the outbound rules here would raise on the speed
+        and rewrite both saturations to the 50/180 send-time defaults.
+        """
+        matrix_light.connection.request.return_value = packets.Tile.StateEffect(
+            settings=TileEffectSettings(
+                instanceid=1,
+                effect_type=FirmwareEffect.SKY,
+                speed=0,
+                duration=0,
+                parameter=TileEffectParameter(
+                    sky_type=TileEffectSkyType.CLOUDS,
+                    cloud_saturation_min=0,
+                    cloud_saturation_max=0,
+                ),
+                palette_count=0,
+                palette=[],
+            )
+        )
+
+        effect = await matrix_light.get_effect()
+
+        assert effect.effect_type == FirmwareEffect.SKY
+        assert effect.speed == 0
+        assert effect.cloud_saturation_min == 0
+        assert effect.cloud_saturation_max == 0
+
+    def test_effect_still_validates_user_input(self) -> None:
+        """Outbound construction keeps the send-time guards."""
+        with pytest.raises(ValueError, match="Effect speed must be positive"):
+            MatrixEffect(effect_type=FirmwareEffect.SKY, speed=0)
+
+    async def test_get64_accepts_saturated_kelvin(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """A State64 response carrying kelvin 0 parses instead of raising."""
+        tile_info = MagicMock()
+        tile_info.width = 8
+        tile_info.height = 8
+        tile_info.tile_index = 0
+        matrix_light.get_device_chain = AsyncMock(return_value=[tile_info])
+        matrix_light.connection.request.return_value = packets.Tile.State64(
+            tile_index=0,
+            rect=TileBufferRect(fb_index=0, x=0, y=0, width=8),
+            colors=[
+                LightHsbk(hue=21845, saturation=65535, brightness=65535, kelvin=0)
+                for _ in range(64)
+            ],
+        )
+
+        colors = await matrix_light.get64()
+
+        assert len(colors) == 64
+        assert all(color.kelvin == KELVIN_SATURATED for color in colors)
+        assert colors[0].replace(brightness=0.5).to_protocol().kelvin == (
+            KELVIN_SATURATED
+        )
 
     async def test_set64_single_tile(self, emulator_devices) -> None:
         """Test setting colors on 8x8 tile (64 zones)."""

@@ -109,6 +109,13 @@ MAX_BRIGHTNESS: Final[float] = 1.0
 MIN_KELVIN: Final[int] = 1500
 MAX_KELVIN: Final[int] = 9000
 
+# Kelvin value devices report for a colour with no white component. The
+# 1500-9000 range above is the white-mode range of the product, not the range
+# of the wire field: firmware reports 0 for fully saturated zones (commonly
+# seen on Tile, Beam and Z devices), so 0 is legitimate inbound and is
+# preserved verbatim rather than clamped to MIN_KELVIN.
+KELVIN_SATURATED: Final[int] = 0
+
 # ============================================================================
 # Ambient Light Sensor
 # ============================================================================

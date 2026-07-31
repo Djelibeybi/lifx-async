@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import InitVar, asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
@@ -175,6 +175,11 @@ class MatrixEffect:
         sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
         cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS sky type)
         cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS sky type)
+        from_device: Set when building this object from a device response. The
+            validation and default-filling below are rules for values the
+            caller is about to send: applying them to values the firmware
+            reported would reject legitimate device state, or silently rewrite
+            it to something the device never reported.
     """
 
     effect_type: FirmwareEffect
@@ -184,9 +189,13 @@ class MatrixEffect:
     sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE
     cloud_saturation_min: int = 0
     cloud_saturation_max: int = 0
+    from_device: InitVar[bool] = False
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, from_device: bool) -> None:
         """Initialize defaults and validate fields."""
+        if from_device:
+            return
+
         # Validate all fields
         # Speed can be 0 only when effect is OFF
         if self.effect_type != FirmwareEffect.OFF:
@@ -955,6 +964,7 @@ class MatrixLight(Light):
             sky_type=response.settings.parameter.sky_type,
             cloud_saturation_min=response.settings.parameter.cloud_saturation_min,
             cloud_saturation_max=response.settings.parameter.cloud_saturation_max,
+            from_device=True,
         )
 
         self._tile_effect = effect
