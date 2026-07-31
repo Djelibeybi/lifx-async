@@ -7,10 +7,51 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.devices.base import DeviceVersion
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
-from lifx.devices.matrix import MatrixLight
+from lifx.devices.matrix import MatrixLight, TileInfo
 from lifx.devices.multizone import MultiZoneLight
 from lifx.products import get_product
+
+
+def make_tile(
+    tile_index: int = 0,
+    *,
+    user_x: float = 0.0,
+    user_y: float = 0.0,
+    width: int = 8,
+    height: int = 8,
+    accel: tuple[int, int, int] = (0, 0, 0),
+) -> TileInfo:
+    """Build a TileInfo with the geometry fields that matter for theming.
+
+    Args:
+        tile_index: Index of the tile in the chain
+        user_x: Reported horizontal position, in tile-position units
+        user_y: Reported vertical position, in tile-position units
+        width: Tile width in pixels
+        height: Tile height in pixels
+        accel: Accelerometer reading (x, y, z), which decides
+            ``nearest_orientation``. The default reads as Upright;
+            ``(1, 0, 0)`` reads as RotatedRight.
+    """
+    return TileInfo(
+        tile_index=tile_index,
+        accel_meas_x=accel[0],
+        accel_meas_y=accel[1],
+        accel_meas_z=accel[2],
+        user_x=user_x,
+        user_y=user_y,
+        width=width,
+        height=height,
+        supported_frame_buffers=2,
+        device_version_vendor=1,
+        device_version_product=27,
+        device_version_version=0,
+        firmware_build=1234567890,
+        firmware_version_minor=50,
+        firmware_version_major=3,
+    )
 
 
 @pytest.fixture
@@ -73,6 +114,38 @@ def multizone_light(mock_device_factory) -> MultiZoneLight:
 def matrix_light(mock_device_factory) -> MatrixLight:
     """Create a test matrix light with mocked theme methods."""
     device = mock_device_factory(MatrixLight)
+    device.set_color = AsyncMock()
+    device.set_matrix_colors = AsyncMock()
+    device.set_power = AsyncMock()
+    device.get_power = AsyncMock(return_value=False)
+    device.get_device_chain = AsyncMock(return_value=[])
+    return device
+
+
+@pytest.fixture
+def tile_light(mock_device_factory) -> MatrixLight:
+    """Create a test LIFX Tile with mocked theme methods.
+
+    Product 55 is the only chain-capable product and the only one with an
+    accelerometer, so it is the only device whose reported orientation is real.
+    """
+    device = mock_device_factory(MatrixLight, product=55)
+    device.set_color = AsyncMock()
+    device.set_matrix_colors = AsyncMock()
+    device.set_power = AsyncMock()
+    device.get_power = AsyncMock(return_value=False)
+    device.get_device_chain = AsyncMock(return_value=[])
+    return device
+
+
+@pytest.fixture
+def ceiling_light(mock_device_factory) -> CeilingLight:
+    """Create a test ceiling light with mocked theme methods.
+
+    Product 201 is a LIFX Ceiling, which reports a single 16x8 tile covering
+    both the downlight pixels and the uplight zone.
+    """
+    device = mock_device_factory(CeilingLight, product=201)
     device.set_color = AsyncMock()
     device.set_matrix_colors = AsyncMock()
     device.set_power = AsyncMock()

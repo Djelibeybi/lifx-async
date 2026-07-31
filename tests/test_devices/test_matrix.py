@@ -1051,3 +1051,51 @@ class TestTileInfo:
         tile_info = TileInfo.from_protocol(0, protocol_tile)
         assert tile_info.requires_frame_buffer
         assert tile_info.total_zones == 128
+
+
+class TestSetMatrixColorsSolidShortcut:
+    """Tests for the all-zones-same-colour shortcut in set_matrix_colors.
+
+    The shortcut sends a device-wide SetColor, which is only equivalent to a
+    per-tile write when the device has exactly one tile.
+    """
+
+    @staticmethod
+    def _tile(tile_index: int) -> MagicMock:
+        tile = MagicMock()
+        tile.tile_index = tile_index
+        tile.width = 8
+        tile.height = 8
+        tile.total_zones = 64
+        tile.requires_frame_buffer = False
+        return tile
+
+    async def test_single_tile_uses_set_color(self, matrix_light: MatrixLight) -> None:
+        """Test a one-tile device still takes the fast path."""
+        matrix_light._device_chain = [self._tile(0)]
+        matrix_light.set_color = AsyncMock()
+
+        await matrix_light.set_matrix_colors(0, [Colors.RED] * 64)
+
+        matrix_light.set_color.assert_awaited_once()
+        matrix_light.connection.send_packet.assert_not_called()
+
+    async def test_chain_does_not_use_set_color(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test a chain writes only the target tile.
+
+        set_color addresses the whole device, so taking the shortcut inside a
+        chain repaints every other tile — wiping out the tiles apply_theme has
+        already written on its way through the loop.
+        """
+        matrix_light._device_chain = [self._tile(0), self._tile(1)]
+        matrix_light.set_color = AsyncMock()
+        matrix_light.connection.send_packet = AsyncMock()
+
+        await matrix_light.set_matrix_colors(1, [Colors.RED] * 64)
+
+        matrix_light.set_color.assert_not_called()
+        matrix_light.connection.send_packet.assert_called_once()
+        sent = matrix_light.connection.send_packet.call_args[0][0]
+        assert sent.tile_index == 1
