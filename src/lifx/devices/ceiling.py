@@ -389,9 +389,9 @@ class CeilingLight(MatrixLight):
         serial: str | None = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
-        *,
         state_file: str | None = None,
     ) -> CeilingLight:
         """Create CeilingLight from IP address.
@@ -418,7 +418,13 @@ class CeilingLight(MatrixLight):
         # Parent factory constructs via cls(...), so this is already a fully
         # configured CeilingLight — only state_file needs setting
         device = await super().from_ip(
-            ip, port, serial, timeout, max_retries, fetch_wifi_info, fetch_ambient_light
+            ip,
+            port,
+            serial,
+            timeout,
+            max_retries,
+            fetch_wifi_info=fetch_wifi_info,
+            fetch_ambient_light=fetch_ambient_light,
         )
         device._state_file = state_file
         return device
