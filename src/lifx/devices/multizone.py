@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
+from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import LifxTimeoutError
 from lifx.protocol import packets
@@ -223,9 +224,32 @@ class MultiZoneLight(Light):
 
     _state: MultiZoneLightState
 
-    def __init__(self, *args, **kwargs) -> None:
-        """Initialize MultiZoneLight with additional state attributes."""
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        serial: str,
+        ip: str,
+        port: int = LIFX_UDP_PORT,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        *,
+        fetch_wifi_info: bool = False,
+        fetch_ambient_light: bool = False,
+    ) -> None:
+        """Initialize MultiZoneLight with additional state attributes.
+
+        See :class:`~lifx.devices.base.Device` for parameter documentation. The
+        signature is spelled out rather than forwarded as ``*args, **kwargs`` so
+        callers get the same type checking the base class offers.
+        """
+        super().__init__(
+            serial,
+            ip,
+            port,
+            timeout,
+            max_retries,
+            fetch_wifi_info=fetch_wifi_info,
+            fetch_ambient_light=fetch_ambient_light,
+        )
         # MultiZone-specific state storage
         self._zone_count: int | None = None
         self._multizone_effect: MultiZoneEffect | None | None = None
