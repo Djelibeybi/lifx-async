@@ -24,17 +24,6 @@ The `ThemeLibrary` provides access to 42 official LIFX app themes organized into
       members_order: source
       show_if_no_docstring: false
 
-## Canvas Class
-
-The `Canvas` class provides 2D sparse grid functionality for tile device color interpolation.
-
-::: lifx.theme.Canvas
-    options:
-      show_root_heading: true
-      heading_level: 3
-      members_order: source
-      show_if_no_docstring: false
-
 ## Convenience Function
 
 ::: lifx.theme.get_theme

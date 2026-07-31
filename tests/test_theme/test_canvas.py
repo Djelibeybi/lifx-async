@@ -62,7 +62,7 @@ class TestAddPointsForTile:
         canvas = Canvas()
         theme = Theme([])
         # Empty theme defaults to white, so it will add points
-        canvas.add_points_for_tile(None, theme)
+        canvas.add_points_for_tile(None, theme, width=8, height=8)
         # Should have distributed white color points
         assert len(canvas.points) > 0
 
@@ -71,7 +71,7 @@ class TestAddPointsForTile:
         canvas = Canvas()
         theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
 
-        canvas.add_points_for_tile(None, theme)
+        canvas.add_points_for_tile(None, theme, width=8, height=8)
 
         # Should have distributed some points
         assert len(canvas.points) > 0
@@ -85,7 +85,7 @@ class TestAddPointsForTile:
         original_point = Colors.BLUE
         canvas[(0, 0)] = original_point
 
-        canvas.add_points_for_tile(None, theme)
+        canvas.add_points_for_tile(None, theme, width=8, height=8)
 
         # Original point should still be there
         assert canvas[(0, 0)] == original_point
@@ -107,13 +107,57 @@ class TestAddPointsForTile:
                 canvas[(x, y)] = Colors.BLUE
 
         # Call add_points_for_tile - it should skip existing points
-        canvas.add_points_for_tile(None, theme)
+        canvas.add_points_for_tile(None, theme, width=8, height=8)
 
         # Check that original points are preserved
         for x in range(-5, 6):
             for y in range(-5, 6):
                 # Original points should still be blue
                 assert canvas[(x, y)] == Colors.BLUE
+
+    def test_add_points_requires_tile_geometry(self) -> None:
+        """Test that the tile's real size must be supplied.
+
+        Pins the removal of the 8x8 defaults: silently assuming 8x8 gave a
+        Candle (5x6) the wrong seed scale.
+        """
+        canvas = Canvas()
+        theme = Theme([Colors.RED])
+
+        with pytest.raises(TypeError, match="width"):
+            canvas.add_points_for_tile(None, theme)  # type: ignore[call-arg]
+
+    def test_add_points_seed_area_scales_with_tile_size(self) -> None:
+        """Test that the seeded area is three times the tile's own geometry.
+
+        A 5x6 Candle must seed a smaller area than an 8x8 Tile, otherwise its
+        theme point density and splotch size are wrong.
+        """
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+
+        candle = Canvas()
+        candle.add_points_for_tile((0, 0), theme, width=5, height=6)
+
+        tile = Canvas()
+        tile.add_points_for_tile((0, 0), theme, width=8, height=8)
+
+        # int(0 - 5 * 1.5) == -7 and int(0 + 5 * 1.5) == 7 (exclusive)
+        assert all(-7 <= i < 7 for i, _ in candle.points)
+        assert all(-9 <= j < 9 for _, j in candle.points)
+
+        # The 8x8 tile seeds the wider -12..12 area on both axes
+        assert all(-12 <= i < 12 for i, _ in tile.points)
+        assert max(i for i, _ in tile.points) > max(i for i, _ in candle.points)
+
+    def test_add_points_seed_area_follows_tile_origin(self) -> None:
+        """Test that the seeded area moves with the tile's pixel origin."""
+        theme = Theme([Colors.RED, Colors.GREEN])
+
+        canvas = Canvas()
+        canvas.add_points_for_tile((32, 16), theme, width=8, height=8)
+
+        assert all(20 <= i < 44 for i, _ in canvas.points)
+        assert all(4 <= j < 28 for _, j in canvas.points)
 
 
 class TestShufflePoints:
@@ -187,23 +231,36 @@ class TestBlurByDistance:
         assert blurred_color.hue != original_color.hue
 
     def test_blur_by_distance_single_point_at_origin(self) -> None:
-        """Test blur_by_distance with single point where weighted is empty.
+        """Test blur_by_distance keeps a lone point.
 
-        When a point queries itself as the only closest point, distance is 0,
-        greatest_distance is 0, and color_weighting yields nothing (weighted is empty).
-        This covers the branch where 'if weighted:' is False.
+        When a point queries itself as the only closest point, distance is 0 and
+        so is greatest_distance. Weighting by distance would then yield nothing
+        and delete the point, emptying the canvas — which later crashes
+        color_weighting with `max() iterable argument is empty`. All-zero
+        distances therefore keep every candidate at equal weight.
         """
         canvas = Canvas()
         canvas[(0, 0)] = Colors.RED
 
-        # With only one point, when we query closest_points for (0,0),
-        # the only point is itself at distance 0.
-        # color_weighting with greatest_distance=0 yields nothing.
         canvas.blur_by_distance()
 
-        # Point should be removed since weighted was empty
-        # (new_points[(i,j)] was never assigned)
-        assert len(canvas.points) == 0
+        assert list(canvas.points) == [(0, 0)]
+        assert canvas[(0, 0)] == Colors.RED
+
+    def test_blur_by_distance_keeps_coincident_points(self) -> None:
+        """Test that points sharing a position survive weighting.
+
+        shuffle_points() can collapse several points onto one key, and a tiny
+        tile (a 3x1 Spot) can seed only two or three points to begin with. The
+        canvas must not empty itself in that case.
+        """
+        canvas = Canvas()
+        canvas[(0, 0)] = Colors.RED
+        canvas[(0, 1)] = Colors.BLUE
+
+        canvas.blur_by_distance()
+
+        assert len(canvas.points) == 2
 
 
 class TestFillInPoints:
@@ -234,12 +291,11 @@ class TestFillInPoints:
         assert len(target_canvas.points) > 0
 
     def test_fill_in_points_single_source_point_at_query_location(self) -> None:
-        """Test fill_in_points where weighted is empty for some pixels.
+        """Test fill_in_points when the only source point is the query pixel.
 
-        When the source canvas has only one point and a query pixel is at
-        that exact location, distance is 0, greatest_distance is 0, and
-        color_weighting yields nothing. This covers the branch where
-        'if weighted:' is False.
+        Distance is 0 and so is greatest_distance, so weighting by distance
+        would drop the colour. The point is kept instead — a 1x1 tile must
+        still render its theme colour rather than a gap.
         """
         source_canvas = Canvas()
         source_canvas[(0, 0)] = Colors.RED
@@ -248,10 +304,18 @@ class TestFillInPoints:
         # Query a 1x1 tile at exactly (0, 0) where the source point is
         target_canvas.fill_in_points(source_canvas, 0, 0, 1, 1)
 
-        # The point at (0,0) queries closest_points which returns [(0, RED)]
-        # color_weighting with greatest_distance=0 yields nothing
-        # so weighted is empty and self[(0,0)] is never assigned
-        assert (0, 0) not in target_canvas.points
+        assert target_canvas[(0, 0)] == Colors.RED
+
+    def test_fill_in_points_empty_source_canvas(self) -> None:
+        """Test fill_in_points against an empty source canvas.
+
+        closest_points returns nothing, so color_weighting must yield nothing
+        rather than calling max() on an empty sequence.
+        """
+        target_canvas = Canvas()
+        target_canvas.fill_in_points(Canvas(), 0, 0, 2, 2)
+
+        assert target_canvas.points == {}
 
 
 class TestBlur:
@@ -312,12 +376,19 @@ class TestPointsForTile:
         assert grid[0].hue == 0  # RED at (0,0)
         assert grid[1].hue == 120  # GREEN at (1,0)
 
-    def test_points_for_tile_default_size(self) -> None:
-        """Test default 8x8 tile size."""
+    def test_points_for_tile_requires_geometry(self) -> None:
+        """Test that width and height are required, with no 8x8 fallback."""
         canvas = Canvas()
-        grid = canvas.points_for_tile(None)
 
-        assert len(grid) == 64  # 8x8
+        with pytest.raises(TypeError, match="width"):
+            canvas.points_for_tile(None)  # type: ignore[call-arg]
+
+    def test_points_for_tile_candle_geometry(self) -> None:
+        """Test a 5x6 Candle returns 30 colours, not 64."""
+        canvas = Canvas()
+        grid = canvas.points_for_tile(None, width=5, height=6)
+
+        assert len(grid) == 30
 
     def test_points_for_tile_with_offset(self) -> None:
         """Test tile extraction with coordinates."""

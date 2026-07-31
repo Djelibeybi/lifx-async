@@ -15,7 +15,18 @@ from lifx.theme.theme import Theme
 
 def color_weighting(distances: list[tuple[int, HSBK]]) -> Iterable[HSBK]:
     """Return an array of colors where there is more of a color the closer it is."""
+    if not distances:
+        return
+
     greatest_distance = max(dist for dist, _ in distances)
+
+    if greatest_distance == 0:
+        # Every candidate sits on the point itself. Weighting by distance would
+        # yield nothing at all and silently delete the point, which empties the
+        # canvas when a small tile seeds only one or two points.
+        for _, color in distances:
+            yield color
+        return
 
     for dist, color in distances:
         if dist == 0:
@@ -58,27 +69,36 @@ class Canvas:
         """Initialize the canvas."""
         self.points: dict[tuple[int, int], HSBK] = {}
 
-    def add_points_for_tile(self, tile: tuple[int, int] | None, theme: Theme) -> None:
+    def add_points_for_tile(
+        self, tile: tuple[int, int] | None, theme: Theme, width: int, height: int
+    ) -> None:
         """Create points on the canvas around where a tile is.
 
-        We create an area that's half the tile width/height beyond the boundary
-        of the tile. We also spread the points out in a random manner and try to avoid
-        having points next to each other.
+        We seed an area three times the tile's width and height, centred on the
+        tile's origin, so that the splotches the theme grows from extend well
+        past the tile itself. We also spread the points out in a random manner
+        and try to avoid having points next to each other.
+
+        The area scales with the tile's real geometry, so a 5x6 Candle gets a
+        proportionally smaller seed area than an 8x8 Tile and ends up with a
+        comparable density of theme colours.
 
         Multiple calls to this function will not override existing points on the canvas.
 
         Args:
-            tile: Tile coordinates (x, y) or None for single tile
+            tile: Top-left pixel coordinates (x, y) of the tile, or None for (0, 0).
+                Convert a device's ``user_x``/``user_y`` with
+                :func:`lifx.geometry.tile_origin_pixels` — they are not pixels.
             theme: Theme containing colors to distribute
+            width: Tile width in pixels
+            height: Tile height in pixels
         """
         tile_x, tile_y = tile if tile else (0, 0)
-        tile_width = 8  # Standard tile width
-        tile_height = 8  # Standard tile height
 
-        from_x = int(tile_x - tile_width * 1.5)
-        to_x = int(tile_x + tile_width * 1.5)
-        from_y = int(tile_y - tile_height * 1.5)
-        to_y = int(tile_y + tile_height * 1.5)
+        from_x = int(tile_x - width * 1.5)
+        to_x = int(tile_x + width * 1.5)
+        from_y = int(tile_y - height * 1.5)
+        to_y = int(tile_y + height * 1.5)
 
         i = from_x
         while i < to_x:
@@ -128,14 +148,15 @@ class Canvas:
         surrounding points."""
         new_points = {}
         for (i, j), _ in self:
+            # closest_points always returns the point itself, and
+            # color_weighting keeps every candidate when they are all at
+            # distance zero, so the average is never taken over an empty list.
             distances = self.closest_points(i, j, 8)
-            weighted = list(color_weighting(distances))
-            if weighted:
-                new_points[(i, j)] = HSBK.average(weighted)
+            new_points[(i, j)] = HSBK.average(list(color_weighting(distances)))
         self.points = new_points
 
     def points_for_tile(
-        self, tile: tuple[int, int] | None, width: int = 8, height: int = 8
+        self, tile: tuple[int, int] | None, width: int, height: int
     ) -> list[HSBK]:
         """Return a list of HSBK values for this tile.
 
@@ -144,9 +165,11 @@ class Canvas:
         to not fill in the gaps.
 
         Args:
-            tile: Tile coordinates (x, y) or None for single tile
-            width: Grid width (typically 8)
-            height: Grid height (typically 8)
+            tile: Top-left pixel coordinates (x, y) of the tile, or None for (0, 0).
+                Convert a device's ``user_x``/``user_y`` with
+                :func:`lifx.geometry.tile_origin_pixels` — they are not pixels.
+            width: Grid width in pixels (8 for a Tile, 5 for a Candle)
+            height: Grid height in pixels (8 for a Tile, 6 for a Candle)
 
         Returns:
             List of HSBK colors in row-major order
@@ -174,10 +197,10 @@ class Canvas:
 
         Args:
             canvas: Source canvas to interpolate from
-            left_x: Left x coordinate of tile
-            top_y: Top y coordinate of tile
-            tile_width: Width of tile
-            tile_height: Height of tile
+            left_x: Left x pixel coordinate of tile
+            top_y: Top y pixel coordinate of tile
+            tile_width: Width of tile in pixels
+            tile_height: Height of tile in pixels
         """
         for j in range(top_y, top_y + tile_height):
             for i in range(left_x, left_x + tile_width):

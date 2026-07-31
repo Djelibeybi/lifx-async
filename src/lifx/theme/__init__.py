@@ -31,7 +31,7 @@ Example:
 
 from __future__ import annotations
 
-from lifx.theme.canvas import Canvas
+from lifx.theme.canvas import Canvas as Canvas  # noqa: PLC0414 (internal re-export)
 from lifx.theme.generators import (
     MatrixGenerator,
     MultiZoneGenerator,
@@ -40,8 +40,11 @@ from lifx.theme.generators import (
 from lifx.theme.library import ThemeLibrary, get_theme
 from lifx.theme.theme import Theme
 
+# Canvas is deliberately absent: it is a rendering primitive for the theme
+# generators, not part of the supported surface. The import above keeps existing
+# `from lifx.theme import Canvas` working, but it is not advertised and its
+# signatures may change without a major version.
 __all__ = [
-    "Canvas",
     "MatrixGenerator",
     "MultiZoneGenerator",
     "SingleZoneGenerator",

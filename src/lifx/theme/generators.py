@@ -6,7 +6,10 @@ applying themes to single-zone, multi-zone, and matrix/tile devices.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from lifx.color import HSBK
+from lifx.geometry import TilePlacement, tile_origin_pixels
 from lifx.theme.canvas import Canvas
 from lifx.theme.theme import Theme
 
@@ -117,6 +120,9 @@ class MatrixGenerator:
 
     Distributes colors across all tiles in a chain using Canvas-based rendering
     to create natural color splotches that grow outward.
+
+    Tile geometry is taken from the chain rather than assumed: a Candle is 5x6,
+    a Tile is 8x8, and a Ceiling reports its own dimensions.
     """
 
     def __init__(
@@ -126,10 +132,37 @@ class MatrixGenerator:
         """Initialize the matrix generator.
 
         Args:
-            coords_and_sizes: List of ((left_x, top_y), (width, height)) for each tile
+            coords_and_sizes: List of ((left_x, top_y), (width, height)) for each
+                tile, in pixels. Build these from a device chain with
+                :meth:`from_tiles` rather than passing ``user_x``/``user_y``
+                directly — those are in tile-position units, not pixels.
         """
         self.coords_and_sizes = coords_and_sizes
         self.tiles: list[list[HSBK]] = []
+
+    @classmethod
+    def from_tiles(cls, tiles: Iterable[TilePlacement]) -> MatrixGenerator:
+        """Create a generator from a device chain.
+
+        Converts each tile's reported ``user_x``/``user_y`` position into pixel
+        coordinates with :func:`lifx.geometry.tile_origin_pixels` and pairs it
+        with the tile's real width and height.
+
+        Args:
+            tiles: Tiles from a device chain, in chain order
+
+        Returns:
+            Generator whose output tiles are in the same order as ``tiles``
+        """
+        return cls(
+            [
+                (
+                    tile_origin_pixels(tile.user_x, tile.user_y),
+                    (tile.width, tile.height),
+                )
+                for tile in tiles
+            ]
+        )
 
     def add_tile(self, colors: list[HSBK]) -> None:
         """Add a list of colors representing one tile."""
@@ -139,7 +172,9 @@ class MatrixGenerator:
         """Extract tiles from canvas and add them."""
         for (left_x, top_y), (tile_width, tile_height) in self.coords_and_sizes:
             self.add_tile(
-                canvas.points_for_tile((left_x, top_y), tile_width, tile_height)
+                canvas.points_for_tile(
+                    (left_x, top_y), width=tile_width, height=tile_height
+                )
             )
 
     def get_theme_colors(self, theme: Theme) -> list[list[HSBK]]:
@@ -156,9 +191,14 @@ class MatrixGenerator:
             theme: Theme to apply
 
         Returns:
-            List of color lists, one per tile (64 colors per tile for 8x8 grid)
+            List of color lists, one per tile, each holding ``width * height``
+            colours for that tile (64 for an 8x8 Tile, 30 for a 5x6 Candle)
         """
-        from lifx.theme.canvas import Canvas
+        # Reset accumulated tiles so the generator can be reused, matching
+        # MultiZoneGenerator.get_theme_colors(). Without this a second call
+        # appends to the list returned by the first one, doubling its length
+        # and retroactively mutating the caller's earlier result.
+        self.tiles = []
 
         # Create main canvas and add random points for all tiles
         canvas = Canvas()
@@ -167,7 +207,9 @@ class MatrixGenerator:
 
         # Add points for all tiles first
         for (left_x, top_y), (width, height) in self.coords_and_sizes:
-            canvas.add_points_for_tile((left_x, top_y), shuffled_theme)
+            canvas.add_points_for_tile(
+                (left_x, top_y), shuffled_theme, width=width, height=height
+            )
 
         # Shuffle and blur ONCE after all points are added
         # (Previously these were inside the loop, causing earlier tiles' points

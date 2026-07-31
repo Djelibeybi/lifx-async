@@ -19,6 +19,7 @@ import time
 from dataclasses import InitVar, asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
+from lifx.animation.orientation import Orientation, build_orientation_lut
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.light import Light, LightState
@@ -476,17 +477,25 @@ class MatrixLight(Light):
     ) -> None:
         """Position tiles in the chain (only for devices with has_chain capability).
 
+        Positions are in tile-position units, **not pixels**: 1.0 is always 8
+        pixels, regardless of this tile's own width or height. ``user_x`` grows
+        to the right and ``user_y`` grows **upwards**. To move a tile a given
+        number of pixels, divide by 8 — moving one 8x8 tile's width to the right
+        is ``user_x += 1.0``, and a 5x6 Candle's width is ``user_x += 5 / 8``.
+
         Args:
             tile_index: Index of the tile to position (0-based)
-            user_x: User-defined X position
-            user_y: User-defined Y position
+            user_x: Horizontal position in tile-position units (1.0 = 8 pixels,
+                growing right)
+            user_y: Vertical position in tile-position units (1.0 = 8 pixels,
+                growing up)
 
         Note:
             Only applicable for multi-tile devices (has_chain capability).
             Most MatrixLight devices have a single tile and don't need positioning.
 
         Example:
-            >>> # Position second tile at coordinates (1.0, 0.0)
+            >>> # Place the second tile one 8-pixel tile-width to the right
             >>> await matrix.set_user_position(tile_index=1, user_x=1.0, user_y=0.0)
         """
         _LOGGER.debug(
@@ -862,9 +871,13 @@ class MatrixLight(Light):
                 f"Color count mismatch: expected {tile.total_zones}, got {len(colors)}"
             )
 
-        # Check if all colors are the same (uint16 wire equality)
+        # Check if all colors are the same (uint16 wire equality). The shortcut
+        # below sends a device-wide SetColor, so it is only safe when the device
+        # has a single tile — on a chain it would repaint every other tile too.
         first_color = colors[0]
-        all_same = all(c == first_color for c in colors)
+        all_same = len(self._device_chain) == 1 and all(
+            c == first_color for c in colors
+        )
 
         if all_same:
             # All zones same color - use SetColor packet (much faster!)
@@ -1159,6 +1172,17 @@ class MatrixLight(Light):
         Distributes theme colors across the tile matrix with smooth color blending
         using the Canvas API for visually pleasing transitions.
 
+        Every device is rendered at its own reported pixel geometry, so non-8x8
+        products (Candle 5x6, Ceiling 16x8) get the right number of colours.
+
+        Position and orientation are used only on a chain-capable device — the
+        LIFX Tile, the sole product that is arranged into a layout and the sole
+        product with an accelerometer. There, each tile is placed on the canvas
+        with :func:`lifx.geometry.tile_origin_pixels` so it gets a distinct slice
+        of the theme, and a physically rotated panel is remapped to match. Every
+        other matrix device is a single fixed panel, so it renders at the canvas
+        origin and is never remapped.
+
         Args:
             theme: Theme to apply
             power_on: Turn on the light
@@ -1172,7 +1196,7 @@ class MatrixLight(Light):
             await matrix.apply_theme(theme, power_on=True, duration=0.5)
             ```
         """
-        from lifx.theme.canvas import Canvas
+        from lifx.theme.generators import MatrixGenerator
 
         # Get device chain
         tiles = await self.get_device_chain()
@@ -1180,54 +1204,70 @@ class MatrixLight(Light):
         if not tiles:
             return
 
-        # Create canvas and populate with theme colors
-        canvas = Canvas()
-        for tile in tiles:
-            canvas.add_points_for_tile((int(tile.user_x), int(tile.user_y)), theme)
+        # The LIFX Tile is the only chain-capable product, and the only one with
+        # an accelerometer. Every other matrix device is a single fixed panel: it
+        # is never arranged relative to anything, and it returns whatever its
+        # firmware leaves in the position and accel fields. Reading those as a
+        # layout or a rotation would scatter and scramble the theme, so both are
+        # used only for a chain. FrameBuffer.for_matrix() gates the same way.
+        await self.ensure_capabilities()
+        has_chain = bool(self.capabilities and self.capabilities.has_chain)
 
-        # Shuffle and blur ONCE after all points are added
-        # (Previously these were inside the loop, causing earlier tiles' points
-        # to be shuffled/blurred multiple times, displacing them from their
-        # intended positions and losing theme color variety)
-        canvas.shuffle_points()
-        canvas.blur_by_distance()
-
-        # Create tile canvas and fill in gaps for smooth interpolation
-        tile_canvas = Canvas()
-        for tile in tiles:
-            tile_canvas.fill_in_points(
-                canvas,
-                int(tile.user_x),
-                int(tile.user_y),
-                tile.width,
-                tile.height,
-            )
-
-        # Final blur for smooth gradients
-        tile_canvas.blur()
+        # Render the theme across the whole chain in one pass
+        if has_chain:
+            generator = MatrixGenerator.from_tiles(tiles)
+        else:
+            generator = MatrixGenerator([((0, 0), (t.width, t.height)) for t in tiles])
+        tile_colors = generator.get_theme_colors(theme)
 
         # Check if light is on
         is_on = await self.get_power()
 
         # Apply colors to each tile
-        for tile in tiles:
-            # Extract tile colors from canvas as 1D list
-            tile_coords = (int(tile.user_x), int(tile.user_y))
-            colors = tile_canvas.points_for_tile(
-                tile_coords, width=tile.width, height=tile.height
-            )
+        for tile, colors in zip(tiles, tile_colors, strict=True):
+            # The canvas renders in row-major screen order, so a physically
+            # rotated tile needs the same orientation remapping the animation
+            # layer applies in FrameBuffer._for_multi_tile().
+            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
 
             # Apply with appropriate timing
             if power_on and not is_on:
-                await self.set_matrix_colors(tile.tile_index, colors, duration=0)
+                await self.set_matrix_colors(tile.tile_index, oriented, duration=0)
             else:
                 await self.set_matrix_colors(
-                    tile.tile_index, colors, duration=int(duration * 1000)
+                    tile.tile_index, oriented, duration=int(duration * 1000)
                 )
 
         # Turn on light if requested and currently off
         if power_on and not is_on:
             await self.set_power(True, duration=duration)
+
+    @staticmethod
+    def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Remap row-major canvas colours into the tile's physical orientation.
+
+        Only meaningful for chain-capable devices: the LIFX Tile is the sole
+        product with an accelerometer, so it is the only one whose reported
+        orientation is real. Callers must gate on ``has_chain``.
+
+        Args:
+            tile: Tile the colours are destined for
+            colors: Colours in row-major screen order
+
+        Returns:
+            The colours reordered for the tile's reported orientation, or the
+            input unchanged when the tile is upright or the count does not match
+            the tile's pixel grid.
+        """
+        orientation = Orientation.from_string(tile.nearest_orientation)
+        if orientation == Orientation.RIGHT_SIDE_UP:
+            return colors
+
+        if len(colors) != tile.width * tile.height:  # pragma: no cover
+            return colors
+
+        lut = build_orientation_lut(tile.width, tile.height, orientation)
+        return [colors[src_idx] for src_idx in lut]
 
     @property
     def device_chain(self) -> list[TileInfo] | None:

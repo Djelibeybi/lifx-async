@@ -379,6 +379,81 @@ class TestFrameBufferMultiTileCanvas:
         assert fb.tile_regions is not None
         assert len(fb.tile_regions) == 5
 
+        # user_x is in tile-position units of 8 pixels, so tiles sit 8 apart
+        assert [region.x for region in fb.tile_regions] == [0, 8, 16, 24, 32]
+
+    @pytest.mark.asyncio
+    async def test_for_matrix_stacked_tiles_invert_user_y(self) -> None:
+        """Test that a tile higher in the chain gets a lower canvas row.
+
+        user_y grows upwards while canvas rows grow downwards.
+        """
+        lower = MagicMock()
+        lower.width = 8
+        lower.height = 8
+        lower.user_x = 0.0
+        lower.user_y = 0.0
+        lower.nearest_orientation = "Upright"
+
+        upper = MagicMock()
+        upper.width = 8
+        upper.height = 8
+        upper.user_x = 0.0
+        upper.user_y = 1.0
+        upper.nearest_orientation = "Upright"
+
+        device = MagicMock()
+        device.device_chain = [lower, upper]
+        device.get_device_chain = AsyncMock(return_value=[lower, upper])
+        device.capabilities = MagicMock()
+        device.capabilities.has_chain = True
+
+        fb = await FrameBuffer.for_matrix(device)
+
+        assert fb.canvas_width == 8
+        assert fb.canvas_height == 16
+        assert fb.tile_regions is not None
+        assert [(r.x, r.y) for r in fb.tile_regions] == [(0, 8), (0, 0)]
+
+    @pytest.mark.asyncio
+    async def test_for_matrix_mixed_geometry_chain(self) -> None:
+        """Test each tile contributes its own size to the canvas.
+
+        The position unit stays 8 pixels even when a tile is not 8 wide, so the
+        second tile still starts at pixel 8.
+        """
+        tile1 = MagicMock()
+        tile1.width = 8
+        tile1.height = 8
+        tile1.user_x = 0.0
+        tile1.user_y = 0.0
+        tile1.nearest_orientation = "Upright"
+
+        tile2 = MagicMock()
+        tile2.width = 5
+        tile2.height = 6
+        tile2.user_x = 1.0
+        tile2.user_y = 0.0
+        tile2.nearest_orientation = "Upright"
+
+        device = MagicMock()
+        device.device_chain = [tile1, tile2]
+        device.get_device_chain = AsyncMock(return_value=[tile1, tile2])
+        device.capabilities = MagicMock()
+        device.capabilities.has_chain = True
+
+        fb = await FrameBuffer.for_matrix(device)
+
+        assert fb.pixel_count == 94  # 64 + 30
+        assert fb.canvas_width == 13  # 8 + 5
+        assert fb.canvas_height == 8
+        assert fb.tile_regions is not None
+        assert [(r.x, r.width, r.height) for r in fb.tile_regions] == [
+            (0, 8, 8),
+            (8, 5, 6),
+        ]
+        assert len(fb._lut) == 94
+
 
 class TestFrameBufferLUT:
     """Tests for FrameBuffer pre-computed lookup table."""

@@ -239,59 +239,44 @@ class FrameBuffer:
         """Create FrameBuffer for multi-tile device with canvas positioning.
 
         Uses user_x/user_y to determine where each tile sits in the canvas.
-        Coordinates are in tile-width units (1.0 = one tile width) and
-        represent the center of each tile.
+        Those values are in tile-position units — a fixed 8 pixels each,
+        independent of the tile's own size — and user_y grows upwards while
+        canvas rows grow downwards, so the conversion goes through
+        :func:`lifx.geometry.tile_origin_pixels` (see that module for why the
+        scale factor is a constant and not the tile width).
+
+        Each tile contributes its own width and height to the canvas bounds, so
+        a chain of mixed geometry maps correctly.
         """
         from lifx.animation.orientation import Orientation, build_orientation_lut
+        from lifx.geometry import tile_origin_pixels
 
         if not tiles:  # pragma: no cover
             raise ValueError("No tiles provided")
 
-        first_tile = tiles[0]
-        tile_width = first_tile.width
-        tile_height = first_tile.height
+        # Convert reported positions to top-left pixel origins
+        origins = [tile_origin_pixels(t.user_x, t.user_y) for t in tiles]
 
-        # Convert tile center positions to pixel coordinates
-        # user_x/user_y are in "tile width" units, representing tile centers
-        tile_centers = [
-            (round(t.user_x * tile_width), round(t.user_y * tile_height)) for t in tiles
-        ]
-
-        # Calculate bounding box of all tile centers
-        min_cx = min(c[0] for c in tile_centers)
-        max_cx = max(c[0] for c in tile_centers)
-        min_cy = min(c[1] for c in tile_centers)
-        max_cy = max(c[1] for c in tile_centers)
-
-        # Canvas extends from leftmost tile left edge to rightmost tile right edge
-        # Since centers are at tile_width/2 from edges:
-        # - Left edge of leftmost tile: min_cx - tile_width/2
-        # - Right edge of rightmost tile: max_cx + tile_width/2
-        # Total width = (max_cx - min_cx) + tile_width
-        canvas_width = (max_cx - min_cx) + tile_width
-        canvas_height = (max_cy - min_cy) + tile_height
-
-        # Origin offset (to convert tile centers to top-left positions)
-        origin_x = min_cx - tile_width // 2
-        origin_y = min_cy - tile_height // 2
+        # Calculate the bounding box that covers every tile
+        placements = list(zip(tiles, origins, strict=True))
+        origin_x = min(x for _, (x, _) in placements)
+        origin_y = min(y for _, (_, y) in placements)
+        canvas_width = max(x + t.width for t, (x, _) in placements) - origin_x
+        canvas_height = max(y + t.height for t, (_, y) in placements) - origin_y
 
         # Build tile regions with canvas-relative positions
         tile_regions: list[TileRegion] = []
-        for tile, (cx, cy) in zip(tiles, tile_centers, strict=True):
-            # Convert center to top-left, relative to canvas origin
-            x = cx - tile_width // 2 - origin_x
-            y = cy - tile_height // 2 - origin_y
-
+        for tile, (x, y) in placements:
             # Build orientation LUT for this tile
             orientation = Orientation.from_string(tile.nearest_orientation)
-            lut = build_orientation_lut(tile_width, tile_height, orientation)
+            lut = build_orientation_lut(tile.width, tile.height, orientation)
 
             tile_regions.append(
                 TileRegion(
-                    x=x,
-                    y=y,
-                    width=tile_width,
-                    height=tile_height,
+                    x=x - origin_x,
+                    y=y - origin_y,
+                    width=tile.width,
+                    height=tile.height,
                     orientation_lut=lut,
                 )
             )

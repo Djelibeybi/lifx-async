@@ -142,6 +142,8 @@ exclude_lines = [
     "if TYPE_CHECKING",
     "raise NotImplementedError",
     'if __name__ == "__main__":',
+    # Bare `...` bodies: Protocol members and stubs, never executed
+    '^\s*\.\.\.$',
 ]
 
 [tool.semantic_release]

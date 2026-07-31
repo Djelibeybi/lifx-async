@@ -272,3 +272,33 @@ class TestMatrixGenerator:
             "when theme has Yellow(60) and Cyan(180). "
             "This suggests only one theme color is being used."
         )
+
+
+class TestMatrixGeneratorReuse:
+    """Tests that a MatrixGenerator can be called more than once.
+
+    ``from_tiles()`` hands back an object callers naturally keep, and
+    ``MultiZoneGenerator.get_theme_colors()`` already resets its accumulator, so
+    the matrix generator must too.
+    """
+
+    def test_second_call_does_not_double_the_result(self) -> None:
+        """Test a repeat call returns one entry per tile, not two."""
+        gen = MatrixGenerator([((0, 0), (8, 8)), ((8, 0), (8, 8))])
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+
+        first = gen.get_theme_colors(theme)
+        assert len(first) == 2
+
+        second = gen.get_theme_colors(theme)
+        assert len(second) == 2
+
+    def test_second_call_does_not_mutate_the_first_result(self) -> None:
+        """Test the list handed to the caller is not appended to later."""
+        gen = MatrixGenerator([((0, 0), (8, 8)), ((8, 0), (8, 8))])
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+
+        first = gen.get_theme_colors(theme)
+        gen.get_theme_colors(theme)
+
+        assert len(first) == 2
