@@ -2,6 +2,39 @@
 
 <!-- version list -->
 
+## v6.1.0 (2026-07-31)
+
+### Bug Fixes
+
+- **devices**: Harden state fetches and correct set_group target
+  ([`118b633`](https://github.com/Djelibeybi/lifx-async/commit/118b6331b341b6e0d9926ab2975c0b17bfc4ad4e))
+
+### Documentation
+
+- Correct refresh_state and ambient light sensor descriptions
+  ([`d61f6e3`](https://github.com/Djelibeybi/lifx-async/commit/d61f6e39071474baca2ca6bd6582295f49925534))
+
+- Explain opt-in state fields on discovered devices
+  ([`a7425b1`](https://github.com/Djelibeybi/lifx-async/commit/a7425b1e0174f7bfc677cb349c052b6d5a99a443))
+
+- **devices**: Correct refresh_state docstrings
+  ([`2df05cb`](https://github.com/Djelibeybi/lifx-async/commit/2df05cb04e2aa6c2930ef9f7b9995e5deeec7300))
+
+### Features
+
+- Export symbols used by the Home Assistant integration
+  ([`b85ab4a`](https://github.com/Djelibeybi/lifx-async/commit/b85ab4a8e3c53769626eeb844ba5049d5c0c58e3))
+
+- **devices**: Add ambient light to state and make fetch flags properties
+  ([`23e27f7`](https://github.com/Djelibeybi/lifx-async/commit/23e27f7c8ba0df9a74630176da17b9a5f000e9bd))
+
+- **devices**: Add wifi_info to DeviceState
+  ([`3ddf7f0`](https://github.com/Djelibeybi/lifx-async/commit/3ddf7f03956c77cf9e0452baf2f5d95f6e448b77))
+
+- **devices**: Allow refresh_state to override fetch_wifi_info
+  ([`aab64f7`](https://github.com/Djelibeybi/lifx-async/commit/aab64f7234f58a17fcc7ab74409e8818c59354fc))
+
+
 ## v6.0.1 (2026-07-29)
 
 ### Bug Fixes
