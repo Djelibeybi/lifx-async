@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v6.1.3 (2026-08-01)
+
+### Bug Fixes
+
+- **themes**: Use real tile geometry when rendering themes and canvases
+  ([`f25ef11`](https://github.com/Djelibeybi/lifx-async/commit/f25ef1155325d002c9a8403c058134e3bb6b425d))
+
+
 ## v6.1.2 (2026-08-01)
 
 ### Bug Fixes
