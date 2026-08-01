@@ -239,6 +239,65 @@ def emulator_server(
 
 
 @pytest.fixture(scope="session")
+def tile_chain_server(
+    emulator_available: bool,
+) -> Generator[int]:
+    """Start an emulator hosting a single 5-tile LIFX Tile chain.
+
+    The shared ``emulator_server`` fixture creates its Tile with
+    ``tile_count=1``, so nothing there exercises chain behaviour. This runs a
+    second emulator with the only chain-capable product (55, LIFX Tile) at its
+    full 5-tile length, on its own server so the device lists that other tests
+    iterate stay unchanged.
+
+    Yields:
+        UDP port the chain emulator is listening on
+    """
+    if not emulator_available:
+        pytest.skip("lifx-emulator-core not available")
+
+    scenario_manager = HierarchicalScenarioManager()
+    devices = [
+        create_tile_device(
+            serial="d073d5000101",
+            tile_count=5,
+            scenario_manager=scenario_manager,
+        )
+    ]
+
+    port = get_free_port()
+    server = EmulatedLifxServer(
+        devices=devices,
+        device_manager=DeviceManager(DeviceRepository()),
+        bind_address="127.0.0.1",
+        port=port,
+        scenario_manager=scenario_manager,
+    )
+
+    runner = EmulatorRunner(server)
+    runner.start()
+
+    yield port
+
+    runner.stop()
+
+
+@pytest.fixture
+def tile_chain_light(tile_chain_server: int) -> MatrixLight:
+    """Return a MatrixLight backed by the 5-tile chain emulator.
+
+    The device is not connected; use it as an async context manager.
+    """
+    return MatrixLight(
+        serial="d073d5000101",
+        ip="127.0.0.1",
+        port=tile_chain_server,
+        timeout=2.0,
+        max_retries=2,
+    )
+
+
+@pytest.fixture(scope="session")
 def emulator_port(
     emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
 ) -> int:
