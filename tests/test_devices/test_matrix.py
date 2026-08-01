@@ -1099,3 +1099,216 @@ class TestSetMatrixColorsSolidShortcut:
         matrix_light.connection.send_packet.assert_called_once()
         sent = matrix_light.connection.send_packet.call_args[0][0]
         assert sent.tile_index == 1
+
+
+@pytest.mark.emulator
+class TestGetAllTileColorsBatching:
+    """Tests for reading a whole chain with one Get64.
+
+    Get64 carries a `length` field, so one request from tile 0 makes the device
+    answer with one State64 per tile. Reading a 5-tile chain a tile at a time
+    cost five sequential round trips.
+    """
+
+    @staticmethod
+    def _count_get64(device: MatrixLight) -> list[packets.Tile.Get64]:
+        """Patch request_stream to record the Get64 packets actually sent."""
+        sent: list[packets.Tile.Get64] = []
+        real_stream = device.connection.request_stream
+
+        def counting_stream(packet, timeout=None):  # noqa: ANN001, ANN202
+            if isinstance(packet, packets.Tile.Get64):
+                sent.append(packet)
+            return real_stream(packet, timeout=timeout)
+
+        device.connection.request_stream = counting_stream  # type: ignore[method-assign]
+        return sent
+
+    async def test_chain_is_read_in_one_request(
+        self, tile_chain_light: MatrixLight
+    ) -> None:
+        """Test a 5-tile chain costs one Get64, not five."""
+        async with tile_chain_light:
+            chain = await tile_chain_light.get_device_chain()
+            assert len(chain) == 5
+
+            sent = self._count_get64(tile_chain_light)
+            all_colors = await tile_chain_light.get_all_tile_colors()
+
+            assert len(sent) == 1
+            assert sent[0].tile_index == 0
+            assert sent[0].length == 5
+
+            assert len(all_colors) == 5
+            assert all(len(tile_colors) == 64 for tile_colors in all_colors)
+            assert all(
+                isinstance(color, HSBK)
+                for tile_colors in all_colors
+                for color in tile_colors
+            )
+
+    async def test_colours_are_keyed_by_reported_tile_index(
+        self, tile_chain_light: MatrixLight
+    ) -> None:
+        """Test each tile's colours land in its own slot, not arrival order."""
+        async with tile_chain_light:
+            chain = await tile_chain_light.get_device_chain()
+
+            # Give every tile a distinct colour so misordering is visible
+            for tile in chain:
+                await tile_chain_light.set_matrix_colors(
+                    tile.tile_index,
+                    [
+                        HSBK(
+                            hue=tile.tile_index * 60,
+                            saturation=1.0,
+                            brightness=1.0,
+                            kelvin=3500,
+                        )
+                    ]
+                    * 64,
+                    duration=0,
+                )
+
+            all_colors = await tile_chain_light.get_all_tile_colors()
+
+            hues = [round(tile_colors[0].hue) for tile_colors in all_colors]
+            assert hues == [0, 60, 120, 180, 240]
+
+    async def test_missing_tile_falls_back_to_individual_request(
+        self, tile_chain_light: MatrixLight
+    ) -> None:
+        """Test a dropped State64 costs one extra request, not the whole read.
+
+        The batched stream is truncated after three responses to stand in for a
+        lost datagram; the two unanswered tiles must still be fetched.
+        """
+        async with tile_chain_light:
+            await tile_chain_light.get_device_chain()
+
+            real_stream = tile_chain_light.connection.request_stream
+            batched_seen = False
+
+            async def truncating_stream(packet, timeout=None):  # noqa: ANN001, ANN202
+                nonlocal batched_seen
+                if isinstance(packet, packets.Tile.Get64) and packet.length > 1:
+                    batched_seen = True
+                    count = 0
+                    async for response in real_stream(packet, timeout=timeout):
+                        yield response
+                        count += 1
+                        if count == 3:
+                            return
+                    return
+                async for response in real_stream(packet, timeout=timeout):
+                    yield response
+
+            tile_chain_light.connection.request_stream = truncating_stream  # type: ignore[method-assign]
+            all_colors = await tile_chain_light.get_all_tile_colors()
+
+            assert batched_seen
+            assert len(all_colors) == 5
+            assert all(len(tile_colors) == 64 for tile_colors in all_colors)
+
+    async def test_single_tile_device_is_not_batched(self, emulator_devices) -> None:
+        """Test a one-tile device keeps the plain per-tile path."""
+        matrix = emulator_devices[6]
+        async with matrix:
+            chain = await matrix.get_device_chain()
+            assert len(chain) == 1
+
+            sent = self._count_get64(matrix)
+            all_colors = await matrix.get_all_tile_colors()
+
+            assert len(sent) == 1
+            assert sent[0].length == 1
+            assert len(all_colors) == 1
+
+
+class TestCanBatchChainFetch:
+    """Tests for the guard that decides whether one Get64 covers the chain."""
+
+    @staticmethod
+    def _tile(index: int, width: int = 8, height: int = 8) -> MagicMock:
+        tile = MagicMock()
+        tile.tile_index = index
+        tile.width = width
+        tile.height = height
+        return tile
+
+    def test_single_tile_is_not_batched(self) -> None:
+        """Test a lone tile gains nothing from batching."""
+        assert MatrixLight._can_batch_chain_fetch([self._tile(0)]) is False
+
+    def test_uniform_chain_is_batched(self) -> None:
+        """Test a 5-tile chain of 8x8 tiles qualifies."""
+        chain = [self._tile(i) for i in range(5)]
+        assert MatrixLight._can_batch_chain_fetch(chain) is True
+
+    def test_large_tiles_are_not_batched(self) -> None:
+        """Test tiles over 64 zones need their own row-chunked requests."""
+        chain = [self._tile(i, width=16, height=8) for i in range(2)]
+        assert MatrixLight._can_batch_chain_fetch(chain) is False
+
+    def test_mixed_widths_are_not_batched(self) -> None:
+        """Test one rect cannot describe tiles of differing width."""
+        chain = [self._tile(0), self._tile(1, width=5, height=6)]
+        assert MatrixLight._can_batch_chain_fetch(chain) is False
+
+
+class TestBatchedChainResponseHandling:
+    """Tests for how the batched read handles unusable State64 responses."""
+
+    @staticmethod
+    def _chain(count: int) -> list[MagicMock]:
+        chain = []
+        for index in range(count):
+            tile = MagicMock()
+            tile.tile_index = index
+            tile.width = 8
+            tile.height = 8
+            chain.append(tile)
+        return chain
+
+    @staticmethod
+    def _state64(tile_index: int, hue: int) -> packets.Tile.State64:
+        return packets.Tile.State64(
+            tile_index=tile_index,
+            rect=TileBufferRect(fb_index=0, x=0, y=0, width=8),
+            colors=[
+                LightHsbk(hue=hue, saturation=65535, brightness=65535, kelvin=3500)
+                for _ in range(64)
+            ],
+        )
+
+    async def test_duplicate_and_out_of_range_responses_are_ignored(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test junk responses neither land in the result nor end the stream.
+
+        Counting a duplicate or an out-of-range tile_index towards the expected
+        total would stop the read before the last real tile arrived, leaving it
+        to the individual-fetch fallback.
+        """
+        matrix_light._device_chain = self._chain(2)
+        fetched_individually: list[int] = []
+
+        async def scripted_stream(packet, timeout=None):  # noqa: ANN001, ANN202
+            assert isinstance(packet, packets.Tile.Get64)
+            assert packet.length == 2
+            yield self._state64(0, 100)
+            yield self._state64(0, 999)  # duplicate index
+            yield self._state64(9, 999)  # index past the end of the chain
+            yield self._state64(1, 200)
+
+        matrix_light.connection.request_stream = scripted_stream  # type: ignore[method-assign]
+        matrix_light.get64 = AsyncMock(  # type: ignore[method-assign]
+            side_effect=lambda tile_index, **_: fetched_individually.append(tile_index)
+        )
+
+        all_colors = await matrix_light.get_all_tile_colors()
+
+        assert fetched_individually == []
+        assert len(all_colors) == 2
+        assert all_colors[0][0].to_protocol().hue == 100
+        assert all_colors[1][0].to_protocol().hue == 200

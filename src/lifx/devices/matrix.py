@@ -608,11 +608,14 @@ class MatrixLight(Light):
         as a list of color lists (one per tile). This is the matrix equivalent
         of MultiZoneLight's get_all_color_zones().
 
-        For tiles with >64 zones (e.g., 16x8 Ceiling with 128 zones), makes
-        multiple Get64 requests to fetch all colors.
-
-        Always fetches from device. Tiles are queried sequentially to avoid
+        A chain of uniform tiles of 64 zones or fewer is read with a single
+        Get64 carrying ``length`` equal to the chain length, which the device
+        answers with one State64 per tile — one round trip instead of one per
+        tile. Everything else (single-tile devices, and tiles over 64 zones such
+        as a 16x8 Ceiling) is queried a tile at a time, sequentially, to avoid
         overwhelming the device with concurrent requests.
+
+        Always fetches from device.
 
         Returns:
             List of color lists, one per tile. Each inner list contains
@@ -641,19 +644,133 @@ class MatrixLight(Light):
         else:
             device_chain = self._device_chain
 
-        # Fetch colors from each tile sequentially
+        if self._can_batch_chain_fetch(device_chain):
+            all_colors = await self._get_chain_colors_batched(device_chain)
+        else:
+            all_colors = await self._get_chain_colors_per_tile(device_chain)
+
+        # Update state if it exists (flatten for state storage)
+        if self._state is not None and hasattr(self._state, "tile_colors"):
+            flat_colors = [c for tile_colors in all_colors for c in tile_colors]
+            self._state.tile_colors = flat_colors
+            self._state.last_updated = time.time()
+
+        return all_colors
+
+    @staticmethod
+    def _can_batch_chain_fetch(device_chain: list[TileInfo]) -> bool:
+        """Return whether the whole chain can be read with one Get64.
+
+        Get64 carries a ``length`` field: one request starting at tile 0 makes
+        the device answer with one State64 per tile, saving a round trip per
+        tile on a chain. That only works when a single 64-colour response
+        covers a whole tile and one rect describes every tile, so it is limited
+        to multi-tile chains of uniform tiles of 64 zones or fewer. In practice
+        that is the LIFX Tile, the only chain-capable product.
+
+        Args:
+            device_chain: Tiles reported by the device
+
+        Returns:
+            True if the batched path applies
+        """
+        if len(device_chain) < 2:
+            return False
+
+        first = device_chain[0]
+        return all(
+            tile.width == first.width and tile.width * tile.height <= 64
+            for tile in device_chain
+        )
+
+    async def _get_chain_colors_batched(
+        self, device_chain: list[TileInfo]
+    ) -> list[list[HSBK]]:
+        """Read every tile in the chain with a single Get64 request.
+
+        Responses are keyed by their reported ``tile_index`` rather than by
+        arrival order. Any tile the device does not answer for is fetched
+        individually afterwards, so a dropped datagram costs one extra request
+        rather than the whole read.
+
+        Args:
+            device_chain: Tiles reported by the device
+
+        Returns:
+            List of color lists, one per tile, in chain order
+        """
+        expected = len(device_chain)
+        colors_by_index: dict[int, list[HSBK]] = {}
+
+        _LOGGER.debug(
+            "Getting all zones from %d tiles in one request for %s",
+            expected,
+            self.label or self.serial,
+        )
+
+        async for response in self.connection.request_stream(
+            packets.Tile.Get64(
+                tile_index=0,
+                length=expected,
+                rect=TileBufferRect(fb_index=0, x=0, y=0, width=device_chain[0].width),
+            )
+        ):
+            self._raise_if_unhandled(response)
+
+            index = response.tile_index
+            if not 0 <= index < expected or index in colors_by_index:
+                # Out of range or a duplicate: neither can be placed in the
+                # result, and counting it would end the stream early.
+                continue
+
+            tile = device_chain[index]
+            colors_by_index[index] = [
+                HSBK.from_protocol(proto_color)
+                for proto_color in response.colors[: tile.width * tile.height]
+            ]
+
+            if len(colors_by_index) == expected:
+                break
+
+        missing = [index for index in range(expected) if index not in colors_by_index]
+        if missing:
+            _LOGGER.debug(
+                "Batched read missed tiles %s for %s, fetching them individually",
+                missing,
+                self.label or self.serial,
+            )
+            for index in missing:
+                colors_by_index[index] = await self.get64(tile_index=index)
+
+        return [colors_by_index[index] for index in range(expected)]
+
+    async def _get_chain_colors_per_tile(
+        self, device_chain: list[TileInfo]
+    ) -> list[list[HSBK]]:
+        """Read each tile with its own request, chunking tiles over 64 zones.
+
+        Used for single-tile devices and for tiles too large for one Set64-sized
+        response (a 16x8 Ceiling needs two). Tiles are queried sequentially to
+        avoid overwhelming the device with concurrent requests.
+
+        Args:
+            device_chain: Tiles reported by the device
+
+        Returns:
+            List of color lists, one per tile, in chain order
+        """
         all_colors: list[list[HSBK]] = []
+
         for tile in device_chain:
             tile_zone_count = tile.width * tile.height
 
             if tile_zone_count <= 64:
                 # Single request for tiles with ≤64 zones
-                tile_colors = await self.get64(tile_index=tile.tile_index)
-                all_colors.append(tile_colors)
+                all_colors.append(await self.get64(tile_index=tile.tile_index))
             else:
                 # Multiple requests for tiles with >64 zones (e.g., 16x8 Ceiling)
                 # Split into multiple 64-zone requests by row
-                tile_colors = []
+                tile_colors: list[HSBK] = []
                 rows_per_request = 64 // tile.width  # e.g., 64/16 = 4 rows
 
                 for y_offset in range(0, tile.height, rows_per_request):
@@ -666,12 +783,6 @@ class MatrixLight(Light):
                     tile_colors.extend(chunk)
 
                 all_colors.append(tile_colors)
-
-        # Update state if it exists (flatten for state storage)
-        if self._state is not None and hasattr(self._state, "tile_colors"):
-            flat_colors = [c for tile_colors in all_colors for c in tile_colors]
-            self._state.tile_colors = flat_colors
-            self._state.last_updated = time.time()
 
         return all_colors
 
