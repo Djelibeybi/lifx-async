@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v6.1.2 (2026-08-01)
+
+### Bug Fixes
+
+- **network**: Keep response correlation intact while learning a serial
+  ([`28cad4a`](https://github.com/Djelibeybi/lifx-async/commit/28cad4af793e98102397ddc814f935fb5169423e))
+
+- **network**: Log the peer as discrete fields that stay current
+  ([`1ab4c5a`](https://github.com/Djelibeybi/lifx-async/commit/1ab4c5a8f274a350e6519452ce18bd179e2bba66))
+
+- **network**: Name the device in transport error warnings
+  ([`e85653d`](https://github.com/Djelibeybi/lifx-async/commit/e85653d7c6ca2d9c213b6fdef8f7e4be5a747159))
+
+
 ## v6.1.1 (2026-07-31)
 
 ### Bug Fixes
