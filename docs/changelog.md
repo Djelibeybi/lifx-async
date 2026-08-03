@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v6.1.4 (2026-08-03)
+
+### Bug Fixes
+
+- **devices**: Harden ceiling state file and power-off
+  ([`f8ecc28`](https://github.com/Djelibeybi/lifx-async/commit/f8ecc28759ceddefbe6a37bd2f8249ca8fc760f3))
+
+- **devices**: Power ceiling off when last component turns off
+  ([`df6cef6`](https://github.com/Djelibeybi/lifx-async/commit/df6cef67c1a80fe4e2df67301f8ad84b47394f9e))
+
+
 ## v6.1.3 (2026-08-01)
 
 ### Bug Fixes
