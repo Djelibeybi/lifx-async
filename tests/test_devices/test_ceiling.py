@@ -4,14 +4,24 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import os
 import tempfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.ceiling import CeilingLight, CeilingLightState
+from lifx.devices.ceiling import (
+    CeilingLight,
+    CeilingLightState,
+    _resolve_state_path,
+    _state_file_lock,
+    _write_state_file,
+)
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout
@@ -849,16 +859,17 @@ class TestCeilingLightStatePersistence:
             0.7, abs=0.01
         )
 
-    async def test_concurrent_saves_to_shared_file_are_serialised(
+    async def test_concurrent_saves_to_shared_file_keep_both_entries(
         self, ceiling_176: CeilingLight, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Devices sharing a state file must not drop each other's entry.
 
         The save is a read-merge-write cycle running in a worker thread, so
         two concurrent saves could otherwise both read the same snapshot and
-        the later write would win. The threaded call is wrapped to yield to the
-        loop mid-flight, which is exactly when an unguarded save would
-        interleave.
+        the later write would win. The lock is taken inside the worker thread,
+        so the coroutines are free to overlap — what must not interleave is
+        the read-merge-write itself. The threaded call is wrapped to yield to
+        the loop mid-flight so the two saves really are in flight together.
         """
         second = CeilingLight(
             serial="d073d5040506",
@@ -892,18 +903,89 @@ class TestCeilingLightStatePersistence:
             ceiling_176._save_state_to_file(), second._save_state_to_file()
         )
 
-        # Each save completes before the next starts — no interleaving
-        assert order == [
-            "start:d073d5010203",
-            "end:d073d5010203",
-            "start:d073d5040506",
-            "end:d073d5040506",
-        ]
+        # Both saves really were in flight at once, so surviving entries are
+        # the lock's doing rather than luck
+        assert order[:2] == ["start:d073d5010203", "start:d073d5040506"]
 
         with open(ceiling_176._state_file) as f:
             data = json.load(f)
 
         assert set(data) == {"d073d5010203", "d073d5040506"}
+
+    def test_write_state_file_serialises_across_threads(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The read-merge-write cycle holds its lock for the whole cycle.
+
+        Two threads writing the same file must not interleave, which is what
+        an ``asyncio.Lock`` could not guarantee: it binds to one event loop,
+        and the worker threads have none.
+        """
+        state_file = tmp_path / "state.json"
+        order: list[str] = []
+        real_replace = os.replace
+
+        def _slow_replace(src: object, dst: object) -> None:
+            order.append("write")
+            time.sleep(0.05)
+            real_replace(src, dst)  # type: ignore[arg-type]
+            order.append("done")
+
+        monkeypatch.setattr("lifx.devices.ceiling.os.replace", _slow_replace)
+
+        threads = [
+            threading.Thread(
+                target=_write_state_file,
+                args=(state_file, serial, {"uplight": {"brightness": 0.5}}),
+            )
+            for serial in ("d073d5010203", "d073d5040506")
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert order == ["write", "done", "write", "done"]
+
+        with state_file.open() as f:
+            data = json.load(f)
+
+        assert set(data) == {"d073d5010203", "d073d5040506"}
+
+    def test_lock_is_shared_across_path_spellings(self, tmp_path: Path) -> None:
+        """Two spellings of one file must map to one lock, not two."""
+        nested = tmp_path / "sub"
+        nested.mkdir()
+
+        direct = _state_file_lock(_resolve_state_path(tmp_path / "state.json"))
+        indirect = _state_file_lock(
+            _resolve_state_path(nested / ".." / "state.json"),
+        )
+
+        assert direct is indirect
+
+    async def test_save_refuses_to_overwrite_non_object_file(
+        self, ceiling_176: CeilingLight, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A file that parses to something other than an object is left alone.
+
+        Overwriting it would discard every other device's stored state on the
+        assumption that the parse failure is this device's problem.
+        """
+        with open(ceiling_176._state_file, "w") as f:
+            json.dump(None, f)
+
+        ceiling_176.state.stored_uplight_color = HSBK(
+            hue=30, saturation=0.2, brightness=0.5, kelvin=2700
+        )
+
+        with caplog.at_level(logging.WARNING):
+            await ceiling_176._save_state_to_file()
+
+        assert "does not contain a JSON object" in caplog.text
+
+        with open(ceiling_176._state_file) as f:
+            assert json.load(f) is None
 
 
 class TestCeilingLightBackwardCompatibility:
@@ -1447,6 +1529,32 @@ class TestCeilingLightStateFileEdgeCases:
 
             # Should not raise, just log warning
             await ceiling._load_state_from_file()
+            assert ceiling.state.stored_uplight_color is None
+
+    async def test_load_state_non_object_json(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A file that parses to JSON ``null`` is corruption, not absence.
+
+        Reporting it as a missing file would silently reset stored colours to
+        the inferred default with nothing in the log to explain it.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            with state_file.open("w") as f:
+                json.dump(None, f)
+
+            ceiling = CeilingLight(
+                serial="d073d5010203",
+                ip="192.168.1.100",
+                state_file=str(state_file),
+            )
+            ceiling._state = _make_mock_state()
+
+            with caplog.at_level(logging.WARNING):
+                await ceiling._load_state_from_file()
+
+            assert "does not contain a JSON object" in caplog.text
             assert ceiling.state.stored_uplight_color is None
 
     async def test_save_state_no_state_file(self) -> None:
@@ -2576,6 +2684,37 @@ class TestCeilingLightTurnOffPowerBehavior:
         assert ceiling_176.state.uplight_is_on is False
         assert ceiling_176.state.downlight_is_on is False
 
+        # The whole device went off, so the downlight cache is refreshed from
+        # the same fetch rather than left describing a lit component
+        assert ceiling_176.state.downlight_colors == [dark] * 63
+        assert ceiling_176.state.last_downlight_colors == [dark] * 63
+
+    async def test_turn_uplight_off_sends_supplied_color_when_powering_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """A supplied colour reaches the device even in the power-off branch.
+
+        The zone keeps its brightness, but its H/S/K has to be written or a
+        later power-on would restore the colour the caller replaced.
+        """
+        lit = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
+        dark = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+        blue = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+        self._mock_tile_colors(ceiling_176, uplight=lit, downlight=dark)
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_uplight_off(color=blue)
+
+        ceiling_176.set_matrix_colors.assert_called_once()
+        sent_colors = ceiling_176.set_matrix_colors.call_args[0][1]
+
+        # Caller's H/S/K, device's brightness — the restore point is blue
+        assert sent_colors[63] == HSBK(
+            hue=240, saturation=1.0, brightness=0.5, kelvin=3500
+        )
+        assert ceiling_176.state.stored_uplight_color == blue
+        assert ceiling_176.state.last_uplight_color == sent_colors[63]
+
     async def test_turn_uplight_off_keeps_power_when_downlight_on(
         self, ceiling_176: CeilingLight
     ) -> None:
@@ -2622,6 +2761,32 @@ class TestCeilingLightTurnOffPowerBehavior:
         assert ceiling_176.state.downlight_is_on is False
         assert ceiling_176.state.uplight_is_on is False
 
+        # The whole device went off, so the uplight cache is refreshed from the
+        # same fetch rather than left describing a lit component
+        assert ceiling_176.state.uplight_color == dark
+        assert ceiling_176.state.last_uplight_color == dark
+
+    async def test_turn_downlight_off_sends_supplied_colors_when_powering_off(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Supplied colours reach the device even in the power-off branch."""
+        dark = HSBK(hue=30, saturation=0.2, brightness=0.0, kelvin=2700)
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        blue = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
+        self._mock_tile_colors(ceiling_176, uplight=dark, downlight=white)
+
+        with patch.object(MatrixLight, "set_power", new_callable=AsyncMock):
+            await ceiling_176.turn_downlight_off(colors=blue)
+
+        ceiling_176.set_matrix_colors.assert_called_once()
+        sent_colors = ceiling_176.set_matrix_colors.call_args[0][1]
+
+        # Caller's H/S/K, device's brightness — the restore point is blue
+        expected = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+        assert sent_colors[:63] == [expected] * 63
+        assert ceiling_176.state.stored_downlight_colors == [blue] * 63
+        assert ceiling_176.state.last_downlight_colors == [expected] * 63
+
     async def test_turn_downlight_off_keeps_power_when_uplight_on(
         self, ceiling_176: CeilingLight
     ) -> None:
@@ -2655,10 +2820,14 @@ class TestCeilingLightTurnOffPowerBehavior:
             ceiling_176.state.power = 0
 
             await ceiling_176.set_power(True)
+            # MatrixLight.set_power is mocked, so mirror the cached power level
+            # the real call would have left behind — the public is_on
+            # properties read it and report False while it says 0
+            ceiling_176.state.power = 65535
 
         # Uplight kept its brightness on the device, so it comes back on
-        assert ceiling_176.state.uplight_is_on is True
-        assert ceiling_176.state.downlight_is_on is False
+        assert ceiling_176.uplight_is_on is True
+        assert ceiling_176.downlight_is_on is False
 
 
 class TestCeilingLightStateCoverage:

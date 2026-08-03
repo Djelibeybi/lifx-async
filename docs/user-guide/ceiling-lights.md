@@ -124,22 +124,28 @@ leaving it on with every zone at zero brightness:
 ```python
 await ceiling.turn_uplight_off()
 
-# Downlight was already off, so this powers the device off entirely
-await ceiling.turn_downlight_off(duration=2.0)
+# The uplight is now off, so turning the downlight off — the last lit
+# component — powers the device off entirely
+await ceiling.turn_downlight_off()
 
 assert await ceiling.get_power() == 0
 ```
 
-The `duration` is applied to the power transition, so the light still fades
-out. The component's zones keep their brightness on the device rather than
-being zeroed, so a plain power-on brings that component back:
+Pass a `duration` and it is applied to the power transition, so the light still
+fades out. `get_power()` reads the device directly and reports the level part
+way through a fade, so only expect `0` once the fade has finished.
+
+The component's zones keep their brightness on the device rather than being
+zeroed, so a plain power-on brings that component back:
 
 ```python
 await ceiling.set_power(True)  # Downlight comes back on
 ```
 
 Both component colours also remain stored, so `turn_uplight_on()` and
-`turn_downlight_on()` restore them as usual.
+`turn_downlight_on()` restore them as usual. Use those rather than
+`set_uplight_color()` / `set_downlight_colors()` when the device may be off:
+the setters change zone colours only and never power the device on.
 
 ### Checking Component State
 
@@ -236,8 +242,10 @@ async with await CeilingLight.from_ip(
 
 All state file reads and writes run in a worker thread, so they never block the
 event loop — safe to use inside an async application such as Home Assistant.
-Saving is a read-merge-write cycle serialised per file, so several devices can
-share one state file without dropping each other's entries.
+Saving is a read-merge-write cycle serialised per file, so several devices in
+the same process can share one state file without dropping each other's
+entries. That lock is process-local: point two separate processes at one state
+file and the later write will drop the earlier process's entries.
 
 The state file stores colors per device serial number, supporting multiple devices:
 
@@ -318,12 +326,15 @@ from lifx.color import HSBK
 async def night_mode(ip: str):
     async with await Device.connect(ip) as ceiling:
         assert isinstance(ceiling, CeilingLight)
-        # Store current colors before turning off
+        # Store current colors before turning off. If the uplight is already
+        # off this powers the whole device down, so bring the uplight back
+        # with turn_uplight_on() rather than set_uplight_color(), which
+        # changes zone colours without powering the device on.
         await ceiling.turn_downlight_off()
 
         # Set uplight to very dim warm glow
-        await ceiling.set_uplight_color(
-            HSBK(hue=30, saturation=0.3, brightness=0.05, kelvin=2200),
+        await ceiling.turn_uplight_on(
+            color=HSBK(hue=30, saturation=0.3, brightness=0.05, kelvin=2200),
             duration=2.0
         )
 ```
