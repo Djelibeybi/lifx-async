@@ -118,6 +118,29 @@ await ceiling.turn_downlight_on(
 )
 ```
 
+Turning off the last lit component powers the whole device off, rather than
+leaving it on with every zone at zero brightness:
+
+```python
+await ceiling.turn_uplight_off()
+
+# Downlight was already off, so this powers the device off entirely
+await ceiling.turn_downlight_off(duration=2.0)
+
+assert await ceiling.get_power() == 0
+```
+
+The `duration` is applied to the power transition, so the light still fades
+out. The component's zones keep their brightness on the device rather than
+being zeroed, so a plain power-on brings that component back:
+
+```python
+await ceiling.set_power(True)  # Downlight comes back on
+```
+
+Both component colours also remain stored, so `turn_uplight_on()` and
+`turn_downlight_on()` restore them as usual.
+
 ### Checking Component State
 
 ```python
@@ -210,6 +233,11 @@ async with await CeilingLight.from_ip(
     # ... later ...
     await ceiling.turn_uplight_on()   # Restores from file if available
 ```
+
+All state file reads and writes run in a worker thread, so they never block the
+event loop — safe to use inside an async application such as Home Assistant.
+Saving is a read-merge-write cycle serialised per file, so several devices can
+share one state file without dropping each other's entries.
 
 The state file stores colors per device serial number, supporting multiple devices:
 

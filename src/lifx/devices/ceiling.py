@@ -24,6 +24,7 @@ import logging
 import os
 import tempfile
 import time
+import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -35,6 +36,90 @@ from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
 
 _LOGGER = logging.getLogger(__name__)
+
+# Locks serialising read-modify-write cycles per state file. Values are weak so
+# a lock disappears once nothing is holding or waiting on it; anyone inside the
+# ``async with`` keeps it alive, which is exactly the window that matters.
+_STATE_FILE_LOCKS: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+    weakref.WeakValueDictionary()
+)
+
+
+def _state_file_lock(path: Path) -> asyncio.Lock:
+    """Get the lock guarding a state file.
+
+    Several devices can share one state file, and saving is a read-merge-write
+    cycle. That I/O now runs in worker threads, so without this lock two saves
+    could interleave and drop one device's entry — running on the event loop
+    used to serialise them for free.
+
+    Args:
+        path: Resolved path to the state file
+
+    Returns:
+        The asyncio.Lock guarding that path
+    """
+    key = str(path)
+    lock = _STATE_FILE_LOCKS.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _STATE_FILE_LOCKS[key] = lock
+    return lock
+
+
+def _read_state_file(path: Path) -> Any:
+    """Read and parse the state file. Blocking — call via asyncio.to_thread.
+
+    Args:
+        path: Resolved path to the state file
+
+    Returns:
+        The parsed JSON contents, or None if the file does not exist
+    """
+    if not path.exists():
+        return None
+
+    with path.open("r") as f:
+        return json.load(f)
+
+
+def _write_state_file(path: Path, serial: str, device_state: dict[str, Any]) -> None:
+    """Merge one device's state into the state file and write it back.
+
+    Blocking — call via asyncio.to_thread, holding the file's lock.
+
+    The on-disk entry is merged rather than replaced so absent in-memory values
+    (e.g. state that failed to load in ``__aenter__``) are not clobbered.
+
+    Args:
+        path: Resolved path to the state file
+        serial: Serial number of the device whose entry is being updated
+        device_state: Serialisable state to merge into that device's entry
+    """
+    if path.exists():
+        with path.open("r") as f:
+            data = json.load(f)
+    else:
+        data = {}
+
+    entry = data.get(serial, {})
+    entry.update(device_state)
+    data[serial] = entry
+
+    # Ensure directory exists
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write atomically: dump to a temp file in the same directory, then
+    # replace, so a crash mid-write cannot leave a truncated file that loses
+    # every device's stored state
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
 
 
 def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
@@ -279,7 +364,7 @@ class CeilingLight(MatrixLight):
 
         # Load state from disk if state_file is provided
         if self._state_file:
-            self._load_state_from_file()
+            await self._load_state_from_file()
 
         return self
 
@@ -292,20 +377,21 @@ class CeilingLight(MatrixLight):
         """Exit async context manager, saving state to file before closing.
 
         Saves the current in-memory state to ``state_file`` (when set) before
-        delegating to the parent ``close()`` via ``super().__aexit__()``.  The
-        save runs in a worker thread via ``asyncio.to_thread`` so the file I/O
-        never blocks the event loop.  Ordinary I/O failures are logged as a
-        WARNING and swallowed by the inner ``except Exception``.  The save is
-        wrapped in ``try/finally`` so the parent cleanup always runs — even if
-        cancellation (``asyncio.CancelledError``, a ``BaseException`` that the
-        inner handler deliberately does not catch) lands while the threaded save
-        is pending.  The original body exception (if any) is never replaced or
-        suppressed.
+        delegating to the parent ``close()`` via ``super().__aexit__()``.
+        ``_save_state_to_file()`` does its file I/O in a worker thread so it
+        never blocks the event loop, and logs ordinary I/O failures as a
+        WARNING rather than raising.  The ``except Exception`` here is a
+        belt-and-braces guard: anything the save does not handle would
+        otherwise escape ``__aexit__`` and replace the body's exception.  The
+        save is wrapped in ``try/finally`` so the parent cleanup always runs —
+        even if cancellation (``asyncio.CancelledError``, a ``BaseException``
+        that neither handler catches) lands while the save is pending.  The
+        original body exception (if any) is never replaced or suppressed.
         """
         try:
             if self._state_file:
                 try:
-                    await asyncio.to_thread(self._save_state_to_file)
+                    await self._save_state_to_file()
                 except Exception as e:
                     _LOGGER.warning(
                         "Failed to save state on __aexit__ for %s: %s",
@@ -617,7 +703,7 @@ class CeilingLight(MatrixLight):
 
         # Persist if enabled
         if self._state_file:
-            self._save_state_to_file()
+            await self._save_state_to_file()
 
     async def set_downlight_colors(
         self, colors: HSBK | list[HSBK], duration: float = 0.0
@@ -680,7 +766,7 @@ class CeilingLight(MatrixLight):
 
         # Persist if enabled
         if self._state_file:
-            self._save_state_to_file()
+            await self._save_state_to_file()
 
     async def turn_uplight_on(
         self, color: HSBK | None = None, duration: float = 0.0
@@ -757,7 +843,7 @@ class CeilingLight(MatrixLight):
 
             # Persist AFTER device operations complete
             if self._state_file:
-                self._save_state_to_file()
+                await self._save_state_to_file()
         else:
             # Light is already on - determine target color first, then set
             if color is not None:
@@ -785,6 +871,10 @@ class CeilingLight(MatrixLight):
 
         Note:
             Sets uplight zone brightness to 0 on device while preserving H, S, K.
+            If the downlight component is already off, the entire device is
+            powered off instead and the uplight zone keeps its brightness, so
+            a later set_power(True) brings the uplight back rather than turning
+            on a light with every zone at zero brightness.
         """
         if color is not None and color.brightness == 0:
             raise ValueError(
@@ -810,19 +900,37 @@ class CeilingLight(MatrixLight):
             kelvin=stored_color.kelvin,
         )
 
-        # Update uplight zone and send immediately
-        tile_colors[self.uplight_zone] = off_color
-        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+        # Device truth, not cached flags: is the downlight already dark?
+        downlight_already_off = all(
+            c.brightness == 0 for c in tile_colors[self.downlight_zones]
+        )
 
-        # Update state only after I/O succeeds
+        if downlight_already_off:
+            # Nothing else is lit, so power the whole device down instead of
+            # leaving it on with every zone at zero brightness. The zone keeps
+            # its brightness on the device: zeroing it as well would leave a
+            # plain set_power(True) turning on a light that shows nothing.
+            await super().set_power(False, duration)
+            device_color = tile_colors[self.uplight_zone]
+        else:
+            # Update uplight zone and send
+            tile_colors[self.uplight_zone] = off_color
+            await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+            device_color = off_color
+
+        # Update state only after I/O succeeds. The colour fields track what
+        # the device actually holds; uplight_is_on is False either way because
+        # the component is dark — powered off or zeroed.
         self.state.stored_uplight_color = stored_color
-        self.state.uplight_color = off_color
+        self.state.uplight_color = device_color
         self.state.uplight_is_on = False
-        self.state.last_uplight_color = off_color
+        self.state.last_uplight_color = device_color
+        if downlight_already_off:
+            self.state.downlight_is_on = False
 
         # Persist if enabled
         if self._state_file:
-            self._save_state_to_file()
+            await self._save_state_to_file()
 
     async def turn_downlight_on(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
@@ -913,7 +1021,7 @@ class CeilingLight(MatrixLight):
 
             # Persist AFTER device operations complete
             if self._state_file:
-                self._save_state_to_file()
+                await self._save_state_to_file()
         else:
             # Light is already on - determine target colors first, then set
             if colors is not None:
@@ -1013,7 +1121,7 @@ class CeilingLight(MatrixLight):
 
         # Persist AFTER device operation completes
         if turning_off and self._state_file:
-            self._save_state_to_file()
+            await self._save_state_to_file()
 
     async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
         """Set light color, updating component state tracking.
@@ -1066,7 +1174,7 @@ class CeilingLight(MatrixLight):
 
         # Persist if enabled
         if self._state_file:
-            self._save_state_to_file()
+            await self._save_state_to_file()
 
     async def turn_downlight_off(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
@@ -1090,6 +1198,10 @@ class CeilingLight(MatrixLight):
 
         Note:
             Sets all downlight zone brightness to 0 on device while preserving H, S, K.
+            If the uplight component is already off, the entire device is
+            powered off instead and the downlight zones keep their brightness,
+            so a later set_power(True) brings the downlight back rather than
+            turning on a light with every zone at zero brightness.
         """
         # Validate provided colors early (before fetching)
         stored_colors: list[HSBK] | None = None
@@ -1134,19 +1246,35 @@ class CeilingLight(MatrixLight):
             for c in stored_colors
         ]
 
-        # Update downlight zones and send immediately
-        tile_colors[self.downlight_zones] = off_colors
-        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+        # Device truth, not cached flags: is the uplight already dark?
+        uplight_already_off = tile_colors[self.uplight_zone].brightness == 0
 
-        # Update state only after I/O succeeds
+        if uplight_already_off:
+            # Nothing else is lit, so power the whole device down instead of
+            # leaving it on with every zone at zero brightness. The zones keep
+            # their brightness on the device: zeroing them as well would leave
+            # a plain set_power(True) turning on a light that shows nothing.
+            await super().set_power(False, duration)
+            device_colors = list(tile_colors[self.downlight_zones])
+        else:
+            # Update downlight zones and send
+            tile_colors[self.downlight_zones] = off_colors
+            await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+            device_colors = list(off_colors)
+
+        # Update state only after I/O succeeds. The colour fields track what
+        # the device actually holds; downlight_is_on is False either way
+        # because the component is dark — powered off or zeroed.
         self.state.stored_downlight_colors = list(stored_colors)
-        self.state.downlight_colors = list(off_colors)
+        self.state.downlight_colors = list(device_colors)
         self.state.downlight_is_on = False
-        self.state.last_downlight_colors = list(off_colors)
+        self.state.last_downlight_colors = list(device_colors)
+        if uplight_already_off:
+            self.state.uplight_is_on = False
 
         # Persist if enabled
         if self._state_file:
-            self._save_state_to_file()
+            await self._save_state_to_file()
 
     async def _determine_uplight_brightness(
         self, tile_colors: list[HSBK] | None = None
@@ -1317,22 +1445,24 @@ class CeilingLight(MatrixLight):
 
         return False
 
-    def _load_state_from_file(self) -> None:
+    async def _load_state_from_file(self) -> None:
         """Load state from JSON file.
 
-        Handles file not found and JSON errors gracefully.
+        The read runs in a worker thread via ``asyncio.to_thread`` so the file
+        I/O never blocks the event loop; the parsed data is applied to state
+        back on the loop. Handles file not found and JSON errors gracefully.
         """
         if not self._state_file:
             return
 
         try:
             state_path = Path(self._state_file).expanduser()
-            if not state_path.exists():
+            async with _state_file_lock(state_path):
+                data = await asyncio.to_thread(_read_state_file, state_path)
+
+            if data is None:
                 _LOGGER.debug("State file does not exist: %s", state_path)
                 return
-
-            with state_path.open("r") as f:
-                data = json.load(f)
 
             # Get state for this device
             device_state = data.get(self.serial)
@@ -1384,10 +1514,13 @@ class CeilingLight(MatrixLight):
         except Exception as e:
             _LOGGER.warning("Failed to load state from %s: %s", self._state_file, e)
 
-    def _save_state_to_file(self) -> None:
+    async def _save_state_to_file(self) -> None:
         """Save state to JSON file.
 
-        Handles file I/O errors gracefully.
+        The read-merge-write cycle runs in a worker thread via
+        ``asyncio.to_thread`` so the file I/O never blocks the event loop, and
+        is serialised by the state file's lock so devices sharing a file cannot
+        drop each other's entries. Handles file I/O errors gracefully.
         """
         if not self._state_file:
             return
@@ -1395,17 +1528,9 @@ class CeilingLight(MatrixLight):
         try:
             state_path = Path(self._state_file).expanduser()
 
-            # Load existing data or create new
-            if state_path.exists():
-                with state_path.open("r") as f:
-                    data = json.load(f)
-            else:
-                data = {}
-
-            # Update state for this device, merging with any existing on-disk
-            # entry so absent in-memory values (e.g. state that failed to load
-            # in __aenter__) are not clobbered by the exit-save
-            device_state = data.get(self.serial, {})
+            # Build this device's entry; _write_state_file merges it into any
+            # existing on-disk entry
+            device_state: dict[str, Any] = {}
             state = self.state
 
             if state.stored_uplight_color:
@@ -1427,22 +1552,10 @@ class CeilingLight(MatrixLight):
                     for c in state.stored_downlight_colors
                 ]
 
-            data[self.serial] = device_state
-
-            # Ensure directory exists
-            state_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write atomically: dump to a temp file in the same directory,
-            # then replace, so a crash mid-write cannot leave a truncated
-            # file that loses every device's stored state
-            fd, tmp = tempfile.mkstemp(dir=state_path.parent, suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w") as f:
-                    json.dump(data, f, indent=2)
-                os.replace(tmp, state_path)
-            except BaseException:
-                os.unlink(tmp)
-                raise
+            async with _state_file_lock(state_path):
+                await asyncio.to_thread(
+                    _write_state_file, state_path, self.serial, device_state
+                )
 
             _LOGGER.debug("Saved state to %s for device %s", state_path, self.serial)
 
