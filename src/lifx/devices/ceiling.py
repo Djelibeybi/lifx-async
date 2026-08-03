@@ -23,8 +23,8 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import time
-import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -37,19 +37,42 @@ from lifx.products import get_ceiling_layout, is_ceiling_product
 
 _LOGGER = logging.getLogger(__name__)
 
-# Locks serialising read-modify-write cycles per state file. Values are weak so
-# a lock disappears once nothing is holding or waiting on it; anyone inside the
-# ``async with`` keeps it alive, which is exactly the window that matters.
-_STATE_FILE_LOCKS: weakref.WeakValueDictionary[str, asyncio.Lock] = (
-    weakref.WeakValueDictionary()
-)
+# Locks serialising read-modify-write cycles per state file, keyed on the
+# resolved path so every spelling of one file shares a lock. Bounded by the
+# number of distinct state files an application opens.
+#
+# These are ``threading.Lock`` rather than ``asyncio.Lock`` because the file
+# I/O runs in worker threads: an asyncio.Lock binds to whichever event loop
+# first contends for it, so two loops sharing a file would deadlock, and it
+# would be released the instant a pending ``asyncio.to_thread`` is cancelled —
+# while the worker thread carried on writing. Taking the lock inside the
+# thread avoids both. ``_STATE_FILE_LOCKS_GUARD`` makes the get-or-create
+# atomic; without it two threads can install two locks for one file.
+_STATE_FILE_LOCKS_GUARD = threading.Lock()
+_STATE_FILE_LOCKS: dict[str, threading.Lock] = {}
 
 
-def _state_file_lock(path: Path) -> asyncio.Lock:
+def _resolve_state_path(path: Path) -> Path:
+    """Normalise a state file path so every spelling maps to one lock.
+
+    Expands ``~`` and resolves relative segments and symlinks. Case-only
+    differences on case-insensitive filesystems are left alone: folding them
+    would be wrong on a case-sensitive one.
+
+    Args:
+        path: State file path as supplied by the caller
+
+    Returns:
+        The resolved path
+    """
+    return path.expanduser().resolve()
+
+
+def _state_file_lock(path: Path) -> threading.Lock:
     """Get the lock guarding a state file.
 
     Several devices can share one state file, and saving is a read-merge-write
-    cycle. That I/O now runs in worker threads, so without this lock two saves
+    cycle. That I/O runs in worker threads, so without this lock two saves
     could interleave and drop one device's entry — running on the event loop
     used to serialise them for free.
 
@@ -57,69 +80,90 @@ def _state_file_lock(path: Path) -> asyncio.Lock:
         path: Resolved path to the state file
 
     Returns:
-        The asyncio.Lock guarding that path
+        The lock guarding that path
     """
     key = str(path)
-    lock = _STATE_FILE_LOCKS.get(key)
-    if lock is None:
-        lock = asyncio.Lock()
-        _STATE_FILE_LOCKS[key] = lock
-    return lock
+    with _STATE_FILE_LOCKS_GUARD:
+        lock = _STATE_FILE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _STATE_FILE_LOCKS[key] = lock
+        return lock
 
 
-def _read_state_file(path: Path) -> Any:
+def _read_state_file(path: Path) -> tuple[bool, Any]:
     """Read and parse the state file. Blocking — call via asyncio.to_thread.
 
+    Takes the file's lock so a read cannot observe a half-finished merge.
+
     Args:
-        path: Resolved path to the state file
+        path: Path to the state file; resolved here
 
     Returns:
-        The parsed JSON contents, or None if the file does not exist
+        ``(exists, contents)``. The flag distinguishes an absent file from one
+        that parses to JSON ``null``, which is corruption rather than absence.
     """
-    if not path.exists():
-        return None
+    resolved = _resolve_state_path(path)
+    with _state_file_lock(resolved):
+        if not resolved.exists():
+            return False, None
 
-    with path.open("r") as f:
-        return json.load(f)
+        with resolved.open("r") as f:
+            return True, json.load(f)
 
 
 def _write_state_file(path: Path, serial: str, device_state: dict[str, Any]) -> None:
     """Merge one device's state into the state file and write it back.
 
-    Blocking — call via asyncio.to_thread, holding the file's lock.
+    Blocking — call via asyncio.to_thread. Takes the file's lock for the whole
+    read-merge-write cycle, so devices sharing a file cannot drop each other's
+    entries. The lock is process-local: it does not coordinate with a separate
+    process pointed at the same file.
 
     The on-disk entry is merged rather than replaced so absent in-memory values
     (e.g. state that failed to load in ``__aenter__``) are not clobbered.
 
     Args:
-        path: Resolved path to the state file
+        path: Path to the state file; resolved here
         serial: Serial number of the device whose entry is being updated
         device_state: Serialisable state to merge into that device's entry
+
+    Raises:
+        ValueError: If the existing file does not contain a JSON object, which
+            would otherwise be silently overwritten along with every device's
+            stored state
     """
-    if path.exists():
-        with path.open("r") as f:
-            data = json.load(f)
-    else:
-        data = {}
+    resolved = _resolve_state_path(path)
+    with _state_file_lock(resolved):
+        if resolved.exists():
+            with resolved.open("r") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError(
+                    f"State file {resolved} does not contain a JSON object "
+                    f"(found {type(data).__name__}); refusing to overwrite it"
+                )
+        else:
+            data = {}
 
-    entry = data.get(serial, {})
-    entry.update(device_state)
-    data[serial] = entry
+        entry = data.get(serial, {})
+        entry.update(device_state)
+        data[serial] = entry
 
-    # Ensure directory exists
-    path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure directory exists
+        resolved.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write atomically: dump to a temp file in the same directory, then
-    # replace, so a crash mid-write cannot leave a truncated file that loses
-    # every device's stored state
-    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp, path)
-    except BaseException:
-        os.unlink(tmp)
-        raise
+        # Write atomically: dump to a temp file in the same directory, then
+        # replace, so a crash mid-write cannot leave a truncated file that
+        # loses every device's stored state
+        fd, tmp = tempfile.mkstemp(dir=resolved.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, resolved)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
 
 def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
@@ -901,8 +945,9 @@ class CeilingLight(MatrixLight):
         )
 
         # Device truth, not cached flags: is the downlight already dark?
+        # Compared at uint16 granularity, matching what the wire can express.
         downlight_already_off = all(
-            c.brightness == 0 for c in tile_colors[self.downlight_zones]
+            c.to_protocol().brightness == 0 for c in tile_colors[self.downlight_zones]
         )
 
         if downlight_already_off:
@@ -911,7 +956,19 @@ class CeilingLight(MatrixLight):
             # its brightness on the device: zeroing it as well would leave a
             # plain set_power(True) turning on a light that shows nothing.
             await super().set_power(False, duration)
-            device_color = tile_colors[self.uplight_zone]
+
+            # Brightness is kept, but a caller-supplied H/S/K still has to
+            # reach the device or a later power-on would restore the old
+            # colour. Sent after the power-off so the change is not seen.
+            device_color = HSBK(
+                hue=stored_color.hue,
+                saturation=stored_color.saturation,
+                brightness=tile_colors[self.uplight_zone].brightness,
+                kelvin=stored_color.kelvin,
+            )
+            if color is not None:
+                tile_colors[self.uplight_zone] = device_color
+                await self.set_matrix_colors(0, tile_colors, duration=0)
         else:
             # Update uplight zone and send
             tile_colors[self.uplight_zone] = off_color
@@ -926,6 +983,12 @@ class CeilingLight(MatrixLight):
         self.state.uplight_is_on = False
         self.state.last_uplight_color = device_color
         if downlight_already_off:
+            # The whole device went off, so refresh the downlight cache from
+            # the same fetch. Leaving it stale makes set_power(True) recompute
+            # downlight_is_on from colours that predate this call.
+            downlight_colors = list(tile_colors[self.downlight_zones])
+            self.state.downlight_colors = downlight_colors
+            self.state.last_downlight_colors = list(downlight_colors)
             self.state.downlight_is_on = False
 
         # Persist if enabled
@@ -1247,7 +1310,10 @@ class CeilingLight(MatrixLight):
         ]
 
         # Device truth, not cached flags: is the uplight already dark?
-        uplight_already_off = tile_colors[self.uplight_zone].brightness == 0
+        # Compared at uint16 granularity, matching what the wire can express.
+        uplight_already_off = (
+            tile_colors[self.uplight_zone].to_protocol().brightness == 0
+        )
 
         if uplight_already_off:
             # Nothing else is lit, so power the whole device down instead of
@@ -1255,7 +1321,24 @@ class CeilingLight(MatrixLight):
             # their brightness on the device: zeroing them as well would leave
             # a plain set_power(True) turning on a light that shows nothing.
             await super().set_power(False, duration)
-            device_colors = list(tile_colors[self.downlight_zones])
+
+            # Brightness is kept, but caller-supplied H/S/K still has to reach
+            # the device or a later power-on would restore the old colours.
+            # Sent after the power-off so the change is not seen.
+            device_colors = [
+                HSBK(
+                    hue=stored.hue,
+                    saturation=stored.saturation,
+                    brightness=current.brightness,
+                    kelvin=stored.kelvin,
+                )
+                for stored, current in zip(
+                    stored_colors, tile_colors[self.downlight_zones], strict=True
+                )
+            ]
+            if colors is not None:
+                tile_colors[self.downlight_zones] = device_colors
+                await self.set_matrix_colors(0, tile_colors, duration=0)
         else:
             # Update downlight zones and send
             tile_colors[self.downlight_zones] = off_colors
@@ -1270,6 +1353,12 @@ class CeilingLight(MatrixLight):
         self.state.downlight_is_on = False
         self.state.last_downlight_colors = list(device_colors)
         if uplight_already_off:
+            # The whole device went off, so refresh the uplight cache from the
+            # same fetch. Leaving it stale makes set_power(True) recompute
+            # uplight_is_on from a colour that predates this call.
+            uplight_color = tile_colors[self.uplight_zone]
+            self.state.uplight_color = uplight_color
+            self.state.last_uplight_color = uplight_color
             self.state.uplight_is_on = False
 
         # Persist if enabled
@@ -1450,18 +1539,28 @@ class CeilingLight(MatrixLight):
 
         The read runs in a worker thread via ``asyncio.to_thread`` so the file
         I/O never blocks the event loop; the parsed data is applied to state
-        back on the loop. Handles file not found and JSON errors gracefully.
+        back on the loop. Handles a missing file, malformed contents and JSON
+        errors gracefully.
         """
         if not self._state_file:
             return
 
         try:
             state_path = Path(self._state_file).expanduser()
-            async with _state_file_lock(state_path):
-                data = await asyncio.to_thread(_read_state_file, state_path)
+            exists, data = await asyncio.to_thread(_read_state_file, state_path)
 
-            if data is None:
+            if not exists:
                 _LOGGER.debug("State file does not exist: %s", state_path)
+                return
+
+            if not isinstance(data, dict):
+                # A file that parses but is not an object (``null`` after a
+                # truncated write, a bare list) is corruption, not absence
+                _LOGGER.warning(
+                    "State file %s does not contain a JSON object (found %s)",
+                    state_path,
+                    type(data).__name__,
+                )
                 return
 
             # Get state for this device
@@ -1518,9 +1617,11 @@ class CeilingLight(MatrixLight):
         """Save state to JSON file.
 
         The read-merge-write cycle runs in a worker thread via
-        ``asyncio.to_thread`` so the file I/O never blocks the event loop, and
-        is serialised by the state file's lock so devices sharing a file cannot
-        drop each other's entries. Handles file I/O errors gracefully.
+        ``asyncio.to_thread`` so the file I/O never blocks the event loop. The
+        thread holds the state file's lock for the whole cycle, so devices
+        sharing a file within this process cannot drop each other's entries —
+        and cancelling this coroutine cannot free the lock mid-write. Handles
+        file I/O errors gracefully.
         """
         if not self._state_file:
             return
@@ -1552,10 +1653,9 @@ class CeilingLight(MatrixLight):
                     for c in state.stored_downlight_colors
                 ]
 
-            async with _state_file_lock(state_path):
-                await asyncio.to_thread(
-                    _write_state_file, state_path, self.serial, device_state
-                )
+            await asyncio.to_thread(
+                _write_state_file, state_path, self.serial, device_state
+            )
 
             _LOGGER.debug("Saved state to %s for device %s", state_path, self.serial)
 
