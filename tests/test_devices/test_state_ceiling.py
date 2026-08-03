@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -542,11 +543,11 @@ class TestCeilingLightSaveOnExit:
     ) -> None:
         """CEIL-02 / TEST-02: no save is attempted when state_file is None."""
         save_calls: list[str] = []
-        monkeypatch.setattr(
-            CeilingLight,
-            "_save_state_to_file",
-            lambda self: save_calls.append("save"),
-        )
+
+        async def _record_save(self) -> None:
+            save_calls.append("save")
+
+        monkeypatch.setattr(CeilingLight, "_save_state_to_file", _record_save)
 
         async with CeilingLight(
             serial=ceiling_device.serial,
@@ -571,7 +572,7 @@ class TestCeilingLightSaveOnExit:
         and ``caplog`` must contain a WARNING record that mentions the failure.
         """
 
-        def _raise_disk_full() -> None:
+        async def _raise_disk_full() -> None:
             raise OSError("disk full")
 
         ceiling = CeilingLight(
@@ -619,7 +620,7 @@ class TestCeilingLightSaveOnExit:
             # Force the write to fail after the temp file has been created.
             monkeypatch.setattr("lifx.devices.ceiling.json.dump", _boom)
             # The outer guard swallows the error — must not raise.
-            ceiling._save_state_to_file()
+            await ceiling._save_state_to_file()
 
         leftover = list(tmp_path.glob("*.tmp"))
         assert not leftover, f"temp file left behind after failed write: {leftover}"
@@ -631,10 +632,11 @@ class TestCeilingLightSaveOnExit:
     ) -> None:
         """Cancellation during the threaded save still runs the parent cleanup.
 
-        ``asyncio.CancelledError`` is a ``BaseException``, so it bypasses the
-        inner ``except Exception``. The ``try/finally`` must still delegate to
-        the parent ``close()`` so the connection is never leaked, and the
-        cancellation must continue to propagate.
+        ``asyncio.CancelledError`` is a ``BaseException``, so it bypasses both
+        the ``except Exception`` inside ``_save_state_to_file`` and the guard in
+        ``__aexit__``. The ``try/finally`` must still delegate to the parent
+        ``close()`` so the connection is never leaked, and the cancellation must
+        continue to propagate.
         """
         ceiling = CeilingLight(
             serial="d073d5000001",
@@ -642,6 +644,10 @@ class TestCeilingLightSaveOnExit:
             port=56700,
             state_file=str(tmp_path / "ceiling_state.json"),
         )
+        # Enough state for _save_state_to_file to reach the threaded write
+        ceiling._state = MagicMock()
+        ceiling._state.stored_uplight_color = None
+        ceiling._state.stored_downlight_colors = None
 
         async def _cancel(*_args, **_kwargs) -> None:
             raise asyncio.CancelledError()
