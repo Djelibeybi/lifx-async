@@ -104,6 +104,21 @@ uv run python examples/control_device_groups.py --demo
 
 Without `--demo`, the script is read-only and only displays device information.
 
+### control_switch_buttons
+
+Connects to a LIFX Switch or Dimmer and demonstrates button configuration: reading the current
+config, setting the backlight on/off colors, and changing the haptic feedback duration. Restores
+the original configuration when done.
+
+```bash
+uv run python examples/control_switch_buttons.py --ip 192.168.1.100 --serial d073d5123456
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--ip` | yes | IP address of the switch |
+| `--serial` | no | Serial number; supplying it skips the serial lookup |
+
 ## Effects
 
 ### effects_pulse

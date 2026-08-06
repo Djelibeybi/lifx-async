@@ -19,6 +19,7 @@ from lifx.api import (
 from lifx.color import HSBK, Colors
 from lifx.const import INVALID_AMBIENT_LIGHT_RESPONSE, STATE_REFRESH_DEBOUNCE_MS
 from lifx.devices import (
+    ButtonConfig,
     CeilingLight,
     CeilingLightState,
     CollectionInfo,
@@ -39,6 +40,8 @@ from lifx.devices import (
     MultiZoneEffect,
     MultiZoneLight,
     MultiZoneLightState,
+    Switch,
+    SwitchState,
     TileInfo,
     WifiInfo,
 )
@@ -104,6 +107,8 @@ __all__ = [
     "MatrixLightState",
     "CeilingLight",
     "CeilingLightState",
+    "Switch",
+    "SwitchState",
     # Color
     "HSBK",
     "Colors",
@@ -119,6 +124,8 @@ __all__ = [
     "HevConfig",
     "HevCycleState",
     "LightLastHevCycleResult",
+    # Switch/Dimmer
+    "ButtonConfig",
     # MultiZone
     "MultiZoneEffect",
     # Matrix (Tile)

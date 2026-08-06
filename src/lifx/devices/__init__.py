@@ -17,8 +17,10 @@ from lifx.devices.infrared import InfraredLight, InfraredLightState
 from lifx.devices.light import Light, LightState
 from lifx.devices.matrix import MatrixEffect, MatrixLight, MatrixLightState, TileInfo
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
+from lifx.devices.switch import ButtonConfig, Switch, SwitchState
 
 __all__ = [
+    "ButtonConfig",
     "CeilingLight",
     "CeilingLightState",
     "CollectionInfo",
@@ -39,6 +41,8 @@ __all__ = [
     "MultiZoneEffect",
     "MultiZoneLight",
     "MultiZoneLightState",
+    "Switch",
+    "SwitchState",
     "TileInfo",
     "WifiInfo",
 ]

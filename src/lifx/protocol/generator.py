@@ -1551,6 +1551,15 @@ def validate_protocol_spec(protocol: dict[str, Any]) -> list[str]:
     return errors
 
 
+#: Button packets kept during generation: the device-wide button
+#: configuration (haptic feedback duration and backlight on/off colours)
+#: for LIFX Switch and Dimmer devices. The per-button gesture/action
+#: packets (ButtonGet/ButtonSet/ButtonState) remain excluded.
+BUTTON_CONFIG_PACKETS = frozenset(
+    {"ButtonGetConfig", "ButtonSetConfig", "ButtonStateConfig"}
+)
+
+
 def should_skip_button_relay(name: str) -> bool:
     """Check if a name should be skipped (Button or Relay related).
 
@@ -1582,17 +1591,57 @@ def filter_button_relay_items(items: dict[str, Any]) -> dict[str, Any]:
 def filter_button_relay_packets(packets: dict[str, Any]) -> dict[str, Any]:
     """Filter out button and relay category packets.
 
+    The button-config packets in ``BUTTON_CONFIG_PACKETS`` are kept: they
+    configure the button backlight colours and haptic feedback duration on
+    LIFX Switch and Dimmer devices, which the library supports through the
+    ``Switch`` device class. The relay category and the per-button
+    gesture/action packets are excluded.
+
     Args:
         packets: Dictionary of packet definitions (grouped by category)
 
     Returns:
-        Filtered dictionary without button/relay categories
+        Filtered dictionary without relay packets and with only the
+        button-config packets from the button category
     """
-    return {
-        category: category_packets
-        for category, category_packets in packets.items()
-        if category not in ("button", "relay")
-    }
+    filtered: dict[str, Any] = {}
+    for category, category_packets in packets.items():
+        if category == "relay":
+            continue
+        if category == "button":
+            kept = {
+                name: packet_def
+                for name, packet_def in category_packets.items()
+                if name in BUTTON_CONFIG_PACKETS
+            }
+            if kept:
+                filtered[category] = kept
+            continue
+        filtered[category] = category_packets
+    return filtered
+
+
+def apply_button_backlight_hsbk_quirk(packets: dict[str, Any]) -> dict[str, Any]:
+    """Replace ButtonBacklightHsbk field references with LightHsbk.
+
+    The protocol's ButtonBacklightHsbk struct is byte-identical to LightHsbk
+    (4x uint16: hue, saturation, brightness, kelvin). The struct itself is
+    filtered out with the other Button items, so the backlight colour fields
+    in the button-config packets are re-pointed at the existing LightHsbk
+    structure instead - matching how every other HSBK-carrying packet is
+    generated (and how the LAN docs reuse the Color structure).
+
+    Args:
+        packets: Dictionary of packet definitions (grouped by category)
+
+    Returns:
+        Dictionary with ButtonBacklightHsbk references replaced
+    """
+    for packet_def in packets.get("button", {}).values():
+        for field in packet_def.get("fields", []):
+            if isinstance(field, dict) and field.get("type") == "<ButtonBacklightHsbk>":
+                field["type"] = "<LightHsbk>"
+    return packets
 
 
 def extract_packets_as_fields(
@@ -1650,7 +1699,8 @@ def main() -> None:
     unions = protocol.get("unions", {})
     packets = protocol.get("packets", {})
 
-    # Filter out Button and Relay items (not relevant for light control)
+    # Filter out Button and Relay items (not relevant for light control),
+    # keeping only the button-config packets (see BUTTON_CONFIG_PACKETS)
     print("Filtering out Button and Relay items...")
     enums = filter_button_relay_items(enums)
     fields = filter_button_relay_items(fields)
@@ -1667,6 +1717,7 @@ def main() -> None:
     fields = apply_tile_effect_parameter_quirk(fields)
     fields = apply_tile_state_device_quirk(fields)
     packets = apply_sensor_packet_quirks(packets)
+    packets = apply_button_backlight_hsbk_quirk(packets)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {

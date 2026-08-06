@@ -20,10 +20,10 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.devices.light import Light, LightState
+from lifx.devices.switch import Switch
 from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
-    LifxUnsupportedDeviceError,
 )
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
@@ -247,8 +247,8 @@ class TestDeviceConnectFactory:
             assert isinstance(device, Light)
 
     @pytest.mark.asyncio
-    async def test_connect_raises_for_relay_device(self, mock_product_info):
-        """Test Device.connect() raises LifxDeviceNotFoundError for relay devices."""
+    async def test_connect_returns_switch_for_relay_device(self, mock_product_info):
+        """Test Device.connect() returns a Switch for relay devices."""
         product_info = mock_product_info(
             pid=70,
             name="LIFX Switch",
@@ -266,14 +266,14 @@ class TestDeviceConnectFactory:
             ),
             patch("lifx.devices.detection.is_ceiling_product", return_value=False),
         ):
-            with pytest.raises(
-                LifxUnsupportedDeviceError, match="Relay/button-only device"
-            ):
-                await Device.connect(ip="192.168.1.100", serial="d073d5010203")
+            device = await Device.connect(ip="192.168.1.100", serial="d073d5010203")
+            assert isinstance(device, Switch)
 
     @pytest.mark.asyncio
-    async def test_connect_raises_for_button_only_device(self, mock_product_info):
-        """Test connect() raises for button-only devices."""
+    async def test_connect_returns_switch_for_button_only_device(
+        self, mock_product_info
+    ):
+        """Test connect() returns a Switch for button-only devices."""
         product_info = mock_product_info(
             pid=71,
             name="LIFX Button",
@@ -291,10 +291,8 @@ class TestDeviceConnectFactory:
             ),
             patch("lifx.devices.detection.is_ceiling_product", return_value=False),
         ):
-            with pytest.raises(
-                LifxUnsupportedDeviceError, match="Relay/button-only device"
-            ):
-                await Device.connect(ip="192.168.1.100", serial="d073d5010203")
+            device = await Device.connect(ip="192.168.1.100", serial="d073d5010203")
+            assert isinstance(device, Switch)
 
 
 class TestStateInitialization:

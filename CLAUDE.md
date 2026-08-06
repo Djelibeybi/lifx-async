@@ -112,8 +112,9 @@ gh workflow run docs.yml
    - `serializer.py`: Binary serialization/deserialization
    - `models.py`: Protocol data models (`Serial` dataclass, HEV types)
    - `base.py`: Base classes for protocol structures
-   - **Focus on lighting**: Button and Relay items are automatically filtered during generation (not
-     relevant for light control)
+   - **Focus on lighting**: Button and Relay items are automatically filtered during generation,
+     with one exception: the button-config packets (909-911) are kept for Switch/Dimmer
+     backlight and haptic configuration
    - **Never edit generated files manually** - download updated `protocol.yml` from LIFX official
      repo instead
 
@@ -139,6 +140,7 @@ gh workflow run docs.yml
    - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
    - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
    - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
+   - `switch.py`: `Switch` class (extends `Device` for LIFX Switch/Dimmer: button backlight color and haptic feedback configuration; not a light)
    - State caching with configurable TTL to reduce network traffic
 
 4. **High-Level API** (`src/lifx/api.py`)
@@ -192,15 +194,16 @@ gh workflow run docs.yml
 
 Different LIFX device types support different features:
 
-| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature | Ceiling Components |
-|-------------|-------|-----------|--------|----------|-----|----------------------|--------------------|
-| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   | ❌                 |
-| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   | ❌                 |
-| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   | ❌                 |
-| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   | ❌                 |
-| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   | ❌                 |
-| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   | ❌                 |
-| CeilingLight | ✅   | ❌        | ✅     | ❌       | ❌  | ✅                   | ✅                 |
+| Device Type | Color | Multizone | Matrix | Infrared | HEV | Variable Temperature | Ceiling Components | Button Config |
+|-------------|-------|-----------|--------|----------|-----|----------------------|--------------------|---------------|
+| Device      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   | ❌                 | ❌            |
+| Light       | ✅    | ❌        | ❌     | ❌       | ❌  | ✅                   | ❌                 | ❌            |
+| InfraredLight | ✅  | ❌        | ❌     | ✅       | ❌  | ✅                   | ❌                 | ❌            |
+| HevLight    | ✅    | ❌        | ❌     | ❌       | ✅  | ✅                   | ❌                 | ❌            |
+| MultiZoneLight | ✅ | ✅        | ❌     | ❌       | ❌  | ✅                   | ❌                 | ❌            |
+| MatrixLight | ✅    | ❌        | ✅     | ❌       | ❌  | ✅                   | ❌                 | ❌            |
+| CeilingLight | ✅   | ❌        | ✅     | ❌       | ❌  | ✅                   | ✅                 | ❌            |
+| Switch      | ❌    | ❌        | ❌     | ❌       | ❌  | ❌                   | ❌                 | ✅            |
 
 **Device Detection**: The `products` registry automatically detects device capabilities based on
 product ID and instantiates the appropriate device class.
@@ -220,7 +223,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 
 ### State Caching
 
-- Cached (semi-static): `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
+- Cached (semi-static): `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`, `button_config`
 - **Never cached** (volatile): `power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level` — always use `get_*()` methods
 - **Opt-in state fields**: `wifi_info` (signal/rssi) and `ambient_light` are only queried when the matching `fetch_wifi_info` / `fetch_ambient_light` flag is on. Both default to off, are settable as constructor arguments *and* as device properties (toggling applies from the next initialization or refresh), join the same parallel batch as the other state requests, and leave their field `None` while disabled (a refresh with the flag off clears the field rather than leaving a stale reading). Both are keyword-only dataclass fields with defaults, so adding them stayed additive for existing state constructors. An ambient reading taken while the light is on is stored as `INVALID_AMBIENT_LIGHT_RESPONSE` (-1.0) because the sensor measures the light's own output. A request that fails outright logs a warning and leaves the field `None` instead of failing state initialization. `get_wifi_info()` / `get_ambient_light_level()` remain the single-request way to read either on demand.
 - `get_color()` returns `(color, power, label)` in a single request/response pair — most efficient way to get color + power
@@ -356,8 +359,16 @@ Local generator quirks:
   - Enums starting with "Button" or "Relay" are excluded
   - Fields starting with "Button" or "Relay" are excluded
   - Unions starting with "Button" or "Relay" are excluded
-  - All packets in "button" and "relay" categories are excluded
-  - This keeps the library focused on LIFX lighting devices
+  - All packets in the "relay" category are excluded
+  - Button packets are excluded **except** the button-config packets (`BUTTON_CONFIG_PACKETS`):
+    `ButtonGetConfig` (909), `ButtonSetConfig` (910) and `ButtonStateConfig` (911), which carry the
+    device-wide button backlight colors and haptic feedback duration for the LIFX Switch and Dimmer
+  - This keeps the library focused on LIFX lighting devices while supporting Switch/Dimmer
+    backlight configuration
+- **button backlight HSBK**: The protocol's `ButtonBacklightHsbk` struct is byte-identical to
+  `LightHsbk` (4x uint16: hue, saturation, brightness, kelvin), so the backlight color fields in
+  the button-config packets are re-pointed at `LightHsbk` and the struct itself stays filtered —
+  the same decision the LAN docs make by reusing the `Color` structure
 - **sensor packets**: Adds the ambient light sensor packets missing from protocol.yml:
   - `SensorGetAmbientLight` (401): Request packet with no parameters — [documented here](https://lan.developer.lifx.com/docs/querying-the-device-for-data#sensorgetambientlight---packet-401)
   - `SensorStateAmbientLight` (402): Response packet with lux field (float32) — [documented here](https://lan.developer.lifx.com/docs/information-messages#sensorstateambientlight---packet-402)
@@ -377,12 +388,15 @@ Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 3. Multizone → `MultiZoneLight`
 4. Infrared → `InfraredLight`
 5. HEV → `HevLight`
-6. Color → `Light`
-7. Relay/Button-only → `None` (filtered out)
+6. Relay or Button-only (no color) → `Switch`
+7. Default → `Light` (covers color, CCT, and brightness-only)
 
 ## Known Limitations
 
-- Button/Relay/Switch devices are explicitly out of scope (library focuses on lighting devices)
+- LIFX Switch and Dimmer devices are supported only for device-level operations (label, power,
+  version, location, group) and button configuration (backlight colors, haptic duration) via the
+  `Switch` class. Relay control (RPower, packets 816-818) and per-button gesture/action
+  configuration (packets 905-907) remain out of scope.
 - Never update docs/changelog.md manually as it is auto-generated during the release process by the CI/CD workflow.
 - If a field is user-visible, it must never be bytes. This means things like serial, label, location and group must always be converted to a string prior to storing it anywhere a user would be able to access it. Conversion to and from bytes should happen either as close to sending or receiving the packet as possible.
 

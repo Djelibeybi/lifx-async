@@ -50,6 +50,7 @@ from lifx.network.utils import IdleDeadline
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
+    from lifx.devices.switch import Switch
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,11 +118,13 @@ def create_device_from_record(
     record: LifxServiceRecord,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
-) -> Light | None:
+) -> Light | Switch:
     """Create appropriate device class based on product ID from mDNS record.
 
     Uses the product registry to determine device capabilities and instantiate
-    the correct device class (Light, MatrixLight, MultiZoneLight, etc.).
+    the correct device class (Light, MatrixLight, MultiZoneLight, Switch,
+    etc.). Products not in the registry fall back to a basic Light, matching
+    the registry's default for unknown product IDs.
 
     Args:
         record: LifxServiceRecord from mDNS discovery
@@ -129,49 +132,28 @@ def create_device_from_record(
         max_retries: Maximum retry attempts for requests
 
     Returns:
-        Device instance of the appropriate type, or None if device should be skipped
-        (e.g., relay/button-only devices)
+        Device instance of the appropriate type
 
     Example:
         ```python
         async for record in discover_lifx_services():
             device = create_device_from_record(record)
-            if device:
-                async with device:
-                    print(f"Device: {await device.get_label()}")
+            async with device:
+                print(f"Device: {await device.get_label()}")
         ```
     """
-    from lifx.devices.ceiling import CeilingLight
-    from lifx.devices.hev import HevLight
-    from lifx.devices.infrared import InfraredLight
-    from lifx.devices.light import Light
-    from lifx.devices.matrix import MatrixLight
-    from lifx.devices.multizone import MultiZoneLight
-    from lifx.products import get_product, is_ceiling_product
+    from lifx.devices.detection import get_device_class_for_product
+    from lifx.products import get_product
 
     product = get_product(record.product_id)
-    kwargs = {
-        "serial": record.serial,
-        "ip": record.ip,
-        "port": record.port,
-        "timeout": timeout,
-        "max_retries": max_retries,
-    }
-
-    # Priority-based selection matching DiscoveredDevice.create_device()
-    if is_ceiling_product(record.product_id):
-        return CeilingLight(**kwargs)
-    if product.has_matrix:
-        return MatrixLight(**kwargs)
-    if product.has_multizone:
-        return MultiZoneLight(**kwargs)
-    if product.has_infrared:
-        return InfraredLight(**kwargs)
-    if product.has_hev:
-        return HevLight(**kwargs)
-    if product.has_relays or (product.has_buttons and not product.has_color):
-        return None
-    return Light(**kwargs)
+    device_class = get_device_class_for_product(record.product_id, product)
+    return device_class(
+        serial=record.serial,
+        ip=record.ip,
+        port=record.port,
+        timeout=timeout,
+        max_retries=max_retries,
+    )
 
 
 async def discover_lifx_services(
@@ -369,14 +351,15 @@ async def discover_devices_mdns(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
-) -> AsyncGenerator[Light, None]:
+) -> AsyncGenerator[Light | Switch, None]:
     """Discover LIFX devices via mDNS and yield device instances.
 
     This is the high-level API that yields fully-typed device instances
-    (Light, MatrixLight, MultiZoneLight, etc.) based on product capabilities.
+    (Light, MatrixLight, MultiZoneLight, Switch, etc.) based on product
+    capabilities.
 
-    Devices that are not lights (relays, buttons without color) are automatically
-    filtered out and not yielded.
+    Devices whose product is not in the registry are filtered out and
+    not yielded.
 
     Args:
         timeout: Overall discovery timeout in seconds
@@ -386,7 +369,8 @@ async def discover_devices_mdns(
         max_retries: Maximum retry attempts for device requests
 
     Yields:
-        Device instances (Light, MatrixLight, etc.) as they are discovered
+        Device instances (Light, MatrixLight, Switch, etc.) as they are
+        discovered
 
     Example:
         ```python
@@ -401,11 +385,8 @@ async def discover_devices_mdns(
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
     ):
-        device = create_device_from_record(
+        yield create_device_from_record(
             record,
             timeout=device_timeout,
             max_retries=max_retries,
         )
-
-        if device is not None:
-            yield device

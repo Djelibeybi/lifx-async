@@ -13,6 +13,7 @@ from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.devices.switch import Switch
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.discovery import (
     _extract_lifx_info,
@@ -238,19 +239,49 @@ class TestCreateDeviceFromRecord:
         assert device is not None
         assert isinstance(device, HevLight)
 
-    def test_relay_device_returns_none(self) -> None:
-        """Test that relay devices return None."""
+    def test_create_switch_device(self) -> None:
+        """Test creating a Switch device for relay/button products."""
         record = LifxServiceRecord(
             serial="d073d5123456",
             ip="192.168.1.100",
             port=56700,
-            product_id=70,  # LIFX Switch - relay only
+            product_id=70,  # LIFX Switch - relays and buttons
             firmware="4.112",
         )
 
         device = create_device_from_record(record)
 
-        assert device is None
+        assert device is not None
+        assert isinstance(device, Switch)
+
+    def test_create_dimmer_device(self) -> None:
+        """Test creating a Switch device for the LIFX Dimmer."""
+        record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="192.168.1.100",
+            port=56700,
+            product_id=226,  # LIFX Dimmer Switch
+            firmware="4.112",
+        )
+
+        device = create_device_from_record(record)
+
+        assert device is not None
+        assert isinstance(device, Switch)
+
+    def test_unknown_product_returns_light(self) -> None:
+        """Test that unknown products fall back to a basic Light."""
+        record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="192.168.1.100",
+            port=56700,
+            product_id=65535,  # not in the product registry
+            firmware="4.112",
+        )
+
+        device = create_device_from_record(record)
+
+        assert isinstance(device, Light)
 
     def test_device_timeout_and_retries(self) -> None:
         """Test that timeout and retries are passed to device."""
@@ -789,16 +820,16 @@ class TestDiscoverDevicesMdns:
             assert devices[0].serial == "d073d5123456"
 
     @pytest.mark.asyncio
-    async def test_discover_filters_relay_devices(self) -> None:
-        """Test that relay devices are filtered out."""
+    async def test_discover_yields_switch_devices(self) -> None:
+        """Test that switch devices are yielded as Switch instances."""
         from lifx.network.mdns.discovery import discover_devices_mdns
 
-        # Create a mock relay device record
+        # Create a mock switch device record
         mock_record = LifxServiceRecord(
             serial="d073d5123456",
             ip="192.168.1.100",
             port=56700,
-            product_id=70,  # LIFX Switch - relay only
+            product_id=70,  # LIFX Switch - relays and buttons
             firmware="4.112",
         )
 
@@ -815,8 +846,8 @@ class TestDiscoverDevicesMdns:
             async for device in discover_devices_mdns(timeout=0.1):
                 devices.append(device)
 
-            # Relay device should be filtered out
-            assert len(devices) == 0
+            assert len(devices) == 1
+            assert isinstance(devices[0], Switch)
 
 
 class TestMdnsRemainingNonPositiveGuard:

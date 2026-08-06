@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         Light,
         MatrixLight,
         MultiZoneLight,
+        Switch,
     )
 
 _LOGGER = logging.getLogger(__name__)
@@ -678,11 +679,19 @@ class Device(Generic[StateT]):
         *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
-    ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
+    ) -> (
+        Light
+        | HevLight
+        | InfraredLight
+        | MultiZoneLight
+        | MatrixLight
+        | CeilingLight
+        | Switch
+    ):
         """Create a device instance with the correct type for the given IP.
 
         This factory method queries the device to determine its product type
-        and returns the appropriate subclass (Light, MatrixLight, etc.).
+        and returns the appropriate subclass (Light, MatrixLight, Switch, etc.).
 
         State is NOT initialized on return. Use ``async with`` to enter the
         context manager, which calls ``__aenter__()`` → ``_initialize_state()``

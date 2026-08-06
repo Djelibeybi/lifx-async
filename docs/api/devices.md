@@ -340,6 +340,52 @@ The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specif
       filters:
         - "!^_"
 
+## Switch
+
+The `Switch` class extends `Device` for the LIFX Switch and LIFX Dimmer. These are
+"non-light" devices: they respond to device messages (label, power, version, location,
+group) like any other LIFX device, but answer light messages with `StateUnhandled`.
+The class adds control over the device-wide button configuration: the haptic feedback
+duration and the backlight colors used when a button is `on` and `off`.
+
+::: lifx.devices.switch.Switch
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
+### SwitchState
+
+The `SwitchState` dataclass extends `DeviceState` with the button configuration. It is
+returned by `Switch.state` after connecting to a device.
+
+::: lifx.devices.switch.SwitchState
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
+### ButtonConfig
+
+The device-wide button configuration returned by `Switch.get_button_config()`. A single
+configuration applies to every button backlight on the device - individual backlights
+cannot be configured with different colors.
+
+::: lifx.devices.switch.ButtonConfig
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
 ## Device Properties
 
 ### MAC Address
@@ -602,3 +648,36 @@ async def main():
 ```
 
 For detailed CeilingLight usage, see the [Ceiling Lights User Guide](../user-guide/ceiling-lights.md).
+
+### Switch Button Configuration
+
+```python
+from lifx import HSBK, Device, Switch
+
+
+async def main():
+    async with await Device.connect("192.168.1.100") as switch:
+        assert isinstance(switch, Switch)
+
+        # Read the current button configuration
+        config = await switch.get_button_config()
+        print(f"Haptic duration: {config.haptic_duration_ms}ms")
+        print(f"Backlight on:  {config.backlight_on_color}")
+        print(f"Backlight off: {config.backlight_off_color}")
+
+        # Set the backlight colors; the haptic duration is kept as-is
+        await switch.set_button_config(
+            backlight_on_color=HSBK(
+                hue=120, saturation=1.0, brightness=0.8, kelvin=3500
+            ),
+            backlight_off_color=HSBK(
+                hue=0, saturation=0.0, brightness=0.1, kelvin=3500
+            ),
+        )
+
+        # Disable haptic feedback without touching the backlight colors
+        await switch.set_button_config(haptic_duration_ms=0)
+```
+
+The configuration is a single device-wide setting that applies to all backlights on the
+device. The LIFX Dimmer has no haptic feedback and ignores `haptic_duration_ms`.
