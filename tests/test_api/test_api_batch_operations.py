@@ -15,6 +15,23 @@ import pytest
 
 from lifx.api import DeviceGroup
 from lifx.color import HSBK
+from lifx.devices.light import Light
+from lifx.devices.switch import Switch
+
+
+class TestDeviceGroupSwitches:
+    """Test Switch segregation in DeviceGroup."""
+
+    def test_switches_grouped_separately(self):
+        """Switches land in .switches and stay out of the light groups."""
+        switch = Switch(serial="d073d5010203", ip="192.168.1.50")
+        light = Light(serial="d073d5010204", ip="192.168.1.51")
+
+        group = DeviceGroup([switch, light])
+
+        assert group.switches == [switch]
+        assert group.lights == [light]
+        assert len(group) == 2
 
 
 @pytest.mark.emulator
@@ -82,6 +99,7 @@ class TestDeviceGroupBatchOperations:
         assert group.infrared_lights == []
         assert group.multizone_lights == []
         assert group.matrix_lights == []
+        assert group.switches == []
 
         # Batch operations should not raise on empty group
         async with group:

@@ -12,6 +12,7 @@ from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.devices.switch import Switch
 from lifx.products.registry import ProductCapability, ProductInfo, TemperatureRange
 
 
@@ -85,6 +86,12 @@ def hev_light(mock_device_factory) -> HevLight:
 def infrared_light(mock_device_factory) -> InfraredLight:
     """Create a test infrared light with mocked connection."""
     return mock_device_factory(InfraredLight)
+
+
+@pytest.fixture
+def switch(mock_device_factory) -> Switch:
+    """Create a test switch with mocked connection."""
+    return mock_device_factory(Switch)
 
 
 @pytest.fixture

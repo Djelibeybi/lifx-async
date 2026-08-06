@@ -5,11 +5,15 @@ from pathlib import Path
 import pytest
 
 from lifx.protocol.generator import (
+    BUTTON_CONFIG_PACKETS,
     TypeRegistry,
+    apply_button_backlight_hsbk_quirk,
     apply_sensor_packet_quirks,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
+    filter_button_relay_items,
+    filter_button_relay_packets,
     format_generated_files,
     format_long_import,
     format_long_list,
@@ -1127,3 +1131,92 @@ class TestFormatGeneratedFiles:
 
         with pytest.raises(RuntimeError, match=r"ruff format failed"):
             format_generated_files(target)
+
+
+class TestButtonRelayFiltering:
+    """Test Button/Relay filtering keeps only the button-config packets."""
+
+    def test_filter_drops_relay_category(self):
+        """Test that the relay category is removed entirely."""
+        packets = {
+            "relay": {"RelayGetPower": {"pkt_type": 816, "fields": []}},
+            "device": {"DeviceGetService": {"pkt_type": 2, "fields": []}},
+        }
+
+        result = filter_button_relay_packets(packets)
+
+        assert "relay" not in result
+        assert "device" in result
+
+    def test_filter_keeps_button_config_packets(self):
+        """Test that the three button-config packets survive filtering."""
+        packets = {
+            "button": {
+                "ButtonGet": {"pkt_type": 905, "fields": []},
+                "ButtonSet": {"pkt_type": 906, "fields": []},
+                "ButtonState": {"pkt_type": 907, "fields": []},
+                "ButtonGetConfig": {"pkt_type": 909, "fields": []},
+                "ButtonSetConfig": {"pkt_type": 910, "fields": []},
+                "ButtonStateConfig": {"pkt_type": 911, "fields": []},
+            },
+        }
+
+        result = filter_button_relay_packets(packets)
+
+        assert set(result["button"]) == BUTTON_CONFIG_PACKETS
+
+    def test_filter_drops_empty_button_category(self):
+        """Test that a button category with no config packets is removed."""
+        packets = {
+            "button": {"ButtonGet": {"pkt_type": 905, "fields": []}},
+        }
+
+        result = filter_button_relay_packets(packets)
+
+        assert "button" not in result
+
+    def test_filter_items_still_drops_button_fields(self):
+        """Test that Button/Relay field structures remain excluded."""
+        fields = {
+            "ButtonBacklightHsbk": {"size_bytes": 8, "fields": []},
+            "RelayPower": {"size_bytes": 2, "fields": []},
+            "LightHsbk": {"size_bytes": 8, "fields": []},
+        }
+
+        result = filter_button_relay_items(fields)
+
+        assert set(result) == {"LightHsbk"}
+
+
+class TestButtonBacklightHsbkQuirk:
+    """Test the ButtonBacklightHsbk -> LightHsbk reference rewrite."""
+
+    def test_rewrites_backlight_color_fields(self):
+        """Test that backlight color fields are re-pointed at LightHsbk."""
+        packets = {
+            "button": {
+                "ButtonSetConfig": {
+                    "pkt_type": 910,
+                    "fields": [
+                        {"name": "HapticDurationMs", "type": "uint16"},
+                        {"name": "BacklightOnColor", "type": "<ButtonBacklightHsbk>"},
+                        {"name": "BacklightOffColor", "type": "<ButtonBacklightHsbk>"},
+                    ],
+                },
+            },
+        }
+
+        result = apply_button_backlight_hsbk_quirk(packets)
+
+        fields = result["button"]["ButtonSetConfig"]["fields"]
+        assert fields[0]["type"] == "uint16"
+        assert fields[1]["type"] == "<LightHsbk>"
+        assert fields[2]["type"] == "<LightHsbk>"
+
+    def test_no_button_category_is_noop(self):
+        """Test that packets without a button category pass through unchanged."""
+        packets = {"device": {"DeviceGetService": {"pkt_type": 2, "fields": []}}}
+
+        result = apply_button_backlight_hsbk_quirk(packets)
+
+        assert result == packets

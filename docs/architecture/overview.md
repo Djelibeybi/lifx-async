@@ -34,6 +34,7 @@ graph TB
         MultiZone[MultiZoneLight<br/>Linear/1D zones]
         Matrix[MatrixLight<br/>Matrix/2D zones]
         Ceiling[CeilingLight<br/>Up/downlight control]
+        Switch[Switch<br/>Button configuration]
     end
 
     subgraph "Layer 3: Network Layer"
@@ -170,7 +171,7 @@ response = await conn.request(packet)
 
 **Purpose**: Device abstractions with high-level operations
 
-- **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, CeilingLight
+- **Device Types**: Base, Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, CeilingLight, Switch
 - **State Caching**: Cached state properties for efficient access
 - **Type Detection**: Automatic capability detection
 - **Async Context Managers**: Automatic resource cleanup
@@ -184,6 +185,7 @@ response = await conn.request(packet)
 - `multizone.py` - MultiZoneLight class
 - `matrix.py` - MatrixLight class
 - `ceiling.py` - CeilingLight class
+- `switch.py` - Switch class (LIFX Switch/Dimmer button configuration)
 
 **Example**:
 

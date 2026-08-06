@@ -27,6 +27,65 @@ from lifx.protocol.protocol_types import (
 )
 
 
+class Button(Packet):
+    """Button category packets."""
+
+    @dataclass
+    class GetConfig(Packet):
+        """Packet type 909."""
+
+        PKT_TYPE: ClassVar[int] = 909
+        STATE_TYPE: ClassVar[int] = 911
+        _fields: ClassVar[list[dict[str, Any]]] = []
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "GET"
+        _requires_ack: ClassVar[bool] = False
+        _requires_response: ClassVar[bool] = False
+
+        pass
+
+    @dataclass
+    class SetConfig(Packet):
+        """Packet type 910."""
+
+        PKT_TYPE: ClassVar[int] = 910
+        _fields: ClassVar[list[dict[str, Any]]] = [
+            {"name": "HapticDurationMs", "type": "uint16", "size_bytes": 2},
+            {"name": "BacklightOnColor", "type": "<LightHsbk>", "size_bytes": 8},
+            {"name": "BacklightOffColor", "type": "<LightHsbk>", "size_bytes": 8},
+        ]
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "SET"
+        _requires_ack: ClassVar[bool] = True
+        _requires_response: ClassVar[bool] = False
+
+        haptic_duration_ms: int
+        backlight_on_color: LightHsbk
+        backlight_off_color: LightHsbk
+
+    @dataclass
+    class StateConfig(Packet):
+        """Packet type 911."""
+
+        PKT_TYPE: ClassVar[int] = 911
+        _fields: ClassVar[list[dict[str, Any]]] = [
+            {"name": "HapticDurationMs", "type": "uint16", "size_bytes": 2},
+            {"name": "BacklightOnColor", "type": "<LightHsbk>", "size_bytes": 8},
+            {"name": "BacklightOffColor", "type": "<LightHsbk>", "size_bytes": 8},
+        ]
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "STATE"
+        _requires_ack: ClassVar[bool] = False
+        _requires_response: ClassVar[bool] = False
+
+        haptic_duration_ms: int
+        backlight_on_color: LightHsbk
+        backlight_off_color: LightHsbk
+
+
 class Device(Packet):
     """Device category packets."""
 
@@ -1389,6 +1448,9 @@ PACKET_REGISTRY: dict[int, type[Packet]] = {
     718: Tile.GetEffect,
     719: Tile.SetEffect,
     720: Tile.StateEffect,
+    909: Button.GetConfig,
+    910: Button.SetConfig,
+    911: Button.StateConfig,
 }
 
 

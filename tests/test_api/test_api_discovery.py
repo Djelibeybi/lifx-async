@@ -439,15 +439,16 @@ class TestDiscoverMdns:
             assert devices[0].serial == "d073d5123456"
 
     @pytest.mark.asyncio
-    async def test_discover_mdns_filters_relay_devices(self) -> None:
-        """Test that discover_mdns() filters out relay-only devices."""
+    async def test_discover_mdns_yields_switch_devices(self) -> None:
+        """Test that discover_mdns() yields switch devices as Switch."""
+        from lifx.devices.switch import Switch
         from lifx.network.mdns.types import LifxServiceRecord
 
         mock_record = LifxServiceRecord(
             serial="d073d5123456",
             ip="192.168.1.100",
             port=56700,
-            product_id=70,  # LIFX Switch - relay only
+            product_id=70,  # LIFX Switch - relays and buttons
             firmware="4.112",
         )
 
@@ -462,8 +463,8 @@ class TestDiscoverMdns:
             async for device in discover_mdns(timeout=0.1):
                 devices.append(device)
 
-            # Relay devices should be filtered out
-            assert len(devices) == 0
+            assert len(devices) == 1
+            assert isinstance(devices[0], Switch)
 
     @pytest.mark.asyncio
     async def test_discover_mdns_empty_network(self) -> None:

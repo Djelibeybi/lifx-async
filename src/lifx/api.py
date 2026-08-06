@@ -33,6 +33,7 @@ from lifx.devices import (
     Light,
     MatrixLight,
     MultiZoneLight,
+    Switch,
 )
 from lifx.network.discovery import (
     DiscoveredDevice,
@@ -85,7 +86,13 @@ class DeviceGroup:
     def __init__(
         self,
         devices: Sequence[
-            Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
+            Device
+            | Light
+            | HevLight
+            | InfraredLight
+            | MultiZoneLight
+            | MatrixLight
+            | Switch
         ],
     ) -> None:
         """Initialize device group.
@@ -108,6 +115,7 @@ class DeviceGroup:
         self._matrix_lights = [
             light for light in devices if isinstance(light, MatrixLight)
         ]
+        self._switches = [device for device in devices if isinstance(device, Switch)]
         self._locations_cache: dict[str, DeviceGroup] | None = None
         self._groups_cache: dict[str, DeviceGroup] | None = None
         self._location_metadata: dict[str, LocationGrouping] | None = None
@@ -130,7 +138,13 @@ class DeviceGroup:
     def __iter__(
         self,
     ) -> Iterator[
-        Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight
+        Device
+        | Light
+        | HevLight
+        | InfraredLight
+        | MultiZoneLight
+        | MatrixLight
+        | Switch
     ]:
         """Iterate over devices in the group."""
         return iter(self._devices)
@@ -141,7 +155,15 @@ class DeviceGroup:
 
     def __getitem__(
         self, index: int
-    ) -> Device | Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight:
+    ) -> (
+        Device
+        | Light
+        | HevLight
+        | InfraredLight
+        | MultiZoneLight
+        | MatrixLight
+        | Switch
+    ):
         """Get device by index."""
         return self._devices[index]
 
@@ -149,7 +171,13 @@ class DeviceGroup:
     def devices(
         self,
     ) -> Sequence[
-        Device | HevLight | InfraredLight | Light | MultiZoneLight | MatrixLight
+        Device
+        | HevLight
+        | InfraredLight
+        | Light
+        | MultiZoneLight
+        | MatrixLight
+        | Switch
     ]:
         """Get all the devices in the group."""
         return self._devices
@@ -178,6 +206,11 @@ class DeviceGroup:
     def matrix_lights(self) -> list[MatrixLight]:
         """Get all Matrix light devices in the group."""
         return self._matrix_lights
+
+    @property
+    def switches(self) -> list[Switch]:
+        """Get all Switch devices (LIFX Switch and Dimmer) in the group."""
+        return self._switches
 
     async def set_power(self, on: bool, duration: float = 0.0) -> None:
         """Set power state for all devices in the group.

@@ -192,12 +192,14 @@ class TestDiscoveryEdgeCasesWithEmulator:
             assert 1024 <= device.port <= 65535
 
 
-class TestCreateDeviceUnsupported:
-    """Unit tests for create_device() with unsupported products."""
+class TestCreateDeviceNonLight:
+    """Unit tests for create_device() with non-light products."""
 
     @pytest.mark.asyncio
-    async def test_create_device_returns_none_for_relay(self) -> None:
-        """Test create_device() returns None for relay devices."""
+    async def test_create_device_returns_switch_for_relay(self) -> None:
+        """Test create_device() returns a Switch for relay devices."""
+        from lifx.devices.switch import Switch
+
         relay_product = ProductInfo(
             pid=70,
             name="LIFX Switch",
@@ -219,7 +221,7 @@ class TestCreateDeviceUnsupported:
         with patch.object(Device, "ensure_capabilities", fake_ensure):
             result = await disc.create_device()
 
-        assert result is None
+        assert isinstance(result, Switch)
 
     @pytest.mark.asyncio
     async def test_create_device_preserves_detection_metadata(self) -> None:

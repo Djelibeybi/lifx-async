@@ -1,6 +1,6 @@
 """Tests for generated protocol types and packets."""
 
-from lifx.protocol.packets import Device, Light, Sensor
+from lifx.protocol.packets import Button, Device, Light, Sensor
 from lifx.protocol.protocol_types import DeviceService, LightHsbk, LightWaveform
 
 
@@ -141,6 +141,72 @@ class TestGeneratedPackets:
         packet = Sensor.StateAmbientLight(lux=50000.0)
 
         assert packet.lux == 50000.0
+
+    def test_button_get_config_packet(self) -> None:
+        """Test ButtonGetConfig packet structure."""
+        packet = Button.GetConfig()
+
+        assert packet.PKT_TYPE == 909
+        assert packet.STATE_TYPE == 911
+        assert hasattr(packet, "__dataclass_fields__")
+
+    def test_button_set_config_packet(self) -> None:
+        """Test ButtonSetConfig packet structure."""
+        packet = Button.SetConfig(
+            haptic_duration_ms=30,
+            backlight_on_color=LightHsbk(
+                hue=21845, saturation=65535, brightness=52428, kelvin=3500
+            ),
+            backlight_off_color=LightHsbk(
+                hue=0, saturation=0, brightness=6553, kelvin=3500
+            ),
+        )
+
+        assert packet.PKT_TYPE == 910
+        assert packet.haptic_duration_ms == 30
+        assert packet._requires_ack is True
+
+    def test_button_state_config_packet(self) -> None:
+        """Test ButtonStateConfig packet structure."""
+        packet = Button.StateConfig(
+            haptic_duration_ms=0,
+            backlight_on_color=LightHsbk(
+                hue=0, saturation=0, brightness=65535, kelvin=3500
+            ),
+            backlight_off_color=LightHsbk(
+                hue=0, saturation=0, brightness=0, kelvin=3500
+            ),
+        )
+
+        assert packet.PKT_TYPE == 911
+        assert packet.haptic_duration_ms == 0
+
+    def test_button_config_packets_serialization(self) -> None:
+        """Test button config packet serialization roundtrip."""
+        # GetConfig has no fields
+        get_packet = Button.GetConfig()
+        packed = get_packet.pack()
+        assert isinstance(packed, bytes)
+        assert len(packed) == 0
+
+        # SetConfig/StateConfig share the same 18-byte wire layout:
+        # uint16 haptic + 2x 8-byte HSBK, with no reserved padding
+        set_packet = Button.SetConfig(
+            haptic_duration_ms=250,
+            backlight_on_color=LightHsbk(
+                hue=21845, saturation=65535, brightness=52428, kelvin=3500
+            ),
+            backlight_off_color=LightHsbk(
+                hue=0, saturation=0, brightness=6553, kelvin=3500
+            ),
+        )
+        packed = set_packet.pack()
+        assert len(packed) == 18
+
+        unpacked = Button.StateConfig.unpack(packed)
+        assert unpacked.haptic_duration_ms == 250
+        assert unpacked.backlight_on_color == set_packet.backlight_on_color
+        assert unpacked.backlight_off_color == set_packet.backlight_off_color
 
     def test_sensor_packets_serialization(self) -> None:
         """Test sensor packet serialization roundtrip."""

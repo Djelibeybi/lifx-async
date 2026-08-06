@@ -62,8 +62,8 @@ class DiscoveredDevice:
 
         Queries the device for its product ID and uses the product registry
         to instantiate the appropriate device class (Device, Light, HevLight,
-        InfraredLight, MultiZoneLight, MatrixLight, or CeilingLight) based on
-        the product capabilities.
+        InfraredLight, MultiZoneLight, MatrixLight, CeilingLight, or Switch)
+        based on the product capabilities.
 
         This is the single source of truth for device type detection and
         instantiation across the library.
@@ -81,13 +81,12 @@ class DiscoveredDevice:
             async for discovered in discover_devices():
                 device = await discovered.create_device()
                 if device is None:
-                    continue  # unsupported product or transient failure
+                    continue  # unknown product or transient failure
                 print(f"Created {type(device).__name__}: {await device.get_label()}")
             ```
         """
         from lifx.devices.base import Device
         from lifx.devices.detection import get_device_class_for_product
-        from lifx.exceptions import LifxUnsupportedDeviceError
 
         kwargs = {
             "serial": self.serial,
@@ -115,9 +114,6 @@ class DiscoveredDevice:
                 # immediately repeat the same network work.
                 device.adopt_cached_metadata(temp_device)
                 return device
-
-        except LifxUnsupportedDeviceError:
-            return None
 
         except Exception:
             return None

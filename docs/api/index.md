@@ -23,7 +23,9 @@ lifx/
 │   ├── hev.py               # HevLight device (anti-bacterial cleaning)
 │   ├── infrared.py          # InfraredLight device (night vision)
 │   ├── multizone.py         # MultiZoneLight (strips/beams)
-│   └── matrix.py            # MatrixLight (2D matrix devices: tiles, candle, path)
+│   ├── matrix.py            # MatrixLight (2D matrix devices: tiles, candle, path)
+│   ├── ceiling.py           # CeilingLight (uplight/downlight components)
+│   └── switch.py            # Switch (LIFX Switch/Dimmer button configuration)
 ├── network/                  # Network layer
 │   ├── connection.py        # Device connections with lazy opening
 │   ├── discovery.py         # Network device discovery (UDP broadcast)
@@ -71,6 +73,8 @@ Control your LIFX devices:
 - [`InfraredLight`](devices.md#lifx.devices.infrared.InfraredLight) - Night vision infrared LED
 - [`MultiZoneLight`](devices.md#lifx.devices.multizone.MultiZoneLight) - Strips/beams
 - [`MatrixLight`](devices.md#lifx.devices.matrix.MatrixLight) - 2D matrix devices (tiles, candle, path)
+- [`CeilingLight`](devices.md#lifx.devices.ceiling.CeilingLight) - Ceiling fixtures with uplight/downlight components
+- [`Switch`](devices.md#lifx.devices.switch.Switch) - LIFX Switch/Dimmer button backlight and haptic configuration
 
 ### Color Utilities
 
