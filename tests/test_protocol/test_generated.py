@@ -1,7 +1,12 @@
 """Tests for generated protocol types and packets."""
 
 from lifx.protocol.packets import Device, Light, Sensor
-from lifx.protocol.protocol_types import DeviceService, LightHsbk, LightWaveform
+from lifx.protocol.protocol_types import (
+    DeviceService,
+    FirmwareEffect,
+    LightHsbk,
+    LightWaveform,
+)
 
 
 class TestGeneratedEnums:
@@ -19,6 +24,25 @@ class TestGeneratedEnums:
         assert LightWaveform.HALF_SINE == 2
         assert LightWaveform.TRIANGLE == 3
         assert LightWaveform.PULSE == 4
+
+    def test_firmware_effect_enum(self) -> None:
+        """Test FirmwareEffect enum.
+
+        FirmwareEffect merges MultiZoneEffectType and TileEffectType, and
+        apply_firmware_effect_enum_quirk() lists its values explicitly rather
+        than deriving them from protocol.yml. That means an effect type added
+        upstream is dropped silently until the quirk is updated, so pin every
+        member here: a regeneration that loses one fails the suite.
+        """
+        assert FirmwareEffect.OFF == 0
+        assert FirmwareEffect.MOVE == 1
+        assert FirmwareEffect.MORPH == 2
+        assert FirmwareEffect.FLAME == 3
+        assert FirmwareEffect.SKY == 5
+        assert FirmwareEffect.COLOR_SWEEP == 6
+
+        # Reserved protocol values (4, and MultiZone 2/3) stay unmapped
+        assert {effect.value for effect in FirmwareEffect} == {0, 1, 2, 3, 5, 6}
 
 
 class TestGeneratedFields:
