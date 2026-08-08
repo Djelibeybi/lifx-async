@@ -35,6 +35,7 @@ class FirmwareEffect(IntEnum):
     MORPH = 2
     FLAME = 3
     SKY = 5
+    COLOR_SWEEP = 6
 
 
 class LightLastHevCycleResult(IntEnum):
