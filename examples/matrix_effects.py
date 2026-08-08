@@ -1,6 +1,7 @@
 """MatrixLight tile effects example.
 
-Demonstrates using built-in tile effects: MORPH, FLAME, and SKY with various parameters.
+Demonstrates using built-in tile effects: MORPH, FLAME, SKY and COLOR_SWEEP
+with various parameters.
 """
 
 import argparse
@@ -88,6 +89,24 @@ async def main(ip: str, serial: str | None = None):
             await asyncio.sleep(10)
         else:
             print("\nSkipping the SKY demos: this device does not support them.")
+
+        # Demonstrate COLOR_SWEEP effect
+        #
+        # COLOR_SWEEP was added in protocol.yml 0.10 (6 August 2026). The
+        # protocol defines the effect type but no parameters of its own, so it
+        # is driven like MORPH and FLAME: speed plus an optional palette. Which
+        # products and firmware versions actually run it is not published, and
+        # there is no capability flag to gate on, so a device that does not
+        # support it will simply ignore the request rather than report an error.
+        print("\nStarting COLOR_SWEEP effect...")
+        print("  (sweeps the palette across the matrix)")
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.COLOR_SWEEP,
+            speed=5,
+            palette=[Colors.PINK, Colors.PURPLE, Colors.BLUE, Colors.CYAN],
+        )
+        print("  Running for 10 seconds...")
+        await asyncio.sleep(10)
 
         # Demonstrate custom palette effect
         print("\nStarting MORPH effect with custom ocean palette...")

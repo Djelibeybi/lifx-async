@@ -312,8 +312,12 @@ def apply_firmware_effect_enum_quirk(
     - Creates FirmwareEffect enum combining values from both
     - Removes MultiZoneEffectType and TileEffectType
     - Updates MultiZoneEffectSettings and TileEffectSettings to use FirmwareEffect
-    - Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, RESERVED_*)
+    - Uses clean enum value names (OFF, MOVE, MORPH, FLAME, SKY, COLOR_SWEEP)
     - Also adds DIRECTION enum for move effect parameter
+
+    The values are listed explicitly rather than derived from the spec, so a new
+    effect type added upstream is dropped silently until it is added here. Check
+    MultiZoneEffectType and TileEffectType after every protocol regeneration.
 
     Args:
         enums: Dictionary of enum definitions
@@ -326,7 +330,8 @@ def apply_firmware_effect_enum_quirk(
     # Create FirmwareEffect enum with clean names manually
     # Based on protocol spec:
     # MultiZone: OFF=0, MOVE=1, reserved=2, reserved=3
-    # Tile: OFF=0, reserved=1, MORPH=2, FLAME=3, reserved=4, SKY=5
+    # Tile: OFF=0, reserved=1, MORPH=2, FLAME=3, reserved=4, SKY=5,
+    #       COLOR_SWEEP=6
     # Note: Reserved values are intentionally omitted
     firmware_effect_values = {
         "OFF": 0,
@@ -334,6 +339,7 @@ def apply_firmware_effect_enum_quirk(
         "MORPH": 2,
         "FLAME": 3,
         "SKY": 5,
+        "COLOR_SWEEP": 6,
     }
 
     # Create FirmwareEffect enum
