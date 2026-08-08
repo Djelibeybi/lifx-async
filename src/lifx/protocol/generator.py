@@ -301,48 +301,6 @@ def apply_tile_state_device_quirk(
     return fields
 
 
-def apply_sensor_packet_quirks(packets: dict[str, Any]) -> dict[str, Any]:
-    """Add the sensor packets for ambient light level reading.
-
-    These packets are missing from the official protocol.yml, but they are part
-    of the published LAN protocol and are supported by LIFX devices with ambient
-    light sensors:
-
-        - https://lan.developer.lifx.com/docs/querying-the-device-for-data#sensorgetambientlight---packet-401
-        - https://lan.developer.lifx.com/docs/information-messages#sensorstateambientlight---packet-402
-
-    Quirks applied:
-
-        - SensorGetAmbientLight (401): Request packet with no parameters
-        - SensorStateAmbientLight (402): Response packet with lux field (float)
-
-    Args:
-        packets: Dictionary of packet definitions
-
-    Returns:
-        Dictionary with sensor packet quirks applied
-    """
-    # Ensure sensor category exists
-    if "sensor" not in packets:
-        packets["sensor"] = {}
-
-    # Add SensorGetAmbientLight (401) - request with no parameters
-    packets["sensor"]["SensorGetAmbientLight"] = {
-        "pkt_type": 401,
-        "fields": [],
-    }
-
-    # Add SensorStateAmbientLight (402) - response with lux field
-    packets["sensor"]["SensorStateAmbientLight"] = {
-        "pkt_type": 402,
-        "fields": [
-            {"name": "Lux", "type": "float32"},
-        ],
-    }
-
-    return packets
-
-
 def apply_firmware_effect_enum_quirk(
     enums: dict[str, Any], fields: dict[str, Any], compound_fields: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -1666,7 +1624,6 @@ def main() -> None:
     enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
     fields = apply_tile_state_device_quirk(fields)
-    packets = apply_sensor_packet_quirks(packets)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {

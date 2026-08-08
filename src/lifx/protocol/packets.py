@@ -1091,7 +1091,9 @@ class Sensor(Packet):
         """Packet type 402."""
 
         PKT_TYPE: ClassVar[int] = 402
-        _fields: ClassVar[list[dict[str, Any]]] = [{"name": "Lux", "type": "float32"}]
+        _fields: ClassVar[list[dict[str, Any]]] = [
+            {"name": "Lux", "type": "float32", "size_bytes": 4}
+        ]
 
         # Packet metadata for automatic handling
         _packet_kind: ClassVar[str] = "STATE"
