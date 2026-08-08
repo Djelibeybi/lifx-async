@@ -35,6 +35,7 @@ class FirmwareEffect(IntEnum):
     MORPH = 2
     FLAME = 3
     SKY = 5
+    COLOR_SWEEP = 6
 
 
 class LightLastHevCycleResult(IntEnum):
@@ -489,6 +490,52 @@ class TileBufferRect:
 
 
 @dataclass
+class TileEffectFillRectangle:
+    """Auto-generated field structure."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def pack(self) -> bytes:
+        """Pack to bytes."""
+        from lifx.protocol import serializer
+
+        result = b""
+
+        # x: uint8
+        result += serializer.pack_value(self.x, "uint8")
+        # y: uint8
+        result += serializer.pack_value(self.y, "uint8")
+        # width: uint8
+        result += serializer.pack_value(self.width, "uint8")
+        # height: uint8
+        result += serializer.pack_value(self.height, "uint8")
+
+        return result
+
+    @classmethod
+    def unpack(
+        cls, data: bytes, offset: int = 0
+    ) -> tuple[TileEffectFillRectangle, int]:
+        """Unpack from bytes."""
+        from lifx.protocol import serializer
+
+        current_offset = offset
+        # x: uint8
+        x, current_offset = serializer.unpack_value(data, "uint8", current_offset)
+        # y: uint8
+        y, current_offset = serializer.unpack_value(data, "uint8", current_offset)
+        # width: uint8
+        width, current_offset = serializer.unpack_value(data, "uint8", current_offset)
+        # height: uint8
+        height, current_offset = serializer.unpack_value(data, "uint8", current_offset)
+
+        return cls(x=x, y=y, width=width, height=height), current_offset
+
+
+@dataclass
 class TileEffectParameter:
     """Auto-generated field structure."""
 
@@ -775,6 +822,12 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
     },
     "TileAccelMeas": {"x": "X", "y": "Y", "z": "Z"},
     "TileBufferRect": {"fb_index": "FbIndex", "x": "X", "y": "Y", "width": "Width"},
+    "TileEffectFillRectangle": {
+        "x": "X",
+        "y": "Y",
+        "width": "Width",
+        "height": "Height",
+    },
     "TileEffectParameter": {
         "cloud_saturation_max": "CloudSaturationMax",
         "cloud_saturation_min": "CloudSaturationMin",

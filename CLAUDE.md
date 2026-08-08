@@ -358,10 +358,19 @@ Local generator quirks:
   - Unions starting with "Button" or "Relay" are excluded
   - All packets in "button" and "relay" categories are excluded
   - This keeps the library focused on LIFX lighting devices
-- **sensor packets**: Adds the ambient light sensor packets missing from protocol.yml:
-  - `SensorGetAmbientLight` (401): Request packet with no parameters — [documented here](https://lan.developer.lifx.com/docs/querying-the-device-for-data#sensorgetambientlight---packet-401)
-  - `SensorStateAmbientLight` (402): Response packet with lux field (float32) — [documented here](https://lan.developer.lifx.com/docs/information-messages#sensorstateambientlight---packet-402)
-  - Both are part of the published LAN protocol; they are simply absent from the official protocol.yml
+- **FirmwareEffect merge**: `MultiZoneEffectType` and `TileEffectType` are merged into one
+  `FirmwareEffect` enum, because both use the same firmware effect protocol values. The members are
+  **listed explicitly** in `apply_firmware_effect_enum_quirk()` rather than derived from
+  protocol.yml, so an effect type added upstream is dropped silently until it is added there —
+  exactly what happened to `COLOR_SWEEP` (6), added in protocol.yml 0.10. Check `TileEffectType` and
+  `MultiZoneEffectType` after every regeneration; `test_generated.py::test_firmware_effect_enum`
+  pins the full member set so a lost value fails the suite.
+- **sensor packets**: No longer a quirk. `SensorGetAmbientLight` (401) and
+  `SensorStateAmbientLight` (402) were absent from protocol.yml and added locally by
+  `apply_sensor_packet_quirks()`; LIFX have since accepted them upstream, so the quirk was removed
+  and both now come straight from the spec. `tests/test_protocol/test_generated.py` asserts their
+  packet types and field structure against the generated code, so an upstream regression fails the
+  suite rather than silently dropping them.
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 
