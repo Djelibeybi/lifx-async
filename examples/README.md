@@ -309,6 +309,27 @@ uv run python examples/matrix_large_tiles.py --ip 192.168.1.100 --serial d073d51
 | `--ip` | yes | IP address of the MatrixLight |
 | `--serial` | no | Serial number; supplying it skips the serial lookup |
 
+## Mirror Devices
+
+### mirror_components
+
+Connects to a LIFX Mirror and drives its two components independently: the front ring (room-facing
+task light) and the back ring (wall-facing backwash). Each is a closed ring of 25 zones, so both
+can carry their own gradient or theme. Demonstrates the component layout, per-component power,
+per-zone gradients, per-component themes, and colour restoration after the whole light is powered
+off. The mirror's original power state and colours are restored on exit.
+
+```bash
+uv run python examples/mirror_components.py --ip 192.168.1.100 --serial d073d5123456
+uv run python examples/mirror_components.py --ip 192.168.1.100 --hold 5
+```
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `--ip` | yes | | IP address of the Mirror |
+| `--serial` | no | | Serial number; supplying it skips the serial lookup |
+| `--hold` | no | `3.0` | Seconds to hold each step before moving on |
+
 ## Animation
 
 ### animation_basic
