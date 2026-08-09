@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v6.2.0 (2026-08-09)
+
+### Features
+
+- **protocol**: Expose the COLOR_SWEEP matrix effect
+  ([`856a1fe`](https://github.com/Djelibeybi/lifx-async/commit/856a1fef9184f983c85d58694b571651e3a37b7a))
+
+
 ## v6.1.4 (2026-08-03)
 
 ### Bug Fixes
