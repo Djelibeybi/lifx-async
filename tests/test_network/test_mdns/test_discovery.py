@@ -12,6 +12,7 @@ from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
+from lifx.devices.mirror import MirrorLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.discovery import (
@@ -207,6 +208,21 @@ class TestCreateDeviceFromRecord:
 
         assert device is not None
         assert isinstance(device, CeilingLight)
+
+    def test_create_mirror_device(self) -> None:
+        """Test creating a MirrorLight device."""
+        record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="192.168.1.100",
+            port=56700,
+            product_id=267,  # LIFX Mirror US
+            firmware="4.112",
+        )
+
+        device = create_device_from_record(record)
+
+        assert device is not None
+        assert isinstance(device, MirrorLight)
 
     def test_create_infrared_device(self) -> None:
         """Test creating an InfraredLight device."""

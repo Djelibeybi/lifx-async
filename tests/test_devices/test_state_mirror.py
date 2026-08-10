@@ -549,6 +549,26 @@ class TestMirrorStateFileEdgeCases:
 
         assert "Failed to load state" in caplog.text
 
+    async def test_load_handles_non_object_json(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A file that parses to JSON ``null`` is corruption, not absence.
+
+        Treating it as a missing file would silently discard the stored
+        colours with nothing in the log to explain it.
+        """
+        state_file = tmp_path / "mirror.json"
+        state_file.write_text(json.dumps(None))
+
+        mirror = _connected_mirror()
+        mirror._state_file = str(state_file)
+        mirror.state.stored_front_colors = None
+
+        await mirror._load_state_from_file()
+
+        assert "does not contain a JSON object" in caplog.text
+        assert mirror.state.stored_front_colors is None
+
     async def test_save_handles_write_failure(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
