@@ -10,6 +10,16 @@ renamed targets.
 Palette order carries no meaning: the app shuffles the order on every
 application, so palettes are stored canonically sorted and all palette
 comparison is unordered.
+
+Attribution: the 28 ``Library`` records are not app captures. They ship
+byte-identical at uint16 to the palettes this library carried before v1.2,
+which came from two upstream projects:
+
+* https://github.com/Djelibeybi/aiolifx-themes
+* https://github.com/pkivolowitz/lifx — the palette themes (``fire``,
+  ``water``, ``neon``, ``tropical``, ``arctic``, and the rest of that set),
+  each originally a ``(hue_a, hue_b, hue_c, saturation)`` tuple expanded to
+  three HSBK colours.
 """
 
 from __future__ import annotations
@@ -75,8 +85,8 @@ class ThemeLibrary:
                 f"available themes."
             )
         record = cls._THEMES[normalized_name]
-        # The Theme is built over a fresh list so mutating a returned Theme
-        # can never corrupt the library's own palette.
+        # Theme.__init__ copies the palette, so mutating a returned Theme can
+        # never corrupt the library's own record.
         return Theme(
             list(record.colors),
             slug=record.slug,

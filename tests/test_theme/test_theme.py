@@ -48,6 +48,25 @@ class TestThemeCreation:
         assert len(theme) == 1
         assert theme[0].saturation == 0.0
 
+    def test_constructor_copies_the_caller_list(self) -> None:
+        """add_color() on the Theme must not reach the caller's list."""
+        colors = [Colors.RED]
+
+        theme = Theme(colors)
+        theme.add_color(Colors.BLUE)
+
+        assert len(colors) == 1
+        assert len(theme) == 2
+
+    def test_constructor_does_not_alias_the_caller_list(self) -> None:
+        """Appending to the caller's list must not reach the Theme."""
+        colors = [Colors.RED]
+
+        theme = Theme(colors)
+        colors.append(Colors.GREEN)
+
+        assert len(theme) == 1
+
 
 class TestThemeColorManagement:
     """Tests for color management in themes."""
@@ -346,7 +365,14 @@ class TestThemeEquality:
 
 
 class TestPaletteThemes:
-    """Tests for palette themes ported from pkivolowitz/lifx."""
+    """Tests for palette themes ported from pkivolowitz/lifx.
+
+    Four of these keys — ``earth``, ``forest``, ``coral_reef`` and
+    ``aurora_borealis`` — no longer return the ported palette: v1.2 gave
+    them app themes or rename aliases. The rest still ship the ported
+    palettes byte-identically at uint16 (attribution in
+    ``lifx/theme/library.py``).
+    """
 
     PALETTE_NAMES = [
         "fire",
