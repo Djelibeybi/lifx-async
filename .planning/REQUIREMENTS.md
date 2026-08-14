@@ -14,19 +14,23 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 - [ ] **THEME-01**: Caller can get any of the 139 non-sport app themes from `ThemeLibrary`
       by ASCII slug
+
 - [ ] **THEME-02**: A returned palette matches the captured app palette as an unordered
       set of HSBK values, brightness and kelvin intact — the app shuffles palette order on
       every application, so order is never compared
+
 - [ ] **THEME-03**: The 27 slugs shared between the app and the pre-v1.2 library return
       the app's palette (6 differ only by a uniform ×1.1087 brightness scale, 19 are
       genuinely redefined — `soothing` among them changes kelvin 3500 → 8000)
-- [ ] **THEME-04**: The theme data in `library.py` is generated from `themes.jsonl` rather
+
+- [x] **THEME-04**: The theme data in `library.py` is generated from `themes.jsonl` rather
       than hand-transcribed, and regenerating reproduces the committed file exactly
 
 ### Compatibility
 
-- [ ] **COMPAT-01**: Every theme name that resolved before v1.2 still resolves after it —
+- [x] **COMPAT-01**: Every theme name that resolved before v1.2 still resolves after it —
       no shipped key disappears
+
 - [x] ~~**COMPAT-02**: Each overwritten palette stays retrievable under a `*_legacy` name~~
       — **RETIRED 2026-08-14** during Phase 6 discussion. Measuring the 19 redefined
       themes showed 10 of them shift by one or two colours; only 9 change wholesale. The
@@ -34,18 +38,21 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
       git history. No `*_legacy` keys, no Legacy category. Supersedes the milestone-kickoff
       decision "Overwrite + keep legacy aliases". COMPAT-01 is unaffected: all 57 pre-v1.2
       names still resolve
-- [ ] **COMPAT-03**: Renamed themes resolve under both the old library key and the new app
+
+- [x] **COMPAT-03**: Renamed themes resolve under both the old library key and the new app
       slug (`aurora_borealis` / `aurora`, `forest` / `forrest`)
+
 - [ ] **COMPAT-04**: Each of the 30 orphaned library keys carries a recorded disposition —
       kept as library-only, or deprecated naming its replacement
 
 ### Metadata
 
-- [ ] **META-01**: A theme exposes its app display name, distinct from its ASCII slug.
+- [x] **META-01**: A theme exposes its app display name, distinct from its ASCII slug.
       **Amended 2026-08-14** (Phase 6 discussion): emoji are stripped from display names
       and categories — the app supports them, downstream consumers likely do not. 'Forrest
       🌳' ships as `Forrest`
-- [ ] **META-02**: A theme exposes its app category
+
+- [x] **META-02**: A theme exposes its app category
 - [ ] **META-03**: Caller can list the categories, and list the themes within one
 - [ ] **META-04**: `ThemeLibrary.get_by_category()`'s existing hand-made taxonomy
       (`seasonal`, `hygge`, `tranquil`, `sports`, …) is reconciled with the app's 11
@@ -58,8 +65,10 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
       palette ceiling for both `SetTileEffect` and `SetMultiZoneEffect`, and all 10 of
       🎨 ART SERIES among them — carry a recorded determination: their true length, or a
       documented finding that no device-based method can supply it
+
 - [ ] **FIDELITY-02**: A sampled theme applied through the library renders on hardware the
       same as that theme applied from the LIFX app
+
 - [ ] **FIDELITY-03**: Product-invariance is spot-checked — a palette read back from a
       matrix product other than the Tile matches the Tile capture
 
@@ -68,6 +77,7 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 - [ ] **TOOL-01**: The capture tooling ships in the repo and runs from a documented command
 - [ ] **TOOL-02**: The analysis tool reports the diff between a fresh capture and the
       shipped library
+
 - [ ] **TOOL-03**: Docs describe the resync procedure for a future app update
 
 ### Docs
@@ -82,8 +92,10 @@ Tracked, not in this milestone.
 
 - **PERS-01**: Generalise `state_file` persistence into a reusable mixin (deferred since
   2026-06-11)
+
 - **THREAD-01 / SEED-001**: Revalidate wire behaviour over Thread/IPv6 when LIFX Thread
   firmware lands (dormant)
+
 - **Spike 006**: Measure the impact of publishing tuning constants vs behaviour only — the
   D5-09 rule is disputed and remains an OPEN decision
 
@@ -108,13 +120,13 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 | THEME-01 | Phase 6 | Pending |
 | THEME-02 | Phase 6 | Pending |
 | THEME-03 | Phase 6 | Pending |
-| THEME-04 | Phase 6 | Pending |
-| COMPAT-01 | Phase 6 | Pending |
+| THEME-04 | Phase 6 | Complete |
+| COMPAT-01 | Phase 6 | Complete |
 | COMPAT-02 | — | Retired 2026-08-14 |
-| COMPAT-03 | Phase 6 | Pending |
+| COMPAT-03 | Phase 6 | Complete |
 | COMPAT-04 | Phase 7 | Pending |
-| META-01 | Phase 6 | Pending |
-| META-02 | Phase 6 | Pending |
+| META-01 | Phase 6 | Complete |
+| META-02 | Phase 6 | Complete |
 | META-03 | Phase 7 | Pending |
 | META-04 | Phase 7 | Pending |
 | FIDELITY-01 | Phase 8 | Pending |
