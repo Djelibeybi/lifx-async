@@ -11,6 +11,7 @@ Reference: https://github.com/Djelibeybi/aiolifx-themes
 from __future__ import annotations
 
 from lifx.color import HSBK
+from lifx.theme.data import THEMES
 from lifx.theme.theme import Theme
 
 
@@ -426,10 +427,22 @@ class ThemeLibrary:
             ```
         """
         normalized_name = name.lower()
+        # Generated-first lookup: the generated data module wins over the
+        # transitional hand-written table. Both paths build the Theme over a
+        # fresh list so mutating a returned Theme can never corrupt the
+        # library's own palette.
+        if normalized_name in THEMES:
+            record = THEMES[normalized_name]
+            return Theme(
+                list(record.colors),
+                slug=record.slug,
+                name=record.name,
+                category=record.category,
+            )
         if normalized_name not in cls._THEMES:
             available = ", ".join(sorted(cls._THEMES.keys()))
             raise KeyError(f"Theme '{name}' not found. Available themes: {available}")
-        return Theme(cls._THEMES[normalized_name])
+        return Theme(list(cls._THEMES[normalized_name]))
 
     @classmethod
     def get_available_themes(cls) -> list[str]:
