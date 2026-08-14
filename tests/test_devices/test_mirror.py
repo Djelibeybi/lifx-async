@@ -27,7 +27,18 @@ UNUSED_POSITIONS = tuple(
     position for position, zone in enumerate(MIRROR_ZONE_MAP) if zone < 0
 )
 
+#: Side columns of the 4x13 buffer, top to bottom. Buffer positions 1 and 3 are
+#: the unused entries at the top of both right-hand columns.
+FRONT_LEFT_POSITIONS = tuple(range(0, BUFFER_SIZE, 4))
+FRONT_RIGHT_POSITIONS = tuple(range(5, BUFFER_SIZE, 4))
+BACK_LEFT_POSITIONS = tuple(range(2, BUFFER_SIZE, 4))
+BACK_RIGHT_POSITIONS = tuple(range(7, BUFFER_SIZE, 4))
+LEFT_ZONE_COUNT = 13
+RIGHT_ZONE_COUNT = 12
+
 WHITE = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+RED = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+BLUE = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
 
 
 def _buffer(front: list[HSBK], back: list[HSBK], fill: HSBK = WHITE) -> list[HSBK]:
@@ -479,6 +490,254 @@ class TestMirrorStatePersistence:
         await mirror._load_state_from_file()
 
         assert mirror._state.stored_front_colors is None
+
+
+class TestMirrorSidePositions:
+    """Tests for left/right side addressing metadata."""
+
+    @pytest.mark.parametrize("product", [267, 268])
+    def test_layout_exposes_side_positions(self, product: int) -> None:
+        """Test that each side maps to one column of the Set64 buffer."""
+        layout = get_mirror_layout(product)
+        assert layout is not None
+
+        assert layout.front_left_positions == FRONT_LEFT_POSITIONS
+        assert layout.front_right_positions == FRONT_RIGHT_POSITIONS
+        assert layout.back_left_positions == BACK_LEFT_POSITIONS
+        assert layout.back_right_positions == BACK_RIGHT_POSITIONS
+
+    def test_side_positions_exclude_unused_buffer_entries(self) -> None:
+        """Test that the two unused positions are absent from every side."""
+        layout = get_mirror_layout(267)
+        assert layout is not None
+
+        for positions in (
+            layout.front_left_positions,
+            layout.front_right_positions,
+            layout.back_left_positions,
+            layout.back_right_positions,
+        ):
+            assert not set(positions) & set(UNUSED_POSITIONS)
+
+    def test_sides_partition_their_component(self) -> None:
+        """Test that left and right together cover a component exactly once."""
+        layout = get_mirror_layout(267)
+        assert layout is not None
+
+        front = set(layout.front_left_positions) | set(layout.front_right_positions)
+        back = set(layout.back_left_positions) | set(layout.back_right_positions)
+
+        assert front == set(layout.front_positions)
+        assert back == set(layout.back_positions)
+        assert not set(layout.front_left_positions) & set(layout.front_right_positions)
+        assert not set(layout.back_left_positions) & set(layout.back_right_positions)
+
+    def test_side_positions_run_top_to_bottom(self) -> None:
+        """Test that sides are in buffer order, unlike the zone-ordered
+        component positions."""
+        layout = get_mirror_layout(267)
+        assert layout is not None
+
+        for positions in (
+            layout.front_left_positions,
+            layout.front_right_positions,
+            layout.back_left_positions,
+            layout.back_right_positions,
+        ):
+            assert list(positions) == sorted(positions)
+
+        # The left column starts at the top-centre zones, so its first entry is
+        # zone 9 rather than zone 0 — proving this is not zone order.
+        assert MIRROR_ZONE_MAP[layout.front_left_positions[0]] == 9
+        assert MIRROR_ZONE_MAP[layout.back_left_positions[0]] == 40
+
+    def test_side_zone_counts_are_asymmetric(self) -> None:
+        """Test that left carries 13 zones and right carries 12."""
+        layout = get_mirror_layout(267)
+        assert layout is not None
+
+        assert len(layout.front_left_positions) == LEFT_ZONE_COUNT
+        assert len(layout.back_left_positions) == LEFT_ZONE_COUNT
+        assert len(layout.front_right_positions) == RIGHT_ZONE_COUNT
+        assert len(layout.back_right_positions) == RIGHT_ZONE_COUNT
+
+    def test_device_side_properties_match_layout(self) -> None:
+        """Test the device-level side position properties."""
+        mirror = _mirror()
+
+        assert mirror.front_left_positions == FRONT_LEFT_POSITIONS
+        assert mirror.front_right_positions == FRONT_RIGHT_POSITIONS
+        assert mirror.back_left_positions == BACK_LEFT_POSITIONS
+        assert mirror.back_right_positions == BACK_RIGHT_POSITIONS
+
+    def test_side_properties_reject_non_mirror_product(self) -> None:
+        """Test that side properties need a Mirror layout."""
+        mirror = _mirror(product=176)
+
+        with pytest.raises(LifxError, match="is not a Mirror light"):
+            _ = mirror.front_left_positions
+
+
+class TestMirrorSideColors:
+    """Tests for reading and writing one side of a component."""
+
+    async def test_get_side_colors_reads_the_column(self) -> None:
+        """Test that a side read gathers only that column, top to bottom."""
+        mirror = _mirror()
+        buffer = [WHITE] * BUFFER_SIZE
+        for offset, position in enumerate(FRONT_LEFT_POSITIONS):
+            buffer[position] = HSBK(
+                hue=offset * 10, saturation=1.0, brightness=1.0, kelvin=3500
+            )
+        mirror.get_all_tile_colors = AsyncMock(return_value=[buffer])
+
+        colors = await mirror.get_side_colors("front", "left")
+
+        assert colors == [buffer[position] for position in FRONT_LEFT_POSITIONS]
+
+    async def test_get_side_colors_rejects_both(self) -> None:
+        """Test that a read cannot span both components at once."""
+        mirror = _mirror()
+
+        with pytest.raises(ValueError, match="get_side_colors"):
+            await mirror.get_side_colors("both", "left")
+
+    async def test_set_side_colors_single_color_fills_the_side(self) -> None:
+        """Test that a single colour fills every zone on one side."""
+        mirror = _mirror()
+
+        await mirror.set_side_colors("front", "left", RED)
+
+        written = mirror.set_matrix_colors.call_args.args[1]
+        assert [written[p] for p in FRONT_LEFT_POSITIONS] == [RED] * LEFT_ZONE_COUNT
+
+    async def test_set_side_colors_leaves_everything_else_untouched(self) -> None:
+        """Test that a side write disturbs neither the other side nor the
+        other component."""
+        mirror = _mirror()
+
+        await mirror.set_side_colors("front", "left", RED)
+
+        written = mirror.set_matrix_colors.call_args.args[1]
+        assert [written[p] for p in FRONT_RIGHT_POSITIONS] == [WHITE] * RIGHT_ZONE_COUNT
+        assert _back_of(written) == [WHITE] * BACK_ZONE_COUNT
+        for position in UNUSED_POSITIONS:
+            assert written[position] == WHITE
+
+    async def test_set_side_colors_list_maps_top_to_bottom(self) -> None:
+        """Test that a per-zone list is written in buffer order."""
+        mirror = _mirror()
+        colors = [
+            HSBK(hue=i * 10, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(RIGHT_ZONE_COUNT)
+        ]
+
+        await mirror.set_side_colors("back", "right", colors)
+
+        written = mirror.set_matrix_colors.call_args.args[1]
+        assert [written[p] for p in BACK_RIGHT_POSITIONS] == colors
+
+    async def test_set_side_colors_both_broadcasts_to_each_ring(self) -> None:
+        """Test that "both" writes the same colours to front and back."""
+        mirror = _mirror()
+        colors = [
+            HSBK(hue=i * 10, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(LEFT_ZONE_COUNT)
+        ]
+
+        await mirror.set_side_colors("both", "left", colors)
+
+        written = mirror.set_matrix_colors.call_args.args[1]
+        assert [written[p] for p in FRONT_LEFT_POSITIONS] == colors
+        assert [written[p] for p in BACK_LEFT_POSITIONS] == colors
+        assert [written[p] for p in FRONT_RIGHT_POSITIONS] == [WHITE] * RIGHT_ZONE_COUNT
+        assert [written[p] for p in BACK_RIGHT_POSITIONS] == [WHITE] * RIGHT_ZONE_COUNT
+
+    async def test_set_side_colors_passes_duration(self) -> None:
+        """Test that the transition duration reaches the device in ms."""
+        mirror = _mirror()
+
+        await mirror.set_side_colors("front", "left", RED, duration=1.5)
+
+        assert mirror.set_matrix_colors.call_args.kwargs["duration"] == 1500
+
+    async def test_set_side_colors_wrong_length_raises(self) -> None:
+        """Test that a list must match the side's zone count."""
+        mirror = _mirror()
+
+        with pytest.raises(ValueError, match="Expected 12 colors"):
+            await mirror.set_side_colors("front", "right", [RED] * LEFT_ZONE_COUNT)
+
+    async def test_set_side_colors_all_dark_raises(self) -> None:
+        """Test that an unlit side write is rejected."""
+        mirror = _mirror()
+        dark = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+
+        with pytest.raises(ValueError, match="turn_front_off"):
+            await mirror.set_side_colors("front", "left", dark)
+
+    async def test_set_side_colors_all_dark_list_raises(self) -> None:
+        """Test that a fully unlit list is rejected before it reaches the wire."""
+        mirror = _mirror()
+        dark = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+
+        with pytest.raises(ValueError, match="turn_back_off"):
+            await mirror.set_side_colors("back", "left", [dark] * LEFT_ZONE_COUNT)
+
+        mirror.set_matrix_colors.assert_not_called()
+
+    async def test_set_side_colors_rejects_invalid_side(self) -> None:
+        """Test that an unknown side is reported rather than guessed at."""
+        mirror = _mirror()
+
+        with pytest.raises(ValueError, match="Unknown side"):
+            await mirror.set_side_colors("front", "middle", RED)  # type: ignore[arg-type]
+
+    async def test_set_side_colors_rejects_invalid_component(self) -> None:
+        """Test that an unknown component is reported rather than guessed at."""
+        mirror = _mirror()
+
+        with pytest.raises(ValueError, match="Unknown component"):
+            await mirror.set_side_colors("side", "left", RED)  # type: ignore[arg-type]
+
+    async def test_set_side_colors_updates_whole_component_state(self) -> None:
+        """Test that a half-write refreshes the full component colour lists."""
+        mirror = _mirror()
+
+        await mirror.set_side_colors("front", "left", RED)
+
+        state = mirror._state
+        expected = [RED if zone < 10 or zone >= 22 else WHITE for zone in range(25)]
+        assert state.front_colors == expected
+        assert state.stored_front_colors == expected
+        assert state.last_front_colors == expected
+
+    async def test_set_side_colors_both_updates_both_component_states(self) -> None:
+        """Test that a "both" write refreshes front and back state."""
+        mirror = _mirror()
+
+        await mirror.set_side_colors("both", "right", BLUE)
+
+        state = mirror._state
+        # Component colour lists are in zone order, and the two rings run in
+        # opposite directions: front-right is zones 10-21, back-right is zones
+        # 28-39, which is offsets 3-14 within the back component.
+        assert state.front_colors == [
+            BLUE if 10 <= zone < 22 else WHITE for zone in range(25)
+        ]
+        assert state.back_colors == [
+            BLUE if 3 <= offset < 15 else WHITE for offset in range(25)
+        ]
+        assert state.last_back_colors == state.back_colors
+
+    async def test_set_side_colors_saves_state_file(self) -> None:
+        """Test that a side write persists state when a state file is set."""
+        mirror = _mirror()
+        mirror._state_file = "/tmp/mirror.json"
+
+        await mirror.set_side_colors("front", "left", RED)
+
+        mirror._save_state_to_file.assert_awaited_once()
 
 
 class TestMirrorZoneMapValidation:

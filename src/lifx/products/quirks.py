@@ -123,12 +123,28 @@ class MirrorComponentLayout:
     positions in zone order, so callers can gather and scatter component
     colours without re-deriving the mapping.
 
+    Each component also splits into a left and a right side, one matrix column
+    each. Unlike the component positions, the side positions are in *buffer*
+    order — top of the mirror to bottom — because that is the order a vertical
+    gradient wants. The two orders differ: front zone 0 sits near the bottom,
+    so ``front_positions[0]`` and ``front_left_positions[0]`` are not the same
+    zone.
+
+    The sides are not the same length. The left column carries 13 zones and the
+    right carries 12, because the top row has no right-hand zone on either
+    component. Left index ``i`` is therefore matrix row ``i``, while right index
+    ``i`` is row ``i + 1``.
+
     Attributes:
         width: Matrix width in zones
         height: Matrix height in zones
         zone_map: Zone index at each buffer position, -1 where unused
         front_positions: Buffer positions of the front zones, in zone order
         back_positions: Buffer positions of the back zones, in zone order
+        front_left_positions: Front left column, top to bottom
+        front_right_positions: Front right column, top to bottom
+        back_left_positions: Back left column, top to bottom
+        back_right_positions: Back right column, top to bottom
     """
 
     width: int
@@ -136,6 +152,10 @@ class MirrorComponentLayout:
     zone_map: tuple[int, ...]
     front_positions: tuple[int, ...]
     back_positions: tuple[int, ...]
+    front_left_positions: tuple[int, ...]
+    front_right_positions: tuple[int, ...]
+    back_left_positions: tuple[int, ...]
+    back_right_positions: tuple[int, ...]
 
     @property
     def zone_count(self) -> int:
@@ -211,6 +231,14 @@ MIRROR_ZONE_MAP: tuple[int, ...] = (
 MIRROR_FRONT_ZONES = range(0, 25)
 MIRROR_BACK_ZONES = range(25, 50)
 
+#: Matrix column carrying each side of each Mirror component. Every column is
+#: exactly one side of one component, which is what makes side addressing a
+#: plain column read.
+MIRROR_FRONT_LEFT_COLUMN = 0
+MIRROR_FRONT_RIGHT_COLUMN = 1
+MIRROR_BACK_LEFT_COLUMN = 2
+MIRROR_BACK_RIGHT_COLUMN = 3
+
 
 def _buffer_positions(zone_map: tuple[int, ...], zones: range) -> tuple[int, ...]:
     """Map zone indices to their Set64 buffer positions.
@@ -233,18 +261,52 @@ def _buffer_positions(zone_map: tuple[int, ...], zones: range) -> tuple[int, ...
         raise ValueError(f"Zone {e.args[0]} is missing from the zone map") from e
 
 
+def _column_positions(
+    zone_map: tuple[int, ...], width: int, column: int
+) -> tuple[int, ...]:
+    """Collect the used buffer positions of one matrix column.
+
+    Args:
+        zone_map: Zone index at each buffer position, -1 where unused
+        width: Matrix width, which is the stride between rows
+        column: Column index to collect
+
+    Returns:
+        Buffer positions in the column, top to bottom, skipping unused entries
+    """
+    return tuple(
+        position
+        for position in range(column, len(zone_map), width)
+        if zone_map[position] >= 0
+    )
+
+
 # Mirror product component layouts
 # Zone map supplied by the LIFX firmware team: a 36x22 capsule, portrait by
 # default, driven as a 4x13 matrix. The Matter buttons sit just above the
-# bottom half-circle endpoint, between front zones 21 and 22. Not yet verified
-# against hardware.
+# bottom half-circle endpoint, between front zones 21 and 22. Matches the
+# layout diagram published by LIFX; not yet exercised against hardware.
 # TODO: Remove once LIFX adds component layout metadata to products.json
+_MIRROR_WIDTH = 4
+
 _MIRROR_LAYOUT = MirrorComponentLayout(
-    width=4,
+    width=_MIRROR_WIDTH,
     height=13,
     zone_map=MIRROR_ZONE_MAP,
     front_positions=_buffer_positions(MIRROR_ZONE_MAP, MIRROR_FRONT_ZONES),
     back_positions=_buffer_positions(MIRROR_ZONE_MAP, MIRROR_BACK_ZONES),
+    front_left_positions=_column_positions(
+        MIRROR_ZONE_MAP, _MIRROR_WIDTH, MIRROR_FRONT_LEFT_COLUMN
+    ),
+    front_right_positions=_column_positions(
+        MIRROR_ZONE_MAP, _MIRROR_WIDTH, MIRROR_FRONT_RIGHT_COLUMN
+    ),
+    back_left_positions=_column_positions(
+        MIRROR_ZONE_MAP, _MIRROR_WIDTH, MIRROR_BACK_LEFT_COLUMN
+    ),
+    back_right_positions=_column_positions(
+        MIRROR_ZONE_MAP, _MIRROR_WIDTH, MIRROR_BACK_RIGHT_COLUMN
+    ),
 )
 
 MIRROR_LAYOUTS: dict[int, MirrorComponentLayout] = {

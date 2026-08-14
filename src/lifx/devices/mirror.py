@@ -9,6 +9,7 @@ Terminology:
   capsule-shaped perimeter:
   - Front Component: Zones 0-24, facing the room, for task lighting
   - Back Component: Zones 25-49, facing the wall, for indirect backwash
+- Side: The left or right half of a component, one matrix column each
 
 Unlike Ceiling lights, whose uplight is a single zone, both Mirror components
 span multiple zones, so each one can carry its own gradient, theme or effect.
@@ -30,7 +31,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
@@ -57,6 +58,15 @@ _LOGGER = logging.getLogger(__name__)
 
 #: Brightness used when neither stored nor inferred brightness is available.
 DEFAULT_COMPONENT_BRIGHTNESS = 0.8
+
+#: A single Mirror component.
+Component = Literal["front", "back"]
+
+#: A component selector that can address both rings at once.
+SideComponent = Literal["front", "back", "both"]
+
+#: The left or right half of a component.
+Side = Literal["left", "right"]
 
 
 @dataclass
@@ -470,6 +480,85 @@ class MirrorLight(MatrixLight):
         """
         return self._component_positions("back")
 
+    def _side_positions(self, component: Component, side: Side) -> tuple[int, ...]:
+        """Get the Set64 buffer positions for one side of one component.
+
+        Args:
+            component: Either "front" or "back"
+            side: Either "left" or "right"
+
+        Returns:
+            Buffer positions of the side's zones, top to bottom
+
+        Raises:
+            LifxError: If device version is not available or not a Mirror
+        """
+        layout = self.layout
+
+        if component == "front":
+            return (
+                layout.front_left_positions
+                if side == "left"
+                else layout.front_right_positions
+            )
+
+        return (
+            layout.back_left_positions
+            if side == "left"
+            else layout.back_right_positions
+        )
+
+    @property
+    def front_left_positions(self) -> tuple[int, ...]:
+        """Set64 buffer positions of the front left zones, top to bottom.
+
+        Side positions are in buffer order, not the zone order used by
+        :attr:`front_positions`.
+
+        Returns:
+            Buffer positions of the 13 front left zones
+
+        Raises:
+            LifxError: If device version is not available or not a Mirror
+        """
+        return self._side_positions("front", "left")
+
+    @property
+    def front_right_positions(self) -> tuple[int, ...]:
+        """Set64 buffer positions of the front right zones, top to bottom.
+
+        Returns:
+            Buffer positions of the 12 front right zones
+
+        Raises:
+            LifxError: If device version is not available or not a Mirror
+        """
+        return self._side_positions("front", "right")
+
+    @property
+    def back_left_positions(self) -> tuple[int, ...]:
+        """Set64 buffer positions of the back left zones, top to bottom.
+
+        Returns:
+            Buffer positions of the 13 back left zones
+
+        Raises:
+            LifxError: If device version is not available or not a Mirror
+        """
+        return self._side_positions("back", "left")
+
+    @property
+    def back_right_positions(self) -> tuple[int, ...]:
+        """Set64 buffer positions of the back right zones, top to bottom.
+
+        Returns:
+            Buffer positions of the 12 back right zones
+
+        Raises:
+            LifxError: If device version is not available or not a Mirror
+        """
+        return self._side_positions("back", "right")
+
     @property
     def front_zone_count(self) -> int:
         """Number of front zones.
@@ -675,6 +764,155 @@ class MirrorLight(MatrixLight):
 
         if self._state_file:
             await self._save_state_to_file()
+
+    async def get_side_colors(self, component: Component, side: Side) -> list[HSBK]:
+        """Get the current colors of one side of one component.
+
+        Args:
+            component: Either "front" or "back"
+            side: Either "left" or "right"
+
+        Returns:
+            List of HSBK colors for the side's zones, top to bottom
+
+        Raises:
+            ValueError: If component is not "front" or "back", or if side is
+                not "left" or "right"
+            LifxTimeoutError: Device did not respond
+
+        Note:
+            There is no "both" option: the two rings can hold different colors,
+            so read them one at a time.
+        """
+        if component not in ("front", "back"):
+            raise ValueError(
+                f"get_side_colors needs a single component, got {component!r}. "
+                "Read 'front' and 'back' separately."
+            )
+
+        _validate_side(side)
+
+        all_colors = await self.get_all_tile_colors()
+
+        return _gather(all_colors[0], self._side_positions(component, side))
+
+    async def set_side_colors(
+        self,
+        component: SideComponent,
+        side: Side,
+        colors: HSBK | list[HSBK],
+        duration: float = 0.0,
+    ) -> None:
+        """Set the colors of one side of one or both components.
+
+        Args:
+            component: "front", "back", or "both" to write the same colors to
+                the same side of each ring
+            side: Either "left" or "right"
+            colors: Either:
+
+                - Single HSBK: sets every zone on the side to the same color
+                - List[HSBK]: sets each zone individually, top to bottom (13
+                  colors for the left side, 12 for the right)
+            duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If component or side is unknown, if every color has
+                brightness == 0, or if a list does not match the side's zone
+                count
+            LifxTimeoutError: Device did not respond
+
+        Note:
+            Colors are ordered top to bottom, which is not the zone order used
+            by :meth:`set_front_colors`. The left side carries 13 zones and the
+            right 12, because the top row has no right-hand zone: left index
+            ``i`` is row ``i``, right index ``i`` is row ``i + 1``.
+
+            The other side and the untouched component are left alone, and the
+            written component's stored state is refreshed in full so a later
+            restore replays both sides.
+        """
+        if component not in ("front", "back", "both"):
+            raise ValueError(
+                f"Unknown component {component!r}, expected 'front', 'back' or 'both'"
+            )
+
+        _validate_side(side)
+
+        components: tuple[Component, ...] = (
+            ("front", "back") if component == "both" else (cast(Component, component),)
+        )
+
+        target_colors = self._normalise_side_colors(component, side, colors)
+
+        # Get current colors for all zones
+        all_colors = await self.get_all_tile_colors()
+        tile_colors = all_colors[0]
+
+        # Update this side of each selected component only
+        for target in components:
+            _scatter(tile_colors, self._side_positions(target, side), target_colors)
+
+        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+
+        # Re-read each written component in full: only half of it changed, so
+        # storing the half would leave the rest stale for a later restore.
+        state = self.state
+        is_on = bool(state.power > 0)
+        for target in components:
+            full = _gather(tile_colors, self._component_positions(target))
+            self._set_component_state(target, full, stored=True)
+            if target == "front":
+                state.front_is_on = is_on
+            else:
+                state.back_is_on = is_on
+
+        if self._state_file:
+            await self._save_state_to_file()
+
+    def _normalise_side_colors(
+        self, component: SideComponent, side: Side, colors: HSBK | list[HSBK]
+    ) -> list[HSBK]:
+        """Expand and validate colors for one side.
+
+        Args:
+            component: "front", "back", or "both"
+            side: Either "left" or "right"
+            colors: Single color for every zone, or one color per zone
+
+        Returns:
+            One color per zone on the side
+
+        Raises:
+            ValueError: If every color has brightness == 0, or if a supplied
+                list does not match the side's zone count
+        """
+        reference: Component = "back" if component == "back" else "front"
+        zone_count = len(self._side_positions(reference, side))
+
+        if component == "both":
+            remedy = "Use turn_front_off() and turn_back_off() instead."
+        else:
+            remedy = f"Use turn_{component}_off() instead."
+        zero_message = (
+            f"Cannot set {component} {side} colors with brightness=0. {remedy}"
+        )
+
+        if isinstance(colors, HSBK):
+            if colors.brightness == 0:
+                raise ValueError(zero_message)
+            return [colors] * zone_count
+
+        if all(c.brightness == 0 for c in colors):
+            raise ValueError(zero_message)
+
+        if len(colors) != zone_count:
+            raise ValueError(
+                f"Expected {zone_count} colors for {component} {side}, "
+                f"got {len(colors)}"
+            )
+
+        return list(colors)
 
     def _normalise_colors(
         self,
@@ -1381,6 +1619,19 @@ class MirrorLight(MatrixLight):
     def __repr__(self) -> str:
         """String representation of mirror light."""
         return f"MirrorLight(serial={self.serial}, ip={self.ip}, port={self.port})"
+
+
+def _validate_side(side: Side) -> None:
+    """Reject a side selector that is neither left nor right.
+
+    Args:
+        side: Side selector supplied by the caller
+
+    Raises:
+        ValueError: If side is not "left" or "right"
+    """
+    if side not in ("left", "right"):
+        raise ValueError(f"Unknown side {side!r}, expected 'left' or 'right'")
 
 
 def _gather(buffer: list[HSBK], positions: tuple[int, ...]) -> list[HSBK]:

@@ -139,7 +139,7 @@ gh workflow run docs.yml
    - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
    - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
    - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
-   - `mirror.py`: `MirrorLight` class (extends `MatrixLight` with independent front/back component control for LIFX Mirror products; both components are multi-zone rings)
+   - `mirror.py`: `MirrorLight` class (extends `MatrixLight` with independent front/back component control for LIFX Mirror products; both components are multi-zone rings, each splitting into a left and right side addressable via `set_side_colors()`)
    - `component_state.py`: Shared helpers for component-based devices (colour comparison, serialisation, atomic state-file I/O)
    - State caching with configurable TTL to reduce network traffic
 

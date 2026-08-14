@@ -342,7 +342,7 @@ The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specif
 
 ## Mirror Light
 
-The `MirrorLight` class extends `MatrixLight` with independent control over the front and back components of a LIFX Mirror. Both components are multi-zone rings, so each can hold its own gradient or theme — see the [Mirror Lights User Guide](../user-guide/mirror-lights.md).
+The `MirrorLight` class extends `MatrixLight` with independent control over the front and back components of a LIFX Mirror. Both components are multi-zone rings, so each can hold its own gradient or theme, and each ring splits into a left and a right side that can be driven on its own — see the [Mirror Lights User Guide](../user-guide/mirror-lights.md).
 
 ::: lifx.devices.mirror.MirrorLight
     options:

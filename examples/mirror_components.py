@@ -3,10 +3,13 @@
 Demonstrates the MirrorLight API: reading the component layout, driving the
 front (room-facing task light) and back (wall-facing backwash) rings
 independently, painting a per-zone gradient, applying a different theme to each
-component, and restoring colours after the whole light is powered off.
+component, addressing the left and right side of a ring on its own, adjusting
+one side in place with a read-modify-write, and restoring colours after the
+whole light is powered off.
 
 Both components are closed rings of 25 zones each, so either one can carry its
-own gradient or theme.
+own gradient or theme. Each ring also splits into a left and a right side, one
+matrix column each, which can be driven separately or in step across both rings.
 
 The mirror's original power state and colours are restored before exiting.
 """
@@ -37,6 +40,16 @@ def gradient(zone_count: int, start_hue: float, end_hue: float) -> list[HSBK]:
         )
         for i in range(zone_count)
     ]
+
+
+def dim(color: HSBK, factor: float) -> HSBK:
+    """Scale a colour's brightness, leaving hue, saturation and kelvin alone."""
+    return HSBK(
+        hue=color.hue,
+        saturation=color.saturation,
+        brightness=color.brightness * factor,
+        kelvin=color.kelvin,
+    )
 
 
 async def main(ip: str, serial: str | None = None, hold: float = 3.0) -> None:
@@ -95,9 +108,40 @@ async def main(ip: str, serial: str | None = None, hold: float = 3.0) -> None:
         await mirror.apply_back_theme(get_theme("galaxy"), duration=1.0)
         await asyncio.sleep(hold)
 
+        print("7. Split the front ring: cool left edge, warm right edge")
+        await mirror.set_side_colors("front", "left", TASK_WHITE, duration=1.0)
+        await mirror.set_side_colors("front", "right", BACKWASH, duration=1.0)
+        await asyncio.sleep(hold)
+
+        # Front-left and back-left are the inner and outer face of the same
+        # physical edge, so "both" lines them up row for row. Sides are ordered
+        # top to bottom, and the left side has one more zone than the right
+        # because the top row has no right-hand zone.
+        print("8. Vertical gradient down both edges, front and back together")
+        left_count = len(mirror.front_left_positions)
+        right_count = len(mirror.front_right_positions)
+        await mirror.set_side_colors(
+            "both", "left", gradient(left_count, 180, 300), duration=1.0
+        )
+        await mirror.set_side_colors(
+            "both", "right", gradient(right_count, 180, 300), duration=1.0
+        )
+        await asyncio.sleep(hold)
+
+        # Reading a side back is what get_side_colors() is for: the colours
+        # come back in the same top-to-bottom order set_side_colors() expects,
+        # so an edge can be adjusted in place without knowing which of the 25
+        # zones live on it or touching the raw Set64 buffer.
+        print("9. Read the left edge back and halve its brightness in place")
+        left_now = await mirror.get_side_colors("front", "left")
+        await mirror.set_side_colors(
+            "front", "left", [dim(c, 0.4) for c in left_now], duration=1.0
+        )
+        await asyncio.sleep(hold)
+
         # Powering the whole light off captures both components' colours, so a
         # single component can be brought back without touching the other.
-        print("7. Whole light off, then back ring only restored from memory")
+        print("10. Whole light off, then back ring only restored from memory")
         await mirror.set_power(False, duration=1.0)
         await asyncio.sleep(hold)
         await mirror.turn_back_on(duration=1.0)
