@@ -7,7 +7,7 @@ with various parameters.
 import argparse
 import asyncio
 
-from lifx import HSBK, Colors, Device, MatrixLight
+from lifx import Colors, Device, MatrixLight
 from lifx.protocol.protocol_types import FirmwareEffect, TileEffectSkyType
 
 
@@ -113,8 +113,8 @@ async def main(ip: str, serial: str | None = None):
         ocean_palette = [
             Colors.CYAN,
             Colors.BLUE,
-            HSBK(hue=210, saturation=1.0, brightness=0.4, kelvin=3500),  # deep blue
-            HSBK(36408, 65535, 38550, 3500),  # Ocean blue
+            Colors.DARK_BLUE,
+            Colors.ROYAL_BLUE,
         ]
         await matrix.set_effect(
             effect_type=FirmwareEffect.MORPH,
