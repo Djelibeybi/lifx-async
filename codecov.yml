@@ -43,7 +43,6 @@ ignore:
 - src/lifx/protocol/protocol_types.py
 - src/lifx/products/generator.py
 - src/lifx/theme/data.py
-- src/lifx/theme/generator.py
 - benchmarks/
 - docs/
 
