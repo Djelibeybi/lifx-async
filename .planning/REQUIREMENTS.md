@@ -12,14 +12,14 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 ### Theme Import
 
-- [ ] **THEME-01**: Caller can get any of the 139 non-sport app themes from `ThemeLibrary`
+- [x] **THEME-01**: Caller can get any of the 139 non-sport app themes from `ThemeLibrary`
       by ASCII slug
 
-- [ ] **THEME-02**: A returned palette matches the captured app palette as an unordered
+- [x] **THEME-02**: A returned palette matches the captured app palette as an unordered
       set of HSBK values, brightness and kelvin intact — the app shuffles palette order on
       every application, so order is never compared
 
-- [ ] **THEME-03**: The 27 slugs shared between the app and the pre-v1.2 library return
+- [x] **THEME-03**: The 27 slugs shared between the app and the pre-v1.2 library return
       the app's palette (6 differ only by a uniform ×1.1087 brightness scale, 19 are
       genuinely redefined — `soothing` among them changes kelvin 3500 → 8000)
 
@@ -117,9 +117,9 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | Phase 6 | Pending |
-| THEME-02 | Phase 6 | Pending |
-| THEME-03 | Phase 6 | Pending |
+| THEME-01 | Phase 6 | Complete |
+| THEME-02 | Phase 6 | Complete |
+| THEME-03 | Phase 6 | Complete |
 | THEME-04 | Phase 6 | Complete |
 | COMPAT-01 | Phase 6 | Complete |
 | COMPAT-02 | — | Retired 2026-08-14 |

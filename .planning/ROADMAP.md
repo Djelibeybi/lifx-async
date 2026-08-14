@@ -80,7 +80,7 @@ vanish, in any intermediate state.
   4. A retrieved theme exposes its display name and category — both emoji-stripped, both distinct from its ASCII slug
   5. Regenerating the theme data module from the committed data file reproduces it exactly (verified by hand, convention only)
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 
 Plans:
 **Wave 1**
@@ -89,7 +89,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-02-PLAN.md — Full 166-record data file, library cutover to the generated dict, and the compatibility/metadata acceptance tests
+- [x] 06-02-PLAN.md — Full 166-record data file, library cutover to the generated dict, and the compatibility/metadata acceptance tests
 
 One phase by necessity, not appetite: the generator's first real output *is* the import,
 and "no key silently vanishes" binds every intermediate state, so splitting the import
@@ -171,7 +171,7 @@ successful outcome.
 | 3. Retry Schedule Reshape | v1.1 | 3/3 | Complete | 2026-07-17 |
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
-| 6. Generated Theme Library | v1.2 | 1/2 | In Progress|  |
+| 6. Generated Theme Library | v1.2 | 2/2 | In Progress|  |
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 0/TBD | Not started | - |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |

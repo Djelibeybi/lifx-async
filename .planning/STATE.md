@@ -4,17 +4,17 @@ milestone: v1.2
 milestone_name: Theme Library Update
 current_phase: 06
 current_phase_name: generated-theme-library
-status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-08-14T13:24:38.024Z"
+status: verifying
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-08-14T13:47:14.815Z"
 last_activity: 2026-08-14
 last_activity_desc: v1.2 roadmap created; 19/19 requirements mapped across Phases 6–9
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 Phase: 06 (generated-theme-library) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-14 — Phase 06 execution started
 
-Progress: [█████░░░░░] 50% (0/4 phases)
+Progress: [██████████] 100% (0/4 phases)
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Per-plan metrics for shipped milestones live with their archives under
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 06 P01 | 12min | 3 tasks | 9 files |
+| Phase 06 P02 | 17min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - Device readback is the only capture source — internal LIFX theme endpoints deliberately untouched; accepted cost: 16-colour protocol ceiling and lost palette order
 - [Phase ?]: Theme equality is Counter-based palette multiset at uint16 precision, identity ignored; Theme unhashable via __eq__-without-__hash__ (D-19, D-20)
 - [Phase ?]: Theme generator + generated data module excluded from coverage in both pyproject omit and codecov ignore, per products/protocol precedent (D-21, D-22)
+- [Phase ?]: codespell ignore-words gained 'whats': the D-06 emoji/non-ASCII strip turns "What's the craic?" into 'Whats the craic?' — mechanical data, not a typo
+- [Phase ?]: exciting shipped as captured despite a 1-ulp uint16 drift vs pre-v1.2 on 3 hues (app truncates, old table rounded) — THEME-02 binds shipped == captured; positional trio 0/7282/10923 unchanged and pinned
 
 ### v1.2 Working Notes
 
@@ -124,8 +127,8 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-14T13:24:38.015Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-08-14T13:47:14.808Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
