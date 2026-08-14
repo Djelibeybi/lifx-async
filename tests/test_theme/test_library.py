@@ -495,6 +495,10 @@ class TestNewSlugBehaviour:
         theme = ThemeLibrary.get("MONDRIAN")
         assert theme.slug == "mondrian"
 
-    def test_consecutive_gets_compare_equal(self) -> None:
-        """Two gets of one slug are equal via the palette-only __eq__."""
-        assert ThemeLibrary.get("mondrian") == ThemeLibrary.get("mondrian")
+    def test_consecutive_gets_carry_the_same_palette(self) -> None:
+        """Two gets of one slug are distinct objects over one palette."""
+        first = ThemeLibrary.get("mondrian")
+        second = ThemeLibrary.get("mondrian")
+
+        assert first is not second
+        assert first.palette_equals(second)
