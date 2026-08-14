@@ -90,26 +90,27 @@ Tracked, not in this milestone.
 
 ## Traceability
 
-Which phases cover which requirements. Filled in during roadmap creation.
+Which phases cover which requirements. Mapped at roadmap creation (2026-08-14) —
+see `.planning/ROADMAP.md` Phase Details. 19/19 requirements mapped, no orphans.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | — | Pending |
-| THEME-02 | — | Pending |
-| THEME-03 | — | Pending |
-| THEME-04 | — | Pending |
-| COMPAT-01 | — | Pending |
-| COMPAT-02 | — | Pending |
-| COMPAT-03 | — | Pending |
-| COMPAT-04 | — | Pending |
-| META-01 | — | Pending |
-| META-02 | — | Pending |
-| META-03 | — | Pending |
-| META-04 | — | Pending |
-| FIDELITY-01 | — | Pending |
-| FIDELITY-02 | — | Pending |
-| FIDELITY-03 | — | Pending |
-| TOOL-01 | — | Pending |
-| TOOL-02 | — | Pending |
-| TOOL-03 | — | Pending |
-| DOCS-03 | — | Pending |
+| THEME-01 | Phase 6 | Pending |
+| THEME-02 | Phase 6 | Pending |
+| THEME-03 | Phase 6 | Pending |
+| THEME-04 | Phase 6 | Pending |
+| COMPAT-01 | Phase 6 | Pending |
+| COMPAT-02 | Phase 6 | Pending |
+| COMPAT-03 | Phase 6 | Pending |
+| COMPAT-04 | Phase 7 | Pending |
+| META-01 | Phase 6 | Pending |
+| META-02 | Phase 6 | Pending |
+| META-03 | Phase 7 | Pending |
+| META-04 | Phase 7 | Pending |
+| FIDELITY-01 | Phase 8 | Pending |
+| FIDELITY-02 | Phase 8 | Pending |
+| FIDELITY-03 | Phase 8 | Pending |
+| TOOL-01 | Phase 9 | Pending |
+| TOOL-02 | Phase 9 | Pending |
+| TOOL-03 | Phase 9 | Pending |
+| DOCS-03 | Phase 9 | Pending |
