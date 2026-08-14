@@ -59,7 +59,7 @@ pytest green, 100% branch patch coverage in CI, Australian English in prose and 
 Theme names are public API — a key may gain values or an alias; it may never silently
 vanish, in any intermediate state.
 
-- [ ] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving
+- [x] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving (completed 2026-08-15)
 - [ ] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate
 - [ ] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way
 - [ ] **Phase 9: Resync Tooling & Docs** - A future app update is resynced by documented procedure; theme docs reflect the new library
@@ -80,7 +80,7 @@ vanish, in any intermediate state.
   4. A retrieved theme exposes its display name and category — both emoji-stripped, both distinct from its ASCII slug
   5. Regenerating the theme data module from the committed data file reproduces it exactly (verified by hand, convention only)
 
-**Plans:** 2/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 **Wave 1**
@@ -171,7 +171,7 @@ successful outcome.
 | 3. Retry Schedule Reshape | v1.1 | 3/3 | Complete | 2026-07-17 |
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
-| 6. Generated Theme Library | v1.2 | 2/2 | In Progress|  |
+| 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 0/TBD | Not started | - |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
