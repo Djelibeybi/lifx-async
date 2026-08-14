@@ -82,7 +82,12 @@ class Theme:
             ```
         """
         if colors and len(colors) > 0:
-            self.colors: list[HSBK] = colors
+            # Copied, never aliased: a Theme built over a caller's list would
+            # otherwise mutate that list through add_color(), and a Theme
+            # built over a cached or shared list would let add_color() corrupt
+            # the source. Every construction path gets the isolation, not just
+            # ThemeLibrary.get().
+            self.colors: list[HSBK] = list(colors)
         else:
             # Default to white if no colors provided
             self.colors = [Colors.WHITE_NEUTRAL]
