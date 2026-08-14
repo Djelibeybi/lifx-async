@@ -33,6 +33,11 @@ class Theme:
         name and category do not propagate. This is a known deferred
         limitation of the identity round-trip guarantee.
 
+    Note:
+        ``==`` compares identity, so a Theme stays hashable and usable as
+        a dict key or set member. To compare palettes, call
+        ``palette_equals()``.
+
     Example:
         ```python
         # Create a theme with specific colors
@@ -215,24 +220,43 @@ class Theme:
         """
         return any(c == color for c in self.colors)
 
-    def __eq__(self, other: object) -> bool:
-        """Two themes are equal if their palettes are the same multiset of colors.
+    def palette_equals(self, other: Theme) -> bool:
+        """Check whether two themes carry the same palette.
 
         Order is never compared because the app shuffles palette order on
         every application, so two orderings of one palette are the same
-        theme. Identity (slug, name, category) is also excluded: an
+        palette. Identity (slug, name, category) is excluded too: an
         identity-bearing library theme and a caller-built theme with the
-        same palette are the same theme. Colors compare at uint16
+        same colors have the same palette. Colors compare at uint16
         (protocol) granularity via HSBK equality, and duplicate counts
         matter — a multiset comparison, not a set comparison.
 
-        Note:
-            Defining ``__eq__`` without ``__hash__`` deliberately makes
-            Theme unhashable: its palette is mutable via ``add_color()``,
-            so a stable hash cannot be provided.
+        This is deliberately a named method rather than ``__eq__``. A
+        Theme's palette is mutable via ``add_color()``, so value equality
+        could not be paired with a stable ``__hash__``; making ``==``
+        compare palettes would leave Theme unhashable and silently change
+        what ``theme in [a, b]``, ``list.index()`` and ``list.remove()``
+        mean. ``==`` therefore stays identity comparison and the palette
+        comparison is spelled out at the call site.
+
+        Args:
+            other: Theme to compare palettes with.
+
+        Returns:
+            True if both palettes are the same multiset of colors.
+
+        Example:
+            ```python
+            # independence and old_glory ship one shared app palette
+            assert ThemeLibrary.get("independence").palette_equals(
+                ThemeLibrary.get("old_glory")
+            )
+            ```
         """
         if not isinstance(other, Theme):
-            return NotImplemented
+            raise TypeError(
+                f"palette_equals() expects a Theme, got {type(other).__name__}"
+            )
         return Counter(self.colors) == Counter(other.colors)
 
     def __repr__(self) -> str:

@@ -283,55 +283,85 @@ class TestThemeIdentity:
         assert theme.category is None
 
 
-class TestThemeEquality:
-    """Tests for palette-only multiset equality (D-19) and unhashability (D-20)."""
+class TestThemePaletteEquals:
+    """Tests for the explicit palette multiset comparison (D-19)."""
 
-    def test_same_colors_different_order_equal(self) -> None:
-        """Themes with the same colours in different orders compare equal."""
+    def test_same_colors_different_order_match(self) -> None:
+        """Palettes with the same colours in different orders match."""
         a = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
         b = Theme([Colors.BLUE, Colors.RED, Colors.GREEN])
 
-        assert a == b
+        assert a.palette_equals(b)
 
-    def test_different_duplicate_counts_unequal(self) -> None:
-        """Themes differing only in duplicate counts compare unequal."""
+    def test_different_duplicate_counts_do_not_match(self) -> None:
+        """Palettes differing only in duplicate counts do not match."""
         a = Theme([Colors.RED, Colors.RED, Colors.GREEN])
         b = Theme([Colors.RED, Colors.GREEN, Colors.GREEN])
 
-        assert a != b
+        assert not a.palette_equals(b)
 
     def test_multiset_not_set(self) -> None:
-        """Same distinct colour set but different multiplicities is unequal."""
+        """Same distinct colour set but different multiplicities does not match."""
         a = Theme([Colors.RED, Colors.RED])
         b = Theme([Colors.RED])
 
-        assert a != b
+        assert not a.palette_equals(b)
 
     def test_identity_ignored(self) -> None:
-        """A library theme and a caller-built theme with the same palette are equal."""
+        """A library theme and a caller-built theme match on palette alone."""
         library_theme = ThemeLibrary.get("evening")
         caller_theme = Theme(list(library_theme.colors))
 
         assert caller_theme.slug is None
-        assert library_theme == caller_theme
+        assert library_theme.palette_equals(caller_theme)
 
-    def test_distinct_themes_with_identical_palettes_compare_equal(self) -> None:
-        """Distinct library themes sharing a palette compare equal (D-19).
+    def test_distinct_themes_with_identical_palettes_match(self) -> None:
+        """Distinct library themes sharing a palette match (D-19).
 
         The app ships memorial_day, independence and old_glory with one
-        identical palette; identity is excluded from equality, so they
-        compare equal. (Pre-v1.2 the example pair was love/romance, but
-        the resync gave romance its own app palette.)
+        identical palette; identity is excluded, so their palettes match.
+        (Pre-v1.2 the example pair was love/romance, but the resync gave
+        romance its own app palette.)
         """
-        assert ThemeLibrary.get("independence") == ThemeLibrary.get("old_glory")
-        assert ThemeLibrary.get("memorial_day") == ThemeLibrary.get("old_glory")
+        old_glory = ThemeLibrary.get("old_glory")
 
-    def test_different_palettes_unequal(self) -> None:
-        """Themes with different palettes compare unequal."""
+        assert ThemeLibrary.get("independence").palette_equals(old_glory)
+        assert ThemeLibrary.get("memorial_day").palette_equals(old_glory)
+
+    def test_different_palettes_do_not_match(self) -> None:
+        """Themes with different palettes do not match."""
         a = Theme([Colors.RED])
         b = Theme([Colors.GREEN])
 
+        assert not a.palette_equals(b)
+
+    def test_non_theme_argument_raises(self) -> None:
+        """A non-Theme argument is a caller error, not a silent False."""
+        theme = Theme([Colors.RED])
+
+        with pytest.raises(TypeError, match="expects a Theme, got int"):
+            theme.palette_equals(3)  # type: ignore[arg-type]
+
+
+class TestThemeEquality:
+    """Tests for identity ``==`` and hashability.
+
+    ``==`` deliberately stays identity comparison. A Theme's palette is
+    mutable via ``add_color()``, so value equality could not be paired
+    with a stable ``__hash__`` — defining ``__eq__`` alone would make
+    Theme unhashable, breaking ``set(themes)``, ``{theme: config}`` and
+    ``functools.lru_cache`` over a Theme argument for every downstream
+    caller. Palette comparison is spelled ``palette_equals()`` instead.
+    """
+
+    def test_distinct_instances_with_same_palette_are_unequal(self) -> None:
+        """Two Themes over one palette are distinct objects, so ``!=``."""
+        a = Theme([Colors.RED, Colors.GREEN])
+        b = Theme([Colors.RED, Colors.GREEN])
+
         assert a != b
+        assert a == a
+        assert a.palette_equals(b)
 
     def test_non_theme_comparison_false_without_raising(self) -> None:
         """Comparing a Theme with a non-Theme is False, never an exception."""
@@ -341,16 +371,29 @@ class TestThemeEquality:
         assert (theme != 3) is True
         assert theme != object()
 
-    def test_unhashable(self) -> None:
-        """hash(theme) raises TypeError — Theme is deliberately unhashable."""
+    def test_hashable(self) -> None:
+        """hash(theme) works: Theme keeps the inherited identity hash."""
         theme = Theme([Colors.RED])
 
-        with pytest.raises(TypeError):
-            hash(theme)
+        assert isinstance(hash(theme), int)
+        assert Theme.__hash__ is not None
 
-    def test_hash_slot_is_none(self) -> None:
-        """Defining __eq__ without __hash__ sets Theme.__hash__ to None."""
-        assert Theme.__hash__ is None
+    def test_usable_as_dict_key_and_set_member(self) -> None:
+        """The container use cases an unhashable Theme would break."""
+        a = Theme([Colors.RED])
+        b = Theme([Colors.GREEN])
+
+        assert len({a, b}) == 2
+        assert {a: "first", b: "second"}[a] == "first"
+
+    def test_list_membership_is_identity(self) -> None:
+        """``in``/``index``/``remove`` match the object, not the palette."""
+        a = Theme([Colors.RED])
+        same_palette = Theme([Colors.RED])
+        themes = [a]
+
+        assert a in themes
+        assert same_palette not in themes
 
     def test_existing_behaviour_unchanged(self) -> None:
         """Iteration, indexing, len() and add_color() behave exactly as before."""
