@@ -8,7 +8,8 @@ Tests cover:
   string numerics, booleans) naming the record and its JSONL line number
 - Name/category metadata validation (non-string, empty, non-ASCII)
 - Key collision aborts naming both display names
-- Colour range validation (kelvin 0 is a legitimate wire value)
+- Colour range validation (kelvin 0 is inbound-only and rejected here) and
+  the 16-slot wire palette ceiling
 - Canonical palette ordering (D-24) with duplicates preserved
 - Alias expansion binding the target's own record (D-13, D-14)
 - uint16 round-trip exactness of emitted HSBK literals
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -31,6 +33,7 @@ from typing import Any
 import pytest
 
 import lifx.theme.generator as generator_module
+from lifx.const import MAX_PALETTE_COLORS
 from lifx.theme.generator import (
     canonical_palette,
     derive_slug,
@@ -293,6 +296,36 @@ class TestValidateRecordsSchema:
         with pytest.raises(RuntimeError, match=r"line 1.*'colors' is not a list"):
             validate_records(_pairs(_record(colors={"hue": 0})))
 
+    def test_colour_entry_not_an_object_aborts(self) -> None:
+        """A colour that is not a JSON object aborts naming its index."""
+        with pytest.raises(
+            RuntimeError, match=r"line 1.*colour 0 is not a JSON object"
+        ):
+            validate_records(_pairs(_record(colors=["not a colour"])))
+
+    def test_non_dict_record_labelled_generically(self) -> None:
+        """A non-dict reaching the error builder is labelled, not crashed.
+
+        validate_records() rejects non-objects before ever calling _fail(),
+        so this arc is defensive only — but _fail() is the single error
+        constructor and must never raise an error of its own.
+        """
+        error = generator_module._fail(7, ["not", "a", "record"], "bad thing")
+
+        assert "unidentifiable record" in str(error)
+        assert "line 7" in str(error)
+
+    def test_unidentifiable_record_named_generically(self) -> None:
+        """A record carrying neither name nor slug still aborts cleanly.
+
+        ``_record_label()`` has nothing to quote, so the error names the
+        record generically rather than raising a KeyError of its own.
+        """
+        with pytest.raises(
+            RuntimeError, match=r"line 1.*unidentifiable record.*missing required field"
+        ):
+            validate_records(_pairs({"category": "Test", "colors": [_color()]}))
+
     def test_aliases_not_a_list_aborts(self) -> None:
         """An aliases field that is not a list aborts."""
         with pytest.raises(RuntimeError, match=r"line 1.*'aliases' is not a list"):
@@ -415,9 +448,26 @@ class TestValidateRecordsColors:
         with pytest.raises(RuntimeError, match=r"line 1.*out of range"):
             validate_records(_pairs(_record(colors=[color])))
 
-    def test_kelvin_zero_does_not_abort(self) -> None:
-        """Kelvin 0 is KELVIN_SATURATED — a legitimate wire value."""
-        validate_records(_pairs(_record(colors=[_color(kelvin=0)])))
+    def test_kelvin_zero_aborts_on_outbound_theme_data(self) -> None:
+        """Kelvin 0 is inbound-only; a theme is outbound, blended data.
+
+        ``HSBK.average()`` averages kelvin linearly, so a palette mixing
+        kelvin 0 with any real kelvin lands in the forbidden 1-1499 band and
+        raises inside every multizone/matrix ``apply_theme()`` path.
+        """
+        with pytest.raises(RuntimeError, match=r"line 1.*kelvin.*not valid in theme"):
+            validate_records(_pairs(_record(colors=[_color(kelvin=0)])))
+
+    def test_palette_over_wire_ceiling_aborts(self) -> None:
+        """A palette above the 16-slot wire ceiling aborts at generation."""
+        colors = [_color(hue=index) for index in range(MAX_PALETTE_COLORS + 1)]
+        with pytest.raises(RuntimeError, match=r"line 1.*more than 16 colours"):
+            validate_records(_pairs(_record(colors=colors)))
+
+    def test_palette_at_wire_ceiling_is_accepted(self) -> None:
+        """Exactly 16 colours is the ceiling, not one past it."""
+        colors = [_color(hue=index) for index in range(MAX_PALETTE_COLORS)]
+        validate_records(_pairs(_record(colors=colors)))
 
 
 # ============================================================================
@@ -504,6 +554,61 @@ class TestEmitDataModule:
         assert counts[(100, 65535, 65535, 3500)] == 2
         assert counts[(200, 65535, 65535, 3500)] == 1
 
+    @pytest.mark.parametrize(
+        ("record", "expected"),
+        [
+            (_record(slug="bad-slug", name="Bad Slug"), r"bad key 'bad-slug'"),
+            (_record(name="Café"), r"bad metadata 'Café'"),
+            (_record(category=""), r"bad metadata ''"),
+            (
+                _record(aliases=["bad-alias"]),
+                r"bad key 'bad-alias'",
+            ),
+        ],
+    )
+    def test_emit_time_backstops_reject_unvalidated_records(
+        self, record: dict[str, Any], expected: str
+    ) -> None:
+        """Emit-time checks hold when validate_records() was not run first.
+
+        emit_data_module() is public and directly callable, so its backstops
+        must re-assert every invariant a hostile record would need to break
+        to inject source text into the generated module.
+        """
+        with pytest.raises(RuntimeError, match=expected):
+            emit_data_module(_pairs(record))
+
+    def test_round_trip_mismatch_aborts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A colour that does not re-encode to its stored uint16 aborts.
+
+        Unreachable through the protocol path today; the check exists so a
+        future HSBK conversion change cannot silently ship drifted palettes.
+        """
+        monkeypatch.setattr(
+            generator_module.HSBK,
+            "as_tuple",
+            lambda self: (1, 2, 3, 4),
+        )
+
+        with pytest.raises(RuntimeError, match="round-trip mismatch"):
+            emit_data_module(_pairs(_record()))
+
+    def test_duplicate_slug_aborts_at_emit_time(self) -> None:
+        """Two records sharing a slug abort rather than last-wins.
+
+        Keying by slug is last-wins, so the first record would vanish while
+        its aliases stayed bound — to the *wrong* theme. validate_records()
+        catches this when the documented order is followed; this backstop
+        holds when emit_data_module() is called directly.
+        """
+        records = _pairs(
+            _record(slug="alpha", name="Alpha", aliases=["old_alpha"]),
+            _record(slug="alpha", name="Alpha"),
+        )
+
+        with pytest.raises(RuntimeError, match="duplicate slug"):
+            emit_data_module(records)
+
     def test_deterministic_output(self) -> None:
         """emit_data_module() called twice over the same records returns
         identical strings."""
@@ -513,6 +618,59 @@ class TestEmitDataModule:
         )
 
         assert emit_data_module(records) == emit_data_module(records)
+
+
+# ============================================================================
+# Tests for format_generated_files()
+# ============================================================================
+
+
+class TestFormatGeneratedFiles:
+    """The ruff invocation and its failure reporting."""
+
+    def test_ruff_failure_raises_with_both_streams(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A non-zero ruff exit aborts, quoting stdout and stderr.
+
+        ``ruff format`` only fails on unparsable Python, which means the
+        generator emitted broken code — that must never pass as a successful
+        generation, and the diagnostics are needed to explain why.
+        """
+
+        class _Result:
+            returncode = 1
+            stdout = "error: unparsable input\n"
+            stderr = "ruff internal failure\n"
+
+        monkeypatch.setattr(
+            generator_module.subprocess, "run", lambda *a, **k: _Result()
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            generator_module.format_generated_files(tmp_path / "data.py")
+
+        message = str(exc_info.value)
+        assert "ruff format failed" in message
+        assert "unparsable input" in message
+        assert "ruff internal failure" in message
+
+    def test_ruff_failure_with_empty_streams_still_raises(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A silent non-zero exit still aborts, with empty diagnostics."""
+
+        class _Result:
+            returncode = 2
+            stdout = ""
+            stderr = "   "
+
+        monkeypatch.setattr(
+            generator_module.subprocess, "run", lambda *a, **k: _Result()
+        )
+
+        with pytest.raises(RuntimeError, match="ruff format failed"):
+            generator_module.format_generated_files(tmp_path / "data.py")
 
 
 # ============================================================================
@@ -570,6 +728,25 @@ class TestMainAtomicWrite:
 
         assert target.read_bytes() == original
         assert [p.name for p in out_dir.iterdir()] == ["data.py"]
+
+    @pytest.mark.parametrize("umask_value", [0o022, 0o077])
+    def test_generated_module_is_world_readable_under_any_umask(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, umask_value: int
+    ) -> None:
+        """The generated module lands 0644 whatever the operator's umask.
+
+        mkstemp creates 0600 and Path.replace() carries the temp mode onto
+        the target, so a umask-derived mode would ship an owner-only module
+        inside the wheel — invisibly, since git tracks only the exec bit.
+        """
+        target, _ = self._prepare(tmp_path, monkeypatch)
+        original_umask = os.umask(umask_value)
+        try:
+            main()
+        finally:
+            os.umask(original_umask)
+
+        assert target.stat().st_mode & 0o777 == 0o644
 
     def test_validation_failure_before_write_leaves_no_temp_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
