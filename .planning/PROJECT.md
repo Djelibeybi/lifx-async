@@ -1,6 +1,6 @@
-# lifx-async — Wire Reliability
+# lifx-async — Theme Library Update
 
-## Current State (post-v1.0)
+## Current State (post-v1.1)
 
 **v1.1 Wire Reliability shipped 2026-07-26.** Phases 2–5 delivered and verified; all 13
 requirements (DISC-01..03, RETRY-01..04, ANIM-01..04, DOCS-01..02) satisfied. Measured
@@ -17,7 +17,7 @@ Nyquist-compliant), and `api.discover()` no longer lets a slow or dead device ex
 discovery idle window (quick task 260726-824). See
 `milestones/v1.1-MILESTONE-AUDIT.md`.
 
-**Next milestone:** not yet defined — run `/gsd-new-milestone`.
+**Next milestone:** v1.2 Theme Library Update — started 2026-08-14 (see below).
 
 **Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) — see `.planning/MILESTONES.md`.
 **Also shipped post-v1.0:** Phase 1 discovery unification (verified 2026-06-13) — rebuilt
@@ -27,6 +27,49 @@ first-wins per-serial dedup.
 **Spike series completed 2026-07-16** (`.planning/spikes/`, packaged as the
 `spike-findings-lifx-async` skill): five real-hardware experiments that disproved the
 "switch to threading" hypothesis and located the actual reliability levers.
+
+## Current Milestone: v1.2 Theme Library Update
+
+**Goal:** Resync `lifx.theme.library` with the LIFX app's live theme set — 139 non-sport
+themes captured from hardware on 2026-08-14 — without silently changing colours existing
+callers already depend on.
+
+**Target features:**
+
+- Import the 139 non-sport app themes as ASCII slugs, carrying the app's display name and
+  category as metadata
+- Resync the 27 shared slugs to the app's values (6 differ only by a uniform ×1.1087
+  brightness scale, 19 are genuinely redefined); every overwritten palette keeps a
+  `*_legacy` alias holding the current values
+- Resolve the 30 orphaned library keys — map the renames (`aurora_borealis` → Aurora 🌌,
+  `forest` → Forrest 🌳), decide keep-or-deprecate for the remainder
+- Expose the app's category taxonomy as queryable theme metadata
+- Establish the true colour count for the 26 themes that returned exactly 16 colours, or
+  record on the record that it cannot be established from a device
+- Ship the capture tooling (`enumerate_themes.py`, `sweep_themes.py`,
+  `analyse_themes.py`) so a future app update can be resynced rather than re-derived
+
+**Key context:**
+
+- Raw capture lives in `.claude/theme-capture/` — `themes.jsonl` (179 records: name,
+  category, picker index, palette), `picker-order.txt`, and `tools/`.
+- Sport categories are dropped: 🏆 AUSSIE RULES (19), 🏉 LEAGUE (17), 🏉 UNION (4) = 40
+  themes. That sidesteps 5 of the 6 slug collisions (`brisbane`, `melbourne`, `sydney`,
+  `gold_coast`, `new_zealand`). `christmas` still collides — Holidays against Archives —
+  but both carry identical palettes, so it collapses cleanly.
+- **Palette order is meaningless.** The app shuffles the sequence on every application;
+  the same theme applied twice returns the same colours in a different order. All
+  comparison is unordered-set comparison.
+- **16 is the protocol palette ceiling** for both `SetTileEffect` and
+  `SetMultiZoneEffect`, so no device-based method can ever recover a palette longer than
+  16. The 26 exactly-16 themes (all 10 of 🎨 ART SERIES among them) may or may not be
+  clipped, and the capture method cannot tell. Resolving this needs a non-device source.
+- Capture came from a single product (Tile, product 55). Palette is effect configuration
+  rather than rendered output, so product-invariance is expected but untested.
+- Themes are server-driven (`com.lifx.shared.data.cloud.themes.ThemeDTO`, cached in a
+  local SQLite table) — no theme name appears in the APK. The internal endpoints
+  (`api.lifx.com/themes/v2` 401, `themes/v1/palette` 405 POST-only) are undocumented and
+  were deliberately not called.
 
 ## Shipped Milestone: v1.1 Wire Reliability (2026-07-26)
 
@@ -52,15 +95,16 @@ the asyncio core or public API.
 ## What This Is
 
 `lifx-async` is a mature, zero-dependency, type-safe async Python library for controlling
-LIFX smart devices over the local network (published on PyPI as `lifx-async`). This
-milestone makes its wire behaviour — discovery coverage, request retries, and animation
-frame delivery — measurably as reliable as the best reference clients, keeping the async
-API untouched.
+LIFX smart devices over the local network (published on PyPI as `lifx-async`). v1.1 made
+its wire behaviour measurably as reliable as the best reference clients. This milestone
+turns to what the library *renders*: its built-in theme palettes, transcribed from photons
+years ago and never resynced, are now mostly wrong — the app ships 179 themes, the library
+carries 57, and most shared names no longer match.
 
 ## Core Value
 
-Commands stick, devices are found, and streaming never starves control traffic — the
-library is reliable enough that "bulb didn't respond" stops being a lifx-async problem.
+Commands stick, devices are found, streaming never starves control traffic — and a theme
+by name looks like the theme of that name in the LIFX app.
 
 ## Requirements
 
@@ -87,7 +131,17 @@ library is reliable enough that "bulb didn't respond" stops being a lifx-async p
 <!-- Next milestone's scope. REQ-IDs are defined in a fresh REQUIREMENTS.md by
      /gsd-new-milestone; these are carried-forward candidates, not commitments. -->
 
-None committed — v1.1 is closed and the next milestone is undefined. Candidates:
+v1.2 Theme Library Update — REQ-IDs defined in `.planning/REQUIREMENTS.md`:
+
+- [ ] Import the 139 non-sport app themes with ASCII slugs, display names and categories
+- [ ] Resync the 27 shared slugs; `*_legacy` aliases preserve every overwritten palette
+- [ ] Resolve the 30 orphaned library keys (renames mapped, remainder kept or deprecated)
+- [ ] Expose the category taxonomy as queryable metadata
+- [ ] Settle the 26 exactly-16-colour themes: true count, or a recorded finding that a
+      device cannot supply it
+- [ ] Ship the capture tooling for future resyncs
+
+Carried-forward candidates, not committed to v1.2:
 
 - [ ] PERS-01: generalise `state_file` persistence into a reusable mixin (deferred since
       2026-06-11)
@@ -109,6 +163,14 @@ None committed — v1.1 is closed and the next milestone is undefined. Candidate
 - Generalising `state_file` persistence into a reusable mixin (PERS-01) — still deferred;
   unrelated to this milestone
 - mDNS discovery changes — Spike 005's finding applies to UDP broadcast discovery
+- **Sport themes** (🏆 AUSSIE RULES, 🏉 LEAGUE, 🏉 UNION — 40 of the 179 captured) —
+  club-branded palettes with colliding slugs and no general appeal (user decision,
+  2026-08-14)
+- **Calling the undocumented LIFX theme endpoints** — `api.lifx.com/themes/v2` and
+  `themes/v1/palette` are internal, unauthenticated to us, and deliberately untouched;
+  the device stays the source of truth
+- **MirrorLight (PR #194)** — complete and open, lands on its own schedule, not folded
+  into this milestone (user decision, 2026-08-14)
 
 ## Context
 
@@ -125,6 +187,10 @@ None committed — v1.1 is closed and the next milestone is undefined. Candidate
   mandatory for discovery/loss claims — single rounds mislead.
 - lifx-async is the LIFX provider for LedFx — the streaming + concurrent-control pattern
   Spike 003 measured is LedFx's exact workload.
+- Theme capture (2026-08-14): the app was driven over adb — apply a theme as MORPH, tap
+  Save (the palette does not reach the device until Save), then read it back over the LAN
+  via `StateTileEffect`, which `MatrixLight.get_effect()` slices to `palette_count` with
+  brightness and kelvin intact. Method and caveats: `.claude/theme-capture/README.md`.
 
 ## Constraints
 
@@ -137,6 +203,8 @@ None committed — v1.1 is closed and the next milestone is undefined. Candidate
 - **Quality gates**: `uv run pyright` (strict) clean, `uv run ruff check`/`format` clean,
   `uv run pytest` green across supported versions; CI requires 100% branch patch coverage.
 - **Spelling**: Australian English in all prose/comments.
+- **Theme names are public API**: every existing key in `lifx.theme.library` is importable
+  and callable today. A key may gain values or an alias; it may not silently vanish.
 
 ## Key Decisions
 
@@ -149,6 +217,9 @@ None committed — v1.1 is closed and the next milestone is undefined. Candidate
 | Publish behaviour, not tuning constants (D5-09 as written) | Rendered docstrings state the behavioural contract; thresholds/expiries stay in `flow.py` and comments where they can change without a docs lie | ✓ Applied — Phase 5. **The rule itself is disputed by the operator and remains an OPEN decision** in `05-CONTEXT.md`, with spike candidate 006 (cap-impact measurement) linked. Phase 5 complied with it as written; its future is unsettled |
 | Drop the 8-warning docs baseline instead of pinning it | The "pre-existing" warnings were a defect set (5 annotations parsed as link refs; 3 anchors to never-rendered mDNS symbols), not a constant | ✓ Shipped — Phase 5 (D5-23). Zero warnings under `--strict`, gated in CI so the class cannot drift back |
 | Discovery keeps its own re-broadcast schedule rather than reusing the Phase 3 retransmit engine | `_transmit_and_listen()` stops retransmitting after its first yield, which would defeat DISC-01's requirement to keep broadcasting after early responders answer | ✓ Validated at the v1.1 close audit — disjoint sockets, packets and sources, so the two schedules cannot double-send |
+| Overwrite redefined themes but keep `*_legacy` aliases | App accuracy is the point of the milestone, but 19 palettes change under callers who never asked for it; an alias makes the old values recoverable by name instead of by git archaeology | Decided 2026-08-14 — v1.2 scope |
+| ASCII slugs, drop the sport categories | Emoji are poor Python identifiers and CLI arguments; dropping AFL/League/Union removes 5 of the 6 slug collisions outright rather than inventing suffixes for club branding | Decided 2026-08-14 — v1.2 scope |
+| Device readback as the only capture source | Themes are server-driven and absent from the APK; the internal endpoints are undocumented and were not called. Accepted cost: palettes are capped at the protocol's 16 colours and order is lost | Applied to the 2026-08-14 capture; the 16-colour consequence is an open v1.2 question |
 | Reset the discovery idle timer on consumer resume, not just before the yield | `api.discover()` constructs a Device per response; those round trips would otherwise spend the idle window and truncate the sweep | ✓ Shipped — v1.1 close-out (260726-824). Overall timeout untouched, so a slow consumer still cannot extend discovery indefinitely |
 
 ## Evolution
@@ -169,4 +240,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-26 after the v1.1 Wire Reliability milestone*
+*Last updated: 2026-08-14 at the start of the v1.2 Theme Library Update milestone*
