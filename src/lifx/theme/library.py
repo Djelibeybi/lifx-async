@@ -1,25 +1,28 @@
-"""Built-in theme library with 60+ curated color themes.
+"""Built-in theme library generated from the LIFX app's own palettes.
 
-This module provides a collection of professionally designed color themes
-for LIFX devices, sourced from the official LIFX app theme library.
+The theme data is generated from ``data/themes.jsonl`` by
+``lifx.theme.generator``, synced from the LIFX app via hardware capture on
+2026-08-14. The library carries 168 resolvable names: 138 app theme slugs,
+28 pre-v1.2 keys with no app counterpart (category ``Library``), and 2
+rename aliases (``forest`` and ``aurora_borealis``) that resolve to their
+renamed targets.
 
-All themes are based on color theory and lighting design principles.
-
-Reference: https://github.com/Djelibeybi/aiolifx-themes
+Palette order carries no meaning: the app shuffles the order on every
+application, so palettes are stored canonically sorted and all palette
+comparison is unordered.
 """
 
 from __future__ import annotations
 
-from lifx.color import HSBK
-from lifx.theme.data import THEMES
+from lifx.theme.data import THEMES, ThemeRecord
 from lifx.theme.theme import Theme
 
 
 class ThemeLibrary:
-    """Collection of built-in color themes for LIFX devices.
+    """Collection of built-in colour themes for LIFX devices.
 
-    Provides access to 60+ professionally designed themes organized by
-    mood, season, occasion, and time of day.
+    Provides access to every theme in the LIFX app (sport themes excluded)
+    plus the pre-v1.2 library keys, organised by the app's own categories.
 
     Example:
         ```python
@@ -37,373 +40,9 @@ class ThemeLibrary:
         ```
     """
 
-    # Theme registry mapping theme names to color lists
-    _THEMES = {
-        "autumn": [
-            HSBK(hue=31, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=83, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=49, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=58, saturation=1.0, brightness=0.5, kelvin=3500),
-        ],
-        "blissful": [
-            HSBK(hue=303, saturation=0.18, brightness=0.82, kelvin=3500),
-            HSBK(hue=232, saturation=0.46, brightness=0.53, kelvin=3500),
-            HSBK(hue=252, saturation=0.37, brightness=0.69, kelvin=3500),
-            HSBK(hue=245, saturation=0.29, brightness=0.81, kelvin=3500),
-            HSBK(hue=303, saturation=0.37, brightness=0.18, kelvin=3500),
-            HSBK(hue=56, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=321, saturation=0.39, brightness=0.78, kelvin=3500),
-        ],
-        "bias_lighting": [
-            HSBK(hue=0, saturation=0.0, brightness=0.9019, kelvin=6500),
-        ],
-        "calaveras": [
-            HSBK(hue=300, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=270, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=240, saturation=1.0, brightness=0.9019, kelvin=3500),
-        ],
-        "cheerful": [
-            HSBK(hue=310, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=266, saturation=0.87, brightness=0.47, kelvin=3500),
-            HSBK(hue=248, saturation=1.0, brightness=0.6, kelvin=3500),
-            HSBK(hue=51, saturation=1.0, brightness=0.67, kelvin=3500),
-            HSBK(hue=282, saturation=0.9, brightness=0.67, kelvin=3500),
-        ],
-        "christmas": [
-            HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=6500),
-            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=15, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=120, saturation=0.75, brightness=1.0, kelvin=3500),
-        ],
-        "dream": [
-            HSBK(hue=201, saturation=0.76, brightness=0.23, kelvin=3500),
-            HSBK(hue=183, saturation=0.75, brightness=0.32, kelvin=3500),
-            HSBK(hue=199, saturation=0.22, brightness=0.62, kelvin=3500),
-            HSBK(hue=223, saturation=0.22, brightness=0.91, kelvin=3500),
-            HSBK(hue=219, saturation=0.29, brightness=0.52, kelvin=3500),
-            HSBK(hue=167, saturation=0.62, brightness=0.55, kelvin=3500),
-            HSBK(hue=201, saturation=0.76, brightness=0.23, kelvin=3500),
-        ],
-        "energizing": [
-            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=205, saturation=0.47, brightness=1.0, kelvin=3500),
-            HSBK(hue=191, saturation=0.89, brightness=1.0, kelvin=3500),
-            HSBK(hue=242, saturation=1.0, brightness=0.42, kelvin=3500),
-            HSBK(hue=180, saturation=0.87, brightness=0.27, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=0.3, kelvin=3500),
-        ],
-        "epic": [
-            HSBK(hue=226, saturation=1.0, brightness=0.96, kelvin=3500),
-            HSBK(hue=233, saturation=1.0, brightness=0.49, kelvin=3500),
-            HSBK(hue=184, saturation=0.6, brightness=0.57, kelvin=3500),
-            HSBK(hue=249, saturation=0.29, brightness=0.95, kelvin=3500),
-            HSBK(hue=261, saturation=0.84, brightness=0.58, kelvin=3500),
-            HSBK(hue=294, saturation=0.78, brightness=0.51, kelvin=3500),
-        ],
-        "evening": [
-            HSBK(hue=34, saturation=0.75, brightness=0.902, kelvin=3500),
-            HSBK(hue=34, saturation=0.8, brightness=0.902, kelvin=3500),
-            HSBK(hue=39, saturation=0.75, brightness=0.902, kelvin=3500),
-        ],
-        "exciting": [
-            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=40, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=60, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=122, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=239, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=271, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=294, saturation=1.0, brightness=1.0, kelvin=3500),
-        ],
-        "fantasy": [
-            HSBK(hue=248, saturation=1.0, brightness=0.2074, kelvin=3500),
-            HSBK(hue=242, saturation=0.75, brightness=0.902, kelvin=3500),
-            HSBK(hue=164, saturation=0.99, brightness=0.902, kelvin=3500),
-            HSBK(hue=300, saturation=1.0, brightness=0.7847, kelvin=3500),
-        ],
-        "focusing": [
-            HSBK(hue=338, saturation=0.38, brightness=1.0, kelvin=3500),
-            HSBK(hue=42, saturation=0.36, brightness=1.0, kelvin=3500),
-            HSBK(hue=52, saturation=0.21, brightness=1.0, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500),
-        ],
-        "gentle": [
-            HSBK(hue=338, saturation=0.38, brightness=0.902, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=0.902, kelvin=9000),
-            HSBK(hue=52, saturation=0.21, brightness=0.902, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=0.902, kelvin=2500),
-            HSBK(hue=42, saturation=0.36, brightness=0.902, kelvin=3500),
-        ],
-        "halloween": [
-            HSBK(hue=31, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=32, saturation=1.0, brightness=0.6, kelvin=3500),
-            HSBK(hue=32, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=33, saturation=1.0, brightness=0.6, kelvin=3500),
-            HSBK(hue=33, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=34, saturation=1.0, brightness=0.7, kelvin=3500),
-        ],
-        "hanukkah": [
-            HSBK(hue=0, saturation=0.0, brightness=0.902, kelvin=6500),
-            HSBK(hue=240, saturation=0.25, brightness=0.902, kelvin=3500),
-            HSBK(hue=240, saturation=1.0, brightness=0.902, kelvin=3500),
-            HSBK(hue=240, saturation=0.5, brightness=0.902, kelvin=3500),
-            HSBK(hue=240, saturation=0.75, brightness=0.902, kelvin=3500),
-        ],
-        "holly": [
-            HSBK(hue=117, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=116, saturation=0.9, brightness=1.0, kelvin=3500),
-            HSBK(hue=1, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=118, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=360, saturation=1.0, brightness=0.9, kelvin=3500),
-        ],
-        "hygge": [
-            HSBK(hue=39, saturation=0.75, brightness=0.9019, kelvin=3500),
-            HSBK(hue=34, saturation=0.75, brightness=0.9019, kelvin=3500),
-        ],
-        "independence": [
-            HSBK(hue=360, saturation=0.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=360, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500),
-        ],
-        "intense": [
-            HSBK(hue=242, saturation=0.75, brightness=1.0, kelvin=3500),
-            HSBK(hue=300, saturation=1.0, brightness=0.87, kelvin=3500),
-            HSBK(hue=164, saturation=0.99, brightness=1.0, kelvin=3500),
-            HSBK(hue=248, saturation=1.0, brightness=0.23, kelvin=3500),
-        ],
-        "love": [
-            HSBK(hue=315, saturation=0.45, brightness=0.8298, kelvin=3500),
-            HSBK(hue=349, saturation=0.88, brightness=0.8117, kelvin=3500),
-            HSBK(hue=345, saturation=0.76, brightness=0.9019, kelvin=3500),
-            HSBK(hue=322, saturation=0.15, brightness=0.8839, kelvin=3500),
-            HSBK(hue=307, saturation=0.16, brightness=0.9019, kelvin=3500),
-        ],
-        "kwanzaa": [
-            HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),
-        ],
-        "mellow": [
-            HSBK(hue=359, saturation=0.31, brightness=0.59, kelvin=3500),
-            HSBK(hue=315, saturation=0.24, brightness=0.82, kelvin=3500),
-            HSBK(hue=241, saturation=1.0, brightness=0.4, kelvin=3500),
-            HSBK(hue=256, saturation=0.36, brightness=0.5, kelvin=3500),
-            HSBK(hue=79, saturation=0.05, brightness=0.4, kelvin=3500),
-        ],
-        "party": [
-            HSBK(hue=300, saturation=1.0, brightness=0.902, kelvin=3500),
-            HSBK(hue=265, saturation=1.0, brightness=0.902, kelvin=3500),
-            HSBK(hue=240, saturation=1.0, brightness=0.902, kelvin=3500),
-            HSBK(hue=240, saturation=0.75, brightness=0.902, kelvin=3500),
-            HSBK(hue=214, saturation=0.85, brightness=0.902, kelvin=3500),
-        ],
-        "peaceful": [
-            HSBK(hue=198, saturation=0.48, brightness=0.11, kelvin=3500),
-            HSBK(hue=2, saturation=0.46, brightness=0.85, kelvin=3500),
-            HSBK(hue=54, saturation=0.36, brightness=0.85, kelvin=3500),
-            HSBK(hue=4, saturation=0.63, brightness=0.56, kelvin=3500),
-            HSBK(hue=203, saturation=0.34, brightness=0.56, kelvin=3500),
-        ],
-        "powerful": [
-            HSBK(hue=10, saturation=0.99, brightness=0.66, kelvin=3500),
-            HSBK(hue=59, saturation=0.7, brightness=0.98, kelvin=3500),
-            HSBK(hue=11, saturation=0.99, brightness=0.41, kelvin=3500),
-            HSBK(hue=61, saturation=0.44, brightness=0.99, kelvin=3500),
-            HSBK(hue=18, saturation=0.98, brightness=0.98, kelvin=3500),
-            HSBK(hue=52, saturation=0.88, brightness=0.97, kelvin=3500),
-            HSBK(hue=52, saturation=0.88, brightness=0.97, kelvin=3500),
-        ],
-        "proud": [
-            HSBK(hue=32, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=271, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=349, saturation=0.88, brightness=0.8117, kelvin=3500),
-            HSBK(hue=215, saturation=0.85, brightness=0.8839, kelvin=3500),
-            HSBK(hue=120, saturation=0.5, brightness=0.8117, kelvin=3500),
-            HSBK(hue=303, saturation=0.2, brightness=0.9019, kelvin=3500),
-            HSBK(hue=60, saturation=1.0, brightness=0.9019, kelvin=3500),
-        ],
-        "pumpkin": [
-            HSBK(hue=40, saturation=1.0, brightness=0.8532, kelvin=3500),
-            HSBK(hue=10, saturation=1.0, brightness=0.4388, kelvin=3500),
-            HSBK(hue=33, saturation=1.0, brightness=0.4875, kelvin=3500),
-            HSBK(hue=46, saturation=1.0, brightness=0.8532, kelvin=3500),
-            HSBK(hue=46, saturation=1.0, brightness=0.8532, kelvin=3500),
-            HSBK(hue=40, saturation=0.55, brightness=0.9019, kelvin=3500),
-        ],
-        "relaxing": [
-            HSBK(hue=110, saturation=0.95, brightness=1.0, kelvin=3500),
-            HSBK(hue=71, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=123, saturation=0.85, brightness=0.33, kelvin=3500),
-            HSBK(hue=120, saturation=0.5, brightness=0.1, kelvin=3500),
-        ],
-        "romance": [
-            HSBK(hue=315, saturation=0.45, brightness=0.8298, kelvin=3500),
-            HSBK(hue=349, saturation=0.88, brightness=0.8117, kelvin=3500),
-            HSBK(hue=345, saturation=0.76, brightness=0.9019, kelvin=3500),
-            HSBK(hue=322, saturation=0.15, brightness=0.8839, kelvin=3500),
-            HSBK(hue=307, saturation=0.16, brightness=0.9019, kelvin=3500),
-        ],
-        "santa": [
-            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=351, saturation=0.05, brightness=1.0, kelvin=3500),
-            HSBK(hue=2, saturation=1.0, brightness=0.58, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=0.52, kelvin=3500),
-        ],
-        "serene": [
-            HSBK(hue=179, saturation=0.1, brightness=0.91, kelvin=3500),
-            HSBK(hue=215, saturation=0.85, brightness=0.98, kelvin=3500),
-            HSBK(hue=205, saturation=0.44, brightness=0.37, kelvin=3500),
-            HSBK(hue=94, saturation=0.63, brightness=0.25, kelvin=3500),
-            HSBK(hue=100, saturation=0.26, brightness=0.42, kelvin=3500),
-            HSBK(hue=132, saturation=0.46, brightness=0.88, kelvin=3500),
-            HSBK(hue=211, saturation=0.73, brightness=0.97, kelvin=3500),
-        ],
-        "shamrock": [
-            HSBK(hue=125, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=130, saturation=0.85, brightness=0.6764, kelvin=3500),
-            HSBK(hue=100, saturation=1.0, brightness=0.8117, kelvin=3500),
-            HSBK(hue=135, saturation=0.5, brightness=0.4509, kelvin=3500),
-            HSBK(hue=110, saturation=1.0, brightness=0.7666, kelvin=3500),
-            HSBK(hue=120, saturation=1.0, brightness=0.9019, kelvin=3500),
-        ],
-        "soothing": [
-            HSBK(hue=336, saturation=0.18, brightness=0.67, kelvin=3500),
-            HSBK(hue=335, saturation=0.5, brightness=0.67, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=302, saturation=0.69, brightness=1.0, kelvin=3500),
-            HSBK(hue=330, saturation=0.45, brightness=0.58, kelvin=3500),
-        ],
-        "spacey": [
-            HSBK(hue=120, saturation=0.5, brightness=0.0902, kelvin=3500),
-            HSBK(hue=71, saturation=1.0, brightness=0.902, kelvin=3500),
-            HSBK(hue=110, saturation=0.95, brightness=0.902, kelvin=3500),
-            HSBK(hue=123, saturation=0.85, brightness=0.2976, kelvin=3500),
-        ],
-        "sports": [
-            HSBK(hue=59, saturation=0.81, brightness=0.96, kelvin=3500),
-            HSBK(hue=120, saturation=1.0, brightness=0.96, kelvin=3500),
-            HSBK(hue=120, saturation=0.74, brightness=1.0, kelvin=3500),
-        ],
-        "spring": [
-            HSBK(hue=184, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=299, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=49, saturation=1.0, brightness=0.5, kelvin=3500),
-            HSBK(hue=198, saturation=1.0, brightness=0.5, kelvin=3500),
-        ],
-        "stardust": [
-            HSBK(hue=0, saturation=0.0, brightness=0.902, kelvin=6500),
-            HSBK(hue=209, saturation=0.5, brightness=0.902, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=0.902, kelvin=6497),
-            HSBK(hue=260, saturation=0.3, brightness=0.902, kelvin=3500),
-        ],
-        "thanksgiving": [
-            HSBK(hue=50, saturation=0.81, brightness=0.7757, kelvin=3500),
-            HSBK(hue=35, saturation=0.81, brightness=0.7757, kelvin=3500),
-            HSBK(hue=30, saturation=1.0, brightness=0.902, kelvin=3500),
-            HSBK(hue=35, saturation=0.85, brightness=0.5863, kelvin=3500),
-            HSBK(hue=15, saturation=0.44, brightness=0.5863, kelvin=3500),
-        ],
-        "tranquil": [
-            HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500),
-            HSBK(hue=205, saturation=0.74, brightness=0.96, kelvin=3500),
-            HSBK(hue=203, saturation=0.94, brightness=0.96, kelvin=3500),
-            HSBK(hue=241, saturation=0.99, brightness=1.0, kelvin=3500),
-            HSBK(hue=37, saturation=0.75, brightness=0.99, kelvin=3500),
-            HSBK(hue=43, saturation=0.83, brightness=0.53, kelvin=3500),
-        ],
-        "warming": [
-            HSBK(hue=4, saturation=1.0, brightness=0.76, kelvin=3500),
-            HSBK(hue=42, saturation=0.36, brightness=0.96, kelvin=3500),
-            HSBK(hue=355, saturation=0.81, brightness=0.86, kelvin=3500),
-            HSBK(hue=44, saturation=0.44, brightness=0.65, kelvin=3500),
-            HSBK(hue=51, saturation=0.85, brightness=0.59, kelvin=3500),
-            HSBK(hue=0, saturation=0.0, brightness=0.3, kelvin=3500),
-        ],
-        "zombie": [
-            HSBK(hue=156, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=156, saturation=1.0, brightness=0.9019, kelvin=3500),
-            HSBK(hue=270, saturation=1.0, brightness=0.859, kelvin=3500),
-            HSBK(hue=147, saturation=1.0, brightness=0.4295, kelvin=3500),
-            HSBK(hue=281, saturation=1.0, brightness=0.4295, kelvin=3500),
-            HSBK(hue=139, saturation=1.0, brightness=0.6442, kelvin=3500),
-        ],
-        # Palette themes ported from pkivolowitz/lifx
-        # Each palette is (hue_a, hue_b, hue_c, saturation) converted to 3 HSBK colors
-        "fire": [
-            HSBK(hue=0, saturation=0.95, brightness=1.0, kelvin=3500),
-            HSBK(hue=30, saturation=0.95, brightness=1.0, kelvin=3500),
-            HSBK(hue=55, saturation=0.95, brightness=1.0, kelvin=3500),
-        ],
-        "water": [
-            HSBK(hue=220, saturation=0.85, brightness=1.0, kelvin=3500),
-            HSBK(hue=185, saturation=0.85, brightness=1.0, kelvin=3500),
-            HSBK(hue=165, saturation=0.85, brightness=1.0, kelvin=3500),
-        ],
-        "forest": [
-            HSBK(hue=130, saturation=0.72, brightness=1.0, kelvin=3500),
-            HSBK(hue=95, saturation=0.72, brightness=1.0, kelvin=3500),
-            HSBK(hue=28, saturation=0.72, brightness=1.0, kelvin=3500),
-        ],
-        "earth": [
-            HSBK(hue=35, saturation=0.70, brightness=1.0, kelvin=3500),
-            HSBK(hue=18, saturation=0.70, brightness=1.0, kelvin=3500),
-            HSBK(hue=130, saturation=0.70, brightness=1.0, kelvin=3500),
-        ],
-        "neon": [
-            HSBK(hue=310, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=183, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=90, saturation=1.0, brightness=1.0, kelvin=3500),
-        ],
-        "aurora_borealis": [
-            HSBK(hue=145, saturation=0.85, brightness=1.0, kelvin=3500),
-            HSBK(hue=178, saturation=0.85, brightness=1.0, kelvin=3500),
-            HSBK(hue=268, saturation=0.85, brightness=1.0, kelvin=3500),
-        ],
-        "tropical": [
-            HSBK(hue=175, saturation=0.90, brightness=1.0, kelvin=3500),
-            HSBK(hue=15, saturation=0.90, brightness=1.0, kelvin=3500),
-            HSBK(hue=55, saturation=0.90, brightness=1.0, kelvin=3500),
-        ],
-        "arctic": [
-            HSBK(hue=200, saturation=0.20, brightness=1.0, kelvin=3500),
-            HSBK(hue=210, saturation=0.20, brightness=1.0, kelvin=3500),
-            HSBK(hue=215, saturation=0.20, brightness=1.0, kelvin=3500),
-        ],
-        "galaxy": [
-            HSBK(hue=268, saturation=0.78, brightness=1.0, kelvin=3500),
-            HSBK(hue=235, saturation=0.78, brightness=1.0, kelvin=3500),
-            HSBK(hue=215, saturation=0.78, brightness=1.0, kelvin=3500),
-        ],
-        "deep_sea": [
-            HSBK(hue=232, saturation=0.90, brightness=1.0, kelvin=3500),
-            HSBK(hue=172, saturation=0.90, brightness=1.0, kelvin=3500),
-            HSBK(hue=262, saturation=0.90, brightness=1.0, kelvin=3500),
-        ],
-        "coral_reef": [
-            HSBK(hue=18, saturation=0.88, brightness=1.0, kelvin=3500),
-            HSBK(hue=175, saturation=0.88, brightness=1.0, kelvin=3500),
-            HSBK(hue=230, saturation=0.88, brightness=1.0, kelvin=3500),
-        ],
-        "desert": [
-            HSBK(hue=45, saturation=0.68, brightness=1.0, kelvin=3500),
-            HSBK(hue=18, saturation=0.68, brightness=1.0, kelvin=3500),
-            HSBK(hue=28, saturation=0.68, brightness=1.0, kelvin=3500),
-        ],
-        "vaporwave": [
-            HSBK(hue=310, saturation=0.95, brightness=1.0, kelvin=3500),
-            HSBK(hue=270, saturation=0.95, brightness=1.0, kelvin=3500),
-            HSBK(hue=185, saturation=0.95, brightness=1.0, kelvin=3500),
-        ],
-        "cyberpunk": [
-            HSBK(hue=130, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=225, saturation=1.0, brightness=1.0, kelvin=3500),
-            HSBK(hue=300, saturation=1.0, brightness=1.0, kelvin=3500),
-        ],
-        "cherry_blossom": [
-            HSBK(hue=348, saturation=0.38, brightness=1.0, kelvin=3500),
-            HSBK(hue=15, saturation=0.38, brightness=1.0, kelvin=3500),
-            HSBK(hue=290, saturation=0.38, brightness=1.0, kelvin=3500),
-        ],
-    }
+    # The generated theme registry. `get_by_category()` reads this class
+    # attribute; Phase 7 owns replacing its taxonomy (META-04).
+    _THEMES: dict[str, ThemeRecord] = THEMES
 
     @classmethod
     def get(cls, name: str) -> Theme:
@@ -427,22 +66,21 @@ class ThemeLibrary:
             ```
         """
         normalized_name = name.lower()
-        # Generated-first lookup: the generated data module wins over the
-        # transitional hand-written table. Both paths build the Theme over a
-        # fresh list so mutating a returned Theme can never corrupt the
-        # library's own palette.
-        if normalized_name in THEMES:
-            record = THEMES[normalized_name]
-            return Theme(
-                list(record.colors),
-                slug=record.slug,
-                name=record.name,
-                category=record.category,
+        if normalized_name not in THEMES:
+            raise KeyError(
+                f"Theme '{name}' not found. Use "
+                f"ThemeLibrary.get_available_themes() to list the "
+                f"available themes."
             )
-        if normalized_name not in cls._THEMES:
-            available = ", ".join(sorted(cls._THEMES.keys()))
-            raise KeyError(f"Theme '{name}' not found. Available themes: {available}")
-        return Theme(list(cls._THEMES[normalized_name]))
+        record = THEMES[normalized_name]
+        # The Theme is built over a fresh list so mutating a returned Theme
+        # can never corrupt the library's own palette.
+        return Theme(
+            list(record.colors),
+            slug=record.slug,
+            name=record.name,
+            category=record.category,
+        )
 
     @classmethod
     def get_available_themes(cls) -> list[str]:
@@ -460,7 +98,7 @@ class ThemeLibrary:
                 print(f"- {theme_name}")
             ```
         """
-        return sorted(cls._THEMES.keys())
+        return sorted(THEMES)
 
     @classmethod
     def get_by_category(cls, category: str) -> dict[str, Theme]:
