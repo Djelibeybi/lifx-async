@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Theme Library Update
-current_phase: 6
-current_phase_name: Generated Theme Library
-status: roadmap_created
-stopped_at: Phase 6 context gathered
-last_updated: "2026-08-14T11:06:30.559Z"
+current_phase: 06
+current_phase_name: generated-theme-library
+status: executing
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-08-14T13:24:38.024Z"
 last_activity: 2026-08-14
 last_activity_desc: v1.2 roadmap created; 19/19 requirements mapped across Phases 6–9
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic — and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** v1.2 Theme Library Update — roadmap created (Phases 6–9); next: plan Phase 6
+**Current focus:** Phase 06 — generated-theme-library
 
 ## Current Position
 
-Phase: 6 of 6–9 (Generated Theme Library) — not started
-Plan: —
-Status: Roadmap created — ready for `/gsd-plan-phase 6`
-Last activity: 2026-08-14 — v1.2 roadmap created; 19/19 requirements mapped across Phases 6–9
+Phase: 06 (generated-theme-library) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-14 — Phase 06 execution started
 
-Progress: [----------] 0% (0/4 phases)
+Progress: [█████░░░░░] 50% (0/4 phases)
 
 ## Performance Metrics
 
@@ -46,6 +46,11 @@ Per-plan metrics for shipped milestones live with their archives under
 `.planning/milestones/` (v1.1's table was retired from this file at the v1.2 rollover).
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 06 P01 | 12min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -65,6 +70,8 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - Overwrite redefined themes but keep `*_legacy` aliases — old values recoverable by name, not git archaeology
 - ASCII slugs; sport categories dropped — removes 5 of the 6 slug collisions outright; `christmas` collapses cleanly (identical palettes)
 - Device readback is the only capture source — internal LIFX theme endpoints deliberately untouched; accepted cost: 16-colour protocol ceiling and lost palette order
+- [Phase ?]: Theme equality is Counter-based palette multiset at uint16 precision, identity ignored; Theme unhashable via __eq__-without-__hash__ (D-19, D-20)
+- [Phase ?]: Theme generator + generated data module excluded from coverage in both pyproject omit and codecov ignore, per products/protocol precedent (D-21, D-22)
 
 ### v1.2 Working Notes
 
@@ -117,9 +124,9 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-14T09:22:43.835Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-generated-theme-library/06-CONTEXT.md
+Last session: 2026-08-14T13:24:38.015Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
