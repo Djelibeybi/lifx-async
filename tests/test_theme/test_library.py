@@ -250,12 +250,56 @@ class TestThemeLibraryColorValues:
         assert christmas.category == "Holidays"
         assert len(christmas) >= 1
 
+    def test_christmas_theme_colors(self) -> None:
+        """Christmas carries green and red.
+
+        A semantic pin, not a count or a full-palette literal: it survives a
+        legitimate resync that adds or reorders colours, and fails a
+        regeneration that inverts the palette or drops a primary. Without
+        it nothing in CI asserts a real colour value — `data.py` is in the
+        coverage omit list and the generator suite runs only against
+        fixtures (D-23).
+        """
+        hues = [color.hue for color in ThemeLibrary.get("christmas")]
+
+        assert any(abs(hue - 120) < 5 for hue in hues), hues
+        assert any(abs(hue - 0) < 5 for hue in hues), hues
+
     def test_halloween_theme_resolves(self) -> None:
         """Test that halloween resolves with a non-empty palette."""
         halloween = ThemeLibrary.get("halloween")
 
         assert halloween.slug == "halloween"
         assert len(halloween) >= 1
+
+    def test_halloween_theme_colors(self) -> None:
+        """Halloween carries an orange."""
+        hues = [color.hue for color in ThemeLibrary.get("halloween")]
+
+        assert any(30 <= hue <= 35 for hue in hues), hues
+
+    @pytest.mark.parametrize(
+        ("slug", "hue_range"),
+        [
+            ("shamrock", (100, 160)),
+            ("hanukkah", (200, 260)),
+            ("pumpkin", (15, 45)),
+        ],
+    )
+    def test_category_golden_hue_pins(
+        self, slug: str, hue_range: tuple[float, float]
+    ) -> None:
+        """One golden hue pin per shipped palette family.
+
+        Each asserts the defining colour of a theme whose identity is
+        unambiguous — shamrock is green, hanukkah is blue, pumpkin is
+        orange — so a data regression that scrambles hues is visible in CI
+        rather than reaching users' lights.
+        """
+        low, high = hue_range
+        hues = [color.hue for color in ThemeLibrary.get(slug)]
+
+        assert any(low <= hue <= high for hue in hues), hues
 
     def test_relaxing_theme_saturation(self) -> None:
         """Test that relaxing theme has generally lower saturation."""
