@@ -10,6 +10,7 @@ on:
     paths:
     - src/**
     - tests/**
+    - data/**  # editing a theme record is a source change: it regenerates data.py
     - pyproject.toml
     - uv.lock
     - .pre-commit-config.yaml
@@ -53,7 +54,7 @@ jobs:
           exit 0
         fi
         # Check if any source/test files changed in this PR
-        CHANGED=$(gh pr diff ${{ github.event.number }} --name-only | grep -cE '^(src/|tests/|pyproject\.toml|uv\.lock)' || true)
+        CHANGED=$(gh pr diff ${{ github.event.number }} --name-only | grep -cE '^(src/|tests/|data/|pyproject\.toml|uv\.lock)' || true)
         if [ "$CHANGED" -gt 0 ]; then
           echo "source=true" >> $GITHUB_OUTPUT
         else
@@ -125,14 +126,21 @@ jobs:
     - name: Regenerate product registry
       run: uv run python -m lifx.products.generator
 
+    # Unlike the two above, this generator's input is the committed
+    # data/themes.jsonl, so the check is deterministic and network-free. It
+    # is also the only place validate_records() runs against the shipped
+    # data: the generator suite deliberately tests fixtures only (D-23).
+    - name: Regenerate theme data
+      run: uv run python -m lifx.theme.generator
+
     - name: Format and lint generated files
       run: |
-        uv run ruff format src/lifx/protocol/packets.py src/lifx/protocol/protocol_types.py src/lifx/products/registry.py
-        uv run ruff check --fix src/lifx/protocol/packets.py src/lifx/protocol/protocol_types.py src/lifx/products/registry.py
+        uv run ruff format src/lifx/protocol/packets.py src/lifx/protocol/protocol_types.py src/lifx/products/registry.py src/lifx/theme/data.py
+        uv run ruff check --fix src/lifx/protocol/packets.py src/lifx/protocol/protocol_types.py src/lifx/products/registry.py src/lifx/theme/data.py
 
     - name: Check for differences
       run: |
-        if ! git diff --exit-code src/lifx/protocol/packets.py src/lifx/protocol/protocol_types.py src/lifx/products/registry.py; then
+        if ! git diff --exit-code src/lifx/protocol/packets.py src/lifx/protocol/protocol_types.py src/lifx/products/registry.py src/lifx/theme/data.py; then
           echo "::error::Generated files do not match committed versions. See diff above for details."
           exit 1
         fi
