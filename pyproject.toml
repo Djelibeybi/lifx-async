@@ -93,7 +93,11 @@ pythonVersion = "3.10"
 include = ["src"]
 exclude = [
     "**/__pycache__",
-    "**/generator.py",  # Code generators deal with untyped YAML/JSON
+    # The two mechanical emitters over remote YAML/JSON. Deliberately not a
+    # `**/generator.py` glob: src/lifx/theme/generator.py is hand-written
+    # validation and path handling, and must stay type-checked.
+    "src/lifx/protocol/generator.py",
+    "src/lifx/products/generator.py",
     "**/registry.py",   # Auto-generated from products.json
 ]
 
@@ -132,8 +136,10 @@ omit = [
     "src/lifx/protocol/generator.py",
     "src/lifx/protocol/protocol_types.py",
     "src/lifx/products/generator.py",
+    # src/lifx/theme/data.py is generated; its generator is hand-written and
+    # stays measured, so the emit-time backstops keep their patch-coverage
+    # requirement.
     "src/lifx/theme/data.py",
-    "src/lifx/theme/generator.py",
 ]
 
 [tool.coverage.report]
