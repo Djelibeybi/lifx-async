@@ -7,6 +7,7 @@ that can be applied to LIFX devices.
 from __future__ import annotations
 
 import random
+from collections import Counter
 from collections.abc import Iterator
 
 from lifx.color import HSBK, Colors
@@ -208,6 +209,26 @@ class Theme:
             ```
         """
         return any(c == color for c in self.colors)
+
+    def __eq__(self, other: object) -> bool:
+        """Two themes are equal if their palettes are the same multiset of colors.
+
+        Order is never compared because the app shuffles palette order on
+        every application, so two orderings of one palette are the same
+        theme. Identity (slug, name, category) is also excluded: an
+        identity-bearing library theme and a caller-built theme with the
+        same palette are the same theme. Colors compare at uint16
+        (protocol) granularity via HSBK equality, and duplicate counts
+        matter — a multiset comparison, not a set comparison.
+
+        Note:
+            Defining ``__eq__`` without ``__hash__`` deliberately makes
+            Theme unhashable: its palette is mutable via ``add_color()``,
+            so a stable hash cannot be provided.
+        """
+        if not isinstance(other, Theme):
+            return NotImplemented
+        return Counter(self.colors) == Counter(other.colors)
 
     def __repr__(self) -> str:
         """Return a string representation of the theme."""
