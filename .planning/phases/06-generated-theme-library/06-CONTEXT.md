@@ -147,6 +147,26 @@ not duplicated here.
   drift check between the data file and the generated module. The data file is the record
   of what should exist. Consequence accepted: a short or stale regeneration ships silently.
 
+### Amendment — 2026-08-14 (plan review convergence)
+
+Recorded during `/gsd-plan-phase --reviews` after cross-AI review surfaced that palette
+order, treated as meaningless by the plans, is consumed positionally by `EffectRuleTrio`
+(`rule_trio.py` takes `colors[:3]`) and `EffectSpin` (`spin.py` uses `colors[0]`).
+Escalated to the operator, who chose canonical sorting.
+
+- **D-24:** **Canonical palette ordering.** The generator sorts every palette by its
+  normalised `(hue, saturation, brightness, kelvin)` tuple, preserving duplicates, before
+  emitting it. Rationale: the app shuffles palette order on every application, so captured
+  order is an accident, not data. THEME-02 compares palettes as an unordered multiset and
+  sorting preserves the multiset exactly, so the requirement is unaffected. The decisive
+  consequence: `exciting`'s captured order `271°, 294°, 239°, 0°, 60°, 40°, 122°` sorts to
+  `0°, 40°, 60°, 122°, 239°, 271°, 294°` — identical to the current `library.py:107`
+  order — so positional consumers keep working and future re-captures become order-stable
+  instead of capture-accident-dependent. Accepted cost: stored order no longer mirrors the
+  app's own display order for any theme. — **Reversibility:** costly — order is observable
+  through the two positional effect sites once released; changing the sort key later
+  changes their visible output.
+
 ### Claude's Discretion
 
 None — every question in this discussion was answered directly.
