@@ -6,15 +6,15 @@ current_phase: 7
 current_phase_name: Taxonomy & Legacy Dispositions
 status: planning
 stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-08-14T14:07:52.595Z"
+last_updated: "2026-08-14T14:23:36.707Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 06 complete, transitioned to Phase 7
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 2
   completed_plans: 2
   percent: 25
+last_activity_desc: Phase 06 complete, transitioned to Phase 7
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 Phase: 7 — Taxonomy & Legacy Dispositions
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-08-15 — Phase 06 complete, transitioned to Phase 7
+Last activity: 2026-08-15
 
 Progress: [██████████] 100% (0/4 phases)
 
