@@ -18,6 +18,13 @@ discovery idle window (quick task 260726-824). See
 `milestones/v1.1-MILESTONE-AUDIT.md`.
 
 **Next milestone:** v1.2 Theme Library Update — started 2026-08-14 (see below).
+**v1.2 progress:** Phase 6 Generated Theme Library complete (2026-08-15) — the hand-written
+366-line palette table is gone. `data/themes.jsonl` (166 committed records) is now the source
+of truth, `src/lifx/theme/generator.py` emits `src/lifx/theme/data.py` (168 keys: 166 slugs
+plus the `forest`/`aurora` rename aliases), and `ThemeLibrary` reads the generated dict alone.
+Verified 16/16 must-haves: all 138 non-sport app slugs resolve with capture-accurate palettes,
+all 57 pre-v1.2 names still resolve, and regeneration is byte-identical. THEME-01..04,
+COMPAT-01, COMPAT-03, META-01 and META-02 satisfied; COMPAT-02 retired.
 
 **Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) — see `.planning/MILESTONES.md`.
 **Also shipped post-v1.0:** Phase 1 discovery unification (verified 2026-06-13) — rebuilt
@@ -241,4 +248,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-14 at the start of the v1.2 Theme Library Update milestone*
+*Last updated: 2026-08-15 after Phase 6 (Generated Theme Library) completed*
