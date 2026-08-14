@@ -2,10 +2,95 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 import pytest
 
 from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
 from lifx.theme import Theme, ThemeLibrary, get_theme
+
+# Every key the pre-v1.2 hand-written library resolved, captured as a
+# LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
+# of the new library cannot vacuously pass (COMPAT-01 empty edge).
+PRE_V12_KEYS = (
+    "arctic",
+    "aurora_borealis",
+    "autumn",
+    "bias_lighting",
+    "blissful",
+    "calaveras",
+    "cheerful",
+    "cherry_blossom",
+    "christmas",
+    "coral_reef",
+    "cyberpunk",
+    "deep_sea",
+    "desert",
+    "dream",
+    "earth",
+    "energizing",
+    "epic",
+    "evening",
+    "exciting",
+    "fantasy",
+    "fire",
+    "focusing",
+    "forest",
+    "galaxy",
+    "gentle",
+    "halloween",
+    "hanukkah",
+    "holly",
+    "hygge",
+    "independence",
+    "intense",
+    "kwanzaa",
+    "love",
+    "mellow",
+    "neon",
+    "party",
+    "peaceful",
+    "powerful",
+    "proud",
+    "pumpkin",
+    "relaxing",
+    "romance",
+    "santa",
+    "serene",
+    "shamrock",
+    "soothing",
+    "spacey",
+    "sports",
+    "spring",
+    "stardust",
+    "thanksgiving",
+    "tranquil",
+    "tropical",
+    "vaporwave",
+    "warming",
+    "water",
+    "zombie",
+)
+
+# The app's 8 categories (D-10) plus Library for the pre-v1.2 orphans.
+LIBRARY_CATEGORIES = frozenset(
+    {
+        "Moods",
+        "Art Series",
+        "Music",
+        "Nature",
+        "Space",
+        "Play",
+        "Holidays",
+        "Archives",
+        "Library",
+    }
+)
+
+
+def _palette_multiset(theme: Theme) -> Counter[tuple[int, int, int, int]]:
+    """Unordered palette multiset at protocol (uint16) precision."""
+    return Counter(color.as_tuple() for color in theme.colors)
 
 
 class TestThemeLibraryGet:
@@ -236,3 +321,136 @@ class TestThemeLibraryIntegration:
         for category in categories:
             themes = ThemeLibrary.get_by_category(category)
             assert len(themes) > 0
+
+
+class TestPreV12Compatibility:
+    """COMPAT-01: every pre-v1.2 theme name still resolves."""
+
+    @pytest.mark.parametrize("key", PRE_V12_KEYS)
+    def test_pre_v12_key_resolves(self, key: str) -> None:
+        """Every pre-v1.2 key resolves without raising."""
+        theme = ThemeLibrary.get(key)
+        assert isinstance(theme, Theme)
+        assert len(theme) >= 1
+
+    def test_no_legacy_suffixed_key(self) -> None:
+        """No key ends with the retired legacy suffix (COMPAT-02 retired)."""
+        for name in ThemeLibrary.get_available_themes():
+            assert not name.endswith("_legacy")
+
+
+class TestRenamePairs:
+    """COMPAT-03: renamed themes answer to both names with target identity."""
+
+    def test_aurora_borealis_resolves_to_aurora(self) -> None:
+        """aurora_borealis returns aurora's palette and identity (D-14)."""
+        alias = ThemeLibrary.get("aurora_borealis")
+        target = ThemeLibrary.get("aurora")
+
+        assert _palette_multiset(alias) == _palette_multiset(target)
+        assert alias.slug == "aurora"
+        assert alias.name == "Aurora"
+        assert alias.category == "Nature"
+
+    def test_forest_resolves_to_forrest(self) -> None:
+        """forest returns forrest's palette and identity (D-14)."""
+        alias = ThemeLibrary.get("forest")
+        target = ThemeLibrary.get("forrest")
+
+        assert _palette_multiset(alias) == _palette_multiset(target)
+        assert alias.slug == "forrest"
+        assert alias.name == "Forrest"
+        assert alias.category == "Nature"
+
+
+class TestResyncedPalettes:
+    """THEME-03: the resynced shared slugs carry app values."""
+
+    def test_soothing_contains_kelvin_8000(self) -> None:
+        """soothing carries kelvin 8000 (pre-v1.2 was uniformly 3500)."""
+        soothing = ThemeLibrary.get("soothing")
+        assert 8000 in {color.kelvin for color in soothing}
+
+
+class TestMutationIsolation:
+    """The mutation-leak fix: get() returns a Theme over a fresh list."""
+
+    def test_add_color_does_not_leak_into_library(self) -> None:
+        """Mutating a returned Theme leaves the next get() unchanged."""
+        first = ThemeLibrary.get("evening")
+        original_length = len(first)
+        first.add_color(first[0])
+
+        second = ThemeLibrary.get("evening")
+        assert len(second) == original_length
+
+
+class TestKeyErrorMessage:
+    """The shortened KeyError (THEME-01 empty edge)."""
+
+    def test_unknown_name_and_pointer_present(self) -> None:
+        """The error carries the requested name and the listing pointer."""
+        with pytest.raises(KeyError) as exc_info:
+            ThemeLibrary.get("no_such_theme")
+
+        message = str(exc_info.value)
+        assert "no_such_theme" in message
+        assert "get_available_themes" in message
+
+    def test_full_listing_dropped(self) -> None:
+        """The error no longer embeds the full theme listing."""
+        with pytest.raises(KeyError) as exc_info:
+            ThemeLibrary.get("no_such_theme")
+
+        message = str(exc_info.value)
+        for name in ThemeLibrary.get_available_themes():
+            assert name not in message
+
+
+class TestLibrarySweeps:
+    """Invariant sweeps over the runtime listing (D-15, META-01, META-02)."""
+
+    def test_every_key_is_identifier(self) -> None:
+        """Every key in get_available_themes() passes str.isidentifier()."""
+        for name in ThemeLibrary.get_available_themes():
+            assert name.isidentifier()
+
+    def test_every_listed_key_resolves(self) -> None:
+        """The listing names exactly what get() accepts (D-15)."""
+        for name in ThemeLibrary.get_available_themes():
+            assert isinstance(ThemeLibrary.get(name), Theme)
+
+    def test_identity_metadata_ascii_and_distinct(self) -> None:
+        """Every name and category is pure ASCII, non-None and not the slug."""
+        for key in ThemeLibrary.get_available_themes():
+            theme = ThemeLibrary.get(key)
+            assert theme.name is not None
+            assert theme.category is not None
+            assert theme.name.isascii()
+            assert theme.category.isascii()
+            assert theme.name != theme.slug
+            assert theme.category != theme.slug
+
+    def test_every_category_is_known(self) -> None:
+        """Every theme's category is one of the 9 library categories."""
+        for key in ThemeLibrary.get_available_themes():
+            assert ThemeLibrary.get(key).category in LIBRARY_CATEGORIES
+
+    def test_canonical_palette_order(self) -> None:
+        """Every served palette is sorted by its uint16 tuple (D-24)."""
+        for key in ThemeLibrary.get_available_themes():
+            palette = [color.as_tuple() for color in ThemeLibrary.get(key)]
+            assert palette == sorted(palette)
+
+
+class TestNewSlugBehaviour:
+    """House-style behaviours over the new app slugs."""
+
+    def test_get_case_insensitive_for_app_slug(self) -> None:
+        """get() keeps lowercasing its input for a new app slug."""
+        theme = ThemeLibrary.get("MONDRIAN")
+        assert theme.slug == "mondrian"
+
+    def test_consecutive_gets_compare_equal(self) -> None:
+        """Two gets of one slug are equal via the palette-only __eq__."""
+        assert ThemeLibrary.get("mondrian") == ThemeLibrary.get("mondrian")
