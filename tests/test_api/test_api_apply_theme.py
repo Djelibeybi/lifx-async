@@ -231,11 +231,13 @@ class TestDeviceGroupApplyTheme:
                 await group.apply_theme(theme)
                 await asyncio.sleep(0.05)
 
-            # Verify last theme was applied
+            # Verify last theme was applied: a single-zone light picks its
+            # colour via theme.random(), so the observed colour must be one
+            # of the applied theme's colours at wire precision — a
+            # deterministic membership check, not a hue window.
             device = group.lights[0]
             color, _, _ = await device.get_color()
-            # Halloween theme has orange colors (hue ~30-35)
-            assert 25 <= color.hue <= 40
+            assert color.as_tuple() in {c.as_tuple() for c in theme.colors}
 
     async def test_apply_theme_only_lights(self) -> None:
         """Test apply_theme on group with only lights."""

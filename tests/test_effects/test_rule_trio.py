@@ -68,13 +68,18 @@ def test_rule_trio_custom_parameters() -> None:
 
 
 def test_rule_trio_default_theme_is_exciting() -> None:
-    """Test that default theme uses 'exciting' from ThemeLibrary."""
+    """Test that default theme uses 'exciting' from ThemeLibrary.
+
+    The literal uint16 trio is the committed regression gate for D-24's
+    canonical palette ordering: under the canonical sort, exciting's
+    leading colours are uint16 hues 0, 7282 and 10923 (0deg, 40deg and
+    60deg), so this positional consumer is behaviourally unchanged on
+    the wire. Dropping the canonical sort resurfaces the captured order
+    (271deg leading) and fails this pin.
+    """
     effect = EffectRuleTrio()
-    # The exciting theme starts with hue=0 (red), hue=40, hue=60
     assert len(effect._theme_colors) == 3
-    assert effect._theme_colors[0].hue == 0
-    assert effect._theme_colors[1].hue == 40
-    assert effect._theme_colors[2].hue == 60
+    assert [c.as_tuple()[0] for c in effect._theme_colors] == [0, 7282, 10923]
 
 
 def test_rule_trio_custom_theme_uses_first_three() -> None:

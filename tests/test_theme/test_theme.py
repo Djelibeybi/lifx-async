@@ -296,9 +296,16 @@ class TestThemeEquality:
         assert caller_theme.slug is None
         assert library_theme == caller_theme
 
-    def test_love_equals_romance(self) -> None:
-        """love and romance carry genuinely identical palettes and compare equal."""
-        assert ThemeLibrary.get("love") == ThemeLibrary.get("romance")
+    def test_distinct_themes_with_identical_palettes_compare_equal(self) -> None:
+        """Distinct library themes sharing a palette compare equal (D-19).
+
+        The app ships memorial_day, independence and old_glory with one
+        identical palette; identity is excluded from equality, so they
+        compare equal. (Pre-v1.2 the example pair was love/romance, but
+        the resync gave romance its own app palette.)
+        """
+        assert ThemeLibrary.get("independence") == ThemeLibrary.get("old_glory")
+        assert ThemeLibrary.get("memorial_day") == ThemeLibrary.get("old_glory")
 
     def test_different_palettes_unequal(self) -> None:
         """Themes with different palettes compare unequal."""
