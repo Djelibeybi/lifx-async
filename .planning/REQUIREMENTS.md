@@ -27,7 +27,13 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 - [ ] **COMPAT-01**: Every theme name that resolved before v1.2 still resolves after it —
       no shipped key disappears
-- [ ] **COMPAT-02**: Each overwritten palette stays retrievable under a `*_legacy` name
+- [x] ~~**COMPAT-02**: Each overwritten palette stays retrievable under a `*_legacy` name~~
+      — **RETIRED 2026-08-14** during Phase 6 discussion. Measuring the 19 redefined
+      themes showed 10 of them shift by one or two colours; only 9 change wholesale. The
+      operator ruled that the app is the source of truth and the pre-v1.2 palettes stay in
+      git history. No `*_legacy` keys, no Legacy category. Supersedes the milestone-kickoff
+      decision "Overwrite + keep legacy aliases". COMPAT-01 is unaffected: all 57 pre-v1.2
+      names still resolve
 - [ ] **COMPAT-03**: Renamed themes resolve under both the old library key and the new app
       slug (`aurora_borealis` / `aurora`, `forest` / `forrest`)
 - [ ] **COMPAT-04**: Each of the 30 orphaned library keys carries a recorded disposition —
@@ -35,8 +41,10 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 ### Metadata
 
-- [ ] **META-01**: A theme exposes its app display name with emoji intact, distinct from
-      its ASCII slug
+- [ ] **META-01**: A theme exposes its app display name, distinct from its ASCII slug.
+      **Amended 2026-08-14** (Phase 6 discussion): emoji are stripped from display names
+      and categories — the app supports them, downstream consumers likely do not. 'Forrest
+      🌳' ships as `Forrest`
 - [ ] **META-02**: A theme exposes its app category
 - [ ] **META-03**: Caller can list the categories, and list the themes within one
 - [ ] **META-04**: `ThemeLibrary.get_by_category()`'s existing hand-made taxonomy
@@ -64,8 +72,9 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 ### Docs
 
-- [ ] **DOCS-03**: Theme documentation lists the available themes and categories and
-      explains the `*_legacy` aliases (continues v1.1's DOCS-01..02)
+- [ ] **DOCS-03**: Theme documentation lists the available themes and categories, and
+      states that the pre-v1.2 palettes of redefined themes were not carried forward
+      (continues v1.1's DOCS-01..02). **Amended 2026-08-14** with COMPAT-02's retirement
 
 ## Future Requirements
 
@@ -91,7 +100,8 @@ Tracked, not in this milestone.
 ## Traceability
 
 Which phases cover which requirements. Mapped at roadmap creation (2026-08-14) —
-see `.planning/ROADMAP.md` Phase Details. 19/19 requirements mapped, no orphans.
+see `.planning/ROADMAP.md` Phase Details. 18/18 live requirements mapped, no orphans;
+COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -100,7 +110,7 @@ see `.planning/ROADMAP.md` Phase Details. 19/19 requirements mapped, no orphans.
 | THEME-03 | Phase 6 | Pending |
 | THEME-04 | Phase 6 | Pending |
 | COMPAT-01 | Phase 6 | Pending |
-| COMPAT-02 | Phase 6 | Pending |
+| COMPAT-02 | — | Retired 2026-08-14 |
 | COMPAT-03 | Phase 6 | Pending |
 | COMPAT-04 | Phase 7 | Pending |
 | META-01 | Phase 6 | Pending |
