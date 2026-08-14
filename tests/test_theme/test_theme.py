@@ -228,6 +228,116 @@ class TestThemeRepresentation:
         assert "3 colors" in repr_str
 
 
+class TestThemeIdentity:
+    """Tests for the optional identity attributes (slug, name, category)."""
+
+    def test_identity_kwargs_stored(self) -> None:
+        """Identity kwargs are stored on the instance."""
+        theme = Theme([Colors.RED], slug="red", name="Red", category="Test")
+
+        assert theme.slug == "red"
+        assert theme.name == "Red"
+        assert theme.category == "Test"
+
+    def test_identity_defaults_none(self) -> None:
+        """Identity fields default to None for caller-constructed themes."""
+        theme = Theme([Colors.RED])
+
+        assert theme.slug is None
+        assert theme.name is None
+        assert theme.category is None
+
+    def test_positional_construction_unchanged(self) -> None:
+        """Positional colour-list construction behaves exactly as before."""
+        theme = Theme([Colors.RED, Colors.GREEN])
+
+        assert len(theme) == 2
+        assert theme.slug is None
+
+    def test_default_construction_identity_none(self) -> None:
+        """Theme() still defaults to white with no identity."""
+        theme = Theme()
+
+        assert len(theme) == 1
+        assert theme.slug is None
+        assert theme.name is None
+        assert theme.category is None
+
+
+class TestThemeEquality:
+    """Tests for palette-only multiset equality (D-19) and unhashability (D-20)."""
+
+    def test_same_colors_different_order_equal(self) -> None:
+        """Themes with the same colours in different orders compare equal."""
+        a = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        b = Theme([Colors.BLUE, Colors.RED, Colors.GREEN])
+
+        assert a == b
+
+    def test_different_duplicate_counts_unequal(self) -> None:
+        """Themes differing only in duplicate counts compare unequal."""
+        a = Theme([Colors.RED, Colors.RED, Colors.GREEN])
+        b = Theme([Colors.RED, Colors.GREEN, Colors.GREEN])
+
+        assert a != b
+
+    def test_multiset_not_set(self) -> None:
+        """Same distinct colour set but different multiplicities is unequal."""
+        a = Theme([Colors.RED, Colors.RED])
+        b = Theme([Colors.RED])
+
+        assert a != b
+
+    def test_identity_ignored(self) -> None:
+        """A library theme and a caller-built theme with the same palette are equal."""
+        library_theme = ThemeLibrary.get("evening")
+        caller_theme = Theme(list(library_theme.colors))
+
+        assert caller_theme.slug is None
+        assert library_theme == caller_theme
+
+    def test_love_equals_romance(self) -> None:
+        """love and romance carry genuinely identical palettes and compare equal."""
+        assert ThemeLibrary.get("love") == ThemeLibrary.get("romance")
+
+    def test_different_palettes_unequal(self) -> None:
+        """Themes with different palettes compare unequal."""
+        a = Theme([Colors.RED])
+        b = Theme([Colors.GREEN])
+
+        assert a != b
+
+    def test_non_theme_comparison_false_without_raising(self) -> None:
+        """Comparing a Theme with a non-Theme is False, never an exception."""
+        theme = Theme([Colors.RED])
+
+        assert (theme == 3) is False
+        assert (theme != 3) is True
+        assert theme != object()
+
+    def test_unhashable(self) -> None:
+        """hash(theme) raises TypeError — Theme is deliberately unhashable."""
+        theme = Theme([Colors.RED])
+
+        with pytest.raises(TypeError):
+            hash(theme)
+
+    def test_hash_slot_is_none(self) -> None:
+        """Defining __eq__ without __hash__ sets Theme.__hash__ to None."""
+        assert Theme.__hash__ is None
+
+    def test_existing_behaviour_unchanged(self) -> None:
+        """Iteration, indexing, len() and add_color() behave exactly as before."""
+        theme = Theme([Colors.RED, Colors.GREEN])
+
+        assert len(theme) == 2
+        assert theme[0] == Colors.RED
+        assert list(theme) == [Colors.RED, Colors.GREEN]
+
+        theme.add_color(Colors.BLUE)
+        assert len(theme) == 3
+
+
 class TestPaletteThemes:
     """Tests for palette themes ported from pkivolowitz/lifx."""
 
