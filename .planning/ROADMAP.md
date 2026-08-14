@@ -77,7 +77,11 @@ vanish, in any intermediate state.
   3. Every theme name that resolved before v1.2 still resolves, and the renamed themes resolve under both the old key and the new app slug (`aurora_borealis`/`aurora`, `forest`/`forrest`)
   4. A retrieved theme exposes its display name and category — both emoji-stripped, both distinct from its ASCII slug
   5. Regenerating the theme data module from the committed data file reproduces it exactly (verified by hand, convention only)
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Tracer: seed data file → generator → generated data module → `ThemeLibrary.get()` with identity, plus `Theme` equality and generator tests
+- [ ] 06-02-PLAN.md — Full 166-record data file, library cutover to the generated dict, and the compatibility/metadata acceptance tests
 
 One phase by necessity, not appetite: the generator's first real output *is* the import,
 and "no key silently vanishes" binds every intermediate state, so splitting the import
@@ -150,7 +154,7 @@ successful outcome.
 | 3. Retry Schedule Reshape | v1.1 | 3/3 | Complete | 2026-07-17 |
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
-| 6. Generated Theme Library | v1.2 | 0/TBD | Not started | - |
+| 6. Generated Theme Library | v1.2 | 0/2 | Not started | - |
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 0/TBD | Not started | - |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
