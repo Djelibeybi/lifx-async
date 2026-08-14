@@ -1,8 +1,24 @@
 # Phase 6: Generated Theme Library — Specification
 
 **Created:** 2026-08-14
+**Amended:** 2026-08-14 (Phase 6 discussion — see `06-CONTEXT.md`)
 **Ambiguity score:** 0.125 (gate: ≤ 0.20)
-**Requirements:** 9 locked
+**Requirements:** 8 locked (9 written, 1 retired)
+
+> **Amendments (2026-08-14, discuss-phase).** Three decisions taken with measured data in
+> hand supersede what was written above them. They are marked inline; nothing has been
+> deleted.
+>
+> 1. **COMPAT-02 retired.** No `*_legacy` keys, no Legacy category. Measuring the 19
+>    redefined themes showed 10 shift by only one or two colours and 9 change wholesale;
+>    the operator ruled the app is the source of truth and the pre-v1.2 palettes stay in
+>    git history. COMPAT-01 is unaffected — all 57 pre-v1.2 names still resolve.
+> 2. **Emoji stripped** from display names and categories. META-01/META-02's "emoji
+>    intact" wording is reversed: 'Forrest 🌳' ships as `Forrest`, '🎉 HOLIDAYS' as
+>    `Holidays`.
+> 3. **One generator input, not two.** The legacy manifest is gone; orphans and rename
+>    aliases are records in the same data file, carrying a `Library` category and an
+>    `aliases` field.
 
 ## Goal
 
@@ -82,9 +98,11 @@ manifest, theme identity on `Theme`, and every one of the 146 new palettes.
 4. **Generated, not transcribed** (THEME-04): `library.py`'s theme data is emitted by a
    generator from committed inputs.
    - Current: 500+ lines of hand-written `HSBK(...)` literals; no theme generator exists
-   - Target: a generator reads a committed themes data file (repo data directory, outside
-     the package — the package ships no data file) plus a committed legacy manifest, and
-     emits `library.py`'s theme data. It writes atomically: emit to a temp file, rename
+   - Target: a generator reads **one** committed themes data file (repo data directory,
+     outside the package — the package ships no data file) and emits the theme data
+     module. **Amended 2026-08-14:** the separate legacy manifest is gone; orphans and
+     rename aliases are records in the same file. It writes atomically: emit to a temp
+     file, format the temp file, rename
      over the target, so an interrupted or concurrent run never leaves a half-written
      `library.py`. Palette order in the emitted file is deterministic and documented as
      carrying no meaning
@@ -100,16 +118,19 @@ manifest, theme identity on `Theme`, and every one of the 146 new palettes.
    - Acceptance: a test parameterised over the full pre-v1.2 key list (captured as a
      literal fixture, not read from the new library) resolves every one without raising
 
-6. **Legacy palettes survive** (COMPAT-02): Each genuinely redefined theme keeps its old
-   palette reachable.
-   - Current: no aliases exist; overwriting would lose the old values to git history
-   - Target: the 19 genuinely redefined themes each gain a `<slug>_legacy` key holding
-     the pre-v1.2 palette. The 6 brightness-scaled themes get **no** legacy alias — the
-     ×1.1087 factor is 1/0.902 = 255/230, so they are the same palette at a different
-     level, not a changed theme
-   - Acceptance: all 19 `*_legacy` keys resolve and each equals its pre-v1.2 palette
-     exactly; no `*_legacy` key exists for any of the 6 brightness-scaled slugs; the
-     ×1.1087 relationship holds for all 6 within uint16 precision
+6. ~~**Legacy palettes survive** (COMPAT-02)~~ — **RETIRED 2026-08-14.** The requirement
+   as written called for a `<slug>_legacy` key per redefined theme. Measurement retired
+   it: of the 19, ten shift by one or two colours (`blissful`, `christmas`, `dream`,
+   `mellow`, `peaceful`, `powerful`, `soothing` lose one; `cheerful`, `energizing`,
+   `warming` lose two) and nine change wholesale (`tranquil` and `zombie` share nothing
+   with their old palettes; `hanukkah` 5→2 colours, `spacey` 4→2, `earth` and
+   `independence` 3→16, `coral_reef` 3500K→9000K). Preserving them would have cost 19
+   name collisions and a second addressing scheme for a benefit the operator judged
+   absent.
+   - Consequence: no `*_legacy` keys, no Legacy category, and the old palettes are
+     recoverable only from git history. Accepted knowingly.
+   - COMPAT-01 still holds: every pre-v1.2 name resolves — 27 of them now returning app
+     palettes, 30 returning their unchanged pre-v1.2 palettes.
 
 7. **Renames resolve both ways** (COMPAT-03): Renamed themes answer to both names.
    - Current: `aurora_borealis` and `forest` exist; the app spells them 'Aurora 🌌' and
@@ -120,34 +141,40 @@ manifest, theme identity on `Theme`, and every one of the 146 new palettes.
    - Acceptance: for each rename pair, both keys resolve and their palettes are equal as
      multisets
 
-8. **Display name on the theme** (META-01): A library theme knows its app name.
+8. **Display name on the theme** (META-01): A library theme knows its name.
    - Current: `Theme` has no name attribute of any kind
-   - Target: `Theme` gains theme identity; a theme from the library exposes its app
-     display name with emoji intact ('Forrest 🌳'), distinct from its slug (`forrest`).
-     The addition is additive — `Theme([...])` constructed by a caller with no name keeps
-     working unchanged
-   - Acceptance: `ThemeLibrary.get("forrest")` exposes display name 'Forrest 🌳';
-     constructing `Theme([HSBK(...)])` directly succeeds and its existing behaviour
-     (iteration, indexing, `add_color`) is unchanged
+   - Target: `Theme` gains theme identity; a theme from the library exposes its display
+     name, distinct from its slug. **Amended 2026-08-14: emoji are stripped** — 'Forrest
+     🌳' ships as `Forrest`, not with the emoji intact. The addition is additive —
+     `Theme([...])` constructed by a caller with no name keeps working unchanged
+   - Acceptance: `ThemeLibrary.get("forrest")` exposes display name `Forrest`; no shipped
+     display name contains a character outside the ASCII range; constructing
+     `Theme([HSBK(...)])` directly succeeds and its existing behaviour (iteration,
+     indexing, `add_color`) is unchanged
 
-9. **Category on the theme** (META-02): A library theme knows its app category.
+9. **Category on the theme** (META-02): A library theme knows its category.
    - Current: no category data exists on `Theme`; `get_by_category()`'s taxonomy is
      hand-made and unrelated to the app's
-   - Target: a theme from the library exposes the app category it came from. `christmas`
-     resolves to the 🎉 HOLIDAYS record; the byte-identical 🗄️ ARCHIVES twin is dropped
-   - Acceptance: `ThemeLibrary.get("christmas")` exposes category 🎉 HOLIDAYS; every one
-     of the 138 slugs exposes a category drawn from the app's 8 in-scope categories
+   - Target: a theme from the library exposes the category it came from. **Amended
+     2026-08-14: emoji stripped and Title Cased** — the app's 8 in-scope categories ship
+     as `Moods`, `Art Series`, `Music`, `Nature`, `Space`, `Play`, `Holidays`, `Archives`,
+     plus `Library` for the 30 pre-v1.2 keys with no app counterpart. `christmas` resolves
+     to the Holidays record; the identical Archives twin is dropped
+   - Acceptance: `ThemeLibrary.get("christmas")` exposes category `Holidays`; every one of
+     the 138 app slugs exposes one of the 8 app categories and every one of the 30
+     pre-v1.2 keys exposes `Library`; no shipped category contains a non-ASCII character
 
 ## Boundaries
 
 **In scope:**
 
-- A theme generator reading a committed themes data file plus a committed legacy manifest
+- A theme generator reading one committed themes data file (amended 2026-08-14 — the
+  separate legacy manifest is gone)
 - The themes data file, moved out of `.claude/theme-capture/` into a repo data directory
-  outside the package
-- The legacy manifest: the 30 orphaned palettes, the 19 `*_legacy` snapshots, and the
-  rename map
-- Regenerated `library.py` carrying 138 app slugs + 30 orphans + 19 legacy aliases
+  outside the package, holding 168 records: 138 app themes plus the 30 pre-v1.2 keys
+  (28 orphan palettes and 2 rename aliases), all emoji-stripped
+- A generated theme data module carrying 168 resolvable names, with the hand-written
+  `ThemeLibrary` API kept separate
 - Theme identity on `Theme` — display name and category, additive and optional
 - Fixing the shared-list mutation leak: `get()` returns a `Theme` over a fresh list
 - Shortening `get()`'s `KeyError` to the name plus a pointer to `get_available_themes()`
@@ -189,11 +216,11 @@ manifest, theme identity on `Theme`, and every one of the 146 new palettes.
 - [ ] `soothing` returns kelvin 8000; the other 24 differing shared slugs match the app
       and differ from their pre-v1.2 values
 - [ ] All 57 pre-v1.2 keys still resolve, checked against a literal fixture list
-- [ ] All 19 `*_legacy` keys resolve and equal their pre-v1.2 palettes exactly
-- [ ] No `*_legacy` key exists for any of the 6 brightness-scaled slugs
+- [ ] No key ending `_legacy` exists anywhere in the library (COMPAT-02 retired)
 - [ ] `aurora_borealis`/`aurora` and `forest`/`forrest` each return equal palettes
-- [ ] `ThemeLibrary.get("forrest")` exposes display name 'Forrest 🌳'
-- [ ] `ThemeLibrary.get("christmas")` exposes category 🎉 HOLIDAYS
+- [ ] `ThemeLibrary.get("forrest")` exposes display name `Forrest`
+- [ ] `ThemeLibrary.get("christmas")` exposes category `Holidays`
+- [ ] No shipped display name or category contains a non-ASCII character
 - [ ] `Theme([HSBK(...)])` with no name still constructs and behaves as before
 - [ ] `get()` returns a fresh list: mutating a returned `Theme` does not change what the
       next `get()` of the same slug returns
@@ -228,15 +255,15 @@ manifest, theme identity on `Theme`, and every one of the 146 new palettes.
 | empty | COMPAT-01 | ✅ covered | Pre-v1.2 key list captured as a literal fixture so an empty/incorrect derivation cannot vacuously pass |
 | encoding | COMPAT-01 | ✅ covered | Pre-v1.2 keys are already ASCII lowercase; `get()` keeps lowercasing its input |
 | ordering | COMPAT-01 | ✅ covered | Resolution is by key, order-independent |
-| adjacency | COMPAT-02 | ✅ covered | A `*_legacy` slug colliding with a real app slug: app wins, legacy dropped loudly. Verified zero live instances |
-| empty | COMPAT-02 | ✅ covered | Exactly 19 legacy keys expected; count asserted, so a silently empty legacy layer fails |
-| encoding | COMPAT-02 | ✅ covered | `_legacy` suffix on an already-ASCII slug; no normalisation involved |
-| ordering | COMPAT-02 | ✅ covered | Legacy palettes compared as multisets like every other palette |
+| adjacency | ~~COMPAT-02~~ | ⛔ moot | Requirement retired 2026-08-14 — no `*_legacy` slugs exist to collide |
+| empty | ~~COMPAT-02~~ | ⛔ moot | Requirement retired — no legacy layer to be empty. Replaced by the criterion that **no** key ends `_legacy` |
+| encoding | ~~COMPAT-02~~ | ⛔ moot | Requirement retired |
+| ordering | ~~COMPAT-02~~ | ⛔ moot | Requirement retired |
 | empty | COMPAT-03 | ✅ covered | Rename map has 2 entries; both asserted. A missing entry fails COMPAT-01 as well |
 | encoding | COMPAT-03 | ✅ covered | Verified: neither `aurora_borealis` nor `forest` exists independently in the app set, so no conflict |
 | empty | META-01 | ✅ covered | `Theme` with no name is the caller-constructed case and must keep working |
-| encoding | META-01 | ✅ covered | Display names stored as Python `str` with emoji intact; only the slug is ASCII-folded |
-| unclassified | META-02 | ✅ covered | Reviewed manually: `christmas` keeps the 🎉 HOLIDAYS record; the identical 🗄️ ARCHIVES twin is dropped, recorded in phase docs only |
+| encoding | META-01 | ✅ covered | **Amended 2026-08-14:** emoji stripped from display names and categories; slug derives from the stripped name, so one rule feeds the next. Verified: no name strips to empty, and only `Christmas` duplicates |
+| unclassified | META-02 | ✅ covered | Reviewed manually: `christmas` keeps the Holidays record; the identical Archives twin is dropped, recorded in phase docs only |
 
 ## Prohibitions (must-NOT)
 

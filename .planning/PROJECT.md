@@ -39,8 +39,8 @@ callers already depend on.
 - Import the 139 non-sport app themes as ASCII slugs, carrying the app's display name and
   category as metadata
 - Resync the 27 shared slugs to the app's values (6 differ only by a uniform ×1.1087
-  brightness scale, 19 are genuinely redefined); every overwritten palette keeps a
-  `*_legacy` alias holding the current values
+  brightness scale, 19 are genuinely redefined). **Amended 2026-08-14:** the pre-v1.2
+  palettes are *not* carried forward — no `*_legacy` aliases, no Legacy category
 - Resolve the 30 orphaned library keys — map the renames (`aurora_borealis` → Aurora 🌌,
   `forest` → Forrest 🌳), decide keep-or-deprecate for the remainder
 - Expose the app's category taxonomy as queryable theme metadata
@@ -134,7 +134,7 @@ by name looks like the theme of that name in the LIFX app.
 v1.2 Theme Library Update — REQ-IDs defined in `.planning/REQUIREMENTS.md`:
 
 - [ ] Import the 139 non-sport app themes with ASCII slugs, display names and categories
-- [ ] Resync the 27 shared slugs; `*_legacy` aliases preserve every overwritten palette
+- [ ] Resync the 27 shared slugs (COMPAT-02's `*_legacy` aliases retired 2026-08-14)
 - [ ] Resolve the 30 orphaned library keys (renames mapped, remainder kept or deprecated)
 - [ ] Expose the category taxonomy as queryable metadata
 - [ ] Settle the 26 exactly-16-colour themes: true count, or a recorded finding that a
@@ -217,7 +217,8 @@ Carried-forward candidates, not committed to v1.2:
 | Publish behaviour, not tuning constants (D5-09 as written) | Rendered docstrings state the behavioural contract; thresholds/expiries stay in `flow.py` and comments where they can change without a docs lie | ✓ Applied — Phase 5. **The rule itself is disputed by the operator and remains an OPEN decision** in `05-CONTEXT.md`, with spike candidate 006 (cap-impact measurement) linked. Phase 5 complied with it as written; its future is unsettled |
 | Drop the 8-warning docs baseline instead of pinning it | The "pre-existing" warnings were a defect set (5 annotations parsed as link refs; 3 anchors to never-rendered mDNS symbols), not a constant | ✓ Shipped — Phase 5 (D5-23). Zero warnings under `--strict`, gated in CI so the class cannot drift back |
 | Discovery keeps its own re-broadcast schedule rather than reusing the Phase 3 retransmit engine | `_transmit_and_listen()` stops retransmitting after its first yield, which would defeat DISC-01's requirement to keep broadcasting after early responders answer | ✓ Validated at the v1.1 close audit — disjoint sockets, packets and sources, so the two schedules cannot double-send |
-| Overwrite redefined themes but keep `*_legacy` aliases | App accuracy is the point of the milestone, but 19 palettes change under callers who never asked for it; an alias makes the old values recoverable by name instead of by git archaeology | Decided 2026-08-14 — v1.2 scope |
+| ~~Overwrite redefined themes but keep `*_legacy` aliases~~ | App accuracy is the point of the milestone, but 19 palettes change under callers who never asked for it; an alias makes the old values recoverable by name instead of by git archaeology | **Reversed 2026-08-14** in the Phase 6 discussion. Measuring the 19: 10 shift by only one or two colours, 9 change wholesale (`tranquil` and `zombie` share nothing with their old palettes). Not worth 19 name collisions and a second addressing scheme — the app is the source of truth and the old palettes stay in git history |
+| Strip emoji from theme names and categories | The app is built to display them; downstream consumers of a Python library are not. 'Forrest 🌳' ships as `Forrest`, '🎉 HOLIDAYS' as `Holidays` | Decided 2026-08-14 — verified no name strips to empty and only `christmas` duplicates, which was already collapsing |
 | ASCII slugs, drop the sport categories | Emoji are poor Python identifiers and CLI arguments; dropping AFL/League/Union removes 5 of the 6 slug collisions outright rather than inventing suffixes for club branding | Decided 2026-08-14 — v1.2 scope |
 | Device readback as the only capture source | Themes are server-driven and absent from the APK; the internal endpoints are undocumented and were not called. Accepted cost: palettes are capped at the protocol's 16 colours and order is lost | Applied to the 2026-08-14 capture; the 16-colour consequence is an open v1.2 question |
 | Reset the discovery idle timer on consumer resume, not just before the yield | `api.discover()` constructs a Device per response; those round trips would otherwise spend the idle window and truncate the sweep | ✓ Shipped — v1.1 close-out (260726-824). Overall timeout untouched, so a slow consumer still cannot extend discovery indefinitely |
