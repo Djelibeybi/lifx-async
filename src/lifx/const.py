@@ -117,6 +117,17 @@ MAX_KELVIN: Final[int] = 9000
 KELVIN_SATURATED: Final[int] = 0
 
 # ============================================================================
+# Palette Limits
+# ============================================================================
+
+# The firmware effect wire format carries exactly 16 palette slots, so a
+# palette longer than this cannot be sent to a device: SetTileEffect and
+# SetMultiZoneEffect both truncate. Theme data is validated against the same
+# ceiling at generation time so an over-long palette fails as a named
+# generator abort rather than a ValueError deep inside user code.
+MAX_PALETTE_COLORS: Final[int] = 16
+
+# ============================================================================
 # Ambient Light Sensor
 # ============================================================================
 

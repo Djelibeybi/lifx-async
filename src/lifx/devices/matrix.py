@@ -21,7 +21,12 @@ from typing import TYPE_CHECKING, Any
 
 from lifx.animation.orientation import Orientation, build_orientation_lut
 from lifx.color import HSBK
-from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.const import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_REQUEST_TIMEOUT,
+    LIFX_UDP_PORT,
+    MAX_PALETTE_COLORS,
+)
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
 from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
@@ -264,9 +269,10 @@ class MatrixEffect:
         """
         if not value:
             raise ValueError("Effect palette must contain at least one color")
-        if len(value) > 16:
+        if len(value) > MAX_PALETTE_COLORS:
             raise ValueError(
-                f"Effect palette can contain at most 16 colors, got {len(value)}"
+                f"Effect palette can contain at most {MAX_PALETTE_COLORS} colors, "
+                f"got {len(value)}"
             )
 
     @staticmethod

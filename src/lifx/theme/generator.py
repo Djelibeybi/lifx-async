@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from lifx.color import HSBK
-from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
+from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MAX_PALETTE_COLORS, MIN_KELVIN
 from lifx.protocol.protocol_types import LightHsbk
 
 #: The committed theme data file, in the repo data directory outside the package.
@@ -114,7 +114,9 @@ def derive_slug(name: str) -> str:
     Returns:
         The derived slug.
     """
-    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", name.lower())).strip("_")
+    # One pass suffices: `[^a-z0-9]+` already matches `_` itself and collapses
+    # runs greedily, so two adjacent replacement underscores cannot survive it.
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
 def canonical_palette(colors: list[dict[str, int]]) -> list[dict[str, int]]:
@@ -164,6 +166,16 @@ def _validate_colors(line_number: int, record: dict[str, Any]) -> None:
         raise _fail(line_number, record, "'colors' is not a list")
     if not colors:
         raise _fail(line_number, record, "has zero colours")
+    if len(colors) > MAX_PALETTE_COLORS:
+        # The firmware effect wire format carries exactly MAX_PALETTE_COLORS
+        # slots. A longer palette is silently truncated by the device, so it
+        # fails here as a named abort rather than as a ValueError inside
+        # MatrixEffect._validate_palette() in user code.
+        raise _fail(
+            line_number,
+            record,
+            f"has more than {MAX_PALETTE_COLORS} colours: {len(colors)}",
+        )
     for index, color in enumerate(colors):
         if type(color) is not dict:
             raise _fail(line_number, record, f"colour {index} is not a JSON object")
@@ -202,14 +214,28 @@ def _validate_colors(line_number: int, record: dict[str, Any]) -> None:
                     f"colour {index} field '{field}' out of range 0-65535: {value}",
                 )
         kelvin = color["kelvin"]
-        # Kelvin 0 is KELVIN_SATURATED — a legitimate wire value this repo
-        # never clamps or rejects on an inbound path.
-        if kelvin != KELVIN_SATURATED and not MIN_KELVIN <= kelvin <= MAX_KELVIN:
+        # Kelvin 0 (KELVIN_SATURATED) is legitimate on an *inbound* read and
+        # is never clamped there. Theme data is outbound, blended data:
+        # HSBK.average() averages kelvin linearly, so a palette mixing kelvin
+        # 0 with any real kelvin lands in the forbidden 1-1499 band and raises
+        # inside Canvas.blur(), fill_in_points() and every multizone/matrix
+        # apply_theme(). A theme that cannot be rendered must not be
+        # generated, so the inbound exemption does not apply here.
+        if kelvin == KELVIN_SATURATED:
+            raise _fail(
+                line_number,
+                record,
+                f"colour {index} field 'kelvin' is {KELVIN_SATURATED}, which "
+                f"is not valid in theme data: {KELVIN_SATURATED} is an "
+                f"inbound-only wire value and blending it raises. Re-capture "
+                f"the palette with the light in white mode, or drop the colour",
+            )
+        if not MIN_KELVIN <= kelvin <= MAX_KELVIN:
             raise _fail(
                 line_number,
                 record,
                 f"colour {index} field 'kelvin' out of range "
-                f"{MIN_KELVIN}-{MAX_KELVIN} (or {KELVIN_SATURATED}): {kelvin}",
+                f"{MIN_KELVIN}-{MAX_KELVIN}: {kelvin}",
             )
 
 
@@ -366,6 +392,12 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
             not round-trip at uint16).
     """
     by_slug = {record["slug"]: record for _, record in records}
+    if len(by_slug) != len(records):
+        # Keying by slug is last-wins, so a duplicate silently drops a record
+        # while its aliases stay in the alias pass below — binding the wrong
+        # theme. validate_records() catches this when the documented order is
+        # followed; the emit-time backstops exist for when it is not.
+        raise RuntimeError("emit-time check failed: duplicate slug in records")
     lines: list[str] = [
         '"""Generated LIFX theme data.',
         "",
@@ -482,17 +514,6 @@ def format_generated_files(*paths: Path) -> None:
             )
 
 
-def _current_umask() -> int:
-    """Return the process umask without leaving it changed.
-
-    ``os.umask()`` is the only way to read the value, and it can only read by
-    setting, so the original is restored immediately.
-    """
-    mask = os.umask(0o022)
-    os.umask(mask)
-    return mask
-
-
 def main() -> None:
     """Load, validate, emit and atomically write the theme data module.
 
@@ -514,11 +535,13 @@ def main() -> None:
         os.close(handle)
         temp_path.write_text(source, encoding="utf-8")
         format_generated_files(temp_path)
-        # mkstemp creates the file 0600. Widen it to the usual source-file
-        # mode before the rename, honouring the process umask, so the
-        # generated module is readable once installed rather than shipping
-        # owner-only permissions into a wheel.
-        temp_path.chmod(0o666 & ~_current_umask())
+        # mkstemp creates the file 0600 and Path.replace() carries that mode
+        # onto the target, so widen it to the mode every other tracked source
+        # file in this repo already has. Fixed rather than umask-derived: git
+        # tracks only the exec bit, so a maintainer running under `umask 077`
+        # would otherwise narrow data.py to 0600 invisibly and ship an
+        # owner-only module inside the wheel.
+        temp_path.chmod(0o644)
         temp_path.replace(OUTPUT_PATH)
     finally:
         # A no-op after a successful rename; removes the temp file when
