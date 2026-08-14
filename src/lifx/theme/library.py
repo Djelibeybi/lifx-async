@@ -40,8 +40,10 @@ class ThemeLibrary:
         ```
     """
 
-    # The generated theme registry. `get_by_category()` reads this class
-    # attribute; Phase 7 owns replacing its taxonomy (META-04).
+    # The generated theme registry. Every lookup classmethod reads this class
+    # attribute rather than the module-global `THEMES`, so a subclass that
+    # rebinds it sees a consistent library across get(), get_available_themes()
+    # and get_by_category(). Phase 7 owns replacing its taxonomy (META-04).
     _THEMES: dict[str, ThemeRecord] = THEMES
 
     @classmethod
@@ -66,13 +68,13 @@ class ThemeLibrary:
             ```
         """
         normalized_name = name.lower()
-        if normalized_name not in THEMES:
+        if normalized_name not in cls._THEMES:
             raise KeyError(
                 f"Theme '{name}' not found. Use "
                 f"ThemeLibrary.get_available_themes() to list the "
                 f"available themes."
             )
-        record = THEMES[normalized_name]
+        record = cls._THEMES[normalized_name]
         # The Theme is built over a fresh list so mutating a returned Theme
         # can never corrupt the library's own palette.
         return Theme(
@@ -98,7 +100,7 @@ class ThemeLibrary:
                 print(f"- {theme_name}")
             ```
         """
-        return sorted(THEMES)
+        return sorted(cls._THEMES)
 
     @classmethod
     def get_by_category(cls, category: str) -> dict[str, Theme]:

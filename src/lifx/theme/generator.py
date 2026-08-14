@@ -482,6 +482,17 @@ def format_generated_files(*paths: Path) -> None:
             )
 
 
+def _current_umask() -> int:
+    """Return the process umask without leaving it changed.
+
+    ``os.umask()`` is the only way to read the value, and it can only read by
+    setting, so the original is restored immediately.
+    """
+    mask = os.umask(0o022)
+    os.umask(mask)
+    return mask
+
+
 def main() -> None:
     """Load, validate, emit and atomically write the theme data module.
 
@@ -503,6 +514,11 @@ def main() -> None:
         os.close(handle)
         temp_path.write_text(source, encoding="utf-8")
         format_generated_files(temp_path)
+        # mkstemp creates the file 0600. Widen it to the usual source-file
+        # mode before the rename, honouring the process umask, so the
+        # generated module is readable once installed rather than shipping
+        # owner-only permissions into a wheel.
+        temp_path.chmod(0o666 & ~_current_umask())
         temp_path.replace(OUTPUT_PATH)
     finally:
         # A no-op after a successful rename; removes the temp file when
