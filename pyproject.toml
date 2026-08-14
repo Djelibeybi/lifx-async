@@ -132,7 +132,8 @@ omit = [
     "src/lifx/protocol/generator.py",
     "src/lifx/protocol/protocol_types.py",
     "src/lifx/products/generator.py",
-
+    "src/lifx/theme/data.py",
+    "src/lifx/theme/generator.py",
 ]
 
 [tool.coverage.report]
