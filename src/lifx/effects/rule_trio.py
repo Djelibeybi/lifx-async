@@ -67,6 +67,35 @@ _BLEND_HALF: float = 0.5
 # lerp(lerp(A, B, 0.5), C, 1/3) = 1/3 A + 1/3 B + 1/3 C.
 _BLEND_THIRD: float = 1.0 / 3.0
 
+# One primary per cellular automaton.
+_PRIMARY_COUNT: int = 3
+
+
+def _select_primaries(colors: list[HSBK]) -> list[HSBK]:
+    """Choose three CA primaries from a palette of any length.
+
+    Distinct colours are taken in palette order, then cycled if the palette
+    holds fewer than three of them. Both rules matter for library themes:
+    the app pads short palettes up to the 16-slot wire array by repeating
+    colours and the canonical D-24 sort clusters those repeats at the front,
+    so a positional ``colors[:3]`` slice renders 19 built-in themes
+    monochrome. Cycling also keeps a two-colour theme usable instead of
+    raising, since a palette's length is captured data, not a caller error.
+
+    Args:
+        colors: Palette colours in any order and of any length.
+
+    Returns:
+        Exactly three HSBK colours.
+
+    Raises:
+        ValueError: If the palette is empty.
+    """
+    distinct = list(dict.fromkeys(colors))
+    if not distinct:
+        raise ValueError("Theme must have at least 1 color, got 0")
+    return [distinct[index % len(distinct)] for index in range(_PRIMARY_COUNT)]
+
 
 class _CA:
     """Lightweight single-track Wolfram elementary cellular automaton.
@@ -198,8 +227,10 @@ class EffectRuleTrio(FrameEffect):
             speed: Base generations per second, must be > 0 (default 5.0)
             drift_b: Speed multiplier for CA B (default 1.31, irrational)
             drift_c: Speed multiplier for CA C (default 1.73, irrational)
-            theme: List of 3+ HSBK colors; first three used as CA primaries.
-                When None, uses ThemeLibrary.get("exciting").
+            theme: Palette of HSBK colors. The first three *distinct*
+                colors become the CA primaries; a palette with fewer than
+                three distinct colors is cycled to fill them. When None,
+                uses ThemeLibrary.get("exciting").
             brightness: Alive-cell brightness 0.0-1.0 (default 0.8)
             kelvin: Color temperature 1500-9000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
@@ -235,14 +266,12 @@ class EffectRuleTrio(FrameEffect):
         self.kelvin = kelvin
         self.zones_per_bulb = zones_per_bulb
 
-        # Resolve theme colors: use first three from theme or default.
+        # Resolve theme colors: three distinct primaries from theme or default.
         if theme is not None:
-            if len(theme) < 3:
-                raise ValueError(f"Theme must have at least 3 colors, got {len(theme)}")
-            self._theme_colors: list[HSBK] = list(theme[:3])
+            self._theme_colors: list[HSBK] = _select_primaries(list(theme))
         else:
             default_theme = ThemeLibrary.get("exciting")
-            self._theme_colors = list(default_theme.colors[:3])
+            self._theme_colors = _select_primaries(list(default_theme.colors))
 
         # Three independent CA instances.
         self._ca_a = _CA()

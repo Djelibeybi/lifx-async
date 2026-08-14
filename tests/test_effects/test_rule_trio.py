@@ -9,6 +9,7 @@ from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.rule_trio import _CA, EffectRuleTrio
+from lifx.theme.library import ThemeLibrary
 
 # ---------------------------------------------------------------------------
 # Default and custom parameters
@@ -173,15 +174,66 @@ def test_rule_trio_invalid_zones_per_bulb() -> None:
         EffectRuleTrio(zones_per_bulb=-1)
 
 
-def test_rule_trio_theme_too_few_colors() -> None:
-    """Test theme with fewer than 3 colors raises ValueError."""
-    with pytest.raises(ValueError, match="Theme must have at least 3 colors"):
-        EffectRuleTrio(
-            theme=[
-                HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),
-                HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500),
-            ]
-        )
+def test_rule_trio_two_color_theme_cycles_to_three() -> None:
+    """A two-colour palette is cycled, not rejected.
+
+    Palette length is captured data, not a caller error: `hanukkah` and
+    `spacey` are two-colour library themes, so raising here would make two
+    shipped themes unusable as rule-trio input.
+    """
+    red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
+    green = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
+
+    effect = EffectRuleTrio(theme=[red, green])
+
+    assert [c.hue for c in effect._theme_colors] == [0, 120, 0]
+
+
+def test_rule_trio_single_color_theme_cycles_to_three() -> None:
+    """A one-colour palette fills all three primaries with that colour."""
+    effect = EffectRuleTrio(
+        theme=[HSBK(hue=200, saturation=1.0, brightness=1.0, kelvin=3500)]
+    )
+
+    assert [c.hue for c in effect._theme_colors] == [200, 200, 200]
+
+
+def test_rule_trio_empty_theme_raises() -> None:
+    """An empty palette has nothing to cycle."""
+    with pytest.raises(ValueError, match="at least 1 color"):
+        EffectRuleTrio(theme=[])
+
+
+def test_rule_trio_duplicate_leading_colors_skipped() -> None:
+    """Leading duplicates do not collapse the primaries to one colour.
+
+    The app pads short palettes up to the 16-slot wire array by repeating
+    colours, and the canonical D-24 sort clusters those repeats at the
+    front — `independence` is stored as 4 white + 8 red + 4 blue, so a
+    positional slice would render it monochrome white.
+    """
+    white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=6500)
+    red = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=6500)
+    blue = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=6500)
+
+    effect = EffectRuleTrio(theme=[white, white, white, white, red, red, blue])
+
+    assert effect._theme_colors == [white, red, blue]
+
+
+def test_rule_trio_library_themes_have_three_distinct_primaries() -> None:
+    """Every built-in theme yields three distinct rule-trio primaries.
+
+    A theme with three or more distinct colours must never render
+    monochrome, whatever its stored duplicate padding.
+    """
+    for name in ThemeLibrary.get_available_themes():
+        theme = ThemeLibrary.get(name)
+        distinct = len(set(theme.colors))
+        primaries = EffectRuleTrio(theme=list(theme.colors))._theme_colors
+
+        expected = min(distinct, 3)
+        assert len(set(primaries)) == expected, name
 
 
 def test_rule_trio_boundary_rule_values() -> None:
