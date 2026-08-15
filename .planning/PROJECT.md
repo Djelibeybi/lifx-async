@@ -136,6 +136,12 @@ by name looks like the theme of that name in the LIFX app.
 - ✓ Reliability documentation (DOCS-01..02) — v1.1
 - ✓ Consumer time cannot expire the discovery idle window — v1.1 close-out
   (quick task 260726-824)
+- ✓ Category taxonomy is queryable — `ThemeLibrary.get_categories()` lists the nine
+  categories and `get_by_category()` reads them from the generated records
+  (META-03, META-04) — Phase 7
+- ✓ The orphaned library keys carry recorded fates — `Theme.disposition` is
+  `lifx-app` / `library-only` / `deprecated`, and the nine deprecated keys name a
+  `Theme.replaced_by` that resolves (COMPAT-04) — Phase 7
 
 ### Active
 
@@ -146,8 +152,8 @@ v1.2 Theme Library Update — REQ-IDs defined in `.planning/REQUIREMENTS.md`:
 
 - [ ] Import the 139 non-sport app themes with ASCII slugs, display names and categories
 - [ ] Resync the 27 shared slugs (COMPAT-02's `*_legacy` aliases retired 2026-08-14)
-- [ ] Resolve the 30 orphaned library keys (renames mapped, remainder kept or deprecated)
-- [ ] Expose the category taxonomy as queryable metadata
+- [x] Resolve the 30 orphaned library keys (renames mapped, remainder kept or deprecated) — Phase 7
+- [x] Expose the category taxonomy as queryable metadata — Phase 7
 - [ ] Settle the 26 exactly-16-colour themes: true count, or a recorded finding that a
       device cannot supply it
 - [ ] Ship the capture tooling for future resyncs
@@ -252,4 +258,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-15 after Phase 6 (Generated Theme Library) completed*
+*Last updated: 2026-08-15 after Phase 7 (Taxonomy & Legacy Dispositions) completed*

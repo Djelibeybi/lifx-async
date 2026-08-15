@@ -13,7 +13,7 @@ requires:
     plan: 02
     provides: get_categories(), rewritten get_by_category() with legacy fates — the behaviour the page documents
 provides:
-  - docs/migration/theme-taxonomy-v1.2.md — dated point-in-time migration record (9 categories with counts, 6 legacy fates, 9 deprecated keys with replacements)
+  - docs/migration/theme-taxonomy-6.4.0.md — dated point-in-time migration record (9 categories with counts, 6 legacy fates, 9 deprecated keys with replacements)
   - mkdocs.yml — page listed in BOTH Migration nav sections (llms nav and main nav)
   - docs/api/themes.md — stale 'older grouping' admonition replaced with current behaviour + migration link
   - docs/getting-started/themes.md — examples re-pointed at Holidays/Moods with a get_categories() discovery line
@@ -32,7 +32,7 @@ tech-stack:
 
 key-files:
   created:
-    - docs/migration/theme-taxonomy-v1.2.md
+    - docs/migration/theme-taxonomy-6.4.0.md
   modified:
     - mkdocs.yml
     - docs/api/themes.md
@@ -40,7 +40,7 @@ key-files:
 
 key-decisions:
   - "Category table carries a third 'Defined by' column (LIFX app / This library) so the Library attribution is explicit in the table itself, not only in prose — the name and count cells stay adjacent, so the R2-03 per-row regex still matches"
-  - "The point-in-time stamp is an admonition titled 'As of the v1.2 migration (2026-08-15)' — prominent, dated, and states the page is deliberately never resynced (D-10)"
+  - "The point-in-time stamp is an admonition titled 'As of the 6.4.0 migration (2026-08-15)' — prominent, dated, and states the page is deliberately never resynced (D-10)"
 
 patterns-established:
   - "Migration pages follow the effect-api-changes.md shape: H1 with version, intro sentence, Overview numbered list, sections with Before/After fenced blocks"
@@ -70,7 +70,7 @@ coverage:
     requirement: META-04
     verification:
       - kind: other
-        ref: "grep -c theme-taxonomy-v1.2.md mkdocs.yml == 2; uv run zensical build exits 0"
+        ref: "grep -c theme-taxonomy-6.4.0.md mkdocs.yml == 2; uv run zensical build exits 0"
         status: pass
     human_judgment: false
   - id: DOC4
@@ -98,7 +98,7 @@ status: complete
 
 # Phase 7 Plan 03: Taxonomy & Migration Docs Summary
 
-**The v1.2 theme-taxonomy migration documented as a dated point-in-time record: a new page under both Migration nav sections carrying the 9 categories with counts, the 6 legacy-name fates and the 9 deprecated→replacement pairs — every After example executed against the shipped library — plus the last two stale doc sites corrected (D-11 sites 3-4)**
+**The 6.4.0 theme-taxonomy migration documented as a dated point-in-time record: a new page under both Migration nav sections carrying the 9 categories with counts, the 6 legacy-name fates and the 9 deprecated→replacement pairs — every After example executed against the shipped library — plus the last two stale doc sites corrected (D-11 sites 3-4)**
 
 ## Performance
 
@@ -110,7 +110,7 @@ status: complete
 
 ## Accomplishments
 
-- `docs/migration/theme-taxonomy-v1.2.md` created following the `effect-api-changes.md` shape, stamped **"As of the v1.2 migration (2026-08-15)"** as a deliberately-never-resynced record (D-10): the 9-category table with counts verified against the shipped data (Archives 60, Art Series 10, Holidays 15, Library 28, Moods 13, Music 14, Nature 8, Play 7, Space 11), one row per legacy name (holiday→Holidays, mood→Moods; seasonal/ambient/functional/atmosphere raise naming Nature/Play/Library/Moods), and one row per deprecated key with its exact replacement
+- `docs/migration/theme-taxonomy-6.4.0.md` created following the `effect-api-changes.md` shape, stamped **"As of the 6.4.0 migration (2026-08-15)"** as a deliberately-never-resynced record (D-10): the 9-category table with counts verified against the shipped data (Archives 60, Art Series 10, Holidays 15, Library 28, Moods 13, Music 14, Nature 8, Play 7, Space 11), one row per legacy name (holiday→Holidays, mood→Moods; seasonal/ambient/functional/atmosphere raise naming Nature/Play/Library/Moods), and one row per deprecated key with its exact replacement
 - The Library attribution is explicit twice — a "Defined by" table column and prose — so the synthetic category is never presented as app-defined; the 3 dropped sport categories are noted as out of scope
 - The deprecation contract uses the SPEC's locked wording (review F6): a deprecated key still resolves, deprecation records a fate and never deletes, removal would be a **v2.0 decision** — no duration-bound 1.x support promise
 - The Before block is labelled historical and the prose states `get_by_category("holiday")`/`("mood")` still resolve — the result set changed, not the call's validity (review F8); every After statement class was executed against the shipped code in the verify step (review R2-03)
@@ -129,8 +129,8 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `docs/migration/theme-taxonomy-v1.2.md` - new dated migration page: stamp admonition, Overview, three tables, Before/After examples
-- `mkdocs.yml` - `migration/theme-taxonomy-v1.2.md` added to the llms nav Migration list and `Theme Taxonomy Changes: migration/theme-taxonomy-v1.2.md` to the main nav Migration section
+- `docs/migration/theme-taxonomy-6.4.0.md` - new dated migration page: stamp admonition, Overview, three tables, Before/After examples
+- `mkdocs.yml` - `migration/theme-taxonomy-6.4.0.md` added to the llms nav Migration list and `Theme Taxonomy Changes: migration/theme-taxonomy-6.4.0.md` to the main nav Migration section
 - `docs/api/themes.md` - admonition deleted; replacement paragraph with migration link and disposition sentence
 - `docs/getting-started/themes.md` - category examples re-pointed at app names; `get_categories()` line added
 

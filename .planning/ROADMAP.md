@@ -60,7 +60,7 @@ Theme names are public API — a key may gain values or an alias; it may never s
 vanish, in any intermediate state.
 
 - [x] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving (completed 2026-08-15)
-- [ ] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate
+- [x] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate (completed 2026-08-15)
 - [ ] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way
 - [ ] **Phase 9: Resync Tooling & Docs** - A future app update is resynced by documented procedure; theme docs reflect the new library
 
@@ -118,7 +118,7 @@ data file plus a separate legacy manifest.
   2. Every category name `get_by_category()` accepted before v1.2 (`seasonal`, `hygge`, `tranquil`, `sports`, …) either still returns themes or fails with a message naming its replacement
   3. Each of the 30 orphaned library keys carries a recorded disposition — kept as library-only, or deprecated naming its replacement — and a deprecated key still resolves
 
-**Plans:** 3/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
@@ -185,6 +185,6 @@ successful outcome.
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
-| 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | In Progress|  |
+| 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete    | 2026-08-15 |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |

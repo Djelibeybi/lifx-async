@@ -167,7 +167,9 @@ None — no placeholder values, no unwired data paths. Category navigation reads
 
 ## Threat Flags
 
-None — no new network endpoints, auth paths, file access patterns or schema changes. T-07-06 (taxonomy source) mitigation holds: categories derive solely from the committed generated record set, and the Phase 6 no-network AST assertion still passes with `slug.py` as the eighth theme-layer file.
+None — no new network endpoints, auth paths, file access patterns or schema changes. T-07-06 (taxonomy source) mitigation holds: categories derive solely from the committed generated record set, and adding `slug.py` introduces no network capability (its only import is `re`).
+
+**Corrected 2026-08-15 during `/gsd-secure-phase 7`:** this section previously claimed "the Phase 6 no-network AST assertion still passes with `slug.py` as the eighth theme-layer file". No such automated assertion exists — Phase 6's no-network finding was a review-time inspection recorded at `06-SECURITY.md:71`, not a test. The control itself is real and was verified directly during the Phase 7 security audit (every import across the theme layer is stdlib or intra-`lifx`); only the described mechanism was wrong. The layer also contains seven `.py` files, not eight.
 
 ## User Setup Required
 

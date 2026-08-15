@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Theme Library Update
-current_phase: 07
-current_phase_name: taxonomy-legacy-dispositions
-status: "Phase 07 shipped — PR #202"
-stopped_at: Completed 07-03-PLAN.md (phase 07 complete)
-last_updated: "2026-08-15T04:27:33.781Z"
+current_phase: 8
+current_phase_name: Hardware Fidelity Validation
+status: planning
+stopped_at: Phase 07 complete and shipped (PR #202); ready to plan Phase 8
+last_updated: "2026-08-15T04:30:54.190Z"
 last_activity: 2026-08-15
+last_activity_desc: "Phase 07 complete and shipped as PR #202; Phase 8 ready to plan"
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 5
   completed_plans: 5
   percent: 50
-last_activity_desc: "Phase 06 merged to main via PR #196; Phase 7 ready to plan"
 ---
 
 # Project State
@@ -24,14 +24,14 @@ last_activity_desc: "Phase 06 merged to main via PR #196; Phase 7 ready to plan"
 See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic — and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 07 — taxonomy-legacy-dispositions
+**Current focus:** Phase 08 — hardware-fidelity-validation
 
 ## Current Position
 
-Phase: 07 (taxonomy-legacy-dispositions) — EXECUTING
-Plan: 3 of 3
-Status: Phase 07 shipped — PR #202
-Last activity: 2026-08-15
+Phase: 8 — Hardware Fidelity Validation
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-15 — Phase 07 complete, transitioned to Phase 8
 
 Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
 Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
@@ -44,11 +44,22 @@ fixed in 732e512.
   unrepresentable. All three need the committed capture→JSONL converter that does not exist
   yet, so none is fixable by editing `data/themes.jsonl`.
 
-- **#200, #201 — Phase 7:** `get_by_category()` still on the legacy six-group taxonomy while
-  `Theme.category` returns the app's nine; no way to tell a rename alias from a primary slug
-  in `get_available_themes()` (168 names, 166 themes).
+- **#200 — closed by Phase 7:** `get_by_category()` now reads the app's nine categories from
+  the generated records, so it no longer disagrees with `Theme.category`.
+- **#201 — deferred to Phase 9:** still no way to tell a rename alias from a primary slug in
+  `get_available_themes()` (168 names, 166 themes). Belongs with the resync tooling.
 
-Progress: [██████████] 100% (1/4 phases)
+Phase 7 shipped: PR #202 opened 2026-08-15 against `main`, 35 signed commits, awaiting review.
+UAT found one defect and it was fixed on the branch rather than deferred: the migration page and
+the shipped docstrings identified this work by `v1.2`, the internal `.planning/` milestone number.
+The first correction labelled it 6.3.0, computed from a checkout that had not been fetched —
+`git tag` reported v6.2.0 and `pyproject.toml` read 6.2.0. Fetching showed 6.3.0 had already
+shipped (`ca52da5`, tag `v6.3.0`) as Phase 6's release from PR #196, so the label pointed at a
+version predating the work. Corrected to **6.4.0** after rebasing onto `origin/main`, which makes
+the next version verifiable from the tree. **Lesson: fetch before deriving a version from tags or
+`pyproject.toml`.**
+
+Progress: [██████████░░░░░░░░░░] 50% (2/4 phases, 5/5 plans)
 
 ## Performance Metrics
 
@@ -99,7 +110,8 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - [Phase ?]: 07-02: no precompute/cache for get_by_category record scan (review F13 declined) — shared _slugs_for_category helper serves both paths; 168 bounded regex passes per call is negligible
 - [Phase ?]: 07-02: no runtime isinstance guard on get_by_category input (review F16 declined) — str typing enforced by pyright at the caller boundary
 - [Phase ?]: 07-03: migration-page category table carries a 'Defined by' column so the Library attribution lives in the table itself; name/count cells stay adjacent for the verify regex
-- [Phase ?]: 07-03: D-10 stamp implemented as a dated admonition ('As of the v1.2 migration (2026-08-15)') stating the page is deliberately never resynced
+- [Phase ?]: 07-03: D-10 stamp implemented as a dated admonition ('As of the 6.4.0 migration (2026-08-15)') stating the page is deliberately never resynced
+- [Phase 7]: user-facing docs and docstrings identify releases by the lifx-async release version, never the internal `.planning/` milestone number — `v1.2` is meaningless outside this repo. Applies to the migration page filename, prose, and the `get_by_category()` ValueError text
 
 ### v1.2 Working Notes
 
@@ -152,10 +164,14 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-15T03:27:39.800Z
-Stopped at: Completed 07-03-PLAN.md (phase 07 complete)
+Last session: 2026-08-15
+Stopped at: Phase 7 complete and shipped (PR #202); ready to plan Phase 8
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan the first v1.2 phase with `/gsd-plan-phase 6`
+- Review and merge PR #202 (Phase 7)
+- Plan Phase 8 with `/gsd-discuss-phase 8` — hardware fidelity validation needs the
+  quiesced test devices, so it cannot run in CI (see Blockers)
+- Deferred, user will circle back: strip em dashes from docs prose (~200 across `docs/`);
+  recorded in `.planning/phases/07-taxonomy-legacy-dispositions/07-UAT.md`
