@@ -1,7 +1,7 @@
 """Built-in theme library generated from the LIFX app's own palettes.
 
 The theme data is generated from ``data/themes.jsonl`` by
-``lifx.theme.generator``, synced from the LIFX app via hardware capture on
+``scripts/generate_theme_data.py``, synced from the LIFX app via hardware capture on
 2026-08-14. The library carries 168 resolvable names: 138 app theme slugs,
 28 pre-v1.2 keys with no app counterpart (category ``Library``), and 2
 rename aliases (``forest`` and ``aurora_borealis``) that resolve to their

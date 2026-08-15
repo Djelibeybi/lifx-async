@@ -131,7 +131,7 @@ jobs:
     # is also the only place validate_records() runs against the shipped
     # data: the generator suite deliberately tests fixtures only (D-23).
     - name: Regenerate theme data
-      run: uv run python -m lifx.theme.generator
+      run: uv run scripts/generate_theme_data.py
 
     - name: Format and lint generated files
       run: |

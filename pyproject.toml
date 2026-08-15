@@ -90,12 +90,12 @@ ignore = []
 [tool.pyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.10"
-include = ["src"]
+# scripts/generate_theme_data.py is hand-written validation and path handling,
+# so it stays type-checked even though it lives outside the package.
+include = ["src", "scripts/generate_theme_data.py"]
 exclude = [
     "**/__pycache__",
-    # The two mechanical emitters over remote YAML/JSON. Deliberately not a
-    # `**/generator.py` glob: src/lifx/theme/generator.py is hand-written
-    # validation and path handling, and must stay type-checked.
+    # The two mechanical emitters over remote YAML/JSON.
     "src/lifx/protocol/generator.py",
     "src/lifx/products/generator.py",
     "**/registry.py",   # Auto-generated from products.json
@@ -106,7 +106,7 @@ skips = ["B101", "B311"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -115,6 +115,7 @@ addopts = """\
     -Wdefault
     -m "not benchmark"
     --cov=lifx
+    --cov=generate_theme_data
     --cov-branch
     --cov-report=xml
     --cov-report=term-missing:skip-covered
@@ -136,9 +137,9 @@ omit = [
     "src/lifx/protocol/generator.py",
     "src/lifx/protocol/protocol_types.py",
     "src/lifx/products/generator.py",
-    # src/lifx/theme/data.py is generated; its generator is hand-written and
-    # stays measured, so the emit-time backstops keep their patch-coverage
-    # requirement.
+    # src/lifx/theme/data.py is generated; scripts/generate_theme_data.py that
+    # emits it is hand-written and stays measured, so the emit-time backstops
+    # keep their patch-coverage requirement.
     "src/lifx/theme/data.py",
 ]
 
