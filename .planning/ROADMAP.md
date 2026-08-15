@@ -118,7 +118,7 @@ data file plus a separate legacy manifest.
   2. Every category name `get_by_category()` accepted before v1.2 (`seasonal`, `hygge`, `tranquil`, `sports`, …) either still returns themes or fails with a message naming its replacement
   3. Each of the 30 orphaned library keys carries a recorded disposition — kept as library-only, or deprecated naming its replacement — and a deprecated key still resolves
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -131,7 +131,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 07-03-PLAN.md — Migration docs: `docs/migration/theme-taxonomy-v1.2.md` point-in-time record plus the two stale doc-site corrections
+- [x] 07-03-PLAN.md — Migration docs: `docs/migration/theme-taxonomy-v1.2.md` point-in-time record plus the two stale doc-site corrections
 
 COMPAT-04 is a per-key judgement over a small fixed set, not a code change: the renames
 were already wired in Phase 6, so this phase records keep-or-deprecate decisions for the
@@ -185,6 +185,6 @@ successful outcome.
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
-| 7. Taxonomy & Legacy Dispositions | v1.2 | 2/3 | In Progress|  |
+| 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | In Progress|  |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
