@@ -2,9 +2,9 @@
 
 Reads the committed theme data file (``data/themes.jsonl``) and emits
 ``src/lifx/theme/data.py``: a frozen ``ThemeRecord`` per theme plus a flat
-``THEMES`` dict keyed by slug, with rename aliases bound to the target's own
-record. Regeneration reads only the committed local data file — no network
-access and no device are ever required.
+``THEMES`` dict keyed by slug, plus a synthesised ``disposition="renamed"``
+record per rename alias. Regeneration reads only the committed local data
+file: no network access and no device are ever required.
 
 The write is atomic: the module is emitted to a uniquely named temp file in
 the target directory, formatted there, then renamed over the target. An
@@ -50,8 +50,15 @@ _REQUIRED_FIELDS = frozenset({"slug", "name", "category", "disposition", "colors
 #: Fields a record may carry in addition to the required set.
 _OPTIONAL_FIELDS = frozenset({"aliases", "replaced_by"})
 
-#: Allowed values of a record's ``disposition`` field (COMPAT-04).
+#: Allowed values of a record's authored ``disposition`` field (COMPAT-04).
 _DISPOSITIONS = frozenset({"lifx-app", "library-only", "deprecated"})
+
+#: Disposition of a rename-alias key. Never authored: an alias lives in its
+#: target's ``aliases`` list, and the generator synthesises a record for it
+#: so the alias key reports the rename instead of inheriting the target's
+#: clean fate. Only the disposition set the emitted module declares is the
+#: union of this and ``_DISPOSITIONS``.
+_RENAMED = "renamed"
 
 #: Exact field set of a colour object.
 _COLOR_FIELDS = frozenset({"hue", "saturation", "brightness", "kelvin"})
@@ -306,6 +313,18 @@ def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
                 f"a deprecated record requires a non-empty 'replaced_by' "
                 f"string: {replaced_by!r}",
             )
+        # The converse, which theme.py documents as an invariant: only a
+        # deprecated record names a successor. Without this, a live record
+        # could ship a `replaced_by` and redirect callers away from a theme
+        # that was never retired.
+        if disposition != "deprecated" and replaced_by is not None:
+            raise _fail(
+                line_number,
+                record,
+                f"only a deprecated record may carry 'replaced_by', but "
+                f"disposition is {disposition!r} and 'replaced_by' is "
+                f"{replaced_by!r}",
+            )
         if replaced_by is not None and not validate_key(replaced_by):
             raise _fail(
                 line_number,
@@ -353,16 +372,42 @@ def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
     # itself. Runs after the main loop so seen_keys holds every slug AND
     # alias — aliases count as resolution targets (SPEC R4: "resolves in
     # THEMES"). Chains onto another deprecated key are permitted by the
-    # schema; zero exist today.
+    # schema; zero exist today. A chain must still terminate: a record
+    # naming itself, or a cycle of records naming each other, resolves in
+    # seen_keys yet hangs any consumer that follows replaced_by to find
+    # the live successor (`while t.replaced_by: t = get(t.replaced_by)`).
+    # Keyed by every resolvable key, not just the slug: a replaced_by may
+    # name an alias, and an alias binds the target's own record, so a cycle
+    # can be closed through one.
+    successors: dict[str, str] = {
+        key: record["replaced_by"]
+        for _, record in records
+        if record.get("replaced_by") is not None
+        for key in (record["slug"], *record.get("aliases", []))
+    }
     for line_number, record in records:
         replaced_by = record.get("replaced_by")
-        if replaced_by is not None and replaced_by not in seen_keys:
+        if replaced_by is None:
+            continue
+        if replaced_by not in seen_keys:
             raise _fail(
                 line_number,
                 record,
                 f"replaced_by {replaced_by!r} does not resolve to any slug "
                 f"or alias in the data",
             )
+        seen_in_chain = {record["slug"], *record.get("aliases", [])}
+        cursor: str | None = replaced_by
+        while cursor is not None:
+            if cursor in seen_in_chain:
+                raise _fail(
+                    line_number,
+                    record,
+                    f"replaced_by {replaced_by!r} starts a successor chain "
+                    f"that cycles back to {cursor!r} instead of terminating",
+                )
+            seen_in_chain.add(cursor)
+            cursor = successors.get(cursor)
 
 
 def _emit_color(color: dict[str, int]) -> str:
@@ -413,8 +458,8 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
     Records are emitted sorted by slug; each palette passes through
     ``canonical_palette()`` (D-24) so even a hand-edited data file cannot
     ship an uncanonical order. Alias keys are assigned after the dict
-    literal in sorted order, binding the target's own record so the alias
-    carries the target's identity.
+    literal in sorted order, each as its own ``disposition="renamed"``
+    record sharing the target's palette object.
 
     Args:
         records: Validated ``(line_number, record)`` pairs.
@@ -457,6 +502,7 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "from dataclasses import dataclass",
         "",
         "from lifx.color import HSBK",
+        "from lifx.theme.theme import Disposition",
         "",
         "",
         "@dataclass(frozen=True)",
@@ -466,7 +512,7 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "    slug: str",
         "    name: str",
         "    category: str",
-        "    disposition: str",
+        "    disposition: Disposition",
         "    colors: tuple[HSBK, ...]",
         "    replaced_by: str | None = None",
         "",
@@ -488,7 +534,12 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
                     f"emit-time check failed: bad metadata {value!r} on record {slug!r}"
                 )
         disposition = record["disposition"]
-        if disposition not in _DISPOSITIONS:
+        # `type(...) is str` before the set membership test, exactly as the
+        # metadata backstop above does it: `x in frozenset` raises TypeError
+        # for an unhashable x, so an unvalidated list or dict would escape
+        # this backstop as a TypeError instead of the documented
+        # RuntimeError.
+        if type(disposition) is not str or disposition not in _DISPOSITIONS:
             raise RuntimeError(
                 f"emit-time check failed: bad disposition {disposition!r} "
                 f"on record {slug!r}"
@@ -508,23 +559,44 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         for color in canonical_palette(record["colors"]):
             lines.append(f"            {_emit_color(color)},")
         lines.append("        ),")
-        lines.append(f"        replaced_by={replaced_by!r},")
+        # Only the 9 deprecated records carry a successor. Emitting
+        # `replaced_by=None` on the other 157 restates the dataclass default
+        # and buries the records that do carry one under a field that is
+        # noise everywhere else.
+        if replaced_by is not None:
+            lines.append(f"        replaced_by={replaced_by!r},")
         lines.append("    ),")
     lines.append("}")
     lines.append("")
     aliases = sorted(
-        (alias, record["slug"])
+        (alias, record["slug"], record["name"], record["category"])
         for _, record in records
         for alias in record.get("aliases", [])
     )
     if aliases:
-        lines.append("# Rename aliases: each alias key binds the target's own")
-        lines.append("# record, so the alias carries the target's identity")
-        lines.append("# (D-13, D-14).")
-        for alias, target in aliases:
+        lines.append("# Rename aliases: a theme's former key, kept resolvable")
+        lines.append("# (D-13, D-14). Each gets its own record rather than")
+        lines.append("# binding the target's, so the dead key reports the")
+        lines.append("# rename in `disposition` and names the live key in")
+        lines.append("# `replaced_by` instead of inheriting the target's clean")
+        lines.append("# fate. `slug` is the alias, so following `replaced_by`")
+        lines.append("# terminates in one hop; `name` is the target's display")
+        lines.append("# name, which is what the theme is actually called now.")
+        for alias, target, name, category in aliases:
             if not validate_key(alias):
                 raise RuntimeError(f"emit-time check failed: bad key {alias!r}")
-            lines.append(f"THEMES[{alias!r}] = THEMES[{target!r}]")
+            lines.append(f"THEMES[{alias!r}] = ThemeRecord(")
+            lines.append(f"    slug={alias!r},")
+            lines.append(f"    name={name!r},")
+            lines.append(f"    category={category!r},")
+            lines.append(f"    disposition={_RENAMED!r},")
+            # The palette is shared, not re-emitted: ThemeRecord is frozen and
+            # `colors` is a tuple of immutable HSBK, so one object behind both
+            # keys cannot drift and keeps the alias byte-identical by
+            # construction rather than by a re-derivation that could differ.
+            lines.append(f"    colors=THEMES[{target!r}].colors,")
+            lines.append(f"    replaced_by={target!r},")
+            lines.append(")")
         lines.append("")
     return "\n".join(lines)
 

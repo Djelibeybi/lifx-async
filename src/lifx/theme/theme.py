@@ -9,8 +9,17 @@ from __future__ import annotations
 import random
 from collections import Counter
 from collections.abc import Iterator
+from typing import Literal
 
 from lifx.color import HSBK, Colors
+
+#: The recorded fate of a library theme. ``"lifx-app"`` is a palette the LIFX
+#: app ships today; ``"library-only"`` is a pre-6.3.0 key this library keeps
+#: with no app counterpart; ``"deprecated"`` and ``"renamed"`` both name a
+#: successor in ``replaced_by`` — a deprecated key keeps its own palette and
+#: points at the closest survivor, a renamed key is the theme's former name
+#: and points at its current one.
+Disposition = Literal["lifx-app", "library-only", "deprecated", "renamed"]
 
 
 class Theme:
@@ -29,15 +38,17 @@ class Theme:
             caller-constructed theme)
         disposition: Recorded fate of a theme from ``ThemeLibrary`` (None
             for a caller-constructed theme)
-        replaced_by: Successor key of a deprecated theme from
+        replaced_by: Successor key of a deprecated or renamed theme from
             ``ThemeLibrary``; None unless ``disposition`` is
-            ``"deprecated"`` (and None for a caller-constructed theme)
+            ``"deprecated"`` or ``"renamed"`` (and None for a
+            caller-constructed theme)
 
     Note:
-        ``shuffled()`` and ``random()`` return identity-less copies: slug,
-        name, category, disposition and replaced_by do not propagate. This
-        is a known deferred limitation of the identity round-trip
-        guarantee.
+        ``shuffled()`` returns an identity-less copy: slug, name, category,
+        disposition and replaced_by do not propagate. This is a known
+        deferred limitation of the identity round-trip guarantee.
+        (``random()`` returns a single ``HSBK``, not a Theme, so it carries
+        no identity to begin with.)
 
     Note:
         ``==`` compares identity, so a Theme stays hashable and usable as
@@ -74,7 +85,7 @@ class Theme:
         slug: str | None = None,
         name: str | None = None,
         category: str | None = None,
-        disposition: str | None = None,
+        disposition: Disposition | None = None,
         replaced_by: str | None = None,
     ) -> None:
         """Create a new theme with the given colors.
@@ -86,9 +97,9 @@ class Theme:
             category: Category for the theme (attached by ``ThemeLibrary``)
             disposition: Recorded fate of the theme (attached by
                 ``ThemeLibrary``)
-            replaced_by: Successor key of a deprecated theme (attached by
-                ``ThemeLibrary``); None unless ``disposition`` is
-                ``"deprecated"``
+            replaced_by: Successor key of a deprecated or renamed theme
+                (attached by ``ThemeLibrary``); None unless ``disposition``
+                is ``"deprecated"`` or ``"renamed"``
 
         Example:
             ```python
@@ -240,11 +251,12 @@ class Theme:
 
         Order is never compared because the app shuffles palette order on
         every application, so two orderings of one palette are the same
-        palette. Identity (slug, name, category) is excluded too: an
-        identity-bearing library theme and a caller-built theme with the
-        same colors have the same palette. Colors compare at uint16
-        (protocol) granularity via HSBK equality, and duplicate counts
-        matter — a multiset comparison, not a set comparison.
+        palette. Identity (slug, name, category, disposition and
+        replaced_by) is excluded too: an identity-bearing library theme and
+        a caller-built theme with the same colors have the same palette.
+        Colors compare at uint16 (protocol) granularity via HSBK equality,
+        and duplicate counts matter — a multiset comparison, not a set
+        comparison.
 
         This is deliberately a named method rather than ``__eq__``. A
         Theme's palette is mutable via ``add_color()``, so value equality

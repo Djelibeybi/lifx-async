@@ -457,6 +457,24 @@ class TestValidateRecordsDispositions:
         ):
             validate_records(_pairs(_record(disposition="deprecated")))
 
+    @pytest.mark.parametrize("disposition", ["lifx-app", "library-only"])
+    def test_replaced_by_on_a_live_record_aborts(self, disposition: str) -> None:
+        """Only a deprecated record may name a successor (theme.py invariant).
+
+        The converse check: without it a current theme could ship a
+        replaced_by and redirect callers away from a theme that was never
+        retired, while every consumer keying off replaced_by believed the
+        documented invariant.
+        """
+        with pytest.raises(
+            RuntimeError,
+            match=r"line 1.*Test Theme.*only a deprecated record may carry "
+            r"'replaced_by'",
+        ):
+            validate_records(
+                _pairs(_record(disposition=disposition, replaced_by="other_theme"))
+            )
+
     def test_unresolvable_replaced_by_aborts(self) -> None:
         """A canonical replaced_by absent from every slug and alias aborts
         in the cross-record pass, naming the unresolvable key."""
@@ -500,6 +518,66 @@ class TestValidateRecordsDispositions:
         aborts with its own controlled message (review F1)."""
         with pytest.raises(RuntimeError, match=expected):
             validate_records(_pairs(_record(**overrides)))
+
+    def test_self_referential_replaced_by_aborts(self) -> None:
+        """A record naming itself as its own successor aborts.
+
+        It resolves in seen_keys, so only the chain walk catches it.
+        """
+        with pytest.raises(RuntimeError, match=r"cycles back to 'test_theme'"):
+            validate_records(
+                _pairs(_record(disposition="deprecated", replaced_by="test_theme"))
+            )
+
+    def test_cyclic_replaced_by_chain_aborts(self) -> None:
+        """Two deprecated records naming each other abort.
+
+        Chains are permitted; a chain that never terminates is not, because
+        a consumer walking replaced_by to the live theme would not stop.
+        """
+        alpha = _record(
+            slug="alpha", name="Alpha", disposition="deprecated", replaced_by="beta"
+        )
+        beta = _record(
+            slug="beta", name="Beta", disposition="deprecated", replaced_by="alpha"
+        )
+
+        with pytest.raises(RuntimeError, match=r"cycles back to"):
+            validate_records(_pairs(alpha, beta))
+
+    def test_cycle_closed_through_an_alias_aborts(self) -> None:
+        """A cycle closed via an alias key is caught, not just a slug cycle."""
+        alpha = _record(
+            slug="alpha",
+            name="Alpha",
+            aliases=["alpha_old"],
+            disposition="deprecated",
+            replaced_by="beta",
+        )
+        beta = _record(
+            slug="beta", name="Beta", disposition="deprecated", replaced_by="alpha_old"
+        )
+
+        with pytest.raises(RuntimeError, match=r"cycles back to"):
+            validate_records(_pairs(alpha, beta))
+
+    def test_terminating_chain_validates(self) -> None:
+        """A chain that ends on a non-deprecated record is accepted."""
+        old = _record(
+            slug="old_theme",
+            name="Old Theme",
+            disposition="deprecated",
+            replaced_by="mid_theme",
+        )
+        mid = _record(
+            slug="mid_theme",
+            name="Mid Theme",
+            disposition="deprecated",
+            replaced_by="new_theme",
+        )
+        new = _record(slug="new_theme", name="New Theme")
+
+        validate_records(_pairs(old, mid, new))
 
     def test_replaced_by_resolving_via_alias_validates(self) -> None:
         """A replaced_by naming an alias of another record validates —
@@ -580,18 +658,41 @@ class TestEmitDataModule:
         assert "themes.jsonl" in docstring
         assert "scripts/generate_theme_data.py" in docstring
 
-    def test_alias_binds_target_record(self) -> None:
-        """The alias key binds the target's own record, so both keys share
-        one record carrying the target's slug/name/category (D-13, D-14)."""
+    def test_alias_emitted_as_its_own_renamed_record(self) -> None:
+        """The alias key gets its own record reporting the rename (D-13, D-14).
+
+        It keeps its own slug so the dead key is what the caller sees, and
+        names the target in replaced_by so one hop reaches the live theme.
+        Binding the target's record instead would make the alias claim the
+        target's fate, hiding the only rename in the data.
+        """
         record = _record(slug="alpha_theme", name="Alpha Theme", aliases=["old_alpha"])
 
         namespace = _exec_module(emit_data_module(_pairs(record)))
 
         themes = namespace["THEMES"]
-        assert themes["old_alpha"] is themes["alpha_theme"]
-        assert themes["old_alpha"].slug == "alpha_theme"
-        assert themes["old_alpha"].name == "Alpha Theme"
-        assert themes["old_alpha"].category == "Test"
+        alias = themes["old_alpha"]
+        assert alias is not themes["alpha_theme"]
+        assert alias.slug == "old_alpha"
+        assert alias.name == "Alpha Theme"
+        assert alias.category == "Test"
+        assert alias.disposition == "renamed"
+        assert alias.replaced_by == "alpha_theme"
+
+    def test_alias_shares_the_target_palette_object(self) -> None:
+        """The alias reuses the target's colours rather than re-emitting them.
+
+        ThemeRecord is frozen and the palette is a tuple of immutable
+        HSBK, so one object behind both keys is safe and keeps them
+        byte-identical by construction rather than by a second derivation
+        that could differ.
+        """
+        record = _record(slug="alpha_theme", name="Alpha Theme", aliases=["old_alpha"])
+
+        namespace = _exec_module(emit_data_module(_pairs(record)))
+
+        themes = namespace["THEMES"]
+        assert themes["old_alpha"].colors is themes["alpha_theme"].colors
 
     def test_palette_emitted_canonically_sorted(self) -> None:
         """A record whose colours arrive unsorted is emitted sorted by its
@@ -655,6 +756,12 @@ class TestEmitDataModule:
                 r"bad key 'bad-alias'",
             ),
             (_record(disposition="retired"), r"bad disposition 'retired'"),
+            # An unhashable value must reach the controlled RuntimeError, not
+            # escape as the TypeError `x in frozenset` raises for it.
+            (
+                _record(disposition=["lifx-app"]),
+                r"bad disposition \['lifx-app'\]",
+            ),
             (
                 _record(replaced_by="Bad-Key"),
                 r"bad replaced_by 'Bad-Key'",

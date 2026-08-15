@@ -186,8 +186,15 @@ gh workflow run docs.yml
 7. **Theme Layer** (`src/lifx/theme/`)
 
    - `theme.py`: Theme definitions (named color palettes); `palette_equals()` compares
-     palettes as an unordered multiset — `==` is identity, so `Theme` stays hashable
-   - `library.py`: Built-in theme library, reading the generated dict alone
+     palettes as an unordered multiset — `==` is identity, so `Theme` stays hashable.
+     `disposition` (`lifx-app` / `library-only` / `deprecated`) and `replaced_by` record
+     each library theme's 6.4.0 fate; both are `None` on a caller-built Theme
+   - `library.py`: Built-in theme library, reading the generated dict alone.
+     `get_categories()` lists the nine categories; `get_by_category()` matches them
+     case- and punctuation-insensitively, with a private `_LEGACY_CATEGORIES` shim for
+     the six pre-6.4.0 names
+   - `slug.py`: The one home of the slug-derivation rule, shared by `library.py` and
+     `scripts/generate_theme_data.py` — a leaf module whose only import is `re`
    - `data.py`: Auto-generated theme records (166 themes, 168 resolvable keys) — **never
      edit manually**; regenerate from `data/themes.jsonl`
    - `generators.py`: Theme-based color generators for effects
@@ -283,7 +290,7 @@ The `discover_devices()` function implements DoS protection through:
 - **Device Layer**: 375 tests (base, light, ceiling, hev, infrared, multizone, matrix, state management, MAC address)
 - **API Layer**: 63 tests (discovery, batch operations, organization, themes, error handling)
 - **Effects Layer**: 1249 tests (26 built-in effects, registry, state manager, integration, capability filtering)
-- **Theme Layer**: 345 tests (themes, canvas, generators, library, apply_theme, data generator)
+- **Theme Layer**: 418 tests (themes, canvas, generators, library, slug, apply_theme, data generator)
 - **Animation Layer**: 123 tests (animator, framebuffer, packets, orientation)
 - **Utilities**: 127 tests (color conversion, product registry, RGB roundtrip)
 

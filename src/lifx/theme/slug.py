@@ -14,6 +14,11 @@ from __future__ import annotations
 
 import re
 
+# Precompiled because this is no longer a build-time-only rule: the library
+# calls it on every category lookup, matching the module-level pattern
+# constants in lifx/protocol/base.py.
+_NON_SLUG_RUN = re.compile(r"[^a-z0-9]+")
+
 
 def derive_slug(name: str) -> str:
     """Derive the canonical slug from a name.
@@ -31,4 +36,4 @@ def derive_slug(name: str) -> str:
     """
     # One pass suffices: `[^a-z0-9]+` already matches `_` itself and collapses
     # runs greedily, so two adjacent replacement underscores cannot survive it.
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return _NON_SLUG_RUN.sub("_", name.lower()).strip("_")

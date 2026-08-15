@@ -3,17 +3,20 @@
 The theme data is generated from ``data/themes.jsonl`` by
 ``scripts/generate_theme_data.py``, synced from the LIFX app via hardware capture on
 2026-08-14. The library carries 168 resolvable names: 138 app theme slugs,
-28 pre-6.4.0 keys with no app counterpart (category ``Library``), and 2
+28 pre-6.3.0 keys with no app counterpart (category ``Library``), and 2
 rename aliases (``forest`` and ``aurora_borealis``) that resolve to their
-renamed targets.
+renamed targets. Every name reports its fate in ``disposition``, including
+the two aliases, which carry ``"renamed"`` and name the canonical key in
+``replaced_by``.
 
 Palette order carries no meaning: the app shuffles the order on every
 application, so palettes are stored canonically sorted and all palette
 comparison is unordered.
 
 Attribution: the 28 ``Library`` records are not app captures. They ship
-byte-identical at uint16 to the palettes this library carried before 6.4.0,
-which came from two upstream projects:
+byte-identical at uint16 to the palettes this library carried before 6.3.0
+(the release that replaced the hand-written library with this generated
+data), which came from two upstream projects:
 
 * https://github.com/Djelibeybi/aiolifx-themes
 * https://github.com/pkivolowitz/lifx — the palette themes (``fire``,
@@ -28,29 +31,12 @@ from lifx.theme.data import THEMES, ThemeRecord
 from lifx.theme.slug import derive_slug
 from lifx.theme.theme import Theme
 
-#: Pre-6.4.0 legacy category names and their locked fates — a migration shim,
-#: deliberately private and unexported (D-03), not taxonomy. Each legacy name
-#: maps to ``(replacement app category, resolves)``: a ``True`` entry returns
-#: the replacement category's themes; a ``False`` entry raises, and its
-#: replacement exists so the raising branch can name it (D-02). Keys MUST be
-#: derive_slug-form: the lookup probes this dict with the derive_slug-normalised
-#: caller input, so a future non-slug-form key would silently never match and
-#: fall through to the unknown-category error (review F4).
-_LEGACY_CATEGORIES: dict[str, tuple[str, bool]] = {
-    "holiday": ("Holidays", True),
-    "mood": ("Moods", True),
-    "seasonal": ("Nature", False),
-    "ambient": ("Play", False),
-    "functional": ("Library", False),
-    "atmosphere": ("Moods", False),
-}
-
 
 class ThemeLibrary:
     """Collection of built-in colour themes for LIFX devices.
 
     Provides access to every theme in the LIFX app (sport themes excluded)
-    plus the pre-6.4.0 library keys, organised by the app's own categories.
+    plus the pre-6.3.0 library keys, organised by the app's own categories.
 
     Example:
         ```python
@@ -71,8 +57,8 @@ class ThemeLibrary:
 
     # The generated theme registry. Every lookup classmethod reads this class
     # attribute rather than the module-global `THEMES`, so a subclass that
-    # rebinds it sees a consistent library across get(), get_available_themes()
-    # and get_by_category(). Phase 7 owns replacing its taxonomy (META-04).
+    # rebinds it sees a consistent library across get(), get_available_themes(),
+    # get_categories() and get_by_category().
     _THEMES: dict[str, ThemeRecord] = THEMES
 
     @classmethod
@@ -96,14 +82,13 @@ class ThemeLibrary:
             await light.apply_theme(evening_theme, power_on=True)
             ```
         """
-        normalized_name = name.lower()
-        if normalized_name not in cls._THEMES:
+        record = cls._THEMES.get(name.lower())
+        if record is None:
             raise KeyError(
                 f"Theme '{name}' not found. Use "
                 f"ThemeLibrary.get_available_themes() to list the "
                 f"available themes."
             )
-        record = cls._THEMES[normalized_name]
         # Theme.__init__ copies the palette, so mutating a returned Theme can
         # never corrupt the library's own record.
         return Theme(
@@ -155,8 +140,15 @@ class ThemeLibrary:
     def _slugs_for_category(cls, key: str) -> set[str]:
         """Collect the slugs of every record whose category normalises to key.
 
-        The set comprehension dedups the two rename-alias keys that bind a
-        shared record, so an aliased theme appears once in the result.
+        The slug rule is applied to the *distinct* category names (nine
+        today), never once per record: a 168-record scan would run 168
+        regex substitutions to answer a question with nine possible
+        answers.
+
+        Rename-alias records are skipped. An alias key carries
+        ``disposition == "renamed"`` and its target's category, so
+        including it would list one theme twice in its own category —
+        once under the canonical slug and once under the dead one.
 
         Args:
             key: A derive_slug-normalised category name.
@@ -164,10 +156,17 @@ class ThemeLibrary:
         Returns:
             Set of theme slugs in the matching category; empty if none match.
         """
+        matching = {
+            category
+            for category in {record.category for record in cls._THEMES.values()}
+            if derive_slug(category) == key
+        }
+        if not matching:
+            return set()
         return {
             record.slug
             for record in cls._THEMES.values()
-            if derive_slug(record.category) == key
+            if record.category in matching and record.disposition != "renamed"
         }
 
     @classmethod
@@ -176,45 +175,40 @@ class ThemeLibrary:
 
         Args:
             category: Category name. Matching is case- and punctuation-
-                insensitive — both sides are normalised by the slug rule, so
+                insensitive: both sides are normalised by the slug rule, so
                 ``"Art Series"``, ``"art series"`` and ``"art_series"`` all
                 resolve. The categories are Archives, Art Series, Holidays,
-                Library (pre-6.4.0 keys with no app counterpart, defined by
+                Library (pre-6.3.0 keys with no app counterpart, defined by
                 this library rather than the LIFX app), Moods, Music, Nature,
-                Play and Space. Two pre-6.4.0 legacy names still map:
-                ``holiday`` (to Holidays) and ``mood`` (to Moods).
+                Play and Space.
 
         Returns:
             Dictionary of Theme objects in the category, keyed by slug and
             sorted by slug.
 
         Raises:
-            ValueError: If the category name is unknown, or is one of the
-                four pre-6.4.0 names (``seasonal``, ``ambient``,
-                ``functional``, ``atmosphere``) that no longer exist — the
-                message names the closest replacement.
+            ValueError: If ``category`` is not a string, or names no category
+                in the library. The pre-6.4.0 names (``seasonal``, ``holiday``,
+                ``mood``, ``ambient``, ``functional``, ``atmosphere``) are
+                among the unrecognised: they were never a taxonomy this data
+                carries, and the message lists the categories that exist.
         """
-        key = derive_slug(category)
-
-        # App taxonomy first, legacy map second (no current name collides).
-        slugs = cls._slugs_for_category(key)
-        if slugs:
-            return {slug: cls.get(slug) for slug in sorted(slugs)}
-
-        if key in _LEGACY_CATEGORIES:
-            replacement, resolves = _LEGACY_CATEGORIES[key]
-            if resolves:
-                replacement_slugs = cls._slugs_for_category(derive_slug(replacement))
-                return {slug: cls.get(slug) for slug in sorted(replacement_slugs)}
+        if type(category) is not str:
+            # derive_slug() would raise AttributeError on a non-string, which
+            # contradicts the documented ValueError and reads as a library
+            # bug rather than a bad argument.
             raise ValueError(
-                f"Category '{category}' is a pre-6.4.0 category name that no "
-                f"longer exists. Its closest replacement is '{replacement}'."
+                f"Category must be a string, got {type(category).__name__}. "
+                f"Available categories: {', '.join(cls.get_categories())}"
             )
 
-        raise ValueError(
-            f"Category '{category}' is not recognised. "
-            f"Available categories: {', '.join(cls.get_categories())}"
-        )
+        slugs = cls._slugs_for_category(derive_slug(category))
+        if not slugs:
+            raise ValueError(
+                f"Category '{category}' is not recognised. "
+                f"Available categories: {', '.join(cls.get_categories())}"
+            )
+        return {slug: cls.get(slug) for slug in sorted(slugs)}
 
 
 def get_theme(name: str) -> Theme:

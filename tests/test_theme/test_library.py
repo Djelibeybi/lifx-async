@@ -9,9 +9,9 @@ import pytest
 from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
 from lifx.theme import Theme, ThemeLibrary, get_theme
 from lifx.theme.data import THEMES, ThemeRecord
-from lifx.theme.library import _LEGACY_CATEGORIES
+from lifx.theme.slug import derive_slug
 
-# Every key the pre-6.4.0 hand-written library resolved, captured as a
+# Every key the pre-6.3.0 hand-written library resolved, captured as a
 # LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
 # of the new library cannot vacuously pass (COMPAT-01 empty edge).
 PRE_V12_KEYS = (
@@ -74,7 +74,7 @@ PRE_V12_KEYS = (
     "zombie",
 )
 
-# The app's 8 categories (D-10) plus Library for the pre-6.4.0 orphans.
+# The app's 8 categories (D-10) plus Library for the pre-6.3.0 orphans.
 LIBRARY_CATEGORIES = frozenset(
     {
         "Moods",
@@ -175,39 +175,41 @@ class TestThemeLibraryList:
         assert len(themes) > 0
 
 
+class EmptyLibrary(ThemeLibrary):
+    """A ThemeLibrary subclass rebinding _THEMES to nothing.
+
+    The class comment on ThemeLibrary._THEMES documents subclass rebinding
+    as a supported seam; this exercises the empty edge of every lookup.
+    """
+
+    _THEMES: dict[str, ThemeRecord] = {}
+
+
 class TestGetCategories:
     """Tests for ThemeLibrary.get_categories() (SPEC R1)."""
 
     def test_exact_sorted_list(self) -> None:
         """Exactly the 9 category names, plain codepoint-sorted."""
-        assert ThemeLibrary.get_categories() == [
-            "Archives",
-            "Art Series",
-            "Holidays",
-            "Library",
-            "Moods",
-            "Music",
-            "Nature",
-            "Play",
-            "Space",
-        ]
+        assert ThemeLibrary.get_categories() == sorted(LIBRARY_CATEGORIES)
 
     def test_empty_library_returns_empty_list(self) -> None:
         """A library with no records has no categories (SPEC R1 empty edge)."""
-
-        class EmptyLibrary(ThemeLibrary):
-            _THEMES: dict[str, ThemeRecord] = {}
-
         assert EmptyLibrary.get_categories() == []
 
     def test_empty_library_lookup_raises_unknown(self) -> None:
         """get_by_category() on an empty library raises the unknown error."""
-
-        class EmptyLibrary(ThemeLibrary):
-            _THEMES: dict[str, ThemeRecord] = {}
-
         with pytest.raises(ValueError, match="Available categories"):
             EmptyLibrary.get_by_category("anything")
+
+    def test_empty_library_never_returns_empty_dict(self) -> None:
+        """A library with no records raises for every name, never returns {}.
+
+        An empty dict reads as "this category exists and has no themes",
+        which is never true here: the category does not exist.
+        """
+        for category in ("Holidays", "holiday", ""):
+            with pytest.raises(ValueError, match="not recognised"):
+                EmptyLibrary.get_by_category(category)
 
 
 class TestThemeLibraryGetByCategory:
@@ -217,10 +219,25 @@ class TestThemeLibraryGetByCategory:
         """record.slug is a key of get_by_category(record.category) for all names.
 
         Membership is asserted by slug key, never by Theme object equality,
-        because Theme ``==`` is identity (WR-02 closure sweep).
+        because Theme ``==`` is identity (WR-02 closure sweep). The lookup
+        is hoisted per category rather than per record: there are 9
+        categories and 168 names, so calling once per record repeats the
+        same 9 answers 168 times.
+
+        Rename aliases are excluded: they are a theme's dead key, not a
+        theme, so listing one in its target's category would show that
+        theme twice. Their reachability is asserted through ``replaced_by``
+        in ``TestRenameAliases`` instead.
         """
+        by_category = {
+            category: ThemeLibrary.get_by_category(category)
+            for category in ThemeLibrary.get_categories()
+        }
+
         for record in THEMES.values():
-            assert record.slug in ThemeLibrary.get_by_category(record.category)
+            if record.disposition == "renamed":
+                continue
+            assert record.slug in by_category[record.category]
 
     def test_holidays_count_and_slug_sorted(self) -> None:
         """Holidays has 15 themes; the returned dict is keyed and sorted by slug."""
@@ -263,6 +280,17 @@ class TestThemeLibraryGetByCategory:
         assert "Archives" in message
         assert "replacement" not in message
 
+    @pytest.mark.parametrize("category", [None, 123, ["Holidays"]])
+    def test_non_string_raises_value_error(self, category: object) -> None:
+        """A non-string argument raises ValueError, not AttributeError.
+
+        The slug rule calls str methods, so an unguarded non-string would
+        surface as an AttributeError from inside the library and read as a
+        bug rather than a bad argument.
+        """
+        with pytest.raises(ValueError, match="must be a string"):
+            ThemeLibrary.get_by_category(category)  # pyright: ignore[reportArgumentType]
+
     def test_results_carry_disposition(self) -> None:
         """get() threading survives the rewrite — a Library result has a fate."""
         library_themes = ThemeLibrary.get_by_category("Library")
@@ -270,63 +298,102 @@ class TestThemeLibraryGetByCategory:
         assert library_themes["hygge"].disposition is not None
 
 
-class TestLegacyCategoryNames:
-    """The 6 pre-6.4.0 category names have their locked fates (SPEC R3)."""
+class TestRetiredCategoryNames:
+    """The 6 pre-6.4.0 category names are gone, with no shim (SPEC R3).
 
-    def test_holiday_resolves_to_holidays(self) -> None:
-        """'holiday' returns the 15 Holidays themes."""
-        holiday = ThemeLibrary.get_by_category("holiday")
-
-        assert len(holiday) == 15
-        assert all(theme.category == "Holidays" for theme in holiday.values())
-        assert holiday.keys() == ThemeLibrary.get_by_category("Holidays").keys()
-
-    def test_mood_resolves_to_moods(self) -> None:
-        """'mood' returns the 13 Moods themes."""
-        mood = ThemeLibrary.get_by_category("mood")
-
-        assert len(mood) == 13
-        assert all(theme.category == "Moods" for theme in mood.values())
-
-    def test_legacy_resolve_case_insensitive(self) -> None:
-        """'HOLIDAY' behaves identically to 'holiday' (SPEC R3 encoding edge)."""
-        assert (
-            ThemeLibrary.get_by_category("HOLIDAY").keys()
-            == ThemeLibrary.get_by_category("holiday").keys()
-        )
+    The old hand-made taxonomy (``seasonal``, ``holiday``, ``mood``,
+    ``ambient``, ``functional``, ``atmosphere``) never matched the data:
+    no name mapped 1:1 to an app category, and only ``holiday`` and
+    ``mood`` were ever shown in the published docs, on a page that told
+    readers to use ``Theme.category`` instead. Rather than redirect six
+    names to categories holding as little as 0/2 of what each returned,
+    they are unrecognised and the error lists what does exist.
+    """
 
     @pytest.mark.parametrize(
-        ("legacy", "replacement"),
-        [
-            ("seasonal", "Nature"),
-            ("ambient", "Play"),
-            ("functional", "Library"),
-            ("atmosphere", "Moods"),
-        ],
+        "retired",
+        ["seasonal", "holiday", "mood", "ambient", "functional", "atmosphere"],
     )
-    def test_retired_names_raise_naming_replacement(
-        self, legacy: str, replacement: str
-    ) -> None:
-        """Each retired name raises ValueError naming its replacement (D-02)."""
+    def test_retired_name_is_unrecognised(self, retired: str) -> None:
+        """Each retired name raises the generic unknown-category error."""
         with pytest.raises(ValueError) as exc_info:
-            ThemeLibrary.get_by_category(legacy)
+            ThemeLibrary.get_by_category(retired)
 
         message = str(exc_info.value)
-        assert legacy in message
-        assert replacement in message
-        assert "pre-6.4.0" in message
+        assert retired in message
+        assert "not recognised" in message
+        assert "Available categories" in message
 
-    def test_every_replacement_is_a_real_category(self) -> None:
-        """Every _LEGACY_CATEGORIES replacement names a listable category.
+    def test_retired_names_do_not_shadow_a_live_category(self) -> None:
+        """No live category normalises onto a retired name.
 
-        Guards the shim against future taxonomy drift (review F4): a
-        replacement that stops existing would raise a message pointing at
-        nothing, and a resolving entry would silently return an empty dict.
+        A category named "Mood" or "Holiday" would resolve one of these
+        and quietly reintroduce the old spelling as a supported argument.
         """
-        categories = set(ThemeLibrary.get_categories())
+        live = {derive_slug(category) for category in ThemeLibrary.get_categories()}
+        retired = {
+            "seasonal",
+            "holiday",
+            "mood",
+            "ambient",
+            "functional",
+            "atmosphere",
+        }
 
-        for replacement, _resolves in _LEGACY_CATEGORIES.values():
-            assert replacement in categories
+        assert live.isdisjoint(retired)
+
+
+class TestRenameAliases:
+    """The 2 rename-alias keys report the rename rather than inheriting."""
+
+    @pytest.mark.parametrize(
+        ("alias", "target"),
+        [("forest", "forrest"), ("aurora_borealis", "aurora")],
+    )
+    def test_alias_reports_renamed_and_names_its_target(
+        self, alias: str, target: str
+    ) -> None:
+        """An alias carries disposition 'renamed' and its live key.
+
+        Before this, an alias bound the target's own record, so the only
+        two keys whose name actually changed were the two reporting a
+        clean ``lifx-app`` fate with no successor — a migration audit
+        keying off ``replaced_by`` saw nothing to do.
+        """
+        theme = ThemeLibrary.get(alias)
+
+        assert theme.slug == alias
+        assert theme.disposition == "renamed"
+        assert theme.replaced_by == target
+
+    @pytest.mark.parametrize(
+        ("alias", "target"),
+        [("forest", "forrest"), ("aurora_borealis", "aurora")],
+    )
+    def test_following_replaced_by_reaches_the_live_theme(
+        self, alias: str, target: str
+    ) -> None:
+        """One hop along replaced_by lands on the theme, which terminates."""
+        theme = ThemeLibrary.get(alias)
+        successor = ThemeLibrary.get(theme.replaced_by or "")
+
+        assert successor.slug == target
+        assert successor.replaced_by is None
+        assert successor.disposition != "renamed"
+        assert theme.palette_equals(successor)
+
+    @pytest.mark.parametrize(
+        ("alias", "target"),
+        [("forest", "forrest"), ("aurora_borealis", "aurora")],
+    )
+    def test_alias_absent_from_its_category_listing(
+        self, alias: str, target: str
+    ) -> None:
+        """A category lists the theme once, under its live slug only."""
+        listing = ThemeLibrary.get_by_category(ThemeLibrary.get(alias).category)
+
+        assert target in listing
+        assert alias not in listing
 
 
 class TestGetThemeConvenienceFunction:
@@ -464,11 +531,11 @@ class TestThemeLibraryIntegration:
 
 
 class TestPreV12Compatibility:
-    """COMPAT-01: every pre-6.4.0 theme name still resolves."""
+    """COMPAT-01: every pre-6.3.0 theme name still resolves."""
 
     @pytest.mark.parametrize("key", PRE_V12_KEYS)
     def test_pre_v12_key_resolves(self, key: str) -> None:
-        """Every pre-6.4.0 key resolves without raising."""
+        """Every pre-6.3.0 key resolves without raising."""
         theme = ThemeLibrary.get(key)
         assert isinstance(theme, Theme)
         assert len(theme) >= 1
@@ -480,25 +547,27 @@ class TestPreV12Compatibility:
 
 
 class TestRenamePairs:
-    """COMPAT-03: renamed themes answer to both names with target identity."""
+    """COMPAT-03: renamed themes answer to both names, with the old key
+    carrying the target's palette, display name and category but its own
+    slug — the one piece of identity that actually changed (D-14)."""
 
     def test_aurora_borealis_resolves_to_aurora(self) -> None:
-        """aurora_borealis returns aurora's palette and identity (D-14)."""
+        """aurora_borealis returns aurora's palette under the old key."""
         alias = ThemeLibrary.get("aurora_borealis")
         target = ThemeLibrary.get("aurora")
 
         assert _palette_multiset(alias) == _palette_multiset(target)
-        assert alias.slug == "aurora"
+        assert alias.slug == "aurora_borealis"
         assert alias.name == "Aurora"
         assert alias.category == "Nature"
 
     def test_forest_resolves_to_forrest(self) -> None:
-        """forest returns forrest's palette and identity (D-14)."""
+        """forest returns forrest's palette under the old key."""
         alias = ThemeLibrary.get("forest")
         target = ThemeLibrary.get("forrest")
 
         assert _palette_multiset(alias) == _palette_multiset(target)
-        assert alias.slug == "forrest"
+        assert alias.slug == "forest"
         assert alias.name == "Forrest"
         assert alias.category == "Nature"
 
@@ -507,7 +576,7 @@ class TestResyncedPalettes:
     """THEME-03: the resynced shared slugs carry app values."""
 
     def test_soothing_contains_kelvin_8000(self) -> None:
-        """soothing carries kelvin 8000 (pre-6.4.0 was uniformly 3500)."""
+        """soothing carries kelvin 8000 (pre-6.3.0 was uniformly 3500)."""
         soothing = ThemeLibrary.get("soothing")
         assert 8000 in {color.kelvin for color in soothing}
 
@@ -609,21 +678,24 @@ class TestDispositionSurfacing:
         assert christmas.replaced_by is None
 
     def test_every_disposition_is_allowed(self) -> None:
-        """Every shipped record's disposition is one of the three values."""
-        allowed = {"lifx-app", "library-only", "deprecated"}
+        """Every shipped record's disposition is one of the four values."""
+        allowed = {"lifx-app", "library-only", "deprecated", "renamed"}
         for record in THEMES.values():
             assert record.disposition in allowed, record.slug
 
-    def test_replaced_by_only_on_deprecated_records(self) -> None:
-        """A non-deprecated record never carries a replaced_by (SPEC R5).
+    def test_replaced_by_only_where_a_successor_exists(self) -> None:
+        """Only a deprecated or renamed record carries a replaced_by.
 
-        This sweep is the sole enforcement of the invariant: the generator
-        deliberately does not reject a replaced_by on a non-deprecated
-        record (R2-05, D-08 held), so a bad data edit is caught here at
-        test time rather than at generation time.
+        Both directions are enforced at generation time: a deprecated
+        record without a successor aborts, and an authored record that is
+        not deprecated may not carry one at all. Renamed records are
+        synthesised by the generator, never authored, and always carry
+        their target. This sweep pins the shipped result.
         """
         for record in THEMES.values():
-            if record.disposition != "deprecated":
+            if record.disposition in ("deprecated", "renamed"):
+                assert record.replaced_by is not None, record.slug
+            else:
                 assert record.replaced_by is None, record.slug
 
     def test_every_replaced_by_resolves(self) -> None:
@@ -632,10 +704,17 @@ class TestDispositionSurfacing:
             if record.replaced_by is not None:
                 assert record.replaced_by in THEMES, record.slug
 
-    def test_alias_identity_survives_new_fields(self) -> None:
-        """Both rename aliases still bind their target's own record (R7)."""
-        assert THEMES["forest"] is THEMES["forrest"]
-        assert THEMES["aurora_borealis"] is THEMES["aurora"]
+    def test_alias_is_its_own_record_sharing_the_palette(self) -> None:
+        """Each alias is a distinct record over the target's palette (R7).
+
+        A shared record would make the alias report the target's fate, so
+        the two keys whose name actually changed would be the only ones
+        claiming nothing changed. The palette object is still shared, so
+        the two keys cannot drift apart.
+        """
+        for alias, target in (("forest", "forrest"), ("aurora_borealis", "aurora")):
+            assert THEMES[alias] is not THEMES[target]
+            assert THEMES[alias].colors is THEMES[target].colors
 
 
 class TestNewSlugBehaviour:

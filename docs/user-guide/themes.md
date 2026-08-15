@@ -59,7 +59,7 @@ async def daily_lighting_schedule():
 
     schedule = [
         ("06:00", "energizing"),   # Morning
-        ("12:00", "focusing"),     # Afternoon
+        ("12:00", "gentle"),       # Afternoon
         ("18:00", "evening"),      # Early evening
         ("21:00", "relaxing"),     # Night
         ("23:00", "peaceful"),     # Bedtime
@@ -85,10 +85,10 @@ async def activate_holiday_theme():
     month = datetime.now().month
 
     holiday_map = {
-        3: "shamrock",        # March: St. Patrick's Day
-        10: "halloween",      # October
-        11: "thanksgiving",   # November
-        12: "christmas",      # December
+        3: "st_patrick_s_day",  # March
+        10: "halloween",        # October
+        11: "thanksgiving",     # November
+        12: "christmas",        # December
     }
 
     theme_name = holiday_map.get(month)
@@ -206,15 +206,18 @@ async def set_room_theme(room_name: str, theme_name: str):
     theme = ThemeLibrary.get(theme_name)
     groups = await group.organize_by_group()
 
-    if room_name in groups:
-        room_lights = groups["room_name"]
+    if room_name not in groups:
+        print(f"Room '{room_name}' not found")
+        return
+
+    room_lights = groups[room_name]
 
     # room_lights.lights already includes the strips and matrix devices
     await room_lights.apply_theme(theme, power_on=True)
 
 # Usage:
 # await set_room_theme("bedroom", "peaceful")
-# await set_room_theme("kitchen", "focusing")
+# await set_room_theme("kitchen", "gentle")
 ```
 
 ### Home Scene Presets
@@ -231,15 +234,15 @@ async def activate_scene(scene: str):
             "bedroom": "peaceful",
         },
         "date_night": {
-            "living_room": "romantic",
-            "bedroom": "romance",
+            "living_room": "romance",
+            "bedroom": "blissful",
         },
         "party": {
             "living_room": "party",
             "kitchen": "energizing",
         },
         "focus": {
-            "home_office": "focusing",
+            "home_office": "gentle",
             "kitchen": "energizing",
         },
     }
@@ -253,13 +256,13 @@ async def activate_scene(scene: str):
         devices.append(device)
     group = DeviceGroup(devices)
 
-    groups = group.organize_by_group()
+    groups = await group.organize_by_group()
 
     for room, theme_name in scenes[scene].items():
         if room not in groups:
             continue
 
-        room_lights = groups["room"]
+        room_lights = groups[room]
         theme = ThemeLibrary.get(theme_name)
 
         # Every colour-capable device in the room, painted exactly once
