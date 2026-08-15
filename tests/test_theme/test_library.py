@@ -8,7 +8,8 @@ import pytest
 
 from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
 from lifx.theme import Theme, ThemeLibrary, get_theme
-from lifx.theme.data import THEMES
+from lifx.theme.data import THEMES, ThemeRecord
+from lifx.theme.library import _LEGACY_CATEGORIES
 
 # Every key the pre-v1.2 hand-written library resolved, captured as a
 # LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
@@ -174,49 +175,158 @@ class TestThemeLibraryList:
         assert len(themes) > 0
 
 
+class TestGetCategories:
+    """Tests for ThemeLibrary.get_categories() (SPEC R1)."""
+
+    def test_exact_sorted_list(self) -> None:
+        """Exactly the 9 category names, plain codepoint-sorted."""
+        assert ThemeLibrary.get_categories() == [
+            "Archives",
+            "Art Series",
+            "Holidays",
+            "Library",
+            "Moods",
+            "Music",
+            "Nature",
+            "Play",
+            "Space",
+        ]
+
+    def test_empty_library_returns_empty_list(self) -> None:
+        """A library with no records has no categories (SPEC R1 empty edge)."""
+
+        class EmptyLibrary(ThemeLibrary):
+            _THEMES: dict[str, ThemeRecord] = {}
+
+        assert EmptyLibrary.get_categories() == []
+
+    def test_empty_library_lookup_raises_unknown(self) -> None:
+        """get_by_category() on an empty library raises the unknown error."""
+
+        class EmptyLibrary(ThemeLibrary):
+            _THEMES: dict[str, ThemeRecord] = {}
+
+        with pytest.raises(ValueError, match="Available categories"):
+            EmptyLibrary.get_by_category("anything")
+
+
 class TestThemeLibraryGetByCategory:
-    """Tests for ThemeLibrary.get_by_category() method."""
+    """Tests for ThemeLibrary.get_by_category() over the app taxonomy (SPEC R2)."""
 
-    def test_get_seasonal_themes(self) -> None:
-        """Test getting seasonal themes."""
-        seasonal = ThemeLibrary.get_by_category("seasonal")
+    def test_every_record_reachable_by_its_own_category(self) -> None:
+        """record.slug is a key of get_by_category(record.category) for all names.
 
-        assert isinstance(seasonal, dict)
-        assert "spring" in seasonal
-        assert "autumn" in seasonal
+        Membership is asserted by slug key, never by Theme object equality,
+        because Theme ``==`` is identity (WR-02 closure sweep).
+        """
+        for record in THEMES.values():
+            assert record.slug in ThemeLibrary.get_by_category(record.category)
 
-    def test_get_holiday_themes(self) -> None:
-        """Test getting holiday themes."""
-        holidays = ThemeLibrary.get_by_category("holiday")
+    def test_holidays_count_and_slug_sorted(self) -> None:
+        """Holidays has 15 themes; the returned dict is keyed and sorted by slug."""
+        holidays = ThemeLibrary.get_by_category("Holidays")
 
-        assert isinstance(holidays, dict)
-        assert "christmas" in holidays
-        assert "halloween" in holidays
-        assert "hanukkah" in holidays
+        assert len(holidays) == 15
+        assert list(holidays) == sorted(holidays)
+        assert all(theme.slug == slug for slug, theme in holidays.items())
 
-    def test_get_mood_themes(self) -> None:
-        """Test getting mood themes."""
-        moods = ThemeLibrary.get_by_category("mood")
+    def test_normalised_forms_agree(self) -> None:
+        """Both sides pass through the D-09 slug rule (SPEC R2 encoding edge)."""
+        canonical = ThemeLibrary.get_by_category("Art Series").keys()
 
-        assert isinstance(moods, dict)
-        assert "relaxing" in moods
-        assert "energizing" in moods
-        assert "peaceful" in moods
+        assert ThemeLibrary.get_by_category("art_series").keys() == canonical
+        assert ThemeLibrary.get_by_category("ART SERIES").keys() == canonical
 
-    def test_get_invalid_category(self) -> None:
-        """Test that invalid category raises ValueError."""
+    def test_concatenated_form_raises(self) -> None:
+        """'artseries' is not a normalised form of 'Art Series' and raises."""
+        with pytest.raises(ValueError, match="artseries"):
+            ThemeLibrary.get_by_category("artseries")
+
+    def test_unknown_category_lists_available(self) -> None:
+        """An unknown category raises ValueError listing the categories."""
         with pytest.raises(ValueError) as exc_info:
             ThemeLibrary.get_by_category("invalid")
 
-        assert "invalid" in str(exc_info.value)
-        assert "not recognized" in str(exc_info.value)
+        message = str(exc_info.value)
+        assert "invalid" in message
+        assert "not recognised" in message
+        assert "Available categories" in message
+        assert "Archives" in message
 
-    def test_category_case_insensitive(self) -> None:
-        """Test that category names are case-insensitive."""
-        seasonal_lower = ThemeLibrary.get_by_category("seasonal")
-        seasonal_upper = ThemeLibrary.get_by_category("SEASONAL")
+    def test_empty_string_gets_generic_error(self) -> None:
+        """'' falls through to the unknown-category error (SPEC R3 empty edge)."""
+        with pytest.raises(ValueError) as exc_info:
+            ThemeLibrary.get_by_category("")
 
-        assert len(seasonal_lower) == len(seasonal_upper)
+        message = str(exc_info.value)
+        assert "Available categories" in message
+        assert "Archives" in message
+        assert "replacement" not in message
+
+    def test_results_carry_disposition(self) -> None:
+        """get() threading survives the rewrite — a Library result has a fate."""
+        library_themes = ThemeLibrary.get_by_category("Library")
+
+        assert library_themes["hygge"].disposition is not None
+
+
+class TestLegacyCategoryNames:
+    """The 6 pre-v1.2 category names have their locked fates (SPEC R3)."""
+
+    def test_holiday_resolves_to_holidays(self) -> None:
+        """'holiday' returns the 15 Holidays themes."""
+        holiday = ThemeLibrary.get_by_category("holiday")
+
+        assert len(holiday) == 15
+        assert all(theme.category == "Holidays" for theme in holiday.values())
+        assert holiday.keys() == ThemeLibrary.get_by_category("Holidays").keys()
+
+    def test_mood_resolves_to_moods(self) -> None:
+        """'mood' returns the 13 Moods themes."""
+        mood = ThemeLibrary.get_by_category("mood")
+
+        assert len(mood) == 13
+        assert all(theme.category == "Moods" for theme in mood.values())
+
+    def test_legacy_resolve_case_insensitive(self) -> None:
+        """'HOLIDAY' behaves identically to 'holiday' (SPEC R3 encoding edge)."""
+        assert (
+            ThemeLibrary.get_by_category("HOLIDAY").keys()
+            == ThemeLibrary.get_by_category("holiday").keys()
+        )
+
+    @pytest.mark.parametrize(
+        ("legacy", "replacement"),
+        [
+            ("seasonal", "Nature"),
+            ("ambient", "Play"),
+            ("functional", "Library"),
+            ("atmosphere", "Moods"),
+        ],
+    )
+    def test_retired_names_raise_naming_replacement(
+        self, legacy: str, replacement: str
+    ) -> None:
+        """Each retired name raises ValueError naming its replacement (D-02)."""
+        with pytest.raises(ValueError) as exc_info:
+            ThemeLibrary.get_by_category(legacy)
+
+        message = str(exc_info.value)
+        assert legacy in message
+        assert replacement in message
+        assert "pre-v1.2" in message
+
+    def test_every_replacement_is_a_real_category(self) -> None:
+        """Every _LEGACY_CATEGORIES replacement names a listable category.
+
+        Guards the shim against future taxonomy drift (review F4): a
+        replacement that stops existing would raise a message pointing at
+        nothing, and a resolving entry would silently return an empty dict.
+        """
+        categories = set(ThemeLibrary.get_categories())
+
+        for replacement, _resolves in _LEGACY_CATEGORIES.values():
+            assert replacement in categories
 
 
 class TestGetThemeConvenienceFunction:
@@ -351,21 +461,6 @@ class TestThemeLibraryIntegration:
         """Test that library has at least 42 themes."""
         themes = ThemeLibrary.get_available_themes()
         assert len(themes) >= 42
-
-    def test_all_categories_have_themes(self) -> None:
-        """Test that all known categories have themes."""
-        categories = [
-            "seasonal",
-            "holiday",
-            "mood",
-            "ambient",
-            "functional",
-            "atmosphere",
-        ]
-
-        for category in categories:
-            themes = ThemeLibrary.get_by_category(category)
-            assert len(themes) > 0
 
 
 class TestPreV12Compatibility:
