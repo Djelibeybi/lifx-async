@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Theme Library Update
-current_phase: 7
-current_phase_name: Taxonomy & Legacy Dispositions
+current_phase: 07
+current_phase_name: taxonomy-legacy-dispositions
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-08-15T02:52:46.074Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-08-15T03:08:40.036Z"
 last_activity: 2026-08-15
 last_activity_desc: "Phase 06 merged to main via PR #196; Phase 7 ready to plan"
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 25
 ---
 
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 ## Current Position
 
-Phase: 7 — Taxonomy & Legacy Dispositions
-Plan: Not started
+Phase: 07 (taxonomy-legacy-dispositions) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-08-15 — Phase 07 planning complete
+Last activity: 2026-08-15 — Phase 07 execution started
 
 Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
 Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
@@ -48,7 +48,7 @@ fixed in 732e512.
   `Theme.category` returns the app's nine; no way to tell a rename alias from a primary slug
   in `get_available_themes()` (168 names, 166 themes).
 
-Progress: [██▌       ] 25% (1/4 phases)
+Progress: [██████░░░░] 60% (1/4 phases)
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Per-plan metrics for shipped milestones live with their archives under
 |------|----------|-------|-------|
 | Phase 06 P01 | 12min | 3 tasks | 9 files |
 | Phase 06 P02 | 17min | 3 tasks | 8 files |
+| Phase 07 P01 | 10min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,8 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - [Phase ?]: Generated theme data module excluded from coverage in both pyproject omit and codecov ignore, per products/protocol precedent (D-21, D-22). **Corrected 2026-08-15 (Phase 7 cross-AI review):** this originally read "Theme generator + generated data module". Only `src/lifx/theme/data.py` is excluded — the hand-written `scripts/generate_theme_data.py` **stays measured** (`pyproject.toml` addopts carry `--cov=generate_theme_data --cov-branch`, and neither the omit list nor `codecov.yml:45-52` names it), so its emit-time backstops keep their branch-patch requirement. The stale wording had already propagated into a Phase 7 plan.
 - [Phase ?]: codespell ignore-words gained 'whats': the D-06 emoji/non-ASCII strip turns "What's the craic?" into 'Whats the craic?' — mechanical data, not a typo
 - [Phase ?]: exciting shipped as captured despite a 1-ulp uint16 drift vs pre-v1.2 on 3 hues (app truncates, old table rounded) — THEME-02 binds shipped == captured; positional trio 0/7282/10923 unchanged and pinned
+- [Phase ?]: 07-01: R2-05 deferral held — generator does not reject replaced_by on non-deprecated records; enforcement is the library-side shape sweep at test time
+- [Phase ?]: 07-01: emit-time asymmetry accepted (F3) — emit backstop checks replaced_by canonical, not resolving; resolution needs whole-set seen_keys
 
 ### v1.2 Working Notes
 
@@ -142,9 +145,9 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-15T01:16:23.494Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-taxonomy-legacy-dispositions/07-CONTEXT.md
+Last session: 2026-08-15T03:08:40.029Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

@@ -42,7 +42,7 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 - [x] **COMPAT-03**: Renamed themes resolve under both the old library key and the new app
       slug (`aurora_borealis` / `aurora`, `forest` / `forrest`)
 
-- [ ] **COMPAT-04**: Each of the 30 orphaned library keys carries a recorded disposition —
+- [x] **COMPAT-04**: Each of the 30 orphaned library keys carries a recorded disposition —
       kept as library-only, or deprecated naming its replacement
 
 ### Metadata
@@ -124,7 +124,7 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 | COMPAT-01 | Phase 6 | Complete |
 | COMPAT-02 | — | Retired 2026-08-14 |
 | COMPAT-03 | Phase 6 | Complete |
-| COMPAT-04 | Phase 7 | Pending |
+| COMPAT-04 | Phase 7 | Complete |
 | META-01 | Phase 6 | Complete |
 | META-02 | Phase 6 | Complete |
 | META-03 | Phase 7 | Pending |

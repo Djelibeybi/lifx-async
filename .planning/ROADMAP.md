@@ -118,12 +118,12 @@ data file plus a separate legacy manifest.
   2. Every category name `get_by_category()` accepted before v1.2 (`seasonal`, `hygge`, `tranquil`, `sports`, …) either still returns themes or fails with a message naming its replacement
   3. Each of the 30 orphaned library keys carries a recorded disposition — kept as library-only, or deprecated naming its replacement — and a deprecated key still resolves
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 07-01-PLAN.md — Disposition schema end-to-end: JSONL rewrite (9 deprecated / 19 library-only / 138 lifx-app), generator validations, regenerated data module, `Theme.disposition`/`replaced_by` via `get()`
+- [x] 07-01-PLAN.md — Disposition schema end-to-end: JSONL rewrite (9 deprecated / 19 library-only / 138 lifx-app), generator validations, regenerated data module, `Theme.disposition`/`replaced_by` via `get()`
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -185,6 +185,6 @@ successful outcome.
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
-| 7. Taxonomy & Legacy Dispositions | v1.2 | 0/TBD | Not started | - |
+| 7. Taxonomy & Legacy Dispositions | v1.2 | 1/3 | In Progress|  |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
