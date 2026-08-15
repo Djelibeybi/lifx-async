@@ -46,7 +46,7 @@ from lifx import ThemeLibrary
 names = ThemeLibrary.get_available_themes()   # every resolvable name
 
 theme = ThemeLibrary.get("evening")
-print(theme.slug, theme.name, theme.category)  # evening Evening Moods
+print(theme.slug, theme.name, theme.category)  # evening Evening Library
 ```
 
 Each theme carries its ASCII `slug`, the app's `name` (which may contain spaces and
