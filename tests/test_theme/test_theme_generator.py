@@ -26,6 +26,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -729,6 +730,14 @@ class TestMainAtomicWrite:
         assert target.read_bytes() == original
         assert [p.name for p in out_dir.iterdir()] == ["data.py"]
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason=(
+            "POSIX permission bits: Windows chmod() only toggles the read-only "
+            "flag, so the mode always stats as 0o666 and umask has no meaning. "
+            "The behaviour under test only exists on POSIX."
+        ),
+    )
     @pytest.mark.parametrize("umask_value", [0o022, 0o077])
     def test_generated_module_is_world_readable_under_any_umask(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, umask_value: int
