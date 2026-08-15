@@ -118,7 +118,20 @@ data file plus a separate legacy manifest.
   2. Every category name `get_by_category()` accepted before v1.2 (`seasonal`, `hygge`, `tranquil`, `sports`, …) either still returns themes or fails with a message naming its replacement
   3. Each of the 30 orphaned library keys carries a recorded disposition — kept as library-only, or deprecated naming its replacement — and a deprecated key still resolves
 
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 07-01-PLAN.md — Disposition schema end-to-end: JSONL rewrite (9 deprecated / 19 library-only / 138 lifx-app), generator validations, regenerated data module, `Theme.disposition`/`replaced_by` via `get()`
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 07-02-PLAN.md — Taxonomy rewrite: `get_categories()`, `get_by_category()` over the app's 9 categories with the private legacy map (2 resolve, 4 raise naming replacements), `derive_slug` relocated into the package
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 07-03-PLAN.md — Migration docs: `docs/migration/theme-taxonomy-v1.2.md` point-in-time record plus the two stale doc-site corrections
 
 COMPAT-04 is a per-key judgement over a small fixed set, not a code change: the renames
 were already wired in Phase 6, so this phase records keep-or-deprecate decisions for the
