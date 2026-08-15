@@ -195,6 +195,44 @@ but Phase 6 recorded it as a review-time inspection (`06-SECURITY.md:71`), not a
 
 Status remains **passed**. None of the above changes a verified behaviour.
 
+## Post-Ship Code Review Addendum (2026-08-15, commit `582f74b`)
+
+A `max`-effort review of PR #202 found 15 defects. Twelve were fixed by the review
+pass itself; three required an operator decision and produced a **behaviour change
+that invalidates two verified acceptance criteria**. `07-SPEC.md` R3, R5 and R7 were
+amended post-ship and carry the full rationale; this records what stopped being true
+here.
+
+**Two criteria this report verified are no longer the contract:**
+
+1. *"`get_by_category("holiday")` returns 15 themes; `get_by_category("mood")` returns
+   13; `seasonal`, `ambient`, `functional`, `atmosphere` each raise naming `Nature`,
+   `Play`, `Library`, `Moods`."* All six names now raise the generic
+   unrecognised-category error. The verification was accurate against the SPEC as
+   written; the SPEC was wrong. Its resolve/raise split was inverted against its own
+   stated criterion — `functional` retained 3/3 of its old themes and raised while
+   `holiday` retained 7/12 and resolved — and two of the four named replacements did
+   not hold a majority of what the name used to return (`seasonal → Nature`: 0/2).
+
+2. *"Both rename aliases still share their target's record object."* Deliberately
+   broken. That binding meant `forest` and `aurora_borealis` reported
+   `disposition="lifx-app"` with `replaced_by=None`, so the only two keys whose name
+   had changed were the only two reporting that nothing had. Each alias is now its own
+   `disposition="renamed"` record naming the live key, sharing only the palette object.
+
+**Why the phase's own gates missed both.** Every automated check confirmed the code
+matched the SPEC; nothing compared the SPEC's rule to the SPEC's own measurement
+table, which already recorded `seasonal | Library 2` on line 36 while R3 named
+`Nature`. The alias gap was invisible for a different reason: R4's closed disposition
+set had no value able to express a rename, so the phase shipped 28 orphan fates for
+30 orphans and no criterion counted the difference.
+
+**Re-verified after the change:** 3428 tests pass, pyright 0 errors, ruff clean, 100%
+branch coverage on `src/lifx/theme/` and `scripts/generate_theme_data.py`, generator
+byte-idempotent.
+
+Status for the amended requirements: **re-verified**. R1, R2, R4 and R6 are unaffected.
+
 ---
 
 _Verified: 2026-08-15_

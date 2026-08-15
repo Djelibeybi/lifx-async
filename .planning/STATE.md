@@ -5,8 +5,8 @@ milestone_name: Theme Library Update
 current_phase: 8
 current_phase_name: Hardware Fidelity Validation
 status: planning
-stopped_at: "Phase 07 complete and shipped (PR #202); ready to plan Phase 8"
-last_updated: "2026-08-15T04:40:34.776Z"
+stopped_at: "Phase 07 shipped (PR #202) and amended post-ship after code review; ready to plan Phase 8"
+last_updated: "2026-08-15T05:55:00.000Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 4
@@ -14,7 +14,7 @@ progress:
   total_plans: 5
   completed_plans: 5
   percent: 50
-last_activity_desc: "Phase 07 complete and shipped as PR #202; Phase 8 ready to plan"
+last_activity_desc: "Phase 07 shipped as PR #202, then amended post-ship (SPEC R3/R5/R7) after a max-effort code review; Phase 8 ready to plan"
 ---
 
 # Project State
@@ -47,8 +47,11 @@ fixed in 732e512.
 - **#200 — closed by Phase 7:** `get_by_category()` now reads the app's nine categories from
   the generated records, so it no longer disagrees with `Theme.category`.
 
-- **#201 — deferred to Phase 9:** still no way to tell a rename alias from a primary slug in
-  `get_available_themes()` (168 names, 166 themes). Belongs with the resync tooling.
+- **#201 — closed by the Phase 7 post-ship amendment:** a rename alias is now distinguishable
+  from a primary slug — `ThemeLibrary.get(name).disposition == "renamed"`, with `replaced_by`
+  naming the live key. `get_available_themes()` still returns all 168 names undifferentiated,
+  so a convenience filter on that method remains open if wanted, but the data is no longer
+  missing.
 
 Phase 7 shipped: PR #202 opened 2026-08-15 against `main`, 35 signed commits, awaiting review.
 UAT found one defect and it was fixed on the branch rather than deferred: the migration page and
@@ -59,6 +62,31 @@ shipped (`ca52da5`, tag `v6.3.0`) as Phase 6's release from PR #196, so the labe
 version predating the work. Corrected to **6.4.0** after rebasing onto `origin/main`, which makes
 the next version verifiable from the tree. **Lesson: fetch before deriving a version from tags or
 `pyproject.toml`.**
+
+Phase 7 amended post-ship (2026-08-15, commit `582f74b`). A `max`-effort code review of
+PR #202 found 15 defects; 12 were fixed in the review pass, 3 needed an operator decision and
+produced a behaviour change. **SPEC R3, R5 and R7 were amended after UAT sign-off** — see the
+Post-Ship Amendment section at the top of `07-SPEC.md`.
+
+- **R3: the legacy-category shim is deleted, not corrected.** All six pre-6.4.0 names now raise
+  the generic unrecognised-category error. The SPEC's resolve/raise split was inverted against
+  its own stated criterion (`functional` kept 3/3 of its old themes and raised; `holiday` kept
+  7/12 and resolved) and two of the four named replacements did not hold a majority of what the
+  name returned (`seasonal → Nature`: 0/2). Deletion rather than correction because
+  `get_by_category()` has zero callers in `src/`, LedFx does not import `ThemeLibrary`, and only
+  `holiday` and `mood` ever appeared in a published example — on a v6.3.0 page that told readers
+  to use `Theme.category` instead.
+- **R7: alias record binding deliberately broken.** `forest` and `aurora_borealis` reported
+  `disposition="lifx-app"` with `replaced_by=None`, so the only two keys whose name had changed
+  were the only two reporting that nothing had. Each is now its own `disposition="renamed"`
+  record naming the live key and sharing the target's palette object.
+- **R5: `replaced_by` widened** to deprecated *or* renamed, with the converse now enforced.
+
+Re-verified: 3428 tests pass, pyright 0 errors, ruff clean, 100% branch coverage on
+`src/lifx/theme/` and `scripts/generate_theme_data.py`, generator byte-idempotent. **Lesson: when
+a SPEC locks per-item fates, make the derivation an acceptance criterion rather than the result —
+R3's contradiction with its own measurement table sat thirty lines apart in one file and passed
+the plan checker, three peer reviews, the verifier and UAT.**
 
 Progress: [██████████░░░░░░░░░░] 50% (2/4 phases, 5/5 plans)
 
@@ -105,11 +133,11 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - [Phase ?]: Generated theme data module excluded from coverage in both pyproject omit and codecov ignore, per products/protocol precedent (D-21, D-22). **Corrected 2026-08-15 (Phase 7 cross-AI review):** this originally read "Theme generator + generated data module". Only `src/lifx/theme/data.py` is excluded — the hand-written `scripts/generate_theme_data.py` **stays measured** (`pyproject.toml` addopts carry `--cov=generate_theme_data --cov-branch`, and neither the omit list nor `codecov.yml:45-52` names it), so its emit-time backstops keep their branch-patch requirement. The stale wording had already propagated into a Phase 7 plan.
 - [Phase ?]: codespell ignore-words gained 'whats': the D-06 emoji/non-ASCII strip turns "What's the craic?" into 'Whats the craic?' — mechanical data, not a typo
 - [Phase ?]: exciting shipped as captured despite a 1-ulp uint16 drift vs pre-v1.2 on 3 hues (app truncates, old table rounded) — THEME-02 binds shipped == captured; positional trio 0/7282/10923 unchanged and pinned
-- [Phase ?]: 07-01: R2-05 deferral held — generator does not reject replaced_by on non-deprecated records; enforcement is the library-side shape sweep at test time
+- [Phase ?]: 07-01: R2-05 deferral held — generator does not reject replaced_by on non-deprecated records; enforcement is the library-side shape sweep at test time. **Superseded 2026-08-15 post-ship (`582f74b`):** the deferral is closed. `validate_records()` now rejects a `replaced_by` on any non-deprecated record, so the invariant theme.py documents is enforced in both directions at generation time rather than only by a test sweep
 - [Phase ?]: 07-01: emit-time asymmetry accepted (F3) — emit backstop checks replaced_by canonical, not resolving; resolution needs whole-set seen_keys
 - [Phase ?]: 07-02: derive_slug home stays src/lifx/theme/slug.py (review F2) — regeneration bootstrap cycle predates the phase via lifx/__init__.py's eager theme import; recovery is git; slug.py pinned as a leaf module
-- [Phase ?]: 07-02: no precompute/cache for get_by_category record scan (review F13 declined) — shared _slugs_for_category helper serves both paths; 168 bounded regex passes per call is negligible
-- [Phase ?]: 07-02: no runtime isinstance guard on get_by_category input (review F16 declined) — str typing enforced by pyright at the caller boundary
+- [Phase ?]: 07-02: no precompute/cache for get_by_category record scan (review F13 declined) — shared _slugs_for_category helper serves both paths. **Amended 2026-08-15 post-ship (`582f74b`):** the 168-per-call figure was wrong by construction — the slug rule now runs over the 9 *distinct* category names, not once per record, and `derive_slug`'s pattern is precompiled. Still no cache; the decision to skip one stands on a much smaller cost
+- [Phase ?]: 07-02: no runtime isinstance guard on get_by_category input (review F16 declined) — str typing enforced by pyright at the caller boundary. **Reversed 2026-08-15 post-ship (`582f74b`):** pyright does not run in a consumer's process. A non-string surfaced as `AttributeError` from inside the slug rule, contradicting the documented `ValueError` and reading as a library bug; `get_by_category()` now type-guards its argument
 - [Phase ?]: 07-03: migration-page category table carries a 'Defined by' column so the Library attribution lives in the table itself; name/count cells stay adjacent for the verify regex
 - [Phase ?]: 07-03: D-10 stamp implemented as a dated admonition ('As of the 6.4.0 migration (2026-08-15)') stating the page is deliberately never resynced
 - [Phase 7]: user-facing docs and docstrings identify releases by the lifx-async release version, never the internal `.planning/` milestone number — `v1.2` is meaningless outside this repo. Applies to the migration page filename, prose, and the `get_by_category()` ValueError text

@@ -93,6 +93,15 @@ coverage:
 requirements-completed: [META-03, META-04]
 ---
 
+!!! warning "Partly superseded by the post-ship amendment (2026-08-15, `582f74b`)"
+
+    This is the execution record as delivered and is not rewritten. A `max`-effort code
+    review of PR #202 changed behaviour afterwards: the legacy-category shim was **deleted**
+    (all six pre-6.4.0 names now raise the generic unrecognised-category error), and each
+    rename alias became its own `disposition="renamed"` record instead of binding its
+    target's. See the Post-Ship Amendment section of `07-SPEC.md` and the addendum in
+    `07-VERIFICATION.md`.
+
 # Phase 7 Plan 02: Taxonomy Rewrite Summary
 
 **Category navigation rewritten over the app's 9-category taxonomy read from the generated records: get_categories() lists them, get_by_category() matches with D-09 slug normalisation on both sides, the 6 pre-v1.2 legacy names get their locked fates via the private _LEGACY_CATEGORIES shim, and generator + library share one derive_slug in the new lifx.theme.slug leaf module — closing the WR-02 defect**

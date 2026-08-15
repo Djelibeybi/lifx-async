@@ -107,6 +107,65 @@ nothing. Raised by the operator during UAT as gap G-07-1.
 
 ## Lessons
 
+### A spec can lock a rule and a measurement that contradict each other, and every gate will pass
+R3 stated the rule as "the closest **app** category" and locked six per-name fates. Its own
+Background table, thirty lines earlier, recorded `seasonal | Library 2` — measured, correct, and
+irreconcilable with R3's `seasonal → Nature`. R3 also used the non-app `Library` for
+`functional`, so the stated rule was not the rule being applied. The plan checker, three external
+peer reviews, the verifier and UAT all passed: each compared the code to R3, and R3 to nothing.
+
+The split was inverted against its own criterion in the same way. `functional` retained 3/3 of
+its old themes and raised; `holiday` retained 7/12 and resolved. Nobody computed the retention
+figures until the post-ship code review, because no gate asked for them — the fates were locked
+as a table of decisions rather than as a derivation from data already in the file.
+
+**Context:** Found by `/code-review max` on PR #202, after ship. Cost: a behaviour change to
+shipped-but-unreleased code, a SPEC amendment across three requirements, and a rewritten
+migration page. **When a SPEC locks per-item fates, make the derivation an acceptance criterion,
+not the result. "Each name maps to the category holding a plurality of its old themes, computed
+from the data" is checkable; a hand-written table of six answers is not.** A spec's internal
+consistency needs a gate of its own — the measurement was right there.
+**Source:** 07-SPEC.md post-ship amendment, commit `582f74b`
+
+---
+
+### A closed enum with no value for a case silently classifies that case as the default
+R4's disposition set was `{lifx-app, library-only, deprecated}`. Rename aliases had no value,
+and rather than failing, they inherited their target's record and reported `lifx-app` with
+`replaced_by=None`. The two keys whose name had actually changed were the only two in the
+library asserting nothing had changed, and a migration audit keyed off `replaced_by` — the
+obvious one — saw no work for exactly the keys that had moved.
+
+The arithmetic was visible in the SPEC: COMPAT-04 counted 30 orphans, R4 assigned 28 fates, and
+the 2-key gap was written off as "already wired by Phase 6". Already-resolvable is not
+already-classified.
+
+**Context:** Found post-ship by the same review. Fixed by synthesising a `renamed` record per
+alias. **When a closed set is introduced over a population, assert the partition covers it —
+count the values against the count of things being classified. A residual bucket is not a
+default; it is a missing member.**
+**Source:** 07-SPEC.md R4/R7 amendment, commit `582f74b`
+
+---
+
+### An API surface with zero internal callers should be checked for external ones before migration machinery is built for it
+Phase 7 designed a six-entry legacy shim with a resolve/raise split and replacement-naming error
+messages. `get_by_category()` has zero callers in `src/`, LedFx (the known downstream) does not
+import `ThemeLibrary` at all, and only two of the six names appeared in any published example —
+on a v6.3.0 page whose own note told readers to use `Theme.category` instead. The shim was
+elaborate machinery for a surface no user had been pointed at.
+
+Asking "was this used?" turned a contested design question into a deletion. The check was two
+greps and took under a minute; it was never run during discuss, plan or review.
+
+**Context:** Operator asked "did we even use categories before the shift?" mid-review. **Before
+designing compatibility machinery, measure the surface: internal callers, published examples,
+known downstreams. Compatibility cost should be proportional to demonstrated use, not to the
+API's age.**
+**Source:** `git grep` over `src/`, `docs/` at tag v6.3.0, and the LedFx checkout
+
+---
+
 ### Deriving a release version from an unfetched checkout produces a confident wrong answer
 The fix for G-07-1 first labelled the work 6.3.0, computed from `git tag` (latest: v6.2.0) and
 `pyproject.toml` (6.2.0). Both were stale. `origin/main` already carried `ca52da5` "6.3.0" and

@@ -3,6 +3,56 @@
 **Created:** 2026-08-15
 **Ambiguity score:** 0.08 (gate: ≤ 0.20)
 **Requirements:** 7 locked
+**Amended:** 2026-08-15 post-ship (R3, R5, R7) — see below
+
+## Post-Ship Amendment (2026-08-15, commit `582f74b`)
+
+The `max`-effort code review of PR #202 found two defects the SPEC itself caused, so
+R3 and R7 were changed after UAT sign-off. Both are behaviour changes, not doc fixes.
+This section is the record; the requirement text below has been updated in place.
+
+**R3 — the legacy-category shim is deleted, not corrected.** The SPEC stated the rule
+as "the closest **app** category" and split the six names into two that resolve and
+four that raise. Measured against shipped data, that split is inverted against its own
+criterion:
+
+| Legacy name | Nearest single category | Share of old set it holds | SPEC fate |
+|---|---|---:|---|
+| `functional` | `Library` | 3/3 | raises |
+| `ambient` | `Play` | 5/6 | raises |
+| `mood` | `Moods` | 10/16 | resolves |
+| `holiday` | `Holidays` | 7/12 | resolves |
+| `atmosphere` | `Library` | 2/3 | raises |
+| `seasonal` | `Library` | 2/2 | raises |
+
+Two of the four named replacements were also wrong: `seasonal → Nature` names a
+category holding neither `spring` nor `autumn` (both are `Library`), and
+`atmosphere → Moods` names the minority holder. The SPEC's own measurement table
+(line 36) already recorded `seasonal | Library 2`, and it already used the non-app
+`Library` for `functional`, so "closest app category" was not the rule being applied.
+
+Correcting the map was rejected in favour of deleting it. Redirecting `holiday` to
+`Holidays` drops 5 themes and adds 8 — a set differing in 13 members with no
+exception and no warning. Only `holiday` and `mood` ever appeared in a published
+example, on a v6.3.0 page that told readers to use `Theme.category` instead, and
+`get_by_category()` has zero callers in `src/`. All six names now raise the generic
+unrecognised-category error listing the nine real categories.
+
+**R7 — alias identity binding is deliberately broken.** The SPEC pinned
+`THEMES[alias] is THEMES[target]`. That binding made `forest` and `aurora_borealis`
+report `disposition="lifx-app"` with `replaced_by=None` — the only two keys whose
+name actually changed were the only two claiming nothing had, so a migration audit
+keyed off `replaced_by` saw no work for exactly the keys that had moved. R4's closed
+disposition set had no value able to express a rename, which is why the phase shipped
+28 orphan fates for 30 orphans. Each alias key now gets its own synthesised record
+with `disposition="renamed"` and `replaced_by` naming the live key.
+
+**R5** gains the corresponding widening: `replaced_by` is non-`None` when
+`disposition` is `deprecated` *or* `renamed`, and the generator now enforces the
+converse (deferral R2-05 closed).
+
+Unchanged: R1, R2, R4, R6, every disposition value locked in R4, all 168 names still
+resolve, and regeneration stays byte-idempotent.
 
 ## Goal
 
@@ -63,17 +113,20 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
      `len(get_by_category("Holidays")) == 15`; `get_by_category("art_series")` equals
      `get_by_category("Art Series")`; `get_by_category("artseries")` raises `ValueError`.
 
-3. **Legacy category names**: every pre-v1.2 category name resolves or raises naming its
-   replacement.
+3. **Legacy category names**: every pre-v1.2 category name is retired. *(Amended
+   post-ship; the original required 2 to resolve and 4 to raise naming a replacement.)*
    - Current: All 6 legacy names return themes from hardcoded lists. No name raises.
-   - Target: `holiday` → `Holidays` and `mood` → `Moods` return the app category's themes.
-     `seasonal`, `ambient`, `functional` and `atmosphere` raise `ValueError` naming the closest
-     app category — `Nature`, `Play`, `Library` and `Moods` respectively. Lookup order is app
-     taxonomy first, legacy map second.
-   - Acceptance: `get_by_category("holiday")` returns the 15 Holidays themes;
-     `get_by_category("mood")` returns the 13 Moods themes; each of the other 4 raises
-     `ValueError` whose message contains its named replacement; `get_by_category("HOLIDAY")`
-     behaves identically to `get_by_category("holiday")`.
+   - Target: `seasonal`, `holiday`, `mood`, `ambient`, `functional` and `atmosphere` are
+     unrecognised. Each raises `ValueError` listing the 9 real categories, with no
+     redirect and no replacement named in the message. No legacy map exists, so there is
+     no second namespace and no lookup order to fix. Rationale: no legacy name maps onto
+     a single app category (see the measurement table above), a silent redirect changes
+     the result set in both directions with no signal, and only `holiday` and `mood`
+     appeared in any published example.
+   - Acceptance: each of the 6 names raises `ValueError` whose message contains the name,
+     `"not recognised"` and the 9 available categories; no message names a replacement;
+     `get_by_category("HOLIDAY")` behaves identically to `get_by_category("holiday")`;
+     no live category normalises onto a retired name.
 
 4. **Orphan dispositions**: each of the 28 `Library` orphans carries a recorded fate in the data.
    - Current: `data/themes.jsonl` records carry slug, name, category and colours. No disposition
@@ -108,7 +161,10 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 5. **Disposition on the public object**: a retrieved `Theme` exposes its disposition.
    - Current: `Theme` carries `slug`, `name` and `category` from Phase 6. No disposition.
    - Target: `Theme.disposition` and `Theme.replaced_by` are readable on the object `get()`
-     returns. `replaced_by` is `None` unless `disposition == "deprecated"`. `Theme.palette_equals()`
+     returns. `replaced_by` is non-`None` when `disposition` is `"deprecated"` or
+     `"renamed"`, and `None` otherwise — enforced in both directions by the generator
+     *(amended post-ship; the original said "None unless deprecated", and the converse
+     was unenforced as deferral R2-05)*. `Theme.palette_equals()`
      stays palette-only and ignores both new fields, exactly as it ignores the Phase 6 identity
      fields (D-19a unchanged); `Theme.__eq__` stays identity, so `Theme` stays hashable
      (D-20a unchanged).
@@ -128,16 +184,24 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 
 7. **No key stops resolving**: the Phase 6 compatibility guarantee holds unchanged.
    - Current: 168 names resolve (166 slugs + 2 rename aliases). All 57 pre-v1.2 keys among them.
-   - Target: Unchanged. Deprecation records a fate; it never removes or renames. Alias identity
-     binding (`THEMES[alias] is THEMES[target]`) is preserved.
+   - Target: Every key keeps resolving. Deprecation records a fate; it never removes or
+     renames. *(Amended post-ship: alias identity binding — `THEMES[alias] is
+     THEMES[target]` — is deliberately broken. Each alias key is now its own record with
+     `disposition="renamed"`, `replaced_by` naming the live key, and its own slug, sharing
+     the target's palette object. The old binding made the two renamed keys the only two
+     reporting a clean `lifx-app` fate with no successor.)*
    - Acceptance: All 168 names still resolve; the `PRE_V12_KEYS` 57-key fixture from Phase 6
-     still passes; both rename aliases still share their target's record object.
+     still passes; each alias returns its target's palette, display name and category, its
+     own slug, `disposition == "renamed"` and `replaced_by` naming the target; following
+     `replaced_by` terminates in one hop; a category lists each theme once, under its live
+     slug only.
 
 ## Boundaries
 
 **In scope:**
 - `get_categories()` and the rewrite of `get_by_category()` over the app taxonomy
-- The legacy-name map and its raising branch, with replacement-naming messages
+- Retiring the 6 legacy names *(amended post-ship; originally "the legacy-name map and its
+  raising branch, with replacement-naming messages" — there is no map)*
 - The `disposition` / `replaced_by` schema addition: data file, generator validation, generated
   module, `ThemeRecord`, and `Theme`
 - The 28 orphan disposition values, as locked in requirement 4
@@ -147,7 +211,7 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 - Removing or renaming any orphan key — deprecation records a fate, it never deletes; removal
   would be a v2.0 decision
 - Restoring the 3 sport categories — they stay dropped; `sports` is a library-only orphan key and
-  `atmosphere` (which listed it) raises, neither being a route back to the 40 sport themes
+  `atmosphere` (which listed it) is retired, neither being a route back to the 40 sport themes
 - Reviving `winter`, `romantic` or `dramatic` — they never resolved to real themes; they simply
   stop being silently filtered
 - Any palette or colour change — Phase 7 touches taxonomy and metadata only; Phase 8 owns fidelity
@@ -172,19 +236,19 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 ## Acceptance Criteria
 
 - [ ] `get_categories()` returns exactly the 9 category names, codepoint-sorted
-- [ ] `get_by_category(t.category)` succeeds and contains `t` for all 168 names
+- [ ] `get_by_category(t.category)` succeeds and contains `t` for all 166 non-alias names *(amended post-ship from 168; a rename alias is excluded from its target's category listing)*
 - [ ] `get_by_category("art_series") == get_by_category("Art Series")`; `"artseries"` raises `ValueError`
-- [ ] `get_by_category("holiday")` returns 15 themes; `get_by_category("mood")` returns 13
-- [ ] `seasonal`, `ambient`, `functional`, `atmosphere` each raise `ValueError` naming `Nature`, `Play`, `Library`, `Moods` respectively
-- [ ] An unknown or empty-string category raises `ValueError` listing the available categories
-- [ ] All 168 records carry `disposition` in `{"lifx-app", "library-only", "deprecated"}`
+- [ ] All 6 legacy names raise `ValueError` listing the 9 available categories, naming no replacement *(amended post-ship; the original required `holiday` to return 15 and `mood` to return 13, and the other 4 to name `Nature`, `Play`, `Library`, `Moods`)*
+- [ ] An unknown, empty-string or non-string category raises `ValueError` listing the available categories
+- [ ] All 168 records carry `disposition` in `{"lifx-app", "library-only", "deprecated", "renamed"}` *(amended post-ship; `renamed` added)*
 - [ ] Exactly 9 records are `deprecated` with the replacements in requirement 4; exactly 19 are `library-only`; every `replaced_by` resolves in `THEMES`
-- [ ] The generator aborts with a controlled error on a `deprecated` record with no `replaced_by`
-- [ ] `Theme.disposition` and `Theme.replaced_by` are readable; `replaced_by is None` unless deprecated
+- [ ] The generator aborts with a controlled error on a `deprecated` record with no `replaced_by`, **and** on a non-`deprecated` record that carries one *(converse added post-ship; deferral R2-05 closed)*
+- [ ] The generator aborts on a self-referencing or cyclic `replaced_by`, including a cycle closed through an alias key *(added post-ship)*
+- [ ] `Theme.disposition` and `Theme.replaced_by` are readable; `replaced_by is None` unless deprecated or renamed
 - [ ] Two Themes with equal palettes and differing dispositions satisfy `palette_equals()`; `Theme.__eq__` stays identity and `hash(theme)` still works *(corrected during Phase 7 planning to agree with R5 / D-19a / D-20a; the original bullet said "compare equal; `Theme.__hash__` is None", contradicting R5)*
 - [ ] Regenerating from the data file reproduces `data.py` byte-identically after the schema change
-- [ ] All 168 names still resolve; the 57-key `PRE_V12_KEYS` fixture passes; both rename aliases still share their target's record object
-- [ ] The docs page names all 9 categories, all 6 legacy names and all 9 deprecated keys
+- [ ] All 168 names still resolve; the 57-key `PRE_V12_KEYS` fixture passes; each rename alias is its own `renamed` record sharing its target's palette object *(amended post-ship; the original required the aliases to share their target's *record* object)*
+- [ ] The docs page names all 9 categories, all 6 retired legacy names and all 9 deprecated keys
 - [ ] No docstring or doc page mentions a `time` category
 - [ ] **MUST NOT** present `Library` as a category the LIFX app defines
 - [ ] **MUST NOT** assign or withhold a disposition based on what a theme depicts
@@ -200,22 +264,22 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 | empty | R1 | ✅ covered | A zero-record category cannot exist since names derive from records; an empty library returns `[]` |
 | encoding | R1 | ✅ covered | All category names are pure ASCII (META-02); comparison is ASCII-only |
 | ordering | R1 | ✅ covered | Plain codepoint `sorted()`; `"Archives"` precedes `"Art Series"` |
-| adjacency | R2 | ✅ covered | Lookup order fixed: app taxonomy first, legacy map second. No current name collides |
+| adjacency | R2 | ✅ covered | Single namespace, so no lookup order to fix *(amended post-ship; the legacy map is deleted)*. No live category normalises onto a retired name |
 | empty | R2 | ✅ covered | Unknown or empty-string category raises `ValueError` listing available categories |
 | encoding | R2 | ✅ covered | Both sides normalised by lower + non-alphanumeric-run→`_` (D-09); `"artseries"` raises |
 | ordering | R2 | ✅ covered | Returned dict is sorted by slug |
-| empty | R3 | ✅ covered | `""` raises the generic unknown-category error, not a legacy-replacement message |
-| encoding | R3 | ✅ covered | Legacy names pass through the same normalisation, so `"HOLIDAY"` resolves |
-| adjacency | R4 | ✅ covered | `replaced_by` must resolve in `THEMES`; chains permitted by schema, zero exist today |
-| empty | R4 | ✅ covered | `replaced_by` is `None` unless deprecated; generator aborts on deprecated-without-replacement |
+| empty | R3 | ✅ covered | `""` raises the generic unknown-category error, as every retired name now does |
+| encoding | R3 | ✅ covered | Retired names pass through the same normalisation, so `"HOLIDAY"` and `"holiday"` raise identically |
+| adjacency | R4 | ✅ covered | `replaced_by` must resolve in `THEMES`; chains permitted by schema, zero exist today; cycles and self-references abort *(added post-ship)* |
+| empty | R4 | ✅ covered | `replaced_by` is `None` unless deprecated or renamed; generator aborts on deprecated-without-replacement **and** on replacement-without-deprecation *(converse added post-ship)* |
 | encoding | R4 | ✅ covered | `disposition` and `replaced_by` are ASCII, enforced by the existing canonical-key check |
 | ordering | R4 | ⛔ dismissed | `disposition` is a per-record scalar; there is no collection whose order could vary |
 | unclassified | R5 | ✅ covered | `disposition` is present on every record including the 140 app themes (`"lifx-app"`); `palette_equals()` ignores both new fields |
-| adjacency | R6 | ✅ covered | The docs table must list all 6 legacy names, including the 4 that raise |
+| adjacency | R6 | ✅ covered | The docs table must list all 6 retired legacy names, all of which raise |
 | empty | R6 | ✅ covered | One row per legacy name and per deprecated key; no empty sections |
 | encoding | R6 | ⛔ dismissed | Markdown documentation; no encoding contract beyond the repo's UTF-8 convention |
 | ordering | R6 | ⛔ dismissed | The presentation order of a docs table carries no behavioural contract |
-| adjacency | R7 | ✅ covered | The 168 count includes the 2 rename alias keys; alias identity binding is preserved |
+| adjacency | R7 | ✅ covered | The 168 count includes the 2 rename alias keys; each is its own `renamed` record over the target's palette object *(amended post-ship; record binding is deliberately broken)* |
 | empty | R7 | ⛔ dismissed | "No key is removed" has no empty-input form |
 | encoding | R7 | ⛔ dismissed | Keys are unchanged from Phase 6, whose ASCII guarantee already holds |
 | ordering | R7 | ⛔ dismissed | Resolution is by key and order-independent |

@@ -77,3 +77,16 @@ deferred_follow_ups: 1
   resolution_preference: "Recast each sentence so no dash is needed (commas, colons, brackets, or a sentence split per case) rather than swapping the character."
   deferred_at: 2026-08-15
   deferred_by: user
+
+## Post-Ship Note (2026-08-15, commit `582f74b`)
+
+This sign-off predates the post-ship amendment. A `max`-effort code review of PR #202
+changed behaviour that was signed off here: the legacy-category shim was deleted (all
+six pre-6.4.0 names now raise the generic unrecognised-category error), and each rename
+alias became its own `disposition="renamed"` record instead of binding its target's.
+Neither of the two judgement-tier prohibitions confirmed above is affected — the
+`Library` attribution wording and the verbatim R4 disposition table both still hold.
+See the Post-Ship Amendment section of `07-SPEC.md`.
+
+The deferred em-dash follow-up above is still open, and the amendment added more of
+them.

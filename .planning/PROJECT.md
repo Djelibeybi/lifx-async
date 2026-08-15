@@ -140,8 +140,11 @@ by name looks like the theme of that name in the LIFX app.
   categories and `get_by_category()` reads them from the generated records
   (META-03, META-04) — Phase 7
 - ✓ The orphaned library keys carry recorded fates — `Theme.disposition` is
-  `lifx-app` / `library-only` / `deprecated`, and the nine deprecated keys name a
-  `Theme.replaced_by` that resolves (COMPAT-04) — Phase 7
+  `lifx-app` / `library-only` / `deprecated` / `renamed`, and every deprecated or renamed
+  key names a `Theme.replaced_by` that resolves (COMPAT-04) — Phase 7. `renamed` was added
+  post-ship (`582f74b`): the closed three-value set had no way to express a rename, so the
+  two alias keys inherited their target's `lifx-app` fate and COMPAT-04's 30 orphans shipped
+  with only 28 recorded fates
 
 ### Active
 
@@ -258,4 +261,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-15 after Phase 7 (Taxonomy & Legacy Dispositions) completed*
+*Last updated: 2026-08-15 after the Phase 7 post-ship amendment (commit `582f74b`)*

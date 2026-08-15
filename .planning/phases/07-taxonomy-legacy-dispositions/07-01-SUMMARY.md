@@ -101,6 +101,15 @@ completed: 2026-08-15
 status: complete
 ---
 
+!!! warning "Partly superseded by the post-ship amendment (2026-08-15, `582f74b`)"
+
+    This is the execution record as delivered and is not rewritten. A `max`-effort code
+    review of PR #202 changed behaviour afterwards: the legacy-category shim was **deleted**
+    (all six pre-6.4.0 names now raise the generic unrecognised-category error), and each
+    rename alias became its own `disposition="renamed"` record instead of binding its
+    target's. See the Post-Ship Amendment section of `07-SPEC.md` and the addendum in
+    `07-VERIFICATION.md`.
+
 # Phase 7 Plan 01: Disposition Schema Summary
 
 **COMPAT-04 disposition schema wired end-to-end: all 166 JSONL records carry a machine-readable fate (138 lifx-app / 19 library-only / 9 deprecated with replaced_by), validated by three D-08 generator aborts and surfaced on the public Theme via get()**

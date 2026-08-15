@@ -96,6 +96,15 @@ completed: 2026-08-15
 status: complete
 ---
 
+!!! warning "Partly superseded by the post-ship amendment (2026-08-15, `582f74b`)"
+
+    This is the execution record as delivered and is not rewritten. A `max`-effort code
+    review of PR #202 changed behaviour afterwards: the legacy-category shim was **deleted**
+    (all six pre-6.4.0 names now raise the generic unrecognised-category error), and each
+    rename alias became its own `disposition="renamed"` record instead of binding its
+    target's. See the Post-Ship Amendment section of `07-SPEC.md` and the addendum in
+    `07-VERIFICATION.md`.
+
 # Phase 7 Plan 03: Taxonomy & Migration Docs Summary
 
 **The 6.4.0 theme-taxonomy migration documented as a dated point-in-time record: a new page under both Migration nav sections carrying the 9 categories with counts, the 6 legacy-name fates and the 9 deprecated→replacement pairs — every After example executed against the shipped library — plus the last two stale doc sites corrected (D-11 sites 3-4)**

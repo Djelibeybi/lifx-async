@@ -43,7 +43,11 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
       slug (`aurora_borealis` / `aurora`, `forest` / `forrest`)
 
 - [x] **COMPAT-04**: Each of the 30 orphaned library keys carries a recorded disposition —
-      kept as library-only, or deprecated naming its replacement
+      kept as library-only, or deprecated naming its replacement.
+      **Amended 2026-08-15 post-ship** (`582f74b`, code review of PR #202): a fourth
+      disposition, `renamed`, was added. The original three-value set had no way to express
+      a rename, so the 2 alias keys (`forest`, `aurora_borealis`) inherited their target's
+      `lifx-app` fate and the requirement shipped 28 recorded fates for 30 orphans
 
 ### Metadata
 
@@ -57,7 +61,12 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 - [x] **META-04**: `ThemeLibrary.get_by_category()`'s existing hand-made taxonomy
       (`seasonal`, `hygge`, `tranquil`, `sports`, …) is reconciled with the app's 11
       categories — the old names either keep working or fail with a message naming their
-      replacement
+      replacement.
+      **Amended 2026-08-15 post-ship** (`582f74b`, code review of PR #202): all six old
+      names fail with a message listing the nine real categories and naming **no**
+      replacement. No old name mapped onto a single category, so every candidate
+      replacement was either a minority holder or, for `seasonal`, held none of what the
+      name returned. Naming one would have been a false promise about the old result set
 
 ### Fidelity
 
