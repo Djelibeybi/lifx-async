@@ -167,5 +167,36 @@ No gaps. Every automated check passed against the live codebase. Two information
 
 ---
 
+## Post-Verification Addendum (2026-08-15)
+
+Recorded after the original run so this file stays the newest artifact in the phase
+(the staleness resolver reads mtimes — see STATE.md Blockers, open-gsd/gsd-core#2348).
+
+**Human verification closed.** Both judgement-tier items above were confirmed by the
+operator during `/gsd-verify-work 7`; `07-UAT.md` records 2/2 passing. Item 1 was
+re-tested after the version-label fix and passes against the current wording.
+
+**One defect found by UAT and fixed on the branch (gap G-07-1, resolved).** The migration
+page and the shipped docstrings identified this work by `v1.2`, the internal `.planning/`
+milestone number, which carries no meaning outside this repository. Corrected to the
+lifx-async release version. The first attempt used 6.3.0, computed from a checkout that
+had not been fetched; `origin` already carried that release (`ca52da5`, tag `v6.3.0`) from
+Phase 6 via PR #196. Final label is **6.4.0**, derived after rebasing onto `origin/main`.
+Re-verified against the rebased tree: 3390 tests pass, pyright 0 errors, ruff clean,
+`zensical build` reports no issues, and every documented example in the migration page
+executes correctly.
+
+**Security review completed.** `07-SECURITY.md` records 10 threats, 0 open, at ASVS L1.
+
+**Two summary corrections** made during transition (see `0a26177`): `07-03-SUMMARY.md`
+pointed at the pre-rename page path, and `07-02-SUMMARY.md` described a "no-network AST
+assertion" that does not exist — the underlying control is real and was verified directly,
+but Phase 6 recorded it as a review-time inspection (`06-SECURITY.md:71`), not a test.
+
+Status remains **passed**. None of the above changes a verified behaviour.
+
+---
+
 _Verified: 2026-08-15_
 _Verifier: Claude (gsd-verifier)_
+_Addendum: 2026-08-15 after UAT, security review, and phase transition_
