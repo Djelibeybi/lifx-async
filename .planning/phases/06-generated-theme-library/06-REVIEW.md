@@ -226,6 +226,13 @@ is fully typed and would benefit from checking.
 `if not DATA_FILE.is_file(): raise RuntimeError("data/themes.jsonl not found — the generator must run from a repo checkout")`
 — and consider narrowing the pyright exclusion to the two genuinely untyped
 generators.
+**Resolved (2026-08-15, commit 5a61194):** fixed more thoroughly than proposed —
+the generator moved out of the package to `scripts/generate_theme_data.py`, so
+the wheel no longer ships it at all and both paths resolve from an explicit
+`REPO_ROOT`. The pyright exclusion was narrowed to the two untyped generators
+and the file added to `include` by name; pytest measures it via
+`--cov=generate_theme_data` (still 100% branch) and the codecov flag paths
+gained `scripts/`.
 
 ### IN-05: `test_full_listing_dropped` is fragile against future theme names
 

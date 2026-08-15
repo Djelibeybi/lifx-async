@@ -46,13 +46,19 @@ THEMES[target]`) rather than merely equal, and removes any possibility of the tw
 future regeneration.
 **Source:** 06-01-PLAN.md, verified in 06-VERIFICATION.md truth 5
 
-### Palette-only multiset equality, deliberately unhashable (D-19, D-20)
-`Theme.__eq__` compares palettes as unordered `Counter` multisets over uint16-hashable HSBK;
-identity fields and order are excluded. `Theme.__hash__` is `None`.
+### Palette comparison is a named method, not `__eq__` (D-19a, D-20a)
+`Theme.palette_equals(other)` compares palettes as unordered `Counter` multisets over
+uint16-hashable HSBK; identity fields and order are excluded. It raises `TypeError` on a
+non-Theme. `Theme.__eq__` is left at identity, so `Theme` stays hashable.
 
-**Rationale:** Order is meaningless (see D-24), so equality must not depend on it. Unhashability
-is deliberate: a mutable palette container with value equality would be unsafe as a dict key.
-**Source:** 06-01-SUMMARY.md Task 2
+**Rationale:** Order is meaningless (see D-24), so palette comparison must not depend on it.
+The method form is the correction: as first built (D-19/D-20), defining `__eq__` set
+`__hash__` to `None`, which turned a previously hashable object unhashable and silently
+redefined `==` for every existing caller — a breaking change mid-milestone, in exchange for
+an operator nobody had asked for. Caught in PR #196 review before it shipped, so 6.3.0 stays
+a plain feature release. **Lesson:** adding `__eq__` to an existing public class is never
+purely additive; check what it costs `__hash__` and `==` first.
+**Source:** 06-01-SUMMARY.md Task 2, reversed by PR #196 review item 15 (commit 9b2a751)
 
 ### No drift gate between the data file and the generated module (D-23)
 Nothing in CI verifies that `src/lifx/theme/data.py` matches the current `data/themes.jsonl`.

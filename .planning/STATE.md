@@ -24,7 +24,7 @@ last_activity_desc: Phase 06 complete, transitioned to Phase 7
 See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic — and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 06 — generated-theme-library
+**Current focus:** Phase 07 — taxonomy-legacy-dispositions
 
 ## Current Position
 
@@ -32,6 +32,13 @@ Phase: 7 — Taxonomy & Legacy Dispositions
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-08-15
+
+Phase 6 ships as PR #196 (branch `chore/theme-capture`), open and green. Self-review
+raised 20 inline comments: 15 fixed, 5 deferred — items 13/14/17 (apostrophe corruption in
+3 display names, `earth`/`coral_reef` substitution, digit-leading slugs unrepresentable)
+need a committed capture→JSONL converter and belong to Phase 9's resync tooling; items
+18/19 (`get_by_category()` on the legacy taxonomy, no alias-vs-primary accessor) are Phase
+7 scope. Comment text: `gh api repos/Djelibeybi/lifx-async/pulls/196/comments --paginate`.
 
 Progress: [██████████] 100% (0/4 phases)
 
@@ -71,7 +78,7 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - Overwrite redefined themes but keep `*_legacy` aliases — old values recoverable by name, not git archaeology
 - ASCII slugs; sport categories dropped — removes 5 of the 6 slug collisions outright; `christmas` collapses cleanly (identical palettes)
 - Device readback is the only capture source — internal LIFX theme endpoints deliberately untouched; accepted cost: 16-colour protocol ceiling and lost palette order
-- [Phase ?]: Theme equality is Counter-based palette multiset at uint16 precision, identity ignored; Theme unhashable via __eq__-without-__hash__ (D-19, D-20)
+- [Phase 6]: Palette comparison is the named `Theme.palette_equals()` — Counter-based multiset at uint16 precision, identity ignored, `TypeError` on a non-Theme; `Theme.__eq__` stays identity so Theme stays hashable and 6.3.0 needs no BREAKING CHANGE footer (D-19a, D-20a; supersedes D-19, D-20 pre-ship during PR #196 review)
 - [Phase ?]: Theme generator + generated data module excluded from coverage in both pyproject omit and codecov ignore, per products/protocol precedent (D-21, D-22)
 - [Phase ?]: codespell ignore-words gained 'whats': the D-06 emoji/non-ASCII strip turns "What's the craic?" into 'Whats the craic?' — mechanical data, not a typo
 - [Phase ?]: exciting shipped as captured despite a 1-ulp uint16 drift vs pre-v1.2 on 3 hues (app truncates, old table rounded) — THEME-02 binds shipped == captured; positional trio 0/7282/10923 unchanged and pinned

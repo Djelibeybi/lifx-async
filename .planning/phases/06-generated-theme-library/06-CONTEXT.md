@@ -124,13 +124,26 @@ not duplicated here.
   empty strings. Callers reading identity must handle `None`.
 - **D-18:** **Slug and display name are both reachable** on a Theme, so code can round-trip
   a theme back to its key without reversing the derivation.
-- **D-19:** `Theme.__eq__` compares **palette only** — identity is ignored, so `love` and
-  `romance` (which genuinely share a palette) compare equal. — **Reversibility:** costly —
-  equality semantics are observable by every caller and by the test suite.
-- **D-20:** `Theme` becomes **deliberately unhashable**: defining `__eq__` sets `__hash__`
+- **D-19:** ~~`Theme.__eq__` compares **palette only** — identity is ignored, so `love` and
+  `romance` (which genuinely share a palette) compare equal.~~ — **Reversibility:** costly —
+  equality semantics are observable by every caller and by the test suite. **SUPERSEDED by
+  D-19a** during PR #196 review, before the behaviour ever shipped.
+- **D-20:** ~~`Theme` becomes **deliberately unhashable**: defining `__eq__` sets `__hash__`
   to `None`, and that is the correct outcome for a mutable object whose palette can change
-  via `add_color()`. Nothing in the codebase hashes a `Theme` today. Do **not** hand-write
-  a `__hash__` over the colour tuple.
+  via `add_color()`.~~ **SUPERSEDED by D-20a.**
+- **D-19a:** Palette comparison is the named method **`Theme.palette_equals(other)`**, not
+  `__eq__`. Semantics are otherwise as D-19 described: unordered multiset over `HSBK` at
+  uint16 granularity, duplicates counted, identity ignored. It takes a `Theme` and raises
+  `TypeError` on anything else rather than returning `NotImplemented` — a named method has
+  no reflected-operand protocol to feed.
+- **D-20a:** `Theme` **stays hashable** — `__eq__` is left at identity, so `__hash__` is
+  inherited from `object`. D-20 traded hashability for an `==` nobody had asked for: it
+  would have made a previously usable object unhashable (breaking any caller putting Themes
+  in a set or dict key), which is a breaking change to a mutable object mid-milestone, and
+  it silently redefines `==` for every existing caller. Keeping identity `==` holds 6.3.0 to
+  a feature release with no BREAKING CHANGE footer. Do **not** hand-write a `__hash__` over
+  the colour tuple: the palette is mutable via `add_color()`, so a value hash would not be
+  stable.
 
 ### Testing
 

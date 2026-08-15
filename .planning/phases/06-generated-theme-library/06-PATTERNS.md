@@ -143,7 +143,7 @@ def __eq__(self, other: object) -> bool:
         return NotImplemented
     return self.as_tuple() == other.as_tuple()
 ```
-`Theme.__eq__` compares palette only, as an **unordered multiset** (SPEC: order is never compared). Since `HSBK` is hashable at uint16 granularity (`__hash__` = `hash(self.as_tuple())`, line 293-295), `collections.Counter(self.colors) == Counter(other.colors)` gives multiset equality at protocol precision with no new comparison code. Return `NotImplemented` for non-`Theme`. **Do not define `__hash__`** — defining `__eq__` sets it to `None`, which is the locked outcome (D-20).
+`Theme.palette_equals(other)` compares palette only, as an **unordered multiset** (SPEC: order is never compared). Since `HSBK` is hashable at uint16 granularity (`__hash__` = `hash(self.as_tuple())`, line 293-295), `collections.Counter(self.colors) == Counter(other.colors)` gives multiset equality at protocol precision with no new comparison code. Raise `TypeError` on a non-`Theme` — a named method has no reflected-operand protocol, so `NotImplemented` has nowhere to go. **Do not define `__eq__` or `__hash__` on `Theme`** — defining `__eq__` would set `__hash__` to `None` and break hashability (D-19a, D-20a; this reverses the originally locked D-19/D-20, which shipped as `__eq__` and was corrected in PR #196 review before release).
 
 **uint16 normalisation for the generator:** `HSBK.as_tuple()` (color.py line 677, returns `tuple[int, int, int, int]`) is the existing uint16 encoding — the generator's THEME-02 normalisation should round-trip captured floats through this rather than reimplementing quantisation.
 
