@@ -108,13 +108,14 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 5. **Disposition on the public object**: a retrieved `Theme` exposes its disposition.
    - Current: `Theme` carries `slug`, `name` and `category` from Phase 6. No disposition.
    - Target: `Theme.disposition` and `Theme.replaced_by` are readable on the object `get()`
-     returns. `replaced_by` is `None` unless `disposition == "deprecated"`. `Theme.__eq__` remains
-     palette-only and ignores both new fields, exactly as it ignores the Phase 6 identity fields
-     (D-19 unchanged); `Theme` remains unhashable (D-20 unchanged).
+     returns. `replaced_by` is `None` unless `disposition == "deprecated"`. `Theme.palette_equals()`
+     stays palette-only and ignores both new fields, exactly as it ignores the Phase 6 identity
+     fields (D-19a unchanged); `Theme.__eq__` stays identity, so `Theme` stays hashable
+     (D-20a unchanged).
    - Acceptance: `get("fire").disposition == "deprecated"` and `.replaced_by == "warm_ember"`;
      `get("hygge").disposition == "library-only"` and `.replaced_by is None`;
      `get("christmas").disposition == "lifx-app"`; two Themes with equal palettes and different
-     dispositions compare equal; `Theme.__hash__ is None`.
+     dispositions satisfy `palette_equals()`; `hash(theme)` still works.
 
 6. **Taxonomy documentation**: the taxonomy and the v1.2 migration are documented.
    - Current: No docs describe the categories. The `get_by_category()` docstring lists a
@@ -209,7 +210,7 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 | empty | R4 | ✅ covered | `replaced_by` is `None` unless deprecated; generator aborts on deprecated-without-replacement |
 | encoding | R4 | ✅ covered | `disposition` and `replaced_by` are ASCII, enforced by the existing canonical-key check |
 | ordering | R4 | ⛔ dismissed | `disposition` is a per-record scalar; there is no collection whose order could vary |
-| unclassified | R5 | ✅ covered | `disposition` is present on every record including the 140 app themes (`"lifx-app"`); `__eq__` ignores both new fields |
+| unclassified | R5 | ✅ covered | `disposition` is present on every record including the 140 app themes (`"lifx-app"`); `palette_equals()` ignores both new fields |
 | adjacency | R6 | ✅ covered | The docs table must list all 6 legacy names, including the 4 that raise |
 | empty | R6 | ✅ covered | One row per legacy name and per deprecated key; no empty sections |
 | encoding | R6 | ⛔ dismissed | Markdown documentation; no encoding contract beyond the repo's UTF-8 convention |
