@@ -11,7 +11,7 @@ from lifx.theme import Theme, ThemeLibrary, get_theme
 from lifx.theme.data import THEMES, ThemeRecord
 from lifx.theme.library import _LEGACY_CATEGORIES
 
-# Every key the pre-v1.2 hand-written library resolved, captured as a
+# Every key the pre-6.3.0 hand-written library resolved, captured as a
 # LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
 # of the new library cannot vacuously pass (COMPAT-01 empty edge).
 PRE_V12_KEYS = (
@@ -74,7 +74,7 @@ PRE_V12_KEYS = (
     "zombie",
 )
 
-# The app's 8 categories (D-10) plus Library for the pre-v1.2 orphans.
+# The app's 8 categories (D-10) plus Library for the pre-6.3.0 orphans.
 LIBRARY_CATEGORIES = frozenset(
     {
         "Moods",
@@ -271,7 +271,7 @@ class TestThemeLibraryGetByCategory:
 
 
 class TestLegacyCategoryNames:
-    """The 6 pre-v1.2 category names have their locked fates (SPEC R3)."""
+    """The 6 pre-6.3.0 category names have their locked fates (SPEC R3)."""
 
     def test_holiday_resolves_to_holidays(self) -> None:
         """'holiday' returns the 15 Holidays themes."""
@@ -314,7 +314,7 @@ class TestLegacyCategoryNames:
         message = str(exc_info.value)
         assert legacy in message
         assert replacement in message
-        assert "pre-v1.2" in message
+        assert "pre-6.3.0" in message
 
     def test_every_replacement_is_a_real_category(self) -> None:
         """Every _LEGACY_CATEGORIES replacement names a listable category.
@@ -464,11 +464,11 @@ class TestThemeLibraryIntegration:
 
 
 class TestPreV12Compatibility:
-    """COMPAT-01: every pre-v1.2 theme name still resolves."""
+    """COMPAT-01: every pre-6.3.0 theme name still resolves."""
 
     @pytest.mark.parametrize("key", PRE_V12_KEYS)
     def test_pre_v12_key_resolves(self, key: str) -> None:
-        """Every pre-v1.2 key resolves without raising."""
+        """Every pre-6.3.0 key resolves without raising."""
         theme = ThemeLibrary.get(key)
         assert isinstance(theme, Theme)
         assert len(theme) >= 1
@@ -507,7 +507,7 @@ class TestResyncedPalettes:
     """THEME-03: the resynced shared slugs carry app values."""
 
     def test_soothing_contains_kelvin_8000(self) -> None:
-        """soothing carries kelvin 8000 (pre-v1.2 was uniformly 3500)."""
+        """soothing carries kelvin 8000 (pre-6.3.0 was uniformly 3500)."""
         soothing = ThemeLibrary.get("soothing")
         assert 8000 in {color.kelvin for color in soothing}
 

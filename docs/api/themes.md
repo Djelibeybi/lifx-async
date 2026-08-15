@@ -66,8 +66,8 @@ punctuation) and its `category`. The categories and their theme counts are:
 
 `ThemeLibrary.get_by_category()` takes the categories in the table above, matched
 case- and punctuation-insensitively (`Art Series`, `art series` and `art_series` all
-resolve), and `ThemeLibrary.get_categories()` lists them. The two pre-v1.2 names
-`holiday` and `mood` still map to Holidays and Moods; the remaining pre-v1.2 names
+resolve), and `ThemeLibrary.get_categories()` lists them. The two pre-6.3.0 names
+`holiday` and `mood` still map to Holidays and Moods; the remaining pre-6.3.0 names
 raise `ValueError` naming their closest replacement — see
-[Theme Taxonomy Changes](../migration/theme-taxonomy-v1.2.md). `Theme.disposition`
-and `Theme.replaced_by` record each theme's v1.2 fate, documented on the same page.
+[Theme Taxonomy Changes](../migration/theme-taxonomy-6.3.0.md). `Theme.disposition`
+and `Theme.replaced_by` record each theme's 6.3.0 fate, documented on the same page.

@@ -37,7 +37,10 @@ blocked: 0
 
 - gap_id: G-07-1
   truth: "User-facing docs and docstrings identify the taxonomy migration by a reference meaningful outside this repository"
-  status: failed
+  status: resolved
+  resolved_by: "direct fix during UAT (no gap-closure plan — mechanical rename, decision locked by user)"
+  resolved_at: 2026-08-15
+  resolution: "docs/migration/theme-taxonomy-v1.2.md renamed to theme-taxonomy-6.3.0.md; all v1.2 references replaced with 6.3.0 across the migration page, docs/api/themes.md, src/lifx/theme/library.py (including the get_by_category() ValueError text), mkdocs.yml nav and llmstxt paths, and the two theme test modules that pin the error string. Also replaced the unrelated `v2.0 decision` milestone leak on the migration page with `major-version decision`. Verified: 3390 tests pass, pyright 0 errors, ruff clean, zensical build reports no issues (no dead link to the old path)."
   reason: "User reported: The v1.2 milestone version has no meaning outside this repo's internal planning so it should be replaced by a date, or a lifx-async release version"
   severity: major
   test: 1
