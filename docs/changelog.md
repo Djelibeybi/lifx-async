@@ -2,6 +2,114 @@
 
 <!-- version list -->
 
+## v6.3.0 (2026-08-15)
+
+### Bug Fixes
+
+- **06**: Resolve code review warnings WR-01 and WR-03
+  ([`5334155`](https://github.com/Djelibeybi/lifx-async/commit/5334155313e0ada643f1bf6b1bfae4d655519873))
+
+- **effects**: Choose three distinct rule-trio primaries
+  ([`1529446`](https://github.com/Djelibeybi/lifx-async/commit/1529446f280c742746c86b169fdc455434562bb7))
+
+- **theme**: Copy the caller's palette into every Theme
+  ([`ef858bb`](https://github.com/Djelibeybi/lifx-async/commit/ef858bb3fed0c67910f3b23d5994f17a3019ded5))
+
+- **theme**: Harden the generator's validation and atomic write
+  ([`5f836f2`](https://github.com/Djelibeybi/lifx-async/commit/5f836f2f043d24852622cc1e7cd9180c82c8d293))
+
+- **theme**: Keep Theme hashable, compare palettes explicitly
+  ([`947ee9b`](https://github.com/Djelibeybi/lifx-async/commit/947ee9b731332da1a9b0e1a97e756d7ac910dd21))
+
+### Documentation
+
+- Create milestone v1.2 roadmap (4 phases)
+  ([`83fe3c8`](https://github.com/Djelibeybi/lifx-async/commit/83fe3c840262051ed2e6d2dd6016401b48b4e2b1))
+
+- Cross-AI review for phase 6
+  ([`8506d7e`](https://github.com/Djelibeybi/lifx-async/commit/8506d7eaffe424284ce165a6fb2cf0ee2b189be0))
+
+- Cross-AI review round 2 for phase 6
+  ([`3a40a41`](https://github.com/Djelibeybi/lifx-async/commit/3a40a41151fce547c7e1c32bff9794b58becdf23))
+
+- Cross-AI review round 3 for phase 6
+  ([`851b83f`](https://github.com/Djelibeybi/lifx-async/commit/851b83f329b9b530ebd29b8d9d48d0d4ceb665ff))
+
+- Define milestone v1.2 requirements
+  ([`9c95d67`](https://github.com/Djelibeybi/lifx-async/commit/9c95d67674537336e1bdb8ee1e8b76366d6b17d9))
+
+- Start milestone v1.2 Theme Library Update
+  ([`2674466`](https://github.com/Djelibeybi/lifx-async/commit/26744668777ca0082880b4d3be9a2858123f7206))
+
+- **06**: Add code review report
+  ([`ac4f350`](https://github.com/Djelibeybi/lifx-async/commit/ac4f350f85a42b2df9872ee3860c343e9b44abd7))
+
+- **06**: Add pattern map and disable nyquist for phase 6
+  ([`8498f65`](https://github.com/Djelibeybi/lifx-async/commit/8498f654569ebbb241964d94bdcc07b6f84abf9c))
+
+- **06**: Capture phase context
+  ([`9656270`](https://github.com/Djelibeybi/lifx-async/commit/9656270a99347d8accb167ccff02a0c3f529d926))
+
+- **06**: Create phase plan
+  ([`313dcfa`](https://github.com/Djelibeybi/lifx-async/commit/313dcfaf4b7bc9f7f0c909d7dcdbf34258af0c0e))
+
+- **06**: Create phase plan
+  ([`225f717`](https://github.com/Djelibeybi/lifx-async/commit/225f7177cfe309e72bd90b31b5f2a1ea586f965c))
+
+- **06**: Extract phase learnings
+  ([`28b7ad5`](https://github.com/Djelibeybi/lifx-async/commit/28b7ad513ed2b294dcf2413a7d2fee21cafc7bca))
+
+- **06**: Fix META-02/D-10 truth in 06-02 plan — 28 orphans, not 30
+  ([`a3afd1a`](https://github.com/Djelibeybi/lifx-async/commit/a3afd1a75ef998b0b5050292373df2bc2b9ded16))
+
+- **06**: Incorporate round-2 review feedback into phase plans
+  ([`a51c2c9`](https://github.com/Djelibeybi/lifx-async/commit/a51c2c9fc6404750e3e4e28d8529fb7bffd24e48))
+
+- **06**: Revise phase plans with cross-AI review feedback
+  ([`00a6a14`](https://github.com/Djelibeybi/lifx-async/commit/00a6a1432762d960e41f31d8a3eaebb6f5e28e37))
+
+- **06-01**: Complete generated theme library tracer plan
+  ([`b777767`](https://github.com/Djelibeybi/lifx-async/commit/b777767b31093e4a148535e4eafa85887dc8e79b))
+
+- **06-02**: Complete full theme import and cutover plan
+  ([`4ab48f6`](https://github.com/Djelibeybi/lifx-async/commit/4ab48f66a545bcf2b846e0569ec328edae172972))
+
+- **phase-06**: Add security threat verification
+  ([`e0e5344`](https://github.com/Djelibeybi/lifx-async/commit/e0e5344078f88ab1f62dd5037b1a749f27b0dcc9))
+
+- **phase-06**: Complete phase execution
+  ([`57d547c`](https://github.com/Djelibeybi/lifx-async/commit/57d547c6a1095c7a0dcf79da2a83ea129a180471))
+
+- **phase-06**: Evolve PROJECT.md after phase completion
+  ([`c2d0554`](https://github.com/Djelibeybi/lifx-async/commit/c2d0554048341d912447c78c7e3c6ba28b9a2177))
+
+- **planning**: Correct the PR #196 review tally in STATE.md
+  ([`cee51bf`](https://github.com/Djelibeybi/lifx-async/commit/cee51bf70f32ee2d43bd3a99420883aa18020f31))
+
+- **planning**: Resync theme equality and generator decisions
+  ([`1fc942f`](https://github.com/Djelibeybi/lifx-async/commit/1fc942f1e9cbfd0609931eeb4a20f9884187aaa2))
+
+- **state**: Record phase 6 context session
+  ([`4ebb8aa`](https://github.com/Djelibeybi/lifx-async/commit/4ebb8aa4aa671e46b92c2615bd6e1e371d590794))
+
+- **theme**: Correct theme counts and retire the hand-listed inventory
+  ([`47e2864`](https://github.com/Djelibeybi/lifx-async/commit/47e2864e0d75d929a15a2c7020d9e11eef484d7f))
+
+### Features
+
+- **06-01**: Generate theme data module from committed JSONL seed
+  ([`bf1008c`](https://github.com/Djelibeybi/lifx-async/commit/bf1008c4875e6776cebd6b65cde63f2d6a194282))
+
+- **06-01**: Implement palette-only multiset Theme equality
+  ([`5ba5d4f`](https://github.com/Djelibeybi/lifx-async/commit/5ba5d4f07798d010fd7008a398d011e8499362e6))
+
+- **06-02**: Build the full committed theme data file
+  ([`60e7f20`](https://github.com/Djelibeybi/lifx-async/commit/60e7f2081b96e98d469ca3184fc155d7514a1a9e))
+
+- **06-02**: Cut ThemeLibrary over to the generated theme data
+  ([`36c77f7`](https://github.com/Djelibeybi/lifx-async/commit/36c77f7cf79c81eeb3fa41ca81cdcf24d66a208d))
+
+
 ## v6.2.0 (2026-08-09)
 
 ### Features
