@@ -33,12 +33,19 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-08-15
 
-Phase 6 ships as PR #196 (branch `chore/theme-capture`), open and green. Self-review
-raised 20 inline comments: 15 fixed, 5 deferred — items 13/14/17 (apostrophe corruption in
-3 display names, `earth`/`coral_reef` substitution, digit-leading slugs unrepresentable)
-need a committed capture→JSONL converter and belong to Phase 9's resync tooling; items
-18/19 (`get_by_category()` on the legacy taxonomy, no alias-vs-primary accessor) are Phase
-7 scope. Comment text: `gh api repos/Djelibeybi/lifx-async/pulls/196/comments --paginate`.
+Phase 6 ships as PR #196 (branch `chore/theme-capture`), open and green, rebased onto main.
+Self-review raised 20 inline comments, all now resolved: 15 fixed on the branch, 5 split out
+as tracked issues. Every one was re-verified against the working tree rather than trusted
+from notes — the docs-staleness comment had been recorded as fixed when it was not, and was
+fixed in 732e512.
+
+- **#197, #198, #199 — Phase 9 (resync tooling):** apostrophe corruption in display names,
+  `earth`/`coral_reef` substitution with no changelog entry, digit-leading slugs
+  unrepresentable. All three need the committed capture→JSONL converter that does not exist
+  yet, so none is fixable by editing `data/themes.jsonl`.
+- **#200, #201 — Phase 7:** `get_by_category()` still on the legacy six-group taxonomy while
+  `Theme.category` returns the app's nine; no way to tell a rename alias from a primary slug
+  in `get_available_themes()` (168 names, 166 themes).
 
 Progress: [██████████] 100% (0/4 phases)
 
