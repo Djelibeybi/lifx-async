@@ -427,6 +427,85 @@ class TestValidateRecordsCollisions:
         assert "Beta Theme" in message
 
 
+class TestValidateRecordsDispositions:
+    """The three D-08 disposition validations (COMPAT-04) and their branches."""
+
+    def test_unknown_disposition_aborts(self) -> None:
+        """An unknown disposition aborts naming record, line and value."""
+        with pytest.raises(
+            RuntimeError,
+            match=r"line 1.*Test Theme.*'disposition' is 'retired', not one of",
+        ):
+            validate_records(_pairs(_record(disposition="retired")))
+
+    def test_deprecated_without_replacement_aborts(self) -> None:
+        """A deprecated record with no replaced_by aborts with the
+        controlled deprecated-requires-replaced_by error (SPEC R4)."""
+        with pytest.raises(
+            RuntimeError,
+            match=r"line 1.*Test Theme.*deprecated record requires a "
+            r"non-empty 'replaced_by'",
+        ):
+            validate_records(_pairs(_record(disposition="deprecated")))
+
+    def test_unresolvable_replaced_by_aborts(self) -> None:
+        """A canonical replaced_by absent from every slug and alias aborts
+        in the cross-record pass, naming the unresolvable key."""
+        with pytest.raises(
+            RuntimeError,
+            match=r"line 1.*Test Theme.*replaced_by 'no_such_theme' does "
+            r"not resolve",
+        ):
+            validate_records(
+                _pairs(_record(disposition="deprecated", replaced_by="no_such_theme"))
+            )
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected"),
+        [
+            # The type-check side of the disposition condition, distinct
+            # from the unknown-string side above.
+            ({"disposition": 123}, r"'disposition' is 123, not one of"),
+            # The falsy side of the replaced_by presence condition.
+            (
+                {"disposition": "deprecated", "replaced_by": ""},
+                r"deprecated record requires a non-empty 'replaced_by' string: ''",
+            ),
+            # The type-check side of the replaced_by presence condition.
+            (
+                {"disposition": "deprecated", "replaced_by": 123},
+                r"deprecated record requires a non-empty 'replaced_by' string: 123",
+            ),
+            # Present but non-canonical: a different branch from the
+            # unresolved-but-canonical case above.
+            (
+                {"disposition": "deprecated", "replaced_by": "Bad-Key"},
+                r"replaced_by 'Bad-Key' is not a canonical key",
+            ),
+        ],
+    )
+    def test_bad_value_branches_abort(
+        self, overrides: dict[str, Any], expected: str
+    ) -> None:
+        """Every bad-value side of the compound disposition conditions
+        aborts with its own controlled message (review F1)."""
+        with pytest.raises(RuntimeError, match=expected):
+            validate_records(_pairs(_record(**overrides)))
+
+    def test_replaced_by_resolving_via_alias_validates(self) -> None:
+        """A replaced_by naming an alias of another record validates —
+        aliases count as resolution targets (SPEC R4: resolves in THEMES)."""
+        target = _record(slug="new_theme", name="New Theme", aliases=["old_alias"])
+        deprecated = _record(
+            slug="old_theme",
+            name="Old Theme",
+            disposition="deprecated",
+            replaced_by="old_alias",
+        )
+
+        validate_records(_pairs(target, deprecated))
+
+
 class TestValidateRecordsColors:
     """Colour count and range aborts."""
 
@@ -566,6 +645,11 @@ class TestEmitDataModule:
                 _record(aliases=["bad-alias"]),
                 r"bad key 'bad-alias'",
             ),
+            (_record(disposition="retired"), r"bad disposition 'retired'"),
+            (
+                _record(replaced_by="Bad-Key"),
+                r"bad replaced_by 'Bad-Key'",
+            ),
         ],
     )
     def test_emit_time_backstops_reject_unvalidated_records(
@@ -610,6 +694,26 @@ class TestEmitDataModule:
 
         with pytest.raises(RuntimeError, match="duplicate slug"):
             emit_data_module(records)
+
+    def test_disposition_round_trips_through_emitted_module(self) -> None:
+        """disposition and replaced_by survive emit into the executed
+        THEMES: the deprecated record carries its successor key and the
+        lifx-app record's replaced_by prints as None."""
+        deprecated = _record(
+            slug="old_theme",
+            name="Old Theme",
+            disposition="deprecated",
+            replaced_by="new_theme",
+        )
+        replacement = _record(slug="new_theme", name="New Theme")
+
+        namespace = _exec_module(emit_data_module(_pairs(deprecated, replacement)))
+
+        themes = namespace["THEMES"]
+        assert themes["old_theme"].disposition == "deprecated"
+        assert themes["old_theme"].replaced_by == "new_theme"
+        assert themes["new_theme"].disposition == "lifx-app"
+        assert themes["new_theme"].replaced_by is None
 
     def test_deterministic_output(self) -> None:
         """emit_data_module() called twice over the same records returns

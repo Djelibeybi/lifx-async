@@ -8,6 +8,7 @@ import pytest
 
 from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
 from lifx.theme import Theme, ThemeLibrary, get_theme
+from lifx.theme.data import THEMES
 
 # Every key the pre-v1.2 hand-written library resolved, captured as a
 # LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
@@ -485,6 +486,61 @@ class TestLibrarySweeps:
         for key in ThemeLibrary.get_available_themes():
             palette = [color.as_tuple() for color in ThemeLibrary.get(key)]
             assert palette == sorted(palette)
+
+
+class TestDispositionSurfacing:
+    """COMPAT-04: dispositions surface on get() and the shipped data holds
+    its shape invariants (shape sweeps, never count pins — D-08/D-23)."""
+
+    def test_fire_is_deprecated_with_replacement(self) -> None:
+        """get('fire') carries the SPEC R5 pinned deprecation triple."""
+        fire = ThemeLibrary.get("fire")
+
+        assert fire.disposition == "deprecated"
+        assert fire.replaced_by == "warm_ember"
+
+    def test_hygge_is_library_only(self) -> None:
+        """get('hygge') is library-only with no successor."""
+        hygge = ThemeLibrary.get("hygge")
+
+        assert hygge.disposition == "library-only"
+        assert hygge.replaced_by is None
+
+    def test_christmas_is_lifx_app(self) -> None:
+        """get('christmas') is a lifx-app theme with no successor."""
+        christmas = ThemeLibrary.get("christmas")
+
+        assert christmas.disposition == "lifx-app"
+        assert christmas.replaced_by is None
+
+    def test_every_disposition_is_allowed(self) -> None:
+        """Every shipped record's disposition is one of the three values."""
+        allowed = {"lifx-app", "library-only", "deprecated"}
+        for record in THEMES.values():
+            assert record.disposition in allowed, record.slug
+
+    def test_replaced_by_only_on_deprecated_records(self) -> None:
+        """A non-deprecated record never carries a replaced_by (SPEC R5).
+
+        This sweep is the sole enforcement of the invariant: the generator
+        deliberately does not reject a replaced_by on a non-deprecated
+        record (R2-05, D-08 held), so a bad data edit is caught here at
+        test time rather than at generation time.
+        """
+        for record in THEMES.values():
+            if record.disposition != "deprecated":
+                assert record.replaced_by is None, record.slug
+
+    def test_every_replaced_by_resolves(self) -> None:
+        """Every non-None replaced_by resolves as a key of THEMES."""
+        for record in THEMES.values():
+            if record.replaced_by is not None:
+                assert record.replaced_by in THEMES, record.slug
+
+    def test_alias_identity_survives_new_fields(self) -> None:
+        """Both rename aliases still bind their target's own record (R7)."""
+        assert THEMES["forest"] is THEMES["forrest"]
+        assert THEMES["aurora_borealis"] is THEMES["aurora"]
 
 
 class TestNewSlugBehaviour:
