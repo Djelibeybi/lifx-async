@@ -25,7 +25,25 @@ which came from two upstream projects:
 from __future__ import annotations
 
 from lifx.theme.data import THEMES, ThemeRecord
+from lifx.theme.slug import derive_slug
 from lifx.theme.theme import Theme
+
+#: Pre-v1.2 legacy category names and their locked fates — a migration shim,
+#: deliberately private and unexported (D-03), not taxonomy. Each legacy name
+#: maps to ``(replacement app category, resolves)``: a ``True`` entry returns
+#: the replacement category's themes; a ``False`` entry raises, and its
+#: replacement exists so the raising branch can name it (D-02). Keys MUST be
+#: derive_slug-form: the lookup probes this dict with the derive_slug-normalised
+#: caller input, so a future non-slug-form key would silently never match and
+#: fall through to the unknown-category error (review F4).
+_LEGACY_CATEGORIES: dict[str, tuple[str, bool]] = {
+    "holiday": ("Holidays", True),
+    "mood": ("Moods", True),
+    "seasonal": ("Nature", False),
+    "ambient": ("Play", False),
+    "functional": ("Library", False),
+    "atmosphere": ("Moods", False),
+}
 
 
 class ThemeLibrary:
@@ -43,7 +61,8 @@ class ThemeLibrary:
         all_themes = ThemeLibrary.get_available_themes()
 
         # Get themes by category
-        seasonal = ThemeLibrary.get_by_category("seasonal")
+        categories = ThemeLibrary.get_categories()
+        holidays = ThemeLibrary.get_by_category("Holidays")
 
         # Apply to a light
         await light.apply_theme(evening_theme, power_on=True)
@@ -115,92 +134,87 @@ class ThemeLibrary:
         return sorted(cls._THEMES)
 
     @classmethod
+    def get_categories(cls) -> list[str]:
+        """Get every category present in the library's data.
+
+        Returns:
+            Sorted ``list[str]`` of the category names present in the
+            library's theme records.
+
+        Example:
+            ```python
+            from lifx.theme import ThemeLibrary
+
+            for category in ThemeLibrary.get_categories():
+                print(f"- {category}")
+            ```
+        """
+        return sorted({record.category for record in cls._THEMES.values()})
+
+    @classmethod
+    def _slugs_for_category(cls, key: str) -> set[str]:
+        """Collect the slugs of every record whose category normalises to key.
+
+        The set comprehension dedups the two rename-alias keys that bind a
+        shared record, so an aliased theme appears once in the result.
+
+        Args:
+            key: A derive_slug-normalised category name.
+
+        Returns:
+            Set of theme slugs in the matching category; empty if none match.
+        """
+        return {
+            record.slug
+            for record in cls._THEMES.values()
+            if derive_slug(record.category) == key
+        }
+
+    @classmethod
     def get_by_category(cls, category: str) -> dict[str, Theme]:
         """Get all themes in a category.
 
         Args:
-            category: Category name (seasonal, mood, holiday, time, etc.)
+            category: Category name. Matching is case- and punctuation-
+                insensitive — both sides are normalised by the slug rule, so
+                ``"Art Series"``, ``"art series"`` and ``"art_series"`` all
+                resolve. The categories are Archives, Art Series, Holidays,
+                Library (pre-v1.2 keys with no app counterpart, defined by
+                this library rather than the LIFX app), Moods, Music, Nature,
+                Play and Space. Two pre-v1.2 legacy names still map:
+                ``holiday`` (to Holidays) and ``mood`` (to Moods).
 
         Returns:
-            Dictionary of Theme objects in the category
+            Dictionary of Theme objects in the category, keyed by slug and
+            sorted by slug.
 
         Raises:
-            ValueError: If category is not recognized
+            ValueError: If the category name is unknown, or is one of the
+                four pre-v1.2 names (``seasonal``, ``ambient``,
+                ``functional``, ``atmosphere``) that no longer exist — the
+                message names the closest replacement.
         """
-        category_lower = category.lower()
+        key = derive_slug(category)
 
-        categories = {
-            "seasonal": [
-                "spring",
-                "autumn",
-                "winter",
-            ],
-            "holiday": [
-                "christmas",
-                "halloween",
-                "hanukkah",
-                "kwanzaa",
-                "shamrock",
-                "thanksgiving",
-                "calaveras",
-                "pumpkin",
-                "santa",
-                "holly",
-                "independence",
-                "proud",
-            ],
-            "mood": [
-                "peaceful",
-                "serene",
-                "relaxing",
-                "mellow",
-                "gentle",
-                "soothing",
-                "blissful",
-                "cheerful",
-                "romantic",
-                "romance",
-                "love",
-                "energizing",
-                "exciting",
-                "epic",
-                "intense",
-                "powerful",
-                "dramatic",
-                "warming",
-            ],
-            "ambient": [
-                "dream",
-                "fantasy",
-                "spacey",
-                "stardust",
-                "zombie",
-                "party",
-            ],
-            "functional": [
-                "focusing",
-                "evening",
-                "bias_lighting",
-            ],
-            "atmosphere": [
-                "hygge",
-                "tranquil",
-                "sports",
-            ],
-        }
+        # App taxonomy first, legacy map second (no current name collides).
+        slugs = cls._slugs_for_category(key)
+        if slugs:
+            return {slug: cls.get(slug) for slug in sorted(slugs)}
 
-        if category_lower not in categories:
-            available = ", ".join(sorted(categories.keys()))
+        if key in _LEGACY_CATEGORIES:
+            replacement, resolves = _LEGACY_CATEGORIES[key]
+            if resolves:
+                replacement_slugs = cls._slugs_for_category(derive_slug(replacement))
+                return {slug: cls.get(slug) for slug in sorted(replacement_slugs)}
             raise ValueError(
-                f"Category '{category}' not recognized. "
-                f"Available categories: {available}"
+                f"Category '{category}' is a pre-v1.2 category name that no "
+                f"longer exists. Its closest replacement is '{replacement}'."
             )
 
-        return {
-            name: cls.get(name)
-            for name in categories[category_lower]
-            if name in cls._THEMES
-        }
+        raise ValueError(
+            f"Category '{category}' is not recognised. "
+            f"Available categories: {', '.join(cls.get_categories())}"
+        )
 
 
 def get_theme(name: str) -> Theme:
