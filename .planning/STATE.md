@@ -5,8 +5,8 @@ milestone_name: Theme Library Update
 current_phase: 7
 current_phase_name: Taxonomy & Legacy Dispositions
 status: planning
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-08-14T14:23:36.707Z"
+stopped_at: Phase 6 merged (PR #196)
+last_updated: "2026-08-15T00:55:04Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 4
@@ -14,7 +14,7 @@ progress:
   total_plans: 2
   completed_plans: 2
   percent: 25
-last_activity_desc: Phase 06 complete, transitioned to Phase 7
+last_activity_desc: Phase 06 merged to main via PR #196; Phase 7 ready to plan
 ---
 
 # Project State
@@ -33,9 +33,9 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-08-15
 
-Phase 6 ships as PR #196 (branch `chore/theme-capture`), open and green, rebased onto main.
-Self-review raised 20 inline comments, all now resolved: 15 fixed on the branch, 5 split out
-as tracked issues. Every one was re-verified against the working tree rather than trusted
+Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
+Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
+split out as tracked issues. Every one was re-verified against the working tree rather than trusted
 from notes — the docs-staleness comment had been recorded as fixed when it was not, and was
 fixed in 732e512.
 
@@ -47,7 +47,7 @@ fixed in 732e512.
   `Theme.category` returns the app's nine; no way to tell a rename alias from a primary slug
   in `get_available_themes()` (168 names, 166 themes).
 
-Progress: [██████████] 100% (0/4 phases)
+Progress: [██▌       ] 25% (1/4 phases)
 
 ## Performance Metrics
 
