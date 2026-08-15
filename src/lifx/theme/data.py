@@ -29,7 +29,9 @@ class ThemeRecord:
     slug: str
     name: str
     category: str
+    disposition: str
     colors: tuple[HSBK, ...]
+    replaced_by: str | None = None
 
 
 THEMES: dict[str, ThemeRecord] = {
@@ -37,16 +39,19 @@ THEMES: dict[str, ThemeRecord] = {
         slug="arctic",
         name="Arctic",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(hue=200.0006103515625, saturation=0.2, brightness=1.0, kelvin=3500),
             HSBK(hue=209.9981689453125, saturation=0.2, brightness=1.0, kelvin=3500),
             HSBK(hue=215.00244140625, saturation=0.2, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "arlington": ThemeRecord(
         slug="arlington",
         name="Arlington",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.8, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -63,11 +68,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3000,
             ),
         ),
+        replaced_by=None,
     ),
     "aurora": ThemeRecord(
         slug="aurora",
         name="Aurora",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=129.9957275390625,
@@ -118,11 +125,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=9000,
             ),
         ),
+        replaced_by=None,
     ),
     "autumn": ThemeRecord(
         slug="autumn",
         name="Autumn",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=30.9979248046875,
@@ -149,11 +158,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "autumn_table": ThemeRecord(
         slug="autumn_table",
         name="Autumn Table",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=7.998046875,
@@ -187,11 +198,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=2600,
             ),
         ),
+        replaced_by=None,
     ),
     "baubles": ThemeRecord(
         slug="baubles",
         name="Baubles",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3500),
@@ -270,11 +283,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "be_my_valentine": ThemeRecord(
         slug="be_my_valentine",
         name="Be my Valentine",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.8, brightness=1.0, kelvin=3500),
             HSBK(hue=275.99853515625, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -297,11 +312,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "beach": ThemeRecord(
         slug="beach",
         name="Beach",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=49.998779296875,
@@ -313,11 +330,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=180.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=219.9957275390625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "bedroom_glow_up": ThemeRecord(
         slug="bedroom_glow_up",
         name="Bedroom Glow Up",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=7.998046875,
@@ -346,19 +365,23 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "bias_lighting": ThemeRecord(
         slug="bias_lighting",
         name="Bias Lighting",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.9018997482261387, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "bijutsukai": ThemeRecord(
         slug="bijutsukai",
         name="Bijutsukai",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=0.0,
@@ -457,11 +480,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "blissful": ThemeRecord(
         slug="blissful",
         name="Blissful",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=55.997314453125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(
@@ -501,11 +526,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "blood_moon": ThemeRecord(
         slug="blood_moon",
         name="Blood Moon",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.2, kelvin=3000),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=2500),
@@ -528,11 +555,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=2500,
             ),
         ),
+        replaced_by=None,
     ),
     "bloodlust": ThemeRecord(
         slug="bloodlust",
         name="Bloodlust",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=1.0, brightness=0.009994659342336155, kelvin=3500),
@@ -544,32 +573,38 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "book_of_the_dead": ThemeRecord(
         slug="book_of_the_dead",
         name="Book of the Dead",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=149.996337890625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=264.9957275390625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=269.9945068359375, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "calaveras": ThemeRecord(
         slug="calaveras",
         name="Calaveras",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=269.9945068359375, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=299.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "canada_day": ThemeRecord(
         slug="canada_day",
         name="Canada Day",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -581,11 +616,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "candy_cane": ThemeRecord(
         slug="candy_cane",
         name="Candy Cane",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -604,20 +641,24 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "candy_cane_twist": ThemeRecord(
         slug="candy_cane_twist",
         name="Candy Cane Twist",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3000),
             HSBK(hue=0.0, saturation=1.0, brightness=0.8, kelvin=1500),
         ),
+        replaced_by=None,
     ),
     "cheerful": ThemeRecord(
         slug="cheerful",
         name="Cheerful",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=50.99853515625,
@@ -645,11 +686,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=309.9957275390625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "cherry_blossom": ThemeRecord(
         slug="cherry_blossom",
         name="Cherry Blossom",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=15.0018310546875,
@@ -670,11 +713,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "christmas": ThemeRecord(
         slug="christmas",
         name="Christmas",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -686,11 +731,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "classic_rock": ThemeRecord(
         slug="classic_rock",
         name="Classic Rock",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.6899977111467155, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=0.7000076295109483, kelvin=3500),
@@ -726,11 +773,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=354.9957275390625, saturation=0.8, brightness=0.8, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "classical": ThemeRecord(
         slug="classical",
         name="Classical",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -792,11 +841,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=218.9959716796875, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=218.9959716796875, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "clouds": ThemeRecord(
         slug="clouds",
         name="Clouds",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=193.99658203125,
@@ -895,11 +946,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "coral_reef": ThemeRecord(
         slug="coral_reef",
         name="Coral Reef",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=24.9993896484375,
@@ -917,11 +970,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=284.996337890625, saturation=1.0, brightness=0.6, kelvin=9000),
             HSBK(hue=329.996337890625, saturation=1.0, brightness=0.8, kelvin=9000),
         ),
+        replaced_by=None,
     ),
     "cranberry_harvest": ThemeRecord(
         slug="cranberry_harvest",
         name="Cranberry Harvest",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=329.996337890625, saturation=0.4, brightness=0.8, kelvin=2500),
             HSBK(
@@ -943,30 +998,36 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=2200,
             ),
         ),
+        replaced_by=None,
     ),
     "crystal_twist": ThemeRecord(
         slug="crystal_twist",
         name="Crystal Twist",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=209.9981689453125, saturation=0.2, brightness=0.8, kelvin=5500),
             HSBK(hue=209.9981689453125, saturation=0.8, brightness=0.8, kelvin=5000),
         ),
+        replaced_by=None,
     ),
     "cyberpunk": ThemeRecord(
         slug="cyberpunk",
         name="Cyberpunk",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(hue=130.001220703125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=225.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=299.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "dance_pop": ThemeRecord(
         slug="dance_pop",
         name="Dance/Pop",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=5.99853515625,
@@ -1011,11 +1072,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "deck_the_halls": ThemeRecord(
         slug="deck_the_halls",
         name="Deck The Halls",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -1049,11 +1112,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=340.99365234375, saturation=0.4, brightness=1.0, kelvin=3500),
             HSBK(hue=340.99365234375, saturation=0.4, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "deep_sea": ThemeRecord(
         slug="deep_sea",
         name="Deep Sea",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=172.001953125,
@@ -1074,11 +1139,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "desert": ThemeRecord(
         slug="desert",
         name="Desert",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=18.0010986328125,
@@ -1094,11 +1161,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=45.0, saturation=0.6800030518043794, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "dinner_for_two": ThemeRecord(
         slug="dinner_for_two",
         name="Dinner For Two",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=4.998779296875,
@@ -1137,11 +1206,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "disco": ThemeRecord(
         slug="disco",
         name="Disco",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=8.997802734375,
@@ -1210,11 +1281,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "diwali": ThemeRecord(
         slug="diwali",
         name="Diwali",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=17.0013427734375,
@@ -1247,11 +1320,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "dream": ThemeRecord(
         slug="dream",
         name="Dream",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=166.9976806640625,
@@ -1296,11 +1371,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "earth": ThemeRecord(
         slug="earth",
         name="Earth",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=108.0010986328125,
@@ -1399,11 +1476,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "energizing": ThemeRecord(
         slug="energizing",
         name="Energizing",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.30000762951094834, kelvin=9000),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=9000),
@@ -1432,11 +1511,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "epic": ThemeRecord(
         slug="epic",
         name="Epic",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=183.9990234375,
@@ -1475,11 +1556,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "eternal": ThemeRecord(
         slug="eternal",
         name="Eternal",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.6, kelvin=3000),
             HSBK(hue=15.0018310546875, saturation=1.0, brightness=0.8, kelvin=3000),
@@ -1491,11 +1574,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=54.99755859375, saturation=1.0, brightness=1.0, kelvin=3000),
         ),
+        replaced_by=None,
     ),
     "evening": ThemeRecord(
         slug="evening",
         name="Evening",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=34.002685546875,
@@ -1516,11 +1601,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "exciting": ThemeRecord(
         slug="exciting",
         name="Exciting",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=40.001220703125, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -1530,11 +1617,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=270.9942626953125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=293.994140625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "extraterrestrial": ThemeRecord(
         slug="extraterrestrial",
         name="Extraterrestrial",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=88.00048828125,
@@ -1562,11 +1651,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "fall": ThemeRecord(
         slug="fall",
         name="Fall",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.6, brightness=1.0, kelvin=3500),
             HSBK(
@@ -1595,11 +1686,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "fantasy": ThemeRecord(
         slug="fantasy",
         name="Fantasy",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=163.9984130859375,
@@ -1626,11 +1719,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "festive": ThemeRecord(
         slug="festive",
         name="Festive",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6000),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6000),
@@ -1649,11 +1744,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=199.9951171875, saturation=1.0, brightness=1.0, kelvin=7000),
             HSBK(hue=199.9951171875, saturation=1.0, brightness=1.0, kelvin=7000),
         ),
+        replaced_by=None,
     ),
     "fire": ThemeRecord(
         slug="fire",
         name="Fire",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(hue=0.0, saturation=0.9499961852445258, brightness=1.0, kelvin=3500),
             HSBK(
@@ -1669,11 +1766,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="warm_ember",
     ),
     "focusing": ThemeRecord(
         slug="focusing",
         name="Focusing",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3500),
@@ -1696,11 +1795,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="gentle",
     ),
     "forrest": ThemeRecord(
         slug="forrest",
         name="Forrest",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=90.0, saturation=1.0, brightness=0.2500038147554742, kelvin=9000),
             HSBK(hue=90.0, saturation=1.0, brightness=0.5000076295109483, kelvin=9000),
@@ -1732,11 +1833,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=164.9981689453125, saturation=1.0, brightness=1.0, kelvin=9000),
         ),
+        replaced_by=None,
     ),
     "fright_night": ThemeRecord(
         slug="fright_night",
         name="Fright Night",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=8.997802734375,
@@ -1801,11 +1904,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "funk": ThemeRecord(
         slug="funk",
         name="Funk",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=14.0020751953125,
@@ -1846,11 +1951,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "galaxy": ThemeRecord(
         slug="galaxy",
         name="Galaxy",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=215.00244140625,
@@ -1871,11 +1978,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "garage_rock": ThemeRecord(
         slug="garage_rock",
         name="Garage Rock",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=47.999267578125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(
@@ -1898,11 +2007,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=338.994140625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "gauguin": ThemeRecord(
         slug="gauguin",
         name="Gauguin",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=0.999755859375,
@@ -2001,11 +2112,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "gentle": ThemeRecord(
         slug="gentle",
         name="Gentle",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=2500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=9000),
@@ -2028,11 +2141,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "ghostly": ThemeRecord(
         slug="ghostly",
         name="Ghostly",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=187.998046875,
@@ -2054,22 +2169,26 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "gold_star": ThemeRecord(
         slug="gold_star",
         name="Gold Star",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.9000076295109484, kelvin=6500),
             HSBK(hue=45.0, saturation=0.4, brightness=0.9499961852445258, kelvin=3000),
             HSBK(hue=45.0, saturation=1.0, brightness=0.7000076295109483, kelvin=3000),
             HSBK(hue=45.0, saturation=1.0, brightness=1.0, kelvin=3000),
         ),
+        replaced_by=None,
     ),
     "graveyard_chill": ThemeRecord(
         slug="graveyard_chill",
         name="Graveyard Chill",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.6, kelvin=5000),
             HSBK(
@@ -2089,11 +2208,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=7000,
             ),
         ),
+        replaced_by=None,
     ),
     "halloween": ThemeRecord(
         slug="halloween",
         name="Halloween",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=9.99755859375,
@@ -2122,20 +2243,24 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "hanukkah": ThemeRecord(
         slug="hanukkah",
         name="Hanukkah",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "haunted_fog": ThemeRecord(
         slug="haunted_fog",
         name="Haunted Fog",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.2, kelvin=4000),
             HSBK(
@@ -2163,11 +2288,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=7500,
             ),
         ),
+        replaced_by=None,
     ),
     "hip_hop_rap": ThemeRecord(
         slug="hip_hop_rap",
         name="Hip Hop/ Rap",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=17.0013427734375,
@@ -2225,11 +2352,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "hokusai": ThemeRecord(
         slug="hokusai",
         name="Hokusai",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.009994659342336155, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=6500),
@@ -2258,11 +2387,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=341.993408203125, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=341.993408203125, saturation=1.0, brightness=1.0, kelvin=4000),
         ),
+        replaced_by=None,
     ),
     "holly": ThemeRecord(
         slug="holly",
         name="Holly",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.9000076295109484, kelvin=3500),
             HSBK(hue=0.999755859375, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -2280,11 +2411,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="christmas",
     ),
     "hygge": ThemeRecord(
         slug="hygge",
         name="Hygge",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=34.002685546875,
@@ -2299,11 +2432,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "independence": ThemeRecord(
         slug="independence",
         name="Independence",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -2322,11 +2457,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "indie_pop": ThemeRecord(
         slug="indie_pop",
         name="Indie Pop",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=10.997314453125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=15.0018310546875, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -2366,11 +2503,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=346.9921875, saturation=0.6, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "intense": ThemeRecord(
         slug="intense",
         name="Intense",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(
                 hue=163.9984130859375,
@@ -2397,11 +2536,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="fantasy",
     ),
     "jazz": ThemeRecord(
         slug="jazz",
         name="Jazz",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=3.9990234375,
@@ -2441,11 +2582,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=54.99755859375, saturation=0.8, brightness=1.0, kelvin=3500),
             HSBK(hue=54.99755859375, saturation=0.8, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "jupiter": ThemeRecord(
         slug="jupiter",
         name="Jupiter",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6000),
             HSBK(
@@ -2473,11 +2616,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=4000,
             ),
         ),
+        replaced_by=None,
     ),
     "kandinsky": ThemeRecord(
         slug="kandinsky",
         name="Kandinsky",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.8500038147554742, kelvin=3500),
             HSBK(
@@ -2553,11 +2698,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "klimt": ThemeRecord(
         slug="klimt",
         name="Klimt",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=6.998291015625,
@@ -2586,31 +2733,37 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=51.998291015625, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=51.998291015625, saturation=1.0, brightness=1.0, kelvin=4000),
         ),
+        replaced_by=None,
     ),
     "kwanzaa": ThemeRecord(
         slug="kwanzaa",
         name="Kwanzaa",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "leprechaun_treasure": ThemeRecord(
         slug="leprechaun_treasure",
         name="Leprechaun Treasure",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=5000),
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=45.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=5500),
         ),
+        replaced_by=None,
     ),
     "lo_fi": ThemeRecord(
         slug="lo_fi",
         name="Lo Fi",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=222.9949951171875,
@@ -2654,11 +2807,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "love": ThemeRecord(
         slug="love",
         name="Love",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(
                 hue=307.001953125,
@@ -2691,22 +2846,26 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="romance",
     ),
     "lucky_shamrock": ThemeRecord(
         slug="lucky_shamrock",
         name="Lucky Shamrock",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=90.0, saturation=1.0, brightness=1.0, kelvin=6000),
             HSBK(hue=110.0006103515625, saturation=1.0, brightness=1.0, kelvin=6000),
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=5500),
             HSBK(hue=139.998779296875, saturation=1.0, brightness=1.0, kelvin=5200),
         ),
+        replaced_by=None,
     ),
     "mars": ThemeRecord(
         slug="mars",
         name="Mars",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=13.0023193359375,
@@ -2805,11 +2964,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "matisse": ThemeRecord(
         slug="matisse",
         name="Matisse",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6850),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6850),
@@ -2863,11 +3024,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=341.993408203125, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=341.993408203125, saturation=1.0, brightness=1.0, kelvin=4000),
         ),
+        replaced_by=None,
     ),
     "mellow": ThemeRecord(
         slug="mellow",
         name="Mellow",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=78.9971923828125,
@@ -2895,11 +3058,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "memorial_day": ThemeRecord(
         slug="memorial_day",
         name="Memorial Day",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -2918,11 +3083,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "menorah": ThemeRecord(
         slug="menorah",
         name="Menorah",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=1500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -2940,11 +3107,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "mercury": ThemeRecord(
         slug="mercury",
         name="Mercury",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.7000076295109483, kelvin=4500),
             HSBK(hue=29.9981689453125, saturation=0.4, brightness=0.6, kelvin=3800),
@@ -2967,11 +3136,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=4000,
             ),
         ),
+        replaced_by=None,
     ),
     "midnight_shadows": ThemeRecord(
         slug="midnight_shadows",
         name="Midnight Shadows",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.10000762951094835, kelvin=3000),
             HSBK(
@@ -2999,11 +3170,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=7000,
             ),
         ),
+        replaced_by=None,
     ),
     "mistletoe": ThemeRecord(
         slug="mistletoe",
         name="Mistletoe",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=127.9962158203125,
@@ -3062,11 +3235,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=354.9957275390625, saturation=1.0, brightness=0.8, kelvin=3500),
             HSBK(hue=354.9957275390625, saturation=1.0, brightness=0.8, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "molly_malone": ThemeRecord(
         slug="molly_malone",
         name="Molly Malone",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=29.9981689453125, saturation=0.6, brightness=0.6, kelvin=4000),
             HSBK(hue=49.998779296875, saturation=1.0, brightness=0.8, kelvin=3500),
@@ -3084,11 +3259,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=6500,
             ),
         ),
+        replaced_by=None,
     ),
     "mondrian": ThemeRecord(
         slug="mondrian",
         name="Mondrian",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=0.0, kelvin=6500),
@@ -3107,11 +3284,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "monet": ThemeRecord(
         slug="monet",
         name="Monet",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=123.9971923828125,
@@ -3210,11 +3389,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=9000,
             ),
         ),
+        replaced_by=None,
     ),
     "moon": ThemeRecord(
         slug="moon",
         name="Moon",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.37000076295109485, kelvin=4628),
             HSBK(hue=0.0, saturation=0.0, brightness=0.37000076295109485, kelvin=4628),
@@ -3233,11 +3414,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=4628),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=4628),
         ),
+        replaced_by=None,
     ),
     "movie_night_romance": ThemeRecord(
         slug="movie_night_romance",
         name="Movie Night Romance",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=27.9986572265625,
@@ -3276,21 +3459,25 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "neon": ThemeRecord(
         slug="neon",
         name="Neon",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(hue=90.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=182.999267578125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=310.001220703125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "neptune": ThemeRecord(
         slug="neptune",
         name="Neptune",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=7200),
             HSBK(
@@ -3318,11 +3505,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=6000,
             ),
         ),
+        replaced_by=None,
     ),
     "ocean": ThemeRecord(
         slug="ocean",
         name="Ocean",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=135.0, saturation=0.5000076295109483, brightness=0.4, kelvin=3500),
             HSBK(hue=180.0, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -3340,11 +3529,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "oktoberfest": ThemeRecord(
         slug="oktoberfest",
         name="Oktoberfest",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -3363,11 +3554,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=199.9951171875, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=199.9951171875, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "old_glory": ThemeRecord(
         slug="old_glory",
         name="Old Glory",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -3386,11 +3579,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "outback": ThemeRecord(
         slug="outback",
         name="Outback",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=7.998046875,
@@ -3419,11 +3614,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "parade": ThemeRecord(
         slug="parade",
         name="Parade",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -3441,11 +3638,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "paranormal": ThemeRecord(
         slug="paranormal",
         name="Paranormal",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=159.9993896484375,
@@ -3490,11 +3689,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "party": ThemeRecord(
         slug="party",
         name="Party",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=213.9971923828125,
@@ -3512,11 +3713,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=264.9957275390625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=299.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "peaceful": ThemeRecord(
         slug="peaceful",
         name="Peaceful",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=1.99951171875,
@@ -3549,11 +3752,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "pine_glow": ThemeRecord(
         slug="pine_glow",
         name="Pine Glow",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.8, brightness=1.0, kelvin=2500),
             HSBK(hue=154.9951171875, saturation=0.6, brightness=0.6, kelvin=3500),
@@ -3561,11 +3766,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=164.9981689453125, saturation=0.4, brightness=0.4, kelvin=3500),
             HSBK(hue=164.9981689453125, saturation=0.4, brightness=0.4, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "pluto": ThemeRecord(
         slug="pluto",
         name="Pluto",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.7499961852445258, kelvin=5200),
             HSBK(hue=20.0006103515625, saturation=0.4, brightness=1.0, kelvin=4500),
@@ -3583,11 +3790,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=5500,
             ),
         ),
+        replaced_by=None,
     ),
     "pop": ThemeRecord(
         slug="pop",
         name="Pop",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=8.997802734375, saturation=0.8, brightness=1.0, kelvin=3500),
             HSBK(hue=41.0009765625, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -3607,11 +3816,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=347.9974365234375, saturation=0.6, brightness=1.0, kelvin=3500),
             HSBK(hue=358.9947509765625, saturation=0.4, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "poppy": ThemeRecord(
         slug="poppy",
         name="Poppy",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.009994659342336155, kelvin=3000),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3000),
@@ -3623,11 +3834,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3000,
             ),
         ),
+        replaced_by=None,
     ),
     "powerful": ThemeRecord(
         slug="powerful",
         name="Powerful",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=9.99755859375,
@@ -3672,11 +3885,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "pride": ThemeRecord(
         slug="pride",
         name="Pride",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=31.9976806640625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=60.0018310546875, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -3702,11 +3917,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "proud": ThemeRecord(
         slug="proud",
         name="Proud",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(
                 hue=31.9976806640625,
@@ -3751,11 +3968,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="pride",
     ),
     "psychedelic_rock": ThemeRecord(
         slug="psychedelic_rock",
         name="Psychedelic Rock",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=7.998046875,
@@ -3803,11 +4022,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "pumpkin": ThemeRecord(
         slug="pumpkin",
         name="Pumpkin",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(
                 hue=9.99755859375,
@@ -3846,11 +4067,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="pumpkin_spice",
     ),
     "pumpkin_glow": ThemeRecord(
         slug="pumpkin_glow",
         name="Pumpkin Glow",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=0.0,
@@ -3873,11 +4096,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=2700,
             ),
         ),
+        replaced_by=None,
     ),
     "pumpkin_party": ThemeRecord(
         slug="pumpkin_party",
         name="Pumpkin Party",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=16.0015869140625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=16.0015869140625, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -3945,11 +4170,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "pumpkin_spice": ThemeRecord(
         slug="pumpkin_spice",
         name="Pumpkin Spice",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=29.9981689453125,
@@ -3978,11 +4205,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=1500),
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "punk": ThemeRecord(
         slug="punk",
         name="Punk",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=75.9979248046875,
@@ -4000,11 +4229,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=206.9989013671875, saturation=1.0, brightness=0.6, kelvin=3500),
             HSBK(hue=269.9945068359375, saturation=0.8, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "ramadan": ThemeRecord(
         slug="ramadan",
         name="Ramadan",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=43.00048828125,
@@ -4043,11 +4274,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "redrum": ThemeRecord(
         slug="redrum",
         name="Redrum",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=12.0025634765625,
@@ -4083,11 +4316,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=358.9947509765625, saturation=0.8, brightness=0.4, kelvin=3500),
             HSBK(hue=358.9947509765625, saturation=0.8, brightness=0.4, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "relaxing": ThemeRecord(
         slug="relaxing",
         name="Relaxing",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(hue=70.9991455078125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(
@@ -4109,11 +4344,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "romance": ThemeRecord(
         slug="romance",
         name="Romance",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=306.9964599609375,
@@ -4146,11 +4383,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "rousseau": ThemeRecord(
         slug="rousseau",
         name="Rousseau",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=0.0,
@@ -4249,11 +4488,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "sage_cedar": ThemeRecord(
         slug="sage_cedar",
         name="Sage & Cedar",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=40.001220703125,
@@ -4280,11 +4521,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3200,
             ),
         ),
+        replaced_by=None,
     ),
     "santa": ThemeRecord(
         slug="santa",
         name="Santa",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.5199969481956207, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -4301,11 +4544,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="candy_cane",
     ),
     "santa_s_candy": ThemeRecord(
         slug="santa_s_candy",
         name="Santa's Candy",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=40.001220703125,
@@ -4332,11 +4577,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "santa_s_workshop": ThemeRecord(
         slug="santa_s_workshop",
         name="Santa's Workshop",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=2800),
             HSBK(
@@ -4347,11 +4594,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=354.9957275390625, saturation=1.0, brightness=1.0, kelvin=1500),
         ),
+        replaced_by=None,
     ),
     "saturn": ThemeRecord(
         slug="saturn",
         name="Saturn",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=24.9993896484375,
@@ -4379,21 +4628,25 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=5000,
             ),
         ),
+        replaced_by=None,
     ),
     "sci_fi": ThemeRecord(
         slug="sci_fi",
         name="Sci Fi",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "scream_queen": ThemeRecord(
         slug="scream_queen",
         name="Scream Queen",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=39.00146484375, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(
@@ -4429,11 +4682,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=346.9921875, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=346.9921875, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "self_care_sanctuary": ThemeRecord(
         slug="self_care_sanctuary",
         name="Self Care Sanctuary",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=119.9981689453125,
@@ -4467,11 +4722,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=5000,
             ),
         ),
+        replaced_by=None,
     ),
     "serene": ThemeRecord(
         slug="serene",
         name="Serene",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=93.9990234375,
@@ -4516,11 +4773,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "shamrock": ThemeRecord(
         slug="shamrock",
         name="Shamrock",
         category="Library",
+        disposition="deprecated",
         colors=(
             HSBK(
                 hue=99.99755859375,
@@ -4559,11 +4818,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by="st_patrick_s_day",
     ),
     "slasher": ThemeRecord(
         slug="slasher",
         name="Slasher",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=10.997314453125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=10.997314453125, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -4606,11 +4867,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "snake_banisher": ThemeRecord(
         slug="snake_banisher",
         name="Snake Banisher",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3000),
             HSBK(
@@ -4633,11 +4896,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=5000,
             ),
         ),
+        replaced_by=None,
     ),
     "snowflake": ThemeRecord(
         slug="snowflake",
         name="Snowflake",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -4673,11 +4938,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=239.996337890625, saturation=0.8, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "soothing": ThemeRecord(
         slug="soothing",
         name="Soothing",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=8000),
             HSBK(
@@ -4705,20 +4972,24 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "spacey": ThemeRecord(
         slug="spacey",
         name="Spacey",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=154.9951171875, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "spiders_lair": ThemeRecord(
         slug="spiders_lair",
         name="Spiders Lair",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.10000762951094835, kelvin=3000),
             HSBK(hue=0.0, saturation=0.8, brightness=0.30000762951094834, kelvin=2700),
@@ -4737,11 +5008,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=299.9981689453125, saturation=0.8, brightness=0.4, kelvin=4000),
         ),
+        replaced_by=None,
     ),
     "sports": ThemeRecord(
         slug="sports",
         name="Sports",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=59.0020751953125,
@@ -4762,11 +5035,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "spring": ThemeRecord(
         slug="spring",
         name="Spring",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=48.9990234375,
@@ -4793,11 +5068,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "st_patrick_s_day": ThemeRecord(
         slug="st_patrick_s_day",
         name="St Patrick's Day",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=99.99755859375,
@@ -4826,11 +5103,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "stardust": ThemeRecord(
         slug="stardust",
         name="Stardust",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6497),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -4848,11 +5127,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "storm_front": ThemeRecord(
         slug="storm_front",
         name="Storm Front",
         category="Nature",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=180.0, saturation=0.6, brightness=0.3499961852445258, kelvin=9000),
             HSBK(
@@ -4865,11 +5146,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=219.9957275390625, saturation=1.0, brightness=0.6, kelvin=9000),
             HSBK(hue=239.996337890625, saturation=1.0, brightness=0.4, kelvin=9000),
         ),
+        replaced_by=None,
     ),
     "sun": ThemeRecord(
         slug="sun",
         name="Sun",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=8.997802734375, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=8.997802734375, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -4913,11 +5196,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=43.00048828125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=43.00048828125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "synthwave": ThemeRecord(
         slug="synthwave",
         name="Synthwave",
         category="Music",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=169.9969482421875,
@@ -4957,11 +5242,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=328.99658203125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "taps": ThemeRecord(
         slug="taps",
         name="Taps",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.8500038147554742, kelvin=3000),
             HSBK(hue=38.001708984375, saturation=1.0, brightness=1.0, kelvin=3000),
@@ -4979,11 +5266,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3000,
             ),
         ),
+        replaced_by=None,
     ),
     "thanksgiving": ThemeRecord(
         slug="thanksgiving",
         name="Thanksgiving",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=15.0018310546875,
@@ -5011,21 +5300,25 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "the_tricolour": ThemeRecord(
         slug="the_tricolour",
         name="The Tricolour",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=5000),
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=119.9981689453125, saturation=1.0, brightness=1.0, kelvin=5500),
         ),
+        replaced_by=None,
     ),
     "toxic_cauldron": ThemeRecord(
         slug="toxic_cauldron",
         name="Toxic Cauldron",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.30000762951094834, kelvin=3000),
             HSBK(hue=85.001220703125, saturation=0.6, brightness=0.6, kelvin=3500),
@@ -5038,11 +5331,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "tranquil": ThemeRecord(
         slug="tranquil",
         name="Tranquil",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=60.0018310546875,
@@ -5075,11 +5370,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "tropical": ThemeRecord(
         slug="tropical",
         name="Tropical",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=15.0018310546875,
@@ -5100,11 +5397,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "turkey_dinner": ThemeRecord(
         slug="turkey_dinner",
         name="Turkey Dinner",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=24.9993896484375, saturation=1.0, brightness=1.0, kelvin=3500),
@@ -5124,11 +5423,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "uranus": ThemeRecord(
         slug="uranus",
         name="Uranus",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=7000),
             HSBK(
@@ -5156,11 +5457,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=6200,
             ),
         ),
+        replaced_by=None,
     ),
     "valentine_s": ThemeRecord(
         slug="valentine_s",
         name="Valentine's",
         category="Holidays",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.8, brightness=1.0, kelvin=3500),
             HSBK(
@@ -5182,11 +5485,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "vampires_den": ThemeRecord(
         slug="vampires_den",
         name="Vampires Den",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.2, kelvin=2500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=2500),
@@ -5204,11 +5509,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=2700,
             ),
         ),
+        replaced_by=None,
     ),
     "van_gogh": ThemeRecord(
         slug="van_gogh",
         name="Van Gogh",
         category="Art Series",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=90.999755859375,
@@ -5307,11 +5614,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "vaporwave": ThemeRecord(
         slug="vaporwave",
         name="Vaporwave",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=184.998779296875,
@@ -5327,11 +5636,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "venus": ThemeRecord(
         slug="venus",
         name="Venus",
         category="Space",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=20.0006103515625, saturation=0.2, brightness=1.0, kelvin=3600),
             HSBK(
@@ -5359,11 +5670,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3000,
             ),
         ),
+        replaced_by=None,
     ),
     "warm_ember": ThemeRecord(
         slug="warm_ember",
         name="Warm Ember",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=15.0018310546875,
@@ -5384,11 +5697,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=1500,
             ),
         ),
+        replaced_by=None,
     ),
     "warming": ThemeRecord(
         slug="warming",
         name="Warming",
         category="Moods",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.30000762951094834, kelvin=3500),
             HSBK(
@@ -5422,11 +5737,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "water": ThemeRecord(
         slug="water",
         name="Water",
         category="Library",
+        disposition="library-only",
         colors=(
             HSBK(
                 hue=164.9981689453125,
@@ -5447,11 +5764,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "whats_the_craic": ThemeRecord(
         slug="whats_the_craic",
         name="Whats the craic?",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=49.998779296875, saturation=1.0, brightness=1.0, kelvin=5500),
@@ -5459,11 +5778,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=209.9981689453125, saturation=1.0, brightness=1.0, kelvin=6000),
             HSBK(hue=279.99755859375, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        replaced_by=None,
     ),
     "wheat_glow": ThemeRecord(
         slug="wheat_glow",
         name="Wheat Glow",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=34.9969482421875,
@@ -5490,11 +5811,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3000,
             ),
         ),
+        replaced_by=None,
     ),
     "winter_night": ThemeRecord(
         slug="winter_night",
         name="Winter Night",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=139.998779296875,
@@ -5521,11 +5844,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=1500,
             ),
         ),
+        replaced_by=None,
     ),
     "winter_wonderland": ThemeRecord(
         slug="winter_wonderland",
         name="Winter Wonderland",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
@@ -5563,11 +5888,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=337.994384765625, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=337.994384765625, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "witchs_ritual": ThemeRecord(
         slug="witchs_ritual",
         name="Witchs Ritual",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.5000076295109483, kelvin=2700),
             HSBK(hue=29.9981689453125, saturation=1.0, brightness=1.0, kelvin=2700),
@@ -5590,11 +5917,13 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
     "witchy": ThemeRecord(
         slug="witchy",
         name="Witchy",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=1.0, brightness=0.14999618524452582, kelvin=3500),
             HSBK(
@@ -5611,11 +5940,13 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=267.9949951171875, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "zombie": ThemeRecord(
         slug="zombie",
         name="Zombie",
         category="Play",
+        disposition="lifx-app",
         colors=(
             HSBK(
                 hue=138.9990234375,
@@ -5633,11 +5964,13 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=269.9945068359375, saturation=1.0, brightness=0.4, kelvin=3500),
             HSBK(hue=280.997314453125, saturation=1.0, brightness=0.2, kelvin=3500),
         ),
+        replaced_by=None,
     ),
     "zombie_apocalypse": ThemeRecord(
         slug="zombie_apocalypse",
         name="Zombie Apocalypse",
         category="Archives",
+        disposition="lifx-app",
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.30000762951094834, kelvin=4000),
             HSBK(hue=0.0, saturation=1.0, brightness=0.4, kelvin=2500),
@@ -5655,6 +5988,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        replaced_by=None,
     ),
 }
 

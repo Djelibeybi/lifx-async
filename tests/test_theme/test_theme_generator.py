@@ -71,6 +71,7 @@ def _record(**overrides: Any) -> dict[str, Any]:
         "slug": "test_theme",
         "name": "Test Theme",
         "category": "Test",
+        "disposition": "lifx-app",
         "colors": [_color()],
     }
     record.update(overrides)

@@ -45,10 +45,13 @@ OUTPUT_PATH = REPO_ROOT / "src" / "lifx" / "theme" / "data.py"
 _UINT16_MAX = 0xFFFF
 
 #: Fields every record must carry.
-_REQUIRED_FIELDS = frozenset({"slug", "name", "category", "colors"})
+_REQUIRED_FIELDS = frozenset({"slug", "name", "category", "disposition", "colors"})
 
 #: Fields a record may carry in addition to the required set.
-_OPTIONAL_FIELDS = frozenset({"aliases"})
+_OPTIONAL_FIELDS = frozenset({"aliases", "replaced_by"})
+
+#: Allowed values of a record's ``disposition`` field (COMPAT-04).
+_DISPOSITIONS = frozenset({"lifx-app", "library-only", "deprecated"})
 
 #: Exact field set of a colour object.
 _COLOR_FIELDS = frozenset({"hue", "saturation", "brightness", "kelvin"})
@@ -298,6 +301,36 @@ def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
                     record,
                     f"field '{field}' contains non-ASCII characters: {value!r}",
                 )
+        # disposition is the COMPAT-04 fate of a record: required on every
+        # record (D-05), drawn from a closed set.
+        disposition = record["disposition"]
+        if type(disposition) is not str or disposition not in _DISPOSITIONS:
+            raise _fail(
+                line_number,
+                record,
+                f"field 'disposition' is {disposition!r}, not one of: "
+                f"{', '.join(sorted(_DISPOSITIONS))}",
+            )
+        # A deprecated record must name its successor (D-06); the successor
+        # key must be canonical or it could never resolve. Whether the key
+        # actually resolves is the cross-record pass after this loop.
+        replaced_by = record.get("replaced_by")
+        if disposition == "deprecated" and not (
+            type(replaced_by) is str and replaced_by
+        ):
+            raise _fail(
+                line_number,
+                record,
+                f"a deprecated record requires a non-empty 'replaced_by' "
+                f"string: {replaced_by!r}",
+            )
+        if replaced_by is not None and not validate_key(replaced_by):
+            raise _fail(
+                line_number,
+                record,
+                f"replaced_by {replaced_by!r} is not a canonical key "
+                f"(non-empty, ASCII, lowercase, valid identifier)",
+            )
         _validate_colors(line_number, record)
         aliases = record.get("aliases", [])
         if type(aliases) is not list:
@@ -333,6 +366,21 @@ def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
                     f"'{name}' collides with record '{seen_keys[key]}'"
                 )
             seen_keys[key] = name
+
+    # Cross-record pass: every replaced_by must resolve within the data
+    # itself. Runs after the main loop so seen_keys holds every slug AND
+    # alias — aliases count as resolution targets (SPEC R4: "resolves in
+    # THEMES"). Chains onto another deprecated key are permitted by the
+    # schema; zero exist today.
+    for line_number, record in records:
+        replaced_by = record.get("replaced_by")
+        if replaced_by is not None and replaced_by not in seen_keys:
+            raise _fail(
+                line_number,
+                record,
+                f"replaced_by {replaced_by!r} does not resolve to any slug "
+                f"or alias in the data",
+            )
 
 
 def _emit_color(color: dict[str, int]) -> str:
@@ -436,7 +484,9 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "    slug: str",
         "    name: str",
         "    category: str",
+        "    disposition: str",
         "    colors: tuple[HSBK, ...]",
+        "    replaced_by: str | None = None",
         "",
         "",
         "THEMES: dict[str, ThemeRecord] = {",
@@ -455,14 +505,28 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
                 raise RuntimeError(
                     f"emit-time check failed: bad metadata {value!r} on record {slug!r}"
                 )
+        disposition = record["disposition"]
+        if disposition not in _DISPOSITIONS:
+            raise RuntimeError(
+                f"emit-time check failed: bad disposition {disposition!r} "
+                f"on record {slug!r}"
+            )
+        replaced_by = record.get("replaced_by")
+        if replaced_by is not None and not validate_key(replaced_by):
+            raise RuntimeError(
+                f"emit-time check failed: bad replaced_by {replaced_by!r} "
+                f"on record {slug!r}"
+            )
         lines.append(f"    {slug!r}: ThemeRecord(")
         lines.append(f"        slug={slug!r},")
         lines.append(f"        name={name!r},")
         lines.append(f"        category={category!r},")
+        lines.append(f"        disposition={disposition!r},")
         lines.append("        colors=(")
         for color in canonical_palette(record["colors"]):
             lines.append(f"            {_emit_color(color)},")
         lines.append("        ),")
+        lines.append(f"        replaced_by={replaced_by!r},")
         lines.append("    ),")
     lines.append("}")
     lines.append("")
