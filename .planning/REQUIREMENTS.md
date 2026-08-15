@@ -53,8 +53,8 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
       🌳' ships as `Forrest`
 
 - [x] **META-02**: A theme exposes its app category
-- [ ] **META-03**: Caller can list the categories, and list the themes within one
-- [ ] **META-04**: `ThemeLibrary.get_by_category()`'s existing hand-made taxonomy
+- [x] **META-03**: Caller can list the categories, and list the themes within one
+- [x] **META-04**: `ThemeLibrary.get_by_category()`'s existing hand-made taxonomy
       (`seasonal`, `hygge`, `tranquil`, `sports`, …) is reconciled with the app's 11
       categories — the old names either keep working or fail with a message naming their
       replacement
@@ -127,8 +127,8 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 | COMPAT-04 | Phase 7 | Complete |
 | META-01 | Phase 6 | Complete |
 | META-02 | Phase 6 | Complete |
-| META-03 | Phase 7 | Pending |
-| META-04 | Phase 7 | Pending |
+| META-03 | Phase 7 | Complete |
+| META-04 | Phase 7 | Complete |
 | FIDELITY-01 | Phase 8 | Pending |
 | FIDELITY-02 | Phase 8 | Pending |
 | FIDELITY-03 | Phase 8 | Pending |

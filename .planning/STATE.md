@@ -5,15 +5,15 @@ milestone_name: Theme Library Update
 current_phase: 07
 current_phase_name: taxonomy-legacy-dispositions
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-08-15T03:08:40.036Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-08-15T03:19:22.420Z"
 last_activity: 2026-08-15
 last_activity_desc: "Phase 06 merged to main via PR #196; Phase 7 ready to plan"
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 25
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 ## Current Position
 
 Phase: 07 (taxonomy-legacy-dispositions) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 07 execution started
 
@@ -48,7 +48,7 @@ fixed in 732e512.
   `Theme.category` returns the app's nine; no way to tell a rename alias from a primary slug
   in `get_available_themes()` (168 names, 166 themes).
 
-Progress: [██████░░░░] 60% (1/4 phases)
+Progress: [████████░░] 80% (1/4 phases)
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Per-plan metrics for shipped milestones live with their archives under
 | Phase 06 P01 | 12min | 3 tasks | 9 files |
 | Phase 06 P02 | 17min | 3 tasks | 8 files |
 | Phase 07 P01 | 10min | 3 tasks | 8 files |
+| Phase 07 P02 | 8min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,9 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - [Phase ?]: exciting shipped as captured despite a 1-ulp uint16 drift vs pre-v1.2 on 3 hues (app truncates, old table rounded) — THEME-02 binds shipped == captured; positional trio 0/7282/10923 unchanged and pinned
 - [Phase ?]: 07-01: R2-05 deferral held — generator does not reject replaced_by on non-deprecated records; enforcement is the library-side shape sweep at test time
 - [Phase ?]: 07-01: emit-time asymmetry accepted (F3) — emit backstop checks replaced_by canonical, not resolving; resolution needs whole-set seen_keys
+- [Phase ?]: 07-02: derive_slug home stays src/lifx/theme/slug.py (review F2) — regeneration bootstrap cycle predates the phase via lifx/__init__.py's eager theme import; recovery is git; slug.py pinned as a leaf module
+- [Phase ?]: 07-02: no precompute/cache for get_by_category record scan (review F13 declined) — shared _slugs_for_category helper serves both paths; 168 bounded regex passes per call is negligible
+- [Phase ?]: 07-02: no runtime isinstance guard on get_by_category input (review F16 declined) — str typing enforced by pyright at the caller boundary
 
 ### v1.2 Working Notes
 
@@ -145,8 +149,8 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-15T03:08:40.029Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-08-15T03:19:14.317Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

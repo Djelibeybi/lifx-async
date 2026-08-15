@@ -118,7 +118,7 @@ data file plus a separate legacy manifest.
   2. Every category name `get_by_category()` accepted before v1.2 (`seasonal`, `hygge`, `tranquil`, `sports`, …) either still returns themes or fails with a message naming its replacement
   3. Each of the 30 orphaned library keys carries a recorded disposition — kept as library-only, or deprecated naming its replacement — and a deprecated key still resolves
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 **Wave 1**
@@ -127,7 +127,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 07-02-PLAN.md — Taxonomy rewrite: `get_categories()`, `get_by_category()` over the app's 9 categories with the private legacy map (2 resolve, 4 raise naming replacements), `derive_slug` relocated into the package
+- [x] 07-02-PLAN.md — Taxonomy rewrite: `get_categories()`, `get_by_category()` over the app's 9 categories with the private legacy map (2 resolve, 4 raise naming replacements), `derive_slug` relocated into the package
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -185,6 +185,6 @@ successful outcome.
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
-| 7. Taxonomy & Legacy Dispositions | v1.2 | 1/3 | In Progress|  |
+| 7. Taxonomy & Legacy Dispositions | v1.2 | 2/3 | In Progress|  |
 | 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
