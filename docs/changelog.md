@@ -2,6 +2,114 @@
 
 <!-- version list -->
 
+## v6.4.0 (2026-08-15)
+
+### Bug Fixes
+
+- **theme**: Retire legacy category names and record alias renames
+  ([`0890917`](https://github.com/Djelibeybi/lifx-async/commit/08909170fa9985171b71358a86c2f34f90aafacd))
+
+### Documentation
+
+- Cross-AI review for phase 7
+  ([`7aecfa1`](https://github.com/Djelibeybi/lifx-async/commit/7aecfa19fe6b211e0cfc76a76774026eda829e99))
+
+- Cross-AI review round 2 for phase 7
+  ([`9e2ad7b`](https://github.com/Djelibeybi/lifx-async/commit/9e2ad7ba758a9c664d08e09ab7970b60c7d0950f))
+
+- **07**: Add code review report
+  ([`9d72c48`](https://github.com/Djelibeybi/lifx-async/commit/9d72c480792cfdd8c4b382ce31fb2d9a7dba2896))
+
+- **07**: Add security threat verification - 10 threats, 0 open
+  ([`3e517aa`](https://github.com/Djelibeybi/lifx-async/commit/3e517aae97ba784d0416805657599c1a09d35d36))
+
+- **07**: Capture phase context
+  ([`70430a9`](https://github.com/Djelibeybi/lifx-async/commit/70430a9dc7d4d27dcc208b5036b9dc318010d1a5))
+
+- **07**: Close residual git-diff idempotence check and fix SPEC citation
+  ([`a93820e`](https://github.com/Djelibeybi/lifx-async/commit/a93820e260f66e0e725418e1c3c2e9dfb37dfbd0))
+
+- **07**: Close round-2 review defects R2-01..R2-05 in phase plans
+  ([`7a985fb`](https://github.com/Djelibeybi/lifx-async/commit/7a985fbbb8f5c6ef66646a88621cbf0ce7981baf))
+
+- **07**: Correct evening's category in the themes API example
+  ([`b3d0c86`](https://github.com/Djelibeybi/lifx-async/commit/b3d0c863eb96b95d5feaca4ef954b85944e2ef46))
+
+- **07**: Correct the taxonomy version label to 6.4.0
+  ([`17021eb`](https://github.com/Djelibeybi/lifx-async/commit/17021ebd001ba9e8919247bb724c9e6704b81f5d))
+
+- **07**: Create phase plans for taxonomy and legacy dispositions
+  ([`92d3740`](https://github.com/Djelibeybi/lifx-async/commit/92d3740ee3f5898c82b839294a0179404e7c506c))
+
+- **07**: Extract phase 7 learnings
+  ([`a724ed7`](https://github.com/Djelibeybi/lifx-async/commit/a724ed7d6b7898f9d6b135ae622651d1e1598bea))
+
+- **07**: Incorporate cross-AI review feedback into phase plans
+  ([`fb49fb0`](https://github.com/Djelibeybi/lifx-async/commit/fb49fb06ad503abe393cfe33450aacd9937e115e))
+
+- **07**: Mark phase 7 complete and transition to phase 8
+  ([`2034d10`](https://github.com/Djelibeybi/lifx-async/commit/2034d10bd380fdfda0a9319254e23ba96deec525))
+
+- **07**: Reconcile SPEC acceptance bullet 11 with R5 hashability contract
+  ([`e3a0fa1`](https://github.com/Djelibeybi/lifx-async/commit/e3a0fa1c0cb9578111e4949e3954ea0f6896acba))
+
+- **07**: Record phase planned and add pattern map
+  ([`0e09546`](https://github.com/Djelibeybi/lifx-async/commit/0e0954667793e2fbc8ebdcdc0558de188a4452af))
+
+- **07**: Record post-verification addendum in 07-VERIFICATION.md
+  ([`60311bb`](https://github.com/Djelibeybi/lifx-async/commit/60311bb1211d266e3990743b86b180eb46fc2b04))
+
+- **07**: Record replanned phase state
+  ([`9cd8fd0`](https://github.com/Djelibeybi/lifx-async/commit/9cd8fd0acaf857bc0124c1e5f9fa4079393f6591))
+
+- **07**: Record the post-ship amendment in .planning
+  ([`244e2b1`](https://github.com/Djelibeybi/lifx-async/commit/244e2b147062ab11ef9f1ff57089139e92c6852c))
+
+- **07**: Refresh phase state after round-2 revision
+  ([`b8fe011`](https://github.com/Djelibeybi/lifx-async/commit/b8fe011d2aa33ff1239bf100626f7927af04bffe))
+
+- **07**: Replace internal v1.2 milestone label with release 6.3.0
+  ([`1290799`](https://github.com/Djelibeybi/lifx-async/commit/12907999bd0eccc71b19b6ed258a7feaccdb87a6))
+
+- **07**: Ship phase 07 — PR #202 [ci skip]
+  ([`cd78121`](https://github.com/Djelibeybi/lifx-async/commit/cd78121086bcb190f20b30fb5c66bb84bc9b2a0d))
+
+- **07-01**: Complete disposition schema plan
+  ([`4d85cf9`](https://github.com/Djelibeybi/lifx-async/commit/4d85cf9fca1b5928af2a8cf19a77a66c0e4f7c19))
+
+- **07-02**: Complete taxonomy rewrite plan
+  ([`6202205`](https://github.com/Djelibeybi/lifx-async/commit/62022057800fc478a9a89e775e2beefbcb536195))
+
+- **07-03**: Add theme taxonomy v1.2 migration page
+  ([`ef2c23f`](https://github.com/Djelibeybi/lifx-async/commit/ef2c23f8f1ae8eed09d4f4794b3ba7bfc07c14dc))
+
+- **07-03**: Complete taxonomy migration docs plan
+  ([`bc79061`](https://github.com/Djelibeybi/lifx-async/commit/bc790611cca6e8ed5c429be4f1808135b987c0f4))
+
+- **07-03**: Correct the two stale theme doc sites
+  ([`6fb986e`](https://github.com/Djelibeybi/lifx-async/commit/6fb986e5bff0c8ccb3757923ecd93e1a802f0c88))
+
+- **planning**: Record Phase 6 merged
+  ([`c460e6b`](https://github.com/Djelibeybi/lifx-async/commit/c460e6b87c876651a4c2ba64d5db5770a439978e))
+
+- **state**: Correct stale D-21 coverage record
+  ([`ed0980c`](https://github.com/Djelibeybi/lifx-async/commit/ed0980c0f13b6eee9bb87ef67672031d2b05d507))
+
+- **state**: Record phase 7 context session
+  ([`7224309`](https://github.com/Djelibeybi/lifx-async/commit/72243095ae3b42ec763d157b9e311cb45495d7bd))
+
+### Features
+
+- **07-01**: Surface disposition and replaced_by on the public Theme
+  ([`8f30fce`](https://github.com/Djelibeybi/lifx-async/commit/8f30fcedf38f980c04d2b1770f84208b207b0b00))
+
+- **07-01**: Wire disposition schema from JSONL through generator into THEMES
+  ([`c479b80`](https://github.com/Djelibeybi/lifx-async/commit/c479b804f225078fec509509e401eb2a8be1dc4c))
+
+- **07-02**: Rewrite category navigation over the app's 9-category taxonomy
+  ([`e80edc5`](https://github.com/Djelibeybi/lifx-async/commit/e80edc533c1c57ea8ce38faaf40c968792777cb2))
+
+
 ## v6.3.0 (2026-08-15)
 
 ### Bug Fixes
