@@ -85,6 +85,18 @@ uv run python -m lifx.protocol.generator
 uv run python -m lifx.products.generator
 ```
 
+### Theme Data Update
+
+```bash
+# Source: data/themes.jsonl (committed; no network, no device required)
+# Regenerate the theme data module
+uv run scripts/generate_theme_data.py
+```
+
+The generator lives in `scripts/`, not the package: its input sits outside `src/` and is
+deliberately not shipped in the wheel. CI regenerates and diffs `src/lifx/theme/data.py`
+on every change to `data/**`.
+
 ### Documentation
 
 ```bash
@@ -173,8 +185,11 @@ gh workflow run docs.yml
 
 7. **Theme Layer** (`src/lifx/theme/`)
 
-   - `theme.py`: Theme definitions (named color palettes)
-   - `library.py`: Built-in theme library
+   - `theme.py`: Theme definitions (named color palettes); `palette_equals()` compares
+     palettes as an unordered multiset — `==` is identity, so `Theme` stays hashable
+   - `library.py`: Built-in theme library, reading the generated dict alone
+   - `data.py`: Auto-generated theme records (166 themes, 168 resolvable keys) — **never
+     edit manually**; regenerate from `data/themes.jsonl`
    - `generators.py`: Theme-based color generators for effects
    - `canvas.py`: Canvas abstraction for applying themes to device layouts
 
@@ -268,7 +283,7 @@ The `discover_devices()` function implements DoS protection through:
 - **Device Layer**: 375 tests (base, light, ceiling, hev, infrared, multizone, matrix, state management, MAC address)
 - **API Layer**: 63 tests (discovery, batch operations, organization, themes, error handling)
 - **Effects Layer**: 1249 tests (26 built-in effects, registry, state manager, integration, capability filtering)
-- **Theme Layer**: 146 tests (themes, canvas, generators, library, apply_theme)
+- **Theme Layer**: 345 tests (themes, canvas, generators, library, apply_theme, data generator)
 - **Animation Layer**: 123 tests (animator, framebuffer, packets, orientation)
 - **Utilities**: 127 tests (color conversion, product registry, RGB roundtrip)
 
