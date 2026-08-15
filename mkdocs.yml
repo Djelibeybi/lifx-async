@@ -148,6 +148,7 @@ plugins:
       - api/exceptions.md
       Migration:
       - migration/effect-api-changes.md
+      - migration/theme-taxonomy-v1.2.md
       Additional Resources:
       - faq.md
       - changelog.md
@@ -222,6 +223,7 @@ nav:
   - Exceptions: api/exceptions.md
 - Migration:
   - Effect API Changes: migration/effect-api-changes.md
+  - Theme Taxonomy Changes: migration/theme-taxonomy-v1.2.md
 - FAQ: faq.md
 - Changelog: changelog.md
 
