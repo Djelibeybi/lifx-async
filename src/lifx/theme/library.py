@@ -92,6 +92,8 @@ class ThemeLibrary:
             slug=record.slug,
             name=record.name,
             category=record.category,
+            disposition=record.disposition,
+            replaced_by=record.replaced_by,
         )
 
     @classmethod

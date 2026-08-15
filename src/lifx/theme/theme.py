@@ -27,11 +27,17 @@ class Theme:
             caller-constructed theme)
         category: Category for a theme from ``ThemeLibrary`` (None for a
             caller-constructed theme)
+        disposition: Recorded fate of a theme from ``ThemeLibrary`` (None
+            for a caller-constructed theme)
+        replaced_by: Successor key of a deprecated theme from
+            ``ThemeLibrary``; None unless ``disposition`` is
+            ``"deprecated"`` (and None for a caller-constructed theme)
 
     Note:
         ``shuffled()`` and ``random()`` return identity-less copies: slug,
-        name and category do not propagate. This is a known deferred
-        limitation of the identity round-trip guarantee.
+        name, category, disposition and replaced_by do not propagate. This
+        is a known deferred limitation of the identity round-trip
+        guarantee.
 
     Note:
         ``==`` compares identity, so a Theme stays hashable and usable as
@@ -68,6 +74,8 @@ class Theme:
         slug: str | None = None,
         name: str | None = None,
         category: str | None = None,
+        disposition: str | None = None,
+        replaced_by: str | None = None,
     ) -> None:
         """Create a new theme with the given colors.
 
@@ -76,6 +84,11 @@ class Theme:
             slug: Library key for the theme (attached by ``ThemeLibrary``)
             name: Display name for the theme (attached by ``ThemeLibrary``)
             category: Category for the theme (attached by ``ThemeLibrary``)
+            disposition: Recorded fate of the theme (attached by
+                ``ThemeLibrary``)
+            replaced_by: Successor key of a deprecated theme (attached by
+                ``ThemeLibrary``); None unless ``disposition`` is
+                ``"deprecated"``
 
         Example:
             ```python
@@ -99,6 +112,8 @@ class Theme:
         self.slug = slug
         self.name = name
         self.category = category
+        self.disposition = disposition
+        self.replaced_by = replaced_by
 
     def add_color(self, color: HSBK) -> None:
         """Add a color to the theme.
