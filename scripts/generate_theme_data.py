@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess  # nosec B404
 import sys
 import tempfile
@@ -31,6 +30,7 @@ from typing import Any
 from lifx.color import HSBK
 from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MAX_PALETTE_COLORS, MIN_KELVIN
 from lifx.protocol.protocol_types import LightHsbk
+from lifx.theme.slug import derive_slug
 
 #: The repo root: this script lives in ``scripts/`` directly beneath it.
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -108,24 +108,6 @@ def validate_key(key: object) -> bool:
         and key == key.lower()
         and key.isidentifier()
     )
-
-
-def derive_slug(name: str) -> str:
-    """Derive the canonical slug from a stored (already ASCII) display name.
-
-    The D-09 derivation restated for stored, emoji-stripped names: lowercase,
-    collapse every run of non-alphanumeric characters to a single underscore,
-    strip leading and trailing underscores.
-
-    Args:
-        name: Stored ASCII display name.
-
-    Returns:
-        The derived slug.
-    """
-    # One pass suffices: `[^a-z0-9]+` already matches `_` itself and collapses
-    # runs greedily, so two adjacent replacement underscores cannot survive it.
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
 def canonical_palette(colors: list[dict[str, int]]) -> list[dict[str, int]]:

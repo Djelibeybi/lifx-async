@@ -43,6 +43,7 @@ from generate_theme_data import (
     validate_records,
 )
 
+import lifx.theme.slug
 from lifx.const import MAX_PALETTE_COLORS
 
 # ============================================================================
@@ -185,6 +186,14 @@ class TestDeriveSlug:
         """Lowercase, collapse non-alphanumeric runs to one underscore,
         strip leading/trailing underscores."""
         assert derive_slug(name) == expected
+
+    def test_generator_shares_the_package_rule(self) -> None:
+        """The generator's derive_slug IS the package's (identity, D-04).
+
+        A second copy anywhere would reintroduce the drift D-04 forbids;
+        identity — not equality — proves there is exactly one implementation.
+        """
+        assert generator_module.derive_slug is lifx.theme.slug.derive_slug
 
 
 # ============================================================================
