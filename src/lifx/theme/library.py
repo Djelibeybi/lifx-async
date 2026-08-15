@@ -3,7 +3,7 @@
 The theme data is generated from ``data/themes.jsonl`` by
 ``scripts/generate_theme_data.py``, synced from the LIFX app via hardware capture on
 2026-08-14. The library carries 168 resolvable names: 138 app theme slugs,
-28 pre-6.3.0 keys with no app counterpart (category ``Library``), and 2
+28 pre-6.4.0 keys with no app counterpart (category ``Library``), and 2
 rename aliases (``forest`` and ``aurora_borealis``) that resolve to their
 renamed targets.
 
@@ -12,7 +12,7 @@ application, so palettes are stored canonically sorted and all palette
 comparison is unordered.
 
 Attribution: the 28 ``Library`` records are not app captures. They ship
-byte-identical at uint16 to the palettes this library carried before 6.3.0,
+byte-identical at uint16 to the palettes this library carried before 6.4.0,
 which came from two upstream projects:
 
 * https://github.com/Djelibeybi/aiolifx-themes
@@ -28,7 +28,7 @@ from lifx.theme.data import THEMES, ThemeRecord
 from lifx.theme.slug import derive_slug
 from lifx.theme.theme import Theme
 
-#: Pre-6.3.0 legacy category names and their locked fates — a migration shim,
+#: Pre-6.4.0 legacy category names and their locked fates — a migration shim,
 #: deliberately private and unexported (D-03), not taxonomy. Each legacy name
 #: maps to ``(replacement app category, resolves)``: a ``True`` entry returns
 #: the replacement category's themes; a ``False`` entry raises, and its
@@ -50,7 +50,7 @@ class ThemeLibrary:
     """Collection of built-in colour themes for LIFX devices.
 
     Provides access to every theme in the LIFX app (sport themes excluded)
-    plus the pre-6.3.0 library keys, organised by the app's own categories.
+    plus the pre-6.4.0 library keys, organised by the app's own categories.
 
     Example:
         ```python
@@ -179,9 +179,9 @@ class ThemeLibrary:
                 insensitive — both sides are normalised by the slug rule, so
                 ``"Art Series"``, ``"art series"`` and ``"art_series"`` all
                 resolve. The categories are Archives, Art Series, Holidays,
-                Library (pre-6.3.0 keys with no app counterpart, defined by
+                Library (pre-6.4.0 keys with no app counterpart, defined by
                 this library rather than the LIFX app), Moods, Music, Nature,
-                Play and Space. Two pre-6.3.0 legacy names still map:
+                Play and Space. Two pre-6.4.0 legacy names still map:
                 ``holiday`` (to Holidays) and ``mood`` (to Moods).
 
         Returns:
@@ -190,7 +190,7 @@ class ThemeLibrary:
 
         Raises:
             ValueError: If the category name is unknown, or is one of the
-                four pre-6.3.0 names (``seasonal``, ``ambient``,
+                four pre-6.4.0 names (``seasonal``, ``ambient``,
                 ``functional``, ``atmosphere``) that no longer exist — the
                 message names the closest replacement.
         """
@@ -207,7 +207,7 @@ class ThemeLibrary:
                 replacement_slugs = cls._slugs_for_category(derive_slug(replacement))
                 return {slug: cls.get(slug) for slug in sorted(replacement_slugs)}
             raise ValueError(
-                f"Category '{category}' is a pre-6.3.0 category name that no "
+                f"Category '{category}' is a pre-6.4.0 category name that no "
                 f"longer exists. Its closest replacement is '{replacement}'."
             )
 

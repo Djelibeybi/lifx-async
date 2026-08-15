@@ -1,10 +1,10 @@
-# Theme Taxonomy Changes (6.3.0)
+# Theme Taxonomy Changes (6.4.0)
 
-This document describes changes to the theme category taxonomy introduced in 6.3.0.
+This document describes changes to the theme category taxonomy introduced in 6.4.0.
 
-!!! note "As of the 6.3.0 migration (2026-08-15)"
+!!! note "As of the 6.4.0 migration (2026-08-15)"
 
-    The tables on this page record the library **as of the 6.3.0 migration** and are
+    The tables on this page record the library **as of the 6.4.0 migration** and are
     deliberately not updated as the library changes. This is a dated migration record,
     not a live reference — the values may change over time, but this page will not be
     updated to reflect current status. For current data, ask the library itself:
@@ -20,15 +20,15 @@ The theme library's category navigation was rewritten over the LIFX app's own ta
    theme lists
 2. **Category discovery**: the new `ThemeLibrary.get_categories()` class method lists
    every category present in the data
-3. **Legacy names**: every pre-6.3.0 category name either maps to an app category or
+3. **Legacy names**: every pre-6.4.0 category name either maps to an app category or
    raises `ValueError` naming its closest replacement
-4. **Dispositions**: every theme records its 6.3.0 fate as queryable data —
+4. **Dispositions**: every theme records its 6.4.0 fate as queryable data —
    `Theme.disposition` and `Theme.replaced_by`
 
 ## The Nine Categories
 
 Eight of the nine categories are the LIFX app's own. **Library is defined by this
-library, not the app**: it holds the 28 pre-6.3.0 keys that have no app counterpart.
+library, not the app**: it holds the 28 pre-6.4.0 keys that have no app counterpart.
 The app's three sport categories (AUSSIE RULES, LEAGUE and UNION) are not carried —
 they have been out of scope since the library was first generated from app data.
 
@@ -49,7 +49,7 @@ and `art_series` all resolve to the same category, while `artseries` does not.
 
 ## Legacy Category Names
 
-Each of the six pre-6.3.0 category names has a recorded fate. Two map to the app
+Each of the six pre-6.4.0 category names has a recorded fate. Two map to the app
 category that absorbed most of their themes; the other four raise `ValueError` with
 a message naming the closest replacement.
 
@@ -68,7 +68,7 @@ results. The hardcoded lists are gone, so nothing is silently filtered any more.
 
 ## Deprecated Keys
 
-Nine pre-6.3.0 theme keys are recorded as deprecated, each with a replacement that
+Nine pre-6.4.0 theme keys are recorded as deprecated, each with a replacement that
 is both palette-close and semantically the same idea:
 
 | Deprecated key | Replacement        |
@@ -87,11 +87,11 @@ A deprecated key still resolves: deprecation records a fate, it never deletes, a
 removing a key would be a major-version decision. The disposition is queryable data —
 `Theme.disposition` and `Theme.replaced_by` on the object `ThemeLibrary.get()`
 returns — and no warning is emitted and nothing is logged when a deprecated key is
-used. The remaining 19 pre-6.3.0 orphan keys are recorded as `library-only` and stay.
+used. The remaining 19 pre-6.4.0 orphan keys are recorded as `library-only` and stay.
 
 ## Before and After
 
-**Before** — historical pre-6.3.0 behaviour, shown for context:
+**Before** — historical pre-6.4.0 behaviour, shown for context:
 
 ```python
 from lifx import ThemeLibrary
@@ -118,7 +118,7 @@ print(theme.replaced_by)  # warm_ember
 ```
 
 Note that `get_by_category("holiday")` and `get_by_category("mood")` **still
-resolve** after 6.3.0 — what changed is the result set, not the call's validity.
+resolve** after 6.4.0 — what changed is the result set, not the call's validity.
 The old hand-built mixed grouping is replaced by the complete Holidays and Moods
 app categories, so the same call now returns a different (and complete) set of
 themes. Neither of the two mapped names was removed.

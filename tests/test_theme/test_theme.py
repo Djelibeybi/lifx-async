@@ -354,7 +354,7 @@ class TestThemePaletteEquals:
 
         The app ships memorial_day, independence and old_glory with one
         identical palette; identity is excluded, so their palettes match.
-        (Pre-6.3.0 the example pair was love/romance, but the resync gave
+        (Pre-6.4.0 the example pair was love/romance, but the resync gave
         romance its own app palette.)
         """
         old_glory = ThemeLibrary.get("old_glory")
@@ -445,7 +445,7 @@ class TestPaletteThemes:
     """Tests for palette themes ported from pkivolowitz/lifx.
 
     Four of these keys — ``earth``, ``forest``, ``coral_reef`` and
-    ``aurora_borealis`` — no longer return the ported palette: 6.3.0 gave
+    ``aurora_borealis`` — no longer return the ported palette: 6.4.0 gave
     them app themes or rename aliases. The rest still ship the ported
     palettes byte-identically at uint16 (attribution in
     ``lifx/theme/library.py``).
