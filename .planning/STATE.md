@@ -5,16 +5,16 @@ milestone_name: Theme Library Update
 current_phase: 8
 current_phase_name: Hardware Fidelity Validation
 status: planning
-stopped_at: Phase 07 complete and shipped (PR #202); ready to plan Phase 8
-last_updated: "2026-08-15T04:30:54.190Z"
+stopped_at: "Phase 07 complete and shipped (PR #202); ready to plan Phase 8"
+last_updated: "2026-08-15T04:40:34.776Z"
 last_activity: 2026-08-15
-last_activity_desc: "Phase 07 complete and shipped as PR #202; Phase 8 ready to plan"
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 5
   completed_plans: 5
   percent: 50
+last_activity_desc: "Phase 07 complete and shipped as PR #202; Phase 8 ready to plan"
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 Phase: 8 — Hardware Fidelity Validation
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-08-15 — Phase 07 complete, transitioned to Phase 8
+Last activity: 2026-08-15
 
 Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
 Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
@@ -46,6 +46,7 @@ fixed in 732e512.
 
 - **#200 — closed by Phase 7:** `get_by_category()` now reads the app's nine categories from
   the generated records, so it no longer disagrees with `Theme.category`.
+
 - **#201 — deferred to Phase 9:** still no way to tell a rename alias from a primary slug in
   `get_available_themes()` (168 names, 166 themes). Belongs with the resync tooling.
 
@@ -173,5 +174,6 @@ Resume file: None
 - Review and merge PR #202 (Phase 7)
 - Plan Phase 8 with `/gsd-discuss-phase 8` — hardware fidelity validation needs the
   quiesced test devices, so it cannot run in CI (see Blockers)
+
 - Deferred, user will circle back: strip em dashes from docs prose (~200 across `docs/`);
   recorded in `.planning/phases/07-taxonomy-legacy-dispositions/07-UAT.md`
