@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: complete
 phase: 07-taxonomy-legacy-dispositions
 source: [07-VERIFICATION.md]
 started: 2026-08-15T03:47:00Z
@@ -14,10 +14,14 @@ updated: 2026-08-15T04:01:00Z
 
 ### 1. Library-category attribution wording
 expected: The synthetic `Library` category is always attributed to lifx-async ("defined by this library, not the app"; "not app captures"), never presented as a LIFX-app category. Verifier's non-authoritative verdict: SATISFIED — exact quotes located at the migration page :30-31 and library.py :14.
-result: issue
-reported: "The v1.2 milestone version has no meaning outside this repo's internal planning so it should be replaced by a date, or a lifx-async release version"
-severity: major
-note: The attribution wording itself reads correctly at both sites; the defect found while reading them is a separate one — internal milestone numbering (`v1.2`) leaking into shipped docs and source docstrings.
+result: pass
+history:
+  - result: issue
+    reported: "The v1.2 milestone version has no meaning outside this repo's internal planning so it should be replaced by a date, or a lifx-async release version"
+    severity: major
+    note: The attribution wording itself read correctly at both sites; the defect found while reading them was a separate one — internal milestone numbering (`v1.2`) leaking into shipped docs and source docstrings. Tracked as G-07-1.
+  - result: pass
+    note: Re-tested after G-07-1 was fixed in a97796d. Attribution confirmed at docs/migration/theme-taxonomy-6.3.0.md:30-31 (prose plus the table's `Defined by` column), src/lifx/theme/library.py:14 ("not app captures") and :182 (get_by_category() docstring).
 
 ### 2. Disposition split provenance
 expected: The 28 orphan dispositions are a verbatim copy of the SPEC R4 locked table with no independent judgement exercised — 9 deprecated pairs and 19 library-only keys exactly match. Verifier's non-authoritative verdict: SATISFIED with deterministic support — exact set equality machine-verified during this run.
@@ -27,11 +31,13 @@ confirmed: data/themes.jsonl re-counted during UAT — 138 lifx-app / 19 library
 ## Summary
 
 total: 2
-passed: 1
-issues: 1
+passed: 2
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
+issues_found_and_resolved: 1
+deferred_follow_ups: 1
 
 ## Gaps
 

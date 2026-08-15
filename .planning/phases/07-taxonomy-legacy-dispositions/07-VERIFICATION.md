@@ -1,14 +1,16 @@
 ---
 phase: 07-taxonomy-legacy-dispositions
 verified: 2026-08-15T00:00:00Z
-status: human_needed
+status: passed
 score: 29/29 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "Read docs/migration/theme-taxonomy-v1.2.md (categories section + Library table row), the library.py module/class docstrings and the get_by_category() docstring, and confirm the synthetic Library category is everywhere attributed to this library and never presented as one the LIFX app defines"
     expected: "Every mention attributes Library to lifx-async (e.g. 'Library is defined by this library, not the app', 'pre-v1.2 keys with no app counterpart'); no wording implies the app publishes it"
     why_human: "Judgment-tier prohibition (SPEC / plans 07-02, 07-03). Non-authoritative LLM-judge verdict: SATISFIED — page states 'Library is defined by this library, not the app'; library.py:14 states 'the 28 Library records are not app captures'. unverified-prohibition — human review recommended"
+
   - test: "Confirm no independent palette/semantic judgement was exercised when assigning the 28 orphan dispositions — the shipped values must be a verbatim copy of the SPEC R4 locked table"
     expected: "9 deprecated pairs and 19 library-only keys exactly equal the SPEC R4 table; no deviation, no extra call"
     why_human: "Judgment-tier prohibition (plan 07-01). Non-authoritative LLM-judge verdict: SATISFIED with deterministic support — set-equality against the locked table was machine-verified in this run (exact match, both directions). unverified-prohibition — human review recommended"
