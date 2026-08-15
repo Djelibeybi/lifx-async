@@ -181,7 +181,7 @@ Phase 6 replaced the hand-written palette table with a generated one, but left
 - [ ] Exactly 9 records are `deprecated` with the replacements in requirement 4; exactly 19 are `library-only`; every `replaced_by` resolves in `THEMES`
 - [ ] The generator aborts with a controlled error on a `deprecated` record with no `replaced_by`
 - [ ] `Theme.disposition` and `Theme.replaced_by` are readable; `replaced_by is None` unless deprecated
-- [ ] Two Themes with equal palettes and differing dispositions compare equal; `Theme.__hash__ is None`
+- [ ] Two Themes with equal palettes and differing dispositions satisfy `palette_equals()`; `Theme.__eq__` stays identity and `hash(theme)` still works *(corrected during Phase 7 planning to agree with R5 / D-19a / D-20a; the original bullet said "compare equal; `Theme.__hash__` is None", contradicting R5)*
 - [ ] Regenerating from the data file reproduces `data.py` byte-identically after the schema change
 - [ ] All 168 names still resolve; the 57-key `PRE_V12_KEYS` fixture passes; both rename aliases still share their target's record object
 - [ ] The docs page names all 9 categories, all 6 legacy names and all 9 deprecated keys
