@@ -30,11 +30,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import generate_theme_data as generator_module
 import pytest
-
-import lifx.theme.generator as generator_module
-from lifx.const import MAX_PALETTE_COLORS
-from lifx.theme.generator import (
+from generate_theme_data import (
     canonical_palette,
     derive_slug,
     emit_data_module,
@@ -43,6 +41,8 @@ from lifx.theme.generator import (
     validate_key,
     validate_records,
 )
+
+from lifx.const import MAX_PALETTE_COLORS
 
 # ============================================================================
 # Fixture helpers
@@ -488,7 +488,7 @@ class TestEmitDataModule:
         assert docstring is not None
         assert "DO NOT EDIT" in docstring
         assert "themes.jsonl" in docstring
-        assert "generator" in docstring
+        assert "scripts/generate_theme_data.py" in docstring
 
     def test_alias_binds_target_record(self) -> None:
         """The alias key binds the target's own record, so both keys share

@@ -18,22 +18,27 @@ flags:
   python3.10:
     paths:
     - src/lifx/
+    - scripts/
     carryforward: true
   python3.11:
     paths:
     - src/lifx/
+    - scripts/
     carryforward: true
   python3.12:
     paths:
     - src/lifx/
+    - scripts/
     carryforward: true
   python3.13:
     paths:
     - src/lifx/
+    - scripts/
     carryforward: true
   python3.14:
     paths:
     - src/lifx/
+    - scripts/
     carryforward: true
 
 # Ignore auto-generated and non-source files in coverage reports
