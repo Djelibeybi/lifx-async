@@ -5,8 +5,8 @@ milestone_name: Theme Library Update
 current_phase: 7
 current_phase_name: Taxonomy & Legacy Dispositions
 status: planning
-stopped_at: Phase 6 merged (PR #196)
-last_updated: "2026-08-15T00:55:04Z"
+stopped_at: Phase 7 context gathered
+last_updated: "2026-08-15T01:16:23.505Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 4
@@ -14,7 +14,7 @@ progress:
   total_plans: 2
   completed_plans: 2
   percent: 25
-last_activity_desc: Phase 06 merged to main via PR #196; Phase 7 ready to plan
+last_activity_desc: "Phase 06 merged to main via PR #196; Phase 7 ready to plan"
 ---
 
 # Project State
@@ -43,6 +43,7 @@ fixed in 732e512.
   `earth`/`coral_reef` substitution with no changelog entry, digit-leading slugs
   unrepresentable. All three need the committed capture→JSONL converter that does not exist
   yet, so none is fixable by editing `data/themes.jsonl`.
+
 - **#200, #201 — Phase 7:** `get_by_category()` still on the legacy six-group taxonomy while
   `Theme.category` returns the app's nine; no way to tell a rename alias from a primary slug
   in `get_available_themes()` (168 names, 166 themes).
@@ -141,9 +142,9 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-14T13:47:14.808Z
-Stopped at: Completed 06-02-PLAN.md
-Resume file: None
+Last session: 2026-08-15T01:16:23.494Z
+Stopped at: Phase 7 context gathered
+Resume file: .planning/phases/07-taxonomy-legacy-dispositions/07-CONTEXT.md
 
 ## Operator Next Steps
 
