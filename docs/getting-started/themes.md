@@ -26,9 +26,10 @@ from lifx import ThemeLibrary
 themes = ThemeLibrary.get_available_themes()
 print(len(themes))  # 168 (166 themes plus 2 rename aliases)
 
-# Get themes by category
-holidays = ThemeLibrary.get_by_category("holiday")
-moods = ThemeLibrary.get_by_category("mood")
+# Discover the categories, then get themes by category
+categories = ThemeLibrary.get_categories()
+holidays = ThemeLibrary.get_by_category("Holidays")
+moods = ThemeLibrary.get_by_category("Moods")
 ```
 
 ## Next Steps

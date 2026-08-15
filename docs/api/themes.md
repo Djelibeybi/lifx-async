@@ -64,9 +64,10 @@ punctuation) and its `category`. The categories and their theme counts are:
 | Nature | 8 |
 | Play | 7 |
 
-!!! note "`get_by_category()` still uses the older grouping"
-
-    `ThemeLibrary.get_by_category()` predates this data and takes the legacy names
-    (`seasonal`, `holiday`, `mood`, `ambient`, `functional`, `atmosphere`), not the
-    categories above. Reconciling the two is tracked for a following release; read
-    `Theme.category` for the app's own grouping.
+`ThemeLibrary.get_by_category()` takes the categories in the table above, matched
+case- and punctuation-insensitively (`Art Series`, `art series` and `art_series` all
+resolve), and `ThemeLibrary.get_categories()` lists them. The two pre-v1.2 names
+`holiday` and `mood` still map to Holidays and Moods; the remaining pre-v1.2 names
+raise `ValueError` naming their closest replacement — see
+[Theme Taxonomy Changes](../migration/theme-taxonomy-v1.2.md). `Theme.disposition`
+and `Theme.replaced_by` record each theme's v1.2 fate, documented on the same page.
