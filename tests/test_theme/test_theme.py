@@ -283,6 +283,40 @@ class TestThemeIdentity:
         assert theme.category is None
 
 
+class TestThemeDisposition:
+    """Tests for the optional disposition attributes (D-06, D-07, SPEC R5)."""
+
+    def test_disposition_defaults_none(self) -> None:
+        """No-keyword construction stays additive (D-07): both default None."""
+        theme = Theme([Colors.RED])
+
+        assert theme.disposition is None
+        assert theme.replaced_by is None
+
+    def test_disposition_kwarg_stored(self) -> None:
+        """disposition is stored; replaced_by stays None when not given."""
+        theme = Theme([Colors.RED], disposition="library-only")
+
+        assert theme.disposition == "library-only"
+        assert theme.replaced_by is None
+
+    def test_palette_equals_ignores_disposition(self) -> None:
+        """Equal palettes with differing dispositions still match (R5)."""
+        a = Theme([Colors.RED, Colors.GREEN], disposition="deprecated")
+        b = Theme([Colors.GREEN, Colors.RED], disposition="lifx-app")
+
+        assert a.palette_equals(b)
+
+    def test_hashable_and_identity_equality_unchanged(self) -> None:
+        """hash() works and == stays identity with both fields set (D-20a)."""
+        a = Theme([Colors.RED], disposition="deprecated", replaced_by="x")
+        b = Theme([Colors.RED], disposition="deprecated", replaced_by="x")
+
+        assert isinstance(hash(a), int)
+        assert a == a
+        assert a != b
+
+
 class TestThemePaletteEquals:
     """Tests for the explicit palette multiset comparison (D-19)."""
 
