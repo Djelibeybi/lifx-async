@@ -15,7 +15,7 @@ The `Theme` class represents a collection of HSBK colors forming a coordinated p
 
 ## ThemeLibrary Class
 
-The `ThemeLibrary` provides access to 42 official LIFX app themes organized into 6 categories.
+The `ThemeLibrary` provides access to 166 themes, resolvable under 168 names.
 
 ::: lifx.theme.ThemeLibrary
     options:
@@ -31,22 +31,42 @@ The `ThemeLibrary` provides access to 42 official LIFX app themes organized into
       show_root_heading: true
       heading_level: 3
 
-## Available Themes (42 Total)
+## Available Themes
 
-### Seasonal (3 themes)
-- spring, autumn, winter
+The library carries **166 themes**, resolvable under **168 names** (the extra two are the
+`forest` and `aurora_borealis` rename aliases). 138 are captured from the LIFX app and carry
+the app's own display name and category; the remaining 28 have no app counterpart and sit
+under the `Library` category.
 
-### Holiday (9 themes)
-- christmas, halloween, hanukkah, kwanzaa, shamrock, thanksgiving, calaveras, pumpkin, santa
+Rather than reproduce the inventory here — where it rots on every resync — ask the library:
 
-### Mood (16 themes)
-- peaceful, serene, relaxing, mellow, gentle, soothing, blissful, cheerful, romantic, romance, love, energizing, exciting, epic, intense, powerful, warming
+```python
+from lifx import ThemeLibrary
 
-### Ambient (6 themes)
-- dream, fantasy, spacey, stardust, zombie, party
+names = ThemeLibrary.get_available_themes()   # every resolvable name
 
-### Functional (3 themes)
-- focusing, evening, bias_lighting
+theme = ThemeLibrary.get("evening")
+print(theme.slug, theme.name, theme.category)  # evening Evening Moods
+```
 
-### Atmosphere (3 themes)
-- hygge, tranquil, sports
+Each theme carries its ASCII `slug`, the app's `name` (which may contain spaces and
+punctuation) and its `category`. The categories and their theme counts are:
+
+| Category | Themes |
+| --- | ---: |
+| Archives | 60 |
+| Library | 28 |
+| Holidays | 15 |
+| Music | 14 |
+| Moods | 13 |
+| Space | 11 |
+| Art Series | 10 |
+| Nature | 8 |
+| Play | 7 |
+
+!!! note "`get_by_category()` still uses the older grouping"
+
+    `ThemeLibrary.get_by_category()` predates this data and takes the legacy names
+    (`seasonal`, `holiday`, `mood`, `ambient`, `functional`, `atmosphere`), not the
+    categories above. Reconciling the two is tracked for a following release; read
+    `Theme.category` for the app's own grouping.

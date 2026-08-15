@@ -12,7 +12,7 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
 - **🔍 Dual Discovery**: UDP broadcast plus zero-dependency mDNS/DNS-SD discovery
 - **🏗️ Layered Architecture**: Protocol → Network → Device → API
 - **🔄 Protocol Generator**: generates LIFX protocol `Packets`, `Fields` and `Enum` classes from LIFX public protocol definition
-- **✨ Built-in Effects**: 26 software effects plus 57 colour themes, filtered by device capability
+- **✨ Built-in Effects**: 26 software effects plus 166 colour themes, filtered by device capability
 - **🎞️ Animation Layer**: high-frequency frame delivery for real-time multizone and matrix effects
 - **🌈 Comprehensive Support**: supports all LIFX smart lighting products — see the [device classes](api/devices.md) documentation
 

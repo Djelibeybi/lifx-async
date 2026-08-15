@@ -1,6 +1,6 @@
 # Themes Quick Start
 
-Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library includes 42 built-in themes across seasonal, holiday, mood, ambient, and functional categories.
+Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library carries 166 themes — 138 captured from the LIFX app plus 28 carried over from earlier versions of this library — resolvable under 168 names once rename aliases are counted.
 
 ## Apply a Theme
 
@@ -22,12 +22,12 @@ await group.apply_theme(theme, power_on=True, duration=1.5)
 ```python
 from lifx import ThemeLibrary
 
-# Get all 42 theme names
+# Get every resolvable theme name
 themes = ThemeLibrary.get_available_themes()
-print(themes)
+print(len(themes))  # 168 (166 themes plus 2 rename aliases)
 
 # Get themes by category
-seasonal = ThemeLibrary.get_by_category("seasonal")
+holidays = ThemeLibrary.get_by_category("holiday")
 moods = ThemeLibrary.get_by_category("mood")
 ```
 
