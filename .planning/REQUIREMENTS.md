@@ -70,15 +70,18 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 ### Fidelity
 
-- [ ] **FIDELITY-01**: The 26 themes that returned exactly 16 colours — the protocol
-      palette ceiling for both `SetTileEffect` and `SetMultiZoneEffect`, and all 10 of
-      🎨 ART SERIES among them — carry a recorded determination: their true length, or a
-      documented finding that no device-based method can supply it
+- [x] **FIDELITY-01**: The 25 shipped non-sport themes selected by
+      `disposition == "lifx-app"` and literal palette length 16 — the protocol palette
+      ceiling for both `SetTileEffect` and `SetMultiZoneEffect`, and including all 10
+      🎨 ART SERIES themes — carry a recorded determination: their true length, or a
+      documented finding that no device-based method can supply it. The raw capture has
+      26 exactly-16-colour records because Carlton belongs to the excluded AUSSIE RULES
+      sport category.
 
-- [ ] **FIDELITY-02**: A sampled theme applied through the library renders on hardware the
+- [x] **FIDELITY-02**: A sampled theme applied through the library renders on hardware the
       same as that theme applied from the LIFX app
 
-- [ ] **FIDELITY-03**: Product-invariance is spot-checked — a palette read back from a
+- [x] **FIDELITY-03**: Product-invariance is spot-checked — a palette read back from a
       matrix product other than the Tile matches the Tile capture
 
 ### Tooling
@@ -138,9 +141,9 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 | META-02 | Phase 6 | Complete |
 | META-03 | Phase 7 | Complete |
 | META-04 | Phase 7 | Complete |
-| FIDELITY-01 | Phase 8 | Pending |
-| FIDELITY-02 | Phase 8 | Pending |
-| FIDELITY-03 | Phase 8 | Pending |
+| FIDELITY-01 | Phase 8 | Complete |
+| FIDELITY-02 | Phase 8 | Complete |
+| FIDELITY-03 | Phase 8 | Complete |
 | TOOL-01 | Phase 9 | Pending |
 | TOOL-02 | Phase 9 | Pending |
 | TOOL-03 | Phase 9 | Pending |

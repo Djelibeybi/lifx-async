@@ -55,8 +55,10 @@ callers already depend on.
 - Resolve the 30 orphaned library keys — map the renames (`aurora_borealis` → Aurora 🌌,
   `forest` → Forrest 🌳), decide keep-or-deprecate for the remainder
 - Expose the app's category taxonomy as queryable theme metadata
-- Establish the true colour count for the 26 themes that returned exactly 16 colours, or
-  record on the record that it cannot be established from a device
+- Establish the true colour count for the 25 shipped non-sport `lifx-app` themes whose
+  committed palettes contain exactly 16 colours, or record that it cannot be established
+  from a device. The raw capture has 26 exactly-16-colour records because Carlton belongs
+  to the excluded AUSSIE RULES sport category.
 - Ship the capture tooling (`enumerate_themes.py`, `sweep_themes.py`,
   `analyse_themes.py`) so a future app update can be resynced rather than re-derived
 
@@ -73,8 +75,11 @@ callers already depend on.
   comparison is unordered-set comparison.
 - **16 is the protocol palette ceiling** for both `SetTileEffect` and
   `SetMultiZoneEffect`, so no device-based method can ever recover a palette longer than
-  16. The 26 exactly-16 themes (all 10 of 🎨 ART SERIES among them) may or may not be
-  clipped, and the capture method cannot tell. Resolving this needs a non-device source.
+  16. The 25 shipped non-sport `lifx-app` themes with literal 16-colour palettes (all 10
+  of 🎨 ART SERIES among them) may or may not be clipped, and the capture method cannot
+  tell. The raw capture has one additional exactly-16-colour record, Carlton, in the
+  excluded AUSSIE RULES sport category. Resolving a true source length needs a non-device
+  source.
 - Capture came from a single product (Tile, product 55). Palette is effect configuration
   rather than rendered output, so product-invariance is expected but untested.
 - Themes are server-driven (`com.lifx.shared.data.cloud.themes.ThemeDTO`, cached in a
@@ -157,8 +162,9 @@ v1.2 Theme Library Update — REQ-IDs defined in `.planning/REQUIREMENTS.md`:
 - [ ] Resync the 27 shared slugs (COMPAT-02's `*_legacy` aliases retired 2026-08-14)
 - [x] Resolve the 30 orphaned library keys (renames mapped, remainder kept or deprecated) — Phase 7
 - [x] Expose the category taxonomy as queryable metadata — Phase 7
-- [ ] Settle the 26 exactly-16-colour themes: true count, or a recorded finding that a
-      device cannot supply it
+- [ ] Settle the 25 shipped non-sport `lifx-app` themes with exactly-16-colour palettes:
+      true count, or a recorded finding that a device cannot supply it. The 26th raw
+      record is Carlton in the excluded AUSSIE RULES sport category.
 - [ ] Ship the capture tooling for future resyncs
 
 Carried-forward candidates, not committed to v1.2:

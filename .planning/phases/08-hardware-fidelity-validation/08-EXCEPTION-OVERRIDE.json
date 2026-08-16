@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "kind": "operator-approved-exception",
+  "scope": "tile-restoration-and-two-role-finalisation",
+  "decision": "accepted_exception",
+  "authority": "operator",
+  "date": "2026-08-16",
+  "facts": {
+    "tile_theme_fidelity_observations": "accepted",
+    "luna_theme_fidelity_observations": "accepted",
+    "luna_restoration": "verified",
+    "tile_restoration": "unverified",
+    "official_08_uat_results_json": "deliberately_absent",
+    "synthetic_merge": "prohibited",
+    "further_hardware_run": "not_required"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "kind": "phase-08-ceiling-determinations",
+  "source": "data/themes.jsonl",
+  "selection": {
+    "disposition": "lifx-app",
+    "literal_palette_length": 16,
+    "excluded_slug": "carlton",
+    "expected_rows": 25
+  },
+  "protocol_ceiling": {
+    "constant": "MAX_PALETTE_COLORS",
+    "value": 16,
+    "applies_to": ["SetTileEffect", "SetMultiZoneEffect"],
+    "determination": "device-ceiling-unresolvable",
+    "explanation": "A device readback cannot reveal a seventeenth source colour."
+  },
+  "determinations": [
+    {"theme_slug": "baubles", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "bijutsukai", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "candy_cane", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "clouds", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "deck_the_halls", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "disco", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "earth", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "festive", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "gauguin", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "hokusai", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "independence", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "kandinsky", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "klimt", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "mars", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "matisse", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "memorial_day", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "mistletoe", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "mondrian", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "monet", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "moon", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "oktoberfest", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "old_glory", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "rousseau", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "sun", "determination": "device-ceiling-unresolvable"},
+    {"theme_slug": "van_gogh", "determination": "device-ceiling-unresolvable"}
+  ]
+}

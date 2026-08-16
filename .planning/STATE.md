@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Theme Library Update
-current_phase: 8
-current_phase_name: Hardware Fidelity Validation
+current_phase: 9
+current_phase_name: Resync Tooling & Docs
 status: planning
-stopped_at: "Phase 07 shipped (PR #202) and amended post-ship after code review; ready to plan Phase 8"
-last_updated: "2026-08-15T05:55:00.000Z"
-last_activity: 2026-08-15
+stopped_at: Completed 08-04-PLAN.md with operator exception
+last_updated: "2026-08-16T08:23:40.560Z"
+last_activity: 2026-08-16
+last_activity_desc: Phase 08 completed with operator exception; transitioned to Phase 9
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 50
-last_activity_desc: "Phase 07 shipped as PR #202, then amended post-ship (SPEC R3/R5/R7) after a max-effort code review; Phase 8 ready to plan"
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
+  percent: 75
 ---
 
 # Project State
@@ -24,14 +24,14 @@ last_activity_desc: "Phase 07 shipped as PR #202, then amended post-ship (SPEC R
 See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic — and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 08 — hardware-fidelity-validation
+**Current focus:** Phase 9 — Resync Tooling & Docs
 
 ## Current Position
 
-Phase: 8 — Hardware Fidelity Validation
+Phase: 9 — Resync Tooling & Docs
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-08-15
+Last activity: 2026-08-16 — Phase 08 complete, transitioned to Phase 9
 
 Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
 Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
@@ -76,10 +76,12 @@ Post-Ship Amendment section at the top of `07-SPEC.md`.
   `get_by_category()` has zero callers in `src/`, LedFx does not import `ThemeLibrary`, and only
   `holiday` and `mood` ever appeared in a published example — on a v6.3.0 page that told readers
   to use `Theme.category` instead.
+
 - **R7: alias record binding deliberately broken.** `forest` and `aurora_borealis` reported
   `disposition="lifx-app"` with `replaced_by=None`, so the only two keys whose name had changed
   were the only two reporting that nothing had. Each is now its own `disposition="renamed"`
   record naming the live key and sharing the target's palette object.
+
 - **R5: `replaced_by` widened** to deprecated *or* renamed, with the converse now enforced.
 
 Re-verified: 3428 tests pass, pyright 0 errors, ruff clean, 100% branch coverage on
@@ -88,7 +90,7 @@ a SPEC locks per-item fates, make the derivation an acceptance criterion rather 
 R3's contradiction with its own measurement table sat thirty lines apart in one file and passed
 the plan checker, three peer reviews, the verifier and UAT.**
 
-Progress: [██████████░░░░░░░░░░] 50% (2/4 phases, 5/5 plans)
+Progress: [█████████░] 89% (2/4 phases, 6/9 plans)
 
 ## Performance Metrics
 
@@ -110,6 +112,9 @@ Per-plan metrics for shipped milestones live with their archives under
 | Phase 07 P01 | 10min | 3 tasks | 8 files |
 | Phase 07 P02 | 8min | 2 tasks | 5 files |
 | Phase 07 P03 | 8min | 2 tasks | 4 files |
+| Phase 08 P01 | 10min | 2 tasks | 4 files |
+| Phase 08 P02 | resumed | 3 tasks | 2 files |
+| Phase 08 P03 | 10min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -141,6 +146,11 @@ Recent decisions affecting current work (all 2026-08-14, PROJECT.md Key Decision
 - [Phase ?]: 07-03: migration-page category table carries a 'Defined by' column so the Library attribution lives in the table itself; name/count cells stay adjacent for the verify regex
 - [Phase ?]: 07-03: D-10 stamp implemented as a dated admonition ('As of the 6.4.0 migration (2026-08-15)') stating the page is deliberately never resynced
 - [Phase 7]: user-facing docs and docstrings identify releases by the lifx-async release version, never the internal `.planning/` milestone number — `v1.2` is meaningless outside this repo. Applies to the migration page filename, prose, and the `get_by_category()` ValueError text
+- [Phase ?]: Phase 08 Plan 01: Theme.palette_equals() is the sole duplicate-sensitive unordered palette comparison seam for tracer reads.
+- [Phase ?]: Phase 08 Plan 01: target identities, raw UI hierarchy, traces and diagnostics remain mode-restricted beneath the local-only Phase 8 root.
+- [Phase ?]: 08-02: designated private run projection is required before public finalisation.
+- [Phase ?]: 08-02: two-device lifecycle restores device state and Android keep-awake before terminal classification.
+- [Phase ?]: 08-03: FIDELITY-01 remains pending for 25 shipped lifx-app themes with literal 16-colour palettes; Carlton is the excluded 26th raw record.
 
 ### v1.2 Working Notes
 
@@ -193,15 +203,14 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-15
-Stopped at: Phase 7 complete and shipped (PR #202); ready to plan Phase 8
-Resume file: None
+Last session: 2026-08-16
+Stopped at: Completed Phase 8 with the recorded operator exception
+Resume file: None — Phase 9 is ready for discussion and planning
 
 ## Operator Next Steps
 
-- Review and merge PR #202 (Phase 7)
-- Plan Phase 8 with `/gsd-discuss-phase 8` — hardware fidelity validation needs the
-  quiesced test devices, so it cannot run in CI (see Blockers)
+- Ship and merge the Phase 8 hardware-fidelity work.
+- Discuss and plan Phase 9, Resync Tooling & Docs.
 
 - Deferred, user will circle back: strip em dashes from docs prose (~200 across `docs/`);
   recorded in `.planning/phases/07-taxonomy-legacy-dispositions/07-UAT.md`

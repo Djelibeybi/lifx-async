@@ -91,6 +91,7 @@ Thumbs.db
 
 # Local storage
 .notes/
+/.planning/local/phase-08-theme-fidelity/
 .claude/settings.local.json
 .mcp.json
 .serena/

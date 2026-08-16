@@ -61,7 +61,7 @@ vanish, in any intermediate state.
 
 - [x] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving (completed 2026-08-15)
 - [x] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate (completed 2026-08-15)
-- [ ] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way
+- [x] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way (completed 2026-08-16)
 - [ ] **Phase 9: Resync Tooling & Docs** - A future app update is resynced by documented procedure; theme docs reflect the new library
 
 ## Phase Details
@@ -147,9 +147,26 @@ of scope, so the old `sports` taxonomy name resolves to a message, not to themes
 
   1. A sampled theme applied through the library renders on hardware the same as the identical theme applied from the LIFX app
   2. A palette read back from a matrix product other than the Tile matches the Tile capture as an unordered HSBK set
-  3. Each of the 26 exactly-16-colour themes carries a committed determination: a true length established from a non-device source, or an evidenced finding that it cannot be established from a device
+  3. Each of the 25 shipped non-sport `lifx-app` themes with literal 16-colour palettes carries a committed determination: a true length established from a non-device source, or an evidenced finding that it cannot be established from a device. [08-CEILING-DETERMINATIONS.json](phases/08-hardware-fidelity-validation/08-CEILING-DETERMINATIONS.json) is the privacy-safe, per-slug protocol-ceiling record. The raw capture has 26 exactly-16-colour records because Carlton is an excluded AUSSIE RULES sport theme.
 
-**Plans**: TBD
+**Plans:** 4/4 plans complete
+
+Plans:
+**Wave 1**
+
+- [x] 08-01-PLAN.md — Tracer: current-hierarchy semantic app/library MORPH path, bounded Mondrian scrolling, targeted Tile readback, private preflight and restoration
+
+**Wave 2** *(blocked on 08-01)*
+
+- [x] 08-02-PLAN.md — Expand to the complete resumable 24-cycle runner, injectable 100%-branch architecture, static/OFF exact restoration and fail-closed evidence finaliser
+
+**Wave 3** *(blocked on 08-02; sole execution-plan ROADMAP writer)*
+
+- [x] 08-03-PLAN.md — Correct the active 26/21 ceiling counts to 25 shipped targets and pin them mechanically
+
+**Wave 4** *(blocked on 08-02 and 08-03)*
+
+- [x] 08-04-PLAN.md — Run the real Tile/non-Tile hardware UAT; close with the recorded operator exception after Tile restoration prevented authoritative JSON finalisation
 
 Hardware phase — runs against the 73-device production fleet and the quiesced gen2/3/4
 test devices; a LIFX Tile is product 55, so FIDELITY-03 needs a different matrix product
@@ -186,5 +203,5 @@ successful outcome.
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete    | 2026-08-15 |
-| 8. Hardware Fidelity Validation | v1.2 | 0/TBD | Not started | - |
+| 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete    | 2026-08-16 |
 | 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
