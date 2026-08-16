@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v6.5.0 (2026-08-16)
+
+### Features
+
+- **theme**: Validate hardware fidelity
+  ([`3d3e9f3`](https://github.com/Djelibeybi/lifx-async/commit/3d3e9f302af508a3d0748975a9df7d1c12b69368))
+
+
 ## v6.4.0 (2026-08-15)
 
 ### Bug Fixes
