@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v6.5.1 (2026-08-18)
+
+### Bug Fixes
+
+- **themes**: Extract the data contract and resync the catalogue
+  ([`291e7e6`](https://github.com/Djelibeybi/lifx-async/commit/291e7e6f0331f59e3fa1250f1e52896c2a13abf9))
+
+
 ## v6.5.0 (2026-08-16)
 
 ### Features
