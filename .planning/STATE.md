@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Theme Library Update
 current_phase: 9
-current_phase_name: Resync Tooling & Docs
+current_phase_name: Theme Data Contract & Docs
 status: planning
 stopped_at: Completed 08-04-PLAN.md with operator exception
 last_updated: "2026-08-16T08:23:40.560Z"
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic — and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 9 — Resync Tooling & Docs
+**Current focus:** Phase 9 — Theme Data Contract & Docs
 
 ## Current Position
 
-Phase: 9 — Resync Tooling & Docs
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-16 — Phase 08 complete, transitioned to Phase 9
+Phase: 9 — Theme Data Contract & Docs
+Plan: Not started — the phase is being executed directly on `split/library-changes`
+Status: In progress, awaiting review
+Last activity: 2026-08-19 — schema extraction, float palette storage and the slug rule landed on the branch
 
 Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
 Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
@@ -39,10 +39,12 @@ split out as tracked issues. Every one was re-verified against the working tree 
 from notes — the docs-staleness comment had been recorded as fixed when it was not, and was
 fixed in 732e512.
 
-- **#197, #198, #199 — Phase 9 (resync tooling):** apostrophe corruption in display names,
-  `earth`/`coral_reef` substitution with no changelog entry, digit-leading slugs
-  unrepresentable. All three need the committed capture→JSONL converter that does not exist
-  yet, so none is fixable by editing `data/themes.jsonl`.
+- **#197 — closed by Phase 9:** display names keep their typographic apostrophes and the
+  slug rule drops them, so `Spider's Lair` ships intact as `spiders_lair`.
+- **#198, #199 — still Phase 9:** `earth`/`coral_reef` substitution still has no changelog
+  entry naming every key whose palette changed, and `validate_key()` still requires
+  `str.isidentifier()`, so a digit-leading display name remains unrepresentable. No shipped
+  theme hits the second today.
 
 - **#200 — closed by Phase 7:** `get_by_category()` now reads the app's nine categories from
   the generated records, so it no longer disagrees with `Theme.category`.
@@ -205,12 +207,12 @@ Items acknowledged and carried forward from previous milestone closes:
 
 Last session: 2026-08-16
 Stopped at: Completed Phase 8 with the recorded operator exception
-Resume file: None — Phase 9 is ready for discussion and planning
+Resume file: None — Phase 9 is in progress on `split/library-changes`
 
 ## Operator Next Steps
 
 - Ship and merge the Phase 8 hardware-fidelity work.
-- Discuss and plan Phase 9, Resync Tooling & Docs.
+- Review and merge Phase 9, Theme Data Contract & Docs.
 
 - Deferred, user will circle back: strip em dashes from docs prose (~200 across `docs/`);
   recorded in `.planning/phases/07-taxonomy-legacy-dispositions/07-UAT.md`

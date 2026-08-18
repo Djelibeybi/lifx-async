@@ -59,8 +59,9 @@ callers already depend on.
   committed palettes contain exactly 16 colours, or record that it cannot be established
   from a device. The raw capture has 26 exactly-16-colour records because Carlton belongs
   to the excluded AUSSIE RULES sport category.
-- Ship the capture tooling (`enumerate_themes.py`, `sweep_themes.py`,
-  `analyse_themes.py`) so a future app update can be resynced rather than re-derived
+- Publish the record contract that the committed data file and the generated module must
+  satisfy as an importable, independently tested part of the library, so a future app
+  update can be resynced against it rather than re-derived
 
 **Key context:**
 
@@ -165,7 +166,7 @@ v1.2 Theme Library Update — REQ-IDs defined in `.planning/REQUIREMENTS.md`:
 - [ ] Settle the 25 shipped non-sport `lifx-app` themes with exactly-16-colour palettes:
       true count, or a recorded finding that a device cannot supply it. The 26th raw
       record is Carlton in the excluded AUSSIE RULES sport category.
-- [ ] Ship the capture tooling for future resyncs
+- [ ] Publish the theme record contract as an importable part of the library
 
 Carried-forward candidates, not committed to v1.2:
 

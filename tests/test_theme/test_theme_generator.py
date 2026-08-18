@@ -8,11 +8,13 @@ Tests cover:
   string numerics, booleans) naming the record and its JSONL line number
 - Name/category metadata validation (non-string, empty, non-ASCII)
 - Key collision aborts naming both display names
-- Colour range validation (kelvin 0 is inbound-only and rejected here) and
-  the 16-slot wire palette ceiling
+- Colour range validation (kelvin 0 is inbound-only and rejected here);
+  palettes longer than a 16-slot MORPH wire palette are valid themes
 - Canonical palette ordering (D-24) with duplicates preserved
 - Alias expansion binding the target's own record (D-13, D-14)
-- uint16 round-trip exactness of emitted HSBK literals
+- Transcription exactness of emitted HSBK literals (stored values are
+  already HSBK's user-facing units; no protocol round-trip involved) and
+  the HSBK-construction guard that still fires for an invalid component
 - Deterministic emission
 - Atomic write via a uniquely named temp file (D-05)
 
@@ -33,18 +35,17 @@ from typing import Any
 
 import generate_theme_data as generator_module
 import pytest
-from generate_theme_data import (
+from generate_theme_data import emit_data_module, main
+
+import lifx.theme.schema
+import lifx.theme.slug
+from lifx.theme.schema import (
     canonical_palette,
-    derive_slug,
-    emit_data_module,
     load_theme_records,
-    main,
     validate_key,
     validate_records,
 )
-
-import lifx.theme.slug
-from lifx.const import MAX_PALETTE_COLORS
+from lifx.theme.slug import derive_slug
 
 # ============================================================================
 # Fixture helpers
@@ -52,12 +53,12 @@ from lifx.const import MAX_PALETTE_COLORS
 
 
 def _color(
-    hue: int = 0,
-    saturation: int = 65535,
-    brightness: int = 65535,
+    hue: float = 0,
+    saturation: float = 1,
+    brightness: float = 1,
     kelvin: int = 3500,
 ) -> dict[str, Any]:
-    """Build one stored uint16 colour object."""
+    """Build one stored user-facing HSBK colour object."""
     return {
         "hue": hue,
         "saturation": saturation,
@@ -176,7 +177,7 @@ class TestDeriveSlug:
         [
             ("Test Theme", "test_theme"),
             ("Forrest", "forrest"),
-            ("Valentine's", "valentine_s"),
+            ("Valentine's", "valentines"),
             ("Dance/Pop", "dance_pop"),
             ("  Padded  ", "padded"),
             ("Multi - Punct!", "multi_punct"),
@@ -188,12 +189,12 @@ class TestDeriveSlug:
         assert derive_slug(name) == expected
 
     def test_generator_shares_the_package_rule(self) -> None:
-        """The generator's derive_slug IS the package's (identity, D-04).
+        """The schema module's derive_slug IS the package's (identity, D-04).
 
         A second copy anywhere would reintroduce the drift D-04 forbids;
         identity — not equality — proves there is exactly one implementation.
         """
-        assert generator_module.derive_slug is lifx.theme.slug.derive_slug
+        assert lifx.theme.schema.derive_slug is lifx.theme.slug.derive_slug
 
 
 # ============================================================================
@@ -204,7 +205,7 @@ class TestDeriveSlug:
 class TestCanonicalPalette:
     """Tests for D-24 canonical palette ordering."""
 
-    def test_sorts_by_uint16_tuple(self) -> None:
+    def test_sorts_by_stored_tuple(self) -> None:
         """Palettes sort by (hue, saturation, brightness, kelvin)."""
         c1 = _color(hue=100)
         c2 = _color(hue=200)
@@ -321,7 +322,7 @@ class TestValidateRecordsSchema:
         so this arc is defensive only — but _fail() is the single error
         constructor and must never raise an error of its own.
         """
-        error = generator_module._fail(7, ["not", "a", "record"], "bad thing")
+        error = lifx.theme.schema._fail(7, ["not", "a", "record"], "bad thing")
 
         assert "unidentifiable record" in str(error)
         assert "line 7" in str(error)
@@ -363,20 +364,62 @@ class TestValidateRecordsSchema:
             validate_records(_pairs(_record(colors=[color])))
 
     def test_string_numeric_color_value_aborts(self) -> None:
-        """A string numeric colour value aborts — not an integer."""
-        with pytest.raises(
-            RuntimeError, match=r"line 1.*'hue' is not an integer: '100'"
-        ):
+        """A string numeric colour value aborts: not a number."""
+        with pytest.raises(RuntimeError, match=r"line 1.*'hue' is not a number: '100'"):
             validate_records(_pairs(_record(colors=[_color(hue="100")])))
 
     def test_bool_color_value_aborts(self) -> None:
-        """A boolean colour value aborts even though True passes an integer
-        range check — bool is an int in Python, so type(v) is int is the
-        only discriminating test of integer-ness."""
+        """A boolean colour value aborts even though True passes a numeric
+        range check: bool's own type is `bool`, distinct from `int` and
+        `float`, so the `type(v) not in (int, float)` membership test is the
+        only discriminating check that excludes it (bool is an int
+        subclass, so a range check alone would admit True as 1.0)."""
         with pytest.raises(
-            RuntimeError, match=r"line 1.*'saturation' is not an integer: True"
+            RuntimeError, match=r"line 1.*'saturation' is not a number: True"
         ):
             validate_records(_pairs(_record(colors=[_color(saturation=True)])))
+
+    def test_bool_hue_value_aborts(self) -> None:
+        """The bool guard applies to hue too, not only saturation."""
+        with pytest.raises(RuntimeError, match=r"line 1.*'hue' is not a number: True"):
+            validate_records(_pairs(_record(colors=[_color(hue=True)])))
+
+    def test_kelvin_float_value_aborts(self) -> None:
+        """Kelvin stays strictly int: a JSON float is rejected even though
+        hue/saturation/brightness now accept one."""
+        with pytest.raises(
+            RuntimeError, match=r"line 1.*'kelvin' is not an integer: 3500\.0"
+        ):
+            validate_records(_pairs(_record(colors=[_color(kelvin=3500.0)])))
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("hue", float("nan")),
+            ("saturation", float("nan")),
+            ("brightness", float("inf")),
+        ],
+    )
+    def test_non_finite_color_value_aborts(self, field: str, value: float) -> None:
+        """nan and inf both fail the range check silently: inf passes a
+        naive `<=` comparison in one direction and nan fails every
+        comparison, so both need an explicit finiteness check."""
+        with pytest.raises(
+            RuntimeError, match=rf"line 1.*'{field}' is not a finite number"
+        ):
+            validate_records(_pairs(_record(colors=[_color(**{field: value})])))
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("hue", 360.0), ("saturation", 1.0), ("brightness", 0.0)],
+    )
+    def test_boundary_color_value_accepted(self, field: str, value: float) -> None:
+        """The inclusive bounds of each field's range validate cleanly."""
+        validate_records(_pairs(_record(colors=[_color(**{field: value})])))
+
+    def test_integer_saturation_accepted(self) -> None:
+        """An int is accepted for a float field: JSON writes 1.0 as 1."""
+        validate_records(_pairs(_record(colors=[_color(saturation=1)])))
 
     def test_line_number_reflects_position(self) -> None:
         """The reported line number is the failing record's own line."""
@@ -604,9 +647,10 @@ class TestValidateRecordsColors:
     @pytest.mark.parametrize(
         "color",
         [
-            _color(hue=65536),
+            _color(hue=360.1),
+            _color(saturation=1.1),
             _color(saturation=-1),
-            _color(brightness=70000),
+            _color(brightness=1.1),
             _color(kelvin=1000),
             _color(kelvin=9001),
         ],
@@ -626,15 +670,23 @@ class TestValidateRecordsColors:
         with pytest.raises(RuntimeError, match=r"line 1.*kelvin.*not valid in theme"):
             validate_records(_pairs(_record(colors=[_color(kelvin=0)])))
 
-    def test_palette_over_wire_ceiling_aborts(self) -> None:
-        """A palette above the 16-slot wire ceiling aborts at generation."""
-        colors = [_color(hue=index) for index in range(MAX_PALETTE_COLORS + 1)]
-        with pytest.raises(RuntimeError, match=r"line 1.*more than 16 colours"):
-            validate_records(_pairs(_record(colors=colors)))
+    def test_palette_above_the_wire_ceiling_is_accepted(self) -> None:
+        """A palette longer than a MORPH wire palette is a valid theme.
 
-    def test_palette_at_wire_ceiling_is_accepted(self) -> None:
-        """Exactly 16 colours is the ceiling, not one past it."""
-        colors = [_color(hue=index) for index in range(MAX_PALETTE_COLORS)]
+        Sixteen is the capacity of one consumer, the MORPH firmware effect,
+        not a property of a theme. Grid themes are painted with Set64 using
+        every colour they carry: the LIFX app ships several 64-colour themes
+        (Van Gogh, Mondrian, Kandinsky) and three of 68. Capping here would
+        make those unrepresentable. ``MatrixEffect._validate_palette()``
+        remains the enforcement point, at the moment a palette goes on the
+        wire.
+        """
+        colors = [_color(hue=index) for index in range(64)]
+        validate_records(_pairs(_record(colors=colors)))
+
+    def test_palette_at_the_wire_ceiling_is_accepted(self) -> None:
+        """Sixteen colours stays valid; the ceiling is not a lower bound."""
+        colors = [_color(hue=index) for index in range(16)]
         validate_records(_pairs(_record(colors=colors)))
 
 
@@ -696,7 +748,7 @@ class TestEmitDataModule:
 
     def test_palette_emitted_canonically_sorted(self) -> None:
         """A record whose colours arrive unsorted is emitted sorted by its
-        uint16 tuple, with a duplicated colour surviving in both positions
+        stored tuple, with a duplicated colour surviving in both positions
         (D-24)."""
         c1 = _color(hue=100)
         c2 = _color(hue=200)
@@ -705,33 +757,36 @@ class TestEmitDataModule:
 
         namespace = _exec_module(emit_data_module(_pairs(record)))
 
-        emitted = [c.as_tuple() for c in namespace["THEMES"]["test_theme"].colors]
+        emitted = [
+            (c.hue, c.saturation, c.brightness, c.kelvin)
+            for c in namespace["THEMES"]["test_theme"].colors
+        ]
         assert emitted == sorted(emitted)
         assert len(emitted) == 4
-        assert emitted.count((100, 65535, 65535, 3500)) == 2
+        assert emitted.count((100, 1, 1, 3500)) == 2
 
     @pytest.mark.parametrize(
         "color",
         [
             _color(hue=0, saturation=0, brightness=0, kelvin=3500),
-            _color(hue=65535, saturation=65535, brightness=65535, kelvin=9000),
-            _color(hue=32768, saturation=12345, brightness=54321, kelvin=1500),
+            _color(hue=360, saturation=1, brightness=1, kelvin=9000),
+            _color(hue=180.5, saturation=0.25, brightness=0.75, kelvin=1500),
         ],
     )
-    def test_uint16_round_trip_exact(self, color: dict[str, Any]) -> None:
-        """The emitted HSBK literal's as_tuple() equals the stored uint16
-        tuple for boundary and mid values."""
-        stored = (
-            color["hue"],
-            color["saturation"],
-            color["brightness"],
-            color["kelvin"],
-        )
-
+    def test_emitted_colour_matches_stored_values_exactly(
+        self, color: dict[str, Any]
+    ) -> None:
+        """_emit_color() transcribes stored values verbatim: the emitted
+        HSBK's own attributes equal the stored dict exactly, boundary and
+        mid values alike. There is no protocol round-trip any more: the
+        stored values already are HSBK's user-facing units."""
         namespace = _exec_module(emit_data_module(_pairs(_record(colors=[color]))))
 
         (emitted,) = namespace["THEMES"]["test_theme"].colors
-        assert emitted.as_tuple() == stored
+        assert emitted.hue == color["hue"]
+        assert emitted.saturation == color["saturation"]
+        assert emitted.brightness == color["brightness"]
+        assert emitted.kelvin == color["kelvin"]
 
     def test_duplicate_colors_survive_as_multiset(self) -> None:
         """Duplicate colours in a record survive into the emitted module
@@ -741,9 +796,12 @@ class TestEmitDataModule:
 
         namespace = _exec_module(emit_data_module(_pairs(record)))
 
-        counts = Counter(c.as_tuple() for c in namespace["THEMES"]["test_theme"].colors)
-        assert counts[(100, 65535, 65535, 3500)] == 2
-        assert counts[(200, 65535, 65535, 3500)] == 1
+        counts = Counter(
+            (c.hue, c.saturation, c.brightness, c.kelvin)
+            for c in namespace["THEMES"]["test_theme"].colors
+        )
+        assert counts[(100, 1, 1, 3500)] == 2
+        assert counts[(200, 1, 1, 3500)] == 1
 
     @pytest.mark.parametrize(
         ("record", "expected"),
@@ -780,20 +838,19 @@ class TestEmitDataModule:
         with pytest.raises(RuntimeError, match=expected):
             emit_data_module(_pairs(record))
 
-    def test_round_trip_mismatch_aborts(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A colour that does not re-encode to its stored uint16 aborts.
-
-        Unreachable through the protocol path today; the check exists so a
-        future HSBK conversion change cannot silently ship drifted palettes.
+    def test_invalid_colour_component_raises_via_hsbk_guard(self) -> None:
+        """emit_data_module() is public and callable without
+        validate_records() first, so an invalid colour component must still
+        fail generation. The ``HSBK`` construction inside ``_emit_color()``
+        is that guard: a value the data file's schema would reject but this
+        call was never validated against still fails, via ``HSBK``'s own
+        component validator, rather than shipping a module that raises on
+        import.
         """
-        monkeypatch.setattr(
-            generator_module.HSBK,
-            "as_tuple",
-            lambda self: (1, 2, 3, 4),
-        )
+        record = _record(colors=[_color(hue=400)])
 
-        with pytest.raises(RuntimeError, match="round-trip mismatch"):
-            emit_data_module(_pairs(_record()))
+        with pytest.raises(ValueError, match="Hue must be"):
+            emit_data_module(_pairs(record))
 
     def test_duplicate_slug_aborts_at_emit_time(self) -> None:
         """Two records sharing a slug abort rather than last-wins.

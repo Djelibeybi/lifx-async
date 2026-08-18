@@ -94,7 +94,7 @@ is both palette-close and semantically the same idea:
 |----------------|--------------------|
 | `focusing`     | `gentle`           |
 | `intense`      | `fantasy`          |
-| `shamrock`     | `st_patrick_s_day` |
+| `shamrock`     | `st_patricks_day`  |
 | `love`         | `romance`          |
 | `holly`        | `christmas`        |
 | `fire`         | `warm_ember`       |
