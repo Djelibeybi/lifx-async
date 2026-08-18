@@ -62,7 +62,7 @@ vanish, in any intermediate state.
 - [x] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving (completed 2026-08-15)
 - [x] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate (completed 2026-08-15)
 - [x] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way (completed 2026-08-16)
-- [ ] **Phase 9: Resync Tooling & Docs** - A future app update is resynced by documented procedure; theme docs reflect the new library
+- [ ] **Phase 9: Theme Data Contract & Docs** - The generated catalogue is produced from a validated, importable data contract and the theme docs reflect the shipped library
 
 ## Phase Details
 
@@ -177,17 +177,22 @@ for both `SetTileEffect` and `SetMultiZoneEffect`, so no device readback can eve
 more — a recorded, evidenced "cannot be determined from a device" is a complete,
 successful outcome.
 
-### Phase 9: Resync Tooling & Docs
+### Phase 9: Theme Data Contract & Docs
 
-**Goal**: A future app update can be resynced by documented procedure rather than re-derived, and the theme docs reflect the new library
+**Goal**: The generated catalogue is produced from a validated, importable data contract, and the theme docs reflect the shipped library
 **Depends on**: Phase 7 (documents the taxonomy) and Phase 8 (the FIDELITY-01 determination reaches the docs)
-**Requirements**: TOOL-01, TOOL-02, TOOL-03, DOCS-03
+**Requirements**: DOCS-03
 **Success Criteria** (what must be TRUE):
 
-  1. The capture tooling (`enumerate_themes.py`, `sweep_themes.py`, `analyse_themes.py`) ships in the repo and each tool runs from a documented command
-  2. The analysis tool, run against a fresh capture, reports the diff against the shipped library — new, changed and orphaned themes
-  3. Docs describe the end-to-end resync procedure for a future app update: capture, analyse, regenerate, review
+  1. The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py` must satisfy lives in the library as `lifx.theme.schema` — importable and independently tested — rather than being private to the generator
+  2. Palettes are stored as the app reports them, as user-facing HSBK floats converted to wire values at runtime, and are not truncated to the 16-colour firmware effect limit
+  3. Slug derivation is one documented rule with a single implementation, applied identically by the library and the generator
   4. Theme documentation lists the available themes and categories, and states that the pre-v1.2 palettes of redefined themes were not carried forward (amended 2026-08-14 with COMPAT-02's retirement)
+
+**Scope reduced 2026-08-19**: TOOL-01, TOOL-02 and TOOL-03 are withdrawn from v1.2. The
+capture and analysis tooling is maintained outside this repository, so shipping it here is
+no longer a requirement of this milestone. The phase entry is kept so phase numbering has
+no gap.
 
 **Plans**: TBD
 
@@ -204,4 +209,4 @@ successful outcome.
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete    | 2026-08-15 |
 | 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete    | 2026-08-16 |
-| 9. Resync Tooling & Docs | v1.2 | 0/TBD | Not started | - |
+| 9. Theme Data Contract & Docs | v1.2 | 0/TBD | In progress | - |

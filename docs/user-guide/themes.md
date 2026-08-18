@@ -85,7 +85,7 @@ async def activate_holiday_theme():
     month = datetime.now().month
 
     holiday_map = {
-        3: "st_patrick_s_day",  # March
+        3: "st_patricks_day",  # March
         10: "halloween",        # October
         11: "thanksgiving",     # November
         12: "christmas",        # December

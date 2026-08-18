@@ -86,11 +86,16 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 ### Tooling
 
-- [ ] **TOOL-01**: The capture tooling ships in the repo and runs from a documented command
-- [ ] **TOOL-02**: The analysis tool reports the diff between a fresh capture and the
-      shipped library
+- [ ] **TOOL-04**: The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py`
+      must satisfy is importable as `lifx.theme.schema` and independently tested
 
-- [ ] **TOOL-03**: Docs describe the resync procedure for a future app update
+**Withdrawn from v1.2 on 2026-08-19** — the capture and analysis tooling is maintained
+outside this repository, so shipping it here is no longer a requirement of this milestone:
+
+- ~~**TOOL-01**: The capture tooling ships in the repo and runs from a documented command~~
+- ~~**TOOL-02**: The analysis tool reports the diff between a fresh capture and the
+      shipped library~~
+- ~~**TOOL-03**: Docs describe the resync procedure for a future app update~~
 
 ### Docs
 
@@ -144,7 +149,8 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 | FIDELITY-01 | Phase 8 | Complete |
 | FIDELITY-02 | Phase 8 | Complete |
 | FIDELITY-03 | Phase 8 | Complete |
-| TOOL-01 | Phase 9 | Pending |
-| TOOL-02 | Phase 9 | Pending |
-| TOOL-03 | Phase 9 | Pending |
+| TOOL-01 | - | Withdrawn 2026-08-19 |
+| TOOL-02 | - | Withdrawn 2026-08-19 |
+| TOOL-03 | - | Withdrawn 2026-08-19 |
+| TOOL-04 | Phase 9 | Pending |
 | DOCS-03 | Phase 9 | Pending |
