@@ -4,17 +4,17 @@ milestone: v1.2
 milestone_name: Theme Library Update
 current_phase: 9
 current_phase_name: Theme Data Contract & Docs
-status: planning
-stopped_at: Completed 08-04-PLAN.md with operator exception
-last_updated: "2026-08-16T08:23:40.560Z"
-last_activity: 2026-08-16
-last_activity_desc: Phase 08 completed with operator exception; transitioned to Phase 9
+status: complete
+stopped_at: Phase 9 closed — record reconstructed and verified
+last_updated: "2026-08-27T04:30:54Z"
+last_activity: 2026-08-27
+last_activity_desc: Phase 9 verified 4/4; v1.2 phases all complete
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 75
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -28,10 +28,18 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 ## Current Position
 
-Phase: 9 — Theme Data Contract & Docs
-Plan: Not started — the phase is being executed directly on `split/library-changes`
-Status: In progress, awaiting review
-Last activity: 2026-08-19 — schema extraction, float palette storage and the slug rule landed on the branch
+Phase: 9 — Theme Data Contract & Docs — **complete** (verified 2026-08-27, 4/4 criteria)
+Plan: 2/2 — both reconstructed after execution; see `09-VERIFICATION.md` § Process deviations
+Status: All four v1.2 phases complete; milestone ready to close
+Last activity: 2026-08-27 — the catalogue page landed (`874f073`) and the Phase 9 record was reconstructed and verified
+
+Phase 9 was executed outside the GSD loop as two commits: `291e7e6` (2026-08-19, schema
+extraction, float palettes, slug rule, API resync) and `874f073` (2026-08-27, the built-in
+theme catalogue page and its publication contract test). No plan preceded either; the plans
+and summaries in the phase directory are labelled `reconstructed: true` and the verification
+report says so plainly rather than presenting them as a plan. TOOL-04 and DOCS-03 are
+complete; TOOL-01/02/03 were withdrawn on 2026-08-19 when the capture and analysis tooling
+moved to the private `lifx-theme-resync` repository.
 
 Phase 6 shipped: PR #196 merged to main 2026-08-15 (merge commit `cee51bf`), branch deleted.
 Self-review raised 20 inline comments, all resolved before merge: 15 fixed on the branch, 5
