@@ -4,11 +4,12 @@ milestone: v1.2
 milestone_name: Theme Library Update
 current_phase: 9
 current_phase_name: Theme Data Contract & Docs
-status: complete
+status: "Phase 9 shipped — PR #207"
 stopped_at: Phase 9 closed — record reconstructed and verified
-last_updated: "2026-08-27T04:30:54Z"
+last_updated: "2026-08-27T04:37:57.480Z"
 last_activity: 2026-08-27
-last_activity_desc: Phase 9 verified 4/4; v1.2 phases all complete
+last_activity_desc: Phase 9 verified 4/4 and shipped as PR #207; v1.2 phases all complete
+state_head: 2830eb96ecdea61e217f0eb69e3f76149c0cf556
 progress:
   total_phases: 4
   completed_phases: 4
@@ -30,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-08-14 at the start of v1.2)
 
 Phase: 9 — Theme Data Contract & Docs — **complete** (verified 2026-08-27, 4/4 criteria)
 Plan: 2/2 — both reconstructed after execution; see `09-VERIFICATION.md` § Process deviations
-Status: All four v1.2 phases complete; milestone ready to close
-Last activity: 2026-08-27 — the catalogue page landed (`874f073`) and the Phase 9 record was reconstructed and verified
+Status: Phase 9 shipped — PR #207; all four v1.2 phases complete, milestone ready to close
+Last activity: 2026-08-27 — the catalogue page landed (`874f073`), the Phase 9 record was reconstructed and verified, and the phase shipped as PR #207
 
 Phase 9 was executed outside the GSD loop as two commits: `291e7e6` (2026-08-19, schema
 extraction, float palettes, slug rule, API resync) and `874f073` (2026-08-27, the built-in
@@ -49,6 +50,7 @@ fixed in 732e512.
 
 - **#197 — closed by Phase 9:** display names keep their typographic apostrophes and the
   slug rule drops them, so `Spider's Lair` ships intact as `spiders_lair`.
+
 - **#198, #199 — still Phase 9:** `earth`/`coral_reef` substitution still has no changelog
   entry naming every key whose palette changed, and `validate_key()` still requires
   `str.isidentifier()`, so a digit-leading display name remains unrepresentable. No shipped
