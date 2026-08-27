@@ -62,7 +62,7 @@ vanish, in any intermediate state.
 - [x] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving (completed 2026-08-15)
 - [x] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate (completed 2026-08-15)
 - [x] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way (completed 2026-08-16)
-- [ ] **Phase 9: Theme Data Contract & Docs** - The generated catalogue is produced from a validated, importable data contract and the theme docs reflect the shipped library
+- [x] **Phase 9: Theme Data Contract & Docs** - The generated catalogue is produced from a validated, importable data contract and the theme docs reflect the shipped library (completed 2026-08-27)
 
 ## Phase Details
 
@@ -181,7 +181,7 @@ successful outcome.
 
 **Goal**: The generated catalogue is produced from a validated, importable data contract, and the theme docs reflect the shipped library
 **Depends on**: Phase 7 (documents the taxonomy) and Phase 8 (the FIDELITY-01 determination reaches the docs)
-**Requirements**: DOCS-03
+**Requirements**: TOOL-04, DOCS-03
 **Success Criteria** (what must be TRUE):
 
   1. The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py` must satisfy lives in the library as `lifx.theme.schema` — importable and independently tested — rather than being private to the generator
@@ -194,7 +194,7 @@ capture and analysis tooling is maintained outside this repository, so shipping 
 no longer a requirement of this milestone. The phase entry is kept so phase numbering has
 no gap.
 
-**Plans**: TBD
+**Plans**: 2 (both reconstructed after execution — see `09-VERIFICATION.md` § Process deviations)
 
 ## Progress
 
@@ -209,4 +209,4 @@ no gap.
 | 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete    | 2026-08-15 |
 | 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete    | 2026-08-16 |
-| 9. Theme Data Contract & Docs | v1.2 | 0/TBD | In progress | - |
+| 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete    | 2026-08-27 |

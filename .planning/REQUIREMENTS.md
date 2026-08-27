@@ -86,7 +86,7 @@ Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a
 
 ### Tooling
 
-- [ ] **TOOL-04**: The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py`
+- [x] **TOOL-04**: The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py`
       must satisfy is importable as `lifx.theme.schema` and independently tested
 
 **Withdrawn from v1.2 on 2026-08-19** — the capture and analysis tooling is maintained
@@ -99,7 +99,7 @@ outside this repository, so shipping it here is no longer a requirement of this 
 
 ### Docs
 
-- [ ] **DOCS-03**: Theme documentation lists the available themes and categories, and
+- [x] **DOCS-03**: Theme documentation lists the available themes and categories, and
       states that the pre-v1.2 palettes of redefined themes were not carried forward
       (continues v1.1's DOCS-01..02). **Amended 2026-08-14** with COMPAT-02's retirement
 
@@ -152,5 +152,5 @@ COMPAT-02 retired during Phase 6 discussion (2026-08-14).
 | TOOL-01 | - | Withdrawn 2026-08-19 |
 | TOOL-02 | - | Withdrawn 2026-08-19 |
 | TOOL-03 | - | Withdrawn 2026-08-19 |
-| TOOL-04 | Phase 9 | Pending |
-| DOCS-03 | Phase 9 | Pending |
+| TOOL-04 | Phase 9 | Complete |
+| DOCS-03 | Phase 9 | Complete |
