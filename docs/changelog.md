@@ -2,6 +2,31 @@
 
 <!-- version list -->
 
+## v6.6.0 (2026-08-27)
+
+### Documentation
+
+- **09**: Add the retroactive-STRIDE security register
+  ([`cfa051a`](https://github.com/Djelibeybi/lifx-async/commit/cfa051a18fd1afee888e02781bdf21c8ac585498))
+
+- **09**: Reconstruct and verify the phase 9 record
+  ([`38f8cc3`](https://github.com/Djelibeybi/lifx-async/commit/38f8cc372b2947b3c2c4ab91d2c8d136375a9330))
+
+- **09**: Ship phase 9 — PR #207 [ci skip]
+  ([`ade1f78`](https://github.com/Djelibeybi/lifx-async/commit/ade1f789ed2118ebbed314bd395b2274cdfab696))
+
+- **theme**: Land the built-in theme catalogue page
+  ([`9d44948`](https://github.com/Djelibeybi/lifx-async/commit/9d4494883bdcb88a6c583b33513e0c42b2365a8c))
+
+### Features
+
+- **network**: Support IPv6 and Thread devices end to end
+  ([`a56bd2c`](https://github.com/Djelibeybi/lifx-async/commit/a56bd2cd1fab7543a0f9e0b0af8e84d61e48f5e7))
+
+- **network**: Support IPv6 Thread devices in discovery and connections
+  ([`79a5ce0`](https://github.com/Djelibeybi/lifx-async/commit/79a5ce09b71ea076d1065953aee72609e154fa0a))
+
+
 ## v6.5.1 (2026-08-18)
 
 ### Bug Fixes
