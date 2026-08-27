@@ -260,7 +260,12 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        uv run --with python-semantic-release semantic-release --noop version
+        # GitPython 3.1.60 removed Actor.name_email_regex, which
+        # python-semantic-release 10.6.1 still calls, so an unpinned resolve
+        # fails with "type object 'Actor' has no attribute 'name_email_regex'".
+        # PSR's own constraint is gitpython~=3.0, which does not exclude it.
+        # 3.1.59 is the last working release; drop the pin once PSR ships a fix.
+        uv run --with python-semantic-release --with "GitPython<3.1.60" semantic-release --noop version
 
     - name: Run Python Semantic Release
       id: release
@@ -269,8 +274,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        # GitPython 3.1.60 removed Actor.name_email_regex, which
+        # python-semantic-release 10.6.1 still calls, so an unpinned resolve
+        # fails with "type object 'Actor' has no attribute 'name_email_regex'".
+        # PSR's own constraint is gitpython~=3.0, which does not exclude it.
+        # 3.1.59 is the last working release; drop the pin once PSR ships a fix.
         # Capture output to detect if a release was made
-        output=$(uv run --with python-semantic-release semantic-release version 2>&1)
+        output=$(uv run --with python-semantic-release --with "GitPython<3.1.60" semantic-release version 2>&1)
         echo "$output"
 
         # Check if a release was made (no "No release will be made" message)
@@ -278,7 +288,7 @@ jobs:
           echo "released=false" >> $GITHUB_OUTPUT
         else
           # Publish distribution artifacts to release
-          uv run --with python-semantic-release semantic-release publish
+          uv run --with python-semantic-release --with "GitPython<3.1.60" semantic-release publish
           echo "released=true" >> $GITHUB_OUTPUT
         fi
 
