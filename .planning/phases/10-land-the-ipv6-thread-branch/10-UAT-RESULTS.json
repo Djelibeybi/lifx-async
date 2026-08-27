@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "kind": "thread-hardware-uat",
+  "phase": "10",
+  "device_serial": "d073d5e00002",
+  "device_ip": "fd00:2::",
+  "timestamp": "2026-08-27T20:08:06.799186+00:00",
+  "library_head": "a56bd2cd1fab7543a0f9e0b0af8e84d61e48f5e7",
+  "stages": {
+    "connect": "passed",
+    "control": "passed",
+    "streaming": "not_run"
+  },
+  "restored": true
+}
