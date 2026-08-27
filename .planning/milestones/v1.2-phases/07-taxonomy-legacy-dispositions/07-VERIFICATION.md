@@ -20,7 +20,13 @@ human_verification:
 
 **Phase Goal:** Callers can navigate the library by the app's category taxonomy, and every legacy category name and orphaned key has a recorded, working fate
 **Verified:** 2026-08-15 (branch `chore/theme-taxonomy`, clean tree at 9e3ff6a)
-**Status:** human_needed (all automated checks passed; 2 judgment-tier prohibitions flagged for human sign-off)
+**Status:** passed. At verification time this read `human_needed`: all automated checks
+passed, but 2 judgment-tier prohibitions carried non-authoritative LLM-judge verdicts and
+were flagged for human sign-off. Both were persisted as UAT scenarios in `c85167f` and
+signed off by the operator in `f002cd4` (2026-08-15), each `result: pass` in
+[07-UAT.md](07-UAT.md); test 1 passed only after the operator rejected the first attempt,
+raising gap G-07-1. The frontmatter has read `passed` since. This body line was left at its
+pre-UAT wording and is reconciled here (v1.2 milestone audit, 2026-08-27).
 **Re-verification:** No — initial verification
 
 All evidence below was produced by executing the delivered code in this run — not taken from SUMMARY.md or 07-REVIEW.md claims.

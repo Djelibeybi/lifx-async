@@ -50,6 +50,7 @@ from lifx.animation.packets import (
     PacketTemplate,
 )
 from lifx.const import LIFX_UDP_PORT
+from lifx.network.address import family_for
 from lifx.network.utils import allocate_source
 from lifx.protocol.models import Serial
 
@@ -392,9 +393,13 @@ class Animator:
                 f"pixel_count ({self._framebuffer.canvas_size})"
             )
 
-        # Ensure socket exists
+        # Ensure socket exists. The socket family follows the device
+        # address, derived by the one shared rule: Thread devices are
+        # IPv6-only, and an AF_INET socket raises gaierror when asked to
+        # send to an IPv6 address.
         if self._socket is None:
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            family = family_for(self._addr[0])
+            self._socket = socket.socket(family, socket.SOCK_DGRAM)
             self._socket.setblocking(False)
 
         now = time.monotonic()

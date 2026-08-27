@@ -1,14 +1,14 @@
 {
   "timestamp": "2026-07-17T07:29:39",
-  "serial": "d073d5a132d9",
-  "label": "Makerspace Ceiling",
+  "serial": "d073d5e00003",
+  "label": "Test Ceiling A",
   "role": "gate",
   "profile": "ceiling",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.19.119"
+    "ip": "203.0.113.7"
   },
-  "ip": "192.168.19.119",
+  "ip": "203.0.113.7",
   "ceiling_power_confirmed": true,
   "restoration": {
     "attempted": true,

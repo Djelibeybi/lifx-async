@@ -27,14 +27,14 @@ key-files:
   created:
     - .planning/phases/04-animation-flow-control/04-SWEEP-DESIGN.md
     - .planning/phases/04-animation-flow-control/sweep_design.py
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5893c04.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d55956e8.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d582bff4.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5866777.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5a132d9.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5a132b8.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d587daab.json
-    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d53e11be.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e00035.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e0001e.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e00001.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e00002.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e00003.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e00036.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e0000c.json
+    - .planning/phases/04-animation-flow-control/04-UAT-SWEEP-d073d5e00008.json
     - .planning/phases/04-animation-flow-control/04-UAT-SWEEP.json
   modified:
     - .planning/ROADMAP.md
@@ -48,7 +48,7 @@ key-decisions:
   - "Operator approved the complete cross-device sweep wording as presented (verbatim '1') -- no amendments"
   - "K=N_valid-1 (allowed_fails=1), quorum Q=5, chosen because it is the strictest K meeting the pre-declared P(sweep PASS | historical rate) >= 0.85 bar; the all-must-pass power (0.4813) was surfaced and rejected"
   - "Sweep aggregate outcome is FAIL: 5 of 5 valid gate sessions FAILed (0 PASS), exceeding the 1-allowed-fail bar; thresholds/roster/rule were not touched after seeing results"
-  - "My Office Ceiling Capsule reported chain 16x8, not the roster's assumed 13x26 -- the chain-dims-derived expected_packets_per_frame() correctly computed 3 packets/frame from the REPORTED dims and every gated frame matched it; the discrepancy is a roster documentation error, not a harness defect"
+  - "Test Ceiling Capsule reported chain 16x8, not the roster's assumed 13x26 -- the chain-dims-derived expected_packets_per_frame() correctly computed 3 packets/frame from the REPORTED dims and every gated frame matched it; the discrepancy is a roster documentation error, not a harness defect"
 
 requirements-completed: []
 
@@ -146,13 +146,13 @@ applied exactly as written.
 
 | Device | Role | Outcome | Gated pooled | Blind pooled | Fisher p | Ratio | Validity | Restoration |
 |---|---|---|---|---|---|---|---|---|
-| Playroom Luna | gate | FAIL | 24/81 = 29.63% | 29/69 = 42.03% | 0.0790 | 1.42 | valid | succeeded |
+| Test Luna | gate | FAIL | 24/81 = 29.63% | 29/69 = 42.03% | 0.0790 | 1.42 | valid | succeeded |
 | Dining Room Table Candle | gate | INCONCLUSIVE | 2/155 = 1.29% | 5/140 = 3.57% | 0.1841 | 2.77 | **ambient n=90 < 100 (V2)** | succeeded |
-| Makerspace Candle | gate | FAIL | 27/77 = 35.06% | 30/67 = 44.78% | 0.1544 | 1.28 | valid | succeeded |
-| Makerspace Tube | gate | FAIL | 24/86 = 27.91% | 28/73 = 38.36% | 0.1094 | 1.37 | valid | succeeded |
-| Makerspace Ceiling | gate | FAIL | 24/79 = 30.38% | 28/68 = 41.18% | 0.1166 | 1.36 | valid | succeeded |
-| Playroom Ceiling | gate | FAIL | 28/72 = 38.89% | 32/54 = 59.26% | 0.0184 | 1.52 | valid | succeeded |
-| My Office Ceiling Capsule | gate | INCONCLUSIVE | 23/82 = 28.05% | 36/38 = 94.74% | 1.0e-12 | 3.38 | **2 gated rounds delivered_ratio < 0.50 (V3)** | succeeded |
+| Test Candle | gate | FAIL | 27/77 = 35.06% | 30/67 = 44.78% | 0.1544 | 1.28 | valid | succeeded |
+| Test Tube | gate | FAIL | 24/86 = 27.91% | 28/73 = 38.36% | 0.1094 | 1.37 | valid | succeeded |
+| Test Ceiling A | gate | FAIL | 24/79 = 30.38% | 28/68 = 41.18% | 0.1166 | 1.36 | valid | succeeded |
+| Test Ceiling B | gate | FAIL | 28/72 = 38.89% | 32/54 = 59.26% | 0.0184 | 1.52 | valid | succeeded |
+| Test Ceiling Capsule | gate | INCONCLUSIVE | 23/82 = 28.05% | 36/38 = 94.74% | 1.0e-12 | 3.38 | **2 gated rounds delivered_ratio < 0.50 (V3)** | succeeded |
 | System Test Tiles II | **reference** | FAIL | 14/102 = 13.73% | 22/85 = 25.88% | 0.0280 | 1.89 | valid | succeeded |
 
 Every measured device showed markedly higher query loss than any prior session
@@ -168,9 +168,9 @@ session actually encountered.
 
 | Device | Chain dims | Expected packets/frame | packet_shape_ok (all rounds) | Ack RTT median | Ack RTT samples/round | A1/A2 disposition |
 |---|---|---|---|---|---|---|
-| Makerspace Ceiling | 8x8 | 1 (<=64 px, one Set64, no CopyFB) | true | 50.2 ms | 442-475 | **confirmed** |
-| Playroom Ceiling | 8x8 | 1 | true | 50.1-50.2 ms | 466-507 | **confirmed** |
-| My Office Ceiling Capsule | **16x8** (not the roster's assumed 13x26) | 3 (64//16=4 rows/packet, ceil(8/4)=2 Set64, +1 CopyFB) | true | 150.0-150.2 ms | 230-297 | **confirmed** |
+| Test Ceiling A | 8x8 | 1 (<=64 px, one Set64, no CopyFB) | true | 50.2 ms | 442-475 | **confirmed** |
+| Test Ceiling B | 8x8 | 1 | true | 50.1-50.2 ms | 466-507 | **confirmed** |
+| Test Ceiling Capsule | **16x8** (not the roster's assumed 13x26) | 3 (64//16=4 rows/packet, ceil(8/4)=2 Set64, +1 CopyFB) | true | 150.0-150.2 ms | 230-297 | **confirmed** |
 
 The Capsule's reported chain (16x8 = 128 pixels) differs from the roster
 documentation's assumed 13x26 (338 pixels) -- this is a **roster documentation
@@ -192,7 +192,7 @@ FAIL count among valid gate sessions = 5                (> allowed_fails = 1)
 => aggregate outcome = FAIL
 ```
 
-Dining Room Table Candle and My Office Ceiling Capsule were INCONCLUSIVE
+Dining Room Table Candle and Test Ceiling Capsule were INCONCLUSIVE
 (excluded from N_valid but reported); System Test Tiles II FAILed but was never
 counted (reference-only, per the operator's Tiles ruling). Full arithmetic and
 per-device rows are in `04-UAT-SWEEP.json`.
@@ -200,7 +200,7 @@ per-device rows are in `04-UAT-SWEEP.json`.
 ## Task 5: Consolidated Visual Checkpoint
 
 **Skipped -- aggregate not PASS.** Per the plan's own routing, Task 5 (the
-consolidated smoothness + geometry verdict on My Office Ceiling Capsule)
+consolidated smoothness + geometry verdict on Test Ceiling Capsule)
 executes ONLY on Task 4 aggregate PASS. Since the aggregate outcome was FAIL,
 Task 5 was not presented to the operator; ANIM-03 and ANIM-04 stay unchecked.
 

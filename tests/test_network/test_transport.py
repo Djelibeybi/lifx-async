@@ -3,6 +3,8 @@
 import asyncio
 import errno
 import logging
+import socket
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -165,47 +167,47 @@ class TestUdpProtocol:
 
     async def test_protocol_error_received_names_the_peer(self) -> None:
         """An unreachable-peer warning identifies which device went away."""
-        protocol = _UdpProtocol(peer=PeerInfo("d073d5d4809b", "192.168.19.200", 56700))
+        protocol = _UdpProtocol(peer=PeerInfo("d073d5e00039", "203.0.113.13", 56700))
 
         with patch("lifx.network.transport._LOGGER") as mock_logger:
             protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
             log_dict = mock_logger.warning.call_args[0][0]
-            assert log_dict["serial"] == "d073d5d4809b"
-            assert log_dict["ip"] == "192.168.19.200"
+            assert log_dict["serial"] == "d073d5e00039"
+            assert log_dict["ip"] == "203.0.113.13"
             assert log_dict["port"] == 56700
             assert log_dict["method"] == "error_received"
 
     async def test_protocol_log_follows_a_serial_learned_later(self) -> None:
         """A serial learned after open() replaces the placeholder in logs."""
-        peer = PeerInfo("000000000000", "192.168.19.200", 56700)
+        peer = PeerInfo("000000000000", "203.0.113.13", 56700)
         protocol = _UdpProtocol(peer=peer)
 
-        peer.serial = "d073d5d4809b"
+        peer.serial = "d073d5e00039"
 
         with patch("lifx.network.transport._LOGGER") as mock_logger:
             protocol.error_received(OSError(errno.EHOSTDOWN, "Host is down"))
             log_dict = mock_logger.warning.call_args[0][0]
-            assert log_dict["serial"] == "d073d5d4809b"
+            assert log_dict["serial"] == "d073d5e00039"
 
     async def test_protocol_dropped_packet_names_peer_and_sender(self) -> None:
         """A queue-full warning names both the peer and the actual sender."""
-        protocol = _UdpProtocol(peer=PeerInfo("d073d5d4809b", "192.168.19.200", 56700))
+        protocol = _UdpProtocol(peer=PeerInfo("d073d5e00039", "203.0.113.13", 56700))
         for _ in range(protocol._MAX_QUEUE_SIZE):
-            protocol.datagram_received(b"x", ("192.168.19.200", 56700))
+            protocol.datagram_received(b"x", ("203.0.113.13", 56700))
 
         with patch("lifx.network.transport._LOGGER") as mock_logger:
             # A different host overruns the queue: the peer alone would blame
             # the device that sent nothing.
-            protocol.datagram_received(b"x", ("192.168.19.7", 56700))
+            protocol.datagram_received(b"x", ("203.0.113.16", 56700))
             log_dict = mock_logger.warning.call_args[0][0]
-            assert log_dict["serial"] == "d073d5d4809b"
-            assert log_dict["sender_ip"] == "192.168.19.7"
+            assert log_dict["serial"] == "d073d5e00039"
+            assert log_dict["sender_ip"] == "203.0.113.16"
             assert log_dict["sender_port"] == 56700
             assert log_dict["action"] == "packet_dropped"
 
     async def test_transport_passes_peer_to_protocol(self) -> None:
         """UdpTransport hands its peer descriptor to the protocol it creates."""
-        peer = PeerInfo("d073d5d4809b", "192.168.19.200", 56700)
+        peer = PeerInfo("d073d5e00039", "203.0.113.13", 56700)
         transport = UdpTransport(peer=peer)
         await transport.open()
         try:
@@ -216,7 +218,7 @@ class TestUdpProtocol:
 
     async def test_endpoint_lost_warning_names_the_peer(self) -> None:
         """The socket-death warning identifies whose connection was torn down."""
-        transport = UdpTransport(peer=PeerInfo("d073d5d4809b", "192.168.19.200", 56700))
+        transport = UdpTransport(peer=PeerInfo("d073d5e00039", "203.0.113.13", 56700))
         await transport.open()
         protocol = transport._protocol
         assert protocol is not None
@@ -226,8 +228,8 @@ class TestUdpProtocol:
             log_dict = mock_logger.warning.call_args[0][0]
             assert log_dict["class"] == "UdpTransport"
             assert log_dict["action"] == "endpoint_lost"
-            assert log_dict["serial"] == "d073d5d4809b"
-            assert log_dict["ip"] == "192.168.19.200"
+            assert log_dict["serial"] == "d073d5e00039"
+            assert log_dict["ip"] == "203.0.113.13"
             assert log_dict["port"] == 56700
 
     async def test_protocol_queue_full_drops_packet(self) -> None:
@@ -385,6 +387,10 @@ class TestErrorHandling:
         transport = UdpTransport()
         protocol = _UdpProtocol()
         transport._protocol = protocol
+        # open() records the socket family for send()'s pre-send check, so a
+        # hand-assembled transport has to record it too or the send is
+        # rejected as "not open" before it can reach sendto.
+        transport._family = socket.AF_INET
 
         # Create a mock transport that raises OSError on sendto
         mock_transport = MagicMock()
@@ -627,3 +633,196 @@ class TestEndpointLoss:
 
         assert not transport.is_open
         assert transport._transport is None
+
+
+class TestSocketFamilySelection:
+    """The socket family follows the local bind address (IPV6-03, B9).
+
+    ``open()`` no longer decides this for itself: it asks
+    :func:`lifx.network.address.family_for`, the one shared rule. Both arms
+    are asserted here because only the IPv4 arm runs in the rest of the
+    suite, which would leave the IPv6 side of the seam unproven.
+    """
+
+    @staticmethod
+    async def _family_used(ip_address: str) -> int:
+        """Open a transport against a mocked loop and report the family."""
+        transport = UdpTransport(ip_address=ip_address, port=0)
+
+        with patch("asyncio.get_running_loop") as mock_loop:
+            endpoint = AsyncMock(return_value=(MagicMock(), MagicMock()))
+            mock_loop.return_value.create_datagram_endpoint = endpoint
+            await transport.open()
+
+        return endpoint.await_args.kwargs["family"]
+
+    async def test_ipv4_bind_address_opens_an_af_inet_endpoint(self) -> None:
+        """The default wildcard bind stays IPv4."""
+        assert await self._family_used("0.0.0.0") == socket.AF_INET
+
+    async def test_ipv6_bind_address_opens_an_af_inet6_endpoint(self) -> None:
+        """The IPv6 wildcard bind is what reaches a Thread device."""
+        assert await self._family_used("::") == socket.AF_INET6
+
+    async def test_zoned_link_local_bind_opens_an_af_inet6_endpoint(self) -> None:
+        """A zoned literal parses, so the family still follows the address."""
+        assert await self._family_used("fe80::1%en0") == socket.AF_INET6
+
+
+class TestSendFamilyAssertion:
+    """A destination of the wrong family must fail loudly, not silently (B1).
+
+    Sending an IPv6 literal down an ``AF_INET`` socket raises
+    :class:`socket.gaierror`, an ``OSError`` subclass, which asyncio hands to
+    ``error_received``. That handler deliberately swallows everything it is
+    given, so before this guard existed an address-shaped configuration error
+    was indistinguishable from a dead device: the caller waited out the whole
+    retry schedule and got a timeout naming nothing. The pre-send check turns
+    it into a typed, immediate, self-describing failure.
+    """
+
+    #: Generous enough to survive a loaded CI runner, tight enough that a
+    #: swallowed error waiting out the retry schedule could never pass.
+    _FAST_FAILURE_SECONDS = 0.1
+
+    @staticmethod
+    async def _open_against_mock_endpoint(
+        ip_address: str,
+    ) -> tuple[UdpTransport, MagicMock]:
+        """Open a transport whose endpoint is a mock, and hand back both.
+
+        The family under test follows the bind address, so proving both
+        directions of the mismatch needs an ``AF_INET6`` transport on hosts
+        that may have no IPv6 stack at all. Mocking the endpoint keeps the
+        assertion about the guard rather than about the runner's networking,
+        and lets the happy path assert the datagram really was handed to
+        ``sendto`` instead of putting a packet on the wire.
+        """
+        transport = UdpTransport(ip_address=ip_address, port=0)
+        datagram_transport = MagicMock()
+
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            await transport.open()
+
+        return transport, datagram_transport
+
+    async def test_ipv6_destination_on_an_ipv4_socket_raises_immediately(self) -> None:
+        """The B1 case: an IPv6 target reached through the IPv4 seam."""
+        transport, datagram_transport = await self._open_against_mock_endpoint(
+            "0.0.0.0"
+        )
+
+        started = time.perf_counter()
+        with pytest.raises(NetworkError) as excinfo:
+            await transport.send(b"x" * 36, ("::1", 56700))
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < self._FAST_FAILURE_SECONDS
+        assert str(excinfo.value) == (
+            "Destination ::1 requires AF_INET6 but the socket family is AF_INET"
+        )
+        datagram_transport.sendto.assert_not_called()
+
+    async def test_ipv4_destination_on_an_ipv6_socket_raises_immediately(self) -> None:
+        """The mirror case, so the guard is not one-directional."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+
+        started = time.perf_counter()
+        with pytest.raises(NetworkError) as excinfo:
+            await transport.send(b"x" * 36, ("127.0.0.1", 56700))
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < self._FAST_FAILURE_SECONDS
+        assert str(excinfo.value) == (
+            "Destination 127.0.0.1 requires AF_INET but the socket family is AF_INET6"
+        )
+        datagram_transport.sendto.assert_not_called()
+
+    async def test_matching_ipv4_destination_still_sends(self) -> None:
+        """The happy path is untouched: a matching family reaches sendto."""
+        transport, datagram_transport = await self._open_against_mock_endpoint(
+            "0.0.0.0"
+        )
+
+        await transport.send(b"x" * 36, ("127.0.0.1", 56700))
+
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("127.0.0.1", 56700)
+        )
+
+    async def test_matching_ipv6_destination_still_sends(self) -> None:
+        """The IPv6 seam this phase exists to open stays open."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+
+        await transport.send(b"x" * 36, ("fd00:1::", 56700))
+
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("fd00:1::", 56700)
+        )
+
+    async def test_ipv4_broadcast_destination_still_sends(self) -> None:
+        """Discovery broadcasts to a literal no device owns; it must pass."""
+        transport, datagram_transport = await self._open_against_mock_endpoint(
+            "0.0.0.0"
+        )
+
+        await transport.send(b"x" * 36, ("255.255.255.255", 56700))
+
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("255.255.255.255", 56700)
+        )
+
+    @pytest.mark.parametrize(
+        "error_number",
+        [errno.EHOSTUNREACH, errno.EHOSTDOWN, errno.ENETUNREACH],
+    )
+    async def test_peer_errors_are_still_swallowed_after_a_send(
+        self, error_number: int
+    ) -> None:
+        """The guard must not reclassify a peer problem as a socket problem.
+
+        This is the regression the family assertion most easily breaks: a
+        sleeping device produces a sustained stream of these, and converting
+        any of them into a raise, or into endpoint death, would tear down
+        healthy request flows across the whole fleet.
+        """
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        try:
+            await transport.send(b"x" * 36, ("127.0.0.1", 56700))
+
+            # asyncio delivers the ICMP-derived failure after sendto returned.
+            for _ in range(50):
+                protocol.error_received(OSError(error_number, "peer unreachable"))
+
+            assert transport.is_open
+            assert transport._protocol is protocol
+            assert transport._transport is not None
+        finally:
+            await transport.close()
+
+    async def test_send_on_a_dead_endpoint_raises_the_typed_error(self) -> None:
+        """A dead endpoint is reported as such, never as an AttributeError.
+
+        The family check needs the socket family recorded at open time, so a
+        transport whose endpoint has since died must still take the "Socket
+        not open" path rather than dereferencing what open() left behind.
+        """
+        transport = UdpTransport()
+        await transport.open()
+        protocol = transport._protocol
+        assert protocol is not None
+
+        protocol.error_received(OSError(errno.EBADF, "Bad file descriptor"))
+        assert not transport.is_open
+
+        with pytest.raises(NetworkError) as excinfo:
+            await transport.send(b"x" * 36, ("::1", 56700))
+
+        assert str(excinfo.value) == "Socket not open"

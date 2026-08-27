@@ -1,3 +1,19 @@
+---
+status: resolved
+phase: 08-hardware-fidelity-validation
+source: [08-EXCEPTION-OVERRIDE.json, 08-CEILING-DETERMINATIONS.json, 08-VERIFICATION.md]
+started: 2026-08-16T08:32:37Z
+updated: 2026-08-16T08:32:37Z
+resolution: operator-approved exception
+resolution_detail: >-
+  Closed by operator decision, not by a clean pass. Theme-fidelity observations
+  for both roles were accepted; Tile restoration remains unverified, official
+  08-UAT-RESULTS.json is deliberately absent, a synthetic two-role merge is
+  prohibited, and no further hardware run is required. Mirrors the override
+  already recorded in 08-VERIFICATION.md (overrides_applied: 1, accepted_at
+  2026-08-16).
+---
+
 # Phase 08 Hardware UAT — Operator-Approved Exception Closeout
 
 **Decision date:** 2026-08-16  

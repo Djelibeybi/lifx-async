@@ -8,12 +8,14 @@ import pytest
 
 from lifx.network.mdns.dns import (
     DNS_TYPE_A,
+    DNS_TYPE_AAAA,
     DNS_TYPE_PTR,
     DNS_TYPE_SRV,
     DNS_TYPE_TXT,
     DnsHeader,
     SrvData,
     TxtData,
+    build_address_query,
     build_ptr_query,
     parse_dns_response,
     parse_name,
@@ -142,9 +144,9 @@ class TestParseTxtRecord:
 
         assert isinstance(result, TxtData)
         assert "p=222" in result.strings
-        assert "id=d073d5882c19" in result.strings
+        assert "id=d073d5e00034" in result.strings
         assert result.pairs["p"] == "222"
-        assert result.pairs["id"] == "d073d5882c19"
+        assert result.pairs["id"] == "d073d5e00034"
         assert result.pairs["fw"] == "4.112"
         assert result.pairs["cnt"] == "5"
 
@@ -255,24 +257,24 @@ class TestParseDnsResponse:
         # Check PTR record
         ptr = ptr_records[0]
         assert "_lifx._udp.local" in ptr.name
-        assert "D073D5882C19" in ptr.parsed_data
+        assert "D073D5E00034" in ptr.parsed_data
 
         # Check SRV record
         srv = srv_records[0]
         assert isinstance(srv.parsed_data, SrvData)
         assert srv.parsed_data.port == 56700
-        assert "D073D5882C19" in srv.parsed_data.target
+        assert "D073D5E00034" in srv.parsed_data.target
 
         # Check TXT record
         txt = txt_records[0]
         assert isinstance(txt.parsed_data, TxtData)
         assert txt.parsed_data.pairs["p"] == "222"
-        assert txt.parsed_data.pairs["id"] == "d073d5882c19"
+        assert txt.parsed_data.pairs["id"] == "d073d5e00034"
         assert txt.parsed_data.pairs["fw"] == "4.112"
 
         # Check A record
         a = a_records[0]
-        assert a.parsed_data == "192.168.19.185"
+        assert a.parsed_data == "203.0.113.11"
 
     def test_parse_response_header_only(self) -> None:
         """Test parsing a response with no records."""
@@ -396,3 +398,63 @@ class TestDnsResourceRecord:
 
         record = DnsResourceRecord("test.local", 999, 1, 120, b"")
         assert record.type_name == "TYPE999"
+
+
+class TestBuildAddressQuery:
+    """Tests for the follow-up A/AAAA query (mDNS rewrite).
+
+    Discovery sends this when a responder advertised a service instance but
+    left out the address records for its SRV target, which is the normal case
+    for a Thread border router answering for a whole mesh in one packet: the
+    reply has room for every instance's TXT and SRV records but not for all
+    of their AAAA records.
+    """
+
+    @staticmethod
+    def _questions(query: bytes) -> list[tuple[str, int, int]]:
+        """Parse a query's questions back out, as (name, qtype, qclass)."""
+        header = DnsHeader.parse(query)
+        offset = 12
+        questions: list[tuple[str, int, int]] = []
+
+        for _ in range(header.qd_count):
+            name, offset = parse_name(query, offset)
+            qtype, qclass = struct.unpack("!HH", query[offset : offset + 4])
+            offset += 4
+            questions.append((name, qtype, qclass))
+
+        assert offset == len(query), "query carries trailing bytes"
+        return questions
+
+    def test_asks_for_both_address_types_of_one_host(self) -> None:
+        """One packet, two questions: A and AAAA for the same name."""
+        query = build_address_query("d073d5123456.local")
+
+        header = DnsHeader.parse(query)
+        assert header.id == 0  # mDNS uses ID=0
+        assert header.is_response is False
+        assert header.qd_count == 2
+        assert header.an_count == 0
+
+        assert self._questions(query) == [
+            ("d073d5123456.local", DNS_TYPE_A, 1),
+            ("d073d5123456.local", DNS_TYPE_AAAA, 1),
+        ]
+
+    def test_round_trips_a_name_at_the_label_length_boundary(self) -> None:
+        """A 63-byte label is the longest a single length prefix can carry."""
+        hostname = f"{'a' * 63}.local"
+
+        query = build_address_query(hostname)
+
+        assert self._questions(query) == [
+            (hostname, DNS_TYPE_A, 1),
+            (hostname, DNS_TYPE_AAAA, 1),
+        ]
+
+    def test_asks_for_the_target_it_was_given(self) -> None:
+        """The hostname is not rewritten or suffixed on the way through."""
+        query = build_address_query("borderrouter.local")
+
+        names = {name for name, _, _ in self._questions(query)}
+        assert names == {"borderrouter.local"}

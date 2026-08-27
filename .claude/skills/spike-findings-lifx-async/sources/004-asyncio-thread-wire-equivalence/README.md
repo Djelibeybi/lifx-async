@@ -60,7 +60,7 @@ uv run python .planning/spikes/004-asyncio-thread-wire-equivalence/wire.py run \
 slightly tighter); under matched in-process load the hypothesis inverts: threading
 degrades catastrophically while asyncio degrades gracefully.**
 
-Target: gen4 downlight (192.168.18.95), 300 probes @ 20/s + 30 s stream @ 20 FPS per arm.
+Target: gen4 downlight (203.0.113.6), 300 probes @ 20/s + 30 s stream @ 20 FPS per arm.
 
 | Condition | Arm | RTT med | RTT p95 | Losses | Send jitter med | Jitter max |
 |-----------|-----|---------|---------|--------|-----------------|------------|

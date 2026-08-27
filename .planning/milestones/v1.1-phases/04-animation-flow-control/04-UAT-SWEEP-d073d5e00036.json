@@ -1,14 +1,14 @@
 {
   "timestamp": "2026-07-17T07:35:05",
-  "serial": "d073d5a132b8",
-  "label": "Playroom Ceiling",
+  "serial": "d073d5e00036",
+  "label": "Test Ceiling B",
   "role": "gate",
   "profile": "ceiling",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.19.82"
+    "ip": "203.0.113.17"
   },
-  "ip": "192.168.19.82",
+  "ip": "203.0.113.17",
   "ceiling_power_confirmed": true,
   "restoration": {
     "attempted": true,

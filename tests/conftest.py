@@ -87,6 +87,24 @@ def get_free_port() -> int:
         return s.getsockname()[1]
 
 
+def get_free_port6() -> int:
+    """Get a free UDP port on the IPv6 loopback.
+
+    ``get_free_port()`` binds ``AF_INET`` on ``127.0.0.1`` and cannot speak
+    for an IPv6 port: a ``IPV6_V6ONLY`` socket has its own port space, so a
+    port free for IPv4 says nothing about ``::1``.
+
+    The port is asserted non-zero before it is returned, so a bind that
+    somehow failed to assign one fails here rather than handing an unusable
+    0 to the emulator.
+    """
+    with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as s:
+        s.bind(("::1", 0))
+        port = s.getsockname()[1]
+    assert port > 0, "binding ('::1', 0) returned port 0 instead of an ephemeral port"
+    return port
+
+
 class EmulatorRunner:
     """Manages the emulator server in a background thread with its own event loop."""
 
@@ -127,6 +145,43 @@ class EmulatorRunner:
             self._thread.join(timeout=5.0)
 
 
+class _Ipv6EmulatedLifxServer(EmulatedLifxServer):
+    """An emulator server that creates and configures its own ``::1`` socket.
+
+    ``IPV6_V6ONLY`` can only be set on an unbound socket: setting it after a
+    bind raises ``OSError: [Errno 22] Invalid argument`` on macOS, verified
+    on this project's development machine. The stock
+    ``EmulatedLifxServer.start()`` binds inside itself, by handing
+    ``local_addr=`` to ``create_datagram_endpoint``, so there is no moment
+    between socket creation and bind for a caller to reach.
+
+    Owning socket creation here is therefore the only way to set the option
+    explicitly rather than trusting the platform default, which is what this
+    phase asked for as hygiene against a future wildcard bind. ``stop()`` is
+    inherited unchanged: it closes the transport, and the transport owns the
+    adopted socket.
+    """
+
+    async def start(self) -> None:
+        """Bind a V6ONLY ``AF_INET6`` socket and hand it to asyncio."""
+        loop = asyncio.get_running_loop()
+        sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        try:
+            # Before the bind. The option is immutable once the socket is
+            # bound, so this ordering is the whole point of the subclass.
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            sock.bind((self.bind_address, self.port))
+            sock.setblocking(False)
+            self.transport, _ = await loop.create_datagram_endpoint(
+                lambda: self.LifxProtocol(self), sock=sock
+            )
+        except Exception:
+            # Nothing has taken ownership of the descriptor yet, so a
+            # partway failure has to close it here or it leaks.
+            sock.close()
+            raise
+
+
 @pytest.fixture(scope="session")
 def emulator_available(request: pytest.FixtureRequest) -> bool:
     """Check if lifx-emulator-core is available.
@@ -154,6 +209,60 @@ def emulator_available(request: pytest.FixtureRequest) -> bool:
         return True
     except ImportError:
         return False
+
+
+def ipv6_probe_outcome(error: OSError, require_ipv6: str | None) -> bool | str:
+    """Decide what a failed ``::1`` bind means for this run.
+
+    Split out of :func:`ipv6_available` so both non-happy arms are testable
+    without arranging a real bind failure. Every host the suite runs on
+    today can bind ``::1``, so the probe only ever takes its success branch
+    and the skip and fail-instead-of-skip behaviour would otherwise be
+    trusted purely on inspection.
+
+    Args:
+        error: The ``OSError`` raised by the probe bind.
+        require_ipv6: The raw ``LIFX_REQUIRE_IPV6`` value, or ``None`` when
+            the variable is unset. Anything other than ``"1"`` means the
+            IPv6 tests may skip.
+
+    Returns:
+        ``False`` when the IPv6 tests should skip, or the message to fail
+        the run with when IPv6 was declared mandatory for this job.
+    """
+    if require_ipv6 == "1":
+        return (
+            f"LIFX_REQUIRE_IPV6=1 set but ::1 cannot be bound: {error}. "
+            "This is the designated must-not-skip IPv6 job, so the IPv6 "
+            "end-to-end tests failing to run is a build failure, not a skip."
+        )
+    return False
+
+
+@pytest.fixture(scope="session")
+def ipv6_available() -> bool:
+    """Check whether an IPv6 loopback socket can be bound.
+
+    Mirrors :func:`emulator_available`: a session-scoped bool, probed once
+    and cached. Every ``::1`` fixture gates on it, so all the dependent
+    tests skip through a single decision rather than each inventing its own.
+
+    ``LIFX_REQUIRE_IPV6=1`` turns a missing ``::1`` from a skip into a
+    failure. CI sets it on exactly one matrix cell, so the IPv6 tests can
+    never quietly skip on every job at once. The variable guards this probe
+    alone and nothing else: a missing emulator is a declared dev-dependency
+    failure that breaks ``uv sync`` long before pytest runs, so
+    ``emulator_available`` deliberately knows nothing about it.
+    """
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as probe:
+            probe.bind(("::1", 0))
+    except OSError as error:
+        outcome = ipv6_probe_outcome(error, os.environ.get("LIFX_REQUIRE_IPV6"))
+        if isinstance(outcome, str):
+            pytest.fail(outcome)
+        return False
+    return True
 
 
 @pytest.fixture(scope="session")
@@ -292,6 +401,103 @@ def tile_chain_light(tile_chain_server: int) -> MatrixLight:
         serial="d073d5000101",
         ip="127.0.0.1",
         port=tile_chain_server,
+        timeout=2.0,
+        max_retries=2,
+    )
+
+
+#: Serial of the single device hosted by the ``::1`` emulator. Exported so
+#: the IPv6 end-to-end tests can address the emulated device directly.
+IPV6_DEVICE_SERIAL = "d073d5000301"
+
+
+@pytest.fixture(scope="session")
+def emulator_server_ipv6(
+    emulator_available: bool,
+    ipv6_available: bool,
+) -> Generator[tuple[int, EmulatedLifxServer]]:
+    """Start a second emulator, bound to ``::1``, for the IPv6 tests.
+
+    Every other emulator fixture binds ``127.0.0.1``, so nothing else in the
+    suite exercises an ``AF_INET6`` socket. This runs its own server on the
+    IPv6 loopback with its own port, which leaves ``emulator_server`` and the
+    seven devices the rest of the suite iterates completely untouched.
+    Parameterising the shared server over both families was rejected: it
+    would roughly double the emulator suite's runtime on every CI job.
+
+    The server is a :class:`_Ipv6EmulatedLifxServer` so ``IPV6_V6ONLY`` is
+    set before the bind; the option is read back here afterwards. Reading the
+    option is legal on a bound socket where setting it is not, which is why
+    the set lives in the subclass and only the read-back lives here.
+
+    Its single device is a matrix-capable Tile rather than a plain colour
+    light. It answers the Light commands the control tests use exactly as a
+    plain light would, and it additionally applies the ``Set64`` frames the
+    Animator sends: the emulator's ``Set64Handler`` returns early for a
+    device without matrix capability, so against a plain light the animation
+    test could only ever prove a datagram was sent, never that a frame
+    arrived and was applied.
+
+    Yields:
+        Tuple of (port, server) where:
+        - port: UDP port the IPv6 emulator is listening on
+        - server: the server itself, so a test can read emulated device
+          state back and prove a frame actually landed
+    """
+    if not emulator_available:
+        pytest.skip("lifx-emulator-core not available")
+
+    if not ipv6_available:
+        pytest.skip("IPv6 loopback (::1) is not available on this host")
+
+    scenario_manager = HierarchicalScenarioManager()
+    devices = [
+        create_tile_device(
+            serial=IPV6_DEVICE_SERIAL,
+            tile_count=1,
+            scenario_manager=scenario_manager,
+        )
+    ]
+
+    port = get_free_port6()
+    server = _Ipv6EmulatedLifxServer(
+        devices=devices,
+        device_manager=DeviceManager(DeviceRepository()),
+        bind_address="::1",
+        port=port,
+        scenario_manager=scenario_manager,
+    )
+
+    runner = EmulatorRunner(server)
+    runner.start()
+
+    serving_socket = (
+        server.transport.get_extra_info("socket")
+        if server.transport is not None
+        else None
+    )
+    assert serving_socket is not None, (
+        "the ::1 emulator did not finish starting within the runner timeout"
+    )
+    assert serving_socket.family == socket.AF_INET6
+    assert serving_socket.getsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY) == 1
+
+    yield port, server
+
+    runner.stop()
+
+
+@pytest.fixture
+def ipv6_light(emulator_server_ipv6: tuple[int, EmulatedLifxServer]) -> Light:
+    """Return a Light backed by the ``::1`` emulator.
+
+    The device is not connected; use it as an async context manager.
+    """
+    port, _ = emulator_server_ipv6
+    return Light(
+        serial=IPV6_DEVICE_SERIAL,
+        ip="::1",
+        port=port,
         timeout=2.0,
         max_retries=2,
     )

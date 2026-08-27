@@ -3,17 +3,21 @@
     "enabled": true
   },
   "model_policy": {
-    "provider": "anthropic-fable",
-    "budget": "high"
+    "provider": "anthropic",
+    "budget": "high",
+    "high": "claude-opus-4-8",
+    "medium": "claude-opus-4-8",
+    "low": "claude-sonnet-5"
   },
   "mode": "interactive",
   "git": {
-    "create_tag": false
+    "create_tag": false,
+    "branching_strategy": "phase"
   },
   "granularity": "standard",
   "parallelization": true,
   "commit_docs": true,
-  "model_profile": "balanced",
+  "model_profile": "adaptive",
   "workflow": {
     "research": true,
     "plan_check": true,
@@ -22,36 +26,50 @@
     "auto_advance": false,
     "_auto_chain_active": false,
     "code_review": true,
-    "code_review_depth": "deep"
+    "code_review_depth": "deep",
+    "pattern_mapper": true,
+    "ui_phase": false,
+    "ui_safety_gate": false,
+    "ui_review": false,
+    "ai_integration_phase": false,
+    "tdd_mode": false,
+    "skip_discuss": false,
+    "research_before_questions": true,
+    "use_worktrees": true,
+    "auto_prune_state": true
   },
   "plan_review": {
-    "source_grounding": true
+    "source_grounding": true,
+    "source_grounding_authority": "lsp"
   },
-  "ship": {
-    "pr_body_sections": [
-      {
-        "heading": "User Stories & Acceptance Criteria",
-        "enabled": false,
-        "source": "REQUIREMENTS.md ## User Stories || REQUIREMENTS.md ## Acceptance Criteria",
-        "fallback": "- Acceptance criteria are covered by the linked requirements and verification evidence."
-      },
-      {
-        "heading": "Risks & Dependencies",
-        "enabled": false,
-        "source": "PLAN.md ## Risks || PLAN.md ## Dependencies",
-        "fallback": "- No known high-risk rollout dependencies."
-      },
-      {
-        "heading": "Success Metrics & Release Criteria",
-        "enabled": true,
-        "source": "REQUIREMENTS.md ## Definition of Done || VERIFICATION.md ## Release Criteria",
-        "fallback": "- Release when automated verification and required manual checks pass."
-      },
-      {
-        "heading": "Stakeholder Review & Approval",
-        "enabled": true,
-        "template": "- Product owner approval pending for {phase_name}."
-      }
+  "graphify": {
+    "enabled": true,
+    "auto_update": true
+  },
+  "hooks": {
+    "context_warnings": true
+  },
+  "context_window": 1000000,
+  "review": {
+    "models": {
+      "codex": "gpt-5.6-sol",
+      "opencode": "openrouter/z-ai/glm-5.3",
+      "agy": "gemini-3.1-pro-high",
+      "claude": "claude-opus-5"
+    },
+    "default_reviewers": [
+      "codex",
+      "opencode",
+      "antigravity"
     ]
+  },
+  "agent_skills": {
+    "gsd-executor": "spike-findings-lifx-async",
+    "gsd-planner": "spike-findings-lifx-async"
+  },
+  "effort": {
+    "agent_overrides": {
+      "gsd-plan-checker": "high"
+    }
   }
 }

@@ -18,7 +18,7 @@ result: pass
 coverage_id: D5 (04-12) / ruling
 
 ### 2. Capsule Visual Streaming Verdict (ANIM-03 smoothness + ANIM-04 geometry)
-expected: Single Capsule visual streaming round (My Office Ceiling Capsule, 16×8 zones / 3 packets per frame, --profile ceiling --rounds 1 --duration 60). Your recorded dual verdict — "Geometry was fine. It was as smooth as the tiles. No multi-second freezes but it stuttered throughout." — reads as geometry PASS and smoothness accepted, with the stutter being documented latest-frame-wins degradation under 20 FPS saturation (~10 FPS sustainable at this chain shape), carried forward as a Phase 5 doc recommendation. Confirm this verdict still stands.
+expected: Single Capsule visual streaming round (Test Ceiling Capsule, 16×8 zones / 3 packets per frame, --profile ceiling --rounds 1 --duration 60). Your recorded dual verdict — "Geometry was fine. It was as smooth as the tiles. No multi-second freezes but it stuttered throughout." — reads as geometry PASS and smoothness accepted, with the stutter being documented latest-frame-wins degradation under 20 FPS saturation (~10 FPS sustainable at this chain shape), carried forward as a Phase 5 doc recommendation. Confirm this verdict still stands.
 result: pass
 coverage_id: D4 (04-13)
 

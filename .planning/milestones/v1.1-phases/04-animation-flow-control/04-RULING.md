@@ -62,13 +62,13 @@ complete cited record:
 
 | Device | Role | Outcome | Gated pooled | Blind pooled | Fisher p | Ratio | Validity |
 |---|---|---|---|---|---|---|---|
-| Playroom Luna | gate | FAIL | 24/81 = 29.63% | 29/69 = 42.03% | 0.0790 | 1.42 | valid |
+| Test Luna | gate | FAIL | 24/81 = 29.63% | 29/69 = 42.03% | 0.0790 | 1.42 | valid |
 | Dining Room Table Candle | gate | INCONCLUSIVE | 2/155 = 1.29% | 5/140 = 3.57% | 0.1841 | 2.77 | ambient n=90 < 100 (V2) |
-| Makerspace Candle | gate | FAIL | 27/77 = 35.06% | 30/67 = 44.78% | 0.1544 | 1.28 | valid |
-| Makerspace Tube | gate | FAIL | 24/86 = 27.91% | 28/73 = 38.36% | 0.1094 | 1.37 | valid |
-| Makerspace Ceiling | gate | FAIL | 24/79 = 30.38% | 28/68 = 41.18% | 0.1166 | 1.36 | valid |
-| Playroom Ceiling | gate | FAIL | 28/72 = 38.89% | 32/54 = 59.26% | 0.0184 | 1.52 | valid |
-| My Office Ceiling Capsule | gate | INCONCLUSIVE | 23/82 = 28.05% | 36/38 = 94.74% | 1.0e-12 | 3.38 | 2 gated rounds delivered_ratio < 0.50 (V3) |
+| Test Candle | gate | FAIL | 27/77 = 35.06% | 30/67 = 44.78% | 0.1544 | 1.28 | valid |
+| Test Tube | gate | FAIL | 24/86 = 27.91% | 28/73 = 38.36% | 0.1094 | 1.37 | valid |
+| Test Ceiling A | gate | FAIL | 24/79 = 30.38% | 28/68 = 41.18% | 0.1166 | 1.36 | valid |
+| Test Ceiling B | gate | FAIL | 28/72 = 38.89% | 32/54 = 59.26% | 0.0184 | 1.52 | valid |
+| Test Ceiling Capsule | gate | INCONCLUSIVE | 23/82 = 28.05% | 36/38 = 94.74% | 1.0e-12 | 3.38 | 2 gated rounds delivered_ratio < 0.50 (V3) |
 | System Test Tiles II | reference | FAIL | 14/102 = 13.73% | 22/85 = 25.88% | 0.0280 | 1.89 | valid (never counted) |
 
 **One-line summary:** the gated arm won directionally in **every session ever
@@ -86,7 +86,7 @@ The operator's correction, verbatim (2026-07-17):
 > "26"x13" is the physical size of the Ceiling. It has 128 zones arranged in
 > 8 rows of 16"
 
-**The corrected facts:** My Office Ceiling Capsule has a **16-wide × 8-high
+**The corrected facts:** Test Ceiling Capsule has a **16-wide × 8-high
 zone grid (128 zones)**; its **physical panel is 26 in × 13 in**. Every
 governing reference that swapped physical inches for a zone-grid figure (the
 "13×26 Capsule" wording carried through `04-SWEEP-DESIGN.md`,
@@ -101,7 +101,7 @@ For the Capsule's actual reported chain (16×8), it correctly computed 3
 packets/frame (64 // 16 = 4 rows/packet, ceil(8/4) = 2 Set64, +1
 CopyFrameBuffer = 3), and every gated frame across all 3 rounds matched that
 expectation (`packet_shape_ok: true` on every round,
-`04-UAT-SWEEP-d073d587daab.json`). The CopyFrameBuffer ack-probe attachment
+`04-UAT-SWEEP-d073d5e0000c.json`). The CopyFrameBuffer ack-probe attachment
 (D4-04) is confirmed: every gated round recorded ≥ 1 ack RTT sample (median
 150.0–150.2 ms across the 3 gated rounds, well under the 1 s expiry tuning).
 The dims mix-up is a roster-documentation error corrected here — it never
@@ -145,13 +145,13 @@ operator-amended) wording verbatim.
 
 > 4. Hardware UAT (large-matrix framebuffer path): the framebuffer-path
 >    evidence captured in the 04-12 sweep sessions of the three ceiling-class
->    devices (Makerspace Ceiling, Playroom Ceiling, My Office Ceiling
+>    devices (Test Ceiling A, Test Ceiling B, Test Ceiling Capsule
 >    Capsule) stands — every sent gated frame matched the chain-dims-derived
 >    row-aligned packets/frame expectation on every round
 >    (`packet_shape_ok: true` in all per-device JSONs), every gated round
 >    recorded ≥ 1 CopyFrameBuffer ack RTT sample (medians 50.1–50.2 ms on the
 >    two 8×8 ceilings, 150.0–150.2 ms on the Capsule's 16×8 chain — the D4-04
->    ack-probe attachment confirmed on all three). My Office Ceiling Capsule
+>    ack-probe attachment confirmed on all three). Test Ceiling Capsule
 >    is **16×8 zones (128 zones, 8 rows of 16; 26 in × 13 in physical)** —
 >    supersedes the earlier units mix-up that attributed physical inches to
 >    the zone grid (operator correction verbatim, 2026-07-17). The operator's
@@ -169,7 +169,7 @@ operator-amended) wording verbatim.
 >   operator ruling (verbatim reply "2", 2026-07-17) the cross-device
 >   directional dossier is accepted as satisfying the requirement's intent —
 >   an acceptance over a recorded FAIL, never a statistical pass. Completed
->   by the operator's visual smoothness verdict on My Office Ceiling Capsule
+>   by the operator's visual smoothness verdict on Test Ceiling Capsule
 >   (04-13 Task 4).
 
 ### (iv) REQUIREMENTS ANIM-04 — proposed replacement (checkbox stays unchecked)
@@ -179,7 +179,7 @@ operator-amended) wording verbatim.
 >   sweep's three ceiling-class devices: every sent gated frame matched the
 >   chain-dims-derived row-aligned packets/frame expectation on every round,
 >   CopyFrameBuffer ack RTT evidence was recorded on every gated round (the
->   D4-04 ack-probe attachment confirmed on all three devices). My Office
+>   D4-04 ack-probe attachment confirmed on all three devices). Area C
 >   Ceiling Capsule is 16×8 zones (128 zones; 26 in × 13 in physical —
 >   supersedes the earlier units mix-up, operator correction verbatim,
 >   2026-07-17). Completed by the operator's visual geometry verdict on the
@@ -225,7 +225,7 @@ approval):**
 > satisfying ANIM-03/ANIM-04's intent — an acceptance over a recorded FAIL,
 > never a statistical pass. The Capsule's dims are corrected (16×8 zones,
 > 128 zones, 26 in × 13 in physical). The only remaining item is the
-> operator's dual visual verdict (smoothness + geometry) on My Office
+> operator's dual visual verdict (smoothness + geometry) on Area C
 > Ceiling Capsule at 04-13 Task 4; ANIM-03/ANIM-04 checkboxes flip only after
 > an approved verdict.
 
@@ -239,7 +239,7 @@ only):**
 > directionally in every session ever measured, ratios 1.28x–5.25x) was
 > accepted as satisfying the requirements' intent — an acceptance over a
 > recorded FAIL, never a statistical pass — and the operator gave an
-> explicit dual approval verdict (smoothness + geometry) on My Office
+> explicit dual approval verdict (smoothness + geometry) on Area C
 > Ceiling Capsule's gated streaming round at 04-13 Task 4. The Capsule's
 > dims are corrected everywhere they govern (16×8 zones, 128 zones, 26 in ×
 > 13 in physical). No gate remains open for Phase 4.
@@ -270,9 +270,9 @@ Capsule's REPORTED chain is 16×8 → 3:
 > # `_thresholds()`); the actual per-frame assertion now uses
 > # `expected_packets_per_frame()`, computed from the REPORTED chain
 > # dimensions of whichever ceiling-class device is streaming
-> # (04-SWEEP-DESIGN.md section 5). My Office Ceiling Capsule's REPORTED
+> # (04-SWEEP-DESIGN.md section 5). Test Ceiling Capsule's REPORTED
 > # chain is 16x8 (128 zones; 26 in x 13 in physical, not 13x26) and expects
-> # 3, measured 2026-07-17 (04-UAT-SWEEP-d073d587daab.json) -- this constant
+> # 3, measured 2026-07-17 (04-UAT-SWEEP-d073d5e0000c.json) -- this constant
 > # is a superseded reference value, not the Capsule's actual expectation.
 
 **(c) `expected_packets_per_frame()` docstring worked example** — relabel the

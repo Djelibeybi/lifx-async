@@ -3,10 +3,11 @@
 import asyncio
 import logging
 import time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from lifx.const import DEFAULT_IP_ADDRESS
 from lifx.exceptions import (
     LifxConnectionError,
     LifxNetworkError,
@@ -1219,3 +1220,45 @@ class TestTransportDeathRecovery:
         finally:
             conn._is_open = True
             await conn.close()
+
+
+class TestWildcardBindSelection:
+    """The local bind literal follows the device address (IPV6-03, B9).
+
+    ``_open()`` performs no family test of its own: it asks
+    :func:`lifx.network.address.wildcard_for`. Only the IPv4 arm runs in the
+    rest of the suite, so both are asserted here, and the transport is
+    mocked so the assertion holds on a host with no IPv6 stack.
+    """
+
+    @staticmethod
+    async def _bind_address_used(ip: str) -> str:
+        """Open a connection against a mocked transport and report the bind."""
+        conn = DeviceConnection(serial="d073d5001234", ip=ip)
+
+        with patch("lifx.network.connection.UdpTransport") as mock_transport:
+            mock_transport.return_value.open = AsyncMock()
+            mock_transport.return_value.receive_packet = AsyncMock(
+                side_effect=LifxTimeoutError("no traffic")
+            )
+            await conn.open()
+            try:
+                return mock_transport.call_args.kwargs["ip_address"]
+            finally:
+                conn._is_open = False
+                if conn._receiver_shutdown is not None:
+                    conn._receiver_shutdown.set()
+                if conn._receiver_task is not None:
+                    conn._receiver_task.cancel()
+
+    async def test_ipv4_device_binds_the_ipv4_wildcard(self) -> None:
+        """A WiFi device keeps today's IPv4 wildcard bind."""
+        assert await self._bind_address_used("192.168.1.100") == DEFAULT_IP_ADDRESS
+
+    async def test_ipv6_device_binds_the_ipv6_wildcard(self) -> None:
+        """A Thread device has no IPv4 address, so the bind must be IPv6."""
+        assert await self._bind_address_used("fd00:1::") == "::"
+
+    async def test_zoned_link_local_device_binds_the_ipv6_wildcard(self) -> None:
+        """A zoned literal parses, so the bind still follows the address."""
+        assert await self._bind_address_used("fe80::1%en0") == "::"

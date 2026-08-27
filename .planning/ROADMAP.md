@@ -2,24 +2,25 @@
 
 ## Milestones
 
-- ✅ **v1.0 Ceiling Save-on-Exit** — Phase 1 (shipped 2026-06-12) — [archive](milestones/v1.0-ROADMAP.md)
-- ✅ **Post-v1.0: Discovery unification** — Phase 1 (verified 2026-06-13) — archived in `milestones/v1.1-phases/01-unify-duplicated-discovery-loops/`
-- ✅ **v1.1 Wire Reliability** — Phases 2–5 (shipped 2026-07-26) — [archive](milestones/v1.1-ROADMAP.md)
-- 🚧 **v1.2 Theme Library Update** — Phases 6–9 (in progress, started 2026-08-14)
+- ✅ **v1.0 Ceiling Save-on-Exit**: Phase 1, shipped 2026-06-12 ([archive](milestones/v1.0-ROADMAP.md))
+- ✅ **Post-v1.0 Discovery unification**: Phase 1, verified 2026-06-13, archived in `milestones/v1.1-phases/01-unify-duplicated-discovery-loops/`
+- ✅ **v1.1 Wire Reliability**: Phases 2–5, shipped 2026-07-26 ([archive](milestones/v1.1-ROADMAP.md))
+- ✅ **v1.2 Theme Library Update**: Phases 6–9, shipped 2026-08-27 ([archive](milestones/v1.2-ROADMAP.md))
+- 🚧 **v2.0 Thread/IPv6 Support**: Phases 10–14, in progress
 
 ## Phases
 
 <details>
-<summary>✅ v1.0 Ceiling Save-on-Exit (Phase 1) — SHIPPED 2026-06-12</summary>
+<summary>✅ v1.0 Ceiling Save-on-Exit (Phase 1), SHIPPED 2026-06-12</summary>
 
-- [x] Phase 1: Ceiling Save-on-Exit (1/1 plans) — completed 2026-06-12
+- [x] Phase 1: Ceiling Save-on-Exit (1/1 plans), completed 2026-06-12
 
 Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 </details>
 
 <details>
-<summary>✅ Post-v1.0: Phase 1 — Unify duplicated discovery loops (verified 2026-06-13)</summary>
+<summary>✅ Post-v1.0 Phase 1: Unify duplicated discovery loops (verified 2026-06-13)</summary>
 
 Standalone phase from the /simplify review (2026-06-13). Rebuilt `discover_devices()`
 on `_discover_with_packet()` with hoisted DoS serial validation and first-wins per-serial
@@ -31,172 +32,188 @@ UAT 4/4 including real-hardware validation (regression 0d83deb found and fixed).
 </details>
 
 <details>
-<summary>✅ v1.1 Wire Reliability (Phases 2–5) — SHIPPED 2026-07-26</summary>
+<summary>✅ v1.1 Wire Reliability (Phases 2–5), SHIPPED 2026-07-26</summary>
 
 Closed the measured reliability gap against the reference clients (Glowup, Photons) using
 the spike-validated blueprints, without changing the asyncio core or the public API.
 
-- [x] Phase 2: Discovery Re-broadcast (2/2 plans) — completed 2026-07-16
-- [x] Phase 3: Retry Schedule Reshape (3/3 plans) — completed 2026-07-17
-- [x] Phase 4: Animation Flow Control (13/13 plans) — completed 2026-07-17
-- [x] Phase 5: Reliability Documentation (6/6 plans) — completed 2026-07-18
+- [x] Phase 2: Discovery Re-broadcast (2/2 plans), completed 2026-07-16
+- [x] Phase 3: Retry Schedule Reshape (3/3 plans), completed 2026-07-17
+- [x] Phase 4: Animation Flow Control (13/13 plans), completed 2026-07-17
+- [x] Phase 5: Reliability Documentation (6/6 plans), completed 2026-07-18
 
-13/13 requirements satisfied · 25/25 must-have truths verified · 7/7 cross-phase
-connections wired · all four phases Nyquist-compliant.
+13/13 requirements satisfied, 25/25 must-have truths verified, 7/7 cross-phase
+connections wired, all four phases Nyquist-compliant.
 
 Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) ·
 audit: [milestones/v1.1-MILESTONE-AUDIT.md](milestones/v1.1-MILESTONE-AUDIT.md)
 
 </details>
 
-### 🚧 v1.2 Theme Library Update (Phases 6–9) — IN PROGRESS
+<details>
+<summary>✅ v1.2 Theme Library Update (Phases 6–9), SHIPPED 2026-08-27</summary>
 
-Resync `lifx.theme.library` with the LIFX app's live theme set — 139 non-sport themes
-captured from hardware on 2026-08-14 (`.claude/theme-capture/`) — without silently
-changing colours existing callers depend on. Every phase is bound by the project-wide
-gates: zero runtime dependencies, Python 3.10–3.14, pyright strict clean, ruff clean,
-pytest green, 100% branch patch coverage in CI, Australian English in prose and comments.
-Theme names are public API — a key may gain values or an alias; it may never silently
-vanish, in any intermediate state.
+Resynced `lifx.theme.library` with the LIFX app's live theme set without silently changing
+colours existing callers depend on. The hand-written palette table is gone: 166 committed
+JSONL records drive a validating generator into `src/lifx/theme/data.py`, and 169 names
+resolve with app-accurate palettes, names, categories and dispositions.
 
-- [x] **Phase 6: Generated Theme Library** - The 138 non-sport app theme slugs land with app-accurate palettes and emoji-stripped metadata, generated from a committed data file, with every pre-v1.2 name still resolving (completed 2026-08-15)
-- [x] **Phase 7: Taxonomy & Legacy Dispositions** - Callers navigate the library by the app's category taxonomy; every legacy category name and orphaned key has a recorded, working fate (completed 2026-08-15)
-- [x] **Phase 8: Hardware Fidelity Validation** - Shipped palettes render as the app renders them, on more than the capture product, and the 16-colour question carries an evidenced determination either way (completed 2026-08-16)
-- [x] **Phase 9: Theme Data Contract & Docs** - The generated catalogue is produced from a validated, importable data contract and the theme docs reflect the shipped library (completed 2026-08-27)
+- [x] Phase 6: Generated Theme Library (2/2 plans), completed 2026-08-15
+- [x] Phase 7: Taxonomy & Legacy Dispositions (3/3 plans), completed 2026-08-15
+- [x] Phase 8: Hardware Fidelity Validation (4/4 plans), completed 2026-08-16
+- [x] Phase 9: Theme Data Contract & Docs (2/2 plans), completed 2026-08-27
+
+16/16 live requirements satisfied, 8 cross-phase seams checked, 3520 tests at 97%
+coverage. COMPAT-02 retired 2026-08-14; TOOL-01..03 withdrawn 2026-08-19 to the private
+`lifx-theme-resync` repository.
+
+Two locked decisions reversed in flight: the `*_legacy` aliases, and the "device readback
+only" capture rule. The latter is what answered the milestone's central question, since
+Phase 9's resync from an internal LIFX HTTP API endpoint supplied the true palette lengths
+that no device could.
+
+Closed at `tech_debt` with both audit findings remediated before archiving, and one
+finding withdrawn as mistaken. Phase 8 retains its operator-approved exception: the
+source-Tile restoration is unverified, `08-UAT-RESULTS.json` is deliberately absent, and a
+synthetic two-role merge is prohibited.
+
+Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) ·
+audit: [milestones/v1.2-MILESTONE-AUDIT.md](milestones/v1.2-MILESTONE-AUDIT.md)
+
+</details>
+
+### 🚧 v2.0 Thread/IPv6 Support (Phases 10–14, In Progress)
+
+**Milestone Goal:** A Thread device becomes a first-class device in this library: found,
+addressed, controlled and animated without the caller needing to know it is on Thread. The
+v1.1 wire-reliability findings are then revalidated over Thread, because every one of them
+was measured on WiFi/IPv4.
+
+- [ ] **Phase 10: Land the IPv6/Thread Branch** - Rebase `feat/ipv6-thread-support` onto `main` with the reconciled branch-audit fixes, so IPv6-only devices can be controlled and animated
+- [ ] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port bind regression test, `tm` transport field, synthetic mesh-scale tests, deterministic address selection, validation and honest docs
+- [ ] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture
+- [ ] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement
+- [ ] **Phase 14: Thread Revalidation and Docs** - SEED-001 measurements over Thread hardware, per-device-class evidence records or named gaps, and the consumer guidance and corrections docs
+
+**Execution notes:**
+
+- **Phase 10 is the critical path.** Nothing else in the milestone is testable on Thread
+  hardware until the branch merges.
+
+- **Phases 11 and 12 are file-disjoint and can run in parallel** once Phase 10 lands.
+  Phase 11 lives in `network/mdns/`; Phase 12 lives in `network/discovery.py`, `api.py`'s
+  `find_by_ip()` and the test fixtures.
+
+- **Phase 13 is serial after both 11 and 12**: both merged functions live in `api.py` and
+  consume the record-level generator shapes those phases finalise.
+
+- **Phase 14 is hardware-gated** (Thread devices; CI has none) and must not block CI or
+  any other phase. THREAD-05 closes incrementally: a device class closes when evidenced or
+  as a named gap, never by waiting for hardware that does not exist yet.
+
+- **No WiFi-measured constant may be retuned before Phase 14 measures it over Thread.**
+  This is the project's spike-first discipline; it binds Phases 10 to 13.
 
 ## Phase Details
 
-### Phase 6: Generated Theme Library
+### Phase 10: Land the IPv6/Thread Branch
 
-**Goal**: Every non-sport app theme resolves by ASCII slug with app-accurate colours and app metadata, generated from the capture, and no name that resolved before v1.2 breaks
-**Depends on**: Nothing within v1.2 (first phase; builds on the shipped v1.1 library)
-**Requirements**: THEME-01, THEME-02, THEME-03, THEME-04, COMPAT-01, COMPAT-03, META-01, META-02
-(COMPAT-02 retired 2026-08-14 — see below)
+**Goal**: The three-commit `feat/ipv6-thread-support` branch (`b49400b`, `b88cdb9`, `2f884f5`) is rebased onto `main` and merged with the reconciled branch-audit fixes applied, so a caller can control a device that has only an IPv6 address
+**Depends on**: Nothing (first phase of v2.0; v1.2 shipped)
+**Requirements**: IPV6-01, IPV6-02, IPV6-03, IPV6-04
 **Success Criteria** (what must be TRUE):
 
-  1. Any of the 138 non-sport app theme slugs is retrievable from `ThemeLibrary`, and its palette matches the captured app palette as an unordered multiset of HSBK values with brightness and kelvin intact
-  2. The 25 differing shared slugs return the app's palette (the 6 brightness-scaled and 19 genuinely redefined among them, `soothing`'s kelvin 3500 → 8000 included)
-  3. Every theme name that resolved before v1.2 still resolves, and the renamed themes resolve under both the old key and the new app slug (`aurora_borealis`/`aurora`, `forest`/`forrest`)
-  4. A retrieved theme exposes its display name and category — both emoji-stripped, both distinct from its ASCII slug
-  5. Regenerating the theme data module from the committed data file reproduces it exactly (verified by hand, convention only)
+  1. A caller can connect to, control and stream animation frames to a device that has only an IPv6 address, and every socket-creation site, including the animator's direct-UDP frame socket, derives its family from the target address
+  2. Supplying a link-local address without a zone identifier raises an immediate `ValueError` naming the problem, instead of the silent 16 second timeout the branch's warning downgrade produced
+  3. Address-family selection has exactly one implementation, a shared helper used by every socket-creation site, replacing the three duplicated `":" in ip` checks
+  4. An `MdnsTransport.open()` that fails partway through endpoint creation leaves no socket behind
+  5. The rebased branch is on `main` with CI green, including the 100% branch patch coverage gate
 
-**Plans:** 2/2 plans complete
+**Plans**: 5/6 plans executed
 
 Plans:
 **Wave 1**
 
-- [x] 06-01-PLAN.md — Tracer: seed data file → generator → generated data module → `ThemeLibrary.get()` with identity, plus `Theme` equality and generator tests
+- [x] 10-01-PLAN.md — Rebase the three branch commits onto main as a pure replay, with an IPv6 end-to-end tracer proof against an emulator on `::1`, then measure the branch's patch-coverage debt into `10-COVERAGE-GAPS.md`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [x] 06-02-PLAN.md — Full 166-record data file, library cutover to the generated dict, and the compatibility/metadata acceptance tests
+- [x] 10-02-PLAN.md — Create `lifx.network.address` (validate_address/family_for/wildcard_for), adopt it at the three socket-creation sites (B9), gate the public IP entry points (B2), close the assigned coverage gaps
 
-One phase by necessity, not appetite: the generator's first real output *is* the import,
-and "no key silently vanishes" binds every intermediate state, so splitting the import
-from the compatibility guarantees would mandate a broken midpoint. Plan ordering inside
-the phase runs data model → generator → generated output, satisfying THEME-04's
-foundational position. Palette comparison is always unordered-multiset — the app shuffles
-palette order on every application. `christmas` appears twice with identical palettes and
-collapses to the HOLIDAYS record.
+**Wave 3** *(blocked on Wave 2 completion)*
 
-**Amended 2026-08-14 (Phase 6 discussion, `06-CONTEXT.md`):** COMPAT-02 is retired — no
-`*_legacy` keys and no Legacy category. Measurement showed 10 of the 19 redefined themes
-shift by only one or two colours; the operator ruled the app is the source of truth and
-the pre-v1.2 palettes stay in git history. Emoji are stripped from display names and
-categories. The generator takes **one** committed input (a normalised JSONL of 168
-records: 138 app themes plus the 30 pre-v1.2 keys, 2 of which are rename aliases), not a
-data file plus a separate legacy manifest.
+- [x] 10-03-PLAN.md — B1 send-time family assertion, IPV6-04 `MdnsTransport.open()` leak and phantom-open-state fix with the R4 concurrency backstop, B4 honest mDNS docstrings, mDNS rewrite coverage top-up
 
-### Phase 7: Taxonomy & Legacy Dispositions
+**Wave 4** *(blocked on Wave 3 completion)*
 
-**Goal**: Callers can navigate the library by the app's category taxonomy, and every legacy category name and orphaned key has a recorded, working fate
-**Depends on**: Phase 6
-**Requirements**: META-03, META-04, COMPAT-04
+- [x] 10-04-PLAN.md — `::1` emulator fixture (socket configured before bind), IPv6 end-to-end tests with per-test family assertions and proven frame delivery, `LIFX_REQUIRE_IPV6` must-not-skip CI cell
+- [x] 10-05-PLAN.md — Extend `scripts/ipv6_thread_probe.py` into the Thread hardware UAT harness (`--serial` control stage, full matrix-state capture and restore, optional streaming stage, `--uat-output`) with its own test module
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 10-06-PLAN.md — PR, CI green at 100% branch patch coverage verified against the gap list, recorded Thread hardware UAT gate with enforcing validators, fast-forward merge to main
+
+### Phase 11: mDNS Hardening
+
+**Goal**: The mDNS leg reaches broadcast-grade quality before it is promoted into the default discovery path: correct at mesh scale (proven synthetically), validated like the broadcast path, and documented honestly
+**Depends on**: Phase 10 (parallel with Phase 12; file-disjoint)
+**Requirements**: MDNS-01, MDNS-02, MDNS-03, MDNS-04, MDNS-05, MDNS-06, MDNS-07, MDNS-08
 **Success Criteria** (what must be TRUE):
 
-  1. Caller can list the app's categories and list the themes within any one of them
-  2. Every category name `get_by_category()` accepted before v1.2 (`seasonal`, `hygge`, `tranquil`, `sports`, …) either still returns themes or fails with a message naming its replacement
-  3. Each of the 30 orphaned library keys carries a recorded disposition — kept as library-only, or deprecated naming its replacement — and a deprecated key still resolves
+  1. mDNS queries bind an ephemeral port, and a regression test proves legacy-unicast replies are received without the test itself binding 5353, because CI runners run Avahi and the test would otherwise measure the runner rather than the fix
+  2. A caller can read how a device was reached from the `tm` field on `LifxServiceRecord`; an absent, unparsable or unrecognised value reports as unknown and never raises, and no expansion of the undocumented `tm` key is asserted anywhere
+  3. Synthetic multi-packet tests prove that records for one service instance accumulate across response packets and that an SRV target whose address records did not fit a reply triggers a follow-up A/AAAA query
+  4. Address selection is deterministic and documented (ULA, then GUA, then scoped link-local) with every discovered address retained on the record; a TXT `id` failing the broadcast serial validation is rejected; TTL 0 goodbye packets and cache-flush bits are honoured
+  5. The module's docstrings match its actual behaviour, with the deleted multicast membership no longer claimed and the unicast-only trade recorded as a known limitation
 
-**Plans:** 3/3 plans complete
+**Plans**: TBD
 
-Plans:
-**Wave 1**
+### Phase 12: IPv6 Discovery Plumbing
 
-- [x] 07-01-PLAN.md — Disposition schema end-to-end: JSONL rewrite (9 deprecated / 19 library-only / 138 lifx-app), generator validations, regenerated data module, `Theme.disposition`/`replaced_by` via `get()`
-
-**Wave 2** *(blocked on Wave 1)*
-
-- [x] 07-02-PLAN.md — Taxonomy rewrite: `get_categories()`, `get_by_category()` over the app's 9 categories with the private legacy map (2 resolve, 4 raise naming replacements), `derive_slug` relocated into the package
-
-**Wave 3** *(blocked on Wave 2)*
-
-- [x] 07-03-PLAN.md — Migration docs: `docs/migration/theme-taxonomy-v1.2.md` point-in-time record plus the two stale doc-site corrections
-
-COMPAT-04 is a per-key judgement over a small fixed set, not a code change: the renames
-were already wired in Phase 6, so this phase records keep-or-deprecate decisions for the
-remainder and encodes only the messaging those decisions require. Sport categories are out
-of scope, so the old `sports` taxonomy name resolves to a message, not to themes.
-
-### Phase 8: Hardware Fidelity Validation
-
-**Goal**: The shipped palettes are demonstrated to render as the app renders them, on more than the capture product, and the 16-colour question has an evidenced answer either way
-**Depends on**: Phase 6 (validates the shipped palette data; independent of Phase 7)
-**Requirements**: FIDELITY-01, FIDELITY-02, FIDELITY-03
+**Goal**: The targeted-lookup leg works over IPv6: `_discover_with_packet` binds by family, `find_by_ip()` accepts an IPv6 literal, and real IPv6 end-to-end tests run on every CI runner
+**Depends on**: Phase 10 (parallel with Phase 11; file-disjoint)
+**Requirements**: FIND-06
 **Success Criteria** (what must be TRUE):
 
-  1. A sampled theme applied through the library renders on hardware the same as the identical theme applied from the LIFX app
-  2. A palette read back from a matrix product other than the Tile matches the Tile capture as an unordered HSBK set
-  3. Each of the 25 shipped non-sport `lifx-app` themes with literal 16-colour palettes carries a committed determination: a true length established from a non-device source, or an evidenced finding that it cannot be established from a device. [08-CEILING-DETERMINATIONS.json](phases/08-hardware-fidelity-validation/08-CEILING-DETERMINATIONS.json) is the privacy-safe, per-slug protocol-ceiling record. The raw capture has 26 exactly-16-colour records because Carlton is an excluded AUSSIE RULES sport theme.
+  1. `find_by_ip()` returns the device for an IPv6 literal instead of returning `None`
+  2. `_discover_with_packet` derives its bind address and socket family from the target address rather than unconditionally binding `0.0.0.0`
+  3. An emulator bound to `::1` is available as a test fixture, giving real IPv6 end-to-end coverage on every CI runner without hardware
 
-**Plans:** 4/4 plans complete
+**Plans**: TBD
 
-Plans:
-**Wave 1**
+### Phase 13: Merged Discovery
 
-- [x] 08-01-PLAN.md — Tracer: current-hierarchy semantic app/library MORPH path, bounded Mondrian scrolling, targeted Tile readback, private preflight and restoration
-
-**Wave 2** *(blocked on 08-01)*
-
-- [x] 08-02-PLAN.md — Expand to the complete resumable 24-cycle runner, injectable 100%-branch architecture, static/OFF exact restoration and fail-closed evidence finaliser
-
-**Wave 3** *(blocked on 08-02; sole execution-plan ROADMAP writer)*
-
-- [x] 08-03-PLAN.md — Correct the active 26/21 ceiling counts to 25 shipped targets and pin them mechanically
-
-**Wave 4** *(blocked on 08-02 and 08-03)*
-
-- [x] 08-04-PLAN.md — Run the real Tile/non-Tile hardware UAT; close with the recorded operator exception after Tile restoration prevented authoritative JSON finalisation
-
-Hardware phase — runs against the 73-device production fleet and the quiesced gen2/3/4
-test devices; a LIFX Tile is product 55, so FIDELITY-03 needs a different matrix product
-(e.g. Candle or Ceiling). These checks cannot run in CI: they are UAT-style evidence,
-while emulator-backed tests must independently reach 100% branch patch coverage.
-FIDELITY-01 is an investigation, not a recovery job: 16 is the protocol palette ceiling
-for both `SetTileEffect` and `SetMultiZoneEffect`, so no device readback can ever return
-more — a recorded, evidenced "cannot be determined from a device" is a complete,
-successful outcome.
-
-### Phase 9: Theme Data Contract & Docs
-
-**Goal**: The generated catalogue is produced from a validated, importable data contract, and the theme docs reflect the shipped library
-**Depends on**: Phase 7 (documents the taxonomy) and Phase 8 (the FIDELITY-01 determination reaches the docs)
-**Requirements**: TOOL-04, DOCS-03
+**Goal**: Thread devices are found by default: `discover()` runs broadcast and mDNS legs concurrently merged by serial, `find_by_serial()` races both legs, and the existing discovery contract survives measurably intact
+**Depends on**: Phase 11 and Phase 12 (both merged functions live in `api.py` and consume the record-level generator shapes those phases finalise)
+**Requirements**: FIND-01, FIND-02, FIND-03, FIND-04, FIND-05, FIND-07, FIND-08
 **Success Criteria** (what must be TRUE):
 
-  1. The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py` must satisfy lives in the library as `lifx.theme.schema` — importable and independently tested — rather than being private to the generator
-  2. Palettes are stored as the app reports them, as user-facing HSBK floats converted to wire values at runtime, and are not truncated to the 16-colour firmware effect limit
-  3. Slug derivation is one documented rule with a single implementation, applied identically by the library and the generator
-  4. Theme documentation lists the available themes and categories, and states that the pre-v1.2 palettes of redefined themes were not carried forward (amended 2026-08-14 with COMPAT-02's retirement)
+  1. ENTRY GATE, satisfied before any merge code lands: the invariant test suite (overall timeout, idle timeout resetting on consumer resume, first-wins per-serial dedup, DoS source and serial validation) and the before-and-after measurement harness both exist and pass against the pre-merge `discover()`
+  2. `discover()` yields Thread devices with no caller opt-in, streaming as found with serial-keyed first-wins merge, and degrades to today's broadcast-only behaviour when the mDNS leg fails or is unavailable, without `asyncio.TaskGroup`, which the Python 3.10 floor rules out
+  3. An mDNS-sourced device is unicast-verified before it is yielded, so `discover()` never yields a device that is not answering right now, closing both the SRP stale-lease liveness hole and the mDNS spoofing exposure
+  4. `find_by_serial()` races a broadcast leg and an mDNS leg, first hit wins, and the losing leg is cancelled and reaped with no leaked task or socket
+  5. The timing change imposed on existing callers is a measured before-and-after number against the fleet including emulator CI wall time, and the TXT `id` versus broadcast serial check for firmware 3.70 to 3.99 WiFi devices is recorded as the low-priority, non-gating verification it is
 
-**Scope reduced 2026-08-19**: TOOL-01, TOOL-02 and TOOL-03 are withdrawn from v1.2. The
-capture and analysis tooling is maintained outside this repository, so shipping it here is
-no longer a requirement of this milestone. The phase entry is kept so phase numbering has
-no gap.
+**Plans**: TBD
 
-**Plans**: 2 (both reconstructed after execution — see `09-VERIFICATION.md` § Process deviations)
+### Phase 14: Thread Revalidation and Docs
+
+**Goal**: The v1.1 wire-reliability findings are revalidated over Thread with measurements from this fleet (SEED-001), evidenced per device class, and the consumer guidance and documentation corrections ship. Hardware-gated: must not block CI or any other phase
+**Depends on**: Phase 13 (needs the whole transport stack)
+**Requirements**: THREAD-01, THREAD-02, THREAD-03, THREAD-04, THREAD-05, DOCS-04, DOCS-05, DOCS-06
+**Success Criteria** (what must be TRUE):
+
+  1. Discovery coverage over Thread is measured across repeated rounds, never a single round, which is the Spike 005 lesson this project already paid for
+  2. The retry schedule's WiFi-tuned constants are measured against Thread ack RTT, and the achievable animation frame rate over Thread is measured; the measured ceiling is the deliverable, and no constant changes without this evidence
+  3. Border router advertisement staleness is measured directly, by unplugging a Thread device and timing when it stops being advertised
+  4. Every device class carries either a Thread evidence record or a named gap: `MatrixLight` closes now on two devices, `CeilingLight`, `MultiZoneLight` and single-zone `Light` close as migrations land, and `InfraredLight` and `HevLight` close as named gaps; the phase closes when every class has one or the other, not when every class is evidenced
+  5. A broadcast-first consumer can read what changes for them and how to reach Thread devices, the known limitations are documented (IPv4-multicast query leg, unicast-only reception, no unsolicited announcements, mesh scale proven synthetically), and the false `asyncio.TaskGroup` claim in `CLAUDE.md` is corrected
+
+**Plans**: TBD
 
 ## Progress
+
+**Execution Order:** 10 → (11 ∥ 12) → 13 → 14
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -206,7 +223,12 @@ no gap.
 | 3. Retry Schedule Reshape | v1.1 | 3/3 | Complete | 2026-07-17 |
 | 4. Animation Flow Control | v1.1 | 13/13 | Complete | 2026-07-17 |
 | 5. Reliability Documentation | v1.1 | 6/6 | Complete | 2026-07-18 |
-| 6. Generated Theme Library | v1.2 | 2/2 | Complete    | 2026-08-15 |
-| 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete    | 2026-08-15 |
-| 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete    | 2026-08-16 |
-| 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete    | 2026-08-27 |
+| 6. Generated Theme Library | v1.2 | 2/2 | Complete | 2026-08-15 |
+| 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete | 2026-08-15 |
+| 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete | 2026-08-16 |
+| 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete | 2026-08-27 |
+| 10. Land the IPv6/Thread Branch | v2.0 | 5/6 | In Progress|  |
+| 11. mDNS Hardening | v2.0 | 0/TBD | Not started | - |
+| 12. IPv6 Discovery Plumbing | v2.0 | 0/TBD | Not started | - |
+| 13. Merged Discovery | v2.0 | 0/TBD | Not started | - |
+| 14. Thread Revalidation and Docs | v2.0 | 0/TBD | Not started | - |

@@ -63,7 +63,7 @@ distinct test for the 100% branch patch coverage gate.
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Zero-loss packets/trial = 1.0 on gen4 downlight (optional per CONTEXT) | RETRY-01 evidence | Real RTT distribution; headless but network-dependent | N × `request(GetColor())` with send spy against 192.168.18.95; expect 1.0 tx/trial |
+| Zero-loss packets/trial = 1.0 on gen4 downlight (optional per CONTEXT) | RETRY-01 evidence | Real RTT distribution; headless but network-dependent | N × `request(GetColor())` with send spy against 203.0.113.6; expect 1.0 tx/trial |
 
 ---
 

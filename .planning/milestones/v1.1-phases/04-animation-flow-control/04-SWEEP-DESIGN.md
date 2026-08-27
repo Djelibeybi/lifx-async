@@ -33,7 +33,7 @@ Derived rulings this design encodes:
 
 1. **Tiles ruling:** gen3 Tiles radios are known-flaky; the measured consistent
    2–2.5x improvement on them IS a win; Tiles loss numbers must not gate
-   certification. System Test Tiles II (192.168.18.62) stays in the sweep as
+   certification. System Test Tiles II (203.0.113.3) stays in the sweep as
    known-bad-radio REFERENCE DATA only — never in the aggregation numerator or
    denominator.
 2. **Cross-device retarget:** ANIM-03 certification moves from "standard Tiles" to a
@@ -45,14 +45,14 @@ Derived rulings this design encodes:
 
 | # | Device | IP (DHCP — may drift) | Serial | Class → profile | Role |
 |---|--------|----------------------|--------|-----------------|------|
-| 1 | Playroom Luna | 192.168.19.182 | d073d5893c04 | MatrixLight (product 219, gen4) → tiles | gate |
-| 2 | Dining Room Table Candle | 192.168.18.81 | d073d55956e8 | MatrixLight → tiles | gate |
-| 3 | Makerspace Candle | 192.168.18.32 | d073d582bff4 | MatrixLight → tiles | gate |
-| 4 | Makerspace Tube | 192.168.19.199 | d073d5866777 | MatrixLight → tiles | gate |
-| 5 | Makerspace Ceiling | 192.168.19.119 | d073d5a132d9 | CeilingLight → ceiling | gate + ANIM-04 evidence |
-| 6 | Playroom Ceiling | 192.168.19.82 | d073d5a132b8 | CeilingLight → ceiling | gate + ANIM-04 evidence |
-| 7 | My Office Ceiling Capsule | 192.168.19.231 | d073d587daab | CeilingLight (product 201, 13×26) → ceiling | gate + ANIM-04 evidence + THE visual device |
-| 8 | System Test Tiles II | 192.168.18.62 | d073d53e11be | MatrixLight (gen3 Tiles) → tiles | REFERENCE DATA ONLY — never gates |
+| 1 | Test Luna | 203.0.113.10 | d073d5e00035 | MatrixLight (product 219, gen4) → tiles | gate |
+| 2 | Dining Room Table Candle | 203.0.113.4 | d073d5e0001e | MatrixLight → tiles | gate |
+| 3 | Test Candle | 203.0.113.2 | d073d5e00001 | MatrixLight → tiles | gate |
+| 4 | Test Tube | 203.0.113.12 | d073d5e00002 | MatrixLight → tiles | gate |
+| 5 | Test Ceiling A | 203.0.113.7 | d073d5e00003 | CeilingLight → ceiling | gate + ANIM-04 evidence |
+| 6 | Test Ceiling B | 203.0.113.17 | d073d5e00036 | CeilingLight → ceiling | gate + ANIM-04 evidence |
+| 7 | Test Ceiling Capsule | 203.0.113.14 | d073d5e0000c | CeilingLight (product 201, 13×26) → ceiling | gate + ANIM-04 evidence + THE visual device |
+| 8 | System Test Tiles II | 203.0.113.3 | d073d5e00008 | MatrixLight (gen3 Tiles) → tiles | REFERENCE DATA ONLY — never gates |
 
 IPs are DHCP leases and may drift: device resolution is serial-authoritative — the
 serial is the device's identity; the roster IP is only a serial-checked fast path,
@@ -182,8 +182,8 @@ resolution/restore overhead → **~45–55 min total**.
 
 ## 5. ANIM-04 piggyback definition
 
-The sweep captures on the three ceiling-class devices (Makerspace Ceiling, Playroom
-Ceiling, My Office Ceiling Capsule) everything 04-07 Task 1 required:
+The sweep captures on the three ceiling-class devices (Test Ceiling A, Area B
+Ceiling, Test Ceiling Capsule) everything 04-07 Task 1 required:
 
 - **Reported chain dimensions** (width, height, tile count) per session.
 - **Packets/frame asserted against the chain-dims-derived expectation** — every sent
@@ -212,7 +212,7 @@ That is the consolidated visual checkpoint (section 6).
 
 ## 6. Visual checkpoint consolidation
 
-**ONE visual ask total**, on My Office Ceiling Capsule (the operator is at their
+**ONE visual ask total**, on Test Ceiling Capsule (the operator is at their
 desk; the Capsule is in their office), with a DUAL verdict:
 
 - **Smoothness (ANIM-03's human-only criterion):** a continuously moving colour
@@ -254,11 +254,11 @@ Task 3 applies the approved (or operator-amended) wording verbatim.
 
 ### (i) ROADMAP Phase 4 success criterion 3 — proposed replacement
 
-> 3. Hardware UAT (cross-device paired sweep): the paired same-session battery — ambient control (prober only), then alternating ack-gated and instrument-level blind-fire rounds under 20 FPS streaming — runs once per device over the 7-device healthy-radio matrix roster (Playroom Luna, Dining Room Table Candle, Makerspace Candle, Makerspace Tube, Makerspace Ceiling, Playroom Ceiling, My Office Ceiling Capsule), each session judged by the unchanged 04-CRITERION-DESIGN.md paired-relative rule (validity: ambient ≤ 2.5%, ambient n ≥ 100, every gated round delivered ≥ 0.50, else INCONCLUSIVE; PASS: gated pooled ≤ 9.0% AND (gated pooled ≤ 2.5% OR Fisher one-sided p < 0.05 AND blind/gated ≥ 2.0)); the sweep certifies iff at least 5 of the 7 gate devices produce valid sessions (N_valid ≥ 5, quorum) and at most one valid session FAILs (per-device PASSes ≥ N_valid − 1); INCONCLUSIVE and ENV-ERROR rows are excluded from N_valid but always reported; below quorum the sweep is INCONCLUSIVE, never a pass or a fail (aggregation derived per 04-SWEEP-DESIGN.md: power 0.8523 at the historical per-device rate, all-must-pass 0.4813 rejected); System Test Tiles II (gen3 Tiles, known-flaky radio — operator ruling 2026-07-17: its measured consistent 2–2.5x gated improvement IS a win and Tiles loss numbers never gate certification) runs as reference data only, never in the aggregation
+> 3. Hardware UAT (cross-device paired sweep): the paired same-session battery — ambient control (prober only), then alternating ack-gated and instrument-level blind-fire rounds under 20 FPS streaming — runs once per device over the 7-device healthy-radio matrix roster (Test Luna, Dining Room Table Candle, Test Candle, Test Tube, Test Ceiling A, Test Ceiling B, Test Ceiling Capsule), each session judged by the unchanged 04-CRITERION-DESIGN.md paired-relative rule (validity: ambient ≤ 2.5%, ambient n ≥ 100, every gated round delivered ≥ 0.50, else INCONCLUSIVE; PASS: gated pooled ≤ 9.0% AND (gated pooled ≤ 2.5% OR Fisher one-sided p < 0.05 AND blind/gated ≥ 2.0)); the sweep certifies iff at least 5 of the 7 gate devices produce valid sessions (N_valid ≥ 5, quorum) and at most one valid session FAILs (per-device PASSes ≥ N_valid − 1); INCONCLUSIVE and ENV-ERROR rows are excluded from N_valid but always reported; below quorum the sweep is INCONCLUSIVE, never a pass or a fail (aggregation derived per 04-SWEEP-DESIGN.md: power 0.8523 at the historical per-device rate, all-must-pass 0.4813 rejected); System Test Tiles II (gen3 Tiles, known-flaky radio — operator ruling 2026-07-17: its measured consistent 2–2.5x gated improvement IS a win and Tiles loss numbers never gate certification) runs as reference data only, never in the aggregation
 
 ### (ii) ROADMAP Phase 4 success criterion 4 — proposed replacement
 
-> 4. Hardware UAT (large-matrix framebuffer path): the sweep's three ceiling-class devices (Makerspace Ceiling, Playroom Ceiling, My Office Ceiling Capsule 13×26) stream the framebuffer path (multi-packet frames + buffer swap) under the same flow control within their paired sweep sessions — every sent gated frame matches the packets/frame expectation derived from the reported chain dimensions by the row-aligned chunking rule (pixels ≤ 64 → one Set64 per tile; else tile_count × (ceil(height / (64 // width)) + 1) including the final CopyFrameBuffer per tile), every gated round records ≥ 1 CopyFrameBuffer ack RTT sample (the D4-04 ack-probe attachment decision confirmed or contradicted with evidence), and rendering geometry (no striping/garbled regions) is confirmed visually on the Capsule at the consolidated 04-12 visual checkpoint
+> 4. Hardware UAT (large-matrix framebuffer path): the sweep's three ceiling-class devices (Test Ceiling A, Test Ceiling B, Test Ceiling Capsule 13×26) stream the framebuffer path (multi-packet frames + buffer swap) under the same flow control within their paired sweep sessions — every sent gated frame matches the packets/frame expectation derived from the reported chain dimensions by the row-aligned chunking rule (pixels ≤ 64 → one Set64 per tile; else tile_count × (ceil(height / (64 // width)) + 1) including the final CopyFrameBuffer per tile), every gated round records ≥ 1 CopyFrameBuffer ack RTT sample (the D4-04 ack-probe attachment decision confirmed or contradicted with evidence), and rendering geometry (no striping/garbled regions) is confirmed visually on the Capsule at the consolidated 04-12 visual checkpoint
 
 ### (iii) REQUIREMENTS ANIM-03 — proposed replacement (checkbox stays unchecked)
 

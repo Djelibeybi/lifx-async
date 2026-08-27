@@ -3,7 +3,7 @@
 Standalone measurement script (optional per 03-CONTEXT.md -- RETRY-01 through
 RETRY-04 are already closed by plan 03-02's emulator-backed test suite). Drives
 the real, shipped ``DeviceConnection.request()`` against the quiesced gen4
-test downlight at 192.168.18.95, the RTT-sensitive device where spike 002
+test downlight at 203.0.113.6, the RTT-sensitive device where spike 002
 measured 1.37 packets/trial (target: 1.0) and a 62 ms median latency inflated
 by the old jitter sleep (target: roughly raw RTT). Mirrors the honest-
 reporting contract of Phase 2's ``uat_rounds.py``.
@@ -56,7 +56,7 @@ class TrialResult(TypedDict):
     ok: bool
 
 
-DEFAULT_IP = "192.168.18.95"
+DEFAULT_IP = "203.0.113.6"
 DEFAULT_JSON_OUT = Path(
     ".planning/phases/03-retry-schedule-reshape/03-UAT-RESULTS.json"
 )

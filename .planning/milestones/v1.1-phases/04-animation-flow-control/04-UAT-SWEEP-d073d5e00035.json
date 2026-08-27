@@ -1,14 +1,14 @@
 {
   "timestamp": "2026-07-17T07:07:55",
-  "serial": "d073d5893c04",
-  "label": "Playroom Luna",
+  "serial": "d073d5e00035",
+  "label": "Test Luna",
   "role": "gate",
   "profile": "tiles",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.19.182"
+    "ip": "203.0.113.10"
   },
-  "ip": "192.168.19.182",
+  "ip": "203.0.113.10",
   "ceiling_power_confirmed": null,
   "restoration": {
     "attempted": true,

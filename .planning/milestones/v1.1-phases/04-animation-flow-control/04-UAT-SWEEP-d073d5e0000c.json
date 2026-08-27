@@ -1,14 +1,14 @@
 {
   "timestamp": "2026-07-17T07:40:29",
-  "serial": "d073d587daab",
-  "label": "My Office Ceiling Capsule",
+  "serial": "d073d5e0000c",
+  "label": "Test Ceiling Capsule",
   "role": "gate",
   "profile": "ceiling",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.19.231"
+    "ip": "203.0.113.14"
   },
-  "ip": "192.168.19.231",
+  "ip": "203.0.113.14",
   "ceiling_power_confirmed": true,
   "restoration": {
     "attempted": true,

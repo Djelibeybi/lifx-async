@@ -1,12 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "kind": "phase-08-ceiling-determinations",
-  "source": "data/themes.jsonl",
+  "status": "historical",
+  "source": "data/themes.jsonl@291e7e6~1",
+  "source_note": "Pinned to the pre-resync blob. These determinations were derived when the shipped palettes were device measurements, where the protocol ceiling truncates every palette at 16 colours. Re-deriving the selection below against the CURRENT data/themes.jsonl yields zero rows, because no shipped record has a 16-colour palette any more. That is supersession, not drift: see superseded_by.",
   "selection": {
     "disposition": "lifx-app",
     "literal_palette_length": 16,
     "excluded_slug": "carlton",
-    "expected_rows": 25
+    "expected_rows": 25,
+    "applies_to": "the pinned source above, not the current working tree"
   },
   "protocol_ceiling": {
     "constant": "MAX_PALETTE_COLORS",
@@ -14,6 +17,15 @@
     "applies_to": ["SetTileEffect", "SetMultiZoneEffect"],
     "determination": "device-ceiling-unresolvable",
     "explanation": "A device readback cannot reveal a seventeenth source colour."
+  },
+  "superseded_by": {
+    "commit": "291e7e6",
+    "date": "2026-08-19",
+    "phase": "09-theme-data-contract-docs",
+    "method": "internal LIFX HTTP API endpoint",
+    "summary": "The resync replaced the device-measured palettes with full palettes obtained from an internal LIFX HTTP API endpoint, which returned the true palette for exactly these 25 themes. Their shipped lengths are now 18 to 68 colours.",
+    "requirement_effect": "FIDELITY-01 asks for the true length OR a documented finding that no device-based method can supply it. Phase 8 could only reach the second branch. The resync satisfied the first, by a non-device method, so the protocol_ceiling finding above remains true as written.",
+    "current_guard": "tests/test_theme/test_ceiling_supersession.py"
   },
   "determinations": [
     {"theme_slug": "baubles", "determination": "device-ceiling-unresolvable"},

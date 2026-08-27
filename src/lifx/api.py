@@ -34,6 +34,7 @@ from lifx.devices import (
     MatrixLight,
     MultiZoneLight,
 )
+from lifx.network.address import validate_address
 from lifx.network.discovery import (
     DiscoveredDevice,
     _discover_with_packet,
@@ -939,6 +940,11 @@ async def find_by_ip(
                 print(f"Found: {device.label}")
         ```
     """
+    # Validate before any socket exists, so a permanent configuration error
+    # such as a zone-less link-local address fails immediately instead of
+    # waiting out the discovery timeout.
+    validate_address(ip)
+
     # Use the target IP as the "broadcast" address - only that device will respond
     async for discovered in discover_devices(
         timeout=timeout,

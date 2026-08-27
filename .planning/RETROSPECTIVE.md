@@ -76,6 +76,49 @@
 
 ---
 
+## Milestone: v1.2 — Theme Library Update
+
+**Shipped:** 2026-08-27
+**Phases:** 4 (6–9) | **Plans:** 11 | **Tasks:** 28 | **Commits:** 87 over 13 days
+
+### What Was Built
+- A generated theme library: 166 committed JSONL records drive a validating generator into `src/lifx/theme/data.py`, replacing a 366-line hand-transcribed table that had drifted from the app for years. 169 names resolve, regeneration is byte-idempotent, and CI regenerates and diffs on every change to `data/**`
+- A machine-readable fate for every key: 138 `lifx-app` / 19 library-only / 9 deprecated with a resolving `replaced_by`, plus `renamed` added post-ship once the closed three-value set proved unable to express an alias
+- Category navigation over the app's own nine-category taxonomy, with slug derivation collapsed into one leaf module shared by library and generator, and the six pre-6.4.0 names failing loudly rather than mapping onto a category none of them matched
+- A fail-closed, resumable hardware fidelity runner with full restoration and privacy-safe artefacts, closed under an explicit operator exception rather than a manufactured pass
+- The record contract as an importable, independently tested `lifx.theme.schema`, and a catalogue page bound to the library by a drift test that fails when the two disagree
+
+### What Worked
+- Making the drift class structurally impossible. The milestone existed because a hand-written table silently diverged from its source for years with nothing to detect it. Generated data plus a CI regen-and-diff gate means that specific failure cannot recur silently.
+- Binding prose to code. `test_docs_catalogue.py` fails when the catalogue page and the library disagree, so the published counts cannot quietly become false. The same instinct produced the supersession guard at the close.
+- Reversing locked decisions when measurement contradicted them, and recording the reversal rather than the outcome alone. COMPAT-02's `*_legacy` aliases were retired once the 19 redefined palettes were actually measured, and the device-readback rule was dropped once it was clear no device could answer the question.
+- Refusing to synthesise evidence. Phase 8's two roles could not be honestly merged into one 24-cycle record, and no combined artefact was published. The exception is written down in a machine-reviewable form that states plainly what was not verified.
+
+### What Was Inefficient
+- **A whole phase was spent proving a question unanswerable under a constraint that was dropped one phase later.** Phase 8 established that no device-based method can recover a palette longer than 16 colours, which was true. Phase 9 then obtained the true lengths from an internal HTTP API. The constraint was never wrong about devices; it was wrong about being sufficient, and nobody tested that until after the phase built around it had shipped.
+- Phase 8's harness became unrunnable within days. It depends on an untracked capture directory that was removed shortly afterwards, so roughly 1,900 covered statements of carefully fail-closed tooling cannot be executed in this repository again.
+- The resync silently invalidated Phase 8's determinations on 2026-08-19 and nothing noticed until the close-out audit on 2026-08-27. The regression test that would have caught it lived outside `testpaths`, so it had never run in CI.
+- Phase 9 was executed entirely outside the GSD loop as two commits on two branches with no plan preceding either. Its plans and summaries are post-hoc reconstructions, and its verification is the phase's first and only goal-backward check.
+
+### Patterns Established
+- Anything transcribed from an external source ships as generated data plus a CI regen-and-diff gate, never as a hand-maintained literal
+- A published page that makes counted claims about the library gets a drift test binding it to the library
+- A shared derivation rule lives in a leaf module both consumers import, so a generator and its library cannot drift apart
+- Superseded evidence is pinned, not regenerated or deleted: stamp it `historical` with a `source@commit` provenance, explain what superseded it, and add a live guard for whatever invariant still matters
+
+### Key Lessons
+1. **Challenge the constraint before building around it.** The most expensive thing in this milestone was a phase scoped by a rule that went unquestioned for three phases and was discarded in the fourth.
+2. **A test outside `testpaths` is documentation, not a guard.** It will not run, it will rot, and it will be cited as coverage that does not exist.
+3. **Evidence pinned to an untracked input has a short shelf life.** If a harness reads something git does not track, its results outlive its ability to reproduce them.
+4. **Reconstructing plans after execution produces a record, not a verification.** Phase 9 labelled its reconstructions honestly and verified goal-backward against the shipped tree instead, which is the right handling, but it is recovery rather than process.
+5. **Audit findings are wrong in both directions.** This close-out called FIDELITY-01 broken when the resync had satisfied it more strongly, and called Phase 7 unsigned when the sign-off had been recorded all along and only a stale line suggested otherwise. Verify the finding before acting on it, and withdraw it visibly when it does not hold.
+
+### Cost Observations
+- Model mix: not tracked precisely; planning and verification on the stronger tier, routine execution on Sonnet-class
+- Notable: the close-out integration check returned a confident BLOCKER that was, on verification, a supersession the milestone should have celebrated. Independent verification of the subagent's headline claim took minutes and changed the milestone's recorded status from `gaps_found` to `tech_debt`
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -84,6 +127,7 @@
 |-----------|----------|--------|------------|
 | v1.0 | ~4 | 1 | First GSD milestone on this repo; full pipeline (map → discuss → plan → execute → review → audit) exercised end-to-end |
 | v1.1 | many | 4 | Spike-first planning (5 hardware experiments before any phase); hardware UAT checkpoints as blocking gates; close-out audit with cross-phase integration checking against source |
+| v1.2 | many | 4 | Generated data with a CI regen-and-diff gate; docs bound to code by drift tests; two locked decisions reversed in flight and recorded; one phase executed outside the loop and reconstructed afterwards |
 
 ### Cumulative Quality
 
@@ -91,9 +135,11 @@
 |-----------|-------|----------|-------------------|
 | v1.0 | 2500 (suite green) | — | 0 (still zero runtime deps) |
 | v1.1 | 2629 (suite green) | 96% overall, 100% branch patch in CI | 0 (still zero runtime deps) |
+| v1.2 | 3520 (suite green) | 97% overall, 100% branch patch in CI | 0 (still zero runtime deps) |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. **A plan's decision is a hypothesis, not a fact.** v1.0's D-01 (synchronous state save) was reversed by review; v1.1's ANIM-03 threshold was amended twice and the D5-09 docs rule is still disputed. Decisions that were never measured get re-litigated at the gate.
 2. **Review catches what planning decided wrongly.** Both milestones' most valuable defects — blocking I/O on the event loop, whole-file clobbering, the large-tile chunking bug, the discovery idle-window hazard — came from review or audit, not from execution.
 3. **Planning artefacts outweigh code on small changes.** True for v1.0 (25 docs commits vs 2 files) and for v1.1's quick tasks. Match the track to the change size.
+4. **Unexamined constraints cost whole phases.** v1.1 calibrated a gate from one measurement round and paid for it in re-runs; v1.2 scoped a phase around a capture rule nobody tested until the phase after it. In both cases the expensive part was an assumption that was never cheap to check.

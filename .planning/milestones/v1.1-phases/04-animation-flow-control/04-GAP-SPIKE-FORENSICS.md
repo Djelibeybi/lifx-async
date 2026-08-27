@@ -20,7 +20,7 @@ Raw sources:
 - `.planning/phases/04-animation-flow-control/04-UAT-TILES.json` — 04-06 UAT run 2
   (timestamp 2026-07-17T02:38:00)
 
-All measurements are against the same device: System Test Tiles I, 192.168.19.243
+All measurements are against the same device: System Test Tiles I, 203.0.113.15
 (684 pixels, 4 Set64 packets/frame, 20 FPS, 30 s per arm/round).
 
 ## Spike 003 sample sizes

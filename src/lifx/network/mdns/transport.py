@@ -1,7 +1,16 @@
-"""mDNS transport for multicast UDP communication.
+"""mDNS transport for LIFX service discovery.
 
-This module provides a UDP transport specifically for mDNS queries,
-with multicast group joining and appropriate socket configuration.
+A UDP socket bound to an ephemeral port, which is what makes every query it
+sends a legacy unicast query under RFC 6762 section 6.7: responders answer
+straight back to that port instead of broadcasting the reply. Queries
+themselves still go to the well-known mDNS address
+(:data:`lifx.const.MDNS_ADDRESS`, 224.0.0.251) on port 5353, so only the
+replies are unicast.
+
+Binding 5353 instead would share the port with whatever system mDNS daemon
+is already running (mDNSResponder on macOS, Avahi on Linux), which silently
+takes the unicast responses and causes devices to be missed. The ephemeral
+bind is what keeps this transport's answers its own.
 """
 
 from __future__ import annotations
@@ -19,10 +28,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MdnsTransport:
-    """UDP transport for mDNS multicast communication.
+    """UDP transport for mDNS queries and their unicast replies.
 
-    This transport is specifically designed for mDNS queries and responses,
-    with support for multicast group membership and appropriate socket options.
+    Sends to the well-known mDNS address from a socket bound to an ephemeral
+    port. Under RFC 6762 section 6.7 that makes each query a legacy unicast
+    query, which a responder answers directly to this socket rather than to
+    5353, so no system mDNS daemon is competing for the reply.
 
     Example:
         >>> async with MdnsTransport() as transport:
@@ -46,10 +57,11 @@ class MdnsTransport:
         await self.close()
 
     async def open(self) -> None:
-        """Open the mDNS socket with multicast configuration.
+        """Open the mDNS socket.
 
-        Creates a UDP socket, configures it for mDNS multicast,
-        and joins the mDNS multicast group.
+        Creates a UDP socket, sets the multicast TTL to 1 so queries stay on
+        the local link, and binds an ephemeral port so that responders reply
+        directly to it (RFC 6762 section 6.7).
 
         Raises:
             LifxNetworkError: If socket creation or configuration fails
@@ -64,10 +76,13 @@ class MdnsTransport:
             )
             return
 
+        sock: socket.socket | None = None
+
         try:
             loop = asyncio.get_running_loop()
 
-            # Create and configure socket manually for multicast
+            # Create and configure the socket by hand, so the ephemeral bind
+            # below is ours to choose rather than asyncio's.
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -94,8 +109,8 @@ class MdnsTransport:
             sock.setblocking(False)
             self._socket = sock
 
-            # Create protocol (shared with UdpTransport — bounded queue with
-            # drop logging guards against multicast floods)
+            # Create protocol. Shared with UdpTransport, whose bounded queue
+            # and drop logging guard against multicast floods.
             protocol = _UdpProtocol()
             self._protocol = protocol
 
@@ -114,6 +129,24 @@ class MdnsTransport:
             )
 
         except OSError as e:
+            # Two things are stranded by a failure partway through, and the
+            # descriptor is only the obvious one. `_socket` and `_protocol`
+            # are assigned before the endpoint is awaited, and `is_open` is
+            # `_protocol is not None`, so an endpoint failure would otherwise
+            # leave the object claiming to be open while the early return at
+            # the top of this method refused to build a replacement:
+            # descriptor-clean, and permanently unusable. Put the object back
+            # to exactly the state close() leaves it in, so a caller's retry
+            # loop gets a working transport instead of a phantom.
+            #
+            # close() is a no-op on an already-closed socket, so this is safe
+            # whether or not create_datagram_endpoint took ownership first.
+            if sock is not None:
+                sock.close()
+            self._socket = None
+            self._protocol = None
+            self._transport = None
+
             _LOGGER.debug(
                 {
                     "class": "MdnsTransport",

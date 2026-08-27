@@ -314,7 +314,7 @@ class TestStateInitialization:
             hue=21845, saturation=65535, brightness=32768, kelvin=3500
         )
         mock_color.power = 65535
-        mock_color.label = "Kitchen Light"
+        mock_color.label = "Test Light"
 
         firmware = mock_firmware_info(version_major=2, version_minor=80)
 
@@ -354,7 +354,7 @@ class TestStateInitialization:
         # Verify all fields populated
         assert light._state is not None
         assert isinstance(light._state, LightState)
-        assert light._state.label == "Kitchen Light"
+        assert light._state.label == "Test Light"
         assert light._state.power == 65535
         assert light._state.color.hue == pytest.approx(120.0, abs=0.01)
         assert light._state.host_firmware.version_major == 2

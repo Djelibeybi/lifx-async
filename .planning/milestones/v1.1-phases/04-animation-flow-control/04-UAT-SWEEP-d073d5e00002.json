@@ -1,14 +1,14 @@
 {
   "timestamp": "2026-07-17T07:24:06",
-  "serial": "d073d5866777",
-  "label": "Makerspace Tube",
+  "serial": "d073d5e00002",
+  "label": "Test Tube",
   "role": "gate",
   "profile": "tiles",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.19.199"
+    "ip": "203.0.113.12"
   },
-  "ip": "192.168.19.199",
+  "ip": "203.0.113.12",
   "ceiling_power_confirmed": null,
   "restoration": {
     "attempted": true,

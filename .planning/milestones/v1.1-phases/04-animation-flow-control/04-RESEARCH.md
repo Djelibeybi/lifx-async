@@ -260,7 +260,7 @@ large-tile mode; first template (index 0) everywhere else.
 
 Tagged [ASSUMED → hardware-validate]: that a Ceiling 13×26 under 20 FPS streaming acks
 the CopyFB with RTTs compatible with the limit-2/1 s tuning. ANIM-04's UAT on
-192.168.19.231 confirms or adjusts; the `probe_template_index` seam makes flipping to
+203.0.113.14 confirms or adjusts; the `probe_template_index` seam makes flipping to
 "first Set64" a one-line generator change if hardware disagrees.
 
 ### Pattern 3: Ack correlation and sequence wrap (Q4 answer)
@@ -634,8 +634,8 @@ unrelated and untouched (scope D4-05).
 | uv + Python 3.10–3.14 | build/test | ✓ | project venv is 3.14 | — |
 | pytest/pytest-asyncio/pytest-cov | automated tests | ✓ | 8.4.2+/0.24+/7.0+ | — |
 | lifx-emulator-core (embedded) | integration tests, incl. ack scenarios and 13×26 tile emulation (`create_tile_device(tile_width=13, tile_height=26)` or `create_device(201, ...)`) | ✓ | 3.6.3 | tests marked `@pytest.mark.emulator` auto-skip |
-| Tiles hardware (192.168.19.243 / .18.62) | ANIM-03 UAT | manual — LAN access required | — | none (UAT is mandatory per CONTEXT.md) |
-| Ceiling Capsule (192.168.19.231, product 201) | ANIM-04 UAT | manual — LAN access; **power on first (`set_power`) or animation is invisible** | — | none |
+| Tiles hardware (203.0.113.15 / .18.62) | ANIM-03 UAT | manual — LAN access required | — | none (UAT is mandatory per CONTEXT.md) |
+| Ceiling Capsule (203.0.113.14, product 201) | ANIM-04 UAT | manual — LAN access; **power on first (`set_power`) or animation is invisible** | — | none |
 
 **Missing dependencies with no fallback:** none for automated work; the two hardware
 UATs require Avi at the network with the devices (already planned as manual gates).
@@ -662,7 +662,7 @@ UATs require Avi at the network with the devices (already planned as manual gate
 | ANIM-04 | Row-aligned 13×26 templates (7 Set64: 52×6+26 colours, y offsets 0,4,…,24, fb_index=1, hsbk_start row-aligned; + CopyFB); 16×8 shape unchanged | unit | `uv run pytest tests/test_animation/test_packets.py -x` | exists; new tests Wave 0 |
 | ANIM-04 | Large-tile streaming against an emulated 13×26 device (product 201), probe on CopyFB acked, gating engages under ack-drop scenario | integration (emulator) | `uv run pytest tests/test_animation/ -m emulator -x` | ❌ Wave 0 (new fixture: 13×26 emulated tile device) |
 | ANIM-03 | 0% concurrent-query loss + ≥85% delivered frames + operator visual verdict on Tiles at 20 FPS | **manual-only UAT** — emulator cannot model real ack RTT under load (CONTEXT.md constraint); requires Avi watching | UAT harness modelled on spike `stream.py` (photons arm + query prober) | ❌ Wave/UAT plan |
-| ANIM-04 | Same flow control on Ceiling Capsule 192.168.19.231; probe-attachment decision recorded + validated; power-on before visual runs | **manual-only UAT** — hardware-specific RTT and visual verdict | UAT harness (same script, ceiling host) | ❌ Wave/UAT plan |
+| ANIM-04 | Same flow control on Ceiling Capsule 203.0.113.14; probe-attachment decision recorded + validated; power-on before visual runs | **manual-only UAT** — hardware-specific RTT and visual verdict | UAT harness (same script, ceiling host) | ❌ Wave/UAT plan |
 
 ### Existing tests that change (enumerated)
 

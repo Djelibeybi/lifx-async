@@ -56,7 +56,7 @@ From spike 002 (540 trials, 3 device generations, seeded loss injection):
 - Optional headless hardware validation: re-run the spike's race harness
   (`.planning/spikes/002-retry-storm-vs-fresh-deadline/race.py`) regime comparison, or a
   targeted zero-loss packets-per-trial measurement against a quiesced test downlight
-  (192.168.18.95 gen4 is the sensitive one). Repeated trials mandatory.
+  (203.0.113.6 gen4 is the sensitive one). Repeated trials mandatory.
 
 ## Requirements in scope
 

@@ -1,5 +1,5 @@
 {
-  "192.168.19.132 (Test Downlight 5)": {
+  "203.0.113.8 (Test Downlight 5)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,
@@ -140,7 +140,7 @@
       }
     }
   },
-  "192.168.18.86 (Test Downlight 6)": {
+  "203.0.113.5 (Test Downlight 6)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,
@@ -281,7 +281,7 @@
       }
     }
   },
-  "192.168.19.243 (System Test Tiles I)": {
+  "203.0.113.15 (System Test Tiles I)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,
@@ -422,7 +422,7 @@
       }
     }
   },
-  "192.168.18.62 (System Test Tiles II)": {
+  "203.0.113.3 (System Test Tiles II)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,
@@ -563,7 +563,7 @@
       }
     }
   },
-  "192.168.18.95 (Test Downlight 2)": {
+  "203.0.113.6 (Test Downlight 2)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,
@@ -704,7 +704,7 @@
       }
     }
   },
-  "192.168.19.158 (Test Downlight 3)": {
+  "203.0.113.9 (Test Downlight 3)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,
@@ -845,7 +845,7 @@
       }
     }
   },
-  "192.168.18.189 (Test Downlight 4)": {
+  "203.0.113.1 (Test Downlight 4)": {
     "idle_curve": {
       "idle=0s": {
         "lost_first": 0,

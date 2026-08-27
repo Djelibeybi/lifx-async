@@ -19,6 +19,7 @@ from lifx.const import (
     TIMEOUT_ERRORS,
 )
 from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
+from lifx.network.address import family_for
 
 if TYPE_CHECKING:
     from asyncio import DatagramTransport
@@ -241,6 +242,10 @@ class UdpTransport:
         self._peer = peer
         self._protocol: _UdpProtocol | None = None
         self._transport: DatagramTransport | None = None
+        # Recorded by open() so send() can compare a destination against it
+        # without asking asyncio for the socket on every datagram. None means
+        # no endpoint has been built yet, which send() reports as "not open".
+        self._family: socket.AddressFamily | None = None
 
     def _log(self, **fields: object) -> dict[str, object]:
         """Build a structured log record, tagged with the peer when known."""
@@ -290,15 +295,17 @@ class UdpTransport:
             self._protocol = protocol
 
             # Create datagram endpoint. The socket family follows the local
-            # bind address: "::" selects IPv6, which is required to reach
+            # bind address, derived by the one shared rule in
+            # lifx.network.address, which is what lets this transport reach
             # Thread devices that have no IPv4 address.
-            family = socket.AF_INET6 if ":" in self._ip_address else socket.AF_INET
+            family = family_for(self._ip_address)
             self._transport, _ = await loop.create_datagram_endpoint(
                 lambda: protocol,
                 local_addr=(self._ip_address, self._port),
                 reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
                 family=family,
             )
+            self._family = family
 
             # Get actual port assigned
             actual_port = self._transport.get_extra_info("sockname")[1]
@@ -375,6 +382,7 @@ class UdpTransport:
 
         transport, self._transport = self._transport, None
         self._protocol = None
+        self._family = None
 
         if transport is not None:
             try:
@@ -392,15 +400,53 @@ class UdpTransport:
     async def send(self, data: bytes, address: tuple[str, int]) -> None:
         """Send data to a specific address.
 
+        The destination's address family is checked against the socket's
+        before the datagram is handed to asyncio. A mismatch is a permanent
+        configuration error, but the socket reports it as a ``gaierror``,
+        an ``OSError`` subclass that :meth:`_UdpProtocol.error_received`
+        deliberately swallows along with every genuine peer error. Without
+        this check an unreachable-by-construction address is
+        indistinguishable from a sleeping device: the caller waits out the
+        full retry schedule and is told only that it timed out. Checking
+        first costs one parse and names the actual problem.
+
+        This is a pre-send guard and nothing more. The routing of errors
+        that arrive from the network is untouched: EHOSTUNREACH, EHOSTDOWN
+        and ENETUNREACH still reach ``error_received`` and still leave the
+        endpoint alive.
+
         Args:
             data: Bytes to send
             address: Tuple of (host, port)
 
         Raises:
-            NetworkError: If socket is not open or send fails
+            NetworkError: If the socket is not open, the destination's
+                address family does not match the socket's, or the send
+                fails.
+            ValueError: If the destination is not a parsable IP literal.
+                Propagated unchanged from :func:`lifx.network.address.family_for`,
+                because every caller reaches here through a validated device
+                address or an internal broadcast literal.
         """
-        if self._transport is None or self._protocol is None:
+        if self._transport is None or self._protocol is None or self._family is None:
             raise LifxNetworkError("Socket not open")
+
+        destination_family = family_for(address[0])
+        if destination_family is not self._family:
+            _LOGGER.debug(
+                self._log(
+                    method="send",
+                    action="family_mismatch",
+                    destination_ip=address[0],
+                    destination_port=address[1],
+                    destination_family=destination_family.name,
+                    socket_family=self._family.name,
+                )
+            )
+            raise LifxNetworkError(
+                f"Destination {address[0]} requires {destination_family.name} "
+                f"but the socket family is {self._family.name}"
+            )
 
         try:
             self._transport.sendto(data, address)
@@ -556,6 +602,7 @@ class UdpTransport:
             self._transport.close()
             self._transport = None
             self._protocol = None
+            self._family = None
             _LOGGER.debug(
                 {
                     "class": "UdpTransport",

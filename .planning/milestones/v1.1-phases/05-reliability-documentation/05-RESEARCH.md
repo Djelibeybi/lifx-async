@@ -201,7 +201,7 @@ quiesced test fleet):
 | Test Downlight 5 | 36 | **2.90** | gen2 |
 | System Test Tiles I | 55 | **3.50** | gen3 |
 | Test Downlight 2 | 224 | **4.112** | gen4 |
-| My Office Ceiling Capsule | 201 | **4.112** | gen4 |
+| Test Ceiling Capsule | 201 | **4.112** | gen4 |
 
 `[VERIFIED: live probe 2026-07-17 using lifx-async Device.from_ip()]`
 

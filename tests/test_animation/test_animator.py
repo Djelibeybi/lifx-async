@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import socket
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -172,6 +173,68 @@ class TestAnimatorSendFrame:
         call_args = mock_udp_socket.sock.sendto.call_args
         address = call_args[0][1]
         assert address == ("192.168.1.100", 56700)
+
+    def test_send_frame_uses_ipv4_socket_family(
+        self, animator: Animator, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """An IPv4 device address creates an AF_INET socket."""
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        animator.send_frame(hsbk)
+
+        mock_udp_socket.socket_class.assert_called_once_with(
+            socket.AF_INET, socket.SOCK_DGRAM
+        )
+
+    def test_send_frame_uses_ipv6_socket_family(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """A Thread device's IPv6 address creates an AF_INET6 socket.
+
+        Thread devices have no IPv4 address, and an AF_INET socket raises
+        gaierror when asked to send to an IPv6 one, so the socket family
+        has to follow the device address.
+        """
+        animator = Animator(
+            ip="fd00:1::",
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=64),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=8, tile_height=8
+            ),
+        )
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        animator.send_frame(hsbk)
+
+        mock_udp_socket.socket_class.assert_called_once_with(
+            socket.AF_INET6, socket.SOCK_DGRAM
+        )
+
+    def test_send_frame_uses_ipv6_socket_family_for_zoned_address(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """A zoned link-local target is still IPv6.
+
+        The family now comes from :func:`lifx.network.address.family_for`,
+        which parses the literal rather than inspecting its characters, so
+        the zone suffix has to survive that round trip.
+        """
+        animator = Animator(
+            ip="fe80::1%en0",
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=64),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=8, tile_height=8
+            ),
+        )
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        animator.send_frame(hsbk)
+
+        mock_udp_socket.socket_class.assert_called_once_with(
+            socket.AF_INET6, socket.SOCK_DGRAM
+        )
 
     def test_close_closes_socket(
         self, animator: Animator, mock_udp_socket: MockUdpSocket

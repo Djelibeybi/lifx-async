@@ -40,10 +40,10 @@ prober at 2/s on a separate socket):
 | photons-style ack-gated | 530/600 (70 gated) | **0.0%** | 101.7 ms |
 
 - ANIM-03 target: 0% concurrent-query loss under 20 FPS streaming on Tiles
-  (192.168.19.243 or .18.62), with delivered-frame rate ≥85% and **operator visual
+  (203.0.113.15 or .18.62), with delivered-frame rate ≥85% and **operator visual
   verdict** (spike: ack-gated was smoothest by eye; requires Avi watching).
 - ANIM-04 target: same flow control exercising the multi-packet + CopyFrameBuffer path
-  on **My Office Ceiling Capsule** (192.168.19.231, product 201, 13×26 Ceiling,
+  on **Test Ceiling Capsule** (203.0.113.14, product 201, 13×26 Ceiling,
   removed from HA 2026-07-16), with the probe-attachment decision recorded and
   hardware-validated. Requires power-on before visual runs (send set_power first —
   animation is invisible otherwise).

@@ -22,7 +22,7 @@ match — the evidence base is provably faithful to the committed bytes.
 
 ## Why the absolute gate cannot work
 
-The same code on the same device (System Test Tiles I, 192.168.19.243) measured
+The same code on the same device (System Test Tiles I, 203.0.113.15) measured
 these pooled ack-gated loss rates within one day:
 
 | Session | Evidence | Gated pooled | Wilson 95% CI |
@@ -168,8 +168,8 @@ one-sided p on the same table = 0.0284 (positive, ≤ two-sided). ✓
 
 ~5.25 min per attempt: 60 s ambient + 6 × 30 s rounds + 6 × 10 s rests + setup
 (reachability probe, chain query, per-round animator setup). Hard attempt budget
-of 2 → **≤ ~11 min of device time** on the primary Tiles (192.168.19.243;
-fallback 192.168.18.62 on ENV-ERROR only).
+of 2 → **≤ ~11 min of device time** on the primary Tiles (203.0.113.15;
+fallback 203.0.113.3 on ENV-ERROR only).
 
 ## Final wording (PROPOSED — NOT applied; operator decision required)
 

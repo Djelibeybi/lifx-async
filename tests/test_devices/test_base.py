@@ -411,7 +411,7 @@ class TestLocationAndGroupManagement:
 
     def test_group_uuid_deterministic(self) -> None:
         """Test that same group labels generate the same UUID."""
-        label = "Bedroom Lights"
+        label = "Test Lights"
 
         # Generate UUID twice with the same label
         uuid1 = uuid.uuid5(LIFX_GROUP_NAMESPACE, label)
@@ -478,7 +478,7 @@ class TestLocationAndGroupManagement:
 
     async def test_set_group_generates_uuid(self, device: Device) -> None:
         """Test that set_group generates deterministic UUID from label."""
-        label = "Bedroom Lights"
+        label = "Test Lights"
         expected_uuid = uuid.uuid5(LIFX_GROUP_NAMESPACE, label)
 
         # Replace device's connection with mock
@@ -775,7 +775,7 @@ class TestLocationAndGroupManagement:
 
     async def test_set_group_reuses_existing_uuid(self, device: Device) -> None:
         """Test that set_group reuses UUID when label already exists on network."""
-        label = "Bedroom Lights"
+        label = "Test Lights"
         existing_uuid = uuid.uuid4().bytes  # Some existing UUID
 
         # Replace device's connection with mock
@@ -879,3 +879,109 @@ class TestLocationAndGroupManagement:
 
         assert packet.group == expected_uuid.bytes
         assert packet.label == label.encode("utf-8")[:32].ljust(32, b"\x00")
+
+
+class TestAddressEntryPointGate:
+    """The address gate at `Device.__init__`, `from_ip()` and `connect()`.
+
+    All three delegate to :func:`lifx.network.address.validate_address`, so
+    what is asserted here is that each one calls it, and calls it *before*
+    building anything. A zone-less IPv6 link-local address is the case that
+    motivated the gate (IPV6-02): the branch logged a warning and carried
+    on, so the caller paid a full silent request timeout for a permanent
+    configuration error.
+
+    The elapsed-time assertions are deliberately loose. They are not
+    performance tests: they distinguish "rejected before a socket existed"
+    from "rejected after the request timeout", which are three orders of
+    magnitude apart.
+    """
+
+    SERIAL = "d073d5001234"
+    ZONE_LESS = "fe80::1"
+    ZONED = "fe80::1%en0"
+
+    def test_init_rejects_zone_less_link_local(self) -> None:
+        """Construction raises, naming the missing zone identifier."""
+        started = time.perf_counter()
+        with pytest.raises(ValueError, match="zone identifier"):
+            Device(serial=self.SERIAL, ip=self.ZONE_LESS)
+        assert time.perf_counter() - started < 0.1
+
+    def test_init_accepts_zoned_link_local(self) -> None:
+        """The zoned form is reachable, so it must construct."""
+        device = Device(serial=self.SERIAL, ip=self.ZONED)
+        assert device.ip == self.ZONED
+
+    async def test_from_ip_rejects_zone_less_link_local(self) -> None:
+        """`from_ip()` raises before any connection object is built."""
+        with patch("lifx.devices.base.DeviceConnection") as mock_conn_class:
+            started = time.perf_counter()
+            with pytest.raises(ValueError, match="zone identifier"):
+                await Device.from_ip(ip=self.ZONE_LESS)
+            assert time.perf_counter() - started < 0.1
+
+        mock_conn_class.assert_not_called()
+
+    async def test_from_ip_accepts_zoned_link_local(self) -> None:
+        """The acceptance side, asserted rather than assumed."""
+        device = await Device.from_ip(ip=self.ZONED, serial=self.SERIAL)
+        assert isinstance(device, Device)
+        assert device.ip == self.ZONED
+
+    async def test_connect_rejects_zone_less_link_local(self) -> None:
+        """`connect()` raises with no DeviceConnection constructed.
+
+        The serial-less leg builds a ``DeviceConnection`` directly instead of
+        going through ``__init__``, so without its own gate this entry point
+        reproduced the exact timeout the other three now avoid.
+        """
+        with patch("lifx.devices.base.DeviceConnection") as mock_conn_class:
+            started = time.perf_counter()
+            with pytest.raises(ValueError, match="zone identifier"):
+                await Device.connect(ip=self.ZONE_LESS)
+            assert time.perf_counter() - started < 0.1
+
+        mock_conn_class.assert_not_called()
+
+    async def test_connect_accepts_zoned_link_local(self) -> None:
+        """A zoned address reaches the existing product-lookup path."""
+        with patch.object(
+            Device,
+            "get_version",
+            AsyncMock(return_value=DeviceVersion(vendor=1, product=27)),
+        ):
+            device = await Device.connect(ip=self.ZONED, serial=self.SERIAL)
+
+        assert device.ip == self.ZONED
+
+    @pytest.mark.parametrize(
+        ("ip", "message"),
+        [
+            ("::ffff:192.0.2.1", "IPv4-mapped"),
+            ("fe80::1%", "Invalid IP address format"),
+            ("FE80::1", "zone identifier"),
+            ("fe80:0:0:0:0:0:0:1", "zone identifier"),
+            ("0.0.0.0", "Unspecified IP address"),
+            ("", "No IP address"),
+        ],
+    )
+    def test_init_delegates_the_whole_rule_set(self, ip: str, message: str) -> None:
+        """Every helper rejection is reachable through construction.
+
+        `Device.__init__` keeps no address logic of its own, so these all
+        arrive from the one shared implementation.
+        """
+        with pytest.raises(ValueError, match=message):
+            Device(serial=self.SERIAL, ip=ip)
+
+    def test_serial_and_port_checks_are_untouched(self) -> None:
+        """The non-address checks stay exactly where they were (D-05)."""
+        with pytest.raises(ValueError, match="all zeros"):
+            Device(serial="000000000000", ip="192.168.1.10")
+
+        with pytest.raises(ValueError, match="Broadcast serial number"):
+            Device(serial="ffffffffffff", ip="192.168.1.10")
+
+        with pytest.raises(ValueError, match="Port must be between"):
+            Device(serial=self.SERIAL, ip="192.168.1.10", port=1023)

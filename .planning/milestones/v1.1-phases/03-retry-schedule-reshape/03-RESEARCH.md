@@ -738,7 +738,7 @@ utils.py, tests read line-by-line this session) or `[VERIFIED: spike 002 measure
 |------------|------------|-----------|---------|----------|
 | `uv` + Python ≥3.10 | build/test | ✓ (repo standard) | per `uv.lock` | — |
 | `lifx-emulator-core` (dev dep, embedded, drop-packet scenarios) | wall-time + retry emulator tests | ✓ via `uv sync` (`emulator_server_with_scenarios` fixture exists and is used by the current retry tests) | dev dependency | tests auto-skip if absent |
-| Quiesced gen4 downlight 192.168.18.95 | optional hardware UAT (packets/trial at zero loss) | ✓ (user's network; spike 002 ran on it) | — | none — optional, human-executed |
+| Quiesced gen4 downlight 203.0.113.6 | optional hardware UAT (packets/trial at zero loss) | ✓ (user's network; spike 002 ran on it) | — | none — optional, human-executed |
 
 **Missing dependencies with no fallback:** none for automated work. The optional
 hardware validation (CONTEXT constraint) needs the user's network; model it as an
@@ -766,7 +766,7 @@ mandatory DISC-03.
 | RETRY-03 | Drop-all: `timeout ≤ elapsed < timeout + 0.3` for GET and SET | integration (emulator) | rewritten `TestRetryTimeoutBudget` in `test_concurrent_requests.py` | ✅ (rewrite) |
 | RETRY-04 | Late reply to sequence 0 accepted after retransmit 1 issued (GET and ACK paths); mismatch injections raise `LifxProtocolError`; post-cleanup late reply logged at DEBUG + discarded (caplog on `_background_receiver` unmatched path) | unit | `test_connection_retry.py` | ❌ Wave 0 |
 | RETRY-01..04 regression | Existing seam/emulator/device tests pass unmodified | all | `uv run --frozen pytest` | ✅ (existing) |
-| Optional hardware | Zero-loss packets/trial = 1.0 on gen4 downlight | manual-only (hardware, optional per CONTEXT) | small harness: N `request(GetColor())` calls with the send spy against 192.168.18.95 | ❌ optional |
+| Optional hardware | Zero-loss packets/trial = 1.0 on gen4 downlight | manual-only (hardware, optional per CONTEXT) | small harness: N `request(GetColor())` calls with the send spy against 203.0.113.6 | ❌ optional |
 
 ### Sampling Rate
 

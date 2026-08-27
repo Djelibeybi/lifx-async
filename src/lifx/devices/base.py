@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import ipaddress
 import logging
 import time
 import uuid
@@ -25,6 +24,7 @@ from lifx.exceptions import (
     LifxError,
     LifxUnsupportedCommandError,
 )
+from lifx.network.address import validate_address
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
@@ -482,56 +482,10 @@ class Device(Generic[StateT]):
                 "Broadcast serial number not allowed for device connection"
             )
 
-        # Validate IP address
-        try:
-            addr = ipaddress.ip_address(ip)
-        except ValueError as e:  # pragma: no cover
-            raise ValueError(f"Invalid IP address format: {e}")
-
-        # Check for localhost
-        if addr.is_loopback:
-            # raise ValueError("Localhost IP address not allowed")  # pragma: no cover
-            _LOGGER.warning(
-                {
-                    "class": "Device",
-                    "method": "__init__",
-                    "action": "is_loopback",
-                    "ip": ip,
-                }
-            )
-
-        # Check for unspecified (0.0.0.0)
-        if addr.is_unspecified:
-            raise ValueError(
-                "Unspecified IP address (0.0.0.0) not allowed"
-            )  # pragma: no cover
-
-        # Warn for non-private IPs (LIFX should be on local network)
-        if not addr.is_private:
-            _LOGGER.warning(
-                {
-                    "class": "Device",
-                    "method": "__init__",
-                    "action": "non_private_ip",
-                    "ip": ip,
-                }
-            )
-
-        # Both IPv4 (WiFi) and IPv6 (Thread) devices are supported. IPv6
-        # link-local addresses need a zone/scope ID to be reachable.
-        if (
-            addr.version == 6
-            and addr.is_link_local
-            and getattr(addr, "scope_id", None) is None
-        ):
-            _LOGGER.warning(
-                {
-                    "class": "Device",
-                    "method": "__init__",
-                    "action": "link_local_without_scope",
-                    "ip": ip,
-                }
-            )
+        # Validate the address. Every rule about what an address may be
+        # lives in lifx.network.address, so this class holds no opinion of
+        # its own and cannot drift from the other entry points.
+        validate_address(ip)
 
         # Validate port
         if not (1024 <= port <= 65535):
@@ -640,6 +594,8 @@ class Device(Generic[StateT]):
                 label = await device.get_label()
             ```
         """
+        validate_address(ip)
+
         if serial is None:
             temp_conn = DeviceConnection(
                 serial="000000000000",
@@ -736,6 +692,12 @@ class Device(Generic[StateT]):
                 await device.set_power(True)
             ```
         """
+        # Validate before Step 1. The serial-less leg below builds a
+        # DeviceConnection directly and never reaches Device.__init__, so
+        # without this call an unusable address would cost a full silent
+        # request timeout here.
+        validate_address(ip)
+
         # Step 1: Get serial if not provided
         if serial is None:
             temp_conn = DeviceConnection(

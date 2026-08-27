@@ -207,7 +207,7 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- RETRY-01 through RETRY-04 are closed. Phase 3's remaining plan (03-03) is the optional zero-loss packets/trial hardware measurement against the gen4 downlight (192.168.18.95) — not a CI gate, can run independently or be deferred.
+- RETRY-01 through RETRY-04 are closed. Phase 3's remaining plan (03-03) is the optional zero-loss packets/trial hardware measurement against the gen4 downlight (203.0.113.6) — not a CI gate, can run independently or be deferred.
 - The shared `_transmit_and_listen()` engine and `REQUEST_RETRANSMIT_GAPS`/`_STREAM_IDLE_TIMEOUT` module attributes are stable, tested seams ready for 03-03's harness reuse (the `_send_spy`/`_header`/`_wait_for_keys` helpers from 03-01 remain available).
 - Phase 4 (Animation Flow Control) and Phase 5 (Reliability Documentation, which must pick up the two docs-rot items noted above plus this phase's own retry-schedule behaviour) are unblocked to proceed independently.
 - No blockers.

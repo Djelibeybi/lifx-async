@@ -97,3 +97,6 @@ Thumbs.db
 .serena/
 .full-review/
 .gsd/
+
+# GSD session lock (transient: carries PID and session id)
+.planning/milestone.lock

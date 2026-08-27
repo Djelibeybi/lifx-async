@@ -180,6 +180,15 @@ jobs:
 
     - name: Run unit tests
       run: uv run --frozen pytest
+      env:
+        # The designated must-not-skip IPv6 cell. Setting this to 1 makes the
+        # ipv6_available probe fail instead of skip when ::1 cannot be bound,
+        # so the IPv6 end-to-end tests can never skip on every job at once and
+        # still report green. ubuntu-latest with Python 3.10 is present in
+        # every matrix configuration, including the reduced ubuntu-only path,
+        # and GitHub-hosted ubuntu runners have IPv6 loopback. Every other
+        # cell gets an empty value and keeps its skip guard.
+        LIFX_REQUIRE_IPV6: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10') && '1' || '' }}
       timeout-minutes: 10
 
     - name: Upload coverage to Codecov

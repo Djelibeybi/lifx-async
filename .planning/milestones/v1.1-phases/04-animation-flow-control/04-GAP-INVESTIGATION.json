@@ -1,7 +1,7 @@
 {
   "timestamp": "2026-07-17T03:28:57",
-  "tiles_ip": "192.168.19.243",
-  "fallback_ip": "192.168.18.62",
+  "tiles_ip": "203.0.113.15",
+  "fallback_ip": "203.0.113.3",
   "arms_run": [
     "control",
     "shipped",
@@ -11,13 +11,13 @@
   ],
   "devices": {
     "primary": {
-      "ip": "192.168.19.243",
+      "ip": "203.0.113.15",
       "label": "System Test Tiles I",
       "chain_width": 8,
       "chain_height": 8
     },
     "fallback": {
-      "ip": "192.168.18.62",
+      "ip": "203.0.113.3",
       "label": "System Test Tiles II",
       "chain_width": 8,
       "chain_height": 8

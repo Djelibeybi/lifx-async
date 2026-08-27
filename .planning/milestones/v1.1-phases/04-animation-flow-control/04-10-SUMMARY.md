@@ -95,7 +95,7 @@ miscalibrated-gate bytes remain in history at commit **5de88f6** (the superseded
 
 Fixed thresholds, committed before the run and never adjusted after it: per-round
 loss ≤ 9.0%; pooled ≤ 5.0%; delivered_ratio ≥ 0.85/round; 3 rounds; 20 FPS; query
-rate 2/s. Device: primary Tiles 192.168.19.243 (fallback never used — no ENV-ERROR).
+rate 2/s. Device: primary Tiles 203.0.113.15 (fallback never used — no ENV-ERROR).
 
 **Run 1 — exit 1 (FAIL)** — preserved as `04-UAT-TILES-amended-run1-FAIL.json`:
 

@@ -89,7 +89,7 @@ Run (Ceiling):
 
 Run (Sweep, one roster device):
     uv run python .planning/phases/04-animation-flow-control/uat_ack_stream.py \\
-        --sweep-device d073d587daab
+        --sweep-device d073d5e0000c
 
 Run (Sweep, aggregate verdict from the on-disk per-device JSONs):
     uv run python .planning/phases/04-animation-flow-control/uat_ack_stream.py \\
@@ -192,9 +192,9 @@ BASELINE: dict[str, Any] = {
 # `_thresholds()`); the actual per-frame assertion now uses
 # `expected_packets_per_frame()`, computed from the REPORTED chain
 # dimensions of whichever ceiling-class device is streaming
-# (04-SWEEP-DESIGN.md section 5). My Office Ceiling Capsule's REPORTED
+# (04-SWEEP-DESIGN.md section 5). Test Ceiling Capsule's REPORTED
 # chain is 16x8 (128 zones; 26 in x 13 in physical, not 13x26) and expects
-# 3, measured 2026-07-17 (04-UAT-SWEEP-d073d587daab.json) -- this constant
+# 3, measured 2026-07-17 (04-UAT-SWEEP-d073d5e0000c.json) -- this constant
 # is a superseded reference value, not the Capsule's actual expectation.
 EXPECTED_CEILING_PACKETS_PER_FRAME: int = 8
 
@@ -256,14 +256,14 @@ class RosterEntry:
 # is serial-authoritative (`_resolve_roster_device`) -- the roster IP below
 # is only a fast path whose reported serial must match.
 ROSTER: tuple[RosterEntry, ...] = (
-    RosterEntry("Playroom Luna", "192.168.19.182", "d073d5893c04", "gate"),
-    RosterEntry("Dining Room Table Candle", "192.168.18.81", "d073d55956e8", "gate"),
-    RosterEntry("Makerspace Candle", "192.168.18.32", "d073d582bff4", "gate"),
-    RosterEntry("Makerspace Tube", "192.168.19.199", "d073d5866777", "gate"),
-    RosterEntry("Makerspace Ceiling", "192.168.19.119", "d073d5a132d9", "gate"),
-    RosterEntry("Playroom Ceiling", "192.168.19.82", "d073d5a132b8", "gate"),
-    RosterEntry("My Office Ceiling Capsule", "192.168.19.231", "d073d587daab", "gate"),
-    RosterEntry("System Test Tiles II", "192.168.18.62", "d073d53e11be", "reference"),
+    RosterEntry("Test Luna", "203.0.113.10", "d073d5e00035", "gate"),
+    RosterEntry("Dining Room Table Candle", "203.0.113.4", "d073d5e0001e", "gate"),
+    RosterEntry("Test Candle", "203.0.113.2", "d073d5e00001", "gate"),
+    RosterEntry("Test Tube", "203.0.113.12", "d073d5e00002", "gate"),
+    RosterEntry("Test Ceiling A", "203.0.113.7", "d073d5e00003", "gate"),
+    RosterEntry("Test Ceiling B", "203.0.113.17", "d073d5e00036", "gate"),
+    RosterEntry("Test Ceiling Capsule", "203.0.113.14", "d073d5e0000c", "gate"),
+    RosterEntry("System Test Tiles II", "203.0.113.3", "d073d5e00008", "reference"),
 )
 
 

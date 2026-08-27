@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
 from lifx.const import (
-    DEFAULT_IP_ADDRESS,
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
@@ -26,6 +25,7 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
+from lifx.network.address import wildcard_for
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
@@ -229,9 +229,11 @@ class DeviceConnection:
             # Create shutdown event for receiver task
             self._receiver_shutdown = asyncio.Event()
 
-            # Open transport, binding to the address family that matches the
-            # device: IPv6 for Thread devices, IPv4 otherwise
-            local_ip = "::" if ":" in self.ip else DEFAULT_IP_ADDRESS
+            # Open transport, binding the wildcard that matches the device
+            # address family: IPv6 for Thread devices, IPv4 otherwise. The
+            # shared rule owns the choice, so this method makes no family
+            # test of its own.
+            local_ip = wildcard_for(self.ip)
             self._transport = UdpTransport(
                 ip_address=local_ip, port=0, broadcast=False, peer=self._peer
             )

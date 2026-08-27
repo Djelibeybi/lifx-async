@@ -1,5 +1,5 @@
 {
-  "192.168.19.132 (Test Downlight 5)": {
+  "203.0.113.8 (Test Downlight 5)": {
     "loss=0": {
       "lifx-async": {
         "n": 3,
@@ -106,7 +106,7 @@
       }
     }
   },
-  "192.168.19.243 (System Test Tiles I)": {
+  "203.0.113.15 (System Test Tiles I)": {
     "loss=0": {
       "lifx-async": {
         "n": 3,
@@ -213,7 +213,7 @@
       }
     }
   },
-  "192.168.18.95 (Test Downlight 2)": {
+  "203.0.113.6 (Test Downlight 2)": {
     "loss=0": {
       "lifx-async": {
         "n": 3,

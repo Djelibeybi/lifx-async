@@ -2,7 +2,7 @@
   {
     "ts": "2026-07-16T21:04:12.655",
     "category": "run_start",
-    "host": "192.168.19.243",
+    "host": "203.0.113.15",
     "label": "System Test Tiles I",
     "pixels": 684,
     "packets_per_frame": 4,

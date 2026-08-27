@@ -10,6 +10,8 @@ This module tests:
 
 from __future__ import annotations
 
+import time
+from collections.abc import AsyncIterator
 from unittest.mock import patch
 
 import pytest
@@ -482,3 +484,47 @@ class TestDiscoverMdns:
                 devices.append(device)
 
             assert len(devices) == 0
+
+
+class TestFindByIpAddressGate:
+    """`find_by_ip()` validates before it opens anything (IPV6-02, D-07).
+
+    The zone-less rejection is all this phase adds here. Returning a device
+    for a routable IPv6 literal is Phase 12's FIND-06, so the fall-through
+    behaviour is asserted as it stands today rather than as it will be.
+    """
+
+    async def test_zone_less_link_local_raises_immediately(self) -> None:
+        """No socket is created, so the raise costs microseconds."""
+        with patch("lifx.network.discovery.discover_devices") as mock_discover:
+            started = time.perf_counter()
+            with pytest.raises(ValueError, match="zone identifier"):
+                await find_by_ip("fe80::1")
+            assert time.perf_counter() - started < 0.1
+
+        mock_discover.assert_not_called()
+
+    async def test_zoned_link_local_does_not_raise(self) -> None:
+        """The acceptance side, with the network layer mocked out."""
+
+        async def _no_responses(*args: object, **kwargs: object) -> AsyncIterator[None]:
+            for _ in ():
+                yield
+
+        with patch("lifx.api.discover_devices", _no_responses):
+            assert await find_by_ip("fe80::1%en0") is None
+
+    async def test_routable_ipv6_literal_falls_through(self) -> None:
+        """A valid IPv6 literal is accepted, then finds nothing today.
+
+        This is the recorded Phase 12 gap (D-07): validation lands now, the
+        family-aware lookup does not, and the function keeps returning None
+        rather than raising an unsupported-command error.
+        """
+
+        async def _no_responses(*args: object, **kwargs: object) -> AsyncIterator[None]:
+            for _ in ():
+                yield
+
+        with patch("lifx.api.discover_devices", _no_responses):
+            assert await find_by_ip("fd00:1::") is None

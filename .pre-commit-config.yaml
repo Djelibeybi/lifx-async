@@ -80,7 +80,7 @@ repos:
   hooks:
   - id: codespell
     args:
-    - --ignore-words-list=ommit,ser,nd,hass,whats,cant
+    - --ignore-words-list=ommit,ser,nd,hass,whats,cant,retuned
     - --skip="*.json,*.csv,*.xml"
 
   # YAML formatting

@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-07-17T07:18:47",
-  "serial": "d073d582bff4",
-  "label": "Makerspace Candle",
+  "timestamp": "2026-07-17T07:13:26",
+  "serial": "d073d5e0001e",
+  "label": "Dining Room Table Candle",
   "role": "gate",
   "profile": "tiles",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.18.32"
+    "ip": "203.0.113.4"
   },
-  "ip": "192.168.18.32",
+  "ip": "203.0.113.4",
   "ceiling_power_confirmed": null,
   "restoration": {
     "attempted": true,
@@ -23,111 +23,113 @@
   "expected_packets_per_frame": null,
   "ambient": {
     "duration_s": 60.0,
-    "queries_ok": 114,
+    "queries_ok": 90,
     "queries_lost": 0,
     "query_loss_pct": 0.0,
-    "query_latency_median_ms": 11.6
+    "query_latency_median_ms": 114.8
   },
   "rounds": [
     {
       "round": 0,
       "arm": "gated",
       "offered": 600,
-      "sent": 499,
-      "gated": 101,
-      "delivered_ratio": 0.8317,
+      "sent": 520,
+      "gated": 80,
+      "delivered_ratio": 0.8667,
       "packet_shape_ok": true,
       "expected_packets_per_frame": null,
-      "queries_ok": 17,
-      "queries_lost": 9,
-      "query_loss_pct": 34.62,
-      "query_latency_median_ms": 19.9,
-      "ack_rtt_median_ms": 50.2,
-      "ack_rtt_p95_ms": 150.1,
-      "ack_rtt_samples": 489,
-      "ack_expiries": 9
+      "queries_ok": 53,
+      "queries_lost": 0,
+      "query_loss_pct": 0.0,
+      "query_latency_median_ms": 33.5,
+      "ack_rtt_median_ms": 50.3,
+      "ack_rtt_p95_ms": 200.2,
+      "ack_rtt_samples": 518,
+      "ack_expiries": 1
     },
     {
       "round": 0,
       "arm": "blind",
       "offered": 600,
       "sent": 600,
-      "queries_ok": 9,
-      "queries_lost": 11,
-      "query_loss_pct": 55.0,
-      "query_latency_median_ms": 24.2
+      "queries_ok": 50,
+      "queries_lost": 1,
+      "query_loss_pct": 1.96,
+      "query_latency_median_ms": 28.6
     },
     {
       "round": 1,
       "arm": "gated",
       "offered": 600,
-      "sent": 582,
-      "gated": 18,
-      "delivered_ratio": 0.97,
+      "sent": 542,
+      "gated": 58,
+      "delivered_ratio": 0.9033,
       "packet_shape_ok": true,
       "expected_packets_per_frame": null,
-      "queries_ok": 14,
-      "queries_lost": 10,
-      "query_loss_pct": 41.67,
-      "query_latency_median_ms": 16.0,
+      "queries_ok": 49,
+      "queries_lost": 1,
+      "query_loss_pct": 2.0,
+      "query_latency_median_ms": 22.2,
       "ack_rtt_median_ms": 50.2,
-      "ack_rtt_p95_ms": 100.2,
-      "ack_rtt_samples": 575,
-      "ack_expiries": 6
+      "ack_rtt_p95_ms": 100.6,
+      "ack_rtt_samples": 539,
+      "ack_expiries": 2
     },
     {
       "round": 1,
       "arm": "blind",
       "offered": 600,
       "sent": 600,
-      "queries_ok": 13,
-      "queries_lost": 10,
-      "query_loss_pct": 43.48,
-      "query_latency_median_ms": 14.9
+      "queries_ok": 41,
+      "queries_lost": 2,
+      "query_loss_pct": 4.65,
+      "query_latency_median_ms": 63.2
     },
     {
       "round": 2,
       "arm": "gated",
       "offered": 600,
-      "sent": 511,
-      "gated": 89,
-      "delivered_ratio": 0.8517,
+      "sent": 542,
+      "gated": 58,
+      "delivered_ratio": 0.9033,
       "packet_shape_ok": true,
       "expected_packets_per_frame": null,
-      "queries_ok": 19,
-      "queries_lost": 8,
-      "query_loss_pct": 29.63,
-      "query_latency_median_ms": 17.1,
+      "queries_ok": 51,
+      "queries_lost": 1,
+      "query_loss_pct": 1.92,
+      "query_latency_median_ms": 21.5,
       "ack_rtt_median_ms": 50.2,
-      "ack_rtt_p95_ms": 100.2,
-      "ack_rtt_samples": 499,
-      "ack_expiries": 11
+      "ack_rtt_p95_ms": 150.2,
+      "ack_rtt_samples": 540,
+      "ack_expiries": 0
     },
     {
       "round": 2,
       "arm": "blind",
       "offered": 600,
       "sent": 600,
-      "queries_ok": 15,
-      "queries_lost": 9,
-      "query_loss_pct": 37.5,
-      "query_latency_median_ms": 15.6
+      "queries_ok": 44,
+      "queries_lost": 2,
+      "query_loss_pct": 4.35,
+      "query_latency_median_ms": 36.4
     }
   ],
   "gated_pooled": {
-    "lost": 27,
-    "n": 77,
-    "loss_pct": 35.06
+    "lost": 2,
+    "n": 155,
+    "loss_pct": 1.29
   },
   "blind_pooled": {
-    "lost": 30,
-    "n": 67,
-    "loss_pct": 44.78
+    "lost": 5,
+    "n": 140,
+    "loss_pct": 3.57
   },
-  "fisher_one_sided_p": 0.15439594545408497,
-  "improvement_ratio": 1.28,
-  "session_valid": true,
-  "validity_reasons": [],
+  "fisher_one_sided_p": 0.1840938881759411,
+  "improvement_ratio": 2.77,
+  "session_valid": false,
+  "validity_reasons": [
+    "ambient sample n=90 below the minimum 100 (validity V2)"
+  ],
   "thresholds": {
     "ambient_control_seconds": 60.0,
     "max_ambient_loss_pct": 2.5,
@@ -148,12 +150,9 @@
     "ack_rtt_median_ms": 98.0,
     "ack_rtt_p95_ms": 150.0
   },
-  "outcome": "FAIL",
+  "outcome": "INCONCLUSIVE",
   "reasons": [
-    "gated pooled loss 35.06% exceeds the absolute ceiling 9.0%",
-    "relative rule missed: Fisher one-sided p = 0.1544 not < 0.05 (gated 27/77 vs blind 30/67)",
-    "relative rule missed: blind/gated improvement 1.28 below 2.0",
-    "no clean escape: gated pooled loss 35.06% > 2.5%"
+    "ambient sample n=90 below the minimum 100 (validity V2)"
   ],
   "pass": false
 }

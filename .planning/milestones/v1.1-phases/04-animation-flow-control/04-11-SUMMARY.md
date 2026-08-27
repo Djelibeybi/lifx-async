@@ -137,7 +137,7 @@ being the only permitted deviation, 04-10 precedent):
 ## The Runs (Task 4) — FAIL twice, flagged loudly
 
 Fixed rules committed before the run (verified via git log) and never adjusted
-after it. Device: primary Tiles 192.168.19.243 (fallback never used — no
+after it. Device: primary Tiles 203.0.113.15 (fallback never used — no
 ENV-ERROR occurred). Two attempts total (hard budget); first attempt preserved as
 `04-UAT-TILES-paired-run1-FAIL.json` before the single re-run.
 

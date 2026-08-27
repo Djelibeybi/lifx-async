@@ -40,11 +40,11 @@ coverage:
         status: pass
     human_judgment: false
   - id: D2
-    description: "Real-hardware zero-loss packets/trial and latency measurement against the gen4 downlight (192.168.18.95), recorded honestly against spike 002 baselines"
+    description: "Real-hardware zero-loss packets/trial and latency measurement against the gen4 downlight (203.0.113.6), recorded honestly against spike 002 baselines"
     requirement: "RETRY-02"
     verification:
       - kind: manual_procedural
-        ref: "Two live runs against 192.168.18.95: run 1 exit 1 (mean 1.083, transient WiFi retransmits), run 2 exit 0 (mean 1.017, median 1.0). See Accomplishments below for full numbers."
+        ref: "Two live runs against 203.0.113.6: run 1 exit 1 (mean 1.083, transient WiFi retransmits), run 2 exit 0 (mean 1.017, median 1.0). See Accomplishments below for full numbers."
         status: pass
     human_judgment: true
     rationale: "Real-network hardware measurement against a specific physical device; a human should sanity-check the transient-event interpretation of run 1 against the recorded per-trial data before treating RETRY-02 real-world evidence as settled."
@@ -70,7 +70,7 @@ status: complete
 
 - Built `uat_zero_loss.py`: argparse harness (`--ip`, `--trials`, `--gap`, `--timeout`, `--json-out`) with a generous-timeout reachability probe (exit 2 ENV-ERROR without hammering an absent device), a `_SendSpy` wrapper around the bound `send_packet` (plain attribute assignment, no mock imports), and a fixed pre-declared 0/1/2 exit-code contract (median==1.0 AND mean<=1.05 AND zero failures → PASS).
 - `--help` exits 0 without opening a connection or sending any packets. `ruff check`/`ruff format --check` and `uv run pyright` both clean (strict mode; required a `TypedDict` for trial records to satisfy strict argument typing, and a `# nosec B105` comment for a bandit false-positive on a `"pass": None` dict key).
-- **Run 1** (60 trials against 192.168.18.95): 0 request failures, but two trials (52, 53) issued 5 and 2 transmissions respectively — trial 52 alone took 1848.9ms, consistent with a genuine WiFi packet-loss event on the physical link, not a duplicate-storm regression. Mean packets/trial = 1.083 (over the 1.05 threshold) → **exit 1 (FAIL)**. Median packets/trial was still exactly 1.0; median latency 17.3ms.
+- **Run 1** (60 trials against 203.0.113.6): 0 request failures, but two trials (52, 53) issued 5 and 2 transmissions respectively — trial 52 alone took 1848.9ms, consistent with a genuine WiFi packet-loss event on the physical link, not a duplicate-storm regression. Mean packets/trial = 1.083 (over the 1.05 threshold) → **exit 1 (FAIL)**. Median packets/trial was still exactly 1.0; median latency 17.3ms.
 - Per plan's transient-event protocol, re-ran once (thresholds/harness untouched, byte-identical to the Task 1 commit): **Run 2**, 60 trials, 0 failures, only one trial (19) needed a retransmit (tx=2). Mean packets/trial = 1.017, median = 1.0 → **exit 0 (PASS)**. Median latency 12.6ms.
 - Both runs' zero-failure counts and near-1.0 median packets/trial confirm the reshaped retry engine (D3-01 floored first window, D3-02 listen-during-backoff) eliminates the old duplicate-packet storm the pre-reshape engine produced on this same device (1.37 packets/trial, 62ms median in spike 002). The elevated mean in run 1 is attributable to real network loss on two trials, not to the retry schedule re-sending against an already-answered request.
 - `03-UAT-RESULTS.json` records the confirmatory (run 2, PASS) per-trial data, thresholds, and the spike 002 baseline block; this summary documents run 1's numbers in full for transparency (see Deviations below — not a deviation from plan, but flagged per the plan's "if it fails again flag prominently" instruction, applied here to the honest documentation of the transient first failure).

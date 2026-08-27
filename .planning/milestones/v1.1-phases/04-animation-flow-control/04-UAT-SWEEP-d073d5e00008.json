@@ -1,14 +1,14 @@
 {
   "timestamp": "2026-07-17T07:47:25",
-  "serial": "d073d53e11be",
+  "serial": "d073d5e00008",
   "label": "System Test Tiles II",
   "role": "reference",
   "profile": "tiles",
   "resolution": {
     "method": "roster-ip",
-    "ip": "192.168.18.62"
+    "ip": "203.0.113.3"
   },
-  "ip": "192.168.18.62",
+  "ip": "203.0.113.3",
   "ceiling_power_confirmed": null,
   "restoration": {
     "attempted": true,

@@ -41,7 +41,7 @@ each strategy, against a no-streaming baseline.
 
 ```bash
 uv run python .planning/spikes/003-ack-paced-frames/stream.py run \
-    --host 192.168.19.243   # System Test Tiles I (gen 3)
+    --host 203.0.113.15   # System Test Tiles I (gen 3)
 ```
 
 ~2 minutes: baseline, then 30 s per arm with 5 s rest. **Watch the tiles while it runs** —

@@ -187,12 +187,18 @@ gh workflow run docs.yml
 
    - `theme.py`: Theme definitions (named color palettes); `palette_equals()` compares
      palettes as an unordered multiset — `==` is identity, so `Theme` stays hashable.
-     `disposition` (`lifx-app` / `library-only` / `deprecated`) and `replaced_by` record
-     each library theme's 6.4.0 fate; both are `None` on a caller-built Theme
+     `disposition` (`lifx-app` / `library-only` / `deprecated` / `renamed`) and
+     `replaced_by` record each library theme's 6.4.0 fate; both are `None` on a
+     caller-built Theme. `renamed` was added post-ship in `582f74b` for the 3 alias
+     keys, which would otherwise have inherited their target's `lifx-app` fate
    - `library.py`: Built-in theme library, reading the generated dict alone.
      `get_categories()` lists the nine categories; `get_by_category()` matches them
-     case- and punctuation-insensitively, with a private `_LEGACY_CATEGORIES` shim for
-     the six pre-6.4.0 names
+     case- and punctuation-insensitively. The six pre-6.4.0 category names are **not**
+     accepted: each raises `ValueError` listing the nine real ones and naming no
+     replacement. The `_LEGACY_CATEGORIES` shim that once mapped them was deleted in
+     review of PR #202 (`2e78de9`) because no old name mapped onto a single category,
+     so every candidate replacement would have been a false promise about the old
+     result set
    - `slug.py`: The one home of the slug-derivation rule, shared by `library.py` and
      `scripts/generate_theme_data.py` — a leaf module whose only import is `re`
    - `data.py`: Auto-generated theme records (166 themes, 169 resolvable keys) — **never
@@ -328,6 +334,14 @@ This is useful when:
 - Testing against actual LIFX hardware on your network
 - Running the emulator with custom configuration or device setup
 - Debugging emulator behavior separately from the test suite
+
+**Requiring the IPv6 tests to run**:
+
+The IPv6 end-to-end tests run against a second emulator bound to `::1` and skip when the
+host cannot bind IPv6 loopback. Set `LIFX_REQUIRE_IPV6=1` to turn that skip into a failure
+naming the cause. CI sets it on exactly one matrix cell, ubuntu with Python 3.10, so the
+IPv6 tests can never skip on every job at once and still report green. The variable guards
+that probe alone and has no effect on `emulator_available`.
 
 **Key Test Directories:**
 

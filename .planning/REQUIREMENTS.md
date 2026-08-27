@@ -1,156 +1,232 @@
-# Requirements: lifx-async — v1.2 Theme Library Update
+# Requirements: lifx-async v2.0 Thread/IPv6 Support
 
-**Defined:** 2026-08-14
-**Core Value:** Commands stick, devices are found, streaming never starves control
-traffic — and a theme by name looks like the theme of that name in the LIFX app.
+**Defined:** 2026-08-27
+**Core Value:** Commands stick, devices are found, streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
 
-## v1.2 Requirements
+**Milestone goal:** A Thread device becomes a first-class device in this library: found,
+addressed, controlled and animated without the caller needing to know it is on Thread. The
+v1.1 wire-reliability findings are then revalidated over Thread, because every one of them
+was measured on WiFi/IPv4.
 
-Source data: `.claude/theme-capture/themes.jsonl` — 179 themes captured from a LIFX Tile
-(product 55) on 2026-08-14, of which 139 are non-sport and in scope. Method and caveats:
-`.claude/theme-capture/README.md`.
+**Research:** `.planning/research/SUMMARY.md` (2026-08-27), backed by STACK, FEATURES,
+ARCHITECTURE and PITFALLS in the same directory.
 
-### Theme Import
+## v2.0 Requirements
 
-- [x] **THEME-01**: Caller can get any of the 139 non-sport app themes from `ThemeLibrary`
-      by ASCII slug
+### IPv6 Transport
 
-- [x] **THEME-02**: A returned palette matches the captured app palette as an unordered
-      set of HSBK values, brightness and kelvin intact — the app shuffles palette order on
-      every application, so order is never compared
+Landing `feat/ipv6-thread-support` (`b49400b`, `b88cdb9`, `2f884f5`) onto `main`. Research
+verdict: the branch's stdlib primitives and address-family seam are correct, so this is a
+rebase plus a reconciled fix list, not a rewrite.
 
-- [x] **THEME-03**: The 27 slugs shared between the app and the pre-v1.2 library return
-      the app's palette (6 differ only by a uniform ×1.1087 brightness scale, 19 are
-      genuinely redefined — `soothing` among them changes kelvin 3500 → 8000)
+- [ ] **IPV6-01**: A caller can connect to, control and send animation frames to a device
+      that has only an IPv6 address. The socket family follows the target address at every
+      socket-creation site, including the animation layer's separate direct-UDP frame
+      socket
+- [ ] **IPV6-02**: A caller who supplies a link-local address with no zone identifier gets
+      an immediate `ValueError` naming the problem, rather than a silent timeout. The
+      branch downgraded this check to a warning on a transport that routes every send-time
+      `OSError` to `error_received` and never raises, which turns a permanent
+      configuration error into a 16 second wait (PITFALLS B2)
+- [ ] **IPV6-03**: Address-family selection has one implementation, shared by every
+      socket-creation site, so the transports cannot drift apart. The branch repeats the
+      `":" in ip` heuristic three times (PITFALLS B9)
+- [ ] **IPV6-04**: An mDNS transport whose endpoint creation fails partway through
+      `open()` leaves no socket behind
 
-- [x] **THEME-04**: The theme data in `library.py` is generated from `themes.jsonl` rather
-      than hand-transcribed, and regenerating reproduces the committed file exactly
+### mDNS Discovery
 
-### Compatibility
+Hardening the mDNS leg to broadcast-grade quality before it is promoted into the default
+discovery path.
 
-- [x] **COMPAT-01**: Every theme name that resolved before v1.2 still resolves after it —
-      no shipped key disappears
+- [ ] **MDNS-01**: mDNS queries bind an ephemeral port, so a system mDNS daemon sharing
+      5353 cannot steal RFC 6762 section 6.7 legacy-unicast replies. Measured impact: 25
+      devices found bound ephemeral against 9 bound on 5353 with `SO_REUSEPORT`. The
+      regression test must not itself bind 5353, because CI runners run Avahi and the test
+      would measure the runner rather than the fix
+- [ ] **MDNS-02**: A caller can read how a device was reached, from a `tm` field on
+      `LifxServiceRecord` carrying the mDNS TXT `tm` key's value. The field keeps the wire
+      name deliberately (user decision, 2026-08-27): the protocol layer normally renames
+      wire fields for readability, but a readable name here would have to assert an
+      expansion nobody has confirmed, so the cryptic-but-honest name wins. What LIFX has
+      confirmed is
+      the value semantics only: `1` is WiFi and `2` is Thread. What `tm` abbreviates is
+      **not** confirmed, and the key is absent from the public LIFX LAN documentation
+      entirely, so no expansion of it may be asserted in the public API name, the
+      docstrings or the docs. Parsing is defensive: an absent, unparsable or unrecognised
+      value reports as unknown and never raises, because a third value could appear in any
+      future firmware
+- [ ] **MDNS-03**: Records for one service instance accumulate across multiple response
+      packets, proven by synthetic multi-packet tests. A Thread border router acts as an
+      advertising proxy for the whole mesh, and RFC 6762 legacy-unicast replies cannot
+      span packets, so records are omitted rather than continued
+- [ ] **MDNS-04**: An SRV target whose address records did not fit in a reply triggers a
+      follow-up A/AAAA query, proven by synthetic tests
+- [ ] **MDNS-05**: Address selection is deterministic and documented, preferring ULA, then
+      GUA, then scoped link-local, and every discovered address is retained on the record
+      rather than discarded at selection time (PITFALLS B3)
+- [ ] **MDNS-06**: A TXT `id` that fails the same validation the broadcast path applies to
+      a serial is rejected rather than trusted (PITFALLS B6)
+- [ ] **MDNS-07**: TTL 0 goodbye packets and cache-flush bits are honoured (PITFALLS B5)
+- [ ] **MDNS-08**: The mDNS module's documented behaviour matches its actual behaviour.
+      The branch deleted `IP_ADD_MEMBERSHIP` while leaving docstrings that still claim the
+      multicast group is joined. The docstrings are corrected and the unicast-only trade
+      is recorded as a known limitation. No group rejoin and no responder-population
+      probe: the ephemeral-port fix came from LIFX, so LIFX devices answering unicast per
+      RFC 6762 section 6.7 is vendor-stated, not inferred
 
-- [x] ~~**COMPAT-02**: Each overwritten palette stays retrievable under a `*_legacy` name~~
-      — **RETIRED 2026-08-14** during Phase 6 discussion. Measuring the 19 redefined
-      themes showed 10 of them shift by one or two colours; only 9 change wholesale. The
-      operator ruled that the app is the source of truth and the pre-v1.2 palettes stay in
-      git history. No `*_legacy` keys, no Legacy category. Supersedes the milestone-kickoff
-      decision "Overwrite + keep legacy aliases". COMPAT-01 is unaffected: all 57 pre-v1.2
-      names still resolve
+### Discovery and Lookup
 
-- [x] **COMPAT-03**: Renamed themes resolve under both the old library key and the new app
-      slug (`aurora_borealis` / `aurora`, `forest` / `forrest`)
+- [ ] **FIND-01**: `discover()` finds Thread devices without the caller opting in, running
+      a broadcast leg and an mDNS leg concurrently and merging by serial, first wins.
+      Measured today: `discover()` returns 25 devices and neither Thread serial, while
+      `discover_mdns()` returns both
+- [ ] **FIND-02**: `discover()`'s existing contract survives the merge, specifically its
+      overall timeout, its idle timeout resetting on consumer resume, first-wins
+      per-serial dedup, and DoS source and serial validation. The invariant tests are
+      written before the merge, as its entry gate, not after it
+- [ ] **FIND-03**: An mDNS leg that fails or is unavailable degrades `discover()` to
+      today's broadcast-only behaviour rather than ending discovery. `asyncio.TaskGroup`
+      is unavailable regardless (Python 3.11 or later; this library ships 3.10 for LedFx),
+      and its cancel-siblings semantics would be wrong here anyway
+- [ ] **FIND-04**: An mDNS-sourced device is unicast-verified before it is yielded, so
+      `discover()` never yields a device that is not answering. A border router's SRP
+      registration can outlive the device by up to a 2 hour default lease, and `discover()`
+      has never broken that liveness contract. Verification also closes the mDNS leg's
+      spoofing exposure, since it carries none of the broadcast leg's validation
+- [ ] **FIND-05**: `find_by_serial()` races a broadcast leg and an mDNS leg, first hit
+      wins, and the losing leg is cancelled and reaped so no task or socket leaks. Both
+      legs are required: broadcast covers WiFi devices whose firmware does not advertise
+      over mDNS, mDNS covers Thread devices with no IPv4 address to broadcast to
+- [ ] **FIND-06**: `find_by_ip()` resolves a device from an IPv6 literal instead of
+      returning `None`
+- [ ] **FIND-07**: The timing change merged discovery imposes on existing callers is a
+      measured before-and-after number against the fleet, not an assumption. Emulator CI
+      wall time is part of that measurement
+- [ ] **FIND-08**: The mDNS TXT `id` is confirmed to match the broadcast serial for
+      firmware 3.70 to 3.99 WiFi devices, the only population where the two could diverge.
+      Low priority and not a gate: Thread requires firmware 4 or later, and
+      `Device.get_mac_address()` fires only on `version_major == 3 and version_minor >= 70`,
+      so a Thread device structurally cannot exhibit the off-by-one quirk
 
-- [x] **COMPAT-04**: Each of the 30 orphaned library keys carries a recorded disposition —
-      kept as library-only, or deprecated naming its replacement.
-      **Amended 2026-08-15 post-ship** (`582f74b`, code review of PR #202): a fourth
-      disposition, `renamed`, was added. The original three-value set had no way to express
-      a rename, so the 2 alias keys (`forest`, `aurora_borealis`) inherited their target's
-      `lifx-app` fate and the requirement shipped 28 recorded fates for 30 orphans
+### Thread Revalidation
 
-### Metadata
+SEED-001, planted 2026-07-16 and dormant through the v1.1 and v1.2 closes. Its trigger
+condition, LIFX Thread firmware shipping, was met during the v1.2 close-out. Every v1.1
+reliability finding was measured on WiFi/IPv4 and none of them transfers unexamined.
 
-- [x] **META-01**: A theme exposes its app display name, distinct from its ASCII slug.
-      **Amended 2026-08-14** (Phase 6 discussion): emoji are stripped from display names
-      and categories — the app supports them, downstream consumers likely do not. 'Forrest
-      🌳' ships as `Forrest`
+- [ ] **THREAD-01**: Discovery coverage over Thread is measured across repeated rounds.
+      Single rounds mislead, which is the Spike 005 lesson this project already paid for
+- [ ] **THREAD-02**: The retry schedule's WiFi-tuned constants are measured against Thread
+      ack RTT. The 200 ms "an acked bulb has answered by now" floor exists because of WiFi
+      timing; no constant changes without evidence
+- [ ] **THREAD-03**: The achievable animation frame rate over Thread is measured, and the
+      measured ceiling is the deliverable. Published arithmetic suggests 20 FPS full-frame
+      matrix streaming is infeasible sustained (roughly 89 kbps for `Set64` at 20 FPS, and
+      roughly 179 kbps for a Ceiling's two `Set64` per frame, against a 250 kbps gross
+      802.15.4 PHY and a measured single-hop ceiling near 100 kbps), and the ack gate's
+      designed degradation floor is exactly 2 FPS. Those are other people's networks;
+      this requirement replaces them with a number from this fleet
+- [ ] **THREAD-04**: Border router advertisement staleness is measured directly, by
+      unplugging a Thread device and timing when it stops being advertised. This settles
+      LIFX's actual SRP lease, which is unverified; OpenThread's default is 2 hours
+- [ ] **THREAD-05**: Every device class has either a Thread evidence record or a named
+      gap, following the v1.2 FIDELITY pattern so that an unavailable class closes rather
+      than staying open indefinitely. `MatrixLight` closes now on two devices;
+      `CeilingLight`, `MultiZoneLight` and single-zone `Light` close as migrations land;
+      `InfraredLight` and `HevLight` close as named gaps, since the fleet's hardware in
+      both classes predates Thread
 
-- [x] **META-02**: A theme exposes its app category
-- [x] **META-03**: Caller can list the categories, and list the themes within one
-- [x] **META-04**: `ThemeLibrary.get_by_category()`'s existing hand-made taxonomy
-      (`seasonal`, `hygge`, `tranquil`, `sports`, …) is reconciled with the app's 11
-      categories — the old names either keep working or fail with a message naming their
-      replacement.
-      **Amended 2026-08-15 post-ship** (`582f74b`, code review of PR #202): all six old
-      names fail with a message listing the nine real categories and naming **no**
-      replacement. No old name mapped onto a single category, so every candidate
-      replacement was either a minority holder or, for `seasonal`, held none of what the
-      name returned. Naming one would have been a false promise about the old result set
+### Documentation
 
-### Fidelity
-
-- [x] **FIDELITY-01**: The 25 shipped non-sport themes selected by
-      `disposition == "lifx-app"` and literal palette length 16 — the protocol palette
-      ceiling for both `SetTileEffect` and `SetMultiZoneEffect`, and including all 10
-      🎨 ART SERIES themes — carry a recorded determination: their true length, or a
-      documented finding that no device-based method can supply it. The raw capture has
-      26 exactly-16-colour records because Carlton belongs to the excluded AUSSIE RULES
-      sport category.
-
-- [x] **FIDELITY-02**: A sampled theme applied through the library renders on hardware the
-      same as that theme applied from the LIFX app
-
-- [x] **FIDELITY-03**: Product-invariance is spot-checked — a palette read back from a
-      matrix product other than the Tile matches the Tile capture
-
-### Tooling
-
-- [x] **TOOL-04**: The record contract that `data/themes.jsonl` and `src/lifx/theme/data.py`
-      must satisfy is importable as `lifx.theme.schema` and independently tested
-
-**Withdrawn from v1.2 on 2026-08-19** — the capture and analysis tooling is maintained
-outside this repository, so shipping it here is no longer a requirement of this milestone:
-
-- ~~**TOOL-01**: The capture tooling ships in the repo and runs from a documented command~~
-- ~~**TOOL-02**: The analysis tool reports the diff between a fresh capture and the
-      shipped library~~
-- ~~**TOOL-03**: Docs describe the resync procedure for a future app update~~
-
-### Docs
-
-- [x] **DOCS-03**: Theme documentation lists the available themes and categories, and
-      states that the pre-v1.2 palettes of redefined themes were not carried forward
-      (continues v1.1's DOCS-01..02). **Amended 2026-08-14** with COMPAT-02's retirement
+- [ ] **DOCS-04**: A broadcast-first consumer can read what changes for them, what Thread
+      support does and does not give them, and how to reach Thread devices
+- [ ] **DOCS-05**: Known limitations are documented rather than discovered: the mDNS query
+      leg is IPv4 multicast by design, there are no unsolicited announcements, reception
+      is unicast-only, and fleet-scale mesh behaviour is proven synthetically rather than
+      on hardware
+- [ ] **DOCS-06**: The repository's own architecture documentation is corrected where it
+      is factually wrong. `CLAUDE.md` states that operations on multiple devices execute
+      in parallel via `asyncio.TaskGroup`; `grep` finds no `TaskGroup` anywhere in `src/`,
+      and it would not run on the Python 3.10 floor this library supports. Left standing,
+      it would mislead a future planner into writing code that fails on 3.10
 
 ## Future Requirements
 
-Tracked, not in this milestone.
+Deferred beyond v2.0. Tracked, not in this roadmap.
+
+### Thread at Fleet Scale
+
+- **FLEET-01**: Cross-packet accumulation and follow-up A/AAAA queries confirmed on real
+  hardware, once enough of the fleet is migrated for a border router to overflow a single
+  legacy-unicast reply packet
+- **FLEET-02**: Multi-address and multi-border-router topologies revalidated, once a
+  second border router or a GUA prefix exists on the network
+
+### Carried Forward
 
 - **PERS-01**: Generalise `state_file` persistence into a reusable mixin (deferred since
   2026-06-11)
-
-- **THREAD-01 / SEED-001**: Revalidate wire behaviour over Thread/IPv6 when LIFX Thread
-  firmware lands (dormant)
-
-- **Spike 006**: Measure the impact of publishing tuning constants vs behaviour only — the
-  D5-09 rule is disputed and remains an OPEN decision
+- **SPIKE-006**: Measure the impact of publishing tuning constants against publishing
+  behaviour only. The D5-09 rule is disputed by the operator and remains an OPEN decision
+- **STYLE-01**: No-em-dash house style across `docs/`, roughly 200 instances. Preference
+  is to recast each sentence rather than swap the character
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Sport themes — 🏆 AUSSIE RULES (19), 🏉 LEAGUE (17), 🏉 UNION (4) | Club-branded palettes with colliding slugs and no general appeal; dropping them removes 5 of the 6 slug collisions outright (user decision, 2026-08-14) |
-| Calling `api.lifx.com/themes/v2` or `themes/v1/palette` | Undocumented internal endpoints, unauthenticated to us, deliberately untouched — the device stays the source of truth |
-| MirrorLight (PR #194) | Complete and open; lands on its own schedule (user decision, 2026-08-14) |
-| Preserving app names verbatim as keys | Emoji are poor Python identifiers and CLI arguments; display names are carried as metadata instead (META-01) |
-| Changing the theme *application* path (`apply_theme`, generators, canvas) | v1.2 changes the palette data and its metadata, not how palettes reach a device |
+| An mDNS path of `find_by_label()`'s own | It keeps the broadcast `GetLabel` trick and gains Thread devices through `discover()`'s new mDNS leg, so a second addressing scheme buys nothing (user decision, 2026-08-27) |
+| Home Assistant integration code | This milestone ships the library capability and the guidance a broadcast-first consumer needs; downstream changes land in their own repositories (user decision, 2026-08-27) |
+| Thread coverage for `HevLight` and `InfraredLight` | No Thread-capable hardware of either class exists in the fleet. Closed as named gaps under THREAD-05 rather than excluded permanently, since newer models may gain Thread |
+| Fleet-scale Thread hardware validation | Deferred until enough of the fleet is migrated. Covered synthetically under MDNS-03 and MDNS-04 in the meantime, and recorded as a named gap (user decision, 2026-08-27) |
+| Rejoining the mDNS multicast group | The ephemeral-port fix came from LIFX, so LIFX devices honouring RFC 6762 section 6.7 unicast replies is vendor-stated. Rejoining would reintroduce the shared-socket exposure the fix was made to escape, with nothing needing it (user decision, 2026-08-27) |
+| An IPv6 multicast mDNS query leg | The query leg is IPv4 multicast by design and the unicast-reply path carries Thread devices fine. Would require per-interface `IPV6_MULTICAST_IF` iteration, which macOS demands and CPython gives no `getifaddrs` for. Documented limitation under DOCS-05, revisit on demand |
+| Transport-specific entry points, `transport=` parameters, or routing control traffic by `tm` | No comparable library does this. Transport is read-only diagnostics; a caller choosing a transport is the anti-feature the merged `discover()` exists to remove |
+| Consumer-facing Thread tuning knobs | Contradicts the locked decision of 2026-07-16 that the animation library owns delivery strategy, not downstream consumers |
+| Thread commissioning or border-router management | Out of a device-control library's remit entirely |
+| Retuning any WiFi-measured constant before SEED-001 measures it | The project's own spike-first discipline. Constants change on evidence, in the Revalidate phase, never in Land or Merge |
 
 ## Traceability
 
-Which phases cover which requirements. Mapped at roadmap creation (2026-08-14) —
-see `.planning/ROADMAP.md` Phase Details. 18/18 live requirements mapped, no orphans;
-COMPAT-02 retired during Phase 6 discussion (2026-08-14).
+Populated at roadmap creation, 2026-08-27.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | Phase 6 | Complete |
-| THEME-02 | Phase 6 | Complete |
-| THEME-03 | Phase 6 | Complete |
-| THEME-04 | Phase 6 | Complete |
-| COMPAT-01 | Phase 6 | Complete |
-| COMPAT-02 | — | Retired 2026-08-14 |
-| COMPAT-03 | Phase 6 | Complete |
-| COMPAT-04 | Phase 7 | Complete |
-| META-01 | Phase 6 | Complete |
-| META-02 | Phase 6 | Complete |
-| META-03 | Phase 7 | Complete |
-| META-04 | Phase 7 | Complete |
-| FIDELITY-01 | Phase 8 | Complete |
-| FIDELITY-02 | Phase 8 | Complete |
-| FIDELITY-03 | Phase 8 | Complete |
-| TOOL-01 | - | Withdrawn 2026-08-19 |
-| TOOL-02 | - | Withdrawn 2026-08-19 |
-| TOOL-03 | - | Withdrawn 2026-08-19 |
-| TOOL-04 | Phase 9 | Complete |
-| DOCS-03 | Phase 9 | Complete |
+| IPV6-01 | Phase 10 | Pending |
+| IPV6-02 | Phase 10 | Pending |
+| IPV6-03 | Phase 10 | Pending |
+| IPV6-04 | Phase 10 | Pending |
+| MDNS-01 | Phase 11 | Pending |
+| MDNS-02 | Phase 11 | Pending |
+| MDNS-03 | Phase 11 | Pending |
+| MDNS-04 | Phase 11 | Pending |
+| MDNS-05 | Phase 11 | Pending |
+| MDNS-06 | Phase 11 | Pending |
+| MDNS-07 | Phase 11 | Pending |
+| MDNS-08 | Phase 11 | Pending |
+| FIND-01 | Phase 13 | Pending |
+| FIND-02 | Phase 13 | Pending |
+| FIND-03 | Phase 13 | Pending |
+| FIND-04 | Phase 13 | Pending |
+| FIND-05 | Phase 13 | Pending |
+| FIND-06 | Phase 12 | Pending |
+| FIND-07 | Phase 13 | Pending |
+| FIND-08 | Phase 13 | Pending |
+| THREAD-01 | Phase 14 | Pending |
+| THREAD-02 | Phase 14 | Pending |
+| THREAD-03 | Phase 14 | Pending |
+| THREAD-04 | Phase 14 | Pending |
+| THREAD-05 | Phase 14 | Pending |
+| DOCS-04 | Phase 14 | Pending |
+| DOCS-05 | Phase 14 | Pending |
+| DOCS-06 | Phase 14 | Pending |
+
+**Coverage:**
+- v2.0 requirements: 28 total
+- Mapped to phases: 28
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-08-27*
+*Last updated: 2026-08-27 after roadmap creation (Phases 10 to 14 mapped)*

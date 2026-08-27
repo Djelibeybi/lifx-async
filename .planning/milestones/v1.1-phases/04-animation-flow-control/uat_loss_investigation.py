@@ -34,7 +34,7 @@ discriminates the hypotheses, in five arms run in this order:
 Run:
     uv run python .planning/phases/04-animation-flow-control/\\
 uat_loss_investigation.py \\
-        --tiles-ip 192.168.19.243 --fallback-ip 192.168.18.62 \\
+        --tiles-ip 203.0.113.15 --fallback-ip 203.0.113.3 \\
         --json-out .planning/phases/04-animation-flow-control/\\
 04-GAP-INVESTIGATION.json \\
         --events-out .planning/phases/04-animation-flow-control/\\
@@ -833,12 +833,12 @@ async def main() -> int:
     )
     parser.add_argument(
         "--tiles-ip",
-        default="192.168.19.243",
+        default="203.0.113.15",
         help="Primary Tiles device (the device 04-06 measured)",
     )
     parser.add_argument(
         "--fallback-ip",
-        default="192.168.18.62",
+        default="203.0.113.3",
         help="Second Tiles device for the fallback arm",
     )
     parser.add_argument(

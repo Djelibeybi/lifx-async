@@ -68,7 +68,7 @@ coverage:
         status: pass
     human_judgment: false
   - id: D4
-    description: "Single Capsule visual streaming round (My Office Ceiling Capsule, serial-verified, --profile ceiling --rounds 1 --duration 60) with power-on + as-found restore, dual operator verdict on smoothness (ANIM-03) and geometry (ANIM-04)"
+    description: "Single Capsule visual streaming round (Test Ceiling Capsule, serial-verified, --profile ceiling --rounds 1 --duration 60) with power-on + as-found restore, dual operator verdict on smoothness (ANIM-03) and geometry (ANIM-04)"
     verification: []
     human_judgment: true
     rationale: "Numbers count packets; only eyes judge rendered smoothness and geometry on the physical panel — this is the plan's designated human-only criterion"
@@ -112,9 +112,9 @@ unamended. Task 3 applied it verbatim.
 
 ## Task 4: Capsule Visual Round — Dual Verdict
 
-Serial-verified My Office Ceiling Capsule (`d073d587daab`) at its roster IP
-(`192.168.19.231`) — no re-resolution needed. Ran
-`uat_ack_stream.py --ip 192.168.19.231 --profile ceiling --rounds 1 --duration 60
+Serial-verified Test Ceiling Capsule (`d073d5e0000c`) at its roster IP
+(`203.0.113.14`) — no re-resolution needed. Ran
+`uat_ack_stream.py --ip 203.0.113.14 --profile ceiling --rounds 1 --duration 60
 --json-out 04-UAT-VISUAL-CAPSULE.json` while the operator watched from their desk.
 
 **Headless outcome (non-gating context, per the ruling):** FAIL, exit code 1.

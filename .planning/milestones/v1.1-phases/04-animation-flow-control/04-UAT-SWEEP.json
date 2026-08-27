@@ -2,49 +2,49 @@
   "timestamp": "2026-07-17T07:47:46",
   "devices": [
     {
-      "serial": "d073d5893c04",
-      "label": "Playroom Luna",
+      "serial": "d073d5e00035",
+      "label": "Test Luna",
       "role": "gate",
       "outcome": "FAIL"
     },
     {
-      "serial": "d073d55956e8",
+      "serial": "d073d5e0001e",
       "label": "Dining Room Table Candle",
       "role": "gate",
       "outcome": "INCONCLUSIVE"
     },
     {
-      "serial": "d073d582bff4",
-      "label": "Makerspace Candle",
+      "serial": "d073d5e00001",
+      "label": "Test Candle",
       "role": "gate",
       "outcome": "FAIL"
     },
     {
-      "serial": "d073d5866777",
-      "label": "Makerspace Tube",
+      "serial": "d073d5e00002",
+      "label": "Test Tube",
       "role": "gate",
       "outcome": "FAIL"
     },
     {
-      "serial": "d073d5a132d9",
-      "label": "Makerspace Ceiling",
+      "serial": "d073d5e00003",
+      "label": "Test Ceiling A",
       "role": "gate",
       "outcome": "FAIL"
     },
     {
-      "serial": "d073d5a132b8",
-      "label": "Playroom Ceiling",
+      "serial": "d073d5e00036",
+      "label": "Test Ceiling B",
       "role": "gate",
       "outcome": "FAIL"
     },
     {
-      "serial": "d073d587daab",
-      "label": "My Office Ceiling Capsule",
+      "serial": "d073d5e0000c",
+      "label": "Test Ceiling Capsule",
       "role": "gate",
       "outcome": "INCONCLUSIVE"
     },
     {
-      "serial": "d073d53e11be",
+      "serial": "d073d5e00008",
       "label": "System Test Tiles II",
       "role": "reference",
       "outcome": "FAIL"

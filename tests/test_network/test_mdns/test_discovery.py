@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -18,7 +18,12 @@ from lifx.network.mdns.discovery import (
     _LifxRecordCache,
     create_device_from_record,
 )
-from lifx.network.mdns.dns import DnsResourceRecord, SrvData, TxtData
+from lifx.network.mdns.dns import (
+    DnsResourceRecord,
+    SrvData,
+    TxtData,
+    build_address_query,
+)
 from lifx.network.mdns.types import LifxServiceRecord
 
 
@@ -1030,3 +1035,396 @@ class TestMdnsRemainingNonPositiveGuard:
 
         assert records == []
         mock_transport.receive.assert_not_called()
+
+
+class TestLifxRecordCacheBounds:
+    """The cache's tables are bounded against a multicast flood.
+
+    Discovery holds every record it sees for the whole window, so an
+    unbounded cache is a memory-growth lever for anything that can put
+    packets on the local link. Each bound is asserted from both sides: the
+    entry below the cap is kept, the one at it is refused.
+    """
+
+    def test_a_full_table_refuses_a_key_it_does_not_hold(self) -> None:
+        """At _MAX_ENTRIES, a genuinely new instance is dropped."""
+        cache = _LifxRecordCache()
+        srv = SrvData(priority=0, weight=0, port=56700, target="host.local")
+
+        cache.add_packet(
+            [
+                DnsResourceRecord(f"bulb{n}._lifx._udp.local", 33, 1, 120, b"", srv)
+                for n in range(_LifxRecordCache._MAX_ENTRIES)
+            ],
+            "192.168.1.50",
+        )
+        assert len(cache._srv_by_instance) == _LifxRecordCache._MAX_ENTRIES
+        assert "bulb0._lifx._udp.local" in cache._srv_by_instance
+
+        cache.add_packet(
+            [DnsResourceRecord("overflow._lifx._udp.local", 33, 1, 120, b"", srv)],
+            "192.168.1.50",
+        )
+
+        assert len(cache._srv_by_instance) == _LifxRecordCache._MAX_ENTRIES
+        assert "overflow._lifx._udp.local" not in cache._srv_by_instance
+
+    def test_a_full_table_still_updates_a_key_it_already_holds(self) -> None:
+        """The bound must not freeze out a re-announcement from a known device.
+
+        A device that moves port or target keeps re-announcing itself. If the
+        cap refused those too, one flood would pin the cache to stale data
+        for the rest of the discovery window.
+        """
+        cache = _LifxRecordCache()
+        srv = SrvData(priority=0, weight=0, port=56700, target="host.local")
+
+        cache.add_packet(
+            [
+                DnsResourceRecord(f"bulb{n}._lifx._udp.local", 33, 1, 120, b"", srv)
+                for n in range(_LifxRecordCache._MAX_ENTRIES)
+            ],
+            "192.168.1.50",
+        )
+
+        moved = SrvData(priority=0, weight=0, port=1234, target="moved.local")
+        cache.add_packet(
+            [DnsResourceRecord("bulb0._lifx._udp.local", 33, 1, 120, b"", moved)],
+            "192.168.1.50",
+        )
+
+        assert len(cache._srv_by_instance) == _LifxRecordCache._MAX_ENTRIES
+        assert cache._srv_by_instance["bulb0._lifx._udp.local"].port == 1234
+
+    def test_a_repeated_aaaa_is_not_stored_twice_for_one_host(self) -> None:
+        """Re-announcements must not grow a host's address list without end."""
+        cache = _LifxRecordCache()
+        record = DnsResourceRecord("host.local", 28, 1, 120, b"", "fd00::1")
+
+        cache.add_packet([record, record, record], "192.168.1.50")
+
+        assert cache._aaaa_by_host["host.local"] == ["fd00::1"]
+
+    def test_a_seventeenth_address_for_one_host_is_dropped(self) -> None:
+        """Sixteen addresses is already far past what a real device has."""
+        cache = _LifxRecordCache()
+
+        cache.add_packet(
+            [
+                DnsResourceRecord("host.local", 28, 1, 120, b"", f"fd00::{n:x}")
+                for n in range(1, 18)
+            ],
+            "192.168.1.50",
+        )
+
+        addrs = cache._aaaa_by_host["host.local"]
+        assert len(addrs) == 16
+        assert "fd00::10" in addrs  # the sixteenth, accepted
+        assert "fd00::11" not in addrs  # the seventeenth, refused
+
+
+class TestLifxRecordCachePendingTargets:
+    """Which SRV targets still need a follow-up address query.
+
+    A responder that answers for a whole Thread mesh can run out of room in
+    one packet and send every instance's TXT and SRV records but only some of
+    their AAAA records. Those instances are pending: their target hostname is
+    known, its address is not.
+    """
+
+    @staticmethod
+    def _instance_records(target: str = "host.local") -> list[DnsResourceRecord]:
+        """TXT plus SRV for one instance, with no address record."""
+        return [
+            DnsResourceRecord("bulb._lifx._udp.local", 16, 1, 120, b"", _txt()),
+            DnsResourceRecord(
+                "bulb._lifx._udp.local",
+                33,
+                1,
+                120,
+                b"",
+                SrvData(priority=0, weight=0, port=56700, target=target),
+            ),
+        ]
+
+    def test_an_instance_missing_its_address_records_is_pending(self) -> None:
+        """The case the follow-up query exists for."""
+        cache = _LifxRecordCache()
+        cache.add_packet(self._instance_records(), "192.168.1.50")
+
+        assert cache.pending_targets() == ["host.local"]
+
+    def test_an_instance_with_no_srv_record_is_not_pending(self) -> None:
+        """Without an SRV record there is no hostname to ask about.
+
+        Such an instance resolves from the source address of its own
+        single-instance packet instead, so querying would be pointless.
+        """
+        cache = _LifxRecordCache()
+        cache.add_packet(
+            [DnsResourceRecord("bulb._lifx._udp.local", 16, 1, 120, b"", _txt())],
+            "192.168.1.50",
+        )
+
+        assert cache.pending_targets() == []
+
+    def test_an_instance_whose_target_address_is_known_is_not_pending(self) -> None:
+        """An A record for the target answers the question already."""
+        cache = _LifxRecordCache()
+        cache.add_packet(
+            [
+                *self._instance_records(),
+                DnsResourceRecord("host.local", 1, 1, 120, b"", "192.168.1.100"),
+            ],
+            "192.168.1.50",
+        )
+
+        assert cache.pending_targets() == []
+
+    def test_an_ipv6_only_target_is_not_pending_either(self) -> None:
+        """A Thread device has an AAAA record and no A record at all."""
+        cache = _LifxRecordCache()
+        cache.add_packet(
+            [
+                *self._instance_records(),
+                DnsResourceRecord("host.local", 28, 1, 120, b"", "fd00::1"),
+            ],
+            "192.168.1.50",
+        )
+
+        assert cache.pending_targets() == []
+
+
+def _fake_deadline() -> MagicMock:
+    """An IdleDeadline stand-in that never expires on its own."""
+    deadline = MagicMock()
+    deadline.idle_expired = False
+    deadline.overall_expired = False
+    deadline.remaining.return_value = 5.0
+    deadline._start = 0.0
+    deadline._last_response = 0.0
+    return deadline
+
+
+def _fake_transport() -> AsyncMock:
+    """An MdnsTransport stand-in usable as its own async context manager."""
+    transport = AsyncMock()
+    transport.__aenter__ = AsyncMock(return_value=transport)
+    transport.__aexit__ = AsyncMock(return_value=False)
+    transport.send = AsyncMock()
+    return transport
+
+
+class TestMdnsQueryRetransmission:
+    """The PTR query is re-sent at its scheduled slots (RFC 6762 section 5.2).
+
+    Responders delay their answers randomly, and those answers can be lost.
+    Re-sending catches the ones that were missed; responses are deduplicated
+    by serial, so the re-answers cost nothing. The clock is faked rather than
+    waited out, since the first slot is a whole second away.
+    """
+
+    @pytest.mark.asyncio
+    async def test_each_slot_re_sends_the_query_once(self) -> None:
+        """Crossing both slots sends the query twice more, then stops."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        clock = MagicMock()
+        # start_time, then the elapsed reading taken on each pass of the
+        # loop: 1.5 crosses the first slot (1.0), 3.5 crosses the second
+        # (3.0), after which the schedule is empty.
+        clock.monotonic.side_effect = [0.0, 1.5, 3.5, 4.0, 4.0]
+
+        transport = _fake_transport()
+        transport.receive = AsyncMock(side_effect=LifxTimeoutError("timeout"))
+
+        with (
+            patch(
+                "lifx.network.mdns.discovery.IdleDeadline",
+                return_value=_fake_deadline(),
+            ),
+            patch("lifx.network.mdns.discovery.time", clock),
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+        ):
+            records = [r async for r in discover_lifx_services(timeout=5.0)]
+
+        assert records == []
+        # The initial query plus one re-send per slot.
+        assert transport.send.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_a_timeout_with_slots_left_loops_instead_of_ending(self) -> None:
+        """A receive timeout before the last slot is not the end of collection.
+
+        The receive timeout is clamped to the next retransmission, so timing
+        out means "the slot arrived", not "nothing more is coming". Ending
+        there would drop every responder that had not yet answered.
+        """
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        clock = MagicMock()
+        # Never reaches a slot, so the schedule stays non-empty and every
+        # timeout has to loop rather than break.
+        clock.monotonic.side_effect = [0.0] + [0.1] * 10
+
+        deadline = _fake_deadline()
+        # Expire on the third pass, so the loop can only end by the deadline.
+        type(deadline).overall_expired = PropertyMock(side_effect=[False, False, True])
+
+        transport = _fake_transport()
+        transport.receive = AsyncMock(side_effect=LifxTimeoutError("timeout"))
+
+        with (
+            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
+            patch("lifx.network.mdns.discovery.time", clock),
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+        ):
+            records = [r async for r in discover_lifx_services(timeout=5.0)]
+
+        assert records == []
+        assert transport.receive.await_count == 2
+        # No slot was crossed, so the query was sent exactly once.
+        assert transport.send.await_count == 1
+
+
+class TestMdnsFollowUpAddressQueries:
+    """Addresses a responder left out are asked for directly."""
+
+    @staticmethod
+    def _pending_records(count: int) -> list[DnsResourceRecord]:
+        """TXT and SRV for `count` instances, with no address records."""
+        records: list[DnsResourceRecord] = []
+        for n in range(count):
+            instance = f"bulb{n}._lifx._udp.local"
+            records.append(
+                DnsResourceRecord(
+                    instance, 16, 1, 120, b"", _txt(serial=f"d073d5{n:06x}")
+                )
+            )
+            records.append(
+                DnsResourceRecord(
+                    instance,
+                    33,
+                    1,
+                    120,
+                    b"",
+                    SrvData(priority=0, weight=0, port=56700, target=f"host{n}.local"),
+                )
+            )
+        return records
+
+    @staticmethod
+    def _response_for(records: list[DnsResourceRecord]) -> MagicMock:
+        """A parsed response carrying the given records."""
+        response = MagicMock()
+        response.header.is_response = True
+        response.records = records
+        return response
+
+    @pytest.mark.asyncio
+    async def test_a_target_with_no_address_record_is_queried_directly(self) -> None:
+        """The instance stays unresolved, so its host is asked about."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        transport = _fake_transport()
+        transport.receive = _receive_script((b"\x00" * 100, ("192.168.1.100", 5353)))
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=self._response_for(self._pending_records(1)),
+            ),
+        ):
+            records = [r async for r in discover_lifx_services(timeout=0.1)]
+
+        # No address ever arrived, so nothing resolved.
+        assert records == []
+
+        sent = [call.args[0] for call in transport.send.await_args_list]
+        assert build_address_query("host0.local") in sent
+        # Asked once, however many times the packet is re-examined: the
+        # target is remembered, not re-queried on every pass of the loop.
+        assert sent.count(build_address_query("host0.local")) == 1
+
+    @pytest.mark.asyncio
+    async def test_follow_up_queries_stop_at_sixty_four_targets(self) -> None:
+        """A hostile responder cannot turn one reply into unbounded traffic."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        transport = _fake_transport()
+        transport.receive = _receive_script((b"\x00" * 100, ("192.168.1.100", 5353)))
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=self._response_for(self._pending_records(65)),
+            ),
+        ):
+            records = [r async for r in discover_lifx_services(timeout=0.1)]
+
+        assert records == []
+
+        sent = [call.args[0] for call in transport.send.await_args_list]
+        # The initial PTR query, then the cap's worth of address queries and
+        # not one more, even though 65 targets are pending.
+        assert len(sent) == 1 + 64
+        assert build_address_query("host64.local") not in sent
+
+
+class TestMdnsSerialDeduplication:
+    """One device answering under two instance names is still one device."""
+
+    @pytest.mark.asyncio
+    async def test_two_instances_sharing_a_serial_yield_one_record(self) -> None:
+        """The dedupe is by serial, not by instance name.
+
+        The cache already emits each *instance* once, so this only bites when
+        a device is advertised twice under different names, which is what a
+        border router re-advertising a device that also answers for itself
+        looks like on the wire.
+        """
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        serial = "d073d5123456"
+        records = []
+        for label, host, ip in (
+            ("bulb-a", "hosta.local", "192.168.1.100"),
+            ("bulb-b", "hostb.local", "192.168.1.101"),
+        ):
+            instance = f"{label}._lifx._udp.local"
+            records.append(
+                DnsResourceRecord(instance, 16, 1, 120, b"", _txt(serial=serial))
+            )
+            records.append(
+                DnsResourceRecord(
+                    instance,
+                    33,
+                    1,
+                    120,
+                    b"",
+                    SrvData(priority=0, weight=0, port=56700, target=host),
+                )
+            )
+            records.append(DnsResourceRecord(host, 1, 1, 120, b"", ip))
+
+        response = MagicMock()
+        response.header.is_response = True
+        response.records = records
+
+        transport = _fake_transport()
+        transport.receive = _receive_script((b"\x00" * 100, ("192.168.1.100", 5353)))
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+        ):
+            found = [r async for r in discover_lifx_services(timeout=0.1)]
+
+        assert len(found) == 1
+        assert found[0].serial == serial
+        assert found[0].ip == "192.168.1.100"
