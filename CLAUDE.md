@@ -195,7 +195,7 @@ gh workflow run docs.yml
      the six pre-6.4.0 names
    - `slug.py`: The one home of the slug-derivation rule, shared by `library.py` and
      `scripts/generate_theme_data.py` — a leaf module whose only import is `re`
-   - `data.py`: Auto-generated theme records (166 themes, 168 resolvable keys) — **never
+   - `data.py`: Auto-generated theme records (166 themes, 169 resolvable keys) — **never
      edit manually**; regenerate from `data/themes.jsonl`
    - `generators.py`: Theme-based color generators for effects
    - `canvas.py`: Canvas abstraction for applying themes to device layouts

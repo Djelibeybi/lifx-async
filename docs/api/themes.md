@@ -15,7 +15,7 @@ The `Theme` class represents a collection of HSBK colors forming a coordinated p
 
 ## ThemeLibrary Class
 
-The `ThemeLibrary` provides access to 166 themes, resolvable under 168 names.
+The `ThemeLibrary` provides access to 166 themes, resolvable under 169 names.
 
 ::: lifx.theme.ThemeLibrary
     options:
@@ -31,44 +31,11 @@ The `ThemeLibrary` provides access to 166 themes, resolvable under 168 names.
       show_root_heading: true
       heading_level: 3
 
-## Available Themes
+## Built-in Theme Catalogue
 
-The library carries **166 themes**, resolvable under **168 names** (the extra two are the
-`forest` and `aurora_borealis` rename aliases). 138 are captured from the LIFX app and carry
-the app's own display name and category; the remaining 28 have no app counterpart and sit
-under the `Library` category.
+For the live category/count table, executable enumeration examples, compatibility notes and
+fidelity boundary, see the [Built-in Theme Catalogue](../getting-started/built-in-themes.md).
 
-Rather than reproduce the inventory here — where it rots on every resync — ask the library:
-
-```python
-from lifx import ThemeLibrary
-
-names = ThemeLibrary.get_available_themes()   # every resolvable name
-
-theme = ThemeLibrary.get("evening")
-print(theme.slug, theme.name, theme.category)  # evening Evening Library
-```
-
-Each theme carries its ASCII `slug`, the app's `name` (which may contain spaces and
-punctuation) and its `category`. The categories and their theme counts are:
-
-| Category | Themes |
-| --- | ---: |
-| Archives | 60 |
-| Library | 28 |
-| Holidays | 15 |
-| Music | 14 |
-| Moods | 13 |
-| Space | 11 |
-| Art Series | 10 |
-| Nature | 8 |
-| Play | 7 |
-
-`ThemeLibrary.get_by_category()` takes the categories in the table above, matched
-case- and punctuation-insensitively (`Art Series`, `art series` and `art_series` all
-resolve), and `ThemeLibrary.get_categories()` lists them. The six pre-6.4.0 names
-(`seasonal`, `holiday`, `mood`, `ambient`, `functional`, `atmosphere`) are retired
-and raise `ValueError` listing the categories above — none of them mapped onto a
-single category, so see [Theme Taxonomy Changes](../migration/theme-taxonomy-6.4.0.md)
-for what each one used to return. `Theme.disposition` and `Theme.replaced_by`
-record each theme's fate, documented on the same page.
+`Theme.disposition` and `Theme.replaced_by` record each theme's fate; the six pre-6.4.0
+category names are retired and raise `ValueError`. Both are documented on the
+[Theme Taxonomy Changes](../migration/theme-taxonomy-6.4.0.md) page.

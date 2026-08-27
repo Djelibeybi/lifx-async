@@ -1,6 +1,6 @@
 # Themes Quick Start
 
-Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library carries 166 themes — 138 captured from the LIFX app plus 28 carried over from earlier versions of this library — resolvable under 168 names once rename aliases are counted.
+Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library carries 166 themes — 138 from the LIFX app plus 28 carried over from earlier versions of this library — resolvable under 169 names once rename aliases are counted.
 
 ## Apply a Theme
 
@@ -17,23 +17,14 @@ theme = ThemeLibrary.get("evening")
 await group.apply_theme(theme, power_on=True, duration=1.5)
 ```
 
-## List Available Themes
+## Browse Built-in Themes
 
-```python
-from lifx import ThemeLibrary
-
-# Get every resolvable theme name
-themes = ThemeLibrary.get_available_themes()
-print(len(themes))  # 168 (166 themes plus 2 rename aliases)
-
-# Discover the categories, then get themes by category
-categories = ThemeLibrary.get_categories()
-holidays = ThemeLibrary.get_by_category("Holidays")
-moods = ThemeLibrary.get_by_category("Moods")
-```
+The [Built-in Theme Catalogue](built-in-themes.md) is the live owner of available categories,
+counts, compatibility notes and executable enumeration examples.
 
 ## Next Steps
 
+- **[Built-in Theme Catalogue](built-in-themes.md)** — Every category, count and enumeration example
 - **[Themes Guide](../user-guide/themes.md)** — Practical examples: time-based lighting, holiday decorations, custom themes, room coordination
 - **[Themes API Reference](../api/themes.md)** — Complete API documentation
 - **[Color Utilities](../api/colors.md)** — HSBK color representation

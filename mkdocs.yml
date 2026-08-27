@@ -114,7 +114,7 @@ plugins:
       - Full async/await support with asyncio
       - Type-safe with strict Pyright validation
       - Auto-generated protocol from official LIFX specification
-      - Supports all LIFX device types: Light, HevLight, InfraredLight, MultiZoneLight, and TileDevice
+      - Supports all LIFX lighting device types: Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, and CeilingLight
       - High-level API with device discovery and batch operations
       - Concurrent request handling with connection pooling
     sections:
@@ -122,6 +122,7 @@ plugins:
       - getting-started/installation.md
       - getting-started/quickstart.md
       - getting-started/themes.md
+      - getting-started/built-in-themes.md
       - getting-started/effects.md
       User Guide:
       - user-guide/themes.md
@@ -195,6 +196,7 @@ nav:
   - Installation: getting-started/installation.md
   - Quick Start: getting-started/quickstart.md
   - Themes: getting-started/themes.md
+  - Built-in Theme Catalogue: getting-started/built-in-themes.md
   - Light Effects: getting-started/effects.md
 - User Guide:
   - Light Effects: user-guide/effects.md
