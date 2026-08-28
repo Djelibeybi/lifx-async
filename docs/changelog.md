@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v6.6.1 (2026-08-28)
+
+### Bug Fixes
+
+- Add IPv6 and Thread transport support
+  ([`7f54ad7`](https://github.com/Djelibeybi/lifx-async/commit/7f54ad783f81d394368c78200b31df0c26534571))
+
+
 ## v6.6.0 (2026-08-27)
 
 ### Documentation
