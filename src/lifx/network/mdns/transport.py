@@ -46,6 +46,8 @@ class MdnsTransport:
         self._protocol: _UdpProtocol | None = None
         self._transport: DatagramTransport | None = None
         self._socket: socket.socket | None = None
+        self._state_lock = asyncio.Lock()
+        self._state_generation = 0
 
     async def __aenter__(self) -> MdnsTransport:
         """Enter async context manager."""
@@ -66,96 +68,106 @@ class MdnsTransport:
         Raises:
             LifxNetworkError: If socket creation or configuration fails
         """
-        if self._protocol is not None:
-            _LOGGER.debug(
-                {
-                    "class": "MdnsTransport",
-                    "method": "open",
-                    "action": "already_open",
-                }
-            )
-            return
+        generation = self._state_generation
+        async with self._state_lock:
+            # A close that began after this open call invalidates the attempt,
+            # including callers queued behind another opener.
+            if generation != self._state_generation:
+                return
 
-        sock: socket.socket | None = None
+            if self.is_open:
+                _LOGGER.debug(
+                    {
+                        "class": "MdnsTransport",
+                        "method": "open",
+                        "action": "already_open",
+                    }
+                )
+                return
 
-        try:
-            loop = asyncio.get_running_loop()
+            sock: socket.socket | None = None
+            datagram_transport: DatagramTransport | None = None
 
-            # Create and configure the socket by hand, so the ephemeral bind
-            # below is ours to choose rather than asyncio's.
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                loop = asyncio.get_running_loop()
 
-            # Bind to an ephemeral port: per RFC 6762 §6.7, queries sent from
-            # a port other than 5353 are "legacy unicast" queries and
-            # responders reply directly to our port. Binding to 5353 instead
-            # would share the port (via SO_REUSEPORT) with any system mDNS
-            # daemon (mDNSResponder, Avahi), which silently steals unicast
-            # responses and causes devices to be missed.
-            sock.bind(("", 0))
-            _LOGGER.debug(
-                {
-                    "class": "MdnsTransport",
-                    "method": "open",
-                    "action": "bound_to_ephemeral_port",
-                    "port": sock.getsockname()[1],
-                }
-            )
+                # Create and configure the socket by hand, so the ephemeral bind
+                # below is ours to choose rather than asyncio's.
+                sock = socket.socket(
+                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
+                )
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-            # Set multicast TTL (1 for link-local)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+                # Bind to an ephemeral port: per RFC 6762 §6.7, queries sent from
+                # a port other than 5353 are "legacy unicast" queries and
+                # responders reply directly to our port. Binding to 5353 instead
+                # would share the port (via SO_REUSEPORT) with any system mDNS
+                # daemon (mDNSResponder, Avahi), which silently steals unicast
+                # responses and causes devices to be missed.
+                sock.bind(("", 0))
+                _LOGGER.debug(
+                    {
+                        "class": "MdnsTransport",
+                        "method": "open",
+                        "action": "bound_to_ephemeral_port",
+                        "port": sock.getsockname()[1],
+                    }
+                )
 
-            # Make socket non-blocking
-            sock.setblocking(False)
-            self._socket = sock
+                # Set multicast TTL (1 for link-local)
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
 
-            # Create protocol. Shared with UdpTransport, whose bounded queue
-            # and drop logging guard against multicast floods.
-            protocol = _UdpProtocol()
-            self._protocol = protocol
+                # Make socket non-blocking
+                sock.setblocking(False)
+                # Create protocol. Shared with UdpTransport, whose bounded queue
+                # and drop logging guard against multicast floods.
+                protocol = _UdpProtocol()
 
-            # Create datagram endpoint using our configured socket
-            self._transport, _ = await loop.create_datagram_endpoint(
-                lambda: protocol,
-                sock=sock,
-            )
+                # Create datagram endpoint using our configured socket
+                datagram_transport, _ = await loop.create_datagram_endpoint(
+                    lambda: protocol,
+                    sock=sock,
+                )
 
-            _LOGGER.debug(
-                {
-                    "class": "MdnsTransport",
-                    "method": "open",
-                    "action": "opened",
-                }
-            )
+                # close() deliberately does not wait for endpoint creation. If
+                # it landed during the await, it wins and this late endpoint is
+                # closed without ever becoming observable as open.
+                if generation != self._state_generation:
+                    datagram_transport.close()
+                    return
 
-        except OSError as e:
-            # Two things are stranded by a failure partway through, and the
-            # descriptor is only the obvious one. `_socket` and `_protocol`
-            # are assigned before the endpoint is awaited, and `is_open` is
-            # `_protocol is not None`, so an endpoint failure would otherwise
-            # leave the object claiming to be open while the early return at
-            # the top of this method refused to build a replacement:
-            # descriptor-clean, and permanently unusable. Put the object back
-            # to exactly the state close() leaves it in, so a caller's retry
-            # loop gets a working transport instead of a phantom.
-            #
-            # close() is a no-op on an already-closed socket, so this is safe
-            # whether or not create_datagram_endpoint took ownership first.
-            if sock is not None:
-                sock.close()
-            self._socket = None
-            self._protocol = None
-            self._transport = None
+                self._socket = sock
+                self._protocol = protocol
+                self._transport = datagram_transport
 
-            _LOGGER.debug(
-                {
-                    "class": "MdnsTransport",
-                    "method": "open",
-                    "action": "failed",
-                    "error": str(e),
-                }
-            )
-            raise LifxNetworkError(f"Failed to open mDNS socket: {e}") from e
+                _LOGGER.debug(
+                    {
+                        "class": "MdnsTransport",
+                        "method": "open",
+                        "action": "opened",
+                    }
+                )
+
+            except BaseException as e:
+                if datagram_transport is not None:
+                    datagram_transport.close()
+                elif sock is not None:
+                    sock.close()
+                self._socket = None
+                self._protocol = None
+                self._transport = None
+
+                _LOGGER.debug(
+                    {
+                        "class": "MdnsTransport",
+                        "method": "open",
+                        "action": "failed",
+                        "error": str(e),
+                    }
+                )
+                if isinstance(e, OSError):
+                    raise LifxNetworkError(f"Failed to open mDNS socket: {e}") from e
+                raise
 
     async def send(self, data: bytes, address: tuple[str, int] | None = None) -> None:
         """Send data to mDNS multicast address.
@@ -232,7 +244,12 @@ class MdnsTransport:
 
     async def close(self) -> None:
         """Close the mDNS socket."""
-        if self._transport is not None:
+        self._state_generation += 1
+        transport, self._transport = self._transport, None
+        sock, self._socket = self._socket, None
+        self._protocol = None
+
+        if transport is not None or sock is not None:
             _LOGGER.debug(
                 {
                     "class": "MdnsTransport",
@@ -241,10 +258,11 @@ class MdnsTransport:
                 }
             )
 
-            self._transport.close()
-            self._transport = None
-            self._protocol = None
-            self._socket = None
+            if transport is not None:
+                transport.close()
+            else:
+                assert sock is not None
+                sock.close()
 
             _LOGGER.debug(
                 {
@@ -257,4 +275,8 @@ class MdnsTransport:
     @property
     def is_open(self) -> bool:
         """Check if socket is open."""
-        return self._protocol is not None
+        return (
+            self._socket is not None
+            and self._protocol is not None
+            and self._transport is not None
+        )

@@ -15,23 +15,27 @@ ARCHITECTURE and PITFALLS in the same directory.
 
 ### IPv6 Transport
 
-Landing `feat/ipv6-thread-support` (`b49400b`, `b88cdb9`, `2f884f5`) onto `main`. Research
-verdict: the branch's stdlib primitives and address-family seam are correct, so this is a
-rebase plus a reconciled fix list, not a rewrite.
+Preparing `feat/ipv6-thread-support` (`b49400b`, `b88cdb9`, `2f884f5`) for shipment from its
+phase branch. The accepted tree merges to `main` only in the post-phase shipment workflow.
+Research verdict: the branch's stdlib primitives and address-family seam are correct, so this
+is a rebase plus a reconciled fix list, not a runtime rewrite.
 
-- [ ] **IPV6-01**: A caller can connect to, control and send animation frames to a device
+- [x] **IPV6-01**: A caller can connect to, control and send animation frames to a device
       that has only an IPv6 address. The socket family follows the target address at every
       socket-creation site, including the animation layer's separate direct-UDP frame
       socket
-- [ ] **IPV6-02**: A caller who supplies a link-local address with no zone identifier gets
+
+- [x] **IPV6-02**: A caller who supplies a link-local address with no zone identifier gets
       an immediate `ValueError` naming the problem, rather than a silent timeout. The
       branch downgraded this check to a warning on a transport that routes every send-time
       `OSError` to `error_received` and never raises, which turns a permanent
       configuration error into a 16 second wait (PITFALLS B2)
-- [ ] **IPV6-03**: Address-family selection has one implementation, shared by every
+
+- [x] **IPV6-03**: Address-family selection has one implementation, shared by every
       socket-creation site, so the transports cannot drift apart. The branch repeats the
       `":" in ip` heuristic three times (PITFALLS B9)
-- [ ] **IPV6-04**: An mDNS transport whose endpoint creation fails partway through
+
+- [x] **IPV6-04**: An mDNS transport whose endpoint creation fails partway through
       `open()` leaves no socket behind
 
 ### mDNS Discovery
@@ -44,6 +48,7 @@ discovery path.
       devices found bound ephemeral against 9 bound on 5353 with `SO_REUSEPORT`. The
       regression test must not itself bind 5353, because CI runners run Avahi and the test
       would measure the runner rather than the fix
+
 - [ ] **MDNS-02**: A caller can read how a device was reached, from a `tm` field on
       `LifxServiceRecord` carrying the mDNS TXT `tm` key's value. The field keeps the wire
       name deliberately (user decision, 2026-08-27): the protocol layer normally renames
@@ -56,17 +61,22 @@ discovery path.
       docstrings or the docs. Parsing is defensive: an absent, unparsable or unrecognised
       value reports as unknown and never raises, because a third value could appear in any
       future firmware
+
 - [ ] **MDNS-03**: Records for one service instance accumulate across multiple response
       packets, proven by synthetic multi-packet tests. A Thread border router acts as an
       advertising proxy for the whole mesh, and RFC 6762 legacy-unicast replies cannot
       span packets, so records are omitted rather than continued
+
 - [ ] **MDNS-04**: An SRV target whose address records did not fit in a reply triggers a
       follow-up A/AAAA query, proven by synthetic tests
+
 - [ ] **MDNS-05**: Address selection is deterministic and documented, preferring ULA, then
       GUA, then scoped link-local, and every discovered address is retained on the record
       rather than discarded at selection time (PITFALLS B3)
+
 - [ ] **MDNS-06**: A TXT `id` that fails the same validation the broadcast path applies to
       a serial is rejected rather than trusted (PITFALLS B6)
+
 - [ ] **MDNS-07**: TTL 0 goodbye packets and cache-flush bits are honoured (PITFALLS B5)
 - [ ] **MDNS-08**: The mDNS module's documented behaviour matches its actual behaviour.
       The branch deleted `IP_ADD_MEMBERSHIP` while leaving docstrings that still claim the
@@ -81,28 +91,35 @@ discovery path.
       a broadcast leg and an mDNS leg concurrently and merging by serial, first wins.
       Measured today: `discover()` returns 25 devices and neither Thread serial, while
       `discover_mdns()` returns both
+
 - [ ] **FIND-02**: `discover()`'s existing contract survives the merge, specifically its
       overall timeout, its idle timeout resetting on consumer resume, first-wins
       per-serial dedup, and DoS source and serial validation. The invariant tests are
       written before the merge, as its entry gate, not after it
+
 - [ ] **FIND-03**: An mDNS leg that fails or is unavailable degrades `discover()` to
       today's broadcast-only behaviour rather than ending discovery. `asyncio.TaskGroup`
       is unavailable regardless (Python 3.11 or later; this library ships 3.10 for LedFx),
       and its cancel-siblings semantics would be wrong here anyway
+
 - [ ] **FIND-04**: An mDNS-sourced device is unicast-verified before it is yielded, so
       `discover()` never yields a device that is not answering. A border router's SRP
       registration can outlive the device by up to a 2 hour default lease, and `discover()`
       has never broken that liveness contract. Verification also closes the mDNS leg's
       spoofing exposure, since it carries none of the broadcast leg's validation
+
 - [ ] **FIND-05**: `find_by_serial()` races a broadcast leg and an mDNS leg, first hit
       wins, and the losing leg is cancelled and reaped so no task or socket leaks. Both
       legs are required: broadcast covers WiFi devices whose firmware does not advertise
       over mDNS, mDNS covers Thread devices with no IPv4 address to broadcast to
+
 - [ ] **FIND-06**: `find_by_ip()` resolves a device from an IPv6 literal instead of
       returning `None`
+
 - [ ] **FIND-07**: The timing change merged discovery imposes on existing callers is a
       measured before-and-after number against the fleet, not an assumption. Emulator CI
       wall time is part of that measurement
+
 - [ ] **FIND-08**: The mDNS TXT `id` is confirmed to match the broadcast serial for
       firmware 3.70 to 3.99 WiFi devices, the only population where the two could diverge.
       Low priority and not a gate: Thread requires firmware 4 or later, and
@@ -117,9 +134,11 @@ reliability finding was measured on WiFi/IPv4 and none of them transfers unexami
 
 - [ ] **THREAD-01**: Discovery coverage over Thread is measured across repeated rounds.
       Single rounds mislead, which is the Spike 005 lesson this project already paid for
+
 - [ ] **THREAD-02**: The retry schedule's WiFi-tuned constants are measured against Thread
       ack RTT. The 200 ms "an acked bulb has answered by now" floor exists because of WiFi
       timing; no constant changes without evidence
+
 - [ ] **THREAD-03**: The achievable animation frame rate over Thread is measured, and the
       measured ceiling is the deliverable. Published arithmetic suggests 20 FPS full-frame
       matrix streaming is infeasible sustained (roughly 89 kbps for `Set64` at 20 FPS, and
@@ -127,9 +146,11 @@ reliability finding was measured on WiFi/IPv4 and none of them transfers unexami
       802.15.4 PHY and a measured single-hop ceiling near 100 kbps), and the ack gate's
       designed degradation floor is exactly 2 FPS. Those are other people's networks;
       this requirement replaces them with a number from this fleet
+
 - [ ] **THREAD-04**: Border router advertisement staleness is measured directly, by
       unplugging a Thread device and timing when it stops being advertised. This settles
       LIFX's actual SRP lease, which is unverified; OpenThread's default is 2 hours
+
 - [ ] **THREAD-05**: Every device class has either a Thread evidence record or a named
       gap, following the v1.2 FIDELITY pattern so that an unavailable class closes rather
       than staying open indefinitely. `MatrixLight` closes now on two devices;
@@ -141,10 +162,12 @@ reliability finding was measured on WiFi/IPv4 and none of them transfers unexami
 
 - [ ] **DOCS-04**: A broadcast-first consumer can read what changes for them, what Thread
       support does and does not give them, and how to reach Thread devices
+
 - [ ] **DOCS-05**: Known limitations are documented rather than discovered: the mDNS query
       leg is IPv4 multicast by design, there are no unsolicited announcements, reception
       is unicast-only, and fleet-scale mesh behaviour is proven synthetically rather than
       on hardware
+
 - [ ] **DOCS-06**: The repository's own architecture documentation is corrected where it
       is factually wrong. `CLAUDE.md` states that operations on multiple devices execute
       in parallel via `asyncio.TaskGroup`; `grep` finds no `TaskGroup` anywhere in `src/`,
@@ -160,6 +183,7 @@ Deferred beyond v2.0. Tracked, not in this roadmap.
 - **FLEET-01**: Cross-packet accumulation and follow-up A/AAAA queries confirmed on real
   hardware, once enough of the fleet is migrated for a border router to overflow a single
   legacy-unicast reply packet
+
 - **FLEET-02**: Multi-address and multi-border-router topologies revalidated, once a
   second border router or a GUA prefix exists on the network
 
@@ -167,8 +191,10 @@ Deferred beyond v2.0. Tracked, not in this roadmap.
 
 - **PERS-01**: Generalise `state_file` persistence into a reusable mixin (deferred since
   2026-06-11)
+
 - **SPIKE-006**: Measure the impact of publishing tuning constants against publishing
   behaviour only. The D5-09 rule is disputed by the operator and remains an OPEN decision
+
 - **STYLE-01**: No-em-dash house style across `docs/`, roughly 200 instances. Preference
   is to recast each sentence rather than swap the character
 
@@ -193,10 +219,10 @@ Populated at roadmap creation, 2026-08-27.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| IPV6-01 | Phase 10 | Pending |
-| IPV6-02 | Phase 10 | Pending |
-| IPV6-03 | Phase 10 | Pending |
-| IPV6-04 | Phase 10 | Pending |
+| IPV6-01 | Phase 10 | Verified |
+| IPV6-02 | Phase 10 | Verified |
+| IPV6-03 | Phase 10 | Verified |
+| IPV6-04 | Phase 10 | Verified |
 | MDNS-01 | Phase 11 | Pending |
 | MDNS-02 | Phase 11 | Pending |
 | MDNS-03 | Phase 11 | Pending |
@@ -223,6 +249,7 @@ Populated at roadmap creation, 2026-08-27.
 | DOCS-06 | Phase 14 | Pending |
 
 **Coverage:**
+
 - v2.0 requirements: 28 total
 - Mapped to phases: 28
 - Unmapped: 0

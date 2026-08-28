@@ -92,6 +92,105 @@ class TestDeviceConnection:
 
         await conn.close()
 
+    async def test_waiting_open_retries_after_opener_failure(self) -> None:
+        """A waiter must not return success after the active opener fails."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        entered = asyncio.Event()
+        released = asyncio.Event()
+        attempts = 0
+
+        async def _open_transport() -> None:
+            """Fail the first attempt after a waiter has joined the schedule."""
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                entered.set()
+                await released.wait()
+                raise LifxNetworkError("forced opener failure")
+
+        with (
+            patch("lifx.network.connection.UdpTransport") as transport_class,
+            patch.object(conn, "_background_receiver", new_callable=AsyncMock),
+        ):
+            transport_class.return_value.open.side_effect = _open_transport
+            transport_class.return_value.close = AsyncMock()
+            first = asyncio.create_task(conn.open())
+            await entered.wait()
+            waiting = asyncio.create_task(conn.open())
+            await asyncio.sleep(0)
+            released.set()
+
+            with pytest.raises(LifxNetworkError, match="forced opener failure"):
+                await first
+            await waiting
+
+            assert attempts == 2
+            assert conn.is_open is True
+            await conn.close()
+            assert transport_class.return_value.close.await_count == 2
+
+    async def test_waiting_open_returns_after_opener_succeeds(self) -> None:
+        """A waiter observes and reuses the endpoint established ahead of it."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        entered = asyncio.Event()
+        released = asyncio.Event()
+        attempts = 0
+
+        async def _open_transport() -> None:
+            nonlocal attempts
+            attempts += 1
+            entered.set()
+            await released.wait()
+
+        with (
+            patch("lifx.network.connection.UdpTransport") as transport_class,
+            patch.object(conn, "_background_receiver", new_callable=AsyncMock),
+        ):
+            transport_class.return_value.open.side_effect = _open_transport
+            transport_class.return_value.close = AsyncMock()
+            first = asyncio.create_task(conn.open())
+            await entered.wait()
+            waiting = asyncio.create_task(conn.open())
+            await asyncio.sleep(0)
+            released.set()
+
+            await asyncio.gather(first, waiting)
+
+            assert attempts == 1
+            assert conn.is_open is True
+            await conn.close()
+
+    async def test_failed_open_preserves_error_when_cleanup_also_fails(self) -> None:
+        """Cleanup failure is logged without replacing the opening failure."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        opening_failure = RuntimeError("forced opening failure")
+
+        with patch("lifx.network.connection.UdpTransport") as transport_class:
+            transport_class.return_value.open = AsyncMock(side_effect=opening_failure)
+            transport_class.return_value.close = AsyncMock(
+                side_effect=RuntimeError("forced cleanup failure")
+            )
+
+            with pytest.raises(RuntimeError) as excinfo:
+                await conn.open()
+
+        assert excinfo.value is opening_failure
+        assert conn.is_open is False
+        assert conn._transport is None
+
+    async def test_transport_construction_failure_has_no_cleanup_target(self) -> None:
+        """Construction failure propagates when no transport exists to close."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
+        failure = RuntimeError("forced transport construction failure")
+
+        with patch("lifx.network.connection.UdpTransport", side_effect=failure):
+            with pytest.raises(RuntimeError) as excinfo:
+                await conn.open()
+
+        assert excinfo.value is failure
+        assert conn.is_open is False
+        assert conn._transport is None
+
     async def test_send_without_open(self) -> None:
         """Test sending without opening raises error."""
         serial = "d073d5001234"

@@ -212,15 +212,20 @@ class DeviceConnection:
         if self._is_open:
             return
 
-        # Prevent concurrent open() calls (see __init__ for why this is a
-        # poll loop rather than an asyncio.Lock)
-        if self._is_opening:
-            # Another task is already opening, wait for it
+        # Claim the opener role without an await between the check and write.
+        # A waiter retries the decision after the current opener finishes: it
+        # must never return success solely because a failed opener cleared the
+        # flag. The poll remains loop-agnostic for connections reopened under
+        # a different event loop.
+        while True:
+            if self._is_open:
+                return
+            if not self._is_opening:
+                self._is_opening = True
+                break
             while self._is_opening:
                 await asyncio.sleep(0.001)
-            return
 
-        self._is_opening = True
         try:
             # Double-check after setting flag
             if self._is_open:  # pragma: no cover
@@ -252,6 +257,25 @@ class DeviceConnection:
                     "port": self.port,
                 }
             )
+        except BaseException:
+            failed_transport, self._transport = self._transport, None
+            self._receiver_shutdown = None
+            if failed_transport is not None:
+                try:
+                    await failed_transport.close()
+                except BaseException as cleanup_error:
+                    _LOGGER.debug(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "open",
+                            "action": "failed_transport_cleanup_failed",
+                            "serial": self.serial,
+                            "ip": self.ip,
+                            "port": self.port,
+                            "error": str(cleanup_error),
+                        }
+                    )
+            raise
         finally:
             self._is_opening = False
 

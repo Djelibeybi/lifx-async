@@ -246,6 +246,8 @@ class UdpTransport:
         # without asking asyncio for the socket on every datagram. None means
         # no endpoint has been built yet, which send() reports as "not open".
         self._family: socket.AddressFamily | None = None
+        self._state_lock = asyncio.Lock()
+        self._state_generation = 0
 
     def _log(self, **fields: object) -> dict[str, object]:
         """Build a structured log record, tagged with the peer when known."""
@@ -262,91 +264,111 @@ class UdpTransport:
 
     async def open(self) -> None:
         """Open the UDP socket."""
-        if self._protocol is not None:
-            _LOGGER.debug(
-                {
-                    "class": "UdpTransport",
-                    "method": "open",
-                    "action": "already_open",
-                    "ip_address": self._ip_address,
-                    "port": self._port,
-                }
-            )
-            return
+        generation = self._state_generation
+        async with self._state_lock:
+            if generation != self._state_generation:
+                return
 
-        try:
-            loop = asyncio.get_running_loop()
-
-            _LOGGER.debug(
-                {
-                    "class": "UdpTransport",
-                    "method": "open",
-                    "action": "opening_socket",
-                    "ip_address": self._ip_address,
-                    "port": self._port,
-                    "broadcast": self._broadcast,
-                }
-            )
-
-            # Create protocol
-            protocol = _UdpProtocol(
-                on_endpoint_lost=self._endpoint_lost, peer=self._peer
-            )
-            self._protocol = protocol
-
-            # Create datagram endpoint. The socket family follows the local
-            # bind address, derived by the one shared rule in
-            # lifx.network.address, which is what lets this transport reach
-            # Thread devices that have no IPv4 address.
-            family = family_for(self._ip_address)
-            self._transport, _ = await loop.create_datagram_endpoint(
-                lambda: protocol,
-                local_addr=(self._ip_address, self._port),
-                reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
-                family=family,
-            )
-            self._family = family
-
-            # Get actual port assigned
-            actual_port = self._transport.get_extra_info("sockname")[1]
-            _LOGGER.debug(
-                {
-                    "class": "UdpTransport",
-                    "method": "open",
-                    "action": "socket_opened",
-                    "assigned_port": actual_port,
-                    "broadcast": self._broadcast,
-                }
-            )
-
-            # Enable broadcast if requested
-            if self._broadcast:
-                sock = self._transport.get_extra_info("socket")
-                if sock:
-                    sock.setsockopt(
-                        socket.SOL_SOCKET,
-                        socket.SO_BROADCAST,
-                        1,
-                    )
-                    _LOGGER.debug(
-                        {
-                            "class": "UdpTransport",
-                            "method": "open",
-                            "action": "broadcast_enabled",
-                        }
-                    )
-
-        except OSError as e:
-            _LOGGER.debug(
-                self._log(
-                    method="open",
-                    action="failed",
-                    bind_address=self._ip_address,
-                    bind_port=self._port,
-                    reason=str(e),
+            if self.is_open:
+                _LOGGER.debug(
+                    {
+                        "class": "UdpTransport",
+                        "method": "open",
+                        "action": "already_open",
+                        "ip_address": self._ip_address,
+                        "port": self._port,
+                    }
                 )
-            )
-            raise LifxNetworkError(f"Failed to open UDP socket: {e}") from e
+                return
+
+            datagram_transport: DatagramTransport | None = None
+            try:
+                loop = asyncio.get_running_loop()
+
+                _LOGGER.debug(
+                    {
+                        "class": "UdpTransport",
+                        "method": "open",
+                        "action": "opening_socket",
+                        "ip_address": self._ip_address,
+                        "port": self._port,
+                        "broadcast": self._broadcast,
+                    }
+                )
+
+                # Create protocol
+                protocol = _UdpProtocol(
+                    on_endpoint_lost=self._endpoint_lost, peer=self._peer
+                )
+
+                # Create datagram endpoint. The socket family follows the local
+                # bind address, derived by the one shared rule in
+                # lifx.network.address, which is what lets this transport reach
+                # Thread devices that have no IPv4 address.
+                family = family_for(self._ip_address)
+                datagram_transport, _ = await loop.create_datagram_endpoint(
+                    lambda: protocol,
+                    local_addr=(self._ip_address, self._port),
+                    reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
+                    family=family,
+                )
+
+                # Get actual port assigned
+                actual_port = datagram_transport.get_extra_info("sockname")[1]
+                _LOGGER.debug(
+                    {
+                        "class": "UdpTransport",
+                        "method": "open",
+                        "action": "socket_opened",
+                        "assigned_port": actual_port,
+                        "broadcast": self._broadcast,
+                    }
+                )
+
+                # Enable broadcast if requested
+                if self._broadcast:
+                    sock = datagram_transport.get_extra_info("socket")
+                    if sock:
+                        sock.setsockopt(
+                            socket.SOL_SOCKET,
+                            socket.SO_BROADCAST,
+                            1,
+                        )
+                        _LOGGER.debug(
+                            {
+                                "class": "UdpTransport",
+                                "method": "open",
+                                "action": "broadcast_enabled",
+                            }
+                        )
+
+                if generation != self._state_generation:
+                    datagram_transport.close()
+                    return
+
+                self._protocol = protocol
+                self._transport = datagram_transport
+                self._family = family
+
+            except BaseException as e:
+                if datagram_transport is not None:
+                    datagram_transport.close()
+                self._transport = None
+                self._protocol = None
+                self._family = None
+
+                _LOGGER.debug(
+                    self._log(
+                        method="open",
+                        action="failed",
+                        bind_address=self._ip_address,
+                        bind_port=self._port,
+                        reason=str(e),
+                    )
+                )
+                if isinstance(e, OSError):
+                    raise LifxNetworkError(f"Failed to open UDP socket: {e}") from e
+                raise
 
     def _endpoint_lost(self, protocol: _UdpProtocol, exc: Exception | None) -> None:
         """Drop references to an endpoint that has died.
@@ -591,7 +613,12 @@ class UdpTransport:
 
     async def close(self) -> None:
         """Close the UDP socket."""
-        if self._transport is not None:
+        self._state_generation += 1
+        transport, self._transport = self._transport, None
+        self._protocol = None
+        self._family = None
+
+        if transport is not None:
             _LOGGER.debug(
                 {
                     "class": "UdpTransport",
@@ -599,10 +626,7 @@ class UdpTransport:
                     "action": "closing",
                 }
             )
-            self._transport.close()
-            self._transport = None
-            self._protocol = None
-            self._family = None
+            transport.close()
             _LOGGER.debug(
                 {
                     "class": "UdpTransport",
@@ -614,4 +638,8 @@ class UdpTransport:
     @property
     def is_open(self) -> bool:
         """Check if socket is open."""
-        return self._protocol is not None
+        return (
+            self._protocol is not None
+            and self._transport is not None
+            and self._family is not None
+        )

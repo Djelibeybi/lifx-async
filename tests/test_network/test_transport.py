@@ -5,6 +5,7 @@ import errno
 import logging
 import socket
 import time
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -372,15 +373,162 @@ class TestErrorHandling:
     """Test error handling in transport."""
 
     async def test_open_oserror_raises_network_error(self) -> None:
-        """Test OSError during open raises NetworkError."""
+        """An endpoint OSError resets state and permits a successful retry."""
         transport = UdpTransport()
+        datagram_transport = MagicMock()
 
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_loop.return_value.create_datagram_endpoint = AsyncMock(
-                side_effect=OSError("Address already in use")
+                side_effect=[
+                    OSError("Address already in use"),
+                    (datagram_transport, MagicMock()),
+                ]
             )
             with pytest.raises(NetworkError, match="Failed to open UDP socket"):
                 await transport.open()
+
+            assert transport._protocol is None
+            assert transport._transport is None
+            assert transport._family is None
+            assert transport.is_open is False
+
+            await transport.open()
+
+        await transport.send(b"test", ("127.0.0.1", 56700))
+        datagram_transport.sendto.assert_called_once_with(b"test", ("127.0.0.1", 56700))
+        await transport.close()
+
+    async def test_cancelled_open_resets_state_and_permits_retry(self) -> None:
+        """Cancellation propagates unchanged and leaves a reusable object."""
+        transport = UdpTransport()
+        entered = asyncio.Event()
+        blocked = asyncio.Event()
+
+        async def _blocked_endpoint(*args: Any, **kwargs: Any) -> None:
+            """Suspend endpoint creation until the opening task is cancelled."""
+            entered.set()
+            await blocked.wait()
+
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_loop.return_value.create_datagram_endpoint = _blocked_endpoint
+            opening = asyncio.create_task(transport.open())
+            await entered.wait()
+            opening.cancel()
+
+            with pytest.raises(asyncio.CancelledError):
+                await opening
+
+        assert transport._protocol is None
+        assert transport._transport is None
+        assert transport._family is None
+        assert transport.is_open is False
+
+        datagram_transport = MagicMock()
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            await transport.open()
+
+        await transport.send(b"test", ("127.0.0.1", 56700))
+        datagram_transport.sendto.assert_called_once_with(b"test", ("127.0.0.1", 56700))
+        await transport.close()
+
+    async def test_queued_open_invalidated_by_close_returns_closed(self) -> None:
+        """A close invalidates an opener queued before it acquired the lock."""
+        transport = UdpTransport()
+        await transport._state_lock.acquire()
+        opening = asyncio.create_task(transport.open())
+        await asyncio.sleep(0)
+
+        await transport.close()
+        transport._state_lock.release()
+        await opening
+
+        assert transport.is_open is False
+        assert transport._protocol is None
+        assert transport._transport is None
+        assert transport._family is None
+
+    async def test_close_racing_successful_open_wins_and_allows_reopen(self) -> None:
+        """close() invalidates a UDP endpoint that completes after it returns."""
+        transport = UdpTransport()
+        entered = asyncio.Event()
+        released = asyncio.Event()
+        attempts = 0
+        endpoints: list[MagicMock] = []
+
+        async def _endpoint(*args: Any, **kwargs: Any) -> tuple[MagicMock, Any]:
+            """Suspend only the endpoint racing the close."""
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                entered.set()
+                await released.wait()
+            datagram_transport = MagicMock()
+            datagram_transport.get_extra_info.return_value = ("127.0.0.1", 12345)
+            endpoints.append(datagram_transport)
+            return datagram_transport, args[0]()
+
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_loop.return_value.create_datagram_endpoint = _endpoint
+            opening = asyncio.create_task(transport.open())
+            await entered.wait()
+
+            assert transport.is_open is False
+            await transport.close()
+            released.set()
+            await opening
+
+            endpoints[0].close.assert_called_once_with()
+            assert transport.is_open is False
+            assert transport._protocol is None
+            assert transport._transport is None
+            assert transport._family is None
+
+            await transport.open()
+            assert attempts == 2
+            assert transport.is_open is True
+            await transport.close()
+
+    async def test_failure_after_endpoint_assignment_closes_endpoint(self) -> None:
+        """A later setup failure closes the endpoint before resetting state."""
+        transport = UdpTransport()
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.side_effect = OSError(
+            "Cannot inspect endpoint"
+        )
+
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            with pytest.raises(NetworkError, match="Failed to open UDP socket"):
+                await transport.open()
+
+        datagram_transport.close.assert_called_once_with()
+        assert transport._protocol is None
+        assert transport._transport is None
+        assert transport._family is None
+        assert transport.is_open is False
+
+    async def test_non_oserror_open_failure_is_reraised_unchanged(self) -> None:
+        """Non-OSError endpoint failures retain their original identity."""
+        transport = UdpTransport()
+        failure = RuntimeError("forced endpoint failure")
+
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                side_effect=failure
+            )
+            with pytest.raises(RuntimeError) as excinfo:
+                await transport.open()
+
+        assert excinfo.value is failure
+        assert transport._protocol is None
+        assert transport._transport is None
+        assert transport._family is None
+        assert transport.is_open is False
 
     async def test_send_oserror_raises_network_error(self) -> None:
         """Test OSError during send raises NetworkError."""

@@ -2,13 +2,14 @@
 
 **Created:** 2026-08-27
 **Ambiguity score:** 0.11 (gate: ≤ 0.20)
-**Requirements:** 9 locked
+**Requirements:** 9 locked, amended by operator decisions D-26 to D-29
 
 ## Goal
 
-The three commits of `feat/ipv6-thread-support` (`b49400b`, `b88cdb9`, `2f884f5`) are rebased
-onto `main` and merged with branch-audit findings B1, B2, B4 and B9 fixed, so a caller can
-connect to, control and stream animation frames to a device whose only address is IPv6.
+The IPv6/Thread series is reconciled with branch-audit findings B1, B2, B4 and B9 fixed and
+is ready to ship from its phase branch, so a caller can connect to, control and stream animation
+frames to a device whose only address is IPv6. The branch MUST remain off `main` until this phase
+ships; merging it to `main` is the post-phase shipment action, not an in-phase acceptance gate.
 
 ## Background
 
@@ -138,26 +139,31 @@ required.
      IPv6. The universal-skip assertion was also narrowed from cross-job aggregation to a single
      designated job, `LIFX_REQUIRE_IPV6=1` on ubuntu with Python 3.10
 
-8. **Rebased, merged, CI green** (IPV6-01..04 delivery): The branch is on `main`.
+8. **Reconciled and ready to ship** (IPV6-01..04 delivery): The exact phase branch is ready for
+   the post-phase merge to `main`.
    - Current: three commits on `feat/ipv6-thread-support`, unmerged, diverged at `42c9ad2`
-   - Target: rebased onto `main` and squashed to two commits (D-25, 2026-08-28) — `79a5ce0`,
+   - Target: rebased from `main` and squashed to two commits (D-25, 2026-08-28) — `79a5ce0`,
      redding1's original replayed byte-identically, plus one authored commit carrying the rest
      of the series — both GPG-signed with DCO sign-off intact and redding1 credited by
-     `Co-Authored-By` on the squashed commit, merged via PR with CI green
-   - Acceptance: `main` contains the rebased commits; the CI run is green including quality,
-     generated-files and the full 3-OS by 5-version matrix; Codecov reports 100% *branch* patch
-     coverage on the merged report, with zero partial branches, not merely 100% line coverage
+     `Co-Authored-By` on the squashed commit, with the final corrected branch green and ready
+     for shipment
+   - Acceptance: the exact branch proposed for shipment passes the functional, quality,
+     generated-files and full-suite gates. Patch coverage is recorded as advisory evidence and
+     may be explicitly overridden by the operator; it is not evidence of runtime functionality
+     and cannot block this phase by itself. The branch is not an ancestor of `main` until the
+     phase has shipped
 
 9. **Thread hardware UAT** (new in this phase): The IPv6 path is proven on real Thread hardware
-   before merge, or its absence is recorded as an operator-approved exception.
+   before shipment, or its absence is recorded as an operator-approved exception.
    - Current: no Thread device has ever been reached by this library
    - Target: a recorded UAT run proves connect and control against a Thread `MatrixLight` over
-     IPv6, and gates the merge. The animation frame-streaming run is recorded as an artefact but
+     IPv6, and gates shipment. The animation frame-streaming run is recorded as an artefact but
      does not gate, because Thread frame-rate ceilings are Phase 14's measurement. If no Thread
      device is reachable when the branch is otherwise ready, the operator may waive the control
      gate by recording a `10-EXCEPTION-OVERRIDE.json` on the v1.2 Phase 8 schema, naming why the
      hardware was unavailable and deferring the evidence to THREAD-05 in Phase 14. CI green is
-     never waivable
+     never waivable. State restoration is best-effort operator hygiene only: its result may be
+     recorded, but a failed or unsupported restore does not invalidate otherwise valid UAT
    - Acceptance: either `10-UAT-RESULTS.json` exists, carries the device serial of one of the two
      known Thread MatrixLights and a timestamp inside the phase window, and records the control
      run as passed; or `10-EXCEPTION-OVERRIDE.json` exists with `kind`
@@ -169,7 +175,7 @@ required.
 
 **In scope:**
 
-- Rebasing all three branch commits onto `main` whole, including the `network/mdns/discovery.py`
+- Rebasing all three branch commits from `main` whole, including the `network/mdns/discovery.py`
   and `network/mdns/dns.py` rewrite and `scripts/ipv6_thread_probe.py`
 - Branch-audit fixes B1, B2, B4 and B9
 - The `MdnsTransport.open()` socket-leak fix (IPV6-04)
@@ -178,8 +184,10 @@ required.
   full Python matrix, with a universal-skip CI assertion
 - Zone-less link-local `ValueError` at `Device.__init__`, `Device.from_ip()`, `find_by_ip()` and
   `Device.connect()` (the fourth added by the 2026-08-27 amendment above)
-- A recorded Thread hardware UAT gating the merge on the control path, waivable only by an
+- A recorded Thread hardware UAT gating shipment on the control path, waivable only by an
   operator-approved exception recorded as `10-EXCEPTION-OVERRIDE.json`
+- Atomic transport lifecycle behaviour when `open()` races another `open()` or `close()`, and
+  correct retry behaviour for `DeviceConnection.open()` waiters after opener failure
 
 **Out of scope:**
 
@@ -203,9 +211,9 @@ required.
 
 - **Python 3.10 floor.** The library ships 3.10 for LedFx; `asyncio.TaskGroup` is unavailable.
 - **Zero runtime dependencies.** `pyproject.toml` declares `dependencies = []`.
-- **100% branch patch coverage.** `codecov.yml` sets `patch.default.target: 100%` with no
-  `flags:` key, so the status is computed against the merged report across all five Python flags.
-  Branch partials count against it, not only uncovered lines.
+- **Patch coverage is advisory.** `codecov.yml` retains `patch.default.target: 100%`; the result
+  is recorded, but it is not a functional acceptance gate and the operator may explicitly
+  override it without changing the delivered runtime contract.
 - **CI matrix.** `os × python-version`: three OSes on a source-changing PR, ubuntu only
   otherwise; Python 3.10 to 3.14. Coverage uploads come from the ubuntu jobs only.
 - **Windows `IPV6_V6ONLY` defaults on**, so per-family sockets are required and dual-stack tricks
@@ -243,12 +251,14 @@ required.
       pass while silently running over IPv4; the fixture sets `IPV6_V6ONLY` explicitly
       (amended: this replaces same-port coexistence, which a `::1`-specific bind cannot suffer
       the dual-stack capture that criterion guarded against)
-- [ ] Every commit the merge adds to `main` carries a good GPG signature (`git verify-commit`
+- [ ] Every commit proposed for shipment carries a good GPG signature (`git verify-commit`
       exits 0 on each) and a `Signed-off-by` trailer; `79a5ce0` is present unmodified with
       redding1's original sign-off, and redding1 is credited by `Co-Authored-By` on the squashed
       commit (amended 2026-08-28 for the D-25 squash; previously "all three commits", which the
       squash made unsatisfiable without losing the authorship it was written to protect)
-- [ ] Codecov reports 100% branch patch coverage on the merged report, zero partial branches
+- [ ] Patch coverage is recorded for the exact proposed branch; a non-passing or unavailable
+      result is advisory and requires an explicit operator override only if the release workflow
+      would otherwise block shipment
 - [ ] Either `10-UAT-RESULTS.json` records a passed control run against a Thread MatrixLight,
       carrying that device's serial and a timestamp inside the phase window, or
       `10-EXCEPTION-OVERRIDE.json` records an operator-approved exception with a non-empty reason
@@ -257,6 +267,11 @@ required.
       both, so the phase record cannot claim a pass and a waiver at once
 - [ ] CI green is required in both cases; the exception waives only the hardware gate
 - [ ] The streaming UAT run is recorded with its actual result, pass or fail, and does not gate
+- [ ] UAT restoration is attempted where supported and may be recorded, but restoration success
+      does not gate the control result or phase completion
+- [ ] Concurrent transport lifecycle operations finish in one coherent open or closed state;
+      a `DeviceConnection.open()` waiter never returns success merely because its opener failed
+- [ ] NEGATIVE: the phase branch is not merged to `main` before Phase 10 ships
 - [ ] NEGATIVE: no value of `REQUEST_RETRANSMIT_GAPS`, `ACK_INFLIGHT_LIMIT`,
       `ACK_EXPIRY_SECONDS` or `DISCOVERY_REBROADCAST_GAPS` changes in this phase
 - [ ] NEGATIVE: `pyproject.toml` `dependencies` is still `[]`
@@ -286,7 +301,7 @@ Amended 2026-08-27 in discuss-phase: the R1 concurrency backstop moved to dismis
 | encoding | R3 | ✅ covered | The helper owns normalisation; shared with R2/encoding; AC 4 |
 | ordering | R3 | ⛔ dismissed | Pure function of one string, no collection produced |
 | concurrency | R3 | ⛔ dismissed | Pure function, no shared state, nothing to interrupt |
-| concurrency | R4 | 🧪 backstop | Held-out test: concurrent `open()` calls, and `close()` racing a failing `open()`, leak no descriptor in either interleaving. The `if self._protocol is not None` early return is not atomic. Carry into plan-phase `must_haves` |
+| concurrency | R4 | ✅ covered | Event-controlled tests cover concurrent `open()` calls and `close()` racing failed, cancelled and successful opens. Endpoint state is published only after complete setup, and a generation invalidates late completion; AC 23 |
 | concurrency | R5 | ✅ covered | `send()` after endpoint death raises the typed error rather than dereferencing a `None` transport; AC 10 |
 | error-handling | R5 | ✅ covered | *(added beyond the probe floor)* The family assertion must not convert genuine peer errors into raises; the swallow-all `error_received` contract stays intact; AC 11 |
 | adjacency | R6 | ⛔ dismissed | Docstring-only change, no runtime behaviour |
@@ -299,8 +314,8 @@ Amended 2026-08-27 in discuss-phase: the R1 concurrency backstop moved to dismis
 | empty | R7 | ⛔ dismissed | Fixture device population follows the existing emulator fixture pattern, unchanged here |
 | ordering | R7 | ⛔ dismissed | No collection produced |
 | precision | R7 | ⛔ dismissed | No numeric semantics in a fixture |
-| boundary | R8 | ✅ covered | 100% *branch* patch coverage on the merged report; branch partials count, not just line hits; AC 18 |
-| precision | R8 | ⛔ dismissed | Folded into R8/boundary; the target is exact with no threshold, nothing to round |
+| boundary | R8 | ✅ covered | The exact phase branch must be ready to ship while remaining off `main`; patch coverage is recorded separately and is operator-overridable; AC 17, AC 18, AC 24 |
+| precision | R8 | ⛔ dismissed | Coverage percentage does not define the runtime contract and is advisory under D-27 |
 | adjacency | R9 | ✅ covered | Control passing while streaming fails is an explicit, allowed outcome; AC 19, AC 20 |
 | empty | R9 | ✅ covered | No reachable Thread device routes to an operator-approved exception recorded as `10-EXCEPTION-OVERRIDE.json`, not to an indefinite block; AC 19, AC 20, AC 21 |
 | ordering | R9 | ⛔ dismissed | Artefact record, no ordering semantics |
@@ -316,7 +331,7 @@ not minted here.
 |----------------------------------|-------------|--------|------------------------|
 | MUST NOT retune any WiFi-measured reliability constant (`REQUEST_RETRANSMIT_GAPS`, `ACK_INFLIGHT_LIMIT`, `ACK_EXPIRY_SECONDS`, `DISCOVERY_REBROADCAST_GAPS`) in this phase | R1, R5, R8 | resolved | judgment. Phase 14 owns the Thread measurement; the IPv6 work runs past these constants and Thread latency will tempt a nudge |
 | MUST NOT add a runtime dependency | R3, R7, R8 | resolved | judgment. `pyproject.toml` declares `dependencies = []`; IPv6/mDNS work is where `zeroconf`, `ifaddr` or `netifaces` get reached for |
-| MUST NOT reach the green gate by weakening the checks: no new `# pragma: no cover` on IPv6 code, no existing test deleted or skipped to make the rebase pass, no lowering of the Codecov patch target | R7, R8 | resolved | judgment. The 100% branch gate is exactly the pressure that invites this |
+| MUST NOT reach the green gate by weakening the checks: no new `# pragma: no cover` on IPv6 code, no existing test deleted or skipped to make the rebase pass, no lowering of the Codecov patch target | R7, R8 | resolved | judgment. Advisory status does not authorise weakening or hiding the recorded coverage evidence |
 | MUST NOT record the hardware UAT as passed without an actual run against a Thread MatrixLight | R9 | resolved | judgment. Nothing can prove a log came from real hardware, so this routes to judgment review. The recorded exception is the sanctioned route when hardware is unavailable: an honest "not run" is always available, so there is never a reason to fabricate a pass |
 
 ## Ambiguity Report
@@ -325,7 +340,7 @@ not minted here.
 |--------------------|-------|------|--------|------------------------------------------------|
 | Goal Clarity       | 0.92  | 0.75 | ✓      | Three named commits, four named audit fixes    |
 | Boundary Clarity   | 0.90  | 0.70 | ✓      | B3/B5/B6/B7/B8 and FIND-06 explicitly excluded |
-| Constraint Clarity | 0.85  | 0.65 | ✓      | Merged-report patch gate confirmed in codecov.yml |
+| Constraint Clarity | 0.85  | 0.65 | ✓      | Shipment boundary and advisory coverage status are explicit |
 | Acceptance Criteria| 0.86  | 0.70 | ✓      | 24 pass/fail criteria, 4 of them negative      |
 | **Ambiguity**      | 0.11  | ≤0.20| ✓      |                                                |
 
@@ -349,6 +364,7 @@ Status: ✓ = met minimum, ⚠ = below minimum (planner treats as assumption)
 | 6 | Seed Closer | Reversal: should the hardware gate admit an exception? | Operator-approved exception allowed, recorded as `10-EXCEPTION-OVERRIDE.json` on the v1.2 Phase 8 schema; supersedes the round 4 decision |
 | 4 | Failure Analyst | Edge probe: 15 non-material rows | Dismissed as a batch with recorded reasons |
 | 5 | Seed Closer | Prohibition probe: 4 kept after precision filter | All 4 kept at judgment tier |
+| 7 | Operator correction | Must the branch already be on `main`, must coverage/restoration gate, and which review finding remains functional? | Phase ships before merge; coverage is advisory; restoration is best-effort; transport races remain blocking (D-26 to D-29) |
 
 ---
 

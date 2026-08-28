@@ -35,6 +35,7 @@ from lifx.const import (
     MAX_RESPONSE_TIME,
 )
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
+from lifx.network.address import validate_address
 from lifx.network.mdns.dns import (
     DNS_TYPE_A,
     DNS_TYPE_AAAA,
@@ -101,6 +102,22 @@ class _LifxRecordCache:
         if len(table) < _LifxRecordCache._MAX_ENTRIES or key in table:
             table[key] = value
 
+    @staticmethod
+    def _setdefault(table: dict[str, str], key: str, value: str) -> None:
+        """Remember the first value for a key without exceeding the table cap."""
+        if key in table:
+            return
+        if len(table) < _LifxRecordCache._MAX_ENTRIES:
+            table[key] = value
+
+    @staticmethod
+    def _add_to_set(table: set[str], value: str) -> bool:
+        """Add a new value to a bounded set, returning whether it was remembered."""
+        if len(table) >= _LifxRecordCache._MAX_ENTRIES:
+            return False
+        table.add(value)
+        return True
+
     def add_packet(self, records: list, source_ip: str) -> bool:
         """Merge one packet's records into the cache.
 
@@ -111,7 +128,9 @@ class _LifxRecordCache:
         Returns:
             True if the packet contained LIFX-related records
         """
-        packet_instances: list[str] = []
+        # Only the distinction between one and multiple advertised instances
+        # matters for source-address fallback, so retain at most two names.
+        packet_instances: set[str] = set()
         has_lifx = False
 
         for record in records:
@@ -124,7 +143,8 @@ class _LifxRecordCache:
                 record.parsed_data, TxtData
             ):
                 self._add(self._txt_by_instance, name, record.parsed_data)
-                packet_instances.append(name)
+                if len(packet_instances) < 2:
+                    packet_instances.add(name)
                 # A TXT record in LIFX format marks the packet as LIFX even
                 # without a service name match, so that duplicate
                 # re-announcements keep resetting the caller's idle deadline
@@ -133,7 +153,12 @@ class _LifxRecordCache:
             elif record.rtype == DNS_TYPE_A and isinstance(record.parsed_data, str):
                 self._add(self._a_by_host, name, record.parsed_data)
             elif record.rtype == DNS_TYPE_AAAA and isinstance(record.parsed_data, str):
-                addrs = self._aaaa_by_host.setdefault(name, [])
+                addrs = self._aaaa_by_host.get(name)
+                if addrs is None:
+                    if len(self._aaaa_by_host) >= self._MAX_ENTRIES:
+                        continue
+                    addrs = []
+                    self._aaaa_by_host[name] = addrs
                 if record.parsed_data not in addrs and len(addrs) < 16:
                     addrs.append(record.parsed_data)
 
@@ -141,7 +166,9 @@ class _LifxRecordCache:
         # itself (not an advertising proxy), so its source address can serve
         # as the device address if no A/AAAA record ever resolves.
         if len(packet_instances) == 1:
-            self._fallback_ip_by_instance.setdefault(packet_instances[0], source_ip)
+            instance = next(iter(packet_instances))
+            if instance in self._txt_by_instance:
+                self._setdefault(self._fallback_ip_by_instance, instance, source_ip)
 
         return has_lifx
 
@@ -193,7 +220,8 @@ class _LifxRecordCache:
             if ip is None:
                 continue
 
-            self._resolved_instances.add(instance)
+            if not self._add_to_set(self._resolved_instances, instance):
+                continue
             results.append(
                 LifxServiceRecord(
                     serial=serial,
@@ -325,6 +353,7 @@ async def discover_lifx_services(
     seen_serials: set[str] = set()
     record_cache = _LifxRecordCache()
     queried_targets: set[str] = set()
+    query_attempts: dict[str, int] = {}
     start_time = time.monotonic()
 
     async with MdnsTransport() as transport:
@@ -442,23 +471,6 @@ async def discover_lifx_services(
                 had_lifx = record_cache.add_packet(response.records, addr[0])
                 extracted = record_cache.resolve()
 
-                # Query address records the responses did not include (a
-                # single reply packet may not have room for every AAAA
-                # record). Capped to bound traffic on hostile networks.
-                for target in record_cache.pending_targets():
-                    if target in queried_targets or len(queried_targets) >= 64:
-                        continue
-                    queried_targets.add(target)
-                    _LOGGER.debug(
-                        {
-                            "class": "discover_lifx_services",
-                            "method": "discover",
-                            "action": "querying_addresses",
-                            "target": target,
-                        }
-                    )
-                    await transport.send(build_address_query(target))
-
                 if not had_lifx and not extracted:
                     continue
 
@@ -489,6 +501,48 @@ async def discover_lifx_services(
                     )
 
                     yield record
+
+                # Query address records the responses did not include (a
+                # single reply packet may not have room for every AAAA
+                # record). Admission and retry limits bound traffic even
+                # when sends fail persistently.
+                for target in record_cache.pending_targets():
+                    if target in queried_targets:
+                        continue
+
+                    attempts = query_attempts.get(target)
+                    if attempts is None:
+                        if len(query_attempts) >= 64:
+                            continue
+                        attempts = 0
+                    if attempts >= 2:
+                        continue
+
+                    query_attempts[target] = attempts + 1
+                    _LOGGER.debug(
+                        {
+                            "class": "discover_lifx_services",
+                            "method": "discover",
+                            "action": "querying_addresses",
+                            "target": target,
+                            "attempt": attempts + 1,
+                        }
+                    )
+                    try:
+                        await transport.send(build_address_query(target))
+                    except LifxNetworkError as error:
+                        _LOGGER.debug(
+                            {
+                                "class": "discover_lifx_services",
+                                "method": "discover",
+                                "action": "address_query_failed",
+                                "target": target,
+                                "attempt": attempts + 1,
+                                "error": str(error),
+                            }
+                        )
+                        continue
+                    queried_targets.add(target)
 
             except Exception as e:
                 _LOGGER.debug(
@@ -551,6 +605,21 @@ async def discover_devices_mdns(
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
     ):
+        try:
+            validate_address(record.ip)
+        except ValueError as error:
+            _LOGGER.debug(
+                {
+                    "class": "discover_devices_mdns",
+                    "method": "discover",
+                    "action": "invalid_address",
+                    "serial": record.serial,
+                    "address": record.ip,
+                    "error": str(error),
+                }
+            )
+            continue
+
         device = create_device_from_record(
             record,
             timeout=device_timeout,

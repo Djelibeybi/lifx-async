@@ -472,3 +472,28 @@ the squash removed from the branch. **Resolved 2026-08-28:** the hardware UAT wa
 the squashed commit on Thread Tube `d073d5e00002` (product 217, firmware 4.200, IPv6-only, no A record) and
 passed: connect and control both `passed`, `restored: true`, streaming `not_run`. The 10-06 Task 2
 validator passes against the fresh record, `library_head` included.
+
+## D-26: Phase 10 remains off main until shipment (operator directive, 2026-08-28)
+
+The former SPEC made ancestry on `main` an in-phase acceptance gate. That reverses the required
+order: Phase 10 must first pass and ship from its phase branch, after which the shipment workflow
+may merge the exact accepted tree to `main`. Verification MUST treat premature `main` ancestry as
+a SPEC violation, not treat branch-only delivery as a gap.
+
+## D-27: Patch coverage is non-functional evidence (operator directive, 2026-08-28)
+
+Patch coverage remains recorded and `codecov.yml` remains unchanged, but coverage does not alter
+runtime functionality. It is advisory for Phase 10 and may be explicitly overridden by the
+operator if the release workflow would otherwise block. No override is fabricated merely because
+the checker is imperfect.
+
+## D-28: Transport lifecycle races are blocking defects (operator directive, 2026-08-28)
+
+The successful-open/close race, partial-state publication and `DeviceConnection.open()` waiter
+failure path MUST be fixed with deterministic regressions before Phase 10 can pass.
+
+## D-29: UAT restoration is best-effort (operator directive, 2026-08-28)
+
+Restoring device state after UAT is nice-to-have operator hygiene. Capture and restoration results
+may remain in the artefact, but restoration success is not a functional, UAT or phase-completion
+gate. The recorded hardware result is not rewritten.

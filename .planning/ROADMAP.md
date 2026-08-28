@@ -89,7 +89,7 @@ addressed, controlled and animated without the caller needing to know it is on T
 v1.1 wire-reliability findings are then revalidated over Thread, because every one of them
 was measured on WiFi/IPv4.
 
-- [ ] **Phase 10: Land the IPv6/Thread Branch** - Rebase `feat/ipv6-thread-support` onto `main` with the reconciled branch-audit fixes, so IPv6-only devices can be controlled and animated
+- [ ] **Phase 10: Land the IPv6/Thread Branch** - Reconcile `feat/ipv6-thread-support` from `main` on its phase branch, so IPv6-only devices can be controlled and animated; merge only in the post-phase shipment workflow
 - [ ] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port bind regression test, `tm` transport field, synthetic mesh-scale tests, deterministic address selection, validation and honest docs
 - [ ] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture
 - [ ] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement
@@ -118,7 +118,7 @@ was measured on WiFi/IPv4.
 
 ### Phase 10: Land the IPv6/Thread Branch
 
-**Goal**: The three-commit `feat/ipv6-thread-support` branch (`b49400b`, `b88cdb9`, `2f884f5`) is rebased onto `main` and merged with the reconciled branch-audit fixes applied, so a caller can control a device that has only an IPv6 address
+**Goal**: The reconciled IPv6/Thread series is complete and ready to ship from its phase branch, so a caller can control a device that has only an IPv6 address; merging the accepted tree to `main` happens only after the phase ships
 **Depends on**: Nothing (first phase of v2.0; v1.2 shipped)
 **Requirements**: IPV6-01, IPV6-02, IPV6-03, IPV6-04
 **Success Criteria** (what must be TRUE):
@@ -127,9 +127,9 @@ was measured on WiFi/IPv4.
   2. Supplying a link-local address without a zone identifier raises an immediate `ValueError` naming the problem, instead of the silent 16 second timeout the branch's warning downgrade produced
   3. Address-family selection has exactly one implementation, a shared helper used by every socket-creation site, replacing the three duplicated `":" in ip` checks
   4. An `MdnsTransport.open()` that fails partway through endpoint creation leaves no socket behind
-  5. The rebased branch is on `main` with CI green, including the 100% branch patch coverage gate
+  5. The exact phase branch is functionally green, signed and ready for the post-phase shipment merge; patch coverage is advisory and operator-overridable, and the branch remains off `main` until shipment
 
-**Plans**: 5/6 plans executed
+**Plans**: 9/9 plans executed
 
 Plans:
 **Wave 1**
@@ -151,7 +151,19 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 10-06-PLAN.md — PR, CI green at 100% branch patch coverage verified against the gap list, recorded Thread hardware UAT gate with enforcing validators, fast-forward merge to main
+- [x] 10-06-PLAN.md — PR, CI green at 100% branch patch coverage verified against the gap list, recorded Thread hardware UAT gate with enforcing validators, fast-forward merge to main
+
+**Wave 6** *(gap closure; blocked on completed Wave 5)*
+
+- [x] 10-07-PLAN.md — Keep mDNS discovery productive when one record has a bare link-local address or an unrelated follow-up query send fails
+
+**Wave 7** *(gap closure; blocked on Wave 6 completion)*
+
+- [x] 10-08-PLAN.md — Make mDNS and general UDP endpoint creation cancellation-safe, descriptor-clean and reusable
+
+**Wave 8** *(operator-directed gap closure; blocked on Wave 7 completion)*
+
+- [x] 10-09-PLAN.md — Correct the shipment/coverage/UAT specification and make transport lifecycle transitions atomic under open/open and open/close races
 
 ### Phase 11: mDNS Hardening
 
@@ -227,7 +239,7 @@ Plans:
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete | 2026-08-15 |
 | 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete | 2026-08-16 |
 | 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete | 2026-08-27 |
-| 10. Land the IPv6/Thread Branch | v2.0 | 5/6 | In Progress|  |
+| 10. Land the IPv6/Thread Branch | v2.0 | 9/9 | Ready to ship | 2026-08-28 |
 | 11. mDNS Hardening | v2.0 | 0/TBD | Not started | - |
 | 12. IPv6 Discovery Plumbing | v2.0 | 0/TBD | Not started | - |
 | 13. Merged Discovery | v2.0 | 0/TBD | Not started | - |

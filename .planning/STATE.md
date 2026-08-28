@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: Thread/IPv6 Support
 current_phase: 10
 current_phase_name: Land the IPv6/Thread Branch
-status: executing
-stopped_at: Completed 10-05-PLAN.md
-last_updated: "2026-08-27T13:49:27.361Z"
-last_activity: 2026-08-27
-last_activity_desc: Phase 10 execution started
-state_head: a99091d1e2e61f1192072dfa260302b9f514a7e5
+status: verified
+stopped_at: "Phase 10 verified on its phase branch; ready for shipment"
+last_updated: "2026-08-28T09:31:00+10:00"
+last_activity: 2026-08-28
+last_activity_desc: Phase 10 plan 09 closed the lifecycle blocker and re-verification passed
+state_head: e31185c07476807768043343f3af7c70bfd16710
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 6
-  completed_plans: 5
+  total_plans: 9
+  completed_plans: 9
   percent: 0
 ---
 
@@ -29,11 +29,13 @@ See: .planning/PROJECT.md (updated 2026-08-27 after opening the v2.0 milestone)
 
 ## Current Position
 
-Phase: 10 (Land the IPv6/Thread Branch) — EXECUTING
-Plan: 6 of 6
-Total Plans in Phase: 6
-Status: Ready to execute
-Last activity: 2026-08-27 — Phase 10 execution started
+Phase: 10 (Land the IPv6/Thread Branch) — VERIFIED, READY TO SHIP
+Plan: 9 of 9
+Total Plans in Phase: 9
+Status: All 9 plans executed and re-verification passed on the phase branch. D-26 requires this
+tree to remain off `main` until the post-phase shipment workflow. Patch coverage remains recorded
+as advisory evidence; UAT restoration remains best-effort.
+Last activity: 2026-08-28 — Plan 10-09 closed the transport lifecycle blocker; 3,731 tests passed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -59,6 +61,9 @@ Per-plan metrics for shipped milestones live with their archives under
 | Phase 10 P03 | 36 min | 4 tasks | 8 files |
 | Phase 10 P04 | 30 min | 3 tasks | 4 files |
 | Phase 10 P05 | 23 min | 3 tasks | 3 files |
+| Phase 10 P07 | 18 min | 3 tasks | 5 files |
+| Phase 10 P08 | 10 min | 2 tasks | 4 files |
+| Phase 10 P09 | 25 min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -95,6 +100,16 @@ this milestone (all 2026-08-27 unless noted):
 - [Phase 10]: scripts/ipv6_thread_probe.py stays OUT of the global --cov and codecov.yml is untouched; the probe helpers are covered by a scoped local assertion instead — The probe is unmeasured, not uncovered. Widening --cov would drop 521 lines of a hardware script whose three original stages need real Thread devices into a PR carrying a 100 percent branch patch target, creating pressure to lower the target or add pragma markers (threat T-10-19). The six new helpers are factored out and asserted to have zero missing lines and zero partial branches. Plan 10-06 verifies this treatment rather than reopening it.
 - [Phase 10]: The UAT harness refuses --uat-output without --serial — An honest not_run is always a valid stage value, but a record naming no device cannot satisfy SPEC AC 19 and would be a repudiation surface (T-10-14) rather than evidence.
 - [Phase 10]: Mutation testing replaced the unreachable TDD RED gate in plan 10-05 Task 3 — The plan assigns implementation to Tasks 1 and 2 and tests to Task 3, so a red commit was impossible. Five mutations of the probe were applied and reverted; the one that survived exposed that the outer restore finally had no test that could fail, which is why a KeyboardInterrupt test now exists.
+- [Phase 10]: Bare link-local mDNS records are skipped only inside the public discovery sweep; direct construction and all four user-input entry points remain strict — Improves availability for mixed-quality advertisements without weakening IPV6-02 or duplicating the shared IPV6-03 validator
+- [Phase 10]: Resolved mDNS records are yielded before auxiliary sends, with separate successful-send and attempt ledgers — Preserves exact-once delivery while allowing one retry and bounding all traffic-bearing targets to 64
+- [Phase 10]: Patch coverage is measured from immutable base b4e9b365f4f388ad4dd6800be8e7f9144f027bd6 using branch-aware coverage.py JSON — Provides one deterministic fail-closed authority for plans 10-07 and 10-08 without a dependency or coverage-configuration change
+- [Phase 10]: MdnsTransport serialises open() calls with an asyncio.Lock so a concurrent opener waits for cancellation cleanup and then establishes the replacement endpoint
+- [Phase 10]: MdnsTransport.close() remains outside the open lock so a close-racing-cancelled-open schedule cannot deadlock
+- [Phase 10]: Both UDP transports wrap only OSError after cleanup; cancellation and other BaseException failures retain their original identity
+- [Phase 10]: The phase branch MUST remain off main until Phase 10 ships; merging to main is the post-phase shipment action, so branch-only delivery is not a verification gap
+- [Phase 10]: Patch coverage remains recorded but is advisory and operator-overridable because it does not affect runtime functionality
+- [Phase 10]: Transport lifecycle races and DeviceConnection opener-waiter failures are blocking defects and require deterministic regression fixes
+- [Phase 10]: UAT state restoration is best-effort operator hygiene and does not gate the control result or phase completion
 
 ### v2.0 Working Notes
 
@@ -110,7 +125,7 @@ this milestone (all 2026-08-27 unless noted):
 
 ### Blockers/Concerns
 
-- **Hardware validation cannot run in CI.** CI has no Thread hardware; THREAD-01..04 are UAT-style measurement runs against the two Thread MatrixLights and the fleet, while the automated emulator and synthetic tests must independently reach 100% branch patch coverage. Repeated rounds remain mandatory for any coverage or loss claim (Spike 005 lesson).
+- **Hardware validation cannot run in CI.** CI has no Thread hardware; THREAD-01..04 are UAT-style measurement runs against the two Thread MatrixLights and the fleet. Automated emulator and synthetic tests remain the functional evidence; patch coverage is recorded separately and is advisory under D-27. Repeated rounds remain mandatory for any coverage or loss claim (Spike 005 lesson).
 - **Verification staleness heuristic (open-gsd/gsd-core#2348).** `readVerificationStatus` overrides a declared `passed` with `stale` whenever any SUMMARY is newer than the VERIFICATION file. Write or refresh each phase VERIFICATION file after the last summary. Do not fix by touching mtimes.
 - **Decision-coverage gate has never fired here (open-gsd/gsd-core#2347).** Mitigation is the `**D-NN**` grammar todo above; until adopted, decision coverage is only verified by the plan-checker reading CONTEXT.md by hand.
 - **`plan-scan.cjs` inflates `completed_plans` for superseded plans (open-gsd/gsd-core#2349).** Read SUMMARY frontmatter (`status: superseded`), not counts.
@@ -133,10 +148,10 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-27T13:49:16.996Z
-Stopped at: Completed 10-05-PLAN.md
+Last session: 2026-08-28T09:31:00+10:00
+Stopped at: Phase 10 verified on its phase branch; ready for shipment
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan the first phase with `/gsd-discuss-phase 10` or `/gsd-plan-phase 10`
+- Ship the verified phase with `/gsd-ship 10`; that post-phase workflow owns the merge to `main`

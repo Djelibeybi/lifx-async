@@ -14,6 +14,37 @@ structures from a YAML specification. Published on PyPI as `lifx-async` (`pip in
 **Async Framework**: Python's built-in `asyncio` (no external async library required)
 **Test Isolation**: lifx-emulator-core runs embedded in-process for fast, cross-platform testing
 
+## Privacy and Hardware Identifiers
+
+- Never commit personally identifiable information or live infrastructure identifiers. This
+  includes real device serials or MAC addresses, IP addresses, local hostnames, account names and
+  raw hardware-discovery output.
+- Committed evidence must replace every live serial and address with a stable, format-preserving
+  pseudonym from the operator's private mapping. Keep that mapping outside this repository; never
+  copy it into source, planning artefacts, logs, prompts, reports or agent memory.
+- When a check must establish that evidence came from an approved physical device, validate the raw
+  result locally against the external mapping first. Commit only the pseudonymised artefact and
+  retain the identity assertion as operator-controlled evidence outside the repository.
+- Raw probe output may exist transiently in the local terminal or an ignored temporary file, but it
+  must be sanitised before being copied into any tracked file. Tools such as
+  `scripts/ipv6_thread_probe.py` may emit live identifiers, so treat their output as private by
+  default.
+- Tests and documentation must use clearly synthetic identifiers and non-live example addresses.
+  Preserve stable aliases across related artefacts so evidence remains correlatable without
+  revealing the underlying device or network.
+- Before staging hardware or network evidence, inspect the staged diff for serials, MAC addresses,
+  IP addresses, hostnames and other PII. If a raw identifier reaches a local commit, amend or rewrite
+  it before any push; a later redaction commit is insufficient because the identifier remains in
+  history.
+
+## Git Commits
+
+- Use Conventional Commit messages.
+- Do not use GSD phase or plan metadata as a Conventional Commit scope. Scopes such as `10`,
+  `phase-10` and `10-07` describe planning bookkeeping rather than a repository component. Omit the
+  scope when no stable repository-specific scope applies.
+- Always use `git commit -S -s` so every commit is GPG-signed and carries the developer sign-off.
+
 ## Essential Commands
 
 ### Development Setup

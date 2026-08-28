@@ -439,6 +439,19 @@ class TestCreateDeviceFromRecord:
         assert device.connection.timeout == 30.0
         assert device.connection.max_retries == 5
 
+    def test_bare_link_local_address_still_raises(self) -> None:
+        """Direct construction keeps the shared link-local validation contract."""
+        record = LifxServiceRecord(
+            serial="d073d5123456",
+            ip="fe80::1",
+            port=56700,
+            product_id=27,
+            firmware="4.112",
+        )
+
+        with pytest.raises(ValueError, match="requires a zone identifier"):
+            create_device_from_record(record)
+
 
 class TestLifxServiceRecord:
     """Tests for LifxServiceRecord dataclass."""
@@ -979,6 +992,84 @@ class TestDiscoverDevicesMdns:
             # Relay device should be filtered out
             assert len(devices) == 0
 
+    @pytest.mark.asyncio
+    async def test_invalid_address_does_not_end_device_sweep(self, caplog) -> None:
+        """A bare link-local record is skipped while later records are yielded."""
+        from lifx.network.mdns.discovery import discover_devices_mdns
+
+        records = (
+            LifxServiceRecord("d073d5000001", "fe80::1", 56700, 27, "4.112"),
+            LifxServiceRecord("d073d5000002", "192.168.1.2", 56700, 27, "4.112"),
+        )
+
+        async def mock_generator():
+            for record in records:
+                yield record
+
+        with patch(
+            "lifx.network.mdns.discovery.discover_lifx_services",
+            return_value=mock_generator(),
+        ):
+            with caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"):
+                devices = [
+                    device async for device in discover_devices_mdns(timeout=0.1)
+                ]
+
+        assert [device.serial for device in devices] == ["d073d5000002"]
+        assert any(
+            record.msg.get("action") == "invalid_address"
+            and record.msg.get("serial") == "d073d5000001"
+            and record.msg.get("address") == "fe80::1"
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+        )
+
+    @pytest.mark.asyncio
+    async def test_invalid_address_adjacent_to_relay_filters_both(self) -> None:
+        """Invalid addresses do not interfere with normal relay filtering."""
+        from lifx.network.mdns.discovery import discover_devices_mdns
+
+        records = (
+            LifxServiceRecord("d073d5000001", "fe80::1", 56700, 27, "4.112"),
+            LifxServiceRecord("d073d5000002", "192.168.1.2", 56700, 70, "4.112"),
+        )
+
+        async def mock_generator():
+            for record in records:
+                yield record
+
+        with patch(
+            "lifx.network.mdns.discovery.discover_lifx_services",
+            return_value=mock_generator(),
+        ):
+            devices = [device async for device in discover_devices_mdns(timeout=0.1)]
+
+        assert devices == []
+
+    @pytest.mark.asyncio
+    async def test_constructor_value_error_propagates(self) -> None:
+        """Only address-validation errors degrade; constructor defects propagate."""
+        from lifx.network.mdns.discovery import discover_devices_mdns
+
+        record = LifxServiceRecord("d073d5000001", "192.168.1.2", 56700, 27, "4.112")
+
+        async def mock_generator():
+            yield record
+
+        with (
+            patch(
+                "lifx.network.mdns.discovery.discover_lifx_services",
+                return_value=mock_generator(),
+            ),
+            patch(
+                "lifx.network.mdns.discovery.create_device_from_record",
+                side_effect=ValueError("constructor defect"),
+            ),
+            pytest.raises(ValueError, match="constructor defect"),
+        ):
+            async for _device in discover_devices_mdns(timeout=0.1):
+                pass
+
 
 class TestMdnsRemainingNonPositiveGuard:
     """The defensive ``remaining() <= 0`` break terminates the mDNS loop cleanly."""
@@ -1121,6 +1212,108 @@ class TestLifxRecordCacheBounds:
         assert len(addrs) == 16
         assert "fd00::10" in addrs  # the sixteenth, accepted
         assert "fd00::11" not in addrs  # the seventeenth, refused
+
+    def test_aaaa_hosts_are_bounded_while_existing_hosts_still_update(self) -> None:
+        """Distinct AAAA owners are capped without freezing admitted owners."""
+        cache = _LifxRecordCache()
+
+        cache.add_packet(
+            [
+                DnsResourceRecord(f"host{n}.local", 28, 1, 120, b"", f"fd00::{n:x}")
+                for n in range(_LifxRecordCache._MAX_ENTRIES)
+            ],
+            "192.0.2.1",
+        )
+        cache.add_packet(
+            [
+                DnsResourceRecord("overflow.local", 28, 1, 120, b"", "fd00::ffff"),
+                DnsResourceRecord("host0.local", 28, 1, 120, b"", "fd00::abcd"),
+            ],
+            "192.0.2.1",
+        )
+
+        assert len(cache._aaaa_by_host) == _LifxRecordCache._MAX_ENTRIES
+        assert "overflow.local" not in cache._aaaa_by_host
+        assert cache._aaaa_by_host["host0.local"] == ["fd00::0", "fd00::abcd"]
+
+    def test_fallback_addresses_are_bounded_by_the_instance_limit(self) -> None:
+        """Single-instance replies cannot grow the fallback map past the cap."""
+        cache = _LifxRecordCache()
+
+        for n in range(_LifxRecordCache._MAX_ENTRIES + 1):
+            instance = f"bulb{n}._lifx._udp.local"
+            cache.add_packet(
+                [
+                    DnsResourceRecord(
+                        instance,
+                        16,
+                        1,
+                        120,
+                        b"",
+                        _txt(serial=f"d073{n:08x}"),
+                    )
+                ],
+                "192.0.2.1",
+            )
+
+        overflow = f"bulb{_LifxRecordCache._MAX_ENTRIES}._lifx._udp.local"
+        assert len(cache._fallback_ip_by_instance) == _LifxRecordCache._MAX_ENTRIES
+        assert overflow not in cache._fallback_ip_by_instance
+
+    def test_fallback_address_keeps_the_first_source_for_an_instance(self) -> None:
+        """A re-announcement cannot replace the source first tied to an instance."""
+        cache = _LifxRecordCache()
+        record = DnsResourceRecord("bulb._lifx._udp.local", 16, 1, 120, b"", _txt())
+
+        cache.add_packet([record], "192.0.2.1")
+        cache.add_packet([record], "192.0.2.2")
+
+        assert cache._fallback_ip_by_instance == {"bulb._lifx._udp.local": "192.0.2.1"}
+
+    def test_duplicate_txt_records_keep_single_instance_fallback(self) -> None:
+        """Duplicate TXT records still describe one fallback-eligible device."""
+        cache = _LifxRecordCache()
+        record = DnsResourceRecord("bulb._lifx._udp.local", 16, 1, 120, b"", _txt())
+
+        cache.add_packet([record, record], "192.0.2.1")
+
+        resolved = cache.resolve()
+        assert len(resolved) == 1
+        assert resolved[0].ip == "192.0.2.1"
+
+    def test_full_fallback_map_rejects_an_admitted_txt_instance(self) -> None:
+        """The fallback map retains its own cap if cache tables diverge."""
+        cache = _LifxRecordCache()
+        cache._fallback_ip_by_instance = {
+            f"existing{n}._lifx._udp.local": "192.0.2.1"
+            for n in range(_LifxRecordCache._MAX_ENTRIES)
+        }
+        instance = "new._lifx._udp.local"
+
+        cache.add_packet(
+            [DnsResourceRecord(instance, 16, 1, 120, b"", _txt())],
+            "192.0.2.2",
+        )
+
+        assert instance in cache._txt_by_instance
+        assert instance not in cache._fallback_ip_by_instance
+        assert len(cache._fallback_ip_by_instance) == _LifxRecordCache._MAX_ENTRIES
+
+    def test_resolved_instances_are_directly_bounded(self) -> None:
+        """Resolution stays bounded even if an upstream table violates its cap."""
+        cache = _LifxRecordCache()
+
+        for n in range(_LifxRecordCache._MAX_ENTRIES + 1):
+            instance = f"bulb{n}._lifx._udp.local"
+            cache._txt_by_instance[instance] = _txt(serial=f"d073{n:08x}")
+            cache._fallback_ip_by_instance[instance] = "192.0.2.1"
+
+        results = cache.resolve()
+        overflow = f"bulb{_LifxRecordCache._MAX_ENTRIES}._lifx._udp.local"
+
+        assert len(results) == _LifxRecordCache._MAX_ENTRIES
+        assert len(cache._resolved_instances) == _LifxRecordCache._MAX_ENTRIES
+        assert overflow not in cache._resolved_instances
 
 
 class TestLifxRecordCachePendingTargets:
@@ -1369,6 +1562,133 @@ class TestMdnsFollowUpAddressQueries:
         sent = [call.args[0] for call in transport.send.await_args_list]
         # The initial PTR query, then the cap's worth of address queries and
         # not one more, even though 65 targets are pending.
+        assert len(sent) == 1 + 64
+        assert build_address_query("host64.local") not in sent
+
+    @pytest.mark.asyncio
+    async def test_resolved_record_survives_unrelated_query_failure(
+        self, caplog
+    ) -> None:
+        """Resolved records are delivered before a pending target's send fails."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        records = [
+            *self._pending_records(2),
+            DnsResourceRecord("host0.local", 1, 1, 120, b"", "192.168.1.100"),
+        ]
+        response = self._response_for(records)
+        transport = _fake_transport()
+        transport.receive = _receive_script(
+            (b"first", ("192.168.1.1", 5353)),
+            (b"duplicate", ("192.168.1.1", 5353)),
+        )
+        transport.send.side_effect = [
+            None,
+            LifxNetworkError("query failed"),
+            LifxNetworkError("query failed again"),
+        ]
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+        ):
+            found = [record async for record in discover_lifx_services(timeout=0.1)]
+
+        assert [record.serial for record in found] == ["d073d5000000"]
+        actions = [
+            record.msg.get("action")
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+        ]
+        assert actions.count("address_query_failed") == 2
+        assert "parse_error" not in actions
+
+    @pytest.mark.asyncio
+    async def test_transient_query_failure_retries_once_then_stops(self) -> None:
+        """A failed target retries once and a successful retry is final."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        response = self._response_for(self._pending_records(1))
+        transport = _fake_transport()
+        transport.receive = _receive_script(
+            (b"first", ("192.168.1.1", 5353)),
+            (b"second", ("192.168.1.1", 5353)),
+            (b"third", ("192.168.1.1", 5353)),
+        )
+        transport.send.side_effect = [None, LifxNetworkError("transient"), None]
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+        ):
+            found = [record async for record in discover_lifx_services(timeout=0.1)]
+
+        assert found == []
+        sent = [call.args[0] for call in transport.send.await_args_list]
+        assert sent.count(build_address_query("host0.local")) == 2
+
+    @pytest.mark.asyncio
+    async def test_persistent_query_failure_stops_after_two_attempts(self) -> None:
+        """Duplicate packets cannot generate more than two failed sends per target."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        response = self._response_for(self._pending_records(1))
+        transport = _fake_transport()
+        transport.receive = _receive_script(
+            *((b"duplicate", ("192.168.1.1", 5353)) for _ in range(4))
+        )
+        transport.send.side_effect = [
+            None,
+            LifxNetworkError("first"),
+            LifxNetworkError("second"),
+        ]
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+        ):
+            found = [record async for record in discover_lifx_services(timeout=0.1)]
+
+        assert found == []
+        sent = [call.args[0] for call in transport.send.await_args_list]
+        assert sent.count(build_address_query("host0.local")) == 2
+
+    @pytest.mark.asyncio
+    async def test_failed_targets_still_count_towards_sixty_four_cap(self) -> None:
+        """The distinct-target cap applies before sends can succeed."""
+        from lifx.network.mdns.discovery import discover_lifx_services
+
+        transport = _fake_transport()
+        transport.receive = _receive_script((b"packet", ("192.168.1.1", 5353)))
+
+        async def fail_address_queries(_data: bytes) -> None:
+            if transport.send.await_count == 1:
+                return
+            raise LifxNetworkError("blocked")
+
+        transport.send.side_effect = fail_address_queries
+
+        with (
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=self._response_for(self._pending_records(65)),
+            ),
+        ):
+            found = [record async for record in discover_lifx_services(timeout=0.1)]
+
+        assert found == []
+        sent = [call.args[0] for call in transport.send.await_args_list]
         assert len(sent) == 1 + 64
         assert build_address_query("host64.local") not in sent
 

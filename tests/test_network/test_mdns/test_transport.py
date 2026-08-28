@@ -150,13 +150,20 @@ class TestMdnsTransportOpen:
         transport = MdnsTransport()
 
         # Set up as already open
-        transport._protocol = MagicMock()
+        protocol = MagicMock()
+        datagram_transport = MagicMock()
+        sock = MagicMock()
+        transport._protocol = protocol
+        transport._transport = datagram_transport
+        transport._socket = sock
 
         # Should not raise and should return early
         await transport.open()
 
-        # Protocol should still be the same mock
-        assert transport._protocol is not None
+        assert transport._protocol is protocol
+        assert transport._transport is datagram_transport
+        assert transport._socket is sock
+        await transport.close()
 
     @pytest.mark.asyncio
     async def test_open_binds_ephemeral_port(self) -> None:
@@ -393,10 +400,12 @@ class TestMdnsTransportIsOpen:
         transport = MdnsTransport()
         assert transport.is_open is False
 
-    def test_is_open_true_when_protocol_set(self) -> None:
-        """Test is_open is True when protocol is set."""
+    def test_is_open_true_when_complete_endpoint_set(self) -> None:
+        """Test is_open requires one complete, publishable endpoint."""
         transport = MdnsTransport()
         transport._protocol = MagicMock()
+        transport._transport = MagicMock()
+        transport._socket = MagicMock()
         assert transport.is_open is True
 
 
@@ -413,13 +422,10 @@ class TestMdnsTransportOpenFailureIsClean:
     closing it, so a retry loop around ``open()`` burned a file descriptor per
     attempt.
 
-    The subtler one is state. ``_socket`` and ``_protocol`` are assigned
-    *before* that await, and ``is_open`` is ``_protocol is not None``, so an
-    endpoint failure left the object claiming to be open. ``open()``'s
-    already-open early return then refused to build a replacement, for the
-    life of the process. Closing the descriptor alone would have produced a
-    transport that was descriptor-clean and permanently unusable, which is
-    why every case here also asserts the object can still be opened.
+    The subtler one is state. A failed or interrupted attempt must not publish
+    a partial endpoint or make ``is_open`` true. Closing the descriptor alone
+    would still permit incoherent lifecycle state, which is why every case
+    here also asserts the object can still be opened.
     """
 
     @staticmethod
@@ -516,16 +522,78 @@ class TestMdnsTransportOpenFailureIsClean:
 
         await transport.close()
 
+    @pytest.mark.asyncio
+    async def test_cancelled_open_closes_its_socket_and_resets_state(self) -> None:
+        """Cancellation releases the descriptor and preserves its exception type."""
+        ledger = _SocketLedger()
+        transport = MdnsTransport()
+        entered = asyncio.Event()
+        blocked = asyncio.Event()
+
+        async def _endpoint(protocol_factory: Any, **kwargs: Any) -> None:
+            """Suspend endpoint creation until the caller cancels it."""
+            entered.set()
+            await blocked.wait()
+
+        with patch("socket.socket", _recording_socket_factory(ledger)):
+            with patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.create_datagram_endpoint = _endpoint
+                opening = asyncio.create_task(transport.open())
+                await entered.wait()
+                opening.cancel()
+
+                with pytest.raises(asyncio.CancelledError):
+                    await opening
+
+        assert ledger.created == 1
+        assert ledger.closed == 1
+        assert ledger.live == []
+        assert transport.is_open is False
+        assert transport._socket is None
+        assert transport._protocol is None
+        assert transport._transport is None
+
+        mock_socket = MagicMock(spec=socket.socket)
+        mock_socket.getsockname.return_value = ("", MDNS_PORT)
+        datagram_transport = MagicMock()
+        with patch("socket.socket", return_value=mock_socket):
+            with patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                    return_value=(datagram_transport, MagicMock())
+                )
+                await transport.open()
+
+        assert transport.is_open is True
+        assert transport._socket is mock_socket
+        assert transport._transport is datagram_transport
+        await transport.close()
+
+    @pytest.mark.asyncio
+    async def test_non_oserror_is_cleaned_up_and_reraised_unchanged(self) -> None:
+        """A non-OSError keeps its type and identity after socket cleanup."""
+        ledger = _SocketLedger()
+        transport = MdnsTransport()
+        failure = RuntimeError("forced non-OSError endpoint failure")
+
+        with patch("socket.socket", _recording_socket_factory(ledger)):
+            with patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                    side_effect=failure
+                )
+                with pytest.raises(RuntimeError) as excinfo:
+                    await transport.open()
+
+        assert excinfo.value is failure
+        assert ledger.created == ledger.closed == 1
+        assert ledger.live == []
+        assert transport.is_open is False
+        assert transport._socket is None
+        assert transport._protocol is None
+        assert transport._transport is None
+
 
 class TestMdnsTransportOpenConcurrency:
-    """The already-open early return is not atomic (SPEC R4 backstop).
-
-    ``open()`` decides whether to build an endpoint, then awaits. Two tasks
-    that both reach the decision before either reaches the await both build
-    one, and the second overwrites ``_socket``, ``_protocol`` and
-    ``_transport``, stranding the first endpoint and its descriptor with no
-    reference left to close them.
-    """
+    """Concurrent lifecycle operations preserve one coherent state (SPEC R4)."""
 
     @pytest.mark.asyncio
     async def test_concurrent_opens_build_exactly_one_endpoint(self) -> None:
@@ -574,6 +642,111 @@ class TestMdnsTransportOpenConcurrency:
                 sock.close()
 
     @pytest.mark.asyncio
+    async def test_queued_open_invalidated_by_close_returns_closed(self) -> None:
+        """A close invalidates an opener queued before it acquired the lock."""
+        transport = MdnsTransport()
+        await transport._state_lock.acquire()
+        opening = asyncio.create_task(transport.open())
+        await asyncio.sleep(0)
+
+        await transport.close()
+        transport._state_lock.release()
+        await opening
+
+        assert transport.is_open is False
+        assert transport._socket is None
+        assert transport._protocol is None
+        assert transport._transport is None
+
+    @pytest.mark.asyncio
+    async def test_failure_after_endpoint_creation_closes_endpoint(self) -> None:
+        """A failure after endpoint creation closes it before clearing state."""
+        transport = MdnsTransport()
+        sock = MagicMock(spec=socket.socket)
+        datagram_transport = MagicMock()
+        failure = RuntimeError("forced post-endpoint failure")
+
+        with (
+            patch("socket.socket", return_value=sock),
+            patch("asyncio.get_running_loop") as mock_loop,
+            patch(
+                "lifx.network.mdns.transport._LOGGER.debug",
+                side_effect=[None, failure, None],
+            ),
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            with pytest.raises(RuntimeError) as excinfo:
+                await transport.open()
+
+        assert excinfo.value is failure
+        datagram_transport.close.assert_called_once_with()
+        assert transport.is_open is False
+
+    @pytest.mark.asyncio
+    async def test_close_releases_unpublished_socket(self) -> None:
+        """Close releases a socket even when no endpoint owns it yet."""
+        transport = MdnsTransport()
+        sock = MagicMock(spec=socket.socket)
+        transport._socket = sock
+
+        await transport.close()
+
+        sock.close.assert_called_once_with()
+        assert transport.is_open is False
+
+    @pytest.mark.asyncio
+    async def test_close_racing_successful_open_wins_and_allows_reopen(self) -> None:
+        """close() invalidates an endpoint that completes after close returns."""
+        ledger = _SocketLedger()
+        transport = MdnsTransport()
+        entered = asyncio.Event()
+        released = asyncio.Event()
+        attempts = 0
+        endpoints: list[MagicMock] = []
+
+        async def _endpoint(
+            protocol_factory: Any, **kwargs: Any
+        ) -> tuple[MagicMock, Any]:
+            """Suspend only the endpoint racing the close."""
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                entered.set()
+                await released.wait()
+            datagram_transport = MagicMock()
+            datagram_transport.close.side_effect = kwargs["sock"].close
+            endpoints.append(datagram_transport)
+            return datagram_transport, protocol_factory()
+
+        with patch("socket.socket", _recording_socket_factory(ledger)):
+            with patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.create_datagram_endpoint = _endpoint
+                opening = asyncio.create_task(transport.open())
+                await entered.wait()
+
+                assert transport.is_open is False
+                await transport.close()
+                released.set()
+                await opening
+
+                assert endpoints[0].close.call_count == 1
+                assert ledger.created == ledger.closed == 1
+                assert transport.is_open is False
+                assert transport._socket is None
+                assert transport._protocol is None
+                assert transport._transport is None
+
+                await transport.open()
+                assert attempts == 2
+                assert transport.is_open is True
+                await transport.close()
+
+        assert ledger.created == ledger.closed == 2
+        assert ledger.live == []
+
+    @pytest.mark.asyncio
     async def test_close_racing_a_failing_open_strands_nothing(self) -> None:
         """close() landing mid-open must not leave the failure path stranded."""
         ledger = _SocketLedger()
@@ -611,3 +784,110 @@ class TestMdnsTransportOpenConcurrency:
         finally:
             for sock in list(ledger.live):
                 sock.close()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_open_allows_waiting_open_to_establish_endpoint(
+        self,
+    ) -> None:
+        """A concurrent opener waits out cancellation and builds a replacement."""
+        ledger = _SocketLedger()
+        transport = MdnsTransport()
+        first_entered = asyncio.Event()
+        hold_first = asyncio.Event()
+        attempts = 0
+
+        async def _endpoint(
+            protocol_factory: Any, **kwargs: Any
+        ) -> tuple[MagicMock, Any]:
+            """Block only the first endpoint attempt."""
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                first_entered.set()
+                await hold_first.wait()
+            datagram_transport = MagicMock()
+            datagram_transport.close.side_effect = kwargs["sock"].close
+            return datagram_transport, protocol_factory()
+
+        with patch("socket.socket", _recording_socket_factory(ledger)):
+            with patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.create_datagram_endpoint = _endpoint
+                first = asyncio.create_task(transport.open())
+                await first_entered.wait()
+                second = asyncio.create_task(transport.open())
+
+                first.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await first
+                await second
+
+                assert attempts == 2
+                assert ledger.created == 2
+                assert ledger.closed == 1
+                assert len(ledger.live) == 1
+                assert transport.is_open is True
+
+                await transport.close()
+
+        assert ledger.created == ledger.closed == 2
+        assert ledger.live == []
+        assert transport.is_open is False
+
+    @pytest.mark.asyncio
+    async def test_close_racing_cancelled_open_finishes_closed_and_reopens(
+        self,
+    ) -> None:
+        """A racing close wins after cancellation without leaking the socket."""
+        ledger = _SocketLedger()
+        transport = MdnsTransport()
+        first_entered = asyncio.Event()
+        hold_first = asyncio.Event()
+        close_started = asyncio.Event()
+        attempts = 0
+
+        async def _endpoint(
+            protocol_factory: Any, **kwargs: Any
+        ) -> tuple[MagicMock, Any]:
+            """Block the cancelled endpoint and complete the later retry."""
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                first_entered.set()
+                await hold_first.wait()
+            datagram_transport = MagicMock()
+            datagram_transport.close.side_effect = kwargs["sock"].close
+            return datagram_transport, protocol_factory()
+
+        async def _close() -> None:
+            """Expose when close has begun racing the in-flight open."""
+            close_started.set()
+            await transport.close()
+
+        with patch("socket.socket", _recording_socket_factory(ledger)):
+            with patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.create_datagram_endpoint = _endpoint
+                opening = asyncio.create_task(transport.open())
+                await first_entered.wait()
+                closing = asyncio.create_task(_close())
+                await close_started.wait()
+
+                opening.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await opening
+                await closing
+
+                assert ledger.created == ledger.closed == 1
+                assert ledger.live == []
+                assert transport.is_open is False
+                assert transport._socket is None
+                assert transport._protocol is None
+                assert transport._transport is None
+
+                await transport.open()
+                assert attempts == 2
+                assert transport.is_open is True
+                await transport.close()
+
+        assert ledger.created == ledger.closed == 2
+        assert ledger.live == []
+        assert transport.is_open is False
