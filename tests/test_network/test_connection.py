@@ -1359,5 +1359,5 @@ class TestWildcardBindSelection:
         assert await self._bind_address_used("fd00:1::") == "::"
 
     async def test_zoned_link_local_device_binds_the_ipv6_wildcard(self) -> None:
-        """A zoned literal parses, so the bind still follows the address."""
-        assert await self._bind_address_used("fe80::1%en0") == "::"
+        """A portable numeric-zone literal still selects the IPv6 wildcard."""
+        assert await self._bind_address_used("fe80::1%1") == "::"
