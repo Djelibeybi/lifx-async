@@ -221,7 +221,7 @@ class TestAnimatorSendFrame:
         the zone suffix has to survive that round trip.
         """
         animator = Animator(
-            ip="fe80::1%en0",
+            ip="fe80::1%1",
             serial=Serial.from_string("d073d5123456"),
             framebuffer=FrameBuffer(pixel_count=64),
             packet_generator=MatrixPacketGenerator(
