@@ -785,15 +785,110 @@ class TestSendFamilyAssertion:
             b"x" * 36, ("127.0.0.1", 56700)
         )
 
-    async def test_matching_ipv6_destination_still_sends(self) -> None:
-        """The IPv6 seam this phase exists to open stays open."""
+    async def test_matching_ipv6_destination_uses_canonical_sockaddr(self) -> None:
+        """IPv6 sends use the four-field sockaddr required by Windows."""
         transport, datagram_transport = await self._open_against_mock_endpoint("::")
 
         await transport.send(b"x" * 36, ("fd00:1::", 56700))
 
         datagram_transport.sendto.assert_called_once_with(
-            b"x" * 36, ("fd00:1::", 56700)
+            b"x" * 36, ("fd00:1::", 56700, 0, 0)
         )
+
+    async def test_numeric_zoned_ipv6_destination_uses_scope_id(self) -> None:
+        """A numeric zone becomes the native sockaddr scope identifier."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+
+        with patch("lifx.network.transport.socket.if_nametoindex") as if_nametoindex:
+            await transport.send(b"x" * 36, ("fe80::1%7", 56700))
+
+        if_nametoindex.assert_not_called()
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("fe80::1", 56700, 0, 7)
+        )
+
+    async def test_named_zoned_ipv6_destination_resolves_scope_id(self) -> None:
+        """A named zone is resolved once before the datagram is sent."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+
+        with patch(
+            "lifx.network.transport.socket.if_nametoindex", return_value=11
+        ) as if_nametoindex:
+            await transport.send(b"x" * 36, ("fe80::1%test0", 56700))
+
+        if_nametoindex.assert_called_once_with("test0")
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("fe80::1", 56700, 0, 11)
+        )
+
+    async def test_unknown_named_ipv6_zone_raises_immediately(self) -> None:
+        """An unknown interface is a typed pre-send configuration failure."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        protocol = transport._protocol
+        assert protocol is not None
+
+        started = time.perf_counter()
+        with (
+            patch(
+                "lifx.network.transport.socket.if_nametoindex",
+                side_effect=OSError("synthetic interface is unavailable"),
+            ) as if_nametoindex,
+            pytest.raises(NetworkError, match="IPv6 zone identifier") as excinfo,
+        ):
+            await transport.send(b"x" * 36, ("fe80::1%missing0", 56700))
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < self._FAST_FAILURE_SECONDS
+        assert isinstance(excinfo.value.__cause__, OSError)
+        if_nametoindex.assert_called_once_with("missing0")
+        datagram_transport.sendto.assert_not_called()
+        assert transport.is_open
+        assert transport._protocol is protocol
+
+        await transport.send(b"x" * 36, ("fd00:1::", 56700))
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("fd00:1::", 56700, 0, 0)
+        )
+
+    async def test_out_of_range_numeric_ipv6_zone_raises_immediately(self) -> None:
+        """A scope outside the native unsigned 32-bit range fails pre-send."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        protocol = transport._protocol
+        assert protocol is not None
+
+        started = time.perf_counter()
+        with (
+            patch("lifx.network.transport.socket.if_nametoindex") as if_nametoindex,
+            pytest.raises(NetworkError, match="IPv6 zone identifier"),
+        ):
+            await transport.send(b"x" * 36, (f"fe80::1%{2**32}", 56700))
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < self._FAST_FAILURE_SECONDS
+        if_nametoindex.assert_not_called()
+        datagram_transport.sendto.assert_not_called()
+        assert transport.is_open
+        assert transport._protocol is protocol
+
+    async def test_zero_numeric_ipv6_zone_raises_immediately(self) -> None:
+        """An explicit zero scope cannot become an unscoped link-local send."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        protocol = transport._protocol
+        assert protocol is not None
+
+        started = time.perf_counter()
+        with (
+            patch("lifx.network.transport.socket.if_nametoindex") as if_nametoindex,
+            pytest.raises(NetworkError, match="IPv6 zone identifier"),
+        ):
+            await transport.send(b"x" * 36, ("fe80::1%0", 56700))
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < self._FAST_FAILURE_SECONDS
+        if_nametoindex.assert_not_called()
+        datagram_transport.sendto.assert_not_called()
+        assert transport.is_open
+        assert transport._protocol is protocol
 
     async def test_ipv4_broadcast_destination_still_sends(self) -> None:
         """Discovery broadcasts to a literal no device owns; it must pass."""

@@ -389,9 +389,9 @@ class UdpTransport:
             # connection_lost). Resetting here would tear down the live one.
             return
 
-        # The local bind values are deliberately left out: both callers bind
-        # 0.0.0.0 on an ephemeral port, so they are constants that name no
-        # device. The peer is what identifies whose socket just died.
+        # The local bind values are deliberately left out: callers use a
+        # family-appropriate wildcard on an ephemeral port, so the values name
+        # no device. The peer is what identifies whose socket just died.
         _LOGGER.warning(
             self._log(
                 method="_endpoint_lost",
@@ -440,9 +440,9 @@ class UdpTransport:
             address: Tuple of (host, port)
 
         Raises:
-            NetworkError: If the socket is not open, the destination's
-                address family does not match the socket's, or the send
-                fails.
+            LifxNetworkError: If the socket is not open, the destination's
+                address family does not match the socket's, an IPv6 zone
+                identifier cannot be resolved, or the send fails.
             ValueError: If the destination is not a parsable IP literal.
                 Propagated unchanged from :func:`lifx.network.address.family_for`,
                 because every caller reaches here through a validated device
@@ -468,8 +468,34 @@ class UdpTransport:
                 f"but the socket family is {self._family.name}"
             )
 
+        # ``AF_INET6`` has a four-field sockaddr. CPython's socket layer lets
+        # callers omit flowinfo and scope_id for backwards compatibility, but
+        # the Windows proactor passes the address to ``WSASendTo`` asynchronously
+        # and the abbreviated form is rejected with WSAEINVAL. Use the canonical
+        # shape on every platform while preserving the caller-facing pair.
+        send_address: tuple[str, int] | tuple[str, int, int, int] = address
+        if destination_family is socket.AF_INET6:
+            host, separator, zone = address[0].rpartition("%")
+            if separator:
+                if zone.isdecimal():
+                    scope_id = int(zone)
+                else:
+                    try:
+                        scope_id = socket.if_nametoindex(zone)
+                    except OSError as e:
+                        raise LifxNetworkError("Invalid IPv6 zone identifier") from e
+
+                if not 1 <= scope_id <= 0xFFFFFFFF:
+                    raise LifxNetworkError(
+                        "Invalid IPv6 zone identifier: scope ID is out of range"
+                    )
+            else:
+                host = address[0]
+                scope_id = 0
+            send_address = (host, address[1], 0, scope_id)
+
         try:
-            self._transport.sendto(data, address)
+            self._transport.sendto(data, send_address)
         except OSError as e:
             _LOGGER.debug(
                 self._log(

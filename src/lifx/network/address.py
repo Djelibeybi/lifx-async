@@ -44,13 +44,15 @@ rejection is evaluated before either warning, so an address on its way to a
    IPv4 device down the IPv6 socket path.
 4. The unspecified address is rejected: it is a wildcard bind, never a
    device.
-5. An IPv6 link-local address with no zone identifier is rejected. Link-local
+5. An explicit numeric IPv6 zone of zero is rejected. Zero means no interface
+   scope, so accepting it would discard the caller's link-local routing intent.
+6. An IPv6 link-local address with no zone identifier is rejected. Link-local
    addresses are ambiguous without an interface, so the send silently goes
    nowhere and the caller waits out the full request timeout. Rejecting it
    turns a permanent configuration error into an immediate, named failure.
-6. A loopback address is accepted with a warning: a real LIFX device is never
+7. A loopback address is accepted with a warning: a real LIFX device is never
    on loopback, but the test suite legitimately puts an emulator there.
-7. A non-private address is accepted with a warning: LIFX devices live on the
+8. A non-private address is accepted with a warning: LIFX devices live on the
    local network, so a routable public address is usually a mistake.
 
 This is a near-leaf module by design. Its one import from ``lifx`` is
@@ -85,8 +87,8 @@ def validate_address(ip: str | None) -> None:
 
     Raises:
         ValueError: If the address is empty, unparsable, IPv4-mapped,
-            unspecified, or an IPv6 link-local address with no zone
-            identifier.
+            unspecified, has an explicit numeric zone of zero, or is an IPv6
+            link-local address with no zone identifier.
     """
     if not ip:
         raise ValueError("No IP address provided")
@@ -101,6 +103,15 @@ def validate_address(ip: str | None) -> None:
             raise ValueError(
                 f"IPv4-mapped IPv6 address not allowed: {ip}. "
                 f"Use the plain IPv4 form instead: {addr.ipv4_mapped}"
+            )
+
+        if (
+            addr.scope_id is not None
+            and addr.scope_id.isdecimal()
+            and int(addr.scope_id) == 0
+        ):
+            raise ValueError(
+                f"IPv6 zone identifier must select a non-zero interface: {ip}"
             )
 
         if addr.is_link_local and addr.scope_id is None:

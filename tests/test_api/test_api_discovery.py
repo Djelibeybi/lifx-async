@@ -10,15 +10,19 @@ This module tests:
 
 from __future__ import annotations
 
-import time
-from collections.abc import AsyncIterator
+import asyncio
+import struct
+from typing import ClassVar, cast
 from unittest.mock import patch
 
 import pytest
 
 from lifx.api import discover, discover_mdns, find_by_ip, find_by_label, find_by_serial
 from lifx.devices import Light
-from lifx.network.discovery import discover_devices
+from lifx.exceptions import LifxTimeoutError
+from lifx.network.discovery import DiscoveredDevice, discover_devices
+from lifx.network.transport import PeerInfo
+from lifx.protocol.header import LifxHeader
 from tests.conftest import get_free_port
 
 
@@ -509,45 +513,237 @@ class TestDiscoverMdns:
             assert len(devices) == 0
 
 
+class _ObservedNoResponseDiscoveryTransport:
+    """Record a discovery boundary, then cooperatively time out."""
+
+    latest: ClassVar[_ObservedNoResponseDiscoveryTransport | None] = None
+
+    def __init__(
+        self,
+        ip_address: str = "0.0.0.0",
+        port: int = 0,
+        broadcast: bool = False,
+        peer: PeerInfo | None = None,
+    ) -> None:
+        self.ip_address = ip_address
+        self.port = port
+        self.broadcast = broadcast
+        self.peer = peer
+        self.destinations: list[tuple[str, int]] = []
+        type(self).latest = self
+
+    async def __aenter__(self) -> _ObservedNoResponseDiscoveryTransport:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def send(self, data: bytes, address: tuple[str, int]) -> None:
+        self.destinations.append(address)
+
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+        await asyncio.sleep(timeout)
+        raise LifxTimeoutError("synthetic discovery timeout")
+
+
+def _build_state_service_packet(source: int) -> bytes:
+    """Build one valid response for a clearly synthetic device identity."""
+    payload = struct.pack("<BI", 1, 56700)
+    header = LifxHeader.create(
+        pkt_type=3,
+        source=source,
+        target=b"\x02\x00\x00\x00\x00\x01\x00\x00",
+        tagged=False,
+        ack_required=False,
+        res_required=False,
+        sequence=0,
+        payload_size=len(payload),
+    )
+    return header.pack() + payload
+
+
+class _SplitScopeResponseDiscoveryTransport(_ObservedNoResponseDiscoveryTransport):
+    """Return an IPv6 sockaddr whose numeric scope is separate from its host."""
+
+    def __init__(
+        self,
+        ip_address: str = "0.0.0.0",
+        port: int = 0,
+        broadcast: bool = False,
+        peer: PeerInfo | None = None,
+    ) -> None:
+        super().__init__(ip_address, port, broadcast, peer)
+        self._response: bytes | None = None
+
+    async def send(self, data: bytes, address: tuple[str, int]) -> None:
+        await super().send(data, address)
+        request_header = LifxHeader.unpack(data[: LifxHeader.HEADER_SIZE])
+        self._response = _build_state_service_packet(request_header.source)
+
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+        if self._response is not None:
+            response, self._response = self._response, None
+            split_scope_address = cast(
+                tuple[str, int],
+                ("fe80::1", 56700, 0, 7),
+            )
+            return response, split_scope_address
+        return await super().receive(timeout)
+
+
+class _FailOnUseDiscoveryTransport:
+    """Fail and record if rejected input reaches any network lifecycle step."""
+
+    calls: ClassVar[dict[str, int]] = {
+        "construction": 0,
+        "open": 0,
+        "send": 0,
+        "receive": 0,
+        "close": 0,
+    }
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.calls = dict.fromkeys(cls.calls, 0)
+
+    def __init__(
+        self,
+        ip_address: str = "0.0.0.0",
+        port: int = 0,
+        broadcast: bool = False,
+        peer: PeerInfo | None = None,
+    ) -> None:
+        type(self).calls["construction"] += 1
+        raise AssertionError("rejected input constructed a discovery transport")
+
+    async def open(self) -> None:
+        type(self).calls["open"] += 1
+        raise AssertionError("rejected input opened a discovery transport")
+
+    async def send(self, data: bytes, address: tuple[str, int]) -> None:
+        type(self).calls["send"] += 1
+        raise AssertionError("rejected input sent a discovery packet")
+
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+        type(self).calls["receive"] += 1
+        raise AssertionError("rejected input waited for a discovery response")
+
+    async def close(self) -> None:
+        type(self).calls["close"] += 1
+        raise AssertionError("rejected input closed a discovery transport")
+
+
 class TestFindByIpAddressGate:
-    """`find_by_ip()` validates before it opens anything (IPV6-02, D-07).
+    """Public targeted lookup preserves accepted text at its network boundary."""
 
-    The zone-less rejection is all this phase adds here. Returning a device
-    for a routable IPv6 literal is Phase 12's FIND-06, so the fall-through
-    behaviour is asserted as it stands today rather than as it will be.
-    """
+    @pytest.mark.parametrize(
+        "literal",
+        [
+            pytest.param("2001:db8::1", id="compressed-representation"),
+            pytest.param(
+                "2001:0db8:0000:0000:0000:0000:0000:0001",
+                id="expanded-representation",
+            ),
+            pytest.param("fd00::1", id="ula-representation"),
+            pytest.param("2001:db8:1::1", id="gua-representation"),
+            pytest.param("::1", id="loopback-representation"),
+            pytest.param("fe80::1%7", id="zoned-link-local-representation"),
+        ],
+    )
+    async def test_ipv6_representation_reaches_transport_boundary(
+        self, literal: str
+    ) -> None:
+        """Every accepted spelling reaches the IPv6 send boundary unchanged."""
+        _ObservedNoResponseDiscoveryTransport.latest = None
 
-    async def test_zone_less_link_local_raises_immediately(self) -> None:
-        """No socket is created, so the raise costs microseconds."""
-        with patch("lifx.network.discovery.discover_devices") as mock_discover:
-            started = time.perf_counter()
-            with pytest.raises(ValueError, match="zone identifier"):
-                await find_by_ip("fe80::1")
-            assert time.perf_counter() - started < 0.1
+        with patch(
+            "lifx.network.discovery.UdpTransport",
+            _ObservedNoResponseDiscoveryTransport,
+        ):
+            result = await find_by_ip(
+                literal,
+                port=56700,
+                timeout=0.05,
+                max_response_time=0.01,
+                idle_timeout_multiplier=1.0,
+            )
 
-        mock_discover.assert_not_called()
+        observation = _ObservedNoResponseDiscoveryTransport.latest
+        assert observation is not None
+        assert result is None
+        assert observation.ip_address == "::"
+        assert observation.broadcast is False
+        assert observation.destinations == [(literal, 56700)]
 
-    async def test_zoned_link_local_does_not_raise(self) -> None:
-        """The acceptance side, with the network layer mocked out."""
+    async def test_zoned_link_local_survives_split_scope_response(self) -> None:
+        """The caller's validated numeric zone reaches product construction."""
+        captured: list[DiscoveredDevice] = []
 
-        async def _no_responses(*args: object, **kwargs: object) -> AsyncIterator[None]:
-            for _ in ():
-                yield
+        async def _capture_create_device(discovered: DiscoveredDevice) -> None:
+            captured.append(discovered)
+            return None
 
-        with patch("lifx.api.discover_devices", _no_responses):
-            assert await find_by_ip("fe80::1%en0") is None
+        with (
+            patch(
+                "lifx.network.discovery.UdpTransport",
+                _SplitScopeResponseDiscoveryTransport,
+            ),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _capture_create_device,
+            ),
+        ):
+            result = await find_by_ip(
+                "fe80::1%7",
+                port=56700,
+                timeout=0.05,
+                max_response_time=0.01,
+                idle_timeout_multiplier=1.0,
+            )
 
-    async def test_routable_ipv6_literal_falls_through(self) -> None:
-        """A valid IPv6 literal is accepted, then finds nothing today.
+        assert result is None
+        assert len(captured) == 1
+        assert captured[0].ip == "fe80::1%7"
 
-        This is the recorded Phase 12 gap (D-07): validation lands now, the
-        family-aware lookup does not, and the function keeps returning None
-        rather than raising an unsupported-command error.
-        """
+    @pytest.mark.parametrize(
+        ("literal", "message"),
+        [
+            pytest.param("", "No IP address provided", id="empty-representation"),
+            pytest.param(
+                "definitely-not-an-ip-address",
+                "Invalid IP address format",
+                id="malformed-representation",
+            ),
+            pytest.param(
+                "fe80::1",
+                "zone identifier",
+                id="bare-link-local-representation",
+            ),
+            pytest.param(
+                "fe80::1%0",
+                "zone identifier",
+                id="zero-scope-link-local-representation",
+            ),
+        ],
+    )
+    async def test_invalid_representation_fails_before_transport(
+        self, literal: str, message: str
+    ) -> None:
+        """Permanent input errors cannot acquire a discovery transport."""
+        _FailOnUseDiscoveryTransport.reset()
 
-        async def _no_responses(*args: object, **kwargs: object) -> AsyncIterator[None]:
-            for _ in ():
-                yield
+        with patch(
+            "lifx.network.discovery.UdpTransport",
+            _FailOnUseDiscoveryTransport,
+        ):
+            with pytest.raises(ValueError, match=message):
+                await find_by_ip(literal)
 
-        with patch("lifx.api.discover_devices", _no_responses):
-            assert await find_by_ip("fd00:1::") is None
+        assert _FailOnUseDiscoveryTransport.calls == {
+            "construction": 0,
+            "open": 0,
+            "send": 0,
+            "receive": 0,
+            "close": 0,
+        }

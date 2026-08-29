@@ -129,7 +129,7 @@ discovery path.
       legs are required: broadcast covers WiFi devices whose firmware does not advertise
       over mDNS, mDNS covers Thread devices with no IPv4 address to broadcast to
 
-- [ ] **FIND-06**: `find_by_ip()` resolves a device from an IPv6 literal instead of
+- [x] **FIND-06**: `find_by_ip()` resolves a device from an IPv6 literal instead of
       returning `None`
 
 - [ ] **FIND-07**: The timing change merged discovery imposes on existing callers is a
@@ -252,7 +252,7 @@ Populated at roadmap creation, 2026-08-27.
 | FIND-03 | Phase 13 | Pending |
 | FIND-04 | Phase 13 | Pending |
 | FIND-05 | Phase 13 | Pending |
-| FIND-06 | Phase 12 | Pending |
+| FIND-06 | Phase 12 | Complete |
 | FIND-07 | Phase 13 | Pending |
 | FIND-08 | Phase 13 | Pending |
 | THREAD-01 | Phase 14 | Pending |

@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 0
 waived_count: 0
-fixed_count: 20
-total_count: 20
-last_updated: 2026-08-28T21:17:27.556Z
+fixed_count: 21
+total_count: 21
+last_updated: 2026-08-29T11:03:01.137Z
 ---
 
 # Broken Windows Ledger
@@ -35,6 +35,7 @@ last_updated: 2026-08-28T21:17:27.556Z
 | 18 | 11 | deviation | tests/test_network/test_mdns/test_discovery.py |  | Replaced a touched private-range test address with an RFC 5737 documentation address | fixed |  | 2026-08-28T20:42:11.320Z | 2026-08-28T20:42:35.592Z |
 | 19 | 11 | deviation | .planning/STATE.md |  | Corrected stale Plan 2 position and gap-planning prose emitted by closeout handlers | fixed |  | 2026-08-28T20:45:00.819Z | 2026-08-28T20:45:00.933Z |
 | 20 | 11 | deviation | .planning/STATE.md |  | Reconciled partial Plan 11 close-out handler updates across STATE, ROADMAP, and REQUIREMENTS | fixed |  | 2026-08-28T21:17:12.229Z | 2026-08-28T21:17:27.556Z |
+| 21 | 12 | deviation | src/lifx/network/transport.py |  | Windows asyncio requires canonical four-field IPv6 datagram destinations | fixed |  | 2026-08-29T11:02:38.890Z | 2026-08-29T11:03:01.137Z |
 
 ````json
 [
@@ -277,6 +278,18 @@ last_updated: 2026-08-28T21:17:27.556Z
     "reason": "",
     "recorded_at": "2026-08-28T21:17:12.229Z",
     "resolved_at": "2026-08-28T21:17:27.556Z"
+  },
+  {
+    "id": 21,
+    "kind": "deviation",
+    "phase": "12",
+    "file": "src/lifx/network/transport.py",
+    "line": null,
+    "description": "Windows asyncio requires canonical four-field IPv6 datagram destinations",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-29T11:02:38.890Z",
+    "resolved_at": "2026-08-29T11:03:01.137Z"
   }
 ]
 ````

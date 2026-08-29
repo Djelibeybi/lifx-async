@@ -1,10 +1,10 @@
 """End-to-end IPv6 tests against an emulator bound to ``::1``.
 
-Scope is deliberately exactly the control path on a single ``Light``:
-connect, ``get_color()``, ``set_color()``, ``set_power()``, plus one
-``Animator`` frame-delivery run. Every other device class reaches the
-network through the same connection, so re-running them over IPv6 would
-test the same code a second time.
+Scope covers targeted discovery plus the control path on a single ``Light``:
+``find_by_ip()``, connect, ``get_color()``, ``set_color()``, ``set_power()``,
+and one ``Animator`` frame-delivery run. Every other device class reaches the
+network through the same connection, so re-running them over IPv6 would test
+the same code a second time.
 
 Every emulator-backed test in this module asserts the address family of the
 socket the call actually used. Without that, a regression that quietly sent
@@ -19,7 +19,11 @@ useful in production, where a LIFX device is never on loopback.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import socket
+import sys
+from dataclasses import dataclass, field
+from unittest.mock import patch
 
 import pytest
 from lifx_emulator import EmulatedLifxServer
@@ -27,10 +31,20 @@ from lifx_emulator import EmulatedLifxServer
 from lifx.animation.animator import Animator
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.packets import MatrixPacketGenerator
+from lifx.api import find_by_ip
 from lifx.color import HSBK
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
+from lifx.network.transport import UdpTransport
 from lifx.protocol.models import Serial
-from tests.conftest import IPV6_DEVICE_SERIAL, ipv6_probe_outcome
+from tests.conftest import (
+    IPV6_DEVICE_SERIAL,
+    emulator_available,
+    emulator_server_ipv6,
+    get_free_port6,
+    ipv6_probe_outcome,
+    targeted_ipv6_emulator_allowed,
+)
 
 # The emulated Tile is 8x8, so one Set64 packet carries a whole frame.
 _TILE_WIDTH = 8
@@ -41,6 +55,67 @@ _PIXEL_COUNT = _TILE_WIDTH * _TILE_HEIGHT
 # so the same frame is offered repeatedly rather than asserted once.
 _FRAME_ATTEMPTS = 40
 _FRAME_INTERVAL = 0.05
+
+
+@dataclass
+class _DiscoveryObservation:
+    """Actual endpoint state retained after one discovery transport closes."""
+
+    transport: UdpTransport
+    endpoint: asyncio.DatagramTransport
+    family: socket.AddressFamily
+    local_address: tuple[str, int]
+    broadcast: bool
+    destinations: list[tuple[str, int]] = field(default_factory=list)
+    close_completed: bool = False
+    opened: asyncio.Event = field(default_factory=asyncio.Event)
+    receive_started: asyncio.Event = field(default_factory=asyncio.Event)
+    closed: asyncio.Event = field(default_factory=asyncio.Event)
+
+
+def _make_observed_discovery_transport(
+    observations: asyncio.Queue[_DiscoveryObservation],
+) -> type[UdpTransport]:
+    """Return a real transport subclass that publishes per-call observations."""
+
+    class _ObservedDiscoveryTransport(UdpTransport):
+        _observation: _DiscoveryObservation | None = None
+
+        async def open(self) -> None:
+            await super().open()
+
+            endpoint = self._transport
+            assert endpoint is not None, "discovery transport did not open an endpoint"
+            sock = endpoint.get_extra_info("socket")
+            assert sock is not None, "discovery endpoint exposes no socket"
+            local_address = sock.getsockname()
+            self._observation = _DiscoveryObservation(
+                transport=self,
+                endpoint=endpoint,
+                family=sock.family,
+                local_address=(local_address[0], local_address[1]),
+                broadcast=self._broadcast,
+            )
+            observations.put_nowait(self._observation)
+            self._observation.opened.set()
+
+        async def send(self, data: bytes, address: tuple[str, int]) -> None:
+            await super().send(data, address)
+            assert self._observation is not None
+            self._observation.destinations.append(address)
+
+        async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+            assert self._observation is not None
+            self._observation.receive_started.set()
+            return await super().receive(timeout)
+
+        async def close(self) -> None:
+            await super().close()
+            if self._observation is not None:
+                self._observation.close_completed = True
+                self._observation.closed.set()
+
+    return _ObservedDiscoveryTransport
 
 
 def connection_socket_family(light: Light) -> socket.AddressFamily:
@@ -61,6 +136,245 @@ def connection_socket_family(light: Light) -> socket.AddressFamily:
     assert sock is not None, "the asyncio endpoint exposes no socket"
 
     return sock.family
+
+
+@pytest.mark.parametrize(
+    ("disable_emulator", "platform", "windows_ci_opt_in", "expected"),
+    [
+        (False, "linux", None, True),
+        (False, "darwin", "0", True),
+        (True, "linux", "1", False),
+        (True, "win32", "1", False),
+        (False, "win32", None, False),
+        (False, "win32", "", False),
+        (False, "win32", "0", False),
+        (False, "win32", "true", False),
+        (False, "win32", "1", True),
+    ],
+)
+def test_targeted_ipv6_emulator_allowed(
+    disable_emulator: bool,
+    platform: str,
+    windows_ci_opt_in: str | None,
+    expected: bool,
+) -> None:
+    """The focused Windows opt-in is exact and never bypasses disablement."""
+    assert (
+        targeted_ipv6_emulator_allowed(
+            disable_emulator,
+            platform,
+            windows_ci_opt_in,
+        )
+        is expected
+    )
+
+
+def test_targeted_ipv6_fixture_preserves_narrow_dependencies() -> None:
+    """Only the IPv6 server fixture receives the focused eligibility path."""
+    ipv6_dependencies = inspect.signature(emulator_server_ipv6).parameters
+    general_dependencies = inspect.signature(emulator_available).parameters
+
+    assert "targeted_ipv6_emulator_available" in ipv6_dependencies
+    assert "ipv6_available" in ipv6_dependencies
+    assert "targeted_ipv6_emulator_available" not in general_dependencies
+
+
+@pytest.mark.emulator
+class TestIpv6TargetedDiscovery:
+    """Public targeted discovery uses and closes the matching real socket."""
+
+    async def test_find_by_ip_over_ipv4(self, emulator_port: int) -> None:
+        """A public IPv4 lookup retains its broadcast-capable socket path."""
+        observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
+        observed_transport = _make_observed_discovery_transport(observations)
+
+        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+            device = await find_by_ip(
+                "127.0.0.1",
+                port=emulator_port,
+                timeout=1.0,
+                idle_timeout_multiplier=0.5,
+            )
+
+        observation = observations.get_nowait()
+        assert isinstance(device, Light)
+        assert observation.family == socket.AF_INET
+        assert observation.local_address[0] == "0.0.0.0"
+        assert observation.local_address[1] != 0
+        assert observation.broadcast is True
+        assert observation.destinations[0] == ("127.0.0.1", emulator_port)
+        assert observation.close_completed is True
+        assert observation.endpoint.is_closing()
+
+    @pytest.mark.flaky(
+        retries=2,
+        delay=1,
+        condition=sys.platform.startswith("win32"),
+    )
+    async def test_find_by_ip_over_ipv6(
+        self, emulator_server_ipv6: tuple[int, EmulatedLifxServer]
+    ) -> None:
+        """A public IPv6 lookup discovers and constructs the emulated Tile."""
+        port, _ = emulator_server_ipv6
+        observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
+        observed_transport = _make_observed_discovery_transport(observations)
+
+        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+            device = await find_by_ip(
+                "::1",
+                port=port,
+                timeout=1.0,
+                idle_timeout_multiplier=0.5,
+            )
+
+        observation = observations.get_nowait()
+        assert isinstance(device, MatrixLight)
+        assert device.serial == IPV6_DEVICE_SERIAL
+        assert observation.family == socket.AF_INET6
+        assert observation.local_address[0] == "::"
+        assert observation.local_address[1] != 0
+        assert observation.destinations[0] == ("::1", port)
+        assert observation.close_completed is True
+        assert observation.endpoint.is_closing()
+
+
+@pytest.mark.emulator
+class TestIpv6TargetedDiscoveryLifecycle:
+    """Concurrent and cancelled lookups retain per-call socket ownership."""
+
+    async def test_concurrent_lookups_use_independent_endpoints(
+        self, emulator_server_ipv6: tuple[int, EmulatedLifxServer]
+    ) -> None:
+        """Two public IPv6 lookups use distinct real discovery endpoints."""
+        port, _ = emulator_server_ipv6
+        observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
+        observed_transport = _make_observed_discovery_transport(observations)
+
+        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+            first_lookup = asyncio.create_task(
+                find_by_ip(
+                    "::1",
+                    port=port,
+                    timeout=1.0,
+                    idle_timeout_multiplier=0.5,
+                )
+            )
+            second_lookup = asyncio.create_task(
+                find_by_ip(
+                    "::1",
+                    port=port,
+                    timeout=1.0,
+                    idle_timeout_multiplier=0.5,
+                )
+            )
+            first_device, second_device = await asyncio.gather(
+                first_lookup, second_lookup
+            )
+
+        first_observation = await observations.get()
+        second_observation = await observations.get()
+
+        assert isinstance(first_device, MatrixLight)
+        assert isinstance(second_device, MatrixLight)
+        assert first_device.serial == IPV6_DEVICE_SERIAL
+        assert second_device.serial == IPV6_DEVICE_SERIAL
+
+        assert first_observation is not second_observation
+        assert first_observation.transport is not second_observation.transport
+        assert first_observation.endpoint is not second_observation.endpoint
+        assert first_observation.local_address[1] != 0
+        assert second_observation.local_address[1] != 0
+        assert first_observation.local_address[1] != second_observation.local_address[1]
+        for observation in (first_observation, second_observation):
+            assert observation.family == socket.AF_INET6
+            assert observation.local_address[0] == "::"
+            assert observation.broadcast is False
+            assert observation.destinations[0] == ("::1", port)
+            assert observation.close_completed is True
+            assert observation.endpoint.is_closing()
+        assert observations.empty()
+
+    async def test_cancellation_closes_endpoint_and_next_lookup_succeeds(
+        self, emulator_server_ipv6: tuple[int, EmulatedLifxServer]
+    ) -> None:
+        """Post-open cancellation closes the endpoint and permits reuse."""
+        emulator_port, _ = emulator_server_ipv6
+        unused_port = get_free_port6()
+        observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
+        observed_transport = _make_observed_discovery_transport(observations)
+
+        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+            lookup = asyncio.create_task(
+                find_by_ip(
+                    "::1",
+                    port=unused_port,
+                    timeout=1.0,
+                    idle_timeout_multiplier=0.5,
+                )
+            )
+            cancelled_observation = await observations.get()
+            await cancelled_observation.opened.wait()
+            await cancelled_observation.receive_started.wait()
+            cancelled_endpoint = cancelled_observation.endpoint
+
+            lookup.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await lookup
+
+            # The cancellation is raised inside the real receive await. The
+            # innermost transport context therefore closes this endpoint while
+            # the two outer generator owners unwind; their separate successful-
+            # return tests remain the proof that both aclosing layers exist.
+            await cancelled_observation.closed.wait()
+            assert cancelled_observation.transport.is_open is False
+            assert cancelled_observation.close_completed is True
+            assert cancelled_endpoint.is_closing()
+
+            device = await find_by_ip(
+                "::1",
+                port=emulator_port,
+                timeout=1.0,
+                idle_timeout_multiplier=0.5,
+            )
+            succeeding_observation = await observations.get()
+
+        assert isinstance(device, MatrixLight)
+        assert device.serial == IPV6_DEVICE_SERIAL
+        assert succeeding_observation.transport is not cancelled_observation.transport
+        assert succeeding_observation.endpoint is not cancelled_endpoint
+        assert succeeding_observation.family == socket.AF_INET6
+        assert succeeding_observation.local_address[0] == "::"
+        assert succeeding_observation.local_address[1] != 0
+        assert succeeding_observation.destinations[0] == ("::1", emulator_port)
+        assert succeeding_observation.opened.is_set()
+        assert succeeding_observation.receive_started.is_set()
+        assert succeeding_observation.closed.is_set()
+        assert succeeding_observation.transport.is_open is False
+        assert succeeding_observation.endpoint.is_closing()
+        assert observations.empty()
+
+
+def test_targeted_ipv6_classes_keep_timeout_and_retry_policy() -> None:
+    """The emulator timeout and Windows retry metadata stay narrowly scoped."""
+    for test_class in (
+        TestIpv6TargetedDiscovery,
+        TestIpv6TargetedDiscoveryLifecycle,
+    ):
+        class_markers = getattr(test_class, "pytestmark", [])
+        assert any(marker.name == "emulator" for marker in class_markers)
+
+    tracer = TestIpv6TargetedDiscovery.test_find_by_ip_over_ipv6
+    flaky_markers = [
+        marker for marker in getattr(tracer, "pytestmark", []) if marker.name == "flaky"
+    ]
+    assert len(flaky_markers) == 1
+    assert flaky_markers[0].kwargs == {
+        "retries": 2,
+        "delay": 1,
+        "condition": sys.platform.startswith("win32"),
+    }
+    compact_source = "".join(inspect.getsource(tracer).split())
+    assert 'condition=sys.platform.startswith("win32")' in compact_source
 
 
 class TestIpv6EndToEnd:
