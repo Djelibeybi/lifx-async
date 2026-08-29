@@ -6,8 +6,6 @@ import asyncio
 import errno
 import logging
 import socket
-import time
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -544,72 +542,6 @@ class UdpTransport:
             )
 
         return data, addr
-
-    async def receive_many(
-        self, timeout: float = 5.0, max_packets: int | None = None
-    ) -> list[tuple[bytes, tuple[str, int]]]:
-        """Receive multiple packets within timeout period.
-
-        Args:
-            timeout: Total timeout in seconds
-            max_packets: Maximum number of packets to receive (None for unlimited)
-
-        Returns:
-            List of (data, address) tuples
-
-        Raises:
-            NetworkError: If socket is not open
-
-        .. deprecated:: 5.5.0
-            :meth:`receive_many` is deprecated and will be removed in v6.0.
-            Use :meth:`receive` in a loop, or the public discovery API in
-            :mod:`lifx.api` (e.g. :func:`~lifx.api.discover`), for
-            multi-response collection.
-        """
-        warnings.warn(
-            "UdpTransport.receive_many is deprecated and will be removed in "
-            "v6.0. Use receive() in a loop, or the public discovery API in "
-            "lifx.api, for multi-response collection.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._protocol is None:
-            raise LifxNetworkError("Socket not open")
-
-        packets: list[tuple[bytes, tuple[str, int]]] = []
-        deadline = time.monotonic() + timeout
-
-        while True:
-            if max_packets is not None and len(packets) >= max_packets:
-                break
-
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-
-            try:
-                data, addr = await asyncio.wait_for(
-                    self._protocol.queue.get(), timeout=remaining
-                )
-
-                # Validate packet size
-                if len(data) > MAX_PACKET_SIZE:
-                    # Drop oversized packet to prevent memory exhaustion DoS
-                    continue
-
-                if len(data) < MIN_PACKET_SIZE:
-                    # Drop undersized packet (header is 36 bytes)
-                    continue
-
-                packets.append((data, addr))
-            except TIMEOUT_ERRORS:
-                # Timeout is expected - return what we collected
-                break
-            except OSError:
-                # Ignore individual receive errors
-                break
-
-        return packets
 
     async def close(self) -> None:
         """Close the UDP socket."""
