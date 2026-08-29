@@ -14,12 +14,13 @@ The call sites, all of which import from here:
   ``Device.connect()`` gate on :func:`validate_address`
 * :mod:`lifx.api`: ``find_by_ip()`` gates on :func:`validate_address`
 * :mod:`lifx.network.transport`: ``UdpTransport.open()`` derives its socket
-  family from the local bind address with :func:`family_for`
+  family with :func:`family_for`, while ``send()`` canonicalises native
+  socket addresses with :func:`sockaddr_for`
 * :mod:`lifx.network.connection`: ``DeviceConnection._open()`` derives its
-  bind literal from the device target with :func:`wildcard_for`, so it
-  contains no family test at all
-* :mod:`lifx.animation.animator`: ``Animator.send_frame`` derives the frame
-  socket's family from the target with :func:`family_for`
+  bind literal with :func:`wildcard_for` and resolves its destination once
+  with :func:`sockaddr_for`
+* :mod:`lifx.animation.animator`: ``Animator`` resolves its frame destination
+  once with :func:`sockaddr_for`
 
 **The validate/derive split.** :func:`validate_address` is the entry-point
 gate and applies the caller-facing rules; :func:`family_for` and
@@ -44,8 +45,9 @@ rejection is evaluated before either warning, so an address on its way to a
    IPv4 device down the IPv6 socket path.
 4. The unspecified address is rejected: it is a wildcard bind, never a
    device.
-5. An explicit numeric IPv6 zone of zero is rejected. Zero means no interface
-   scope, so accepting it would discard the caller's link-local routing intent.
+5. An IPv6 zone must be printable ASCII. Numeric zones must fit the native
+   unsigned 32-bit scope field and cannot be zero; zero means no interface
+   scope and would discard the caller's link-local routing intent.
 6. An IPv6 link-local address with no zone identifier is rejected. Link-local
    addresses are ambiguous without an interface, so the send silently goes
    nowhere and the caller waits out the full request timeout. Rejecting it
@@ -73,6 +75,83 @@ _LOGGER = logging.getLogger(__name__)
 #: :data:`lifx.const.DEFAULT_IP_ADDRESS` on the IPv6 side. Named here rather
 #: than in ``const.py`` because :func:`wildcard_for` is its only consumer.
 _IPV6_WILDCARD = "::"
+_MAX_SCOPE_ID = 0xFFFFFFFF
+
+SocketAddress = tuple[str, int] | tuple[str, int, int, int]
+
+
+def _numeric_scope_id(zone: str, ip: str) -> int | None:
+    """Validate zone text and return an ASCII numeric scope when present."""
+    if not zone.isascii() or not zone.isprintable():
+        raise ValueError(f"Invalid IPv6 zone identifier in {ip!r}")
+
+    if not zone.isdecimal():
+        return None
+
+    significant = zone.lstrip("0") or "0"
+    maximum = str(_MAX_SCOPE_ID)
+    if len(significant) > len(maximum) or (
+        len(significant) == len(maximum) and significant > maximum
+    ):
+        raise ValueError(f"IPv6 zone identifier is out of range in {ip!r}")
+
+    scope_id = int(significant)
+    if scope_id == 0:
+        raise ValueError(f"IPv6 zone identifier must select a non-zero interface: {ip}")
+    return scope_id
+
+
+def _scope_id_for(zone: str, ip: str) -> int:
+    """Resolve a validated numeric or named IPv6 zone to an interface index."""
+    numeric_scope = _numeric_scope_id(zone, ip)
+    if numeric_scope is not None:
+        return numeric_scope
+
+    try:
+        scope_id = socket.if_nametoindex(zone)
+    except (OSError, ValueError, UnicodeError) as error:
+        raise ValueError(f"Invalid IPv6 zone identifier {zone!r} in {ip!r}") from error
+
+    if not 1 <= scope_id <= _MAX_SCOPE_ID:
+        raise ValueError(f"IPv6 zone identifier is out of range in {ip!r}")
+    return scope_id
+
+
+def sockaddr_for(address: SocketAddress) -> SocketAddress:
+    """Return the canonical native sockaddr for an IP endpoint.
+
+    IPv4 endpoints remain two-tuples. IPv6 endpoints always become four-tuples,
+    preserving an existing flowinfo/scope pair or resolving a textual zone once.
+    """
+    host, port = address[0], address[1]
+    parsed = ipaddress.ip_address(host)
+    if isinstance(parsed, ipaddress.IPv4Address):
+        return host, port
+
+    flowinfo = address[2] if len(address) == 4 else 0
+    supplied_scope = address[3] if len(address) == 4 else 0
+    if not 0 <= supplied_scope <= _MAX_SCOPE_ID:
+        raise ValueError(f"IPv6 zone identifier is out of range in {host!r}")
+
+    textual_scope = parsed.scope_id
+    resolved_scope = (
+        _scope_id_for(textual_scope, host) if textual_scope is not None else 0
+    )
+    scope_id = supplied_scope or resolved_scope
+    unscoped_host = str(ipaddress.IPv6Address(parsed.packed))
+    return unscoped_host, port, flowinfo, scope_id
+
+
+def host_from_sockaddr(address: SocketAddress) -> str:
+    """Return a host literal that preserves an IPv6 sockaddr's numeric scope."""
+    host = address[0]
+    if len(address) != 4 or address[3] == 0:
+        return host
+
+    parsed = ipaddress.ip_address(host)
+    if not isinstance(parsed, ipaddress.IPv6Address) or parsed.scope_id is not None:
+        return host
+    return f"{host}%{address[3]}"
 
 
 def validate_address(ip: str | None) -> None:
@@ -87,8 +166,8 @@ def validate_address(ip: str | None) -> None:
 
     Raises:
         ValueError: If the address is empty, unparsable, IPv4-mapped,
-            unspecified, has an explicit numeric zone of zero, or is an IPv6
-            link-local address with no zone identifier.
+            unspecified, has a malformed or out-of-range zone identifier, or
+            is an IPv6 link-local address with no zone identifier.
     """
     if not ip:
         raise ValueError("No IP address provided")
@@ -105,23 +184,18 @@ def validate_address(ip: str | None) -> None:
                 f"Use the plain IPv4 form instead: {addr.ipv4_mapped}"
             )
 
-        if (
-            addr.scope_id is not None
-            and addr.scope_id.isdecimal()
-            and int(addr.scope_id) == 0
-        ):
-            raise ValueError(
-                f"IPv6 zone identifier must select a non-zero interface: {ip}"
-            )
+    if addr.is_unspecified:
+        raise ValueError("Unspecified IP address (0.0.0.0) not allowed")
+
+    if isinstance(addr, ipaddress.IPv6Address):
+        if addr.scope_id is not None:
+            _numeric_scope_id(addr.scope_id, ip)
 
         if addr.is_link_local and addr.scope_id is None:
             raise ValueError(
                 f"IPv6 link-local address requires a zone identifier: {ip}. "
                 f"Append the interface, for example {ip}%en0"
             )
-
-    if addr.is_unspecified:
-        raise ValueError("Unspecified IP address (0.0.0.0) not allowed")
 
     if addr.is_loopback:
         _LOGGER.warning(

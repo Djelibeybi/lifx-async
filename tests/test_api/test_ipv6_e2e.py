@@ -19,7 +19,6 @@ useful in production, where a LIFX device is never on loopback.
 from __future__ import annotations
 
 import asyncio
-import inspect
 import socket
 import sys
 from dataclasses import dataclass, field
@@ -35,12 +34,11 @@ from lifx.api import find_by_ip
 from lifx.color import HSBK
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
+from lifx.network.address import SocketAddress
 from lifx.network.transport import UdpTransport
 from lifx.protocol.models import Serial
 from tests.conftest import (
     IPV6_DEVICE_SERIAL,
-    emulator_available,
-    emulator_server_ipv6,
     get_free_port6,
     ipv6_probe_outcome,
     targeted_ipv6_emulator_allowed,
@@ -66,7 +64,7 @@ class _DiscoveryObservation:
     family: socket.AddressFamily
     local_address: tuple[str, int]
     broadcast: bool
-    destinations: list[tuple[str, int]] = field(default_factory=list)
+    destinations: list[SocketAddress] = field(default_factory=list)
     close_completed: bool = False
     opened: asyncio.Event = field(default_factory=asyncio.Event)
     receive_started: asyncio.Event = field(default_factory=asyncio.Event)
@@ -99,12 +97,12 @@ def _make_observed_discovery_transport(
             observations.put_nowait(self._observation)
             self._observation.opened.set()
 
-        async def send(self, data: bytes, address: tuple[str, int]) -> None:
+        async def send(self, data: bytes, address: SocketAddress) -> None:
             await super().send(data, address)
             assert self._observation is not None
             self._observation.destinations.append(address)
 
-        async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+        async def receive(self, timeout: float = 2.0) -> tuple[bytes, SocketAddress]:
             assert self._observation is not None
             self._observation.receive_started.set()
             return await super().receive(timeout)
@@ -169,16 +167,6 @@ def test_targeted_ipv6_emulator_allowed(
     )
 
 
-def test_targeted_ipv6_fixture_preserves_narrow_dependencies() -> None:
-    """Only the IPv6 server fixture receives the focused eligibility path."""
-    ipv6_dependencies = inspect.signature(emulator_server_ipv6).parameters
-    general_dependencies = inspect.signature(emulator_available).parameters
-
-    assert "targeted_ipv6_emulator_available" in ipv6_dependencies
-    assert "ipv6_available" in ipv6_dependencies
-    assert "targeted_ipv6_emulator_available" not in general_dependencies
-
-
 @pytest.mark.emulator
 class TestIpv6TargetedDiscovery:
     """Public targeted discovery uses and closes the matching real socket."""
@@ -211,11 +199,12 @@ class TestIpv6TargetedDiscovery:
         delay=1,
         condition=sys.platform.startswith("win32"),
     )
+    @pytest.mark.targeted_ipv6_windows
     async def test_find_by_ip_over_ipv6(
-        self, emulator_server_ipv6: tuple[int, EmulatedLifxServer]
+        self, targeted_emulator_server_ipv6: tuple[int, EmulatedLifxServer]
     ) -> None:
         """A public IPv6 lookup discovers and constructs the emulated Tile."""
-        port, _ = emulator_server_ipv6
+        port, _ = targeted_emulator_server_ipv6
         observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
         observed_transport = _make_observed_discovery_transport(observations)
 
@@ -233,6 +222,7 @@ class TestIpv6TargetedDiscovery:
         assert observation.family == socket.AF_INET6
         assert observation.local_address[0] == "::"
         assert observation.local_address[1] != 0
+        assert observation.broadcast is False
         assert observation.destinations[0] == ("::1", port)
         assert observation.close_completed is True
         assert observation.endpoint.is_closing()
@@ -352,29 +342,6 @@ class TestIpv6TargetedDiscoveryLifecycle:
         assert succeeding_observation.transport.is_open is False
         assert succeeding_observation.endpoint.is_closing()
         assert observations.empty()
-
-
-def test_targeted_ipv6_classes_keep_timeout_and_retry_policy() -> None:
-    """The emulator timeout and Windows retry metadata stay narrowly scoped."""
-    for test_class in (
-        TestIpv6TargetedDiscovery,
-        TestIpv6TargetedDiscoveryLifecycle,
-    ):
-        class_markers = getattr(test_class, "pytestmark", [])
-        assert any(marker.name == "emulator" for marker in class_markers)
-
-    tracer = TestIpv6TargetedDiscovery.test_find_by_ip_over_ipv6
-    flaky_markers = [
-        marker for marker in getattr(tracer, "pytestmark", []) if marker.name == "flaky"
-    ]
-    assert len(flaky_markers) == 1
-    assert flaky_markers[0].kwargs == {
-        "retries": 2,
-        "delay": 1,
-        "condition": sys.platform.startswith("win32"),
-    }
-    compact_source = "".join(inspect.getsource(tracer).split())
-    assert 'condition=sys.platform.startswith("win32")' in compact_source
 
 
 class TestIpv6EndToEnd:

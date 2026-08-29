@@ -17,7 +17,7 @@ from lifx.const import (
     TIMEOUT_ERRORS,
 )
 from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
-from lifx.network.address import family_for
+from lifx.network.address import SocketAddress, family_for, sockaddr_for
 
 if TYPE_CHECKING:
     from asyncio import DatagramTransport
@@ -112,7 +112,7 @@ class _UdpProtocol(asyncio.DatagramProtocol):
                 optional and omitted from the log when unset.
         """
         self._peer = peer
-        self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue(
+        self.queue: asyncio.Queue[tuple[bytes, SocketAddress]] = asyncio.Queue(
             maxsize=self._MAX_QUEUE_SIZE
         )
         self.transport: DatagramTransport | None = None
@@ -129,7 +129,7 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         """Called when connection is established."""
         self.transport = transport  # type: ignore[assignment]
 
-    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+    def datagram_received(self, data: bytes, addr: SocketAddress) -> None:
         """Called when a datagram is received."""
         # A received datagram proves the socket still works, so the
         # rate-limited error log starts fresh on the next failure burst.
@@ -280,6 +280,7 @@ class UdpTransport:
                 return
 
             datagram_transport: DatagramTransport | None = None
+            raw_socket: socket.socket | None = None
             try:
                 loop = asyncio.get_running_loop()
 
@@ -304,12 +305,33 @@ class UdpTransport:
                 # lifx.network.address, which is what lets this transport reach
                 # Thread devices that have no IPv4 address.
                 family = family_for(self._ip_address)
-                datagram_transport, _ = await loop.create_datagram_endpoint(
-                    lambda: protocol,
-                    local_addr=(self._ip_address, self._port),
-                    reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
-                    family=family,
-                )
+                if family is socket.AF_INET6:
+                    raw_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+                    raw_socket.setsockopt(
+                        socket.IPPROTO_IPV6,
+                        socket.IPV6_V6ONLY,
+                        1,
+                    )
+                    if hasattr(socket, "SO_REUSEPORT"):
+                        raw_socket.setsockopt(
+                            socket.SOL_SOCKET,
+                            socket.SO_REUSEPORT,
+                            1,
+                        )
+                    raw_socket.bind((self._ip_address, self._port))
+                    raw_socket.setblocking(False)
+                    datagram_transport, _ = await loop.create_datagram_endpoint(
+                        lambda: protocol,
+                        sock=raw_socket,
+                    )
+                    raw_socket = None  # asyncio owns the descriptor now
+                else:
+                    datagram_transport, _ = await loop.create_datagram_endpoint(
+                        lambda: protocol,
+                        local_addr=(self._ip_address, self._port),
+                        reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
+                        family=family,
+                    )
 
                 # Get actual port assigned
                 actual_port = datagram_transport.get_extra_info("sockname")[1]
@@ -351,6 +373,8 @@ class UdpTransport:
             except BaseException as e:
                 if datagram_transport is not None:
                     datagram_transport.close()
+                if raw_socket is not None:
+                    raw_socket.close()
                 self._transport = None
                 self._protocol = None
                 self._family = None
@@ -417,7 +441,7 @@ class UdpTransport:
                     }
                 )
 
-    async def send(self, data: bytes, address: tuple[str, int]) -> None:
+    async def send(self, data: bytes, address: SocketAddress) -> None:
         """Send data to a specific address.
 
         The destination's address family is checked against the socket's
@@ -468,31 +492,21 @@ class UdpTransport:
                 f"but the socket family is {self._family.name}"
             )
 
-        # ``AF_INET6`` has a four-field sockaddr. CPython's socket layer lets
-        # callers omit flowinfo and scope_id for backwards compatibility, but
-        # the Windows proactor passes the address to ``WSASendTo`` asynchronously
-        # and the abbreviated form is rejected with WSAEINVAL. Use the canonical
-        # shape on every platform while preserving the caller-facing pair.
-        send_address: tuple[str, int] | tuple[str, int, int, int] = address
-        if destination_family is socket.AF_INET6:
-            host, separator, zone = address[0].rpartition("%")
-            if separator:
-                if zone.isdecimal():
-                    scope_id = int(zone)
-                else:
-                    try:
-                        scope_id = socket.if_nametoindex(zone)
-                    except OSError as e:
-                        raise LifxNetworkError("Invalid IPv6 zone identifier") from e
-
-                if not 1 <= scope_id <= 0xFFFFFFFF:
-                    raise LifxNetworkError(
-                        "Invalid IPv6 zone identifier: scope ID is out of range"
-                    )
-            else:
-                host = address[0]
-                scope_id = 0
-            send_address = (host, address[1], 0, scope_id)
+        try:
+            send_address = sockaddr_for(address)
+        except ValueError as error:
+            _LOGGER.debug(
+                self._log(
+                    method="send",
+                    action="invalid_destination",
+                    destination_ip=address[0],
+                    destination_port=address[1],
+                    reason=str(error),
+                )
+            )
+            raise LifxNetworkError(
+                f"Invalid destination {address[0]!r}: {error}"
+            ) from error
 
         try:
             self._transport.sendto(data, send_address)
@@ -509,7 +523,7 @@ class UdpTransport:
             )
             raise LifxNetworkError(f"Failed to send data: {e}") from e
 
-    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, SocketAddress]:
         """Receive data from socket with size validation.
 
         Args:
@@ -520,8 +534,8 @@ class UdpTransport:
 
         Raises:
             LifxTimeoutError: If no data received within timeout
-            NetworkError: If socket is not open or receive fails
-            ProtocolError: If packet size is invalid
+            LifxNetworkError: If socket is not open or receive fails
+            LifxProtocolError: If packet size is invalid
         """
         if self._protocol is None:
             raise LifxNetworkError("Socket not open")

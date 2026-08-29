@@ -129,6 +129,7 @@ timeout = 30
 timeout_method = "thread"
 markers = [
     "emulator: tests that require the lifx-emulator-core embedded emulator",
+    "targeted_ipv6_windows: focused targeted-IPv6 test enabled on Windows CI",
     "benchmark: performance benchmark tests — run with -m benchmark to measure baselines",
 ]
 

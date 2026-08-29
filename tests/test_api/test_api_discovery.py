@@ -11,8 +11,7 @@ This module tests:
 from __future__ import annotations
 
 import asyncio
-import struct
-from typing import ClassVar, cast
+from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -20,9 +19,13 @@ import pytest
 from lifx.api import discover, discover_mdns, find_by_ip, find_by_label, find_by_serial
 from lifx.devices import Light
 from lifx.exceptions import LifxTimeoutError
-from lifx.network.discovery import DiscoveredDevice, discover_devices
-from lifx.network.transport import PeerInfo
+from lifx.network.address import SocketAddress
+from lifx.network.discovery import DiscoveredDevice, DiscoveryResponse, discover_devices
+from lifx.network.message import create_message
+from lifx.network.transport import UdpTransport
 from lifx.protocol.header import LifxHeader
+from lifx.protocol.packets import Device as DevicePackets
+from lifx.protocol.protocol_types import DeviceService
 from tests.conftest import get_free_port
 
 
@@ -409,6 +412,104 @@ class TestFindByLabel:
                 pytest.fail(f"Unexpected yield of {d} from find_by_label()")
 
 
+class TestDiscoveryDelegateLifecycle:
+    """Public helpers synchronously close their socket-owning delegates."""
+
+    async def test_discover_close_finalises_device_discovery(self) -> None:
+        """Closing ``discover`` immediately closes ``discover_devices``."""
+        finalised = False
+        discovered = DiscoveredDevice("d073d5123456", "192.0.2.10")
+        device = Light("d073d5123456", "192.0.2.10")
+
+        async def _discover_devices(*args, **kwargs):
+            nonlocal finalised
+            try:
+                yield discovered
+            finally:
+                finalised = True
+
+        async def _create_device(_discovered: DiscoveredDevice) -> Light:
+            return device
+
+        with (
+            patch("lifx.api.discover_devices", side_effect=_discover_devices),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _create_device,
+            ),
+        ):
+            generator = discover()
+            assert await anext(generator) is device
+            await generator.aclose()
+
+        assert finalised is True
+
+    async def test_find_by_serial_return_finalises_device_discovery(self) -> None:
+        """An early matching return does not leave the delegate suspended."""
+        finalised = False
+        discovered = DiscoveredDevice("d073d5123456", "192.0.2.10")
+        device = Light("d073d5123456", "192.0.2.10")
+
+        async def _discover_devices(*args, **kwargs):
+            nonlocal finalised
+            try:
+                yield discovered
+            finally:
+                finalised = True
+
+        async def _create_device(_discovered: DiscoveredDevice) -> Light:
+            return device
+
+        with (
+            patch("lifx.api.discover_devices", side_effect=_discover_devices),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _create_device,
+            ),
+        ):
+            assert await find_by_serial(discovered.serial) is device
+
+        assert finalised is True
+
+    async def test_find_by_label_close_finalises_packet_discovery(self) -> None:
+        """A consumer break closes the packet-discovery delegate immediately."""
+        finalised = False
+        response = DiscoveryResponse(
+            serial="d073d5123456",
+            ip="192.0.2.10",
+            port=56700,
+            response_time=0.01,
+            response_payload={"label": "Synthetic Light"},
+        )
+        device = Light(response.serial, response.ip)
+
+        async def _discover_packets(*args, **kwargs):
+            nonlocal finalised
+            try:
+                yield response
+            finally:
+                finalised = True
+
+        async def _create_device(_discovered: DiscoveredDevice) -> Light:
+            return device
+
+        with (
+            patch("lifx.api._discover_with_packet", side_effect=_discover_packets),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _create_device,
+            ),
+        ):
+            generator = find_by_label("Synthetic", exact_match=False)
+            assert await anext(generator) is device
+            await generator.aclose()
+
+        assert finalised is True
+
+
 class TestDiscoverMdns:
     """Tests for discover_mdns() high-level API function."""
 
@@ -513,124 +614,84 @@ class TestDiscoverMdns:
             assert len(devices) == 0
 
 
-class _ObservedNoResponseDiscoveryTransport:
+class _ObservedNoResponseDiscoveryTransport(UdpTransport):
     """Record a discovery boundary, then cooperatively time out."""
 
     latest: ClassVar[_ObservedNoResponseDiscoveryTransport | None] = None
+    destinations: list[SocketAddress]
 
-    def __init__(
-        self,
-        ip_address: str = "0.0.0.0",
-        port: int = 0,
-        broadcast: bool = False,
-        peer: PeerInfo | None = None,
-    ) -> None:
-        self.ip_address = ip_address
-        self.port = port
-        self.broadcast = broadcast
-        self.peer = peer
-        self.destinations: list[tuple[str, int]] = []
-        type(self).latest = self
+    @property
+    def ip_address(self) -> str:
+        """Expose the configured bind address for boundary assertions."""
+        return self._ip_address
+
+    @property
+    def broadcast(self) -> bool:
+        """Expose the configured broadcast flag for boundary assertions."""
+        return self._broadcast
 
     async def __aenter__(self) -> _ObservedNoResponseDiscoveryTransport:
+        self.destinations = []
+        _ObservedNoResponseDiscoveryTransport.latest = self
         return self
 
     async def __aexit__(self, *args: object) -> None:
         return None
 
-    async def send(self, data: bytes, address: tuple[str, int]) -> None:
+    async def send(self, data: bytes, address: SocketAddress) -> None:
         self.destinations.append(address)
 
-    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, SocketAddress]:
         await asyncio.sleep(timeout)
         raise LifxTimeoutError("synthetic discovery timeout")
 
 
 def _build_state_service_packet(source: int) -> bytes:
     """Build one valid response for a clearly synthetic device identity."""
-    payload = struct.pack("<BI", 1, 56700)
-    header = LifxHeader.create(
-        pkt_type=3,
+    return create_message(
+        DevicePackets.StateService(service=DeviceService.UDP, port=56700),
         source=source,
         target=b"\x02\x00\x00\x00\x00\x01\x00\x00",
-        tagged=False,
         ack_required=False,
         res_required=False,
         sequence=0,
-        payload_size=len(payload),
     )
-    return header.pack() + payload
 
 
 class _SplitScopeResponseDiscoveryTransport(_ObservedNoResponseDiscoveryTransport):
     """Return an IPv6 sockaddr whose numeric scope is separate from its host."""
 
-    def __init__(
-        self,
-        ip_address: str = "0.0.0.0",
-        port: int = 0,
-        broadcast: bool = False,
-        peer: PeerInfo | None = None,
-    ) -> None:
-        super().__init__(ip_address, port, broadcast, peer)
-        self._response: bytes | None = None
+    _response: bytes | None = None
 
-    async def send(self, data: bytes, address: tuple[str, int]) -> None:
+    async def send(self, data: bytes, address: SocketAddress) -> None:
         await super().send(data, address)
         request_header = LifxHeader.unpack(data[: LifxHeader.HEADER_SIZE])
         self._response = _build_state_service_packet(request_header.source)
 
-    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, SocketAddress]:
         if self._response is not None:
             response, self._response = self._response, None
-            split_scope_address = cast(
-                tuple[str, int],
-                ("fe80::1", 56700, 0, 7),
-            )
-            return response, split_scope_address
-        return await super().receive(timeout)
+            return response, ("fe80::1", 56700, 0, 7)
+        await super().receive(timeout)
+        raise AssertionError("the no-response transport should time out")
+
+
+class _UnicastResponseDiscoveryTransport(_SplitScopeResponseDiscoveryTransport):
+    """Return a unicast responder after a multi-responder target was queried."""
+
+    async def receive(self, timeout: float = 2.0) -> tuple[bytes, SocketAddress]:
+        if self._response is not None:
+            response, self._response = self._response, None
+            return response, ("192.0.2.10", 56700)
+        await super().receive(timeout)
+        raise AssertionError("the no-response transport should time out")
 
 
 class _FailOnUseDiscoveryTransport:
-    """Fail and record if rejected input reaches any network lifecycle step."""
+    """Fail immediately if rejected input reaches transport construction."""
 
-    calls: ClassVar[dict[str, int]] = {
-        "construction": 0,
-        "open": 0,
-        "send": 0,
-        "receive": 0,
-        "close": 0,
-    }
-
-    @classmethod
-    def reset(cls) -> None:
-        cls.calls = dict.fromkeys(cls.calls, 0)
-
-    def __init__(
-        self,
-        ip_address: str = "0.0.0.0",
-        port: int = 0,
-        broadcast: bool = False,
-        peer: PeerInfo | None = None,
-    ) -> None:
-        type(self).calls["construction"] += 1
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
         raise AssertionError("rejected input constructed a discovery transport")
-
-    async def open(self) -> None:
-        type(self).calls["open"] += 1
-        raise AssertionError("rejected input opened a discovery transport")
-
-    async def send(self, data: bytes, address: tuple[str, int]) -> None:
-        type(self).calls["send"] += 1
-        raise AssertionError("rejected input sent a discovery packet")
-
-    async def receive(self, timeout: float = 2.0) -> tuple[bytes, tuple[str, int]]:
-        type(self).calls["receive"] += 1
-        raise AssertionError("rejected input waited for a discovery response")
-
-    async def close(self) -> None:
-        type(self).calls["close"] += 1
-        raise AssertionError("rejected input closed a discovery transport")
 
 
 class TestFindByIpAddressGate:
@@ -675,8 +736,8 @@ class TestFindByIpAddressGate:
         assert observation.broadcast is False
         assert observation.destinations == [(literal, 56700)]
 
-    async def test_zoned_link_local_survives_split_scope_response(self) -> None:
-        """The caller's validated numeric zone reaches product construction."""
+    async def test_split_response_scope_reaches_product_construction(self) -> None:
+        """Discovery reconstructs the responder's zone without caller rewriting."""
         captured: list[DiscoveredDevice] = []
 
         async def _capture_create_device(discovered: DiscoveredDevice) -> None:
@@ -695,7 +756,7 @@ class TestFindByIpAddressGate:
             ),
         ):
             result = await find_by_ip(
-                "fe80::1%7",
+                "fe80::1%11",
                 port=56700,
                 timeout=0.05,
                 max_response_time=0.01,
@@ -705,6 +766,47 @@ class TestFindByIpAddressGate:
         assert result is None
         assert len(captured) == 1
         assert captured[0].ip == "fe80::1%7"
+
+    async def test_multi_responder_target_keeps_the_unicast_responder(self) -> None:
+        """A broadcast lookup never becomes a Device at the broadcast address."""
+        captured: list[DiscoveredDevice] = []
+
+        async def _capture_create_device(discovered: DiscoveredDevice) -> None:
+            captured.append(discovered)
+            return None
+
+        with (
+            patch(
+                "lifx.network.discovery.UdpTransport",
+                _UnicastResponseDiscoveryTransport,
+            ),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _capture_create_device,
+            ),
+        ):
+            result = await find_by_ip(
+                "255.255.255.255",
+                port=56700,
+                timeout=0.05,
+                max_response_time=0.01,
+                idle_timeout_multiplier=1.0,
+            )
+
+        assert result is None
+        assert len(captured) == 1
+        assert captured[0].ip == "192.0.2.10"
+
+    async def test_unzoned_link_local_discovery_fails_before_transport(self) -> None:
+        """Every public discovery entry point shares the immediate address gate."""
+        with patch(
+            "lifx.network.discovery.UdpTransport",
+            _FailOnUseDiscoveryTransport,
+        ):
+            generator = discover(broadcast_address="fe80::1")
+            with pytest.raises(ValueError, match="zone identifier"):
+                await anext(generator)
 
     @pytest.mark.parametrize(
         ("literal", "message"),
@@ -731,19 +833,9 @@ class TestFindByIpAddressGate:
         self, literal: str, message: str
     ) -> None:
         """Permanent input errors cannot acquire a discovery transport."""
-        _FailOnUseDiscoveryTransport.reset()
-
         with patch(
             "lifx.network.discovery.UdpTransport",
             _FailOnUseDiscoveryTransport,
         ):
             with pytest.raises(ValueError, match=message):
                 await find_by_ip(literal)
-
-        assert _FailOnUseDiscoveryTransport.calls == {
-            "construction": 0,
-            "open": 0,
-            "send": 0,
-            "receive": 0,
-            "close": 0,
-        }

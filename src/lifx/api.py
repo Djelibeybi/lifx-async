@@ -784,7 +784,7 @@ async def discover(
             devices.append(device)
         ```
     """
-    async for discovered in discover_devices(
+    devices = discover_devices(
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
@@ -792,10 +792,12 @@ async def discover(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-    ):
-        device = await discovered.create_device()
-        if device is not None:
-            yield device
+    )
+    async with aclosing(devices):
+        async for discovered in devices:
+            device = await discovered.create_device()
+            if device is not None:
+                yield device
 
 
 async def discover_mdns(
@@ -900,7 +902,7 @@ async def find_by_serial(
     # Normalize serial to string format (12-digit hex, no separators)
     serial_str = serial.replace(":", "").replace("-", "").lower()
 
-    async for disc in discover_devices(
+    devices = discover_devices(
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
@@ -908,10 +910,12 @@ async def find_by_serial(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-    ):
-        if disc.serial.lower() == serial_str:
-            # Detect device type and return appropriate class
-            return await disc.create_device()
+    )
+    async with aclosing(devices):
+        async for disc in devices:
+            if disc.serial.lower() == serial_str:
+                # Detect device type and return appropriate class
+                return await disc.create_device()
 
     return None
 
@@ -945,6 +949,12 @@ async def find_by_ip(
     Returns:
         Device instance if found, None otherwise
 
+    Raises:
+        ValueError: If ``ip`` is not a usable IPv4 or IPv6 literal, including
+            a link-local IPv6 address without a valid zone identifier.
+        LifxNetworkError: If the validated destination cannot be resolved to a
+            native socket address or the discovery transport fails.
+
     Example:
         ```python
         # Find device at specific IP
@@ -972,11 +982,6 @@ async def find_by_ip(
     async with aclosing(devices):
         async for discovered in devices:
             # Should only get one response (or none)
-            # Targeted lookup already validated the caller's exact literal.
-            # Preserve it here because an IPv6 sockaddr can report a link-local
-            # host and its numeric scope separately, while DiscoveryResponse
-            # stores only the host component.
-            discovered.ip = ip
             return await discovered.create_device()
 
     return None
@@ -1029,40 +1034,42 @@ async def find_by_label(
             break  # exact_match yields at most one device
         ```
     """
-    async for resp in _discover_with_packet(
+    responses = _discover_with_packet(
         packets.Device.GetLabel(),
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
-    ):
-        device_label = resp.response_payload.get("label", "")
-        matched = False
+    )
+    async with aclosing(responses):
+        async for resp in responses:
+            device_label = resp.response_payload.get("label", "")
+            matched = False
 
-        if exact_match:
-            # Exact match - return first match only
-            if device_label.lower() == label.lower():
-                matched = True
-        else:
-            # Substring match - return all matches
-            if label.lower() in device_label.lower():
-                matched = True
+            if exact_match:
+                # Exact match - return first match only
+                if device_label.lower() == label.lower():
+                    matched = True
+            else:
+                # Substring match - return all matches
+                if label.lower() in device_label.lower():
+                    matched = True
 
-        if matched:
-            # Create DiscoveredDevice from response
-            disc = DiscoveredDevice(
-                serial=resp.serial,
-                ip=resp.ip,
-                port=resp.port,
-                response_time=resp.response_time,
-                timeout=device_timeout,
-                max_retries=max_retries,
-            )
+            if matched:
+                # Create DiscoveredDevice from response
+                disc = DiscoveredDevice(
+                    serial=resp.serial,
+                    ip=resp.ip,
+                    port=resp.port,
+                    response_time=resp.response_time,
+                    timeout=device_timeout,
+                    max_retries=max_retries,
+                )
 
-            device = await disc.create_device()
-            if device is not None:
-                yield device
+                device = await disc.create_device()
+                if device is not None:
+                    yield device
 
 
 __all__ = [

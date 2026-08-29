@@ -58,6 +58,19 @@ class TestDiscoveryGeneratorOwnership:
         assert finalised is True
 
 
+class TestDiscoveredDeviceValidationBoundary:
+    """Malformed responder data is isolated to that response."""
+
+    async def test_invalid_address_returns_none_instead_of_aborting_sweep(self) -> None:
+        """Device construction failures stay inside ``create_device``."""
+        discovered = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="fe80::1",
+        )
+
+        assert await discovered.create_device() is None
+
+
 @pytest.mark.emulator
 @pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
 class TestDiscoveredDeviceCreateDevice:

@@ -7,6 +7,7 @@ import logging
 import time
 import uuid
 from collections.abc import Coroutine
+from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
 from math import floor, log10
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
@@ -1439,55 +1440,57 @@ class Device(Generic[StateT]):
 
         try:
             # Check each device for the target label
-            async for disc in discover_devices(
+            discoveries = discover_devices(
                 timeout=discover_timeout,
                 device_timeout=self._timeout,
                 max_retries=self._max_retries,
-            ):
-                temp_conn = DeviceConnection(
-                    serial=disc.serial,
-                    ip=disc.ip,
-                    port=disc.port,
-                    timeout=self._timeout,
-                    max_retries=self._max_retries,
-                )
+            )
+            async with aclosing(discoveries):
+                async for disc in discoveries:
+                    temp_conn = DeviceConnection(
+                        serial=disc.serial,
+                        ip=disc.ip,
+                        port=disc.port,
+                        timeout=self._timeout,
+                        max_retries=self._max_retries,
+                    )
 
-                try:
-                    # Get location info using new request() API
-                    state_packet = await temp_conn.request(packets.Device.GetLocation())  # type: ignore
+                    try:
+                        # Get location info using new request() API
+                        state_packet = await temp_conn.request(  # type: ignore
+                            packets.Device.GetLocation()
+                        )
 
-                    # Check if this device has the target label
-                    if (
-                        state_packet.label == label
-                        and state_packet.location is not None
-                        and isinstance(state_packet.location, bytes)
-                    ):
-                        location_uuid_to_use = state_packet.location
-                        assert location_uuid_to_use is not None
-                        # Type narrowing: we know location_uuid_to_use is not None here
+                        # Check if this device has the target label
+                        if (
+                            state_packet.label == label
+                            and state_packet.location is not None
+                            and isinstance(state_packet.location, bytes)
+                        ):
+                            location_uuid_to_use = state_packet.location
+                            assert location_uuid_to_use is not None
+                            _LOGGER.debug(
+                                {
+                                    "action": "device.set_location",
+                                    "location_found": True,
+                                    "label": label,
+                                    "uuid": location_uuid_to_use.hex(),
+                                }
+                            )
+                            break
+
+                    except Exception as e:
                         _LOGGER.debug(
                             {
                                 "action": "device.set_location",
-                                "location_found": True,
-                                "label": label,
-                                "uuid": location_uuid_to_use.hex(),
+                                "discovery_query_failed": True,
+                                "reason": str(e),
                             }
                         )
-                        break
+                        continue
 
-                except Exception as e:
-                    _LOGGER.debug(
-                        {
-                            "action": "device.set_location",
-                            "discovery_query_failed": True,
-                            "reason": str(e),
-                        }
-                    )
-                    continue
-
-                finally:
-                    # Always close the temporary connection to prevent resource leaks
-                    await temp_conn.close()
+                    finally:
+                        await temp_conn.close()
 
         except Exception as e:
             _LOGGER.warning(
@@ -1633,55 +1636,57 @@ class Device(Generic[StateT]):
 
         try:
             # Check each device for the target label
-            async for disc in discover_devices(
+            discoveries = discover_devices(
                 timeout=discover_timeout,
                 device_timeout=self._timeout,
                 max_retries=self._max_retries,
-            ):
-                temp_conn = DeviceConnection(
-                    serial=disc.serial,
-                    ip=disc.ip,
-                    port=disc.port,
-                    timeout=self._timeout,
-                    max_retries=self._max_retries,
-                )
+            )
+            async with aclosing(discoveries):
+                async for disc in discoveries:
+                    temp_conn = DeviceConnection(
+                        serial=disc.serial,
+                        ip=disc.ip,
+                        port=disc.port,
+                        timeout=self._timeout,
+                        max_retries=self._max_retries,
+                    )
 
-                try:
-                    # Get group info using new request() API
-                    state_packet = await temp_conn.request(packets.Device.GetGroup())  # type: ignore
+                    try:
+                        # Get group info using new request() API
+                        state_packet = await temp_conn.request(  # type: ignore
+                            packets.Device.GetGroup()
+                        )
 
-                    # Check if this device has the target label
-                    if (
-                        state_packet.label == label
-                        and state_packet.group is not None
-                        and isinstance(state_packet.group, bytes)
-                    ):
-                        group_uuid_to_use = state_packet.group
-                        assert group_uuid_to_use is not None
-                        # Type narrowing: we know group_uuid_to_use is not None here
+                        # Check if this device has the target label
+                        if (
+                            state_packet.label == label
+                            and state_packet.group is not None
+                            and isinstance(state_packet.group, bytes)
+                        ):
+                            group_uuid_to_use = state_packet.group
+                            assert group_uuid_to_use is not None
+                            _LOGGER.debug(
+                                {
+                                    "action": "device.set_group",
+                                    "group_found": True,
+                                    "label": label,
+                                    "uuid": group_uuid_to_use.hex(),
+                                }
+                            )
+                            break
+
+                    except Exception as e:
                         _LOGGER.debug(
                             {
                                 "action": "device.set_group",
-                                "group_found": True,
-                                "label": label,
-                                "uuid": group_uuid_to_use.hex(),
+                                "discovery_query_failed": True,
+                                "reason": str(e),
                             }
                         )
-                        break
+                        continue
 
-                except Exception as e:
-                    _LOGGER.debug(
-                        {
-                            "action": "device.set_group",
-                            "discovery_query_failed": True,
-                            "reason": str(e),
-                        }
-                    )
-                    continue
-
-                finally:
-                    # Always close the temporary connection to prevent resource leaks
-                    await temp_conn.close()
+                    finally:
+                        await temp_conn.close()
 
         except Exception as e:
             _LOGGER.warning(

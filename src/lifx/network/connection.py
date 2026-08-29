@@ -25,7 +25,7 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.network.address import wildcard_for
+from lifx.network.address import SocketAddress, sockaddr_for, wildcard_for
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
@@ -131,6 +131,7 @@ class DeviceConnection:
         self._serial = serial_obj.to_string()
         self.ip = ip
         self.port = port
+        self._send_address: SocketAddress | None = None
         self.max_retries = max_retries
         self.timeout = timeout
 
@@ -239,10 +240,12 @@ class DeviceConnection:
             # shared rule owns the choice, so this method makes no family
             # test of its own.
             local_ip = wildcard_for(self.ip)
+            send_address = sockaddr_for((self.ip, self.port))
             self._transport = UdpTransport(
                 ip_address=local_ip, port=0, broadcast=False, peer=self._peer
             )
             await self._transport.open()
+            self._send_address = send_address
             self._is_open = True
 
             # Start background receiver task
@@ -330,6 +333,7 @@ class DeviceConnection:
             }
         )
         self._transport = None
+        self._send_address = None
 
     def _is_alive(self) -> bool:
         """Report whether the machinery behind an open connection still works.
@@ -400,7 +404,7 @@ class DeviceConnection:
         Raises:
             ConnectionError: If connection is not open or send fails
         """
-        if not self._is_open or self._transport is None:
+        if not self._is_open or self._transport is None or self._send_address is None:
             raise LifxConnectionError("Connection not open")
 
         # Allocate source if not provided
@@ -417,7 +421,7 @@ class DeviceConnection:
         )
 
         # Send to device
-        await self._transport.send(message, (self.ip, self.port))
+        await self._transport.send(message, self._send_address)
 
     async def receive_packet(self, timeout: float = 0.5) -> tuple[LifxHeader, bytes]:
         """Receive a packet from the device.

@@ -51,15 +51,15 @@ jobs:
       id: filter
       run: |
         if [ "${{ github.event_name }}" != "pull_request" ]; then
-          echo "source=true" >> $GITHUB_OUTPUT
+          echo "source=true" >> "$GITHUB_OUTPUT"
           exit 0
         fi
         # Check if any source/test files changed in this PR
-        CHANGED=$(gh pr diff ${{ github.event.number }} --name-only | grep -cE '^(src/|tests/|data/|scripts/|pyproject\.toml|uv\.lock)' || true)
+        CHANGED=$(gh pr diff "${{ github.event.number }}" --name-only | grep -cE '^(src/|tests/|data/|scripts/|\.github/workflows/ci\.yml|pyproject\.toml|uv\.lock)' || true)
         if [ "$CHANGED" -gt 0 ]; then
-          echo "source=true" >> $GITHUB_OUTPUT
+          echo "source=true" >> "$GITHUB_OUTPUT"
         else
-          echo "source=false" >> $GITHUB_OUTPUT
+          echo "source=false" >> "$GITHUB_OUTPUT"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -178,14 +178,6 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
 
-    - name: Run targeted IPv6 discovery
-      if: ${{ matrix.os == 'windows-latest' && matrix.python-version == '3.10' }}
-      run: uv run --frozen pytest tests/test_api/test_ipv6_e2e.py::TestIpv6TargetedDiscovery::test_find_by_ip_over_ipv6 -q
-      env:
-        LIFX_WINDOWS_IPV6_DISCOVERY: '1'
-        LIFX_REQUIRE_IPV6: '1'
-      timeout-minutes: 3
-
     - name: Run unit tests
       run: uv run --frozen pytest
       env:
@@ -198,6 +190,14 @@ jobs:
         # cell gets an empty value and keeps its skip guard.
         LIFX_REQUIRE_IPV6: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10') && '1' || '' }}
       timeout-minutes: 10
+
+    - name: Run targeted IPv6 discovery
+      if: ${{ matrix.os == 'windows-latest' && matrix.python-version == '3.10' }}
+      run: uv run --frozen pytest tests/test_api/test_ipv6_e2e.py -m targeted_ipv6_windows --no-cov -p no:cacheprovider -q
+      env:
+        LIFX_WINDOWS_IPV6_DISCOVERY: '1'
+        LIFX_REQUIRE_IPV6: '1'
+      timeout-minutes: 3
 
     - name: Upload coverage to Codecov
       if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
@@ -302,11 +302,11 @@ jobs:
 
         # Check if a release was made (no "No release will be made" message)
         if echo "$output" | grep -q "No release will be made"; then
-          echo "released=false" >> $GITHUB_OUTPUT
+          echo "released=false" >> "$GITHUB_OUTPUT"
         else
           # Publish distribution artifacts to release
           uv run --with python-semantic-release --with "GitPython<3.1.60" semantic-release publish
-          echo "released=true" >> $GITHUB_OUTPUT
+          echo "released=true" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Upload Distribution Artifacts
@@ -345,11 +345,11 @@ jobs:
             echo "::error::Invalid release tag format: must match vX.Y.Z"
             exit 1
           fi
-          echo "tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
         else
           # Get latest release tag
-          latest_tag=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName --jq '.[0].tagName')
-          echo "tag=${latest_tag}" >> $GITHUB_OUTPUT
+          latest_tag=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName --jq '.[0].tagName')
+          echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Download artifacts from GitHub Release
@@ -358,8 +358,8 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         mkdir -p dist
-        gh release download ${{ steps.get-release-tag.outputs.tag }} --repo ${{ github.repository }} --pattern '*.whl' --dir dist
-        gh release download ${{ steps.get-release-tag.outputs.tag }} --repo ${{ github.repository }} --pattern '*.tar.gz' --dir dist
+        gh release download "${{ steps.get-release-tag.outputs.tag }}" --repo "${{ github.repository }}" --pattern '*.whl' --dir dist
+        gh release download "${{ steps.get-release-tag.outputs.tag }}" --repo "${{ github.repository }}" --pattern '*.tar.gz' --dir dist
         echo "Downloaded artifacts for ${{ steps.get-release-tag.outputs.tag }}:"
         ls -lh dist/
 

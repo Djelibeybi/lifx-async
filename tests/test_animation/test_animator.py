@@ -236,6 +236,26 @@ class TestAnimatorSendFrame:
             socket.AF_INET6, socket.SOCK_DGRAM
         )
 
+    def test_send_frame_preserves_zoned_ipv6_scope(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """Animator frames use the native four-field scoped sockaddr."""
+        with patch("lifx.network.address.socket.if_nametoindex", return_value=7):
+            animator = Animator(
+                ip="fe80::1%test0",
+                serial=Serial.from_string("d073d5123456"),
+                framebuffer=FrameBuffer(pixel_count=64),
+                packet_generator=MatrixPacketGenerator(
+                    tile_count=1, tile_width=8, tile_height=8
+                ),
+            )
+
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+        animator.send_frame(hsbk)
+
+        address = mock_udp_socket.sock.sendto.call_args.args[1]
+        assert address == ("fe80::1", 56700, 0, 7)
+
     def test_close_closes_socket(
         self, animator: Animator, mock_udp_socket: MockUdpSocket
     ) -> None:

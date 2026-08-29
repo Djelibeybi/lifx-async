@@ -50,7 +50,7 @@ from lifx.animation.packets import (
     PacketTemplate,
 )
 from lifx.const import LIFX_UDP_PORT
-from lifx.network.address import family_for
+from lifx.network.address import SocketAddress, family_for, sockaddr_for
 from lifx.network.utils import allocate_source
 from lifx.protocol.models import Serial
 
@@ -145,7 +145,7 @@ class Animator:
         """
         self._ip = ip
         self._port = port
-        self._addr = (ip, port)  # Prebuilt sockaddr for the per-packet send path
+        self._addr: SocketAddress = sockaddr_for((ip, port))
         self._serial = serial
         self._framebuffer = framebuffer
         self._packet_generator = packet_generator
