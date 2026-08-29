@@ -50,7 +50,8 @@ from lifx.animation.packets import (
     PacketTemplate,
 )
 from lifx.const import LIFX_UDP_PORT
-from lifx.network.address import SocketAddress, family_for, sockaddr_for
+from lifx.exceptions import LifxNetworkError
+from lifx.network.address import SocketAddress, sockaddr_for
 from lifx.network.utils import allocate_source
 from lifx.protocol.models import Serial
 
@@ -145,7 +146,14 @@ class Animator:
         """
         self._ip = ip
         self._port = port
-        self._addr: SocketAddress = sockaddr_for((ip, port))
+        # Socket state exists before any packet-generator work that could
+        # raise, so finalisation is safe even for a partly built instance.
+        # Address resolution is deliberately deferred until the first send:
+        # constructing an animator must stay lightweight, and a named IPv6
+        # interface is re-resolved for each new socket session.
+        self._addr: SocketAddress | None = None
+        self._socket: socket.socket | None = None
+        self._ack_gate = AckGate()
         self._serial = serial
         self._framebuffer = framebuffer
         self._packet_generator = packet_generator
@@ -166,12 +174,8 @@ class Animator:
         # ack_required flag once into the template that carries the probe
         # (default: first packet; large-tile matrix: final CopyFrameBuffer,
         # D4-04). The hot send loop never touches the flags byte again.
-        self._ack_gate = AckGate()
         self._probe_index = packet_generator.probe_template_index
         self._templates[self._probe_index].data[FLAGS_OFFSET] |= ACK_REQUIRED_FLAG
-
-        # UDP socket (created lazily)
-        self._socket: socket.socket | None = None
 
     @classmethod
     async def for_matrix(
@@ -384,6 +388,8 @@ class Animator:
             ValueError: If hsbk length doesn't match pixel_count. This
                 validation always runs, even when the gate is saturated --
                 a full gate must never suppress input validation.
+            LifxNetworkError: If the destination is invalid or the UDP socket
+                cannot be created.
         """
         start_time = time.perf_counter()
 
@@ -398,10 +404,23 @@ class Animator:
         # IPv6-only, and an AF_INET socket raises gaierror when asked to
         # send to an IPv6 address.
         if self._socket is None:
-            family = family_for(self._addr[0])
-            self._socket = socket.socket(family, socket.SOCK_DGRAM)
-            self._socket.setblocking(False)
+            new_socket: socket.socket | None = None
+            try:
+                addr = sockaddr_for((self._ip, self._port))
+                family = socket.AF_INET6 if len(addr) == 4 else socket.AF_INET
+                new_socket = socket.socket(family, socket.SOCK_DGRAM)
+                new_socket.setblocking(False)
+            except (OSError, ValueError) as error:
+                if new_socket is not None:
+                    new_socket.close()
+                raise LifxNetworkError(
+                    f"Failed to open UDP socket for {self._ip!r}: {error}"
+                ) from error
+            self._addr = addr
+            self._socket = new_socket
 
+        send_address = self._addr
+        assert send_address is not None
         now = time.monotonic()
         self._ack_gate.sweep(self._socket, self._source, now)
         if self._ack_gate.gated:
@@ -424,7 +443,7 @@ class Animator:
             if i == self._probe_index:
                 self._ack_gate.track(self._sequence, now)
             self._sequence = (self._sequence + 1) % 256
-            self._socket.sendto(tmpl.data, self._addr)
+            self._socket.sendto(tmpl.data, send_address)
 
         end_time = time.perf_counter()
 
@@ -444,6 +463,7 @@ class Animator:
         if self._socket is not None:
             self._socket.close()
             self._socket = None
+        self._addr = None
         self._ack_gate.reset()
 
     def __del__(self) -> None:

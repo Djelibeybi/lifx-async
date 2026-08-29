@@ -11,6 +11,7 @@ import pytest
 from lifx.animation.animator import Animator, AnimatorStats
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.packets import MatrixPacketGenerator
+from lifx.exceptions import LifxNetworkError
 from lifx.protocol.models import Serial
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
 
@@ -240,21 +241,85 @@ class TestAnimatorSendFrame:
         self, mock_udp_socket: MockUdpSocket
     ) -> None:
         """Animator frames use the native four-field scoped sockaddr."""
-        with patch("lifx.network.address.socket.if_nametoindex", return_value=7):
-            animator = Animator(
-                ip="fe80::1%test0",
-                serial=Serial.from_string("d073d5123456"),
-                framebuffer=FrameBuffer(pixel_count=64),
-                packet_generator=MatrixPacketGenerator(
-                    tile_count=1, tile_width=8, tile_height=8
-                ),
-            )
+        animator = Animator(
+            ip="fe80::1%test0",
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=64),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=8, tile_height=8
+            ),
+        )
 
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
-        animator.send_frame(hsbk)
+        with patch("lifx.network.address.socket.if_nametoindex", return_value=7):
+            animator.send_frame(hsbk)
 
         address = mock_udp_socket.sock.sendto.call_args.args[1]
         assert address == ("fe80::1", 56700, 0, 7)
+
+    def test_invalid_named_zone_fails_on_send_as_network_error(self) -> None:
+        """Construction is lightweight and first use reports a typed failure."""
+        animator = Animator(
+            ip="fe80::1%missing0",
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=64),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=8, tile_height=8
+            ),
+        )
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        with patch(
+            "lifx.network.address.socket.if_nametoindex",
+            side_effect=OSError("no such interface"),
+        ):
+            with pytest.raises(LifxNetworkError, match="Failed to open UDP socket"):
+                animator.send_frame(hsbk)
+
+        assert animator._socket is None
+        assert animator._addr is None
+
+    def test_socket_setup_failure_closes_partial_socket(
+        self, animator: Animator, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """Failure after descriptor creation closes it before surfacing."""
+        mock_udp_socket.sock.setblocking.side_effect = OSError("setup failed")
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        with pytest.raises(LifxNetworkError, match="Failed to open UDP socket"):
+            animator.send_frame(hsbk)
+
+        mock_udp_socket.sock.close.assert_called_once_with()
+        assert animator._socket is None
+        assert animator._addr is None
+
+    def test_close_re_resolves_named_zone_for_next_session(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """A new socket session does not reuse a stale interface index."""
+        animator = Animator(
+            ip="fe80::1%test0",
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=64),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=8, tile_height=8
+            ),
+        )
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        with patch(
+            "lifx.network.address.socket.if_nametoindex", side_effect=[7, 9]
+        ) as lookup:
+            animator.send_frame(hsbk)
+            animator.close()
+            animator.send_frame(hsbk)
+
+        assert lookup.call_count == 2
+        addresses = [
+            call.args[1] for call in mock_udp_socket.sock.sendto.call_args_list
+        ]
+        assert addresses[0] == ("fe80::1", 56700, 0, 7)
+        assert addresses[-1] == ("fe80::1", 56700, 0, 9)
 
     def test_close_closes_socket(
         self, animator: Animator, mock_udp_socket: MockUdpSocket

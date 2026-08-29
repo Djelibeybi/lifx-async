@@ -174,6 +174,16 @@ class TestValidateAddressWarns:
         assert "class" not in payload
         assert "method" not in payload
 
+    @pytest.mark.parametrize("value", ["127.0.0.1", "8.8.8.8"])
+    def test_wire_validation_can_suppress_advisory_warnings(
+        self, value: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Responder-controlled datagrams cannot produce a warning flood."""
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            validate_address(value, emit_warnings=False)
+
+        assert caplog.records == []
+
 
 class TestValidateAddressAccepts:
     """Addresses that pass, with and without a log line."""
@@ -216,6 +226,44 @@ class TestSocketAddressConversion:
     def test_already_scoped_native_host_is_preserved(self) -> None:
         """A four-tuple does not append a second zone to a scoped host."""
         assert host_from_sockaddr(("fe80::1%7", 56700, 0, 7)) == "fe80::1%7"
+
+    def test_ipv4_host_in_native_four_tuple_is_unchanged(self) -> None:
+        """Unexpected extra native fields do not manufacture an IPv6 zone."""
+        assert host_from_sockaddr(("192.0.2.10", 56700, 0, 7)) == "192.0.2.10"
+
+    def test_supplied_scope_avoids_stale_named_interface_lookup(self) -> None:
+        """A native scope stays authoritative if the interface name vanished."""
+        with patch(
+            "lifx.network.address.socket.if_nametoindex",
+            side_effect=AssertionError("native scope should avoid lookup"),
+        ):
+            assert sockaddr_for(("fe80::1%test0", 56700, 0, 7)) == (
+                "fe80::1",
+                56700,
+                0,
+                7,
+            )
+
+    def test_conflicting_numeric_scopes_raise(self) -> None:
+        """Two different numeric zones cannot be silently reconciled."""
+        with pytest.raises(ValueError, match="Conflicting IPv6 zone identifiers"):
+            sockaddr_for(("fe80::1%7", 56700, 0, 8))
+
+    def test_unscoped_link_local_native_sockaddr_raises(self) -> None:
+        """A four-tuple with scope zero is still an unusable link-local route."""
+        with pytest.raises(ValueError, match="requires a zone identifier"):
+            sockaddr_for(("fe80::1", 56700, 0, 0))
+
+    def test_native_scope_overrides_textual_scope(self) -> None:
+        """The scope field returned by the socket is authoritative."""
+        assert host_from_sockaddr(("fe80::1%8", 56700, 0, 7)) == "fe80::1%7"
+
+    def test_target_scope_fills_missing_responder_scope(self) -> None:
+        """Targeted discovery keeps the caller's validated link-local zone."""
+        assert (
+            host_from_sockaddr(("fe80::1", 56700, 0, 0), fallback_ip="fe80::2%11")
+            == "fe80::1%11"
+        )
 
 
 class TestFamilyFor:

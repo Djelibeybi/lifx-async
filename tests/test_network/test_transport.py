@@ -6,7 +6,7 @@ import logging
 import socket
 import time
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -454,7 +454,7 @@ class TestErrorHandling:
         failure = RuntimeError("forced IPv6 endpoint failure")
 
         with (
-            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
             patch("asyncio.get_running_loop") as mock_loop,
         ):
             mock_loop.return_value.create_datagram_endpoint = AsyncMock(
@@ -700,7 +700,7 @@ class TestSocketFamilySelection:
     """
 
     @staticmethod
-    async def _family_used(ip_address: str) -> int:
+    async def _family_used(ip_address: str) -> socket.AddressFamily:
         """Open a transport against a mocked loop and report the family."""
         transport = UdpTransport(ip_address=ip_address, port=0)
         raw_socket = MagicMock()
@@ -708,17 +708,24 @@ class TestSocketFamilySelection:
         datagram_transport.get_extra_info.return_value = (ip_address, 49152)
 
         with (
-            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch(
+                "lifx.network.transport._socket_factory",
+                return_value=raw_socket,
+            ) as socket_factory,
             patch("asyncio.get_running_loop") as mock_loop,
         ):
             endpoint = AsyncMock(return_value=(datagram_transport, MagicMock()))
             mock_loop.return_value.create_datagram_endpoint = endpoint
             await transport.open()
 
+        family = transport._family
+        assert family is not None
+        if family is socket.AF_INET6:
+            socket_factory.assert_called_once_with(socket.AF_INET6, socket.SOCK_DGRAM)
+        else:
+            socket_factory.assert_not_called()
         await transport.close()
-        if "family" in endpoint.await_args.kwargs:
-            return endpoint.await_args.kwargs["family"]
-        return socket.AF_INET6
+        return family
 
     async def test_ipv4_bind_address_opens_an_af_inet_endpoint(self) -> None:
         """The default wildcard bind stays IPv4."""
@@ -730,7 +737,7 @@ class TestSocketFamilySelection:
 
     async def test_zoned_link_local_bind_opens_an_af_inet6_endpoint(self) -> None:
         """A zoned literal parses, so the family still follows the address."""
-        assert await self._family_used("fe80::1%en0") == socket.AF_INET6
+        assert await self._family_used("fe80::1%1") == socket.AF_INET6
 
     async def test_ipv6_endpoint_is_explicitly_v6_only(self) -> None:
         """Platform defaults cannot admit IPv4-mapped datagrams."""
@@ -744,7 +751,7 @@ class TestSocketFamilySelection:
         }.get(name)
 
         with (
-            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
             patch("asyncio.get_running_loop") as mock_loop,
         ):
             mock_loop.return_value.create_datagram_endpoint = AsyncMock(
@@ -757,19 +764,21 @@ class TestSocketFamilySelection:
             socket.IPV6_V6ONLY,
             1,
         )
+        assert raw_socket.method_calls.index(
+            call.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        ) < raw_socket.method_calls.index(call.bind(("::", 0, 0, 0)))
+        await transport.close()
 
-    async def test_ipv6_endpoint_without_reuse_port_support(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_ipv6_endpoint_without_reuse_port_support(self) -> None:
         """IPv6 setup works when the platform omits ``SO_REUSEPORT``."""
-        monkeypatch.delattr(socket, "SO_REUSEPORT", raising=False)
         transport = UdpTransport(ip_address="::", port=0)
         raw_socket = MagicMock()
         datagram_transport = MagicMock()
         datagram_transport.get_extra_info.return_value = ("::", 49152, 0, 0)
 
         with (
-            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("lifx.network.transport._SO_REUSEPORT", None),
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
             patch("asyncio.get_running_loop") as mock_loop,
         ):
             mock_loop.return_value.create_datagram_endpoint = AsyncMock(
@@ -782,6 +791,34 @@ class TestSocketFamilySelection:
             socket.IPV6_V6ONLY,
             1,
         )
+        assert raw_socket.method_calls.index(
+            call.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        ) < raw_socket.method_calls.index(call.bind(("::", 0, 0, 0)))
+        await transport.close()
+
+    async def test_zoned_ipv6_bind_uses_canonical_native_sockaddr(self) -> None:
+        """A textual interface zone becomes the bind tuple's scope field."""
+        transport = UdpTransport(ip_address="fe80::1%test0", port=56700)
+        raw_socket = MagicMock()
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = (
+            "fe80::1",
+            56700,
+            0,
+            7,
+        )
+
+        with (
+            patch("lifx.network.address.socket.if_nametoindex", return_value=7),
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            await transport.open()
+
+        raw_socket.bind.assert_called_once_with(("fe80::1", 56700, 0, 7))
         await transport.close()
 
 
@@ -820,7 +857,7 @@ class TestSendFamilyAssertion:
         raw_socket = MagicMock()
 
         with (
-            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
             patch("asyncio.get_running_loop") as mock_loop,
         ):
             mock_loop.return_value.create_datagram_endpoint = AsyncMock(

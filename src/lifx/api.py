@@ -1031,7 +1031,6 @@ async def find_by_label(
         async for device in find_by_label("Living Room", exact_match=True):
             async with device:
                 await device.set_power(True)
-            break  # exact_match yields at most one device
         ```
     """
     responses = _discover_with_packet(
@@ -1070,6 +1069,8 @@ async def find_by_label(
                 device = await disc.create_device()
                 if device is not None:
                     yield device
+                    if exact_match:
+                        return
 
 
 __all__ = [

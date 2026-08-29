@@ -23,6 +23,8 @@ if TYPE_CHECKING:
     from asyncio import DatagramTransport
 
 _LOGGER = logging.getLogger(__name__)
+_socket_factory = socket.socket
+_SO_REUSEPORT: int | None = getattr(socket, "SO_REUSEPORT", None)
 
 
 # Errnos that mean the endpoint itself is gone rather than one datagram
@@ -306,19 +308,20 @@ class UdpTransport:
                 # Thread devices that have no IPv4 address.
                 family = family_for(self._ip_address)
                 if family is socket.AF_INET6:
-                    raw_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+                    bind_address = sockaddr_for((self._ip_address, self._port))
+                    raw_socket = _socket_factory(socket.AF_INET6, socket.SOCK_DGRAM)
                     raw_socket.setsockopt(
                         socket.IPPROTO_IPV6,
                         socket.IPV6_V6ONLY,
                         1,
                     )
-                    if hasattr(socket, "SO_REUSEPORT"):
+                    if _SO_REUSEPORT is not None:
                         raw_socket.setsockopt(
                             socket.SOL_SOCKET,
-                            socket.SO_REUSEPORT,
+                            _SO_REUSEPORT,
                             1,
                         )
-                    raw_socket.bind((self._ip_address, self._port))
+                    raw_socket.bind(bind_address)
                     raw_socket.setblocking(False)
                     datagram_transport, _ = await loop.create_datagram_endpoint(
                         lambda: protocol,
@@ -329,7 +332,7 @@ class UdpTransport:
                     datagram_transport, _ = await loop.create_datagram_endpoint(
                         lambda: protocol,
                         local_addr=(self._ip_address, self._port),
-                        reuse_port=bool(hasattr(socket, "SO_REUSEPORT")),
+                        reuse_port=_SO_REUSEPORT is not None,
                         family=family,
                     )
 
@@ -388,7 +391,7 @@ class UdpTransport:
                         reason=str(e),
                     )
                 )
-                if isinstance(e, OSError):
+                if isinstance(e, (OSError, ValueError)):
                     raise LifxNetworkError(f"Failed to open UDP socket: {e}") from e
                 raise
 
@@ -467,30 +470,9 @@ class UdpTransport:
             LifxNetworkError: If the socket is not open, the destination's
                 address family does not match the socket's, an IPv6 zone
                 identifier cannot be resolved, or the send fails.
-            ValueError: If the destination is not a parsable IP literal.
-                Propagated unchanged from :func:`lifx.network.address.family_for`,
-                because every caller reaches here through a validated device
-                address or an internal broadcast literal.
         """
         if self._transport is None or self._protocol is None or self._family is None:
             raise LifxNetworkError("Socket not open")
-
-        destination_family = family_for(address[0])
-        if destination_family is not self._family:
-            _LOGGER.debug(
-                self._log(
-                    method="send",
-                    action="family_mismatch",
-                    destination_ip=address[0],
-                    destination_port=address[1],
-                    destination_family=destination_family.name,
-                    socket_family=self._family.name,
-                )
-            )
-            raise LifxNetworkError(
-                f"Destination {address[0]} requires {destination_family.name} "
-                f"but the socket family is {self._family.name}"
-            )
 
         try:
             send_address = sockaddr_for(address)
@@ -507,6 +489,25 @@ class UdpTransport:
             raise LifxNetworkError(
                 f"Invalid destination {address[0]!r}: {error}"
             ) from error
+
+        destination_family = (
+            socket.AF_INET6 if len(send_address) == 4 else socket.AF_INET
+        )
+        if destination_family is not self._family:
+            _LOGGER.debug(
+                self._log(
+                    method="send",
+                    action="family_mismatch",
+                    destination_ip=address[0],
+                    destination_port=address[1],
+                    destination_family=destination_family.name,
+                    socket_family=self._family.name,
+                )
+            )
+            raise LifxNetworkError(
+                f"Destination {address[0]} requires {destination_family.name} "
+                f"but the socket family is {self._family.name}"
+            )
 
         try:
             self._transport.sendto(data, send_address)

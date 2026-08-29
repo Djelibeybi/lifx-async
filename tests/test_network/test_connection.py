@@ -1361,3 +1361,25 @@ class TestWildcardBindSelection:
     async def test_zoned_link_local_device_binds_the_ipv6_wildcard(self) -> None:
         """A portable numeric-zone literal still selects the IPv6 wildcard."""
         assert await self._bind_address_used("fe80::1%1") == "::"
+
+    async def test_invalid_named_zone_raises_network_error_without_transport(
+        self,
+    ) -> None:
+        """Address derivation stays inside the public network-error taxonomy."""
+        conn = DeviceConnection(serial="d073d5001234", ip="fe80::1%missing0")
+
+        with (
+            patch(
+                "lifx.network.address.socket.if_nametoindex",
+                side_effect=OSError("no such interface"),
+            ),
+            patch("lifx.network.connection.UdpTransport") as transport_class,
+        ):
+            with pytest.raises(LifxNetworkError, match="Invalid destination"):
+                await conn.open()
+
+        transport_class.assert_not_called()
+        assert conn._transport is None
+        assert conn._send_address is None
+        assert conn._receiver_shutdown is None
+        assert not conn._is_opening

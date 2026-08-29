@@ -148,8 +148,8 @@ jobs:
         echo "All generated files are up-to-date."
 
   # Testing matrix scope:
-  # - PRs with source/test changes: full 3-OS matrix
-  # - PRs with CI-only changes: Ubuntu-only (smoke test)
+  # - PRs with source/test/CI workflow changes: full 3-OS matrix
+  # - PRs with documentation-only changes: Ubuntu-only (smoke test)
   # - Push to main: Ubuntu-only (PR already validated all OSes)
   test:
     needs: changes
@@ -192,7 +192,7 @@ jobs:
       timeout-minutes: 10
 
     - name: Run targeted IPv6 discovery
-      if: ${{ matrix.os == 'windows-latest' && matrix.python-version == '3.10' }}
+      if: ${{ !cancelled() && matrix.os == 'windows-latest' && matrix.python-version == '3.10' }}
       run: uv run --frozen pytest tests/test_api/test_ipv6_e2e.py -m targeted_ipv6_windows --no-cov -p no:cacheprovider -q
       env:
         LIFX_WINDOWS_IPV6_DISCOVERY: '1'

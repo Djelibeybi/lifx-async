@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import struct
 import sys
 from unittest.mock import AsyncMock, patch
@@ -163,6 +164,170 @@ class TestDiscoveryResponderAddressValidation:
             ]
 
         assert discovered == []
+
+    async def test_target_zone_fills_scope_zero_link_local_response(self) -> None:
+        """Targeted discovery retains its validated zone when the OS omits it."""
+        known_source = 42
+        packet = _build_state_service_packet(
+            source=known_source,
+            target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00",
+        )
+        responses = iter([(packet, ("fe80::1", 56700, 0, 0))])
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                return next(responses)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            discovered = [
+                response
+                async for response in _discover_with_packet(
+                    DevicePackets.GetService(),
+                    timeout=0.01,
+                    broadcast_address="fe80::2%11",
+                )
+            ]
+
+        assert len(discovered) == 1
+        assert discovered[0].ip == "fe80::1%11"
+
+    async def test_invalid_responder_still_resets_idle_deadline(self) -> None:
+        """A valid LIFX response remains network activity before filtering."""
+        known_source = 42
+        packet = _build_state_service_packet(
+            source=known_source,
+            target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00",
+        )
+        responses = iter([(packet, ("fe80::1", 56700, 0, 0))])
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                return next(responses)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch(
+                "lifx.network.discovery.IdleDeadline.mark_response", autospec=True
+            ) as mark_response,
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            assert [
+                response
+                async for response in _discover_with_packet(
+                    DevicePackets.GetService(), timeout=0.01
+                )
+            ] == []
+
+        mark_response.assert_called_once()
+
+    async def test_responder_address_failure_is_debug_not_error(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Malformed native address metadata is isolated without a traceback."""
+        known_source = 42
+        packet = _build_state_service_packet(
+            source=known_source,
+            target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00",
+        )
+        responses = iter([(packet, ("fe80::1", 56700, 0, 7))])
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                return next(responses)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx.network.discovery"),
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch(
+                "lifx.network.discovery.host_from_sockaddr",
+                side_effect=ValueError("invalid native scope"),
+            ),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            assert [
+                response
+                async for response in _discover_with_packet(
+                    DevicePackets.GetService(), timeout=0.01
+                )
+            ] == []
+
+        assert any(
+            isinstance(record.msg, dict)
+            and record.msg.get("action") == "ignored_invalid_responder_address"
+            for record in caplog.records
+        )
+        assert not [
+            record for record in caplog.records if record.levelno >= logging.ERROR
+        ]
+
+    async def test_inbound_loopback_does_not_emit_address_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Caller advisories are disabled for responder-controlled addresses."""
+        known_source = 42
+        packet = _build_state_service_packet(
+            source=known_source,
+            target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00",
+        )
+        responses = iter([(packet, ("127.0.0.1", 56700))])
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                return next(responses)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            caplog.at_level(logging.WARNING, logger="lifx.network.address"),
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            discovered = [
+                response
+                async for response in _discover_with_packet(
+                    DevicePackets.GetService(), timeout=0.01
+                )
+            ]
+
+        assert len(discovered) == 1
+        assert caplog.records == []
 
 
 class TestDiscoverySourceValidation:

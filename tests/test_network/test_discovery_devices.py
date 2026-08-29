@@ -6,6 +6,7 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 
 from __future__ import annotations
 
+import logging
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -61,17 +62,41 @@ class TestDiscoveryGeneratorOwnership:
 class TestDiscoveredDeviceValidationBoundary:
     """Malformed responder data is isolated to that response."""
 
-    async def test_constructor_failure_returns_none_without_cleanup(self) -> None:
+    async def test_constructor_failure_returns_none_without_cleanup(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Failure before a temporary device exists needs no connection cleanup."""
         discovered = DiscoveredDevice(
             serial="d073d5010203",
             ip="192.0.2.10",
         )
 
-        with patch(
-            "lifx.devices.base.Device", side_effect=ValueError("invalid address")
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx.network.discovery"),
+            patch(
+                "lifx.devices.base.Device", side_effect=ValueError("invalid address")
+            ),
         ):
             assert await discovered.create_device() is None
+
+        record = caplog.records[-1].msg
+        assert isinstance(record, dict)
+        assert record["action"] == "invalid_device_address"
+        assert record["serial"] == discovered.serial
+        assert record["reason"] == "invalid address"
+
+    async def test_constructor_programming_error_propagates(self) -> None:
+        """A refactor error is not misreported as an unsupported responder."""
+        discovered = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="192.0.2.10",
+        )
+
+        with patch(
+            "lifx.devices.base.Device", side_effect=TypeError("broken signature")
+        ):
+            with pytest.raises(TypeError, match="broken signature"):
+                await discovered.create_device()
 
     async def test_invalid_address_returns_none_instead_of_aborting_sweep(self) -> None:
         """Device construction failures stay inside ``create_device``."""
