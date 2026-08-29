@@ -3878,6 +3878,41 @@ class TestMdnsConsumerYieldTiming:
         assert record.serial == "d073d5123456"
         assert receive_timeouts[-1] == pytest.approx(4.0)
 
+    @pytest.mark.asyncio
+    async def test_deadline_expiry_during_yield_blocks_address_follow_up(self) -> None:
+        """Consumer delay cannot permit a follow-up send past the deadline."""
+        ready_instance = "ready._lifx._udp.local"
+        pending_instance = "pending._lifx._udp.local"
+        response = MagicMock()
+        response.header.is_response = True
+        response.records = [
+            _txt_record(ready_instance),
+            _srv_record(ready_instance, target="ready-host.local"),
+            _address_record("ready-host.local", "192.0.2.20"),
+            _txt_record(pending_instance, _txt(serial="d073d5123457")),
+            _srv_record(pending_instance, target="pending-host.local"),
+        ]
+        deadline = _fake_deadline()
+        transport = _fake_transport()
+        transport.receive = _receive_script((b"response", ("192.0.2.10", 5353)))
+
+        with (
+            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+        ):
+            generator = _discover_lifx_services_sweep(_LifxRecordCache(), timeout=10.0)
+            record = await anext(generator)
+            deadline.idle_expired = True
+            with pytest.raises(StopAsyncIteration):
+                await anext(generator)
+
+        assert record.serial == "d073d5123456"
+        assert transport.send.await_count == 1
+
 
 class TestMdnsGoodbyeExpiryScheduling:
     """Goodbye timer wakes stay within the caller-owned deadlines."""
