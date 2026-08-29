@@ -63,23 +63,11 @@ class TestUdpTransport:
             with pytest.raises(TimeoutError):
                 await transport.receive(timeout=0.1)
 
-    async def test_receive_many_timeout(self) -> None:
-        """Test receive_many returns empty list on timeout."""
-        async with UdpTransport() as transport:
-            packets = await transport.receive_many(timeout=0.1)
-            assert packets == []
-
     async def test_broadcast_mode(self) -> None:
         """Test transport with broadcast mode."""
         async with UdpTransport(broadcast=True) as transport:
             assert transport.is_open
             # Just verify it opens successfully with broadcast enabled
-
-    async def test_receive_many_without_open(self) -> None:
-        """Test receive_many without opening raises error."""
-        transport = UdpTransport()
-        with pytest.raises(NetworkError):
-            await transport.receive_many(timeout=1.0)
 
     async def test_double_close(self) -> None:
         """Test closing transport twice is safe."""
@@ -99,19 +87,6 @@ class TestUdpTransport:
         """Test transport with specific IP address binding."""
         async with UdpTransport(ip_address="127.0.0.1") as transport:
             assert transport.is_open
-
-    async def test_receive_many_with_max_packets(self) -> None:
-        """Test receive_many respects max_packets limit."""
-        async with UdpTransport() as transport:
-            # With max_packets=0, should return immediately
-            packets = await transport.receive_many(timeout=0.5, max_packets=0)
-            assert packets == []
-
-    async def test_receive_many_emits_deprecation_warning(self) -> None:
-        """receive_many must emit DeprecationWarning naming v6.0 (D-12)."""
-        async with UdpTransport() as transport:
-            with pytest.warns(DeprecationWarning, match="v6.0"):
-                await transport.receive_many(timeout=0.1)
 
 
 class TestUdpProtocol:
@@ -309,64 +284,6 @@ class TestPacketSizeValidation:
         data, addr = await transport.receive(timeout=1.0)
         assert data == valid_data
         assert addr == test_addr
-
-    async def test_receive_many_drops_oversized_packets(self) -> None:
-        """Test receive_many silently drops oversized packets."""
-        protocol = _UdpProtocol()
-
-        # Add one valid and one oversized packet
-        valid_data = b"\x00" * 36
-        oversized_data = b"\x00" * 2000
-        test_addr = ("127.0.0.1", 56700)
-
-        protocol.datagram_received(valid_data, test_addr)
-        protocol.datagram_received(oversized_data, test_addr)
-
-        transport = UdpTransport()
-        transport._protocol = protocol
-
-        # Should only get the valid packet (oversized is dropped)
-        packets = await transport.receive_many(timeout=0.1)
-        assert len(packets) == 1
-        assert packets[0][0] == valid_data
-
-    async def test_receive_many_drops_undersized_packets(self) -> None:
-        """Test receive_many silently drops undersized packets."""
-        protocol = _UdpProtocol()
-
-        # Add one valid and one undersized packet
-        valid_data = b"\x00" * 36
-        undersized_data = b"\x00" * 10
-        test_addr = ("127.0.0.1", 56700)
-
-        protocol.datagram_received(valid_data, test_addr)
-        protocol.datagram_received(undersized_data, test_addr)
-
-        transport = UdpTransport()
-        transport._protocol = protocol
-
-        # Should only get the valid packet (undersized is dropped)
-        packets = await transport.receive_many(timeout=0.1)
-        assert len(packets) == 1
-        assert packets[0][0] == valid_data
-
-    async def test_receive_many_max_packets_limit(self) -> None:
-        """Test receive_many stops after max_packets."""
-        protocol = _UdpProtocol()
-
-        # Add multiple valid packets
-        valid_data = b"\x00" * 36
-        test_addr = ("127.0.0.1", 56700)
-
-        for _ in range(5):
-            protocol.datagram_received(valid_data, test_addr)
-
-        transport = UdpTransport()
-        transport._protocol = protocol
-
-        # Should only get 2 packets
-        packets = await transport.receive_many(timeout=1.0, max_packets=2)
-        assert len(packets) == 2
 
 
 class TestErrorHandling:
@@ -585,39 +502,6 @@ class TestErrorHandling:
         # Should still be open even though socket was None
         assert transport.is_open
         await transport.close()
-
-    async def test_receive_many_oserror_breaks_loop(self) -> None:
-        """Test receive_many breaks on OSError during packet receive."""
-
-        protocol = _UdpProtocol()
-        transport = UdpTransport()
-        transport._protocol = protocol
-
-        # Add one valid packet then make queue raise OSError
-        valid_data = b"\x00" * 36
-        test_addr = ("127.0.0.1", 56700)
-        protocol.datagram_received(valid_data, test_addr)
-
-        # Replace queue with one that raises OSError after first get
-        original_queue = protocol.queue
-
-        class FailAfterOneQueue(asyncio.Queue):
-            def __init__(self):
-                super().__init__()
-                self._get_count = 0
-
-            async def get(self):
-                self._get_count += 1
-                if self._get_count == 1:
-                    return await original_queue.get()
-                raise OSError("Socket error")
-
-        protocol.queue = FailAfterOneQueue()
-
-        # Should get the one valid packet and then break on OSError
-        packets = await transport.receive_many(timeout=1.0)
-        assert len(packets) == 1
-        assert packets[0][0] == valid_data
 
 
 class TestEndpointLoss:
