@@ -214,6 +214,8 @@ class _LifxRecordCache:
                 dict[tuple[str, int, int, bytes], _CachedResourceRecord],
             ],
         ] = {}
+        self._construction_owners: set[str] = set()
+        self._address_owners: set[str] = set()
         self._fallback_ip_by_instance: dict[str, str] = {}
         self._resolved_instances: set[str] = set()
         self._pending_expiries: dict[tuple[str, int, int, bytes], float] = {}
@@ -276,13 +278,19 @@ class _LifxRecordCache:
             return None
         return _pick_address(self._addresses_in_order(owner))
 
-    def _admit_owner(self, owner: str) -> bool:
-        """Admit one distinct lower-case owner without evicting another."""
-        if owner in self._records_by_owner:
+    def _admit_owner(self, owner: str, rtype: int) -> bool:
+        """Admit one owner within its construction or address budget."""
+        owners = (
+            self._address_owners
+            if rtype in (DNS_TYPE_A, DNS_TYPE_AAAA)
+            else self._construction_owners
+        )
+        if owner in owners:
             return True
-        if len(self._records_by_owner) >= self._MAX_ENTRIES:
+        if len(owners) >= self._MAX_ENTRIES:
             return False
-        self._records_by_owner[owner] = {}
+        owners.add(owner)
+        self._records_by_owner.setdefault(owner, {})
         return True
 
     @staticmethod
@@ -376,10 +384,12 @@ class _LifxRecordCache:
             self._retained_payload_bytes = prospective_payload_bytes
             return True
 
-        if not self._admit_owner(name):
+        if not self._admit_owner(name, record.rtype):
             if record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
                 self._address_budget_exhausted = True
                 self._rejection_counts[("address_capacity", type_name)] += 1
+            else:
+                self._rejection_counts[("owner_capacity", type_name)] += 1
             return False
         by_type = self._records_by_owner[name].setdefault(record.rtype, {})
 
@@ -602,14 +612,19 @@ class _LifxRecordCache:
             if is_construction_record and not _is_lifx_service_instance(name):
                 continue
 
+            # Count every TXT owner advertised in this packet before cache
+            # admission. A refused goodbye or over-cap record still proves
+            # that a proxy may be answering for multiple devices, so its
+            # packet source must never be attributed to the sole admitted one.
+            if record.rtype == DNS_TYPE_TXT and len(packet_instances) < 2:
+                packet_instances.add(name)
+
             admitted = self._add_record(record)
             if not admitted:
                 continue
             if is_construction_record:
                 has_lifx = True
-            if record.rtype == DNS_TYPE_TXT and len(packet_instances) < 2:
-                packet_instances.add(name)
-            elif record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+            if record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
                 packet_address_owners.add(name)
 
         # Address records are bounded candidates, not construction evidence.
@@ -888,21 +903,6 @@ async def _discover_lifx_services_sweep(
             now = time.monotonic()
             record_cache.expire(now)
 
-            # Process every due clock cause in deterministic order: elapsed
-            # goodbye expiry first, then a due query retransmission.
-            elapsed = now - start_time
-            if retransmit_delays and elapsed >= retransmit_delays[0]:
-                retransmit_delays.pop(0)
-                _LOGGER.debug(
-                    {
-                        "class": "_discover_lifx_services",
-                        "method": "discover",
-                        "action": "retransmitting_query",
-                        "elapsed": elapsed,
-                    }
-                )
-                await transport.send(query)
-
             if deadline.idle_expired:
                 _LOGGER.debug(
                     {
@@ -927,12 +927,38 @@ async def _discover_lifx_services_sweep(
                 )
                 break
 
+            # Process every due clock cause in deterministic order: elapsed
+            # goodbye expiry first, then a due query retransmission. Deadline
+            # expiry always wins over initiating another send.
+            elapsed = now - start_time
+            if retransmit_delays and elapsed >= retransmit_delays[0]:
+                retransmit_delays.pop(0)
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_lifx_services",
+                        "method": "discover",
+                        "action": "retransmitting_query",
+                        "elapsed": elapsed,
+                    }
+                )
+                await transport.send(query)
+
+            ready_records = new_records()
+            for record in ready_records:
+                yield record
+                deadline.mark_response()
+
+            if ready_records:
+                # The consumer may have suspended for an arbitrary duration.
+                # Re-enter through the deadline and clock checks instead of
+                # using timing values captured before the yield.
+                continue
+
+            now = time.monotonic()
+            elapsed = now - start_time
             remaining = deadline.remaining()
             if remaining <= 0:
                 break
-
-            for record in new_records():
-                yield record
 
             # Clock-only work may shorten this receive, but it never mutates
             # or extends the caller-owned IdleDeadline.
@@ -996,7 +1022,7 @@ async def _discover_lifx_services_sweep(
                 continue
 
             # Reset idle timer on every valid LIFX response, before the
-            # dedup check — repeated mDNS re-announcements from one device
+            # dedup check - repeated mDNS re-announcements from one device
             # must not cause premature idle expiry while slower devices
             # have not yet answered (Pitfall 1 / D-04, mirroring
             # _discover_with_packet).
@@ -1004,6 +1030,10 @@ async def _discover_lifx_services_sweep(
 
             for record in extracted:
                 yield record
+                deadline.mark_response()
+
+            if extracted and (deadline.idle_expired or deadline.overall_expired):
+                continue
 
             # Query address records the responses did not include (a
             # single reply packet may not have room for every AAAA

@@ -22,6 +22,7 @@ from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns.discovery import (
     _create_device_from_record,
+    _discover_lifx_services_sweep,
     _LifxRecordCache,
 )
 from lifx.network.mdns.dns import (
@@ -250,6 +251,26 @@ class TestLifxRecordCache:
         assert results[0].serial == "d073d5123456"
         assert results[0].ip == "192.168.1.50"  # From source IP
         assert results[0].port == 56700  # Default
+
+    def test_refused_second_txt_instance_blocks_packet_source_fallback(self) -> None:
+        """Every advertised instance participates in the proxy-packet guard."""
+        first = "first._lifx._udp.local"
+        second = "second._lifx._udp.local"
+        cache = _LifxRecordCache()
+
+        cache.add_packet(
+            [
+                _txt_record(first),
+                _txt_record(
+                    second,
+                    _txt(serial="d073d5123457"),
+                    ttl=0,
+                ),
+            ],
+            "192.0.2.254",
+        )
+
+        assert cache.resolve() == []
 
     def test_resolve_missing_serial(self) -> None:
         """Test resolution fails without serial."""
@@ -2670,6 +2691,39 @@ class TestLifxRecordCacheBounds:
         assert len(cache._records_by_owner) == _LifxRecordCache._MAX_ENTRIES
         assert cache.records_for("overflow._lifx._udp.local", 33) == ()
 
+    def test_address_owner_exhaustion_preserves_construction_capacity(self) -> None:
+        """Unrelated address owners cannot consume every LIFX instance slot."""
+        cache = _LifxRecordCache()
+        cache.add_packet(
+            [
+                _address_record(f"junk-{n}.local", f"fd00::{n:x}")
+                for n in range(_LifxRecordCache._MAX_ENTRIES)
+            ],
+            "192.0.2.1",
+        )
+
+        cache.add_packet(
+            [_txt_record("genuine._lifx._udp.local")],
+            "192.0.2.10",
+        )
+
+        assert [(record.serial, record.ip) for record in cache.resolve()] == [
+            ("d073d5123456", "192.0.2.10")
+        ]
+
+    def test_construction_owner_exhaustion_is_reported(self) -> None:
+        """A refused LIFX owner contributes to the bounded rejection summary."""
+        cache = _LifxRecordCache()
+        cache.add_packet(
+            [
+                _srv_record(f"bulb{n}._lifx._udp.local")
+                for n in range(_LifxRecordCache._MAX_ENTRIES + 1)
+            ],
+            "192.0.2.10",
+        )
+
+        assert cache.rejection_counts == {("owner_capacity", "SRV"): 1}
+
     def test_a_full_table_still_updates_a_key_it_already_holds(self) -> None:
         """The bound must not freeze out a re-announcement from a known device.
 
@@ -3669,10 +3723,11 @@ class TestMdnsQueryRetransmission:
         from lifx.network.mdns.discovery import _discover_lifx_services
 
         clock = MagicMock()
-        # start_time, then the elapsed reading taken on each pass of the
-        # loop: 1.5 crosses the first slot (1.0), 3.5 crosses the second
-        # (3.0), after which the schedule is empty.
-        clock.monotonic.side_effect = [0.0, 1.5, 3.5, 4.0, 4.0]
+        # start_time, loop timing, freshly recomputed pre-receive timing, and
+        # timeout handling. The loop readings at 1.5 and 4.0 cross the two
+        # retransmission slots; the repeated values keep each local snapshot
+        # internally consistent.
+        clock.monotonic.side_effect = [0.0, 1.5, 3.5, 4.0, 4.0, 4.0, 4.0]
 
         transport = _fake_transport()
         transport.receive = AsyncMock(side_effect=LifxTimeoutError("timeout"))
@@ -3724,6 +3779,104 @@ class TestMdnsQueryRetransmission:
         assert transport.receive.await_count == 2
         # No slot was crossed, so the query was sent exactly once.
         assert transport.send.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_due_retransmit_is_not_sent_after_the_overall_deadline(self) -> None:
+        """Deadline expiry wins over a retransmission that became overdue."""
+        clock = _FakeMonotonicClock()
+        deadline = _fake_deadline()
+        deadline.overall_expired = True
+        transport = _fake_transport()
+
+        async def send(_data: bytes) -> None:
+            clock.advance(1.1)
+
+        transport.send.side_effect = send
+
+        with (
+            patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
+            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+        ):
+            records = [
+                record
+                async for record in _discover_lifx_services_sweep(
+                    _LifxRecordCache(), timeout=1.0
+                )
+            ]
+
+        assert records == []
+        assert transport.send.await_count == 1
+
+
+class TestMdnsConsumerYieldTiming:
+    """Consumer work is excluded from the mDNS idle receive window."""
+
+    @staticmethod
+    def _ready_cache() -> _LifxRecordCache:
+        cache = _LifxRecordCache()
+        instance = "ready._lifx._udp.local"
+        cache.add_packet(
+            [
+                _txt_record(instance),
+                _srv_record(instance, target="ready-host.local"),
+                _address_record("ready-host.local", "192.0.2.20"),
+            ],
+            "192.0.2.10",
+        )
+        return cache
+
+    @pytest.mark.asyncio
+    async def test_resuming_after_a_yield_resets_the_idle_window(self) -> None:
+        """A yielded record marks consumer resumption before collection continues."""
+        deadline = _fake_deadline()
+        transport = _fake_transport()
+        transport.receive = AsyncMock(side_effect=LifxNetworkError("stop"))
+
+        with (
+            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+        ):
+            records = [
+                record
+                async for record in _discover_lifx_services_sweep(
+                    self._ready_cache(), timeout=10.0
+                )
+            ]
+
+        assert len(records) == 1
+        deadline.mark_response.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    async def test_receive_timeout_is_recomputed_after_consumer_resumes(self) -> None:
+        """A pre-yield remaining value cannot bound a post-yield receive."""
+        clock = _FakeMonotonicClock()
+        transport = _fake_transport()
+        receive_timeouts: list[float] = []
+
+        async def receive(timeout: float) -> tuple[bytes, tuple[str, int]]:
+            receive_timeouts.append(timeout)
+            raise LifxTimeoutError("timeout")
+
+        transport.receive = receive
+
+        with (
+            patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
+            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+        ):
+            generator = _discover_lifx_services_sweep(
+                self._ready_cache(),
+                timeout=10.0,
+                max_response_time=2.0,
+                idle_timeout_multiplier=2.0,
+            )
+            record = await anext(generator)
+            clock.advance(3.5)
+            with pytest.raises(StopAsyncIteration):
+                await anext(generator)
+
+        assert record.serial == "d073d5123456"
+        assert receive_timeouts[-1] == pytest.approx(4.0)
 
 
 class TestMdnsGoodbyeExpiryScheduling:

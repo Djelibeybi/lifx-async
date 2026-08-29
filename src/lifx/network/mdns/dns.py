@@ -364,7 +364,7 @@ def build_address_query(hostname: str) -> bytes:
     """Build an mDNS query for a host's A and AAAA records.
 
     Used to resolve an SRV target hostname whose address records were not
-    included in the service response — e.g. when a Thread border router's
+    included in the service response - e.g. when a Thread border router's
     single legacy-unicast reply had room for every instance's TXT/SRV
     records but not all of their AAAA records.
 
