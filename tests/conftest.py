@@ -228,19 +228,11 @@ def targeted_ipv6_emulator_allowed(
 def targeted_ipv6_emulator_available(request: pytest.FixtureRequest) -> bool:
     """Check emulator availability for the focused targeted-IPv6 path."""
     disable_emulator = request.config.getoption("--disable-emulator", default=False)
-    if not targeted_ipv6_emulator_allowed(
+    return targeted_ipv6_emulator_allowed(
         disable_emulator,
         sys.platform,
         os.environ.get("LIFX_WINDOWS_IPV6_DISCOVERY"),
-    ):
-        return False
-
-    try:
-        from lifx_emulator import EmulatedLifxServer  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
+    )
 
 
 def ipv6_probe_outcome(error: OSError, require_ipv6: str | None) -> bool | str:
@@ -280,11 +272,10 @@ def ipv6_available() -> bool:
     tests skip through a single decision rather than each inventing its own.
 
     ``LIFX_REQUIRE_IPV6=1`` turns a missing ``::1`` from a skip into a
-    failure. CI sets it on exactly one matrix cell, so the IPv6 tests can
-    never quietly skip on every job at once. The variable guards this probe
-    alone and nothing else: a missing emulator is a declared dev-dependency
-    failure that breaks ``uv sync`` long before pytest runs, so
-    ``emulator_available`` deliberately knows nothing about it.
+    failure. CI sets it for the Ubuntu IPv6 suite and the focused Windows
+    targeted-discovery check, so IPv6 cannot quietly skip everywhere. The
+    variable guards this probe alone; emulator eligibility is handled by the
+    normal and focused fixtures separately.
     """
     try:
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as probe:
@@ -443,12 +434,9 @@ def tile_chain_light(tile_chain_server: int) -> MatrixLight:
 IPV6_DEVICE_SERIAL = "d073d5000301"
 
 
-@pytest.fixture(scope="session")
-def emulator_server_ipv6(
-    targeted_ipv6_emulator_available: bool,
-    ipv6_available: bool,
-) -> Generator[tuple[int, EmulatedLifxServer]]:
-    """Start a second emulator, bound to ``::1``, for the IPv6 tests.
+@contextmanager
+def _running_ipv6_emulator() -> Generator[tuple[int, EmulatedLifxServer]]:
+    """Run one emulator bound to ``::1`` for an owning fixture.
 
     Every other emulator fixture binds ``127.0.0.1``, so nothing else in the
     suite exercises an ``AF_INET6`` socket. This runs its own server on the
@@ -476,12 +464,6 @@ def emulator_server_ipv6(
         - server: the server itself, so a test can read emulated device
           state back and prove a frame actually landed
     """
-    if not targeted_ipv6_emulator_available:
-        pytest.skip("lifx-emulator-core not available")
-
-    if not ipv6_available:
-        pytest.skip("IPv6 loopback (::1) is not available on this host")
-
     scenario_manager = HierarchicalScenarioManager()
     devices = [
         create_tile_device(
@@ -501,22 +483,58 @@ def emulator_server_ipv6(
     )
 
     runner = EmulatorRunner(server)
-    runner.start()
+    try:
+        runner.start()
 
-    serving_socket = (
-        server.transport.get_extra_info("socket")
-        if server.transport is not None
-        else None
-    )
-    assert serving_socket is not None, (
-        "the ::1 emulator did not finish starting within the runner timeout"
-    )
-    assert serving_socket.family == socket.AF_INET6
-    assert serving_socket.getsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY) == 1
+        serving_socket = (
+            server.transport.get_extra_info("socket")
+            if server.transport is not None
+            else None
+        )
+        assert serving_socket is not None, (
+            "the ::1 emulator did not finish starting within the runner timeout"
+        )
+        assert serving_socket.family == socket.AF_INET6
+        assert serving_socket.getsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY) == 1
 
-    yield port, server
+        yield port, server
+    finally:
+        runner.stop()
 
-    runner.stop()
+
+@pytest.fixture(scope="session")
+def emulator_server_ipv6(
+    emulator_available: bool,
+    ipv6_available: bool,
+) -> Generator[tuple[int, EmulatedLifxServer]]:
+    """Start the normal IPv6 emulator used by the cross-platform suite."""
+    if not emulator_available:
+        pytest.skip("lifx-emulator-core tests are disabled on this platform")
+    if not ipv6_available:
+        pytest.skip("IPv6 loopback (::1) is not available on this host")
+
+    with _running_ipv6_emulator() as running_server:
+        yield running_server
+
+
+@pytest.fixture(scope="session")
+def targeted_emulator_server_ipv6(
+    targeted_ipv6_emulator_available: bool,
+    ipv6_available: bool,
+) -> Generator[tuple[int, EmulatedLifxServer]]:
+    """Start only the explicitly opted-in Windows targeted-IPv6 server."""
+    if not targeted_ipv6_emulator_available:
+        if sys.platform == "win32" and os.environ.get("LIFX_REQUIRE_IPV6") == "1":
+            pytest.fail(
+                "the required Windows IPv6 check was not opted in; set "
+                "LIFX_WINDOWS_IPV6_DISCOVERY=1"
+            )
+        pytest.skip("the focused Windows IPv6 emulator path is not enabled")
+    if not ipv6_available:
+        pytest.skip("IPv6 loopback (::1) is not available on this host")
+
+    with _running_ipv6_emulator() as running_server:
+        yield running_server
 
 
 @pytest.fixture

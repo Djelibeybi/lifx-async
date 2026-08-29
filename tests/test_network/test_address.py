@@ -65,6 +65,35 @@ class TestValidateAddressRejects:
         with pytest.raises(ValueError, match="IPv4-mapped"):
             validate_address("::ffff:192.0.2.1")
 
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "fe80::1%\u0667",
+            "fe80::1%a\x00b",
+            "fe80::1%\ud800",
+        ],
+    )
+    def test_invalid_zone_text_raises_a_named_validation_error(
+        self, value: str
+    ) -> None:
+        """Malformed zone text never leaks a codec or socket exception."""
+        with pytest.raises(ValueError, match="zone identifier"):
+            validate_address(value)
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            f"fe80::1%{2**32}",
+            "fe80::1%" + "9" * 5000,
+        ],
+    )
+    def test_out_of_range_numeric_zone_raises_a_named_validation_error(
+        self, value: str
+    ) -> None:
+        """Oversized numeric scopes fail without calling ``int`` unsafely."""
+        with pytest.raises(ValueError, match="zone identifier"):
+            validate_address(value)
+
     @pytest.mark.parametrize("value", ["0.0.0.0", "::"])
     def test_unspecified_raises(self, value: str) -> None:
         """The rule moved from Device.__init__, message intact."""

@@ -235,7 +235,10 @@ class MdnsTransport:
             data, addr = await asyncio.wait_for(
                 self._protocol.queue.get(), timeout=timeout
             )
-            return data, addr
+            # MdnsTransport always opens an AF_INET endpoint. Narrow the
+            # shared UDP protocol's dual-family sockaddr type at this IPv4-only
+            # boundary instead of leaking an impossible four-tuple downstream.
+            return data, (addr[0], addr[1])
         except TIMEOUT_ERRORS as e:
             raise LifxTimeoutError(f"No mDNS data received within {timeout}s") from e
         except OSError as e:

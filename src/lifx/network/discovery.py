@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import socket
 import time
 from collections.abc import AsyncGenerator
 from contextlib import aclosing
@@ -12,6 +11,7 @@ from itertools import accumulate
 from typing import TYPE_CHECKING, Any
 
 from lifx.const import (
+    DEFAULT_IP_ADDRESS,
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     DISCOVERY_REBROADCAST_GAPS,
@@ -21,7 +21,7 @@ from lifx.const import (
     MAX_RESPONSE_TIME,
 )
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
-from lifx.network.address import family_for, wildcard_for
+from lifx.network.address import host_from_sockaddr, validate_address, wildcard_for
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
 from lifx.network.utils import IdleDeadline, allocate_source
@@ -100,10 +100,13 @@ class DiscoveredDevice:
             "max_retries": self.max_retries,
         }
 
-        # Create temporary device to query version
-        temp_device = Device(**kwargs)
+        temp_device: Device | None = None
 
         try:
+            # Create temporary device to query version. Address validation can
+            # fail here, before a connection exists, so keep construction
+            # inside the same failure boundary as capability detection.
+            temp_device = Device(**kwargs)
             await temp_device.ensure_capabilities()
 
             if temp_device.capabilities and temp_device.version:
@@ -127,7 +130,8 @@ class DiscoveredDevice:
 
         finally:
             # Always close the temporary device connection
-            await temp_device.connection.close()
+            if temp_device is not None:
+                await temp_device.connection.close()
 
         return None
 
@@ -241,11 +245,12 @@ async def _discover_with_packet(
     seen_serials: set[str] = set()
     start_time = time.monotonic()
 
-    target_family = family_for(broadcast_address)
+    validate_address(broadcast_address)
+    local_bind = wildcard_for(broadcast_address)
     async with UdpTransport(
-        ip_address=wildcard_for(broadcast_address),
+        ip_address=local_bind,
         port=0,
-        broadcast=target_family == socket.AF_INET,
+        broadcast=local_bind == DEFAULT_IP_ADDRESS,
     ) as transport:
         # Allocate unique source for this discovery session
         discovery_source = allocate_source()
@@ -431,6 +436,19 @@ async def _discover_with_packet(
                     )
                     continue
 
+                responder_ip = host_from_sockaddr(addr)
+                try:
+                    validate_address(responder_ip)
+                except ValueError as error:
+                    _LOGGER.debug(
+                        {
+                            "class": "_discover_with_packet",
+                            "action": "ignored_invalid_responder_address",
+                            "reason": str(error),
+                        }
+                    )
+                    continue
+
                 # Extract all fields into a dict
                 response_payload = response_packet.as_dict
 
@@ -443,7 +461,7 @@ async def _discover_with_packet(
                 # port field (e.g. StateLabel via find_by_label). WR-04.
                 discovery_resp = DiscoveryResponse(
                     serial=device_serial,
-                    ip=addr[0],
+                    ip=responder_ip,
                     port=addr[1],
                     response_time=response_time,
                     response_payload=response_payload,

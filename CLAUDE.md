@@ -132,7 +132,7 @@ gh workflow run docs.yml
 2. **Network Layer** (`src/lifx/network/`)
 
    - `transport.py`: UDP transport using asyncio
-   - `discovery.py`: Device discovery via broadcast with `DiscoveredDevice` dataclass
+   - `discovery.py`: Device discovery via IPv4 broadcast or targeted IPv4/IPv6 datagrams with `DiscoveredDevice` dataclass
    - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
    - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
@@ -172,7 +172,7 @@ gh workflow run docs.yml
      fall back to `discover()`
    - `find_by_serial()`: Find specific device by serial number
    - `find_by_label()`: Async generator yielding devices matching label (exact or substring)
-   - `find_by_ip()`: Find device by IP address using targeted broadcast
+   - `find_by_ip()`: Find a device by IPv4 or IPv6 literal using a targeted UDP discovery request; link-local IPv6 requires a zone ID
    - `DeviceGroup`: Batch operations (set_power, set_color, etc.)
    - `LocationGrouping` / `GroupGrouping`: Organizational structures for location/group-based grouping
 
@@ -352,9 +352,10 @@ This is useful when:
 
 The IPv6 end-to-end tests run against a second emulator bound to `::1` and skip when the
 host cannot bind IPv6 loopback. Set `LIFX_REQUIRE_IPV6=1` to turn that skip into a failure
-naming the cause. CI sets it on exactly one matrix cell, ubuntu with Python 3.10, so the
-IPv6 tests can never skip on every job at once and still report green. The variable guards
-that probe alone and has no effect on `emulator_available`.
+naming the cause. CI requires IPv6 on Ubuntu with Python 3.10 for the full IPv6 suite and
+also runs the `targeted_ipv6_windows` test on Windows with Python 3.10. The Windows path
+requires `LIFX_WINDOWS_IPV6_DISCOVERY=1`; that opt-in applies only to its dedicated fixture
+and does not enable the rest of the emulator suite on Windows.
 
 **Key Test Directories:**
 

@@ -46,6 +46,25 @@ cancels the generator, or when a transport failure aborts the sweep. A valid
 response resets the four-second idle window; it does not extend the overall
 timeout.
 
+### Targeted UDP Discovery
+
+When the device address is already known, `find_by_ip()` sends the discovery
+request directly to that IPv4 or IPv6 literal and returns the responding device:
+
+```python
+from lifx import find_by_ip
+
+device = await find_by_ip("2001:db8::10")
+
+# Link-local IPv6 addresses must identify their interface.
+link_local_device = await find_by_ip("fe80::10%en0")
+```
+
+The address is validated before a socket is opened. Invalid literals, IPv4-mapped
+IPv6 literals, wildcard addresses and link-local IPv6 addresses without a zone ID
+raise `ValueError` immediately. A named zone that the host cannot resolve, or a
+transport failure, raises `LifxNetworkError`.
+
 ### mDNS Discovery
 
 mDNS discovery uses DNS-SD to find devices with an IPv4 multicast query:
@@ -137,6 +156,7 @@ been entered yet — and to `fetch_ambient_light` on lights.
 | Scenario | Recommended Method |
 |----------|-------------------|
 | General use | `discover()` or `discover_mdns()` |
+| Known device address | `find_by_ip()` |
 | Cross-subnet (with reflector) | `discover_mdns()` |
 | Maximum compatibility | `discover()` |
 

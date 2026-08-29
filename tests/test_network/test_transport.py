@@ -680,13 +680,22 @@ class TestSocketFamilySelection:
     async def _family_used(ip_address: str) -> int:
         """Open a transport against a mocked loop and report the family."""
         transport = UdpTransport(ip_address=ip_address, port=0)
+        raw_socket = MagicMock()
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = (ip_address, 49152)
 
-        with patch("asyncio.get_running_loop") as mock_loop:
-            endpoint = AsyncMock(return_value=(MagicMock(), MagicMock()))
+        with (
+            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            endpoint = AsyncMock(return_value=(datagram_transport, MagicMock()))
             mock_loop.return_value.create_datagram_endpoint = endpoint
             await transport.open()
 
-        return endpoint.await_args.kwargs["family"]
+        await transport.close()
+        if "family" in endpoint.await_args.kwargs:
+            return endpoint.await_args.kwargs["family"]
+        return socket.AF_INET6
 
     async def test_ipv4_bind_address_opens_an_af_inet_endpoint(self) -> None:
         """The default wildcard bind stays IPv4."""
@@ -699,6 +708,32 @@ class TestSocketFamilySelection:
     async def test_zoned_link_local_bind_opens_an_af_inet6_endpoint(self) -> None:
         """A zoned literal parses, so the family still follows the address."""
         assert await self._family_used("fe80::1%en0") == socket.AF_INET6
+
+    async def test_ipv6_endpoint_is_explicitly_v6_only(self) -> None:
+        """Platform defaults cannot admit IPv4-mapped datagrams."""
+        transport = UdpTransport(ip_address="::", port=0)
+        raw_socket = MagicMock()
+        raw_socket.getsockname.return_value = ("::", 49152, 0, 0)
+        endpoint = MagicMock()
+        endpoint.get_extra_info.side_effect = lambda name: {
+            "sockname": ("::", 49152, 0, 0),
+            "socket": raw_socket,
+        }.get(name)
+
+        with (
+            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(endpoint, MagicMock())
+            )
+            await transport.open()
+
+        raw_socket.setsockopt.assert_any_call(
+            socket.IPPROTO_IPV6,
+            socket.IPV6_V6ONLY,
+            1,
+        )
 
 
 class TestSendFamilyAssertion:
@@ -732,8 +767,13 @@ class TestSendFamilyAssertion:
         """
         transport = UdpTransport(ip_address=ip_address, port=0)
         datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = (ip_address, 49152)
+        raw_socket = MagicMock()
 
-        with patch("asyncio.get_running_loop") as mock_loop:
+        with (
+            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
             mock_loop.return_value.create_datagram_endpoint = AsyncMock(
                 return_value=(datagram_transport, MagicMock())
             )
@@ -795,11 +835,21 @@ class TestSendFamilyAssertion:
             b"x" * 36, ("fd00:1::", 56700, 0, 0)
         )
 
+    async def test_existing_ipv6_sockaddr_preserves_flowinfo_and_scope(self) -> None:
+        """A received IPv6 sockaddr can be sent back without losing routing."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+
+        await transport.send(b"x" * 36, ("fe80::1", 56700, 3, 7))
+
+        datagram_transport.sendto.assert_called_once_with(
+            b"x" * 36, ("fe80::1", 56700, 3, 7)
+        )
+
     async def test_numeric_zoned_ipv6_destination_uses_scope_id(self) -> None:
         """A numeric zone becomes the native sockaddr scope identifier."""
         transport, datagram_transport = await self._open_against_mock_endpoint("::")
 
-        with patch("lifx.network.transport.socket.if_nametoindex") as if_nametoindex:
+        with patch("lifx.network.address.socket.if_nametoindex") as if_nametoindex:
             await transport.send(b"x" * 36, ("fe80::1%7", 56700))
 
         if_nametoindex.assert_not_called()
@@ -812,7 +862,7 @@ class TestSendFamilyAssertion:
         transport, datagram_transport = await self._open_against_mock_endpoint("::")
 
         with patch(
-            "lifx.network.transport.socket.if_nametoindex", return_value=11
+            "lifx.network.address.socket.if_nametoindex", return_value=11
         ) as if_nametoindex:
             await transport.send(b"x" * 36, ("fe80::1%test0", 56700))
 
@@ -830,7 +880,7 @@ class TestSendFamilyAssertion:
         started = time.perf_counter()
         with (
             patch(
-                "lifx.network.transport.socket.if_nametoindex",
+                "lifx.network.address.socket.if_nametoindex",
                 side_effect=OSError("synthetic interface is unavailable"),
             ) as if_nametoindex,
             pytest.raises(NetworkError, match="IPv6 zone identifier") as excinfo,
@@ -839,7 +889,8 @@ class TestSendFamilyAssertion:
         elapsed = time.perf_counter() - started
 
         assert elapsed < self._FAST_FAILURE_SECONDS
-        assert isinstance(excinfo.value.__cause__, OSError)
+        assert isinstance(excinfo.value.__cause__, ValueError)
+        assert isinstance(excinfo.value.__cause__.__cause__, OSError)
         if_nametoindex.assert_called_once_with("missing0")
         datagram_transport.sendto.assert_not_called()
         assert transport.is_open
@@ -850,6 +901,17 @@ class TestSendFamilyAssertion:
             b"x" * 36, ("fd00:1::", 56700, 0, 0)
         )
 
+    async def test_malformed_named_zone_is_wrapped_with_destination_context(
+        self,
+    ) -> None:
+        """Socket and codec failures stay inside the Lifx exception hierarchy."""
+        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+
+        with pytest.raises(NetworkError, match="destination.*zone identifier"):
+            await transport.send(b"x" * 36, ("fe80::1%a\x00b", 56700))
+
+        datagram_transport.sendto.assert_not_called()
+
     async def test_out_of_range_numeric_ipv6_zone_raises_immediately(self) -> None:
         """A scope outside the native unsigned 32-bit range fails pre-send."""
         transport, datagram_transport = await self._open_against_mock_endpoint("::")
@@ -858,7 +920,7 @@ class TestSendFamilyAssertion:
 
         started = time.perf_counter()
         with (
-            patch("lifx.network.transport.socket.if_nametoindex") as if_nametoindex,
+            patch("lifx.network.address.socket.if_nametoindex") as if_nametoindex,
             pytest.raises(NetworkError, match="IPv6 zone identifier"),
         ):
             await transport.send(b"x" * 36, (f"fe80::1%{2**32}", 56700))
@@ -878,7 +940,7 @@ class TestSendFamilyAssertion:
 
         started = time.perf_counter()
         with (
-            patch("lifx.network.transport.socket.if_nametoindex") as if_nametoindex,
+            patch("lifx.network.address.socket.if_nametoindex") as if_nametoindex,
             pytest.raises(NetworkError, match="IPv6 zone identifier"),
         ):
             await transport.send(b"x" * 36, ("fe80::1%0", 56700))
