@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v7.0.0 (2026-08-29)
+
+### Bug Fixes
+
+- **mdns**: Harden discovery timing and admission
+  ([`4ace930`](https://github.com/Djelibeybi/lifx-async/commit/4ace9308db41b7d5a0327239bb5f51bf9a3164cd))
+
+### Features
+
+- **discovery**: Harden mDNS discovery
+  ([`4a485e0`](https://github.com/Djelibeybi/lifx-async/commit/4a485e08afdc2af2c1e165626fbfa5694b3c2530))
+
+### Breaking Changes
+
+- **discovery**: Remove the public low-level mDNS record APIs LifxServiceRecord,
+  discover_lifx_services(), and create_device_from_record(); use discover_mdns() and
+  Device.connectivity instead.
+
+
 ## v6.6.1 (2026-08-28)
 
 ### Bug Fixes
