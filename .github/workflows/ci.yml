@@ -178,6 +178,14 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
 
+    - name: Run targeted IPv6 discovery
+      if: ${{ matrix.os == 'windows-latest' && matrix.python-version == '3.10' }}
+      run: uv run --frozen pytest tests/test_api/test_ipv6_e2e.py::TestIpv6TargetedDiscovery::test_find_by_ip_over_ipv6 -q
+      env:
+        LIFX_WINDOWS_IPV6_DISCOVERY: '1'
+        LIFX_REQUIRE_IPV6: '1'
+      timeout-minutes: 3
+
     - name: Run unit tests
       run: uv run --frozen pytest
       env:

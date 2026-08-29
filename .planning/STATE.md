@@ -5,17 +5,17 @@ milestone_name: Thread/IPv6 Support
 current_phase: 10
 current_phase_name: Land the IPv6/Thread Branch
 status: ready_to_ship
-stopped_at: Phase 11 complete; Phase 10 remains ready to ship
-last_updated: "2026-08-29T02:43:22.515Z"
+stopped_at: Phase 12 complete; Phase 10 remains ready to ship
+last_updated: "2026-08-29T13:34:05.481Z"
 last_activity: 2026-08-29
-last_activity_desc: Phase 11 verified complete; Phase 10 remains ready to ship
-state_head: e4a37a57f0c803448311d2957e61db39da86f15b
+last_activity_desc: Phase 12 complete; Phase 10 remains ready to ship
+state_head: 0b5e57cb908d6904768a08de282d731fd91e14bb
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 23
-  completed_plans: 23
-  percent: 40
+  completed_phases: 3
+  total_plans: 28
+  completed_plans: 28
+  percent: 60
 ---
 
 # Project State
@@ -25,17 +25,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-27 after opening the v2.0 milestone)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 10 — Land the IPv6/Thread Branch shipment
+**Current focus:** Phase 10 — Land the IPv6/Thread Branch
 
 ## Current Position
 
 Phase: 10 — Land the IPv6/Thread Branch
 Plan: 9 of 9
-Total Plans in Phase: 9
 Status: Ready to ship
-Last activity: 2026-08-29 — Phase 11 verified complete
-
-Progress: [████░░░░░░] 40%
+Last activity: 2026-08-29 — Phase 12 complete; Phase 10 remains ready to ship
+Progress: [██████░░░░] 60%
 
 Execution order: 10 → (11 ∥ 12, file-disjoint) → 13 → 14. Phase 14 is hardware-gated
 and must not block CI or any other phase.
@@ -67,6 +65,11 @@ and must not block CI or any other phase.
 | Phase 11 P10 | 47 min | 2 tasks | 5 files |
 | Phase 11 P11 | 22 min | 2 tasks | 2 files |
 | Phase 11 P12 | 38 min | 2 tasks | 2 files |
+| Phase 12 P01 | 17 min | 2 tasks | 5 files |
+| Phase 12 P02 | 7 min | 2 tasks | 2 files |
+| Phase 12 P03 | 4 min | 2 tasks | 1 files |
+| Phase 12 P04 | 15 min | 3 tasks | 5 files |
+| Phase 12 P05 | 32 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +102,18 @@ this milestone (all 2026-08-27 unless noted):
 - [Phase 11]: TXT construction metadata uses one-pass effective-value consensus with immediate conflict rejection.
 - [Phase 11]: Charge only exact retained variable payload and release the stored cost only when expiry removes the cached identity.
 - [Phase 11]: Filter unusable mDNS addresses before the IPv4, ULA, GUA, scoped-link-local ranking and use lexical same-class order.
+- [Phase 12]: Select the wildcard and IPv4-only broadcast capability from the validated target family, close both generator ownership layers with `aclosing`, and prove behaviour from the actual endpoint without replacing emulator traffic.
+- [Phase 12]: Targeted find_by_ip preserves the already validated caller literal through device construction.
+- [Phase 12]: Representation tests exercise the public API and real discovery parser while replacing only transport delivery.
+- [Phase 12]: Invalid-target regressions use a fail-on-construction transport sentinel to prove validation precedes network setup.
+- [Phase 12]: Retain concrete discovery transports and endpoints in per-test observations so lifecycle assertions use actual OS-managed objects.
+- [Phase 12]: Synchronise cancellation on real endpoint-open, receive-started, and close-completed events without sleeps or polling.
+- [Phase 12]: Keep concurrent independence and cancellation/reuse in separate public-API tests.
+- [Phase 12]: Keep Windows IPv6 emulator eligibility behind exact opt-in and exact CI node selection.
+- [Phase 12]: Require exact current-revision CI job logs, not aggregate green status, for D-10.
+- [Phase 12]: Normalise AF_INET6 datagram destinations to canonical four-field socket addresses at send time.
+- [Phase 12]: Resolve numeric and named IPv6 zones at the UDP send boundary and pass scope in the native sockaddr field.
+- [Phase 12]: Report invalid IPv6 zone resolution as an immediate LifxNetworkError while keeping the endpoint reusable.
 
 ### v2.0 Working Notes
 
@@ -121,6 +136,7 @@ Thread hardware endpoint values remain operator-controlled evidence outside the 
 - **Decision-coverage gate has never fired here (open-gsd/gsd-core#2347).** Mitigation is the `**D-NN**` grammar todo above; until adopted, decision coverage is only verified by the plan-checker reading CONTEXT.md by hand.
 - **`plan-scan.cjs` inflates `completed_plans` for superseded plans (open-gsd/gsd-core#2349).** Read SUMMARY frontmatter (`status: superseded`), not counts.
 - **Do not run `state sync` unchecked.** `cmdStateSync` lacks the ratchet `cmdStateJson` applies, so the write path can regress protected values. When citing the archived predecessor repo, always qualify refs; both repos number issues from 1.
+- PR #219 DCO is blocked by three earlier unsigned Phase 12 documentation commits; history rewrite or repository-owner override requires explicit authorisation.
 
 ## Deferred Items
 
@@ -139,10 +155,11 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-29T02:43:22.515Z
-Stopped at: Phase 11 complete; Phase 10 remains ready to ship
+Last session: 2026-08-29T12:50:45.012Z
+Stopped at: Phase 12 complete; Phase 10 remains ready to ship
 Resume file: None
 
 ## Operator Next Steps
 
-- Ship the already verified Phase 10 branch when ready.
+- Resolve PR #219's pre-existing DCO history failure, then ship the verified Phase 12 branch.
+- Ship the already verified Phase 10 branch separately when ready.

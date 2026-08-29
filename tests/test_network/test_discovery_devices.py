@@ -17,8 +17,45 @@ from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.network.discovery import DiscoveredDevice, discover_devices
+from lifx.network.discovery import (
+    DiscoveredDevice,
+    DiscoveryResponse,
+    discover_devices,
+)
 from lifx.products.registry import ProductCapability, ProductInfo
+
+
+class TestDiscoveryGeneratorOwnership:
+    """The public discovery generator owns its private packet delegate."""
+
+    @pytest.mark.asyncio
+    async def test_close_synchronously_finalises_packet_discovery(self) -> None:
+        """Closing device discovery immediately finalises packet discovery."""
+        finalised = False
+
+        async def packet_discovery():
+            nonlocal finalised
+            try:
+                yield DiscoveryResponse(
+                    serial="d073d5010203",
+                    ip="192.0.2.10",
+                    port=56700,
+                    response_time=0.01,
+                    response_payload={"port": 56700},
+                )
+            finally:
+                finalised = True
+
+        with patch(
+            "lifx.network.discovery._discover_with_packet",
+            return_value=packet_discovery(),
+        ):
+            generator = discover_devices(timeout=0.1)
+            device = await anext(generator)
+            assert device.serial == "d073d5010203"
+            await generator.aclose()
+
+        assert finalised is True
 
 
 @pytest.mark.emulator

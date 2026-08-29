@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import socket
 import time
 from collections.abc import AsyncGenerator
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from itertools import accumulate
 from typing import TYPE_CHECKING, Any
@@ -19,6 +21,7 @@ from lifx.const import (
     MAX_RESPONSE_TIME,
 )
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
+from lifx.network.address import family_for, wildcard_for
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
 from lifx.network.utils import IdleDeadline, allocate_source
@@ -238,7 +241,12 @@ async def _discover_with_packet(
     seen_serials: set[str] = set()
     start_time = time.monotonic()
 
-    async with UdpTransport(port=0, broadcast=True) as transport:
+    target_family = family_for(broadcast_address)
+    async with UdpTransport(
+        ip_address=wildcard_for(broadcast_address),
+        port=0,
+        broadcast=target_family == socket.AF_INET,
+    ) as transport:
         # Allocate unique source for this discovery session
         discovery_source = allocate_source()
 
@@ -581,23 +589,25 @@ async def discover_devices(
             devices.append(device)
         ```
     """
-    async for resp in _discover_with_packet(
+    responses = _discover_with_packet(
         DevicePackets.GetService(),
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
-    ):
-        # Device's authoritative service port comes from the StateService
-        # payload (D-05). resp.port is only the device's source port (addr[1]) —
-        # prefer the reported service port here (Pitfall 2).
-        device_port: int = resp.response_payload["port"]
-        yield DiscoveredDevice(
-            serial=resp.serial,
-            ip=resp.ip,
-            port=device_port,
-            response_time=resp.response_time,
-            timeout=device_timeout,
-            max_retries=max_retries,
-        )
+    )
+    async with aclosing(responses):
+        async for resp in responses:
+            # Device's authoritative service port comes from the StateService
+            # payload (D-05). resp.port is only the device's source port (addr[1]) —
+            # prefer the reported service port here (Pitfall 2).
+            device_port: int = resp.response_payload["port"]
+            yield DiscoveredDevice(
+                serial=resp.serial,
+                ip=resp.ip,
+                port=device_port,
+                response_time=resp.response_time,
+                timeout=device_timeout,
+                max_retries=max_retries,
+            )

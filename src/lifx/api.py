@@ -927,12 +927,14 @@ async def find_by_ip(
 ) -> Device | None:
     """Find a LIFX device by IP address.
 
-    Uses a targeted discovery by sending the broadcast to the specific IP address,
-    which means only that device will respond (if it exists). This is more efficient
-    than broadcasting to all devices and filtering.
+    Uses targeted discovery by sending the request to the validated IPv4 or IPv6
+    literal, which means only that device will respond (if it exists). Zoned IPv6
+    link-local literals are supported when they include their interface identifier.
+    This is more efficient than broadcasting to all devices and filtering.
 
     Args:
-        ip: Target device IP address
+        ip: Validated IPv4 or IPv6 device address literal, including a zoned
+            link-local IPv6 literal
         timeout: Discovery timeout in seconds (default DISCOVERY_TIMEOUT)
         port: Port to use (default LIFX_UDP_PORT)
         max_response_time: Max time to wait for responses
@@ -958,7 +960,7 @@ async def find_by_ip(
     validate_address(ip)
 
     # Use the target IP as the "broadcast" address - only that device will respond
-    async for discovered in discover_devices(
+    devices = discover_devices(
         timeout=timeout,
         broadcast_address=ip,  # Protocol trick: send directly to target IP
         port=port,
@@ -966,9 +968,16 @@ async def find_by_ip(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-    ):
-        # Should only get one response (or none)
-        return await discovered.create_device()
+    )
+    async with aclosing(devices):
+        async for discovered in devices:
+            # Should only get one response (or none)
+            # Targeted lookup already validated the caller's exact literal.
+            # Preserve it here because an IPv6 sockaddr can report a link-local
+            # host and its numeric scope separately, while DiscoveryResponse
+            # stores only the host component.
+            discovered.ip = ip
+            return await discovered.create_device()
 
     return None
 

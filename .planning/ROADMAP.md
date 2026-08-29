@@ -91,7 +91,7 @@ was measured on WiFi/IPv4.
 
 - [ ] **Phase 10: Land the IPv6/Thread Branch** - Reconcile `feat/ipv6-thread-support` from `main` on its phase branch, so IPv6-only devices can be controlled and animated; merge only in the post-phase shipment workflow
 - [x] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port proof, private connectivity internals under D-16, synthetic mesh-scale tests, bounded fail-closed address admission under D-15, validation and honest docs (completed 2026-08-29)
-- [ ] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture
+- [x] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture (completed 2026-08-29)
 - [ ] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement
 - [ ] **Phase 14: Thread Revalidation and Docs** - SEED-001 measurements over Thread hardware, per-device-class evidence records or named gaps, and the consumer guidance and corrections docs
 
@@ -232,7 +232,25 @@ Plans:
   2. `_discover_with_packet` derives its bind address and socket family from the target address rather than unconditionally binding `0.0.0.0`
   3. An emulator bound to `::1` is available as a test fixture, giving real IPv6 end-to-end coverage on every CI runner without hardware
 
-**Plans**: TBD
+**Plans**: 5/5 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 12-01-PLAN.md — Trace public IPv6 lookup through family-aware shared discovery and a real emulator socket
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 12-02-PLAN.md — Cover accepted IPv6 representations and fail-before-transport validation boundaries
+- [x] 12-03-PLAN.md — Prove concurrent endpoint independence, cancellation cleanup, and immediate reuse
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 12-04-PLAN.md — Add the narrow Windows CI attempt and verify current-PR cross-runner evidence
+
+**Wave 4** *(gap closure; blocked on 12-04)*
+
+- [x] 12-05-PLAN.md — Preserve numeric and named IPv6 scope IDs at the real UDP send boundary and re-prove current-revision CI
 
 ### Phase 13: Merged Discovery
 
@@ -282,6 +300,6 @@ Plans:
 | 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete | 2026-08-27 |
 | 10. Land the IPv6/Thread Branch | v2.0 | 9/9 | Ready to ship | 2026-08-28 |
 | 11. mDNS Hardening | v2.0 | 14/14 | Complete    | 2026-08-29 |
-| 12. IPv6 Discovery Plumbing | v2.0 | 0/TBD | Not started | - |
+| 12. IPv6 Discovery Plumbing | v2.0 | 5/5 | Complete    | 2026-08-29 |
 | 13. Merged Discovery | v2.0 | 0/TBD | Not started | - |
 | 14. Thread Revalidation and Docs | v2.0 | 0/TBD | Not started | - |

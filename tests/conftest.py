@@ -211,6 +211,38 @@ def emulator_available(request: pytest.FixtureRequest) -> bool:
         return False
 
 
+def targeted_ipv6_emulator_allowed(
+    disable_emulator: bool,
+    platform: str,
+    windows_ci_opt_in: str | None,
+) -> bool:
+    """Decide whether the focused targeted-IPv6 emulator path may run."""
+    if disable_emulator:
+        return False
+    if platform.startswith("win32"):
+        return windows_ci_opt_in == "1"
+    return True
+
+
+@pytest.fixture(scope="session")
+def targeted_ipv6_emulator_available(request: pytest.FixtureRequest) -> bool:
+    """Check emulator availability for the focused targeted-IPv6 path."""
+    disable_emulator = request.config.getoption("--disable-emulator", default=False)
+    if not targeted_ipv6_emulator_allowed(
+        disable_emulator,
+        sys.platform,
+        os.environ.get("LIFX_WINDOWS_IPV6_DISCOVERY"),
+    ):
+        return False
+
+    try:
+        from lifx_emulator import EmulatedLifxServer  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
 def ipv6_probe_outcome(error: OSError, require_ipv6: str | None) -> bool | str:
     """Decide what a failed ``::1`` bind means for this run.
 
@@ -413,7 +445,7 @@ IPV6_DEVICE_SERIAL = "d073d5000301"
 
 @pytest.fixture(scope="session")
 def emulator_server_ipv6(
-    emulator_available: bool,
+    targeted_ipv6_emulator_available: bool,
     ipv6_available: bool,
 ) -> Generator[tuple[int, EmulatedLifxServer]]:
     """Start a second emulator, bound to ``::1``, for the IPv6 tests.
@@ -444,7 +476,7 @@ def emulator_server_ipv6(
         - server: the server itself, so a test can read emulated device
           state back and prove a frame actually landed
     """
-    if not emulator_available:
+    if not targeted_ipv6_emulator_available:
         pytest.skip("lifx-emulator-core not available")
 
     if not ipv6_available:
