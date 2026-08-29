@@ -490,7 +490,7 @@ class Device(Generic[StateT]):
         # Validate port
         if not (1024 <= port <= 65535):
             raise ValueError(
-                f"Port must be between 1 and 65535, got {port}"
+                f"Port must be between 1024 and 65535, got {port}"
             )  # pragma: no cover
 
         # Warn for non-standard ports
@@ -513,6 +513,7 @@ class Device(Generic[StateT]):
         self._max_retries = max_retries
         self._fetch_wifi_info = fetch_wifi_info
         self._fetch_ambient_light = fetch_ambient_light
+        self._connectivity: Literal["wifi", "thread"] = "wifi"
 
         # Create lightweight connection handle - connection pooling is internal
         self.connection = DeviceConnection(
@@ -544,6 +545,12 @@ class Device(Generic[StateT]):
         self._refresh_lock = asyncio.Lock()
         self._is_closed = False
 
+    def _set_connectivity(self, value: Literal["wifi", "thread"]) -> None:
+        """Set validated discovery connectivity metadata."""
+        if value not in ("wifi", "thread"):
+            raise ValueError(f"Invalid connectivity value: {value!r}")
+        self._connectivity = value
+
     def adopt_cached_metadata(self, source: Device) -> None:
         """Adopt metadata already fetched by a temporary device instance.
 
@@ -557,6 +564,7 @@ class Device(Generic[StateT]):
         self._capabilities = source._capabilities
         self._mac_address = source._mac_address
         self._mac_address_firmware = source._mac_address_firmware
+        self._connectivity = source._connectivity
 
     @classmethod
     async def from_ip(
@@ -2216,6 +2224,11 @@ class Device(Generic[StateT]):
         elif self._label is not None:
             return self._label
         return None
+
+    @property
+    def connectivity(self) -> Literal["wifi", "thread"]:
+        """Get the device's reported network connectivity."""
+        return self._connectivity
 
     @property
     def version(self) -> DeviceVersion | None:

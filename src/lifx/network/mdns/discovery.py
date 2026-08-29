@@ -4,12 +4,6 @@ This module provides discovery functions using mDNS/DNS-SD to find
 LIFX devices on the local network.
 
 Example:
-    Low-level API (raw service records):
-    ```python
-    async for record in discover_lifx_services():
-        print(f"Found: {record.serial} at {record.ip}:{record.port}")
-    ```
-
     High-level API (device instances):
     ```python
     async for device in discover_devices_mdns():
@@ -22,9 +16,13 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import struct
 import time
-from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
+from collections import Counter
+from collections.abc import AsyncGenerator, Iterable
+from contextlib import aclosing
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -41,6 +39,7 @@ from lifx.network.mdns.dns import (
     DNS_TYPE_AAAA,
     DNS_TYPE_SRV,
     DNS_TYPE_TXT,
+    DnsResourceRecord,
     SrvData,
     TxtData,
     build_address_query,
@@ -48,7 +47,7 @@ from lifx.network.mdns.dns import (
     parse_dns_response,
 )
 from lifx.network.mdns.transport import MdnsTransport
-from lifx.network.mdns.types import LifxServiceRecord
+from lifx.network.mdns.types import _LifxServiceRecord
 from lifx.network.utils import IdleDeadline
 
 if TYPE_CHECKING:
@@ -56,23 +55,138 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Count ceilings bound fixed Python object overhead independently of these
+# attacker-controlled variable-payload byte ceilings.
+_MAX_RETAINED_PAYLOAD_BYTES_PER_RECORD = 4096
+_MAX_RETAINED_PAYLOAD_BYTES_PER_SWEEP = 262144
 
-def _pick_address(a_ip: str | None, aaaa_ips: list[str]) -> str | None:
-    """Pick the best address for a host from its A and AAAA records.
 
-    Prefers an IPv4 A record, then an IPv6 AAAA record (Thread devices are
-    IPv6-only). Among AAAA records, routable addresses (ULA/GUA) are
-    preferred over link-local, which would need a zone/scope ID to be
-    reachable.
+def _normalise_dns_name(name: str) -> str:
+    """Canonicalise a DNS name without changing its label structure."""
+    if name.endswith("."):
+        name = name[:-1]
+    return name.casefold()
+
+
+_LIFX_MDNS_SERVICE_CANONICAL = _normalise_dns_name(LIFX_MDNS_SERVICE)
+
+
+def _is_lifx_service_instance(name: str | None) -> bool:
+    """Return whether *name* is an exact instance of the LIFX service."""
+    if name is None:
+        return False
+    canonical = _normalise_dns_name(name)
+    suffix = f".{_LIFX_MDNS_SERVICE_CANONICAL}"
+    return canonical.endswith(suffix) and bool(canonical[: -len(suffix)])
+
+
+def _connectivity_from_txt(value: str | None) -> Literal["wifi", "thread"]:
+    """Map the exact private TXT sentinel to public connectivity metadata."""
+    return "thread" if value == "2" else "wifi"
+
+
+def _validate_txt_id(value: str) -> str | None:
+    """Validate an mDNS TXT identity against broadcast serial rules.
+
+    TXT identities deliberately accept less syntax than ``Serial.from_string``:
+    discovery data must contain exactly six hexadecimal octets with no
+    separators, and the value must identify one unicast device.
     """
-    if a_ip is not None:
-        return a_ip
-    if aaaa_ips:
-        routable = [
-            addr for addr in aaaa_ips if not ipaddress.ip_address(addr).is_link_local
-        ]
-        return routable[0] if routable else aaaa_ips[0]
-    return None
+    if len(value) != 12:
+        return None
+    try:
+        raw = bytes.fromhex(value)
+    except ValueError:
+        return None
+    if len(raw) != 6 or raw == b"\x00" * 6 or raw == b"\xff" * 6:
+        return None
+    if raw[0] & 0x01:
+        return None
+    return value.lower()
+
+
+_ULA_NETWORK = ipaddress.ip_network("fc00::/7")
+_GUA_NETWORK = ipaddress.ip_network("2000::/3")
+
+
+def _is_usable_mdns_address(
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """Return whether a syntactically valid candidate can name a route."""
+    if address.is_unspecified:
+        return False
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None:
+            return False
+        if address.is_link_local and address.scope_id is None:
+            return False
+    return True
+
+
+def _pick_address(addresses: Iterable[str]) -> str | None:
+    """Select the lexical address from the best usable class.
+
+    The class order is IPv4, ULA, GUA, then scoped link-local. A syntactically
+    valid but unusable address remains useful cache evidence but cannot name a
+    route, so it is rejected before candidate ranking. DNS AAAA wire data does
+    not carry a zone ID, so scoped link-local is available only to internal or
+    synthetic callers that already know the interface scope.
+    """
+    candidates: list[tuple[int, str]] = []
+    for address in addresses:
+        parsed = ipaddress.ip_address(address)
+        if not _is_usable_mdns_address(parsed):
+            continue
+
+        priority: int | None = None
+        if isinstance(parsed, ipaddress.IPv4Address):
+            priority = 0
+        elif parsed in _ULA_NETWORK:
+            priority = 1
+        elif parsed in _GUA_NETWORK:
+            priority = 2
+        elif parsed.is_link_local:
+            priority = 3
+
+        if priority is not None:
+            candidates.append((priority, address))
+
+    return min(candidates)[1] if candidates else None
+
+
+def _retained_payload_cost(
+    name: str,
+    rtype: int,
+    rdata: bytes,
+    parsed_data: object,
+) -> int:
+    """Return the exact variable payload bytes copied into cache state."""
+    parsed_cost = 0
+    if rtype == DNS_TYPE_TXT and isinstance(parsed_data, TxtData):
+        parsed_cost = sum(len(value.encode()) for value in parsed_data.strings)
+    elif rtype == DNS_TYPE_SRV and isinstance(parsed_data, SrvData):
+        parsed_cost = len(_normalise_dns_name(parsed_data.target).encode()) + 6
+    elif rtype in (DNS_TYPE_A, DNS_TYPE_AAAA) and isinstance(parsed_data, str):
+        parsed_cost = len(ipaddress.ip_address(parsed_data).packed)
+    return len(name.encode()) + len(rdata) + 4 + parsed_cost
+
+
+@dataclass
+class _CachedResourceRecord:
+    """One complete live DNS resource-record identity and its parsed value."""
+
+    name: str
+    rtype: int
+    rclass: int
+    rdata: bytes
+    parsed_data: object
+    retained_payload_bytes: int
+    expires_at: float | None = None
+
+    @property
+    def identity(self) -> tuple[str, int, int, bytes]:
+        """Return the case-normalised identity used for cache refreshes."""
+        return (self.name, self.rtype, self.rclass, self.rdata)
 
 
 class _LifxRecordCache:
@@ -85,22 +199,378 @@ class _LifxRecordCache:
     each instance is emitted as soon as it can be fully resolved.
     """
 
-    # Bound on entries per record table — guards against multicast floods
-    # filling memory during the discovery window
+    # Distinct owner admission remains bounded for the discovery window.
     _MAX_ENTRIES = 1024
+    _MAX_TXT_RRS_PER_OWNER = 16
+    _MAX_SRV_RRS_PER_OWNER = 16
+    _MAX_ADDRESS_RRS_PER_OWNER = 256
+    _MAX_ADDRESS_RRS_PER_SWEEP = 1024
 
     def __init__(self) -> None:
-        self._srv_by_instance: dict[str, SrvData] = {}
-        self._txt_by_instance: dict[str, TxtData] = {}
-        self._a_by_host: dict[str, str] = {}
-        self._aaaa_by_host: dict[str, list[str]] = {}
+        self._records_by_owner: dict[
+            str,
+            dict[
+                int,
+                dict[tuple[str, int, int, bytes], _CachedResourceRecord],
+            ],
+        ] = {}
         self._fallback_ip_by_instance: dict[str, str] = {}
         self._resolved_instances: set[str] = set()
+        self._pending_expiries: dict[tuple[str, int, int, bytes], float] = {}
+        self._rejection_counts: Counter[tuple[str, str]] = Counter()
+        self._reported_rejections: set[tuple[str, str, str]] = set()
+        self._address_rr_count = 0
+        self._address_overflowed_owners: set[str] = set()
+        self._address_budget_exhausted = False
+        self._retained_payload_bytes = 0
+        self._byte_incomplete_owner_types: set[tuple[str, int]] = set()
+        self._retained_payload_budget_exhausted = False
+
+    @property
+    def rejection_counts(self) -> dict[tuple[str, str], int]:
+        """Return the privacy-safe aggregate collected for later reporting."""
+        return dict(self._rejection_counts)
+
+    def count_rejection(self, reason: str, record_type: str) -> None:
+        """Count one observation without retaining packet or address details."""
+        self._rejection_counts[(reason, record_type)] += 1
+
+    def records_for(self, owner: str, rtype: int) -> tuple[_CachedResourceRecord, ...]:
+        """Return live records for one owner/type in first-learned order."""
+        by_type = self._records_by_owner.get(_normalise_dns_name(owner))
+        if by_type is None:
+            return ()
+        return tuple(by_type.get(rtype, {}).values())
+
+    def owners_for(self, rtype: int) -> tuple[str, ...]:
+        """Return admitted owners carrying at least one live record of a type."""
+        return tuple(
+            owner
+            for owner, by_type in self._records_by_owner.items()
+            if by_type.get(rtype)
+        )
+
+    def _addresses_in_order(self, owner: str) -> tuple[str, ...]:
+        """Return canonical addresses in first-learned order for selection."""
+        values: list[str] = []
+        for rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+            for record in self.records_for(owner, rtype):
+                if isinstance(record.parsed_data, str):
+                    values.append(record.parsed_data)
+        return tuple(values)
+
+    def addresses_for(self, owner: str) -> frozenset[str]:
+        """Return immutable unordered advertised-address membership."""
+        return frozenset(self._addresses_in_order(owner))
+
+    def selected_address_for(self, owner: str) -> str | None:
+        """Select a usable address without exposing same-class ordering."""
+        owner = owner.lower()
+        if (
+            self._retained_payload_budget_exhausted
+            or self._address_budget_exhausted
+            or owner in self._address_overflowed_owners
+            or (owner, DNS_TYPE_A) in self._byte_incomplete_owner_types
+            or (owner, DNS_TYPE_AAAA) in self._byte_incomplete_owner_types
+        ):
+            return None
+        return _pick_address(self._addresses_in_order(owner))
+
+    def _admit_owner(self, owner: str) -> bool:
+        """Admit one distinct lower-case owner without evicting another."""
+        if owner in self._records_by_owner:
+            return True
+        if len(self._records_by_owner) >= self._MAX_ENTRIES:
+            return False
+        self._records_by_owner[owner] = {}
+        return True
 
     @staticmethod
-    def _add(table: dict, key: str, value: object) -> None:
-        if len(table) < _LifxRecordCache._MAX_ENTRIES or key in table:
-            table[key] = value
+    def _record_type_name(rtype: int) -> str:
+        """Return the stable diagnostic type names used by the cache."""
+        return {
+            DNS_TYPE_A: "A",
+            DNS_TYPE_AAAA: "AAAA",
+            DNS_TYPE_SRV: "SRV",
+            DNS_TYPE_TXT: "TXT",
+        }[rtype]
+
+    def _add_record(self, record: DnsResourceRecord) -> bool:
+        """Admit or refresh one supported RR by its complete DNS identity."""
+        if record.rtype not in (
+            DNS_TYPE_TXT,
+            DNS_TYPE_SRV,
+            DNS_TYPE_A,
+            DNS_TYPE_AAAA,
+        ):
+            return False
+
+        type_name = self._record_type_name(record.rtype)
+        if record.cache_flush:
+            self._rejection_counts[("unexpected_cache_flush", type_name)] += 1
+
+        name = _normalise_dns_name(record.name)
+        parsed_data = record.parsed_data
+        if record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+            if not isinstance(parsed_data, str):
+                return False
+            try:
+                parsed_address = ipaddress.ip_address(parsed_data)
+            except ValueError:
+                self._rejection_counts[("invalid_address", type_name)] += 1
+                return False
+            if (
+                isinstance(parsed_address, ipaddress.IPv6Address)
+                and parsed_address.ipv4_mapped is not None
+            ):
+                parsed_data = f"::ffff:{parsed_address.ipv4_mapped}"
+            else:
+                parsed_data = str(parsed_address)
+
+        masked_class = record.rclass & 0x7FFF
+        identity = (name, record.rtype, masked_class, record.rdata)
+        owner_records = self._records_by_owner.get(name)
+        by_type = owner_records.get(record.rtype, {}) if owner_records else {}
+        existing = by_type.get(identity)
+
+        if record.ttl == 0:
+            if existing is None:
+                return False
+            expires_at = time.monotonic() + 1.0
+            existing.expires_at = expires_at
+            self._pending_expiries[identity] = expires_at
+            return True
+
+        retained_payload_bytes = _retained_payload_cost(
+            name,
+            record.rtype,
+            record.rdata,
+            parsed_data,
+        )
+        if retained_payload_bytes > _MAX_RETAINED_PAYLOAD_BYTES_PER_RECORD:
+            self._byte_incomplete_owner_types.add((name, record.rtype))
+            self._rejection_counts[("record_byte_capacity", type_name)] += 1
+            return False
+
+        previous_payload_bytes = (
+            existing.retained_payload_bytes if existing is not None else 0
+        )
+        prospective_payload_bytes = (
+            self._retained_payload_bytes
+            - previous_payload_bytes
+            + retained_payload_bytes
+        )
+        if (
+            self._retained_payload_budget_exhausted
+            or prospective_payload_bytes > _MAX_RETAINED_PAYLOAD_BYTES_PER_SWEEP
+        ):
+            self._retained_payload_budget_exhausted = True
+            self._rejection_counts[("sweep_byte_capacity", type_name)] += 1
+            return False
+
+        if existing is not None:
+            existing.parsed_data = parsed_data
+            existing.retained_payload_bytes = retained_payload_bytes
+            existing.expires_at = None
+            self._pending_expiries.pop(identity, None)
+            self._retained_payload_bytes = prospective_payload_bytes
+            return True
+
+        if not self._admit_owner(name):
+            if record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+                self._address_budget_exhausted = True
+                self._rejection_counts[("address_capacity", type_name)] += 1
+            return False
+        by_type = self._records_by_owner[name].setdefault(record.rtype, {})
+
+        if record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+            if (
+                self._address_budget_exhausted
+                or name in self._address_overflowed_owners
+            ):
+                self._rejection_counts[("address_capacity", type_name)] += 1
+                return False
+            address_count_for_owner = sum(
+                len(self._records_by_owner[name].get(address_type, {}))
+                for address_type in (DNS_TYPE_A, DNS_TYPE_AAAA)
+            )
+            if address_count_for_owner >= self._MAX_ADDRESS_RRS_PER_OWNER:
+                self._address_overflowed_owners.add(name)
+                self._rejection_counts[("address_capacity", type_name)] += 1
+                return False
+            if self._address_rr_count >= self._MAX_ADDRESS_RRS_PER_SWEEP:
+                self._address_budget_exhausted = True
+                self._address_overflowed_owners.add(name)
+                self._rejection_counts[("address_capacity", type_name)] += 1
+                return False
+
+        limit: int | None = None
+        if record.rtype == DNS_TYPE_TXT:
+            limit = self._MAX_TXT_RRS_PER_OWNER
+        elif record.rtype == DNS_TYPE_SRV:
+            limit = self._MAX_SRV_RRS_PER_OWNER
+        if limit is not None and len(by_type) >= limit:
+            type_name = self._record_type_name(record.rtype)
+            self._rejection_counts[("rr_identity_limit", type_name)] += 1
+            return False
+
+        cached = _CachedResourceRecord(
+            name=name,
+            rtype=record.rtype,
+            rclass=masked_class,
+            rdata=record.rdata,
+            parsed_data=parsed_data,
+            retained_payload_bytes=retained_payload_bytes,
+        )
+        by_type[cached.identity] = cached
+        self._retained_payload_bytes = prospective_payload_bytes
+        if record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+            self._address_rr_count += 1
+        return True
+
+    def next_expiry_delay(self, now: float) -> float | None:
+        """Return the delay until the nearest pending goodbye expires."""
+        if not self._pending_expiries:
+            return None
+        return max(min(self._pending_expiries.values()) - now, 0.0)
+
+    def expire(self, now: float) -> int:
+        """Remove every exact RR whose one-second goodbye grace has elapsed."""
+        due = [
+            identity
+            for identity, expires_at in self._pending_expiries.items()
+            if now >= expires_at
+        ]
+        expired = 0
+        for identity in due:
+            self._pending_expiries.pop(identity, None)
+            owner, rtype, _rclass, _rdata = identity
+            by_owner = self._records_by_owner.get(owner)
+            if by_owner is None:
+                continue
+            by_type = by_owner.get(rtype)
+            expired_record = (
+                by_type.pop(identity, None) if by_type is not None else None
+            )
+            if expired_record is None:
+                continue
+            self._retained_payload_bytes -= expired_record.retained_payload_bytes
+            if self._retained_payload_bytes < 0:
+                raise RuntimeError("mDNS retained-payload accounting underflow")
+            if rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+                self._address_rr_count -= 1
+            expired += 1
+            if not by_type:
+                by_owner.pop(rtype, None)
+        return expired
+
+    def _reject(self, instance: str, reason: str, record_type: str) -> None:
+        """Count one stable, privacy-safe rejection reason per instance."""
+        rejection = (instance, reason, record_type)
+        if rejection in self._reported_rejections:
+            return
+        self._reported_rejections.add(rejection)
+        self._rejection_counts[(reason, record_type)] += 1
+
+    @staticmethod
+    def _txt_values(txt_data: TxtData, key: str) -> tuple[str, ...]:
+        """Read every raw value for a TXT key without last-wins collapse."""
+        values: list[str] = []
+        for string in txt_data.strings:
+            candidate_key, separator, value = string.partition("=")
+            if separator and candidate_key == key:
+                values.append(value)
+        return tuple(values)
+
+    def _resolve_txt_metadata(
+        self, instance: str
+    ) -> tuple[str, int, str | None, Literal["wifi", "thread"]] | None:
+        """Resolve one unambiguous TXT construction identity for an owner."""
+        if (instance, DNS_TYPE_TXT) in self._byte_incomplete_owner_types:
+            return None
+        serial: str | None = None
+        product_id: int | None = None
+        firmware: str | None = None
+        firmware_seen = False
+        connectivity: Literal["wifi", "thread"] | None = None
+
+        for record in self.records_for(instance, DNS_TYPE_TXT):
+            if not isinstance(record.parsed_data, TxtData):
+                self._reject(instance, "malformed_packet", "TXT")
+                return None
+            txt_data = record.parsed_data
+
+            candidate_ids = self._txt_values(txt_data, "id")
+            if not candidate_ids or any(not value for value in candidate_ids):
+                self._reject(instance, "missing_txt_id", "TXT")
+                return None
+            for candidate_id in candidate_ids:
+                candidate_serial = _validate_txt_id(candidate_id)
+                if candidate_serial is None:
+                    self._reject(instance, "invalid_txt_id", "TXT")
+                    return None
+                if serial is None:
+                    serial = candidate_serial
+                elif candidate_serial != serial:
+                    self._reject(instance, "conflicting_txt_id", "TXT")
+                    return None
+
+            product_values = self._txt_values(txt_data, "p")
+            if not product_values or any(not value for value in product_values):
+                self._reject(instance, "missing_product_id", "TXT")
+                return None
+            for product_value in product_values:
+                try:
+                    candidate_product_id = int(product_value)
+                except ValueError:
+                    self._reject(instance, "invalid_product_id", "TXT")
+                    return None
+                if product_id is None:
+                    product_id = candidate_product_id
+                elif candidate_product_id != product_id:
+                    return None
+
+            firmware_values = self._txt_values(txt_data, "fw")
+            for candidate_firmware in firmware_values or (None,):
+                if not firmware_seen:
+                    firmware = candidate_firmware
+                    firmware_seen = True
+                elif candidate_firmware != firmware:
+                    return None
+
+            connectivity_values = self._txt_values(txt_data, "tm")
+            for raw_connectivity in connectivity_values or (None,):
+                candidate_connectivity = _connectivity_from_txt(raw_connectivity)
+                if connectivity is None:
+                    connectivity = candidate_connectivity
+                elif candidate_connectivity != connectivity:
+                    return None
+
+        if serial is None or product_id is None or connectivity is None:
+            return None
+        return serial, product_id, firmware, connectivity
+
+    def _resolve_srv_endpoint(self, instance: str) -> tuple[str, int] | None:
+        """Resolve one target and port when every live SRV RR agrees."""
+        if (instance, DNS_TYPE_SRV) in self._byte_incomplete_owner_types:
+            return None
+        endpoints: set[tuple[str, int]] = set()
+        for record in self.records_for(instance, DNS_TYPE_SRV):
+            if not isinstance(record.parsed_data, SrvData):
+                self._reject(instance, "malformed_packet", "SRV")
+                return None
+            if not (1024 <= record.parsed_data.port <= 65535):
+                self._reject(instance, "invalid_port", "SRV")
+                return None
+            endpoints.add(
+                (
+                    _normalise_dns_name(record.parsed_data.target),
+                    record.parsed_data.port,
+                )
+            )
+        if len(endpoints) != 1:
+            return None
+        return next(iter(endpoints))
 
     @staticmethod
     def _setdefault(table: dict[str, str], key: str, value: str) -> None:
@@ -109,14 +579,6 @@ class _LifxRecordCache:
             return
         if len(table) < _LifxRecordCache._MAX_ENTRIES:
             table[key] = value
-
-    @staticmethod
-    def _add_to_set(table: set[str], value: str) -> bool:
-        """Add a new value to a bounded set, returning whether it was remembered."""
-        if len(table) >= _LifxRecordCache._MAX_ENTRIES:
-            return False
-        table.add(value)
-        return True
 
     def add_packet(self, records: list, source_ip: str) -> bool:
         """Merge one packet's records into the cache.
@@ -133,74 +595,86 @@ class _LifxRecordCache:
         packet_instances: set[str] = set()
         has_lifx = False
 
+        packet_address_owners: set[str] = set()
         for record in records:
-            name = record.name.lower()
-            if LIFX_MDNS_SERVICE in name:
+            name = _normalise_dns_name(record.name)
+            is_construction_record = record.rtype in (DNS_TYPE_TXT, DNS_TYPE_SRV)
+            if is_construction_record and not _is_lifx_service_instance(name):
+                continue
+
+            admitted = self._add_record(record)
+            if not admitted:
+                continue
+            if is_construction_record:
                 has_lifx = True
-            if record.rtype == DNS_TYPE_SRV and isinstance(record.parsed_data, SrvData):
-                self._add(self._srv_by_instance, name, record.parsed_data)
-            elif record.rtype == DNS_TYPE_TXT and isinstance(
-                record.parsed_data, TxtData
-            ):
-                self._add(self._txt_by_instance, name, record.parsed_data)
-                if len(packet_instances) < 2:
-                    packet_instances.add(name)
-                # A TXT record in LIFX format marks the packet as LIFX even
-                # without a service name match, so that duplicate
-                # re-announcements keep resetting the caller's idle deadline
-                if "id" in record.parsed_data.pairs and "p" in record.parsed_data.pairs:
-                    has_lifx = True
-            elif record.rtype == DNS_TYPE_A and isinstance(record.parsed_data, str):
-                self._add(self._a_by_host, name, record.parsed_data)
-            elif record.rtype == DNS_TYPE_AAAA and isinstance(record.parsed_data, str):
-                addrs = self._aaaa_by_host.get(name)
-                if addrs is None:
-                    if len(self._aaaa_by_host) >= self._MAX_ENTRIES:
-                        continue
-                    addrs = []
-                    self._aaaa_by_host[name] = addrs
-                if record.parsed_data not in addrs and len(addrs) < 16:
-                    addrs.append(record.parsed_data)
+            if record.rtype == DNS_TYPE_TXT and len(packet_instances) < 2:
+                packet_instances.add(name)
+            elif record.rtype in (DNS_TYPE_A, DNS_TYPE_AAAA):
+                packet_address_owners.add(name)
+
+        # Address records are bounded candidates, not construction evidence.
+        # They become LIFX activity only when a live SRV from an exact LIFX
+        # instance explicitly links its target owner.
+        linked_targets = {
+            _normalise_dns_name(record.parsed_data.target)
+            for instance in self.owners_for(DNS_TYPE_SRV)
+            if _is_lifx_service_instance(instance)
+            for record in self.records_for(instance, DNS_TYPE_SRV)
+            if isinstance(record.parsed_data, SrvData)
+        }
+        if packet_address_owners & linked_targets:
+            has_lifx = True
 
         # A packet advertising exactly one instance came from the device
         # itself (not an advertising proxy), so its source address can serve
         # as the device address if no A/AAAA record ever resolves.
         if len(packet_instances) == 1:
             instance = next(iter(packet_instances))
-            if instance in self._txt_by_instance:
-                self._setdefault(self._fallback_ip_by_instance, instance, source_ip)
+            if self.records_for(instance, DNS_TYPE_TXT):
+                try:
+                    validate_address(source_ip)
+                except ValueError:
+                    self.count_rejection("invalid_address", "A")
+                else:
+                    fallback_ip = str(ipaddress.ip_address(source_ip))
+                    self._setdefault(
+                        self._fallback_ip_by_instance, instance, fallback_ip
+                    )
 
         return has_lifx
 
-    def resolve(self) -> list[LifxServiceRecord]:
+    def resolve(self, *, allow_fallback: bool = True) -> list[_LifxServiceRecord]:
         """Return service records for instances that can now be resolved.
 
         Each instance is returned at most once across the lifetime of the
-        cache.
+        cache. A live receive loop can defer packet-source fallback until
+        collection ends so a later SRV and advertised address cannot be
+        preempted by packet arrival order.
         """
-        results: list[LifxServiceRecord] = []
+        results: list[_LifxServiceRecord] = []
+        if self._retained_payload_budget_exhausted:
+            return results
 
-        for instance, txt_data in self._txt_by_instance.items():
+        for instance in self.owners_for(DNS_TYPE_TXT):
+            if not _is_lifx_service_instance(instance):
+                continue
             if instance in self._resolved_instances:
                 continue
 
-            # Extract required fields from TXT record
-            serial = txt_data.pairs.get("id", "").lower()
-            product_id_str = txt_data.pairs.get("p", "")
-            firmware = txt_data.pairs.get("fw", "")
-
-            # Validate required fields
-            if not serial or not product_id_str:
+            txt_metadata = self._resolve_txt_metadata(instance)
+            if txt_metadata is None:
                 continue
+            serial, product_id, firmware, connectivity = txt_metadata
 
-            try:
-                product_id = int(product_id_str)
-            except ValueError:
+            if (instance, DNS_TYPE_SRV) in self._byte_incomplete_owner_types:
                 continue
 
             # Get port from SRV record or use default
-            srv_data = self._srv_by_instance.get(instance)
-            port = srv_data.port if srv_data else 56700
+            srv_records = self.records_for(instance, DNS_TYPE_SRV)
+            srv_endpoint = self._resolve_srv_endpoint(instance) if srv_records else None
+            if srv_records and srv_endpoint is None:
+                continue
+            port = srv_endpoint[1] if srv_endpoint else 56700
 
             # Resolve the instance's SRV target hostname to an address. An
             # instance advertised without any SRV record falls back to the
@@ -210,25 +684,27 @@ class _LifxRecordCache:
             # follow-up query — because guessing the packet's source address
             # would misattribute devices advertised by a border router.
             ip: str | None = None
-            if srv_data is not None:
-                target = srv_data.target.lower()
-                ip = _pick_address(
-                    self._a_by_host.get(target), self._aaaa_by_host.get(target, [])
-                )
-            else:
+            addresses = frozenset[str]()
+            if srv_endpoint is not None:
+                target = srv_endpoint[0]
+                addresses = self.addresses_for(target)
+                ip = self.selected_address_for(target)
+            elif allow_fallback:
                 ip = self._fallback_ip_by_instance.get(instance)
             if ip is None:
                 continue
 
-            if not self._add_to_set(self._resolved_instances, instance):
-                continue
+            self._resolved_instances.add(instance)
             results.append(
-                LifxServiceRecord(
+                _LifxServiceRecord(
                     serial=serial,
                     ip=ip,
                     port=port,
                     product_id=product_id,
-                    firmware=firmware,
+                    firmware=firmware or "",
+                    connectivity=connectivity,
+                    addresses=addresses,
+                    service_instance=instance,
                 )
             )
 
@@ -243,25 +719,41 @@ class _LifxRecordCache:
         AAAA records. The caller can query these hosts directly.
         """
         targets: list[str] = []
+        if self._retained_payload_budget_exhausted:
+            return targets
 
-        for instance, txt_data in self._txt_by_instance.items():
+        for instance in self.owners_for(DNS_TYPE_TXT):
+            if not _is_lifx_service_instance(instance):
+                continue
             if instance in self._resolved_instances:
                 continue
-            if not txt_data.pairs.get("id") or not txt_data.pairs.get("p"):
+            if self._resolve_txt_metadata(instance) is None:
                 continue
-            srv_data = self._srv_by_instance.get(instance)
-            if srv_data is None:
+            if (instance, DNS_TYPE_SRV) in self._byte_incomplete_owner_types:
                 continue
-            target = srv_data.target.lower()
-            if target in self._a_by_host or target in self._aaaa_by_host:
+            srv_records = self.records_for(instance, DNS_TYPE_SRV)
+            if not srv_records:
+                continue
+            srv_endpoint = self._resolve_srv_endpoint(instance)
+            if srv_endpoint is None:
+                continue
+            target = srv_endpoint[0]
+            if (
+                self._address_budget_exhausted
+                or target in self._address_overflowed_owners
+                or (target, DNS_TYPE_A) in self._byte_incomplete_owner_types
+                or (target, DNS_TYPE_AAAA) in self._byte_incomplete_owner_types
+            ):
+                continue
+            if self.selected_address_for(target) is not None:
                 continue
             targets.append(target)
 
         return targets
 
 
-def create_device_from_record(
-    record: LifxServiceRecord,
+def _create_device_from_record(
+    record: _LifxServiceRecord,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Light | None:
@@ -271,7 +763,7 @@ def create_device_from_record(
     the correct device class (Light, MatrixLight, MultiZoneLight, etc.).
 
     Args:
-        record: LifxServiceRecord from mDNS discovery
+        record: Internal mDNS service record
         timeout: Request timeout for the device
         max_retries: Maximum retry attempts for requests
 
@@ -279,14 +771,6 @@ def create_device_from_record(
         Device instance of the appropriate type, or None if device should be skipped
         (e.g., relay/button-only devices)
 
-    Example:
-        ```python
-        async for record in discover_lifx_services():
-            device = create_device_from_record(record)
-            if device:
-                async with device:
-                    print(f"Device: {await device.get_label()}")
-        ```
     """
     from lifx.devices.ceiling import CeilingLight
     from lifx.devices.hev import HevLight
@@ -306,27 +790,34 @@ def create_device_from_record(
     }
 
     # Priority-based selection matching DiscoveredDevice.create_device()
+    device: Light | None
     if is_ceiling_product(record.product_id):
-        return CeilingLight(**kwargs)
-    if product.has_matrix:
-        return MatrixLight(**kwargs)
-    if product.has_multizone:
-        return MultiZoneLight(**kwargs)
-    if product.has_infrared:
-        return InfraredLight(**kwargs)
-    if product.has_hev:
-        return HevLight(**kwargs)
-    if product.has_relays or (product.has_buttons and not product.has_color):
-        return None
-    return Light(**kwargs)
+        device = CeilingLight(**kwargs)
+    elif product.has_matrix:
+        device = MatrixLight(**kwargs)
+    elif product.has_multizone:
+        device = MultiZoneLight(**kwargs)
+    elif product.has_infrared:
+        device = InfraredLight(**kwargs)
+    elif product.has_hev:
+        device = HevLight(**kwargs)
+    elif product.has_relays or (product.has_buttons and not product.has_color):
+        device = None
+    else:
+        device = Light(**kwargs)
+
+    if device is not None:
+        device._set_connectivity(record.connectivity)
+    return device
 
 
-async def discover_lifx_services(
+async def _discover_lifx_services_sweep(
+    record_cache: _LifxRecordCache,
     timeout: float = DISCOVERY_TIMEOUT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
-) -> AsyncGenerator[LifxServiceRecord, None]:
-    """Discover LIFX devices via mDNS and yield service records.
+) -> AsyncGenerator[_LifxServiceRecord, None]:
+    """Run one mDNS discovery sweep using invocation-local cache state.
 
     Sends an mDNS PTR query for _lifx._udp.local and yields service records
     as devices respond. Records are deduplicated by serial number.
@@ -340,21 +831,33 @@ async def discover_lifx_services(
         idle_timeout_multiplier: Multiplier for idle timeout
 
     Yields:
-        LifxServiceRecord for each discovered device
-
-    Example:
-        ```python
-        async for record in discover_lifx_services(timeout=10.0):
-            print(f"Found: {record.serial} (product {record.product_id})")
-            print(f"  IP: {record.ip}:{record.port}")
-            print(f"  Firmware: {record.firmware}")
-        ```
+        Internal service record for each discovered device
     """
     seen_serials: set[str] = set()
-    record_cache = _LifxRecordCache()
     queried_targets: set[str] = set()
     query_attempts: dict[str, int] = {}
     start_time = time.monotonic()
+
+    def new_records(*, allow_fallback: bool = False) -> list[_LifxServiceRecord]:
+        """Resolve and serial-deduplicate records ready in this sweep."""
+        records: list[_LifxServiceRecord] = []
+        for record in record_cache.resolve(allow_fallback=allow_fallback):
+            if record.serial in seen_serials:
+                continue
+            seen_serials.add(record.serial)
+            _LOGGER.debug(
+                {
+                    "class": "_discover_lifx_services",
+                    "method": "discover",
+                    "action": "device_found",
+                    "serial": record.serial,
+                    "ip": record.ip,
+                    "port": record.port,
+                    "product_id": record.product_id,
+                }
+            )
+            records.append(record)
+        return records
 
     async with MdnsTransport() as transport:
         # Build and send PTR query
@@ -362,7 +865,7 @@ async def discover_lifx_services(
 
         _LOGGER.debug(
             {
-                "class": "discover_lifx_services",
+                "class": "_discover_lifx_services",
                 "method": "discover",
                 "action": "sending_query",
                 "service": LIFX_MDNS_SERVICE,
@@ -382,10 +885,28 @@ async def discover_lifx_services(
 
         # Collect responses with dynamic timeout
         while True:
+            now = time.monotonic()
+            record_cache.expire(now)
+
+            # Process every due clock cause in deterministic order: elapsed
+            # goodbye expiry first, then a due query retransmission.
+            elapsed = now - start_time
+            if retransmit_delays and elapsed >= retransmit_delays[0]:
+                retransmit_delays.pop(0)
+                _LOGGER.debug(
+                    {
+                        "class": "_discover_lifx_services",
+                        "method": "discover",
+                        "action": "retransmitting_query",
+                        "elapsed": elapsed,
+                    }
+                )
+                await transport.send(query)
+
             if deadline.idle_expired:
                 _LOGGER.debug(
                     {
-                        "class": "discover_lifx_services",
+                        "class": "_discover_lifx_services",
                         "method": "discover",
                         "action": "idle_timeout",
                         "idle_time": time.monotonic() - deadline._last_response,
@@ -397,7 +918,7 @@ async def discover_lifx_services(
             if deadline.overall_expired:
                 _LOGGER.debug(
                     {
-                        "class": "discover_lifx_services",
+                        "class": "_discover_lifx_services",
                         "method": "discover",
                         "action": "overall_timeout",
                         "elapsed": time.monotonic() - deadline._start,
@@ -410,35 +931,33 @@ async def discover_lifx_services(
             if remaining <= 0:
                 break
 
-            # Cap the receive timeout at the next scheduled retransmission
-            elapsed = time.monotonic() - start_time
-            if retransmit_delays and elapsed >= retransmit_delays[0]:
-                retransmit_delays.pop(0)
-                _LOGGER.debug(
-                    {
-                        "class": "discover_lifx_services",
-                        "method": "discover",
-                        "action": "retransmitting_query",
-                        "elapsed": elapsed,
-                    }
-                )
-                await transport.send(query)
+            for record in new_records():
+                yield record
+
+            # Clock-only work may shorten this receive, but it never mutates
+            # or extends the caller-owned IdleDeadline.
             if retransmit_delays:
                 remaining = min(remaining, retransmit_delays[0] - elapsed)
+            expiry_delay = record_cache.next_expiry_delay(now)
+            if expiry_delay is not None:
+                remaining = min(remaining, expiry_delay)
 
             try:
                 data, addr = await transport.receive(timeout=max(remaining, 0.01))
             except LifxTimeoutError:
-                if retransmit_delays:
-                    # Timed out waiting for the retransmission slot, not the
-                    # deadline — loop to re-send the query
+                if (
+                    retransmit_delays
+                    or record_cache.next_expiry_delay(time.monotonic()) is not None
+                ):
+                    # A scheduled retransmission or goodbye expiry still owns
+                    # a wake-up inside the unchanged caller deadline.
                     continue
                 # Clean end of collection — no more responses within the deadline
                 break
             except LifxNetworkError as e:
                 _LOGGER.warning(
                     {
-                        "class": "discover_lifx_services",
+                        "class": "_discover_lifx_services",
                         "action": "network_error",
                         "error": str(e),
                     }
@@ -447,7 +966,7 @@ async def discover_lifx_services(
             except Exception as e:
                 _LOGGER.error(
                     {
-                        "class": "discover_lifx_services",
+                        "class": "_discover_lifx_services",
                         "action": "unexpected_error",
                         "error": str(e),
                     },
@@ -456,113 +975,123 @@ async def discover_lifx_services(
                 raise
 
             try:
-                # Parse DNS response
                 response = parse_dns_response(data)
+            except (ValueError, IndexError, struct.error):
+                record_cache.count_rejection("malformed_packet", "PACKET")
+                continue
 
-                # Only process responses (not queries)
-                if not response.header.is_response:
+            # Only process responses (not queries)
+            if not response.header.is_response:
+                continue
+
+            # Merge every response packet into the cache: a packet
+            # carrying only A/AAAA records may complete an instance whose
+            # SRV/TXT arrived in an earlier packet. A packet may also
+            # advertise multiple instances at once (e.g. a Thread border
+            # router answering for its whole mesh).
+            had_lifx = record_cache.add_packet(response.records, addr[0])
+            extracted = new_records()
+
+            if not had_lifx and not extracted:
+                continue
+
+            # Reset idle timer on every valid LIFX response, before the
+            # dedup check — repeated mDNS re-announcements from one device
+            # must not cause premature idle expiry while slower devices
+            # have not yet answered (Pitfall 1 / D-04, mirroring
+            # _discover_with_packet).
+            deadline.mark_response()
+
+            for record in extracted:
+                yield record
+
+            # Query address records the responses did not include (a
+            # single reply packet may not have room for every AAAA
+            # record). Admission and retry limits bound traffic even
+            # when sends fail persistently.
+            for target in record_cache.pending_targets():
+                if target in queried_targets:
                     continue
 
-                # Merge every response packet into the cache: a packet
-                # carrying only A/AAAA records may complete an instance whose
-                # SRV/TXT arrived in an earlier packet. A packet may also
-                # advertise multiple instances at once (e.g. a Thread border
-                # router answering for its whole mesh).
-                had_lifx = record_cache.add_packet(response.records, addr[0])
-                extracted = record_cache.resolve()
-
-                if not had_lifx and not extracted:
+                attempts = query_attempts.get(target)
+                if attempts is None:
+                    if len(query_attempts) >= 64:
+                        continue
+                    attempts = 0
+                if attempts >= 2:
                     continue
 
-                # Reset idle timer on every valid LIFX response, before the
-                # dedup check — repeated mDNS re-announcements from one device
-                # must not cause premature idle expiry while slower devices
-                # have not yet answered (Pitfall 1 / D-04, mirroring
-                # _discover_with_packet).
-                deadline.mark_response()
-
-                for record in extracted:
-                    # Deduplicate by serial
-                    if record.serial in seen_serials:
-                        continue
-
-                    seen_serials.add(record.serial)
-
-                    _LOGGER.debug(
-                        {
-                            "class": "discover_lifx_services",
-                            "method": "discover",
-                            "action": "device_found",
-                            "serial": record.serial,
-                            "ip": record.ip,
-                            "port": record.port,
-                            "product_id": record.product_id,
-                        }
-                    )
-
-                    yield record
-
-                # Query address records the responses did not include (a
-                # single reply packet may not have room for every AAAA
-                # record). Admission and retry limits bound traffic even
-                # when sends fail persistently.
-                for target in record_cache.pending_targets():
-                    if target in queried_targets:
-                        continue
-
-                    attempts = query_attempts.get(target)
-                    if attempts is None:
-                        if len(query_attempts) >= 64:
-                            continue
-                        attempts = 0
-                    if attempts >= 2:
-                        continue
-
-                    query_attempts[target] = attempts + 1
-                    _LOGGER.debug(
-                        {
-                            "class": "discover_lifx_services",
-                            "method": "discover",
-                            "action": "querying_addresses",
-                            "target": target,
-                            "attempt": attempts + 1,
-                        }
-                    )
-                    try:
-                        await transport.send(build_address_query(target))
-                    except LifxNetworkError as error:
-                        _LOGGER.debug(
-                            {
-                                "class": "discover_lifx_services",
-                                "method": "discover",
-                                "action": "address_query_failed",
-                                "target": target,
-                                "attempt": attempts + 1,
-                                "error": str(error),
-                            }
-                        )
-                        continue
-                    queried_targets.add(target)
-
-            except Exception as e:
+                query_attempts[target] = attempts + 1
                 _LOGGER.debug(
                     {
-                        "class": "discover_lifx_services",
+                        "class": "_discover_lifx_services",
                         "method": "discover",
-                        "action": "parse_error",
-                        "error": str(e),
-                        "source_ip": addr[0],
+                        "action": "querying_addresses",
+                        "target": target,
+                        "attempt": attempts + 1,
                     }
                 )
-                continue
+                try:
+                    await transport.send(build_address_query(target))
+                except LifxNetworkError as error:
+                    _LOGGER.debug(
+                        {
+                            "class": "_discover_lifx_services",
+                            "method": "discover",
+                            "action": "address_query_failed",
+                            "target": target,
+                            "attempt": attempts + 1,
+                            "error": str(error),
+                        }
+                    )
+                    continue
+                queried_targets.add(target)
+
+        # Packet-source fallback is a last resort. Waiting until collection
+        # closes prevents a TXT-only packet from winning over a later SRV and
+        # advertised A/AAAA response solely because it arrived first.
+        for record in new_records(allow_fallback=True):
+            yield record
 
         _LOGGER.debug(
             {
-                "class": "discover_lifx_services",
+                "class": "_discover_lifx_services",
                 "method": "discover",
                 "action": "complete",
                 "devices_found": len(seen_serials),
                 "elapsed": time.monotonic() - start_time,
+            }
+        )
+
+
+async def _discover_lifx_services(
+    timeout: float = DISCOVERY_TIMEOUT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+) -> AsyncGenerator[_LifxServiceRecord, None]:
+    """Discover LIFX services and report one bounded rejection aggregate."""
+    record_cache = _LifxRecordCache()
+    sweep = _discover_lifx_services_sweep(
+        record_cache,
+        timeout=timeout,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+    )
+    try:
+        async with aclosing(sweep):
+            async for record in sweep:
+                yield record
+    finally:
+        _LOGGER.debug(
+            {
+                "class": "_discover_lifx_services",
+                "action": "rejection_summary",
+                "rejections": [
+                    {"reason": reason, "type": record_type, "count": count}
+                    for (reason, record_type), count in sorted(
+                        record_cache.rejection_counts.items()
+                    )
+                ],
             }
         )
 
@@ -600,31 +1129,25 @@ async def discover_devices_mdns(
                 print(f"{type(device).__name__}: {label} at {device.ip}")
         ```
     """
-    async for record in discover_lifx_services(
+    records = _discover_lifx_services(
         timeout=timeout,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
-    ):
-        try:
-            validate_address(record.ip)
-        except ValueError as error:
-            _LOGGER.debug(
-                {
-                    "class": "discover_devices_mdns",
-                    "method": "discover",
-                    "action": "invalid_address",
-                    "serial": record.serial,
-                    "address": record.ip,
-                    "error": str(error),
-                }
+    )
+    async with aclosing(records):
+        async for record in records:
+            if not _is_lifx_service_instance(record.service_instance):
+                continue
+            try:
+                validate_address(record.ip)
+            except ValueError:
+                continue
+
+            device = _create_device_from_record(
+                record,
+                timeout=device_timeout,
+                max_retries=max_retries,
             )
-            continue
 
-        device = create_device_from_record(
-            record,
-            timeout=device_timeout,
-            max_retries=max_retries,
-        )
-
-        if device is not None:
-            yield device
+            if device is not None:
+                yield device

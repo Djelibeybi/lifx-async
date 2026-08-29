@@ -3,11 +3,12 @@
 This module defines the data structures used for mDNS service discovery.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Literal
 
 
 @dataclass(frozen=True)
-class LifxServiceRecord:
+class _LifxServiceRecord:
     """Information about a LIFX device discovered via mDNS.
 
     Attributes:
@@ -23,6 +24,9 @@ class LifxServiceRecord:
     port: int
     product_id: int
     firmware: str
+    connectivity: Literal["wifi", "thread"] = "wifi"
+    addresses: frozenset[str] = field(default_factory=frozenset)
+    service_instance: str | None = None
 
     def __hash__(self) -> int:
         """Hash based on serial number for deduplication."""
@@ -30,6 +34,6 @@ class LifxServiceRecord:
 
     def __eq__(self, other: object) -> bool:
         """Equality based on serial number."""
-        if not isinstance(other, LifxServiceRecord):
+        if not isinstance(other, _LifxServiceRecord):
             return False
         return self.serial == other.serial

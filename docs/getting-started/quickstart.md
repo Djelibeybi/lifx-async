@@ -26,7 +26,8 @@ asyncio.run(main())
 
 **Alternative: mDNS Discovery**
 
-For faster discovery with device type detection in a single query:
+As an explicit alternative to broadcast discovery, mDNS can provide device type metadata
+without a separate LIFX product query for every device:
 
 ```python
 import asyncio
@@ -43,7 +44,16 @@ async def main():
 asyncio.run(main())
 ```
 
-mDNS discovery is faster because it gets device type information directly from the mDNS response, eliminating extra network queries.
+mDNS discovery sends an initial DNS-SD PTR service query and may retransmit that PTR query
+once at one second and once at three seconds within the caller's deadline. It assembles valid
+legacy-unicast replies during the quiet window and yields devices incrementally as an async
+generator. Only when a valid SRV target lacks a usable address does it send bounded A/AAAA
+follow-ups: one successful send, or no more than two failed attempts, for each of at most 64
+targets.
+
+This opt-in discovery path may be unavailable on networks or devices that do not expose the
+required DNS-SD service records. Use `discover()` as the broadcast fallback when mDNS is not
+available. Each yielded device reports `connectivity` as either `"wifi"` or `"thread"`.
 
 ### 2. Control a Light
 

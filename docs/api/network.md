@@ -18,18 +18,6 @@ Functions for discovering LIFX devices on the local network.
       heading_level: 3
       members_order: source
 
-::: lifx.network.mdns.discover_lifx_services
-    options:
-      show_root_heading: true
-      heading_level: 3
-      members_order: source
-
-::: lifx.network.mdns.LifxServiceRecord
-    options:
-      show_root_heading: true
-      heading_level: 3
-      members_order: source
-
 ### DiscoveryResponse
 
 Response dataclass from custom discovery broadcasts (using packets other than GetService).

@@ -49,8 +49,8 @@ uv run python examples/discovery_find_device.py --ip 192.168.1.100
 
 ### discovery_mdns
 
-Discovers devices using mDNS/DNS-SD instead of UDP broadcast. Demonstrates both the high-level
-API (yields device instances) and low-level API (yields raw service records).
+Discovers devices using mDNS/DNS-SD instead of UDP broadcast. Demonstrates the supported
+device-level API and reports each device's `"wifi"` or `"thread"` connectivity.
 
 ```bash
 uv run python examples/discovery_mdns.py

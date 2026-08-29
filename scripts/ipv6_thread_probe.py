@@ -19,9 +19,9 @@ independently:
             did not answer".
 4. control  With --serial, the one named device is driven through a
             set_power and a set_color roundtrip with readback, and its full
-            pre-run state is restored afterwards. This is the Phase 10
-            hardware UAT: with --uat-output it writes the machine-checkable
-            record that gates the merge.
+            pre-run state is restored afterwards. With --uat-output it writes
+            a privacy-sanitised Phase 11 diagnostic record. This schema does
+            not replace or feed the immutable Phase 10 merge-gate artefact.
 5. stream   With --stream as well, a short bounded Animator frame run is
             delivered to the same device, strictly after the control stage.
             Its result is recorded as an artefact and gates nothing.
@@ -31,7 +31,8 @@ Usage:
     uv run scripts/ipv6_thread_probe.py --stage records --timeout 20
     uv run scripts/ipv6_thread_probe.py --stage ports
     uv run scripts/ipv6_thread_probe.py --serial d073d5123456 \\
-        --uat-output .planning/phases/10-land-the-ipv6-thread-branch/10-UAT-RESULTS.json
+        --device-alias thread-target-alpha \\
+        --uat-output .planning/phases/11-mdns-hardening/11-UAT-RESULTS.json
 
 The control stage mutates a real device, so it is opt-in per device: without
 --serial nothing is written to any light and the control stage is recorded as
@@ -49,6 +50,7 @@ import argparse
 import asyncio
 import ipaddress
 import json
+import re
 import shutil
 import socket
 import struct
@@ -64,22 +66,27 @@ from typing import TypeVar
 from lifx.animation.animator import Animator
 from lifx.color import HSBK
 from lifx.const import (
+    IDLE_TIMEOUT_MULTIPLIER,
     LIFX_MDNS_SERVICE,
+    MAX_RESPONSE_TIME,
     MDNS_ADDRESS,
     MDNS_PORT,
 )
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixEffect, MatrixLight
-from lifx.devices.multizone import MultiZoneLight
-from lifx.exceptions import LifxError, LifxTimeoutError
+from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.exceptions import LifxError, LifxNetworkError, LifxTimeoutError
 from lifx.network.mdns import discovery as mdns_discovery
 from lifx.network.mdns.discovery import (
+    _create_device_from_record,
+    _discover_lifx_services,
     _LifxRecordCache,
-    _pick_address,
-    create_device_from_record,
-    discover_lifx_services,
 )
 from lifx.network.mdns.dns import (
+    DNS_TYPE_A,
+    DNS_TYPE_AAAA,
+    DNS_TYPE_SRV,
+    DNS_TYPE_TXT,
     SrvData,
     TxtData,
     build_address_query,
@@ -87,8 +94,9 @@ from lifx.network.mdns.dns import (
     parse_dns_response,
 )
 from lifx.network.mdns.transport import MdnsTransport
-from lifx.network.mdns.types import LifxServiceRecord
+from lifx.network.mdns.types import _LifxServiceRecord
 from lifx.network.transport import _UdpProtocol
+from lifx.network.utils import IdleDeadline
 from lifx.products import get_product
 from lifx.protocol.protocol_types import FirmwareEffect
 
@@ -104,9 +112,26 @@ STAGE_PASSED = "passed"
 STAGE_FAILED = "failed"
 STAGE_NOT_RUN = "not_run"
 
-UAT_SCHEMA_VERSION = 1
-UAT_KIND = "thread-hardware-uat"
-UAT_PHASE = "10"
+UAT_SCHEMA_VERSION = 2
+UAT_KIND = "thread-hardware-uat-sanitised"
+UAT_PHASE = "11"
+
+_DEVICE_ALIAS_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
+_LIBRARY_HEAD_PATTERN = re.compile(r"[0-9a-f]{7,64}\Z")
+_UAT_RECORD_KEYS = {
+    "schema_version",
+    "kind",
+    "phase",
+    "device_alias",
+    "network",
+    "timestamp",
+    "library_head",
+    "stages",
+    "restored",
+}
+_UAT_NETWORK_KEYS = {"address_family", "connectivity"}
+_UAT_STAGE_KEYS = {"connect", "control", "streaming"}
+_UAT_STAGE_VALUES = {STAGE_PASSED, STAGE_FAILED, STAGE_NOT_RUN}
 
 _POWER_ON = 65535
 _POWER_OFF = 0
@@ -170,7 +195,7 @@ class SweepResult:
     lifx_packet_count: int = 0
     malformed_count: int = 0
     sources: set[str] = field(default_factory=set)
-    resolved: list[LifxServiceRecord] = field(default_factory=list)
+    resolved: list[_LifxServiceRecord] = field(default_factory=list)
 
 
 class _LegacyMdnsTransport(MdnsTransport):
@@ -221,7 +246,9 @@ async def sweep(
     """Run one full mDNS discovery sweep, keeping every record it parsed."""
     cache = _LifxRecordCache()
     queried_targets: set[str] = set()
+    query_attempts: dict[str, int] = {}
     start = time.monotonic()
+    idle_timeout = MAX_RESPONSE_TIME * IDLE_TIMEOUT_MULTIPLIER
 
     async with transport:
         sock = transport._socket  # noqa: SLF001 - diagnostic needs the real port
@@ -230,27 +257,44 @@ async def sweep(
 
         await transport.send(build_ptr_query(LIFX_MDNS_SERVICE))
         retransmit_at = [start + 1.0, start + 3.0]
+        deadline = IdleDeadline(timeout, idle_timeout)
 
-        while time.monotonic() - start < timeout:
+        while True:
             now = time.monotonic()
-            while retransmit_at and now >= retransmit_at[0]:
+            cache.expire(now)
+
+            # Match production clock ordering: elapsed goodbyes disappear
+            # before one due PTR retransmission is processed.
+            if retransmit_at and now >= retransmit_at[0]:
                 retransmit_at.pop(0)
                 await transport.send(build_ptr_query(LIFX_MDNS_SERVICE))
 
-            try:
-                data, addr = await transport.receive(timeout=0.5)
-            except LifxTimeoutError:
-                for target in cache.pending_targets():
-                    if target in queried_targets:
-                        continue
-                    queried_targets.add(target)
-                    if verbose:
-                        print(f"    [follow-up A/AAAA query for {target}]")
-                    await transport.send(build_address_query(target))
+            if deadline.idle_expired or deadline.overall_expired:
+                break
+
+            remaining = deadline.remaining()
+            if remaining <= 0:
+                break
+            if retransmit_at:
+                remaining = min(remaining, retransmit_at[0] - now)
+            expiry_delay = cache.next_expiry_delay(now)
+            if expiry_delay is not None:
+                remaining = min(remaining, expiry_delay)
+
+            # A due clock cause is handled at the top of the loop. Do not
+            # invent a positive wait that could reorder simultaneous causes.
+            if remaining <= 0:
                 continue
 
-            result.packet_count += 1
-            result.sources.add(addr[0])
+            try:
+                data, addr = await transport.receive(timeout=remaining)
+            except LifxTimeoutError:
+                if (
+                    retransmit_at
+                    or cache.next_expiry_delay(time.monotonic()) is not None
+                ):
+                    continue
+                break
 
             try:
                 response = parse_dns_response(data)
@@ -260,34 +304,89 @@ async def sweep(
                     print(f"    [malformed packet from {addr[0]}: {exc}]")
                 continue
 
+            if not response.header.is_response:
+                continue
+
+            result.packet_count += 1
+            result.sources.add(addr[0])
+
             if cache.add_packet(response.records, addr[0]):
                 result.lifx_packet_count += 1
+                # Reset after parsing and cache work resumes so the quiet
+                # window excludes consumer work and measures network silence.
+                deadline.mark_response()
 
+                for target in cache.pending_targets():
+                    target_key = target.casefold()
+                    if target_key in queried_targets:
+                        continue
+
+                    attempts = query_attempts.get(target_key)
+                    if attempts is None:
+                        if len(query_attempts) >= 64:
+                            continue
+                        attempts = 0
+                    if attempts >= 2:
+                        continue
+
+                    query_attempts[target_key] = attempts + 1
+                    if verbose:
+                        print(f"    [follow-up A/AAAA query for {target}]")
+                    try:
+                        await transport.send(build_address_query(target))
+                    except LifxNetworkError:
+                        continue
+                    queried_targets.add(target_key)
+
+    cache.expire(time.monotonic())
     result.resolved = cache.resolve()
     return result
 
 
 def _instance_view(cache: _LifxRecordCache) -> list[tuple[str, dict[str, object]]]:
     """Pull the per-instance record set out of the cache for reporting."""
-    txt_by_instance: dict[str, TxtData] = cache._txt_by_instance  # noqa: SLF001
-    srv_by_instance: dict[str, SrvData] = cache._srv_by_instance  # noqa: SLF001
-    a_by_host: dict[str, str] = cache._a_by_host  # noqa: SLF001
-    aaaa_by_host: dict[str, list[str]] = cache._aaaa_by_host  # noqa: SLF001
     fallback: dict[str, str] = cache._fallback_ip_by_instance  # noqa: SLF001
 
     views: list[tuple[str, dict[str, object]]] = []
-    for instance in sorted(txt_by_instance):
-        srv = srv_by_instance.get(instance)
+    for instance in sorted(cache.owners_for(DNS_TYPE_TXT)):
+        txt_records = cache.records_for(instance, DNS_TYPE_TXT)
+        txt_values = [
+            record.parsed_data
+            for record in txt_records
+            if isinstance(record.parsed_data, TxtData)
+        ]
+        srv_values = [
+            record.parsed_data
+            for record in cache.records_for(instance, DNS_TYPE_SRV)
+            if isinstance(record.parsed_data, SrvData)
+        ]
+        txt = txt_values[0] if txt_values else None
+        srv = srv_values[0] if srv_values else None
         target = srv.target.lower() if srv is not None else None
+        addresses = cache.addresses_for(target) if target else frozenset()
+        a_values = [
+            record.parsed_data
+            for record in cache.records_for(target or "", DNS_TYPE_A)
+            if isinstance(record.parsed_data, str)
+        ]
+        aaaa_values = [
+            record.parsed_data
+            for record in cache.records_for(target or "", DNS_TYPE_AAAA)
+            if isinstance(record.parsed_data, str)
+        ]
         views.append(
             (
                 instance,
                 {
-                    "txt": txt_by_instance[instance],
+                    "txt": txt,
+                    "txt_count": len(txt_values),
                     "srv": srv,
+                    "srv_count": len(srv_values),
                     "target": target,
-                    "a": a_by_host.get(target) if target else None,
-                    "aaaa": aaaa_by_host.get(target, []) if target else [],
+                    "a": a_values[0] if a_values else None,
+                    "aaaa": aaaa_values,
+                    "addresses": addresses,
+                    "chosen": cache.selected_address_for(target) if target else None,
                     "fallback": fallback.get(instance),
                 },
             )
@@ -361,8 +460,8 @@ def report_records(result: SweepResult) -> None:
         else:
             print("  AAAA     : (none)")
 
-        if isinstance(a_ip, str) or aaaa_ips:
-            chosen = _pick_address(a_ip if isinstance(a_ip, str) else None, aaaa_ips)
+        if view["addresses"]:
+            chosen = view["chosen"]
         elif isinstance(view["fallback"], str):
             chosen = view["fallback"]
         else:
@@ -374,6 +473,7 @@ def report_records(result: SweepResult) -> None:
             else:
                 print("  CHOSEN   : none - no SRV record and no fallback source")
             continue
+        assert isinstance(chosen, str)
 
         classification = classify_address(chosen)
         if isinstance(a_ip, str) and chosen == a_ip:
@@ -460,15 +560,15 @@ async def stage_ports(timeout: float) -> None:
         print("  VERDICT: mixed result - re-run to check it is not just packet loss.")
 
 
-async def _collect(timeout: float) -> list[LifxServiceRecord]:
-    """Collect service records via the library's public discovery generator."""
-    records: list[LifxServiceRecord] = []
-    async for record in discover_lifx_services(timeout=timeout):
+async def _collect(timeout: float) -> list[_LifxServiceRecord]:
+    """Collect service records through the internal discovery generator."""
+    records: list[_LifxServiceRecord] = []
+    async for record in _discover_lifx_services(timeout=timeout):
         records.append(record)
     return records
 
 
-async def stage_connect(records: list[LifxServiceRecord]) -> None:
+async def stage_connect(records: list[_LifxServiceRecord]) -> None:
     """Contact each discovered device and classify any failure."""
     print(f"\n{RULE}")
     print("STAGE 3: connecting to discovered devices")
@@ -492,7 +592,7 @@ async def stage_connect(records: list[LifxServiceRecord]) -> None:
             print("      link-local address has no zone ID, so it cannot be routed")
             continue
 
-        device = create_device_from_record(record)
+        device = _create_device_from_record(record)
         if device is None:
             print(f"{label}\n      SKIP: relay/button-only product")
             continue
@@ -557,6 +657,8 @@ class CapturedState:
     power: int
     tiles: list[list[HSBK]] | None = None
     effect: MatrixEffect | None = None
+    zones: list[HSBK] | None = None
+    multizone_effect: MultiZoneEffect | None = None
     color: HSBK | None = None
 
 
@@ -576,7 +678,7 @@ class TargetOutcome:
 
 
 def _select_target(
-    records: list[LifxServiceRecord], serial: str
+    records: list[_LifxServiceRecord], serial: str
 ) -> Light | TargetNotFound:
     """Resolve a requested serial to exactly one device from the sweep.
 
@@ -605,7 +707,7 @@ def _select_target(
             reason=f"chosen address {record.ip} has no zone ID and cannot be routed",
         )
 
-    device = create_device_from_record(record)
+    device = _create_device_from_record(record)
     if device is None:
         return TargetNotFound(
             serial=wanted,
@@ -633,6 +735,17 @@ async def _capture_device_state(device: Light) -> CapturedState:
         effect = await device.get_effect()
         running = effect if effect.effect_type != FirmwareEffect.OFF else None
         return CapturedState(kind="matrix", power=power, tiles=tiles, effect=running)
+
+    if isinstance(device, MultiZoneLight):
+        zones = await device.get_all_color_zones()
+        power = await device.get_power()
+        effect = await device.get_effect()
+        return CapturedState(
+            kind="multizone",
+            power=power,
+            zones=zones,
+            multizone_effect=effect,
+        )
 
     color, power, _label = await device.get_color()
     return CapturedState(kind="light", power=power, color=color)
@@ -667,6 +780,11 @@ async def _restore_device_state(device: Light, state: CapturedState) -> bool:
                     cloud_saturation_min=state.effect.cloud_saturation_min,
                     cloud_saturation_max=state.effect.cloud_saturation_max,
                 )
+        elif isinstance(device, MultiZoneLight) and state.zones is not None:
+            await device.set_all_color_zones(state.zones)
+            if state.multizone_effect is not None:
+                await device.set_effect(state.multizone_effect)
+            await device.set_power(state.power)
         else:
             if state.color is not None:
                 await device.set_color(state.color)
@@ -697,13 +815,17 @@ def _stage_result(outcome: bool | BaseException | None) -> str:
 
 
 def _build_uat_record(
-    serial: str | None, ip: str | None, outcome: TargetOutcome
+    device_alias: str,
+    address_family: str | None,
+    connectivity: str | None,
+    outcome: TargetOutcome,
 ) -> dict[str, object]:
     """Assemble the machine-checkable record of what this run observed.
 
     Args:
-        serial: The target device's serial as a 12-digit hex string.
-        ip: The address the target was contacted on, or None.
+        device_alias: Stable operator-managed alias with no embedded identifier.
+        address_family: Non-identifying address family used for the connection.
+        connectivity: Public WiFi/Thread classification, when known.
         outcome: The per-stage results, exactly as observed.
 
     Returns:
@@ -730,8 +852,11 @@ def _build_uat_record(
         "schema_version": UAT_SCHEMA_VERSION,
         "kind": UAT_KIND,
         "phase": UAT_PHASE,
-        "device_serial": serial,
-        "device_ip": ip,
+        "device_alias": device_alias,
+        "network": {
+            "address_family": address_family,
+            "connectivity": connectivity,
+        },
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "library_head": library_head,
         "stages": {
@@ -743,16 +868,136 @@ def _build_uat_record(
     }
 
 
-def _write_uat_record(record: dict[str, object], path: Path) -> None:
+def _write_uat_record(
+    record: dict[str, object], path: Path, *, raw_serial: str
+) -> None:
     """Write the UAT record to disk as JSON.
 
     Args:
         record: The record from `_build_uat_record()`.
         path: Where to write it. Parent directories are created.
+        raw_serial: Selected device serial, used only for final leak validation.
     """
+    _validate_uat_record(record, raw_serial=raw_serial)
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"\nUAT record written to {path}")
+
+
+def _validate_uat_record(record: dict[str, object], *, raw_serial: str) -> None:
+    """Validate the complete privacy-safe Phase 11 evidence contract.
+
+    The raw serial is used transiently to reject a leaking alias. It is never
+    added to the record or returned by this consumer.
+    """
+    forbidden_keys = {"device_serial", "device_ip", "serial", "ip"}
+
+    def contains_forbidden_key(value: object) -> bool:
+        if isinstance(value, dict):
+            return any(
+                key in forbidden_keys or contains_forbidden_key(child)
+                for key, child in value.items()
+            )
+        if isinstance(value, list):
+            return any(contains_forbidden_key(child) for child in value)
+        return False
+
+    if contains_forbidden_key(record):
+        raise ValueError("refusing to write a UAT record containing raw identifiers")
+
+    compact_serial = re.sub(r"[^a-z0-9]", "", raw_serial.casefold())
+
+    def contains_raw_serial(value: object) -> bool:
+        if isinstance(value, str):
+            compact_value = re.sub(r"[^a-z0-9]", "", value.casefold())
+            return bool(compact_serial and compact_serial in compact_value)
+        if isinstance(value, dict):
+            return any(
+                contains_raw_serial(key) or contains_raw_serial(child)
+                for key, child in value.items()
+            )
+        if isinstance(value, list):
+            return any(contains_raw_serial(child) for child in value)
+        return False
+
+    if contains_raw_serial(record):
+        raise ValueError("UAT record contains the raw device serial")
+
+    if set(record) != _UAT_RECORD_KEYS:
+        raise ValueError("invalid Phase 11 UAT record fields")
+    if record["schema_version"] != UAT_SCHEMA_VERSION:
+        raise ValueError("invalid Phase 11 UAT schema version")
+    if record["kind"] != UAT_KIND or record["phase"] != UAT_PHASE:
+        raise ValueError("invalid Phase 11 UAT contract identity")
+
+    alias = record.get("device_alias")
+    if not isinstance(alias, str):
+        raise ValueError("refusing to write a UAT record without a valid device alias")
+    _validate_device_alias(alias, raw_serial)
+
+    network = record["network"]
+    if not isinstance(network, dict) or set(network) != _UAT_NETWORK_KEYS:
+        raise ValueError("invalid Phase 11 UAT network properties")
+    if network["address_family"] not in {None, "ipv4", "ipv6"}:
+        raise ValueError("invalid Phase 11 UAT address family")
+    if network["connectivity"] not in {None, "wifi", "thread"}:
+        raise ValueError("invalid Phase 11 UAT connectivity")
+
+    timestamp = record["timestamp"]
+    if not isinstance(timestamp, str):
+        raise ValueError("invalid Phase 11 UAT timestamp")
+    try:
+        parsed_timestamp = datetime.fromisoformat(timestamp)
+    except ValueError as exc:
+        raise ValueError("invalid Phase 11 UAT timestamp") from exc
+    if parsed_timestamp.tzinfo is None:
+        raise ValueError("invalid Phase 11 UAT timestamp")
+
+    library_head = record["library_head"]
+    if library_head is not None and (
+        not isinstance(library_head, str)
+        or _LIBRARY_HEAD_PATTERN.fullmatch(library_head) is None
+    ):
+        raise ValueError("invalid Phase 11 UAT library head")
+
+    stages = record["stages"]
+    if not isinstance(stages, dict) or set(stages) != _UAT_STAGE_KEYS:
+        raise ValueError("invalid Phase 11 UAT stages")
+    if any(value not in _UAT_STAGE_VALUES for value in stages.values()):
+        raise ValueError("invalid Phase 11 UAT stage result")
+
+    if not isinstance(record["restored"], bool):
+        raise ValueError("invalid Phase 11 UAT restoration result")
+
+
+def _validate_device_alias(alias: str, raw_serial: str) -> str:
+    """Return a stable evidence alias that cannot repeat the raw target ID."""
+    cleaned = alias.strip()
+    if not cleaned:
+        raise ValueError("--device-alias must not be empty")
+
+    if _DEVICE_ALIAS_PATTERN.fullmatch(cleaned) is None:
+        raise ValueError(
+            "--device-alias must start with a lowercase letter and contain only "
+            "lowercase letters, digits, and hyphens (maximum 64 characters)"
+        )
+
+    compact_alias = re.sub(r"[^a-z0-9]", "", cleaned.casefold())
+    compact_serial = re.sub(r"[^a-z0-9]", "", raw_serial.strip().casefold())
+    if compact_serial and compact_serial in compact_alias:
+        raise ValueError("--device-alias must not contain the raw device serial")
+
+    return cleaned
+
+
+def _address_family(address: str) -> str | None:
+    """Reduce a live address to its non-identifying protocol family."""
+    try:
+        version = ipaddress.ip_address(address).version
+    except ValueError:
+        return None
+    return f"ipv{version}"
 
 
 def _hue_delta(first: float, second: float) -> float:
@@ -805,6 +1050,8 @@ def _exit_code(outcome: TargetOutcome) -> int:
     Streaming is deliberately absent: SPEC Requirement 9 records the streaming
     run as an artefact and does not let it gate the merge.
     """
+    if not outcome.restored:
+        return 1
     if STAGE_FAILED in (outcome.connect, outcome.control):
         return 1
     return 0
@@ -1023,10 +1270,10 @@ async def stage_target(
 
 async def main_async(args: argparse.Namespace) -> int:
     """Run the requested stages."""
-    records: list[LifxServiceRecord] = []
+    records: list[_LifxServiceRecord] = []
     outcome = TargetOutcome()
-    serial_for_record: str | None = args.serial
-    target_ip: str | None = None
+    address_family: str | None = None
+    connectivity: str | None = None
 
     try:
         if args.stage in ("records", "all"):
@@ -1044,7 +1291,6 @@ async def main_async(args: argparse.Namespace) -> int:
                 await stage_connect(records)
             else:
                 target = _select_target(records, args.serial)
-                serial_for_record = target.serial
                 if isinstance(target, TargetNotFound):
                     print(f"\n{RULE}")
                     print("STAGE 4: control UAT against the named target")
@@ -1052,13 +1298,20 @@ async def main_async(args: argparse.Namespace) -> int:
                     print(f"  {target.serial}\n      FAIL: {target.reason}")
                     outcome.connect = STAGE_FAILED
                 else:
-                    target_ip = target.ip
+                    address_family = _address_family(target.ip)
+                    connectivity = target.connectivity
                     await stage_target(target, outcome, stream=args.stream)
     finally:
         if args.uat_output is not None:
             _write_uat_record(
-                _build_uat_record(serial_for_record, target_ip, outcome),
+                _build_uat_record(
+                    args.device_alias,
+                    address_family,
+                    connectivity,
+                    outcome,
+                ),
                 args.uat_output,
+                raw_serial=args.serial,
             )
 
     return _exit_code(outcome)
@@ -1107,19 +1360,42 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--device-alias",
+        default=None,
+        metavar="ALIAS",
+        help=(
+            "Stable operator-managed alias or pseudonym for sanitised UAT evidence. "
+            "Required with --uat-output; use 1-64 lowercase letters, digits, or "
+            "hyphens, starting with a letter. It must not contain the raw serial "
+            "or an IP address. The private alias-to-device mapping stays outside "
+            "the repository."
+        ),
+    )
+    parser.add_argument(
         "--uat-output",
         type=Path,
         default=None,
         metavar="PATH",
         help=(
-            "Write this run's UAT record to PATH as JSON. Requires --serial, "
-            "because a record naming no device proves nothing."
+            "Write a sanitised Phase 11 schema-v2 diagnostic record to PATH as "
+            "JSON. Requires --serial and --device-alias. It does not replace the "
+            "Phase 10 merge-gate artefact; raw serials and IP addresses are never "
+            "written."
         ),
     )
     args = parser.parse_args()
 
     if args.uat_output is not None and args.serial is None:
         parser.error("--uat-output requires --serial: the record must name a device")
+    if args.uat_output is not None and args.device_alias is None:
+        parser.error("--uat-output requires --device-alias for sanitised evidence")
+    if args.device_alias is not None:
+        if args.serial is None:
+            parser.error("--device-alias requires --serial")
+        try:
+            args.device_alias = _validate_device_alias(args.device_alias, args.serial)
+        except ValueError as error:
+            parser.error(str(error))
 
     try:
         return asyncio.run(main_async(args))

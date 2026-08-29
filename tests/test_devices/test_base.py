@@ -67,6 +67,53 @@ class TestDevice:
         assert device.port == 56700
         assert device.connection is not None
 
+    def test_connectivity_defaults_to_wifi(self) -> None:
+        """Direct construction defaults to WiFi connectivity."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+
+        assert device.connectivity == "wifi"
+
+    @pytest.mark.parametrize("connectivity", ["wifi", "thread"])
+    def test_set_connectivity_accepts_public_literals(self, connectivity: str) -> None:
+        """The private discovery hand-off accepts both public literals."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+
+        device._set_connectivity(connectivity)  # type: ignore[arg-type]
+
+        assert device.connectivity == connectivity
+
+    @pytest.mark.parametrize("connectivity", ["", "Thread", "ethernet", None, 2])
+    def test_set_connectivity_rejects_invalid_values_without_mutation(
+        self, connectivity: object
+    ) -> None:
+        """Invalid private hand-off values do not change connectivity."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+        device._set_connectivity("thread")
+
+        with pytest.raises(ValueError, match="Invalid connectivity value"):
+            device._set_connectivity(connectivity)  # type: ignore[arg-type]
+
+        assert device.connectivity == "thread"
+
+    def test_adopt_cached_metadata_copies_connectivity(self) -> None:
+        """Metadata adoption preserves the donor's discovery connectivity."""
+        donor = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient = Device(serial="d073d5010203", ip="192.0.2.10")
+        donor._set_connectivity("thread")
+
+        recipient.adopt_cached_metadata(donor)
+
+        assert recipient.connectivity == "thread"
+
+    def test_adopt_cached_metadata_preserves_default_wifi(self) -> None:
+        """Adopting from a default device leaves WiFi connectivity intact."""
+        donor = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient = Device(serial="d073d5010203", ip="192.0.2.10")
+
+        recipient.adopt_cached_metadata(donor)
+
+        assert recipient.connectivity == "wifi"
+
     def test_serial_property(self, device: Device) -> None:
         """Test serial property."""
         assert device.serial == "d073d5010203"
@@ -983,5 +1030,5 @@ class TestAddressEntryPointGate:
         with pytest.raises(ValueError, match="Broadcast serial number"):
             Device(serial="ffffffffffff", ip="192.168.1.10")
 
-        with pytest.raises(ValueError, match="Port must be between"):
+        with pytest.raises(ValueError, match="Port must be between 1024 and 65535"):
             Device(serial=self.SERIAL, ip="192.168.1.10", port=1023)

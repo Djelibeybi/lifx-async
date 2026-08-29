@@ -1,6 +1,6 @@
 """mDNS transport for LIFX service discovery.
 
-A UDP socket bound to an ephemeral port, which is what makes every query it
+An IPv4 UDP socket bound to an ephemeral port, which is what makes every query it
 sends a legacy unicast query under RFC 6762 section 6.7: responders answer
 straight back to that port instead of broadcasting the reply. Queries
 themselves still go to the well-known mDNS address
@@ -10,7 +10,14 @@ replies are unicast.
 Binding 5353 instead would share the port with whatever system mDNS daemon
 is already running (mDNSResponder on macOS, Avahi on Linux), which silently
 takes the unicast responses and causes devices to be missed. The ephemeral
-bind is what keeps this transport's answers its own.
+bind gives this transport a per-call socket queue instead.
+
+The implemented path sends an IPv4 multicast query from an ephemeral source port
+and accepts legacy-unicast replies addressed directly to that socket. It
+does not join the multicast group and does not receive unsolicited announcements.
+It does not authenticate or correlate responders with the outstanding queries.
+Because cache-flush semantics do not apply to these replies, the discovery-layer
+cache state is scoped to one discovery call.
 """
 
 from __future__ import annotations
@@ -28,7 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MdnsTransport:
-    """UDP transport for mDNS queries and their unicast replies.
+    """IPv4 UDP transport for multicast mDNS queries and direct replies.
 
     Sends to the well-known mDNS address from a socket bound to an ephemeral
     port. Under RFC 6762 section 6.7 that makes each query a legacy unicast
