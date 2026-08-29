@@ -257,6 +257,35 @@ class TestMdnsTransportContextManager:
                 assert transport.is_open is False
 
 
+class TestMdnsTransportLegacyUnicast:
+    """The real ephemeral socket owns its direct legacy-unicast replies."""
+
+    @pytest.mark.asyncio
+    async def test_ephemeral_socket_receives_direct_loopback_datagram(self) -> None:
+        """A datagram sent to the selected port reaches this transport."""
+        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sender.bind(("127.0.0.1", 0))
+
+        transport = MdnsTransport()
+        payload = b"synthetic legacy-unicast response"
+
+        try:
+            async with transport:
+                assert transport._socket is not None
+                local_port = transport._socket.getsockname()[1]
+                assert 1 <= local_port <= 65535
+                assert local_port != MDNS_PORT
+
+                sender_address = sender.getsockname()
+                sender.sendto(payload, ("127.0.0.1", local_port))
+                received, received_from = await transport.receive(timeout=1.0)
+
+                assert received == payload
+                assert received_from == sender_address
+        finally:
+            sender.close()
+
+
 class TestMdnsTransportSend:
     """Tests for sending data."""
 

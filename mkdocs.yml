@@ -150,6 +150,7 @@ plugins:
       Migration:
       - migration/effect-api-changes.md
       - migration/theme-taxonomy-6.4.0.md
+      - migration/mdns-low-level-api-7.0.0.md
       Additional Resources:
       - faq.md
       - changelog.md
@@ -226,6 +227,7 @@ nav:
 - Migration:
   - Effect API Changes: migration/effect-api-changes.md
   - Theme Taxonomy Changes: migration/theme-taxonomy-6.4.0.md
+  - mDNS Low-Level API Removal: migration/mdns-low-level-api-7.0.0.md
 - FAQ: faq.md
 - Changelog: changelog.md
 

@@ -64,8 +64,9 @@ measured on WiFi/IPv4.
   sufficient: broadcast covers WiFi devices whose firmware does not advertise over mDNS,
   mDNS covers Thread devices that have no IPv4 address to broadcast to
 - **`find_by_ip()` accepts an IPv6 literal** instead of returning `None`
-- **`LifxServiceRecord` exposes the TXT `tm` transport method** (1 WiFi, 2 Thread), which
-  is also what lets a caller see how a device was reached
+- **Every `Device` exposes `connectivity` as `"wifi"` or `"thread"`.** Exact private TXT
+  `tm=2` means Thread; every other case means WiFi. The low-level mDNS record and generator
+  become explicitly private in Phase 11
 - **Synthetic multi-packet mDNS tests** exercising cross-packet record accumulation and
   the follow-up A/AAAA path, neither of which two Thread devices can trigger
 - **Thread revalidation (SEED-001)** of discovery coverage, retry schedule and animation
@@ -207,7 +208,8 @@ by name looks like the theme of that name in the LIFX app.
 - [ ] `discover()` runs a broadcast leg and an mDNS leg, merged by serial
 - [ ] `find_by_serial()` runs both legs concurrently, first hit wins
 - [ ] `find_by_ip()` resolves a device from an IPv6 literal
-- [ ] `tm` transport method parsed from the mDNS TXT record and exposed
+- [ ] `Device.connectivity` exposes `"thread"` for exact private TXT `tm=2` and `"wifi"`
+      otherwise; the low-level mDNS record and generator are explicitly private
 - [ ] Synthetic multi-packet mDNS tests for cross-packet accumulation and follow-up
       A/AAAA queries
 - [ ] THREAD-01 / SEED-001: revalidate discovery coverage, retry schedule and animation
@@ -362,6 +364,9 @@ Carried-forward candidates, not in v2.0 scope:
 | `find_by_ip()` accepts IPv6; `find_by_label()` does not change | A caller passing an IPv6 literal got `None`, which reads as "no such device" rather than "wrong function". `find_by_label()` needs nothing of its own once `discover()` carries mDNS | Decided 2026-08-27. `Device.from_ip()` already proved the IPv6 connection path, so this is the targeted-lookup leg, not new transport work |
 | Prove the fleet-scale mDNS paths synthetically first, on hardware later | Cross-packet record accumulation and follow-up A/AAAA queries never fired with two Thread devices, and they are the claims most likely to break at mesh scale. Blocking the milestone on hardware not yet purchased would stall it | Decided 2026-08-27. Hardware confirmation follows once the Home Assistant path works and more of the fleet is migrated |
 | The mDNS ephemeral-port bind is a v2.0 requirement in its own right | It is an IPv4 defect, not a Thread feature: system mDNS daemons sharing 5353 under `SO_REUSEPORT` were stealing legacy-unicast replies, costing 16 of 25 devices on plain WiFi discovery. Landing it uncredited inside the Thread work would leave it without a regression test | Decided 2026-08-27 |
+| Expose connectivity on `Device`, not the low-level mDNS record | Consumers care whether a device is on WiFi or Thread, not about a DNS cache hand-off object. Exact private `tm=2` means `"thread"`; every other case means `"wifi"` | Decided 2026-08-28 in Phase 11 discussion. Supersedes the 2026-08-27 record-level `tm` decision; `LifxServiceRecord`, `discover_lifx_services()` and any transport enum become explicitly private without aliases |
+| Treat retained mDNS addresses as an unordered internal set | Address membership and the selected address class matter; byte-for-byte tuple ordering does not once the record is private. Packet-source fallback is transport evidence and remains separate | Decided 2026-08-28 in Phase 11 discussion |
+| Apply RFC 6762's legacy-unicast cache rules exactly | TTL-zero goodbyes receive one-second grace/rescue without extending discovery deadlines. Cache-flush is forbidden on legacy-unicast replies, so its semantics are ignored and an unexpected bit is counted in a privacy-safe debug summary | Decided 2026-08-28 in Phase 11 discussion; supersedes the initial immediate-eviction/cache-flush SPEC contract |
 
 ## Evolution
 
@@ -381,4 +386,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-27 after opening the v2.0 Thread/IPv6 Support milestone*
+*Last updated: 2026-08-28 during Phase 11 context discussion*

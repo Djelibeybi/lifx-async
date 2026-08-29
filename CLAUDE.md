@@ -136,10 +136,19 @@ gh workflow run docs.yml
    - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
    - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
-     - `discovery.py`: `discover_lifx_services()` and `discover_devices_mdns()`
+     - `discovery.py`: Per-call service-record assembly and supported device construction.
+       Each sweep sends an initial DNS-SD PTR service query, may retransmit that PTR query
+       once at one second and once at three seconds within the caller's deadline, and
+       assembles valid legacy-unicast replies during the quiet window. When a valid SRV
+       target still lacks a usable address, it conditionally sends bounded A/AAAA follow-ups:
+       one successful send, or no more than two failed attempts, for each of at most 64
+       targets
      - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
-     - `transport.py`: `MdnsTransport` class for multicast UDP
-     - `types.py`: `LifxServiceRecord` dataclass
+     - `transport.py`: `MdnsTransport` sends IPv4 multicast queries from an ephemeral port and
+       receives only direct legacy-unicast replies; it does not join the multicast group or
+       receive unsolicited announcements
+     - `types.py`: Internal service-record model; record cache state belongs to one discovery
+       call and is never reused
    - Lazy connection opening (auto-opens on first request)
 
 3. **Device Layer** (`src/lifx/devices/`)
@@ -156,7 +165,11 @@ gh workflow run docs.yml
 4. **High-Level API** (`src/lifx/api.py`)
 
    - `discover()`: Async generator yielding devices via UDP broadcast
-   - `discover_mdns()`: Async generator yielding devices via mDNS (faster, single query)
+   - `discover_mdns()`: Explicit alternative to broadcast discovery that yields devices
+     incrementally as an async generator. It uses the bounded initial-PTR, retransmission,
+     and conditional address-follow-up model described above, and may be unavailable on
+     networks or devices that do not expose the required DNS-SD service records; callers can
+     fall back to `discover()`
    - `find_by_serial()`: Find specific device by serial number
    - `find_by_label()`: Async generator yielding devices matching label (exact or substring)
    - `find_by_ip()`: Find device by IP address using targeted broadcast

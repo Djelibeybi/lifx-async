@@ -43,47 +43,63 @@ is a rebase plus a reconciled fix list, not a runtime rewrite.
 Hardening the mDNS leg to broadcast-grade quality before it is promoted into the default
 discovery path.
 
-- [ ] **MDNS-01**: mDNS queries bind an ephemeral port, so a system mDNS daemon sharing
+- [x] **MDNS-01**: mDNS queries bind an ephemeral port, so a system mDNS daemon sharing
       5353 cannot steal RFC 6762 section 6.7 legacy-unicast replies. Measured impact: 25
       devices found bound ephemeral against 9 bound on 5353 with `SO_REUSEPORT`. The
       regression test must not itself bind 5353, because CI runners run Avahi and the test
       would measure the runner rather than the fix
 
-- [ ] **MDNS-02**: A caller can read how a device was reached, from a `tm` field on
-      `LifxServiceRecord` carrying the mDNS TXT `tm` key's value. The field keeps the wire
-      name deliberately (user decision, 2026-08-27): the protocol layer normally renames
-      wire fields for readability, but a readable name here would have to assert an
-      expansion nobody has confirmed, so the cryptic-but-honest name wins. What LIFX has
-      confirmed is
-      the value semantics only: `1` is WiFi and `2` is Thread. What `tm` abbreviates is
-      **not** confirmed, and the key is absent from the public LIFX LAN documentation
-      entirely, so no expansion of it may be asserted in the public API name, the
-      docstrings or the docs. Parsing is defensive: an absent, unparsable or unrecognised
-      value reports as unknown and never raises, because a third value could appear in any
-      future firmware
+- [x] **MDNS-02**: A caller can read how a device was reached from
+      `Device.connectivity: Literal["wifi", "thread"]`. Exact TXT `tm=2` reports
+      `"thread"`; every other value, including absent, malformed, unrecognised, and exact
+      `tm=1`, reports `"wifi"` without raising or logging a validation failure. The raw
+      key remains private and its abbreviation is never expanded. The documented
+      low-level `LifxServiceRecord`, `discover_lifx_services()`, and
+      `create_device_from_record()` API remains explicitly private as
+      `_LifxServiceRecord`, `_discover_lifx_services`, and `_create_device_from_record`,
+      with no compatibility aliases and no public record or transport enum. Supported
+      callers use `discover_devices_mdns()` or `lifx.api.discover_mdns()` (D-16,
+      2026-08-28; supersedes the earlier preserved-factory interpretation of D-03)
 
-- [ ] **MDNS-03**: Records for one service instance accumulate across multiple response
+- [x] **MDNS-03**: Records for one service instance accumulate across multiple response
       packets, proven by synthetic multi-packet tests. A Thread border router acts as an
       advertising proxy for the whole mesh, and RFC 6762 legacy-unicast replies cannot
       span packets, so records are omitted rather than continued
 
-- [ ] **MDNS-04**: An SRV target whose address records did not fit in a reply triggers a
+- [x] **MDNS-04**: An SRV target whose address records did not fit in a reply triggers a
       follow-up A/AAAA query, proven by synthetic tests
 
-- [ ] **MDNS-05**: Address selection is deterministic and documented, preferring ULA, then
-      GUA, then scoped link-local, and every discovered address is retained on the record
-      rather than discarded at selection time (PITFALLS B3)
+- [x] **MDNS-05**: Address selection is documented, preserving IPv4-first compatibility,
+      then preferring ULA, GUA, and scoped link-local while admitted state is complete.
+      D-15 admits at most 256 live A/AAAA RR identities per owner and 1,024 per sweep;
+      exact duplicates refresh without consuming capacity. An unseen over-cap identity is
+      rejected without eviction, owner overflow and sweep exhaustion are permanent for the
+      call, capacity diagnostics contain counts rather than identifiers, and incomplete
+      state cannot select an address, resolve a record, or trigger follow-up work.
+      Packet-source fallback remains separate, and tests compare unordered admitted
+      membership rather than imposing within-class order (D-15, 2026-08-28; supersedes
+      D-05's unbounded retention interpretation)
 
-- [ ] **MDNS-06**: A TXT `id` that fails the same validation the broadcast path applies to
-      a serial is rejected rather than trusted (PITFALLS B6)
+- [x] **MDNS-06**: A TXT `id` that fails the same validation the broadcast path applies to
+      a serial is rejected rather than trusted. Live conflicting IDs invalidate the
+      instance; it may recover after RFC-compliant goodbye expiry leaves exactly one valid
+      ID (PITFALLS B6)
 
-- [ ] **MDNS-07**: TTL 0 goodbye packets and cache-flush bits are honoured (PITFALLS B5)
-- [ ] **MDNS-08**: The mDNS module's documented behaviour matches its actual behaviour.
+- [x] **MDNS-07**: TTL 0 goodbye packets receive RFC 6762's one-second grace and rescue
+      semantics without extending the caller's discovery deadline. Cache-flush semantics
+      are not applied to legacy-unicast replies because RFC 6762 forbids that bit on this
+      path; an unexpected bit is retained as ordinary record data and counted in the
+      privacy-safe aggregate `DEBUG` sweep diagnostic (PITFALLS B5; corrected 2026-08-28)
+
+- [x] **MDNS-08**: The mDNS module's documented behaviour matches its actual behaviour.
       The branch deleted `IP_ADD_MEMBERSHIP` while leaving docstrings that still claim the
       multicast group is joined. The docstrings are corrected and the unicast-only trade
-      is recorded as a known limitation. No group rejoin and no responder-population
-      probe: the ephemeral-port fix came from LIFX, so LIFX devices answering unicast per
-      RFC 6762 section 6.7 is vendor-stated, not inferred
+      is recorded as a known limitation. Public docs cover `Device.connectivity`; the
+      low-level service record, generator, and record-to-device converter remain private
+      together under D-16 and disappear from public docs and examples. No
+      group rejoin and no responder-population probe: the ephemeral-port fix came from
+      LIFX, so LIFX devices answering unicast per RFC 6762 section 6.7 is vendor-stated,
+      not inferred
 
 ### Discovery and Lookup
 
@@ -223,14 +239,14 @@ Populated at roadmap creation, 2026-08-27.
 | IPV6-02 | Phase 10 | Verified |
 | IPV6-03 | Phase 10 | Verified |
 | IPV6-04 | Phase 10 | Verified |
-| MDNS-01 | Phase 11 | Pending |
-| MDNS-02 | Phase 11 | Pending |
-| MDNS-03 | Phase 11 | Pending |
-| MDNS-04 | Phase 11 | Pending |
-| MDNS-05 | Phase 11 | Pending |
-| MDNS-06 | Phase 11 | Pending |
-| MDNS-07 | Phase 11 | Pending |
-| MDNS-08 | Phase 11 | Pending |
+| MDNS-01 | Phase 11 | Complete |
+| MDNS-02 | Phase 11 | Complete |
+| MDNS-03 | Phase 11 | Complete |
+| MDNS-04 | Phase 11 | Complete |
+| MDNS-05 | Phase 11 | Complete |
+| MDNS-06 | Phase 11 | Complete |
+| MDNS-07 | Phase 11 | Complete |
+| MDNS-08 | Phase 11 | Complete |
 | FIND-01 | Phase 13 | Pending |
 | FIND-02 | Phase 13 | Pending |
 | FIND-03 | Phase 13 | Pending |
@@ -256,4 +272,4 @@ Populated at roadmap creation, 2026-08-27.
 
 ---
 *Requirements defined: 2026-08-27*
-*Last updated: 2026-08-27 after roadmap creation (Phases 10 to 14 mapped)*
+*Last updated: 2026-08-29 after final Phase 11 re-verification passed*

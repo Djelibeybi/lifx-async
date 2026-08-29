@@ -1,11 +1,25 @@
+---
+last_mapped_commit: 8ae4918a4b63d299d5216a19f51ff9550fd8ac72
+last_mapped_at: 2026-08-28T16:55:53+10:00
+---
 # Codebase Structure
 
-**Analysis Date:** 2026-06-11
+**Analysis Date:** 2026-08-28
 
 ## Directory Layout
 
 ```
 lifx-async/
+├── .agents/                    # Project-local agent skills and preserved spike evidence
+│   └── skills/
+│       └── spike-findings-lifx-async/
+│           ├── SKILL.md        # Reliability finding router and non-negotiable constraints
+│           ├── references/     # Focused implementation contracts
+│           └── sources/        # Five numbered, reproducible spike harness bundles
+├── .benchmarks/                # Committed pytest-benchmark result archive
+│   └── Darwin-CPython-3.14-64bit/
+│       ├── 0001_baseline.json
+│       └── 0002_*.json … 0010_*.json
 ├── .planning/                  # GSD planning artifacts (generated)
 ├── .claude/                    # Project-specific instructions and skills
 ├── src/lifx/                   # Main source code
@@ -169,15 +183,40 @@ lifx-async/
 │   └── test_multiversion.py # Multi-Python version testing
 │
 ├── pyproject.toml         # Project metadata, dependencies, tool config
-├── uv.lock                # Locked dependency versions
-├── mkdocs.yml             # Documentation site configuration
-├── README.md              # Project overview
-├── CLAUDE.md              # Project-specific coding instructions
-└── LICENSE                # MIT license
+├── uv.lock                # uv-generated development dependency lock
+├── .gitignore             # Generated, local, secret-bearing, and transient path policy
+├── .pre-commit-config.yaml # Repository validation and auto-fix hooks
+├── AGENTS.md              # Codex-facing project architecture and constraints
+├── CLAUDE.md              # Claude-facing project architecture and constraints
+├── README.md              # Package overview and public feature summary
+├── SECURITY.md            # Vulnerability policy and local-network threat boundary
+├── codecov.yml            # Coverage gates and per-Python-version flags
+├── context7.json          # Context7 documentation registration
+├── mkdocs.yml             # Documentation IA, plugins, and build configuration
+├── renovate.json          # Automated dependency update policy
+└── LICENSE                # Universal Permissive License 1.0
 
 ```
 
 ## Directory Purposes
+
+**`.agents/skills/spike-findings-lifx-async/`**
+- Purpose: Supply project-local, implementation-ready reliability knowledge to planning and execution agents
+- Contains: `SKILL.md`, four focused files in `references/`, and five numbered experimental bundles in `sources/`
+- Key files: `SKILL.md` (routing index), `references/discovery.md`, `references/retry-schedule.md`, `references/animation-flow-control.md`, `references/concurrency-and-keepalive.md`
+- Constraint: Use the references to guide production changes, but keep runtime implementation under `src/lifx/`
+
+**`.agents/skills/spike-findings-lifx-async/sources/`**
+- Purpose: Preserve the reproducible Python harness and README for each hardware reliability experiment
+- Contains: `001-modem-sleep-keepalive/`, `002-retry-storm-vs-fresh-deadline/`, `003-ack-paced-frames/`, `004-asyncio-thread-wire-equivalence/`, `005-discovery-regimes/`
+- Key files: `001-modem-sleep-keepalive/probe.py`, `001-modem-sleep-keepalive/report.py`, `002-retry-storm-vs-fresh-deadline/race.py`, `003-ack-paced-frames/stream.py`, `004-asyncio-thread-wire-equivalence/wire.py`, `005-discovery-regimes/sweep.py`
+- Constraint: Treat probe output as private by default and follow identifier-handling rules in `AGENTS.md`
+
+**`.benchmarks/Darwin-CPython-3.14-64bit/`**
+- Purpose: Store committed pytest-benchmark snapshots for performance regression comparison on a fixed platform/interpreter family
+- Contains: Ten sequential JSON snapshots covering effects generation, theme canvas application, matrix/multizone colour updates, and matrix template creation
+- Key files: `0001_baseline.json` (baseline), `0009_docs-ia-restructure_20260319-final.json`, `0010_review-tests_20260318.json`
+- Constraint: Regenerate snapshots through pytest-benchmark; do not hand-edit measurement JSON
 
 **`src/lifx/`**
 - Purpose: Main library source code
@@ -256,6 +295,26 @@ lifx-async/
 **Configuration:**
 - `src/lifx/const.py`: Constants (LIFX_UDP_PORT, timeouts, default values, official URLs)
 - `pyproject.toml`: Project metadata, dependencies, tool configuration
+- `uv.lock`: uv-generated lock for the editable project and its development toolchain
+- `.gitignore`: Ignore policy for Python/build/test caches, local configuration, generated documentation, profiling data, and GSD transient state
+- `.pre-commit-config.yaml`: Hook graph for file checks, Conventional Commits, uv locking, Ruff, manual Pyright, Bandit, codespell, and YAML formatting
+- `codecov.yml`: Project/patch coverage targets, Python-version flags, and generated/non-source exclusions
+- `renovate.json`: Renovate scheduling, grouping, automerge, vulnerability, and lock-file maintenance policy
+- `mkdocs.yml`: Documentation navigation, Material/Zensical configuration, mkdocstrings source lookup, and llmstxt generation
+- `context7.json`: Published documentation registration for Context7
+
+**Project Guidance:**
+- `AGENTS.md`: Codex-facing source of repository architecture, commands, privacy rules, generated-file constraints, and spike-skill routing
+- `CLAUDE.md`: Claude-facing source of architecture, workflow guidance, detailed gotchas, and spike-skill routing
+- `README.md`: Public package summary, supported Python versions, major features, documentation links, and licence summary
+- `SECURITY.md`: Supported-version policy, vulnerability reporting path, security scope, and trusted-local-network boundary
+- `LICENSE`: Universal Permissive License 1.0 terms
+
+**Engineering Evidence:**
+- `.agents/skills/spike-findings-lifx-async/SKILL.md`: Entry point for reliability implementation work
+- `.agents/skills/spike-findings-lifx-async/references/`: Prescriptive contracts selected by the skill index
+- `.agents/skills/spike-findings-lifx-async/sources/`: Preserved real-hardware experiment harnesses and per-spike READMEs
+- `.benchmarks/Darwin-CPython-3.14-64bit/`: Comparable macOS CPython 3.14 performance snapshots
 
 **Core Logic:**
 - `src/lifx/devices/base.py`: Base Device class, state management, common operations
@@ -284,6 +343,11 @@ lifx-async/
 - Device files: `base.py` (Device base), `light.py`, `multizone.py`, `matrix.py`, `ceiling.py`, `hev.py`, `infrared.py`
 - Effect files: `aurora.py`, `flame.py`, `plasma.py` (one file per effect), `registry.py`, `conductor.py`
 - Test files: `test_<module>.py` (e.g., `test_connection.py`, `test_light.py`)
+- Agent skill entry point: uppercase `SKILL.md` under `.agents/skills/<kebab-case-skill>/`
+- Skill references: descriptive kebab-case Markdown such as `.agents/skills/spike-findings-lifx-async/references/retry-schedule.md`
+- Spike bundles: zero-padded sequence plus kebab-case topic, such as `.agents/skills/spike-findings-lifx-async/sources/003-ack-paced-frames/`
+- Spike executables: concise snake_case Python names reflecting the experiment action, such as `probe.py`, `race.py`, `stream.py`, `wire.py`, and `sweep.py`
+- Benchmark snapshots: zero-padded sequence plus descriptive label in `.benchmarks/<platform-interpreter>/`, such as `0001_baseline.json` and `0010_review-tests_20260318.json`
 
 **Functions:**
 - `async def`: External API (discovery, control, requests)
@@ -303,6 +367,27 @@ lifx-async/
 - Enums: PascalCase (Direction, LightWaveform)
 
 ## Where to Add New Code
+
+**New Reliability Finding:**
+- Routing/index update: `.agents/skills/spike-findings-lifx-async/SKILL.md`
+- Prescriptive contract: `.agents/skills/spike-findings-lifx-async/references/<kebab-case-topic>.md`
+- Preserved experiment: `.agents/skills/spike-findings-lifx-async/sources/<NNN-kebab-case-topic>/README.md`
+- Harness implementation: `.agents/skills/spike-findings-lifx-async/sources/<NNN-kebab-case-topic>/<action>.py`
+- Production implementation: the appropriate existing module under `src/lifx/`; never import `.agents/` code into the package
+- Evidence handling: keep raw hardware identifiers and discovery output outside tracked files as required by `AGENTS.md`
+
+**New Benchmark Snapshot:**
+- Generated result: `.benchmarks/<system>-<implementation>-<version>-<bitness>/<NNNN_label>.json`
+- Naming: Continue the directory's zero-padded numeric sequence and add a concise comparison label
+- Ownership: Generate through pytest-benchmark; do not use `.benchmarks/` for production code, fixtures, or hand-authored results
+
+**New Repository Policy or Tool Configuration:**
+- Agent/runtime instruction: update the relevant root guide, `AGENTS.md` or `CLAUDE.md`
+- Pre-commit enforcement: `.pre-commit-config.yaml`
+- Dependency resolution: change project metadata through uv, then regenerate `uv.lock`
+- Coverage policy: `codecov.yml`
+- Dependency automation: `renovate.json`
+- Documentation information architecture or plugins: `mkdocs.yml`
 
 **New Device Type:**
 - Implementation: `src/lifx/devices/<device_name>.py` (inherit from Device[StateT])
@@ -338,6 +423,16 @@ lifx-async/
 
 ## Special Directories
 
+**`.agents/`**
+- Purpose: Project-local agent skills, focused implementation guidance, and preserved spike source evidence
+- Generated: No
+- Committed: Yes
+
+**`.benchmarks/`**
+- Purpose: Platform-specific pytest-benchmark snapshot archive
+- Generated: Yes, by pytest-benchmark
+- Committed: Yes
+
 **`.planning/codebase/`**
 - Purpose: GSD codebase analysis documents
 - Generated: Created by `/gsd-map-codebase` command
@@ -357,7 +452,7 @@ lifx-async/
 **`site/`**
 - Purpose: Built documentation (MkDocs output)
 - Generated: Yes (from docs/)
-- Committed: Yes (for GitHub Pages)
+- Committed: No (`site/` is excluded by `.gitignore`)
 
 **`.github/workflows/`**
 - Purpose: CI/CD pipelines
@@ -371,4 +466,4 @@ lifx-async/
 
 ---
 
-*Structure analysis: 2026-06-11*
+*Structure analysis: 2026-08-28*

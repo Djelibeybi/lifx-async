@@ -33,13 +33,22 @@ async def broadcast_discovery():
 
 **Characteristics:**
 
-- Sends 1 broadcast + N queries (one per device for type detection)
+- Sends one initial broadcast, then schedules re-broadcasts 0.6, 1.8, 3.6,
+  5.6 and 7.6 seconds later; the five-second example schedules the first three,
+  then performs per-device type detection
 - Works on any local network
 - May miss devices on other subnets
 
+The offsets are fixed constants; they are not scaled to the requested discovery
+timeout. A due re-broadcast is sent only while discovery remains active. Later
+sends do not occur after the overall or idle deadline, when the caller closes or
+cancels the generator, or when a transport failure aborts the sweep. A valid
+response resets the four-second idle window; it does not extend the overall
+timeout.
+
 ### mDNS Discovery
 
-mDNS discovery uses DNS-SD to find devices with a single multicast query:
+mDNS discovery uses DNS-SD to find devices with an IPv4 multicast query:
 
 ```python
 from lifx import discover_mdns
@@ -48,30 +57,39 @@ async def mdns_discovery():
     async for device in discover_mdns(timeout=5.0):
         async with device:
             color, power, label = await device.get_color()
-            print(f"Found: {label} ({type(device).__name__})")
+            print(
+                f"Found: {label} ({type(device).__name__}, "
+                f"{device.connectivity})"
+            )
 ```
 
 **Characteristics:**
 
-- Single network query (device type in TXT record)
-- Faster discovery with immediate type detection
-- Can work across subnets with an mDNS reflector
+- Device type metadata arrives in DNS-SD responses, avoiding a separate LIFX
+  product query for every device
+- Starts with an IPv4 multicast query and may send bounded retransmissions or
+  address follow-up queries within the discovery timeout
+- May work across subnets when the network provides an mDNS reflector
 - Zero dependencies (uses Python stdlib only)
 
-### Low-Level mDNS API
+`discover_mdns()` sends its query from an **ephemeral source port** and accepts
+**legacy-unicast replies** addressed directly to that socket. The socket
+**does not join the multicast group** and **does not receive unsolicited announcements**,
+so each call observes only direct traffic delivered to its per-call socket during
+the sweep and does not reuse DNS cache state from an earlier call. Discovery
+**does not authenticate or correlate responders** with its outstanding queries.
+Large-mesh packet assembly and follow-up behaviour are covered by deterministic
+multi-packet tests: **mesh scale is proven synthetically**.
 
-For raw mDNS data without device instantiation:
+An IPv6 link-local address needs a zone ID identifying its network interface,
+but a DNS AAAA record cannot carry that ID. An mDNS response containing only an
+unscoped link-local AAAA address therefore cannot produce a usable device route;
+use `discover()` as the compatibility fallback on such networks.
 
-```python
-from lifx import discover_lifx_services
-
-async def raw_mdns_discovery():
-    async for record in discover_lifx_services(timeout=5.0):
-        print(f"Serial: {record.serial}")
-        print(f"IP: {record.ip}:{record.port}")
-        print(f"Product ID: {record.product_id}")
-        print(f"Firmware: {record.firmware}")
-```
+Every yielded device exposes `connectivity` as `"thread"` only after an exact
+positive Thread report. Every other construction or discovery outcome is
+`"wifi"`. This metadata describes how the device was reported; it does not
+authenticate the device or change routing and retry behaviour.
 
 ### Opt-In State Fields on Discovered Devices
 
@@ -119,10 +137,8 @@ been entered yet — and to `fetch_ambient_light` on lights.
 | Scenario | Recommended Method |
 |----------|-------------------|
 | General use | `discover()` or `discover_mdns()` |
-| Fastest discovery | `discover_mdns()` |
 | Cross-subnet (with reflector) | `discover_mdns()` |
 | Maximum compatibility | `discover()` |
-| Raw device data | `discover_lifx_services()` |
 
 ## Storing State
 
@@ -199,6 +215,8 @@ async def use_cached_or_fetch():
 - `Device.wifi_firmware` - Major and minor wifi firmware version and build number
 - `Device.location` - Device location name/label
 - `Device.group` - Device group name/label
+- `Device.connectivity` - `"thread"` for an exact positive Thread report,
+  otherwise `"wifi"`
 
 ##### Non-State Properties
 

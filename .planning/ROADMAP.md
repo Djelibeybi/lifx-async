@@ -90,7 +90,7 @@ v1.1 wire-reliability findings are then revalidated over Thread, because every o
 was measured on WiFi/IPv4.
 
 - [ ] **Phase 10: Land the IPv6/Thread Branch** - Reconcile `feat/ipv6-thread-support` from `main` on its phase branch, so IPv6-only devices can be controlled and animated; merge only in the post-phase shipment workflow
-- [ ] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port bind regression test, `tm` transport field, synthetic mesh-scale tests, deterministic address selection, validation and honest docs
+- [x] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port proof, private connectivity internals under D-16, synthetic mesh-scale tests, bounded fail-closed address admission under D-15, validation and honest docs (completed 2026-08-29)
 - [ ] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture
 - [ ] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement
 - [ ] **Phase 14: Thread Revalidation and Docs** - SEED-001 measurements over Thread hardware, per-device-class evidence records or named gaps, and the consumer guidance and corrections docs
@@ -173,12 +173,53 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. mDNS queries bind an ephemeral port, and a regression test proves legacy-unicast replies are received without the test itself binding 5353, because CI runners run Avahi and the test would otherwise measure the runner rather than the fix
-  2. A caller can read how a device was reached from the `tm` field on `LifxServiceRecord`; an absent, unparsable or unrecognised value reports as unknown and never raises, and no expansion of the undocumented `tm` key is asserted anywhere
+  2. Every `Device` exposes `connectivity` as `"thread"` only for the exact private Thread sentinel and `"wifi"` otherwise; under D-16 the raw key, service record, low-level generator and record-to-device converter are private together with no aliases or public enum
   3. Synthetic multi-packet tests prove that records for one service instance accumulate across response packets and that an SRV target whose address records did not fit a reply triggers a follow-up A/AAAA query
-  4. Address selection is deterministic and documented (ULA, then GUA, then scoped link-local) with every discovered address retained on the record; a TXT `id` failing the broadcast serial validation is rejected; TTL 0 goodbye packets and cache-flush bits are honoured
+  4. Under D-15, exact duplicates refresh within ceilings of 256 live A/AAAA identities per owner and 1,024 per sweep; owner overflow or sweep exhaustion is permanent for the call, and incomplete state cannot select, resolve, or trigger follow-up work. Complete state still selects IPv4, ULA, GUA, then scoped link-local; strict TXT identity validation, one-second goodbye grace/rescue, and count-only legacy-unicast cache-flush handling are proven synthetically
   5. The module's docstrings match its actual behaviour, with the deleted multicast membership no longer claimed and the unicast-only trade recorded as a known limitation
 
-**Plans**: TBD
+**Plans**: 14/14 plans executed; all historical gaps and review findings are closed, and final independent verification passed
+
+Plans:
+
+- [x] 11-10-PLAN.md
+- [x] 11-11-PLAN.md
+- [x] 11-12-PLAN.md
+- [x] 11-13-PLAN.md
+- [x] 11-14-PLAN.md
+
+**Wave 1**
+
+- [x] 11-01-PLAN.md — Trace exact private connectivity metadata into `Device.connectivity` and prove real ephemeral legacy-unicast receipt
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [x] 11-02-PLAN.md — Replace last-wins cache slots with bounded live RR identities, unordered addresses, class selection and strict TXT identity validation
+
+**Wave 3** *(blocked on 11-02)*
+
+- [x] 11-03-PLAN.md — Add one-second goodbye/rescue, privacy-safe aggregate diagnostics, concurrent isolation and bounded mesh-scale follow-up proof
+
+**Wave 4** *(blocked on 11-03; plans are file-disjoint)*
+
+- [x] 11-04-PLAN.md — Publish honest Device-level mDNS guidance after behaviour lands and record the complete legacy-unicast limitations
+- [x] 11-05-PLAN.md — Historical execution under the earlier preserved-factory expectation; D-16 in 11-07 supersedes that API interpretation without rewriting this executed plan
+
+**Wave 5** *(blocked on 11-04 and 11-05)*
+
+- [x] 11-06-PLAN.md — Run structured public/private surface assertions plus complete diff-derived quality, privacy and coverage gates
+
+**Wave 6** *(gap closure; blocked on 11-06)*
+
+- [x] 11-07-PLAN.md — Resume the halted gap closure without replaying completed authority commits: sanitise the current STATE finding, preserve and finish the four draft guidance files, and create the missing summary
+
+**Wave 7** *(privacy decision; blocked on 11-07)*
+
+- [x] 11-08-PLAN.md — Audit inherited versus phase-owned history and exact reachability with values suppressed, then block for an explicit rewrite, no-rewrite, or stop disposition
+
+**Wave 8** *(history disposition; blocked on an explicit `rewrite` or `no-rewrite` decision in 11-08)*
+
+- [x] 11-09-PLAN.md — Apply the authorised rewrite/no-rewrite disposition, preserve or re-sign history exactly as required, and rerun fresh privacy/full gates before independent re-verification
 
 ### Phase 12: IPv6 Discovery Plumbing
 
@@ -240,7 +281,7 @@ Plans:
 | 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete | 2026-08-16 |
 | 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete | 2026-08-27 |
 | 10. Land the IPv6/Thread Branch | v2.0 | 9/9 | Ready to ship | 2026-08-28 |
-| 11. mDNS Hardening | v2.0 | 0/TBD | Not started | - |
+| 11. mDNS Hardening | v2.0 | 14/14 | Complete    | 2026-08-29 |
 | 12. IPv6 Discovery Plumbing | v2.0 | 0/TBD | Not started | - |
 | 13. Merged Discovery | v2.0 | 0/TBD | Not started | - |
 | 14. Thread Revalidation and Docs | v2.0 | 0/TBD | Not started | - |

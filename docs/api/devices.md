@@ -342,6 +342,14 @@ The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specif
 
 ## Device Properties
 
+### Connectivity
+
+The `connectivity` property is always one of two lowercase strings. It is
+`"thread"` only when mDNS discovery receives an exact positive Thread report,
+and `"wifi"` for every other outcome, including devices constructed directly
+or discovered without that report. The value is descriptive metadata; it does
+not change the device's address, routing, retry, or tuning behaviour.
+
 ### MAC Address
 
 The `mac_address` property provides the device's MAC address, calculated from the serial number

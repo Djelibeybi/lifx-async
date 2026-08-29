@@ -1,7 +1,11 @@
-<!-- refreshed: 2026-06-11 -->
+---
+last_mapped_commit: 8ae4918a4b63d299d5216a19f51ff9550fd8ac72
+last_mapped_at: 2026-08-28T16:55:53+10:00
+---
+<!-- refreshed: 2026-08-28 -->
 # Architecture
 
-**Analysis Date:** 2026-06-11
+**Analysis Date:** 2026-08-28
 
 ## System Overview
 
@@ -26,7 +30,7 @@
 │                    Network Layer                                             │
 │  DeviceConnection | Discovery | mDNS | Transport | Message Builder         │
 │  `src/lifx/network/`                                                        │
-│  Features: Lazy connection opening, request serialization, retry logic      │
+│  Features: Lazy opening, correlated concurrent requests, retry logic        │
 └───────────────────────────────┬─────────────────────────────────────────────┘
          │
          ▼
@@ -74,6 +78,13 @@
 | **Theme** | Named color palettes with generators for device types | `src/lifx/theme/` |
 | **Color** | HSBK class with RGB conversion and presets | `src/lifx/color.py` |
 | **Products** | Device capability registry from official products.json | `src/lifx/products/` |
+| **Project Guidance** | Repository-wide architecture, privacy, generated-code, testing, and workflow constraints | `AGENTS.md`, `CLAUDE.md` |
+| **Spike Findings Skill** | Routes reliability implementation work to validated requirements, references, and preserved harnesses | `.agents/skills/spike-findings-lifx-async/SKILL.md` |
+| **Spike References** | Prescriptive discovery, retry, animation-flow, concurrency, and keepalive findings | `.agents/skills/spike-findings-lifx-async/references/` |
+| **Spike Harnesses** | Reproducible real-hardware probes and reports retained as engineering evidence | `.agents/skills/spike-findings-lifx-async/sources/` |
+| **Benchmark Archive** | Committed pytest-benchmark snapshots for effects, theme canvas, matrix, and multizone hot paths | `.benchmarks/Darwin-CPython-3.14-64bit/` |
+| **Documentation Configuration** | Builds the navigable documentation site and LLM-oriented text output from `docs/` and `src/` | `mkdocs.yml` |
+| **Repository Automation** | Pre-commit checks, dependency locking/updates, and coverage policy | `.pre-commit-config.yaml`, `uv.lock`, `renovate.json`, `codecov.yml` |
 
 ## Pattern Overview
 
@@ -88,6 +99,8 @@
 - **Request/response streaming**: Async generators for flexible multi-response handling
 - **State caching**: Reduced network traffic via semi-persistent device state
 - **Device capability detection**: Automatic instantiation of correct device class based on product ID
+- **Evidence-backed reliability work**: The project skill routes implementation to measured findings and preserved harnesses under `.agents/skills/spike-findings-lifx-async/`
+- **Committed performance baselines**: pytest-benchmark JSON snapshots are organised by platform and interpreter under `.benchmarks/`
 
 ## Layers
 
@@ -146,6 +159,21 @@
 - Depends on: Protocol layer (for types)
 - Used by: All other layers
 
+**Engineering Knowledge and Evidence Layer:**
+- Purpose: Preserve implementation constraints, validated reliability findings, reproducible probes, and performance baselines without placing experimental code in the runtime package
+- Location: `.agents/skills/spike-findings-lifx-async/`, `.benchmarks/`
+- Contains: `SKILL.md` routing, focused reference documents, five spike source bundles, and pytest-benchmark JSON snapshots
+- Depends on: Repository guidance in `AGENTS.md` and `CLAUDE.md`; spike harnesses import the installed `lifx` package and require real hardware for network-fidelity claims
+- Used by: GSD planning/execution, reliability implementation, performance review, and regression comparison
+- Key insight: Treat `.agents/skills/spike-findings-lifx-async/sources/` as preserved experimental evidence, not as importable production modules
+
+**Repository Automation and Documentation Layer:**
+- Purpose: Enforce repository invariants and publish user-facing/reference documentation
+- Location: `.pre-commit-config.yaml`, `uv.lock`, `renovate.json`, `codecov.yml`, `mkdocs.yml`, `context7.json`
+- Contains: File and security hooks, deterministic development dependency resolution, dependency-update policy, coverage gates, MkDocs navigation/plugins, and Context7 registration
+- Depends on: Project metadata and source/documentation trees referenced from these root configuration files
+- Used by: Local development, pre-commit.ci, CI coverage reporting, Renovate, documentation builds, and external documentation indexing
+
 ## Data Flow
 
 ### Primary Request Path (Device → Network → Protocol → UDP → Device)
@@ -192,9 +220,24 @@
 9. No response handling — animation is fire-and-forget
 10. Stats returned (packets sent, bytes sent)
 
+### Reliability Finding Path (Skill → Reference → Harness → Production Change)
+
+1. Implementation work loads the routing index in `.agents/skills/spike-findings-lifx-async/SKILL.md`.
+2. The index selects one focused contract in `.agents/skills/spike-findings-lifx-async/references/` for discovery, retry scheduling, animation flow control, or concurrency/keepalive.
+3. The selected reference points to a reproducible harness under `.agents/skills/spike-findings-lifx-async/sources/<NNN-spike-name>/`.
+4. Hardware-sensitive claims are validated with repeated runs against quiesced real devices; the emulator is not treated as evidence for Wi-Fi sleep, loss, or broadcast-delivery behaviour (`AGENTS.md`).
+5. The production implementation remains in the appropriate `src/lifx/` layer; the skill and harness directories retain guidance and evidence only.
+
+### Documentation Build Path
+
+1. `mkdocs.yml` defines the documentation information architecture and loads Python objects from `src/` through mkdocstrings.
+2. Zensical/MkDocs builds the site from `docs/`; the llmstxt plugin also emits `llms-full.txt` from the configured sections (`mkdocs.yml`).
+3. `context7.json` registers the published documentation with Context7.
+4. `site/` and other documentation build products remain generated and ignored according to `.gitignore`.
+
 **State Management:**
-- Request/response serialized per device via `_request_lock` (asyncio.Lock) to prevent mixing on same UDP socket
-- Multiple devices execute in parallel via `asyncio.TaskGroup`
+- Concurrent requests on one connection are correlated through per-request queues keyed by source, sequence, and serial; a background receiver routes responses (`AGENTS.md`)
+- Multiple devices execute in parallel via `asyncio.gather()` for Python 3.10 compatibility
 - Sequence numbers (0-255) atomically allocated per request for matching responses
 - Cached state (color, power, label) updated after responses
 - No automatic cache expiration — application controls refresh
@@ -232,6 +275,16 @@
 - Multi-response requests stream until timeout or early exit
 - Enables discovery streaming (yield devices as found)
 
+**Project Skill Bundle:**
+- Purpose: Convert validated reliability experiments into implementation-ready constraints without coupling production code to experiment scripts
+- Examples: `.agents/skills/spike-findings-lifx-async/SKILL.md`, `.agents/skills/spike-findings-lifx-async/references/discovery.md`, `.agents/skills/spike-findings-lifx-async/sources/005-discovery-regimes/sweep.py`
+- Pattern: Lightweight index → one focused reference → matching preserved source bundle
+
+**Benchmark Snapshot:**
+- Purpose: Retain comparable pytest-benchmark results for performance-sensitive rendering and packet-generation paths
+- Examples: `.benchmarks/Darwin-CPython-3.14-64bit/0001_baseline.json`, `.benchmarks/Darwin-CPython-3.14-64bit/0010_review-tests_20260318.json`
+- Pattern: Platform/interpreter directory containing sequentially numbered, labelled JSON records with machine, commit, timestamp, and benchmark sections
+
 ## Entry Points
 
 **Application Entry Points (typically used):**
@@ -250,16 +303,29 @@
 - `create_message(header, packet)` — Serialize header + packet to binary (`src/lifx/network/message.py:10`)
 - `parse_message(frame)` — Deserialize binary frame to (header, packet) (`src/lifx/network/message.py:40`)
 
+**Engineering Workflow Entry Points:**
+- `.agents/skills/spike-findings-lifx-async/SKILL.md` — Start here for discovery, retry, animation reliability, concurrency, or keepalive implementation work
+- `.agents/skills/spike-findings-lifx-async/references/` — Load only the focused design contract selected by the skill index
+- `.agents/skills/spike-findings-lifx-async/sources/` — Run or inspect the corresponding experimental harness with `uv run`; treat raw hardware output as private by default
+- `.benchmarks/Darwin-CPython-3.14-64bit/` — Compare committed CPython 3.14 macOS benchmark snapshots
+- `AGENTS.md` — Canonical Codex-facing repository constraints, architecture, commands, privacy rules, and gotchas
+- `CLAUDE.md` — Claude-facing repository guidance and detailed architecture notes
+- `mkdocs.yml` — Documentation navigation, plugins, source introspection, and LLM-text build configuration
+
 ## Architectural Constraints
 
-- **Threading:** Single-threaded event loop (asyncio). No worker threads used. Devices are serialized per connection via `_request_lock`.
+- **Threading:** Keep the asyncio core and public async API. `.agents/skills/spike-findings-lifx-async/references/concurrency-and-keepalive.md` records that threading provides no wire-level advantage and must not replace asyncio.
 - **Global state:** Source ID allocated once per import via `allocate_source()` (`src/lifx/network/utils.py`). No mutable module-level singletons.
 - **Circular imports:** Type-checking guard used (`if TYPE_CHECKING:`) in device hierarchy to prevent cycles at runtime (`src/lifx/devices/base.py:28`).
 - **Protocol immutability:** `packets.py` auto-generated from YAML — modifications are overwritten on regeneration. Never edit manually.
 - **Zero dependencies:** Runtime layer has zero external dependencies. All protocol handling is stdlib-only.
 - **Lazy connections:** Connections open on first request, not on Device instantiation. No network calls during Device creation.
-- **One socket per device:** Each `DeviceConnection` owns one `UdpTransport` (one socket). Multiple requests serialize via `_request_lock`.
+- **Concurrent request correlation:** A single connection supports concurrent requests through background response routing and per-request queues keyed by source, sequence, and serial (`AGENTS.md`).
 - **No automatic rate limiting:** Devices handle ~20 msg/sec; application responsible for throttling if needed.
+- **Hardware evidence:** Wi-Fi loss, modem sleep, and broadcast-delivery claims require repeated runs on quiesced real devices; emulator-only results are insufficient (`AGENTS.md`, `.agents/skills/spike-findings-lifx-async/SKILL.md`).
+- **Evidence privacy:** Never commit live serials, MAC addresses, IP addresses, hostnames, account names, or raw discovery/probe output. Pseudonymise tracked evidence and keep private mappings outside the repository (`AGENTS.md`).
+- **Experimental isolation:** Keep spike harnesses under `.agents/skills/spike-findings-lifx-async/sources/`; production code belongs under `src/lifx/` and must preserve the public async API.
+- **Generated documentation:** `docs/changelog.md` is release-generated and must not be edited manually (`AGENTS.md`); `site/` is ignored build output (`.gitignore`).
 
 ## Anti-Patterns
 
@@ -308,6 +374,14 @@
 - Run `uv run python -m lifx.protocol.generator` to regenerate
 - For local quirks (field renames, filtering), modify `src/lifx/protocol/generator.py`
 
+### Treating Experimental Assets as Runtime Modules
+
+**What happens:** Code imports from `.agents/skills/spike-findings-lifx-async/sources/` or copies a spike harness directly into the public API.
+
+**Why it's wrong:** The source bundles are measurement harnesses tied to real-hardware validation and may deliberately reach into low-level behaviour. They document a proven shape, not a supported runtime boundary.
+
+**Do this instead:** Load the focused contract from `.agents/skills/spike-findings-lifx-async/references/`, implement it in the appropriate `src/lifx/` layer, and retain the public asyncio API required by `.agents/skills/spike-findings-lifx-async/SKILL.md`.
+
 ## Error Handling
 
 **Strategy:** Exception-based with specific error types for different failure modes
@@ -339,11 +413,15 @@
 **Authentication:** No authentication in protocol layer. LIFX protocol is unauthenticated (assumes local network trust). Device discovery requires network access.
 
 **Concurrency:** All external-facing APIs are async. Concurrency patterns:
-- Single connection per device serializes requests via `_request_lock`
-- Multiple devices use `asyncio.TaskGroup` for parallel requests
+- A background receiver routes responses for concurrent requests on one connection via per-request queues
+- Multiple devices use `asyncio.gather()` for parallel requests
 - Discovery uses async generators for streaming results
 - No explicit thread spawning; all parallelism is async
 
+**Repository governance:** `AGENTS.md` and `CLAUDE.md` carry architecture and operational constraints; `.pre-commit-config.yaml` enforces file validity, secret detection, formatting, linting, dependency-lock consistency, security checks, spelling, and Conventional Commit policy.
+
+**Performance evidence:** `.benchmarks/Darwin-CPython-3.14-64bit/` stores committed pytest-benchmark snapshots. Compare records within the same platform/interpreter family and regenerate them through the benchmark test suite rather than editing JSON manually.
+
 ---
 
-*Architecture analysis: 2026-06-11*
+*Architecture analysis: 2026-08-28*

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Iterator, Sequence
+from contextlib import aclosing
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Literal
@@ -806,13 +807,22 @@ async def discover_mdns(
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices via mDNS and yield them as they are found.
 
-    Uses mDNS/DNS-SD discovery with the _lifx._udp.local service type.
-    This method is faster than broadcast discovery as device type information
-    is included in the mDNS TXT records, eliminating the need for additional
-    device queries.
+    Uses mDNS/DNS-SD discovery with the _lifx._udp.local service type. Device
+    type metadata in DNS-SD responses avoids a separate LIFX product query for
+    every device.
 
-    Note: mDNS discovery requires the mDNS multicast group (224.0.0.251:5353)
-    to be accessible. Some network configurations may block multicast traffic.
+    The IPv4 multicast query is sent from an ephemeral source port and the
+    transport accepts legacy-unicast replies addressed directly to that
+    socket. It does not join the multicast group and does not receive unsolicited
+    announcements. Each call observes direct traffic delivered to its per-call
+    socket during the sweep and has its own non-reusable discovery cache, but it
+    does not authenticate or correlate responders with outstanding queries.
+    Mesh scale is proven synthetically.
+
+    Each yielded device reports ``connectivity`` as ``"thread"`` only after an
+    exact positive Thread report. Every other construction or discovery
+    outcome is ``"wifi"``. This descriptive value does not authenticate the
+    device or change its routing, retry, or tuning behaviour.
 
     Args:
         timeout: Discovery timeout in seconds (default 15.0)
@@ -841,14 +851,16 @@ async def discover_mdns(
     """
     from lifx.network.mdns.discovery import discover_devices_mdns
 
-    async for device in discover_devices_mdns(
+    devices = discover_devices_mdns(
         timeout=timeout,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-    ):
-        yield device
+    )
+    async with aclosing(devices):
+        async for device in devices:
+            yield device
 
 
 async def find_by_serial(

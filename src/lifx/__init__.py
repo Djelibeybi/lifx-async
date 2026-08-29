@@ -73,7 +73,6 @@ from lifx.exceptions import (
     LifxUnsupportedDeviceError,
 )
 from lifx.network.discovery import DiscoveredDevice, discover_devices
-from lifx.network.mdns import LifxServiceRecord, discover_lifx_services
 from lifx.products import ProductCapability, ProductInfo, ProductRegistry
 from lifx.protocol.models import HevConfig, HevCycleState, mac_candidates_for_serial
 from lifx.protocol.protocol_types import (
@@ -161,9 +160,6 @@ __all__ = [
     # Discovery (low-level)
     "discover_devices",
     "DiscoveredDevice",
-    # mDNS Discovery (low-level)
-    "discover_lifx_services",
-    "LifxServiceRecord",
     # Products
     "ProductInfo",
     "ProductRegistry",
