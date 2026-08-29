@@ -21,7 +21,12 @@ from lifx.const import (
     MAX_RESPONSE_TIME,
 )
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
-from lifx.network.address import host_from_sockaddr, validate_address, wildcard_for
+from lifx.network.address import (
+    host_from_sockaddr,
+    sockaddr_for,
+    validate_address,
+    wildcard_for,
+)
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
 from lifx.network.utils import IdleDeadline, allocate_source
@@ -74,11 +79,6 @@ class DiscoveredDevice:
         Returns:
             Device instance of the appropriate type
 
-        Raises:
-            LifxDeviceNotFoundError: If device doesn't respond
-            LifxTimeoutError: If device query times out
-            LifxProtocolError: If device returns invalid data
-
         Example:
             ```python
             async for discovered in discover_devices():
@@ -106,7 +106,17 @@ class DiscoveredDevice:
             # inside the same failure boundary as capability detection.
             temp_device = Device(**kwargs)
 
-        except Exception:
+        except ValueError as error:
+            _LOGGER.debug(
+                {
+                    "class": "DiscoveredDevice",
+                    "method": "create_device",
+                    "action": "invalid_device_address",
+                    "serial": self.serial,
+                    "ip": self.ip,
+                    "reason": str(error),
+                }
+            )
             return None
 
         try:
@@ -249,6 +259,7 @@ async def _discover_with_packet(
 
     validate_address(broadcast_address)
     local_bind = wildcard_for(broadcast_address)
+    send_address = sockaddr_for((broadcast_address, port))
     async with UdpTransport(
         ip_address=local_bind,
         port=0,
@@ -278,7 +289,7 @@ async def _discover_with_packet(
                 "expected_response": expected_response_type,
             }
         )
-        await transport.send(message, (broadcast_address, port))
+        await transport.send(message, send_address)
 
         idle_timeout = max_response_time * idle_timeout_multiplier
         deadline = IdleDeadline(timeout, idle_timeout)
@@ -323,7 +334,7 @@ async def _discover_with_packet(
                         "port": port,
                     }
                 )
-                await transport.send(message, (broadcast_address, port))
+                await transport.send(message, send_address)
                 next_tx = next(tx_offsets, None)
                 now = time.monotonic()
 
@@ -417,6 +428,11 @@ async def _discover_with_packet(
                 # Unpack the response packet
                 response_packet = response_packet_class.unpack(payload)
 
+                # A valid protocol response proves the network is active even
+                # when its service or responder address is unusable. Reset the
+                # idle window before those filtering decisions.
+                deadline.mark_response()
+
                 # GetService discovery: a device advertises one StateService per
                 # service it supports, but only UDP carries an address we can
                 # talk to. Ignore the others so they neither claim the serial
@@ -427,7 +443,6 @@ async def _discover_with_packet(
                     isinstance(response_packet, DevicePackets.StateService)
                     and response_packet.service != DeviceService.UDP
                 ):
-                    deadline.mark_response()  # live device — keep idle window open
                     _LOGGER.debug(
                         {
                             "class": "_discover_with_packet",
@@ -438,14 +453,17 @@ async def _discover_with_packet(
                     )
                     continue
 
-                responder_ip = host_from_sockaddr(addr)
                 try:
-                    validate_address(responder_ip)
+                    responder_ip = host_from_sockaddr(
+                        addr, fallback_ip=broadcast_address
+                    )
+                    validate_address(responder_ip, emit_warnings=False)
                 except ValueError as error:
                     _LOGGER.debug(
                         {
                             "class": "_discover_with_packet",
                             "action": "ignored_invalid_responder_address",
+                            "serial": device_serial,
                             "reason": str(error),
                         }
                     )
@@ -468,11 +486,6 @@ async def _discover_with_packet(
                     response_time=response_time,
                     response_payload=response_payload,
                 )
-
-                # Reset idle timer on every valid protocol response, before dedup
-                # check — a duplicate flood must not cause premature idle expiry
-                # (Pitfall 1 / D-04).
-                deadline.mark_response()
 
                 # First-wins dedup: yield each serial at most once (D-04)
                 if device_serial in seen_serials:

@@ -16,11 +16,17 @@ The call sites, all of which import from here:
 * :mod:`lifx.network.transport`: ``UdpTransport.open()`` derives its socket
   family with :func:`family_for`, while ``send()`` canonicalises native
   socket addresses with :func:`sockaddr_for`
-* :mod:`lifx.network.connection`: ``DeviceConnection._open()`` derives its
+* :mod:`lifx.network.connection`: ``DeviceConnection.open()`` derives its
   bind literal with :func:`wildcard_for` and resolves its destination once
   with :func:`sockaddr_for`
+* :mod:`lifx.network.discovery`: discovery derives bind literals with
+  :func:`wildcard_for`, reconstructs responder scope with
+  :func:`host_from_sockaddr`, and validates wire addresses without emitting
+  caller-input warnings
+* :mod:`lifx.network.mdns.discovery`: mDNS validates caller-supplied device
+  addresses with :func:`validate_address`
 * :mod:`lifx.animation.animator`: ``Animator`` resolves its frame destination
-  once with :func:`sockaddr_for`
+  with :func:`sockaddr_for`; the canonical tuple determines the socket family
 
 **The validate/derive split.** :func:`validate_address` is the entry-point
 gate and applies the caller-facing rules; :func:`family_for` and
@@ -134,27 +140,57 @@ def sockaddr_for(address: SocketAddress) -> SocketAddress:
         raise ValueError(f"IPv6 zone identifier is out of range in {host!r}")
 
     textual_scope = parsed.scope_id
-    resolved_scope = (
-        _scope_id_for(textual_scope, host) if textual_scope is not None else 0
-    )
-    scope_id = supplied_scope or resolved_scope
-    unscoped_host = str(ipaddress.IPv6Address(parsed.packed))
+    if supplied_scope:
+        if textual_scope is not None:
+            numeric_scope = _numeric_scope_id(textual_scope, host)
+            if numeric_scope is not None and numeric_scope != supplied_scope:
+                raise ValueError(
+                    f"Conflicting IPv6 zone identifiers in {host!r}: "
+                    f"text selects {numeric_scope}, sockaddr selects {supplied_scope}"
+                )
+        scope_id = supplied_scope
+    elif textual_scope is not None:
+        scope_id = _scope_id_for(textual_scope, host)
+    else:
+        scope_id = 0
+
+    if parsed.is_link_local and scope_id == 0:
+        raise ValueError(f"IPv6 link-local address requires a zone identifier: {host}")
+
+    unscoped_host = host.partition("%")[0]
     return unscoped_host, port, flowinfo, scope_id
 
 
-def host_from_sockaddr(address: SocketAddress) -> str:
-    """Return a host literal that preserves an IPv6 sockaddr's numeric scope."""
+def host_from_sockaddr(
+    address: SocketAddress, *, fallback_ip: str | None = None
+) -> str:
+    """Return a host literal that preserves an IPv6 sockaddr's scope.
+
+    A native numeric scope is authoritative. If a platform supplies scope zero
+    for a link-local response, the validated destination's textual zone may be
+    used as a fallback so targeted discovery does not discard a live response.
+    """
     host = address[0]
-    if len(address) != 4 or address[3] == 0:
+    if len(address) != 4:
         return host
 
     parsed = ipaddress.ip_address(host)
-    if not isinstance(parsed, ipaddress.IPv6Address) or parsed.scope_id is not None:
+    if not isinstance(parsed, ipaddress.IPv6Address):
         return host
-    return f"{host}%{address[3]}"
+
+    unscoped_host = host.partition("%")[0]
+    if address[3] != 0:
+        return f"{unscoped_host}%{address[3]}"
+
+    if parsed.is_link_local and fallback_ip is not None:
+        fallback = ipaddress.ip_address(fallback_ip)
+        if isinstance(fallback, ipaddress.IPv6Address) and fallback.scope_id:
+            return f"{unscoped_host}%{fallback.scope_id}"
+
+    return unscoped_host
 
 
-def validate_address(ip: str | None) -> None:
+def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
     """Validate a device address, raising on anything unusable.
 
     This is the entry-point gate. It is called before any socket exists, so
@@ -163,6 +199,9 @@ def validate_address(ip: str | None) -> None:
 
     Args:
         ip: The device address to check.
+        emit_warnings: Emit caller-facing advisories for loopback and public
+            addresses. Inbound wire validation disables these warnings to
+            avoid one warning per responder datagram.
 
     Raises:
         ValueError: If the address is empty, unparsable, IPv4-mapped,
@@ -197,7 +236,7 @@ def validate_address(ip: str | None) -> None:
                 f"Append the interface, for example {ip}%en0"
             )
 
-    if addr.is_loopback:
+    if emit_warnings and addr.is_loopback:
         _LOGGER.warning(
             {
                 "module": "lifx.network.address",
@@ -207,7 +246,7 @@ def validate_address(ip: str | None) -> None:
             }
         )
 
-    if not addr.is_private:
+    if emit_warnings and not addr.is_private:
         _LOGGER.warning(
             {
                 "module": "lifx.network.address",

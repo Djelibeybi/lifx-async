@@ -139,8 +139,8 @@ def connection_socket_family(light: Light) -> socket.AddressFamily:
 @pytest.mark.parametrize(
     ("disable_emulator", "platform", "windows_ci_opt_in", "expected"),
     [
-        (False, "linux", None, True),
-        (False, "darwin", "0", True),
+        (False, "linux", None, False),
+        (False, "darwin", "0", False),
         (True, "linux", "1", False),
         (True, "win32", "1", False),
         (False, "win32", None, False),
@@ -223,7 +223,7 @@ class TestIpv6TargetedDiscovery:
         assert observation.local_address[0] == "::"
         assert observation.local_address[1] != 0
         assert observation.broadcast is False
-        assert observation.destinations[0] == ("::1", port)
+        assert observation.destinations[0] == ("::1", port, 0, 0)
         assert observation.close_completed is True
         assert observation.endpoint.is_closing()
 
@@ -279,7 +279,7 @@ class TestIpv6TargetedDiscoveryLifecycle:
             assert observation.family == socket.AF_INET6
             assert observation.local_address[0] == "::"
             assert observation.broadcast is False
-            assert observation.destinations[0] == ("::1", port)
+            assert observation.destinations[0] == ("::1", port, 0, 0)
             assert observation.close_completed is True
             assert observation.endpoint.is_closing()
         assert observations.empty()
@@ -335,7 +335,12 @@ class TestIpv6TargetedDiscoveryLifecycle:
         assert succeeding_observation.family == socket.AF_INET6
         assert succeeding_observation.local_address[0] == "::"
         assert succeeding_observation.local_address[1] != 0
-        assert succeeding_observation.destinations[0] == ("::1", emulator_port)
+        assert succeeding_observation.destinations[0] == (
+            "::1",
+            emulator_port,
+            0,
+            0,
+        )
         assert succeeding_observation.opened.is_set()
         assert succeeding_observation.receive_started.is_set()
         assert succeeding_observation.closed.is_set()

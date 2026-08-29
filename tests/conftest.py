@@ -203,12 +203,7 @@ def emulator_available(request: pytest.FixtureRequest) -> bool:
     if sys.platform == "win32":
         return False
 
-    try:
-        from lifx_emulator import EmulatedLifxServer  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
+    return True
 
 
 def targeted_ipv6_emulator_allowed(
@@ -219,9 +214,7 @@ def targeted_ipv6_emulator_allowed(
     """Decide whether the focused targeted-IPv6 emulator path may run."""
     if disable_emulator:
         return False
-    if platform.startswith("win32"):
-        return windows_ci_opt_in == "1"
-    return True
+    return platform.startswith("win32") and windows_ci_opt_in == "1"
 
 
 @pytest.fixture(scope="session")

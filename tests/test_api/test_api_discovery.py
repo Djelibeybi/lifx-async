@@ -19,7 +19,7 @@ import pytest
 from lifx.api import discover, discover_mdns, find_by_ip, find_by_label, find_by_serial
 from lifx.devices import Light
 from lifx.exceptions import LifxTimeoutError
-from lifx.network.address import SocketAddress
+from lifx.network.address import SocketAddress, sockaddr_for
 from lifx.network.discovery import DiscoveredDevice, DiscoveryResponse, discover_devices
 from lifx.network.message import create_message
 from lifx.network.transport import UdpTransport
@@ -529,6 +529,44 @@ class TestDiscoveryDelegateLifecycle:
 
         assert finalised is True
 
+    async def test_find_by_label_exact_match_stops_after_first_device(self) -> None:
+        """The exact-match contract yields at most one matching device."""
+        finalised = False
+        responses = [
+            DiscoveryResponse(
+                serial=f"d073d51234{suffix}",
+                ip=f"192.0.2.{index}",
+                port=56700,
+                response_time=0.01,
+                response_payload={"label": "Synthetic Light"},
+            )
+            for index, suffix in enumerate(("56", "57"), start=10)
+        ]
+
+        async def _discover_packets(*args, **kwargs):
+            nonlocal finalised
+            try:
+                for response in responses:
+                    yield response
+            finally:
+                finalised = True
+
+        async def _create_device(discovered: DiscoveredDevice) -> Light:
+            return Light(discovered.serial, discovered.ip)
+
+        with (
+            patch("lifx.api._discover_with_packet", side_effect=_discover_packets),
+            patch.object(DiscoveredDevice, "create_device", _create_device),
+        ):
+            devices = [
+                device
+                async for device in find_by_label("Synthetic Light", exact_match=True)
+            ]
+
+        assert len(devices) == 1
+        assert devices[0].serial == responses[0].serial
+        assert finalised is True
+
     async def test_find_by_label_skips_unsupported_device(self) -> None:
         """A matching label is ignored when its device type is unsupported."""
         response = DiscoveryResponse(
@@ -762,7 +800,7 @@ class TestFindByIpAddressGate:
     async def test_ipv6_representation_reaches_transport_boundary(
         self, literal: str
     ) -> None:
-        """Every accepted spelling reaches the IPv6 send boundary unchanged."""
+        """Every accepted spelling reaches the canonical IPv6 send boundary."""
         _ObservedNoResponseDiscoveryTransport.latest = None
 
         with patch(
@@ -782,7 +820,7 @@ class TestFindByIpAddressGate:
         assert result is None
         assert observation.ip_address == "::"
         assert observation.broadcast is False
-        assert observation.destinations == [(literal, 56700)]
+        assert observation.destinations == [sockaddr_for((literal, 56700))]
 
     async def test_split_response_scope_reaches_product_construction(self) -> None:
         """Discovery reconstructs the responder's zone without caller rewriting."""

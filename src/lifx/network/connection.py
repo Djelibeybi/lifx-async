@@ -239,8 +239,13 @@ class DeviceConnection:
             # address family: IPv6 for Thread devices, IPv4 otherwise. The
             # shared rule owns the choice, so this method makes no family
             # test of its own.
-            local_ip = wildcard_for(self.ip)
-            send_address = sockaddr_for((self.ip, self.port))
+            try:
+                local_ip = wildcard_for(self.ip)
+                send_address = sockaddr_for((self.ip, self.port))
+            except ValueError as error:
+                raise LifxNetworkError(
+                    f"Invalid destination {self.ip!r}: {error}"
+                ) from error
             self._transport = UdpTransport(
                 ip_address=local_ip, port=0, broadcast=False, peer=self._peer
             )
