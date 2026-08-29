@@ -447,6 +447,29 @@ class TestErrorHandling:
         assert transport._family is None
         assert transport.is_open is False
 
+    async def test_ipv6_endpoint_failure_closes_raw_socket(self) -> None:
+        """A failed endpoint hand-off does not leak its raw IPv6 socket."""
+        transport = UdpTransport(ip_address="::")
+        raw_socket = MagicMock()
+        failure = RuntimeError("forced IPv6 endpoint failure")
+
+        with (
+            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                side_effect=failure
+            )
+            with pytest.raises(RuntimeError) as excinfo:
+                await transport.open()
+
+        assert excinfo.value is failure
+        raw_socket.close.assert_called_once_with()
+        assert transport._protocol is None
+        assert transport._transport is None
+        assert transport._family is None
+        assert transport.is_open is False
+
     async def test_send_oserror_raises_network_error(self) -> None:
         """Test OSError during send raises NetworkError."""
         transport = UdpTransport()
@@ -734,6 +757,32 @@ class TestSocketFamilySelection:
             socket.IPV6_V6ONLY,
             1,
         )
+
+    async def test_ipv6_endpoint_without_reuse_port_support(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """IPv6 setup works when the platform omits ``SO_REUSEPORT``."""
+        monkeypatch.delattr(socket, "SO_REUSEPORT", raising=False)
+        transport = UdpTransport(ip_address="::", port=0)
+        raw_socket = MagicMock()
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = ("::", 49152, 0, 0)
+
+        with (
+            patch("lifx.network.transport.socket.socket", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            await transport.open()
+
+        raw_socket.setsockopt.assert_called_once_with(
+            socket.IPPROTO_IPV6,
+            socket.IPV6_V6ONLY,
+            1,
+        )
+        await transport.close()
 
 
 class TestSendFamilyAssertion:

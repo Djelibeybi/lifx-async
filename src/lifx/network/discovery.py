@@ -100,13 +100,16 @@ class DiscoveredDevice:
             "max_retries": self.max_retries,
         }
 
-        temp_device: Device | None = None
-
         try:
             # Create temporary device to query version. Address validation can
             # fail here, before a connection exists, so keep construction
             # inside the same failure boundary as capability detection.
             temp_device = Device(**kwargs)
+
+        except Exception:
+            return None
+
+        try:
             await temp_device.ensure_capabilities()
 
             if temp_device.capabilities and temp_device.version:
@@ -130,8 +133,7 @@ class DiscoveredDevice:
 
         finally:
             # Always close the temporary device connection
-            if temp_device is not None:
-                await temp_device.connection.close()
+            await temp_device.connection.close()
 
         return None
 

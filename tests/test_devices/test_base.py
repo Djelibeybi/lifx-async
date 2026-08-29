@@ -20,6 +20,7 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.network.connection import DeviceConnection
+from lifx.network.discovery import DiscoveredDevice
 from lifx.protocol import packets
 
 
@@ -721,8 +722,6 @@ class TestLocationAndGroupManagement:
         # Replace device's connection with mock
 
         # Mock discovered devices
-        from lifx.network.discovery import DiscoveredDevice
-
         discovered_devices = [
             DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
@@ -777,8 +776,6 @@ class TestLocationAndGroupManagement:
         # Replace device's connection with mock
 
         # Mock discovered devices with different label
-        from lifx.network.discovery import DiscoveredDevice
-
         discovered_devices = [
             DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
@@ -828,8 +825,6 @@ class TestLocationAndGroupManagement:
         # Replace device's connection with mock
 
         # Mock discovered devices
-        from lifx.network.discovery import DiscoveredDevice
-
         discovered_devices = [
             DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
@@ -884,8 +879,6 @@ class TestLocationAndGroupManagement:
         # Replace device's connection with mock
 
         # Mock discovered devices with different label
-        from lifx.network.discovery import DiscoveredDevice
-
         discovered_devices = [
             DiscoveredDevice(serial="d073d5aabbcc", ip="192.168.1.50")
         ]
@@ -926,6 +919,110 @@ class TestLocationAndGroupManagement:
 
         assert packet.group == expected_uuid.bytes
         assert packet.label == label.encode("utf-8")[:32].ljust(32, b"\x00")
+
+    @pytest.mark.parametrize(
+        ("collection", "label", "namespace"),
+        [
+            ("location", "Query Failure Location", LIFX_LOCATION_NAMESPACE),
+            ("group", "Query Failure Group", LIFX_GROUP_NAMESPACE),
+        ],
+    )
+    async def test_set_collection_falls_back_when_device_query_fails(
+        self,
+        device: Device,
+        collection: str,
+        label: str,
+        namespace: uuid.UUID,
+    ) -> None:
+        """One unreachable discovery result does not prevent the update."""
+        discovered = DiscoveredDevice(
+            serial="d073d5aabbcc",
+            ip="192.168.1.50",
+        )
+
+        async def mock_discover_gen(timeout: float = 5.0, **kwargs):
+            yield discovered
+
+        mock_discovered_conn = MagicMock(spec=DeviceConnection)
+        mock_discovered_conn.request = AsyncMock(
+            side_effect=RuntimeError("synthetic query failure")
+        )
+        mock_discovered_conn.close = AsyncMock()
+
+        with (
+            patch(
+                "lifx.network.discovery.discover_devices",
+                side_effect=mock_discover_gen,
+            ),
+            patch(
+                "lifx.devices.base.DeviceConnection",
+                return_value=mock_discovered_conn,
+            ),
+        ):
+            await getattr(device, f"set_{collection}")(label)
+
+        mock_discovered_conn.close.assert_awaited_once_with()
+        packet = device.connection.request.call_args.args[0]
+        assert getattr(packet, collection) == uuid.uuid5(namespace, label).bytes
+
+    @pytest.mark.parametrize(
+        ("collection", "label", "namespace"),
+        [
+            ("location", "Discovery Failure Location", LIFX_LOCATION_NAMESPACE),
+            ("group", "Discovery Failure Group", LIFX_GROUP_NAMESPACE),
+        ],
+    )
+    async def test_set_collection_falls_back_when_discovery_fails(
+        self,
+        device: Device,
+        collection: str,
+        label: str,
+        namespace: uuid.UUID,
+    ) -> None:
+        """A failed discovery sweep still uses the deterministic UUID."""
+
+        async def failed_discovery(timeout: float = 5.0, **kwargs):
+            raise RuntimeError("synthetic discovery failure")
+            yield
+
+        with patch(
+            "lifx.network.discovery.discover_devices",
+            side_effect=failed_discovery,
+        ):
+            await getattr(device, f"set_{collection}")(label)
+
+        packet = device.connection.request.call_args.args[0]
+        assert getattr(packet, collection) == uuid.uuid5(namespace, label).bytes
+
+    async def test_set_location_updates_initialised_state(self, device: Device) -> None:
+        """A successful location update is mirrored into cached device state."""
+        label = "Cached Location"
+        expected_uuid = uuid.uuid5(LIFX_LOCATION_NAMESPACE, label)
+
+        async def empty_discovery(timeout: float = 5.0, **kwargs):
+            return
+            yield
+
+        device._state = MagicMock()
+        device.connection.request.return_value = MagicMock()
+
+        with (
+            patch(
+                "lifx.network.discovery.discover_devices",
+                side_effect=empty_discovery,
+            ),
+            patch.object(
+                device,
+                "_schedule_refresh",
+                new_callable=AsyncMock,
+            ) as schedule_refresh,
+        ):
+            await device.set_location(label)
+
+        assert device._state.location.uuid == expected_uuid.hex
+        assert device._state.location.label == label
+        assert device._state.location.updated_at > 0
+        schedule_refresh.assert_awaited_once_with()
 
 
 class TestAddressEntryPointGate:

@@ -18,11 +18,18 @@ from __future__ import annotations
 
 import logging
 import socket
+from unittest.mock import patch
 
 import pytest
 
 from lifx.const import DEFAULT_IP_ADDRESS
-from lifx.network.address import family_for, validate_address, wildcard_for
+from lifx.network.address import (
+    family_for,
+    host_from_sockaddr,
+    sockaddr_for,
+    validate_address,
+    wildcard_for,
+)
 
 _LOGGER_NAME = "lifx.network.address"
 
@@ -183,6 +190,32 @@ class TestValidateAddressAccepts:
             assert validate_address(value) is None
 
         assert caplog.records == []
+
+
+class TestSocketAddressConversion:
+    """Native socket tuples preserve valid IPv6 scope information."""
+
+    @pytest.mark.parametrize("resolved_scope", [0, 2**32])
+    def test_named_zone_resolving_out_of_range_raises(
+        self, resolved_scope: int
+    ) -> None:
+        """Platform interface lookup cannot supply an unusable scope ID."""
+        with patch(
+            "lifx.network.address.socket.if_nametoindex",
+            return_value=resolved_scope,
+        ):
+            with pytest.raises(ValueError, match="out of range"):
+                sockaddr_for(("fe80::1%test0", 56700))
+
+    @pytest.mark.parametrize("scope_id", [-1, 2**32])
+    def test_supplied_scope_out_of_range_raises(self, scope_id: int) -> None:
+        """A caller-supplied native scope must fit the platform field."""
+        with pytest.raises(ValueError, match="out of range"):
+            sockaddr_for(("fe80::1", 56700, 0, scope_id))
+
+    def test_already_scoped_native_host_is_preserved(self) -> None:
+        """A four-tuple does not append a second zone to a scoped host."""
+        assert host_from_sockaddr(("fe80::1%7", 56700, 0, 7)) == "fe80::1%7"
 
 
 class TestFamilyFor:
