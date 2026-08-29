@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.0.1 (2026-08-29)
+
+### Bug Fixes
+
+- Overdue removal of deprecated receive_many method
+  ([`6f35070`](https://github.com/Djelibeybi/lifx-async/commit/6f35070e0d821af35028f0af1051b55981102895))
+
+
 ## v7.0.0 (2026-08-29)
 
 ### Bug Fixes
