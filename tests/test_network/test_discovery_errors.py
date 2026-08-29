@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from lifx.exceptions import LifxTimeoutError
 from lifx.network.discovery import _discover_with_packet, discover_devices
 from lifx.network.transport import UdpTransport, _UdpProtocol
 from lifx.protocol.header import LifxHeader
@@ -123,6 +124,45 @@ def _build_state_service_packet(
         payload_size=len(payload),
     )
     return header.pack() + payload
+
+
+class TestDiscoveryResponderAddressValidation:
+    """Invalid responder socket addresses are isolated to one datagram."""
+
+    async def test_unscoped_ipv6_link_local_responder_is_ignored(self) -> None:
+        """A native IPv6 four-tuple with scope zero cannot identify a peer."""
+        known_source = 42
+        packet = _build_state_service_packet(
+            source=known_source,
+            target=b"\xd0\x73\xd5\x01\x02\x03\x00\x00",
+        )
+        responses = iter([(packet, ("fe80::1", 56700, 0, 0))])
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                return next(responses)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            discovered = [
+                response
+                async for response in _discover_with_packet(
+                    DevicePackets.GetService(), timeout=0.01
+                )
+            ]
+
+        assert discovered == []
 
 
 class TestDiscoverySourceValidation:

@@ -7,7 +7,7 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 from __future__ import annotations
 
 import sys
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -61,6 +61,18 @@ class TestDiscoveryGeneratorOwnership:
 class TestDiscoveredDeviceValidationBoundary:
     """Malformed responder data is isolated to that response."""
 
+    async def test_constructor_failure_returns_none_without_cleanup(self) -> None:
+        """Failure before a temporary device exists needs no connection cleanup."""
+        discovered = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="192.0.2.10",
+        )
+
+        with patch(
+            "lifx.devices.base.Device", side_effect=ValueError("invalid address")
+        ):
+            assert await discovered.create_device() is None
+
     async def test_invalid_address_returns_none_instead_of_aborting_sweep(self) -> None:
         """Device construction failures stay inside ``create_device``."""
         discovered = DiscoveredDevice(
@@ -69,6 +81,23 @@ class TestDiscoveredDeviceValidationBoundary:
         )
 
         assert await discovered.create_device() is None
+
+    async def test_missing_capability_metadata_returns_none(self) -> None:
+        """A valid responder without version metadata is not constructible."""
+        discovered = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="192.0.2.10",
+        )
+        temporary_device = MagicMock()
+        temporary_device.ensure_capabilities = AsyncMock()
+        temporary_device.capabilities = None
+        temporary_device.version = None
+        temporary_device.connection.close = AsyncMock()
+
+        with patch("lifx.devices.base.Device", return_value=temporary_device):
+            assert await discovered.create_device() is None
+
+        temporary_device.connection.close.assert_awaited_once_with()
 
 
 @pytest.mark.emulator

@@ -415,6 +415,26 @@ class TestFindByLabel:
 class TestDiscoveryDelegateLifecycle:
     """Public helpers synchronously close their socket-owning delegates."""
 
+    async def test_discover_skips_unsupported_device(self) -> None:
+        """Discovery continues when capability detection rejects a responder."""
+        discovered = DiscoveredDevice("d073d5123456", "192.0.2.10")
+
+        async def _discover_devices(*args, **kwargs):
+            yield discovered
+
+        async def _create_device(_discovered: DiscoveredDevice) -> None:
+            return None
+
+        with (
+            patch("lifx.api.discover_devices", side_effect=_discover_devices),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _create_device,
+            ),
+        ):
+            assert [device async for device in discover()] == []
+
     async def test_discover_close_finalises_device_discovery(self) -> None:
         """Closing ``discover`` immediately closes ``discover_devices``."""
         finalised = False
@@ -508,6 +528,34 @@ class TestDiscoveryDelegateLifecycle:
             await generator.aclose()
 
         assert finalised is True
+
+    async def test_find_by_label_skips_unsupported_device(self) -> None:
+        """A matching label is ignored when its device type is unsupported."""
+        response = DiscoveryResponse(
+            serial="d073d5123456",
+            ip="192.0.2.10",
+            port=56700,
+            response_time=0.01,
+            response_payload={"label": "Synthetic Light"},
+        )
+
+        async def _discover_packets(*args, **kwargs):
+            yield response
+
+        async def _create_device(_discovered: DiscoveredDevice) -> None:
+            return None
+
+        with (
+            patch("lifx.api._discover_with_packet", side_effect=_discover_packets),
+            patch.object(
+                DiscoveredDevice,
+                "create_device",
+                _create_device,
+            ),
+        ):
+            assert [
+                device async for device in find_by_label("Synthetic", exact_match=False)
+            ] == []
 
 
 class TestDiscoverMdns:
