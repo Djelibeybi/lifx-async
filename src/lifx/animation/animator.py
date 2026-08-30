@@ -148,6 +148,10 @@ class Animator:
             framebuffer: Configured FrameBuffer for orientation mapping
             packet_generator: Configured PacketGenerator for the device
             port: UDP port (default: 56700)
+
+        Raises:
+            ValueError: If ``ip`` is not a usable IPv4 or IPv6 literal,
+                including a link-local IPv6 address without a valid zone.
         """
         self._ip = ip
         self._port = port
@@ -426,11 +430,13 @@ class Animator:
                 ) from error
             self._addr = addr
             self._socket = new_socket
-
-        sock = self._socket
-        send_address = self._addr
-        if sock is None or send_address is None:
-            raise LifxNetworkError("Animator UDP session is incomplete")
+            sock = new_socket
+            send_address = addr
+        else:
+            sock = self._socket
+            send_address = self._addr
+            if send_address is None:
+                raise LifxNetworkError("Animator UDP session is incomplete")
         now = time.monotonic()
         self._ack_gate.sweep(sock, self._source, now)
         if self._ack_gate.gated:

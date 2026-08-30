@@ -51,8 +51,8 @@ uv run pytest --cov=lifx --cov-report=html
 # Verbose output
 uv run --frozen pytest -v
 
-# Run with emulator integration tests (requires lifx-emulator on PATH)
-# Tests marked with @pytest.mark.emulator will be skipped if emulator is not available
+# Run with emulator integration tests (lifx-emulator-core is a required dev dependency)
+# Use --disable-emulator to skip the normal embedded-emulator suite explicitly
 uv run pytest
 ```
 

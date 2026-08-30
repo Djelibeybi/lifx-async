@@ -147,6 +147,20 @@ class TestMdnsPublicSurface:
 class TestLifxRecordCache:
     """Tests for the _LifxRecordCache mDNS record accumulator."""
 
+    def test_packet_source_validation_suppresses_caller_warnings(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A responder-controlled source cannot emit caller-input warnings."""
+        cache = _LifxRecordCache()
+
+        with caplog.at_level("WARNING", logger="lifx.network.address"):
+            cache.add_packet(
+                [_txt_record("device._lifx._udp.local")],
+                "127.0.0.1",
+            )
+
+        assert caplog.records == []
+
     def test_complete_unrelated_service_chain_is_rejected_at_every_boundary(
         self,
     ) -> None:
@@ -2314,6 +2328,41 @@ class TestDiscoverDevicesMdns:
             assert len(devices) == 1
             assert isinstance(devices[0], Light)
             assert devices[0].serial == "d073d5123456"
+
+    @pytest.mark.asyncio
+    async def test_record_validation_suppresses_caller_warnings(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An advertised address cannot emit caller-input warnings."""
+        from lifx.network.mdns.discovery import discover_devices_mdns
+
+        record = _LifxServiceRecord(
+            serial="d073d5123456",
+            ip="127.0.0.1",
+            port=56700,
+            product_id=27,
+            firmware="4.112",
+            service_instance="device._lifx._udp.local",
+        )
+
+        async def mock_generator():
+            yield record
+
+        with (
+            caplog.at_level("WARNING", logger="lifx.network.address"),
+            patch(
+                "lifx.network.mdns.discovery._discover_lifx_services",
+                return_value=mock_generator(),
+            ),
+            patch(
+                "lifx.network.mdns.discovery._create_device_from_record",
+                return_value=None,
+            ),
+        ):
+            devices = [device async for device in discover_devices_mdns(timeout=0.1)]
+
+        assert devices == []
+        assert caplog.records == []
 
     @pytest.mark.asyncio
     async def test_mixed_unusable_ipv4_and_valid_ula_yields_thread_device(

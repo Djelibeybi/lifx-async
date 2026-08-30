@@ -328,7 +328,9 @@ def emulator_server(
         return
 
     if not emulator_enabled:
-        pytest.skip("lifx-emulator-core not available")
+        pytest.skip(
+            "embedded emulator tests are disabled on this platform or by option"
+        )
 
     # Create scenario manager for all devices to share
     scenario_manager = HierarchicalScenarioManager()
@@ -390,7 +392,9 @@ def tile_chain_server(
         UDP port the chain emulator is listening on
     """
     if not emulator_enabled:
-        pytest.skip("lifx-emulator-core not available")
+        pytest.skip(
+            "embedded emulator tests are disabled on this platform or by option"
+        )
 
     scenario_manager = HierarchicalScenarioManager()
     devices = [
@@ -656,11 +660,11 @@ async def cleanup_device_connections(request, emulator_enabled):
     connections must be closed so they can reopen with the new loop.
 
     Only runs for tests marked with @pytest.mark.emulator and when
-    the emulator is available.
+    the normal embedded-emulator suite is enabled.
     """
     yield
 
-    # Skip cleanup if emulator is not available or test doesn't use it
+    # Skip cleanup if the emulator suite is disabled or the test does not use it
     if not emulator_enabled:
         return
 

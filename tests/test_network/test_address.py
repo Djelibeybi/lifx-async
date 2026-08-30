@@ -275,11 +275,12 @@ class TestSocketAddressConversion:
         with pytest.raises(ValueError, match="requires a zone identifier"):
             sockaddr_for(("fe80::1", 56700, 0, 0))
 
-    def test_textual_scope_is_preserved_when_native_scope_is_also_present(
-        self,
-    ) -> None:
-        """A host that already names its route is returned without rewriting."""
-        assert host_from_sockaddr(("fe80::1%8", 56700, 0, 7)) == "fe80::1%8"
+    def test_native_scope_replaces_conflicting_textual_scope(self) -> None:
+        """Kernel routing metadata remains authoritative over host text."""
+        host = host_from_sockaddr(("fe80::1%8", 56700, 0, 7))
+
+        assert host == "fe80::1%7"
+        assert sockaddr_for((host, 56700, 0, 7)) == ("fe80::1", 56700, 0, 7)
 
     def test_target_scope_fills_missing_responder_scope(self) -> None:
         """Targeted discovery keeps the caller's validated link-local zone."""

@@ -647,7 +647,7 @@ class _LifxRecordCache:
             instance = next(iter(packet_instances))
             if self.records_for(instance, DNS_TYPE_TXT):
                 try:
-                    validate_address(source_ip)
+                    validate_address(source_ip, emit_warnings=False)
                 except ValueError:
                     self.count_rejection("invalid_address", "A")
                 else:
@@ -1169,7 +1169,7 @@ async def discover_devices_mdns(
             if not _is_lifx_service_instance(record.service_instance):
                 continue
             try:
-                validate_address(record.ip)
+                validate_address(record.ip, emit_warnings=False)
             except ValueError:
                 continue
 

@@ -15,7 +15,8 @@ The call sites, all of which import from here:
 * :mod:`lifx.api`: ``find_by_ip()`` gates on :func:`validate_address`
 * :mod:`lifx.network.transport`: ``UdpTransport.open()`` derives its socket
   family with :func:`family_for` and canonicalises its local bind with
-  :func:`sockaddr_for`, while ``send()`` derives the destination family with
+  :func:`sockaddr_for`, while ``send()`` canonicalises its destination with
+  :func:`sockaddr_for` and derives its family with
   :func:`family_for_sockaddr`
 * :mod:`lifx.network.connection`: ``DeviceConnection.open()`` derives its
   bind literal with :func:`wildcard_for` and resolves its destination once
@@ -24,8 +25,9 @@ The call sites, all of which import from here:
   :func:`wildcard_for`, reconstructs responder scope with
   :func:`host_from_sockaddr`, and validates wire addresses without emitting
   caller-input warnings
-* :mod:`lifx.network.mdns.discovery`: mDNS validates caller-supplied device
-  addresses with :func:`validate_address`
+* :mod:`lifx.network.mdns.discovery`: mDNS validates packet-source and
+  advertised device addresses with :func:`validate_address`, suppressing
+  caller-input warnings for both wire-controlled paths
 * :mod:`lifx.animation.animator`: ``Animator`` validates its caller-supplied
   address, resolves its frame destination with :func:`sockaddr_for`, and
   derives the socket family with :func:`family_for_sockaddr`
@@ -132,6 +134,11 @@ def _scope_id_for(zone: str, ip: str) -> int:
     return scope_id
 
 
+def _unscoped_ipv6_host(address: ipaddress.IPv6Address) -> str:
+    """Return the canonical IPv6 host text without any zone identifier."""
+    return str(ipaddress.IPv6Address(address.packed))
+
+
 def sockaddr_for(
     address: SocketAddress, *, require_routable: bool = True
 ) -> SocketAddress:
@@ -170,7 +177,7 @@ def sockaddr_for(
     if require_routable and parsed.is_link_local and scope_id == 0:
         raise ValueError(f"IPv6 link-local address requires a zone identifier: {host}")
 
-    unscoped_host = str(ipaddress.IPv6Address(parsed.packed))
+    unscoped_host = _unscoped_ipv6_host(parsed)
     return unscoped_host, port, flowinfo, scope_id
 
 
@@ -179,10 +186,11 @@ def host_from_sockaddr(
 ) -> str:
     """Return a host literal that preserves an IPv6 sockaddr's scope.
 
-    A textual zone already attached to the host is preserved. Otherwise a
-    native numeric scope is authoritative. If a platform supplies scope zero
-    for a link-local response, the validated destination's textual zone may be
-    used as a fallback so targeted discovery does not discard a live response.
+    A non-zero native numeric scope is authoritative. If a platform supplies
+    scope zero, a textual zone already attached to the host is preserved. If
+    both are absent for a link-local response, the validated destination's
+    textual zone may be used as a fallback so targeted discovery does not
+    discard a live response.
     """
     host = address[0]
     if len(address) != 4:
@@ -192,12 +200,12 @@ def host_from_sockaddr(
     if not isinstance(parsed, ipaddress.IPv6Address):
         return host
 
-    if parsed.scope_id is not None:
-        return str(parsed)
-
-    unscoped_host = str(ipaddress.IPv6Address(parsed.packed))
+    unscoped_host = _unscoped_ipv6_host(parsed)
     if address[3] != 0:
         return f"{unscoped_host}%{address[3]}"
+
+    if parsed.scope_id is not None:
+        return str(parsed)
 
     if parsed.is_link_local and fallback_ip is not None:
         fallback = ipaddress.ip_address(fallback_ip)

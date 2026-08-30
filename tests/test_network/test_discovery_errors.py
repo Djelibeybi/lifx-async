@@ -67,24 +67,6 @@ class TestDiscoveryWithEmulatorErrors:
         # Should not yield any devices
         assert count == 0
 
-
-class TestDiscoveryDestinationErrors:
-    """Invalid native destinations retain the public network-error taxonomy."""
-
-    async def test_unresolvable_named_zone_raises_network_error(self) -> None:
-        """Scope resolution cannot leak a bare ``ValueError`` from discovery."""
-        with (
-            patch(
-                "lifx.network.address.socket.if_nametoindex",
-                side_effect=OSError("no such interface"),
-            ),
-            pytest.raises(LifxNetworkError, match="Invalid destination"),
-        ):
-            async for _ in _discover_with_packet(
-                DevicePackets.GetService(), broadcast_address="fe80::1%nosuch0"
-            ):
-                pass
-
     @pytest.mark.asyncio
     async def test_discovery_idle_timeout_branch(self) -> None:
         """Test discovery exits via idle timeout when idle_timeout is zero."""
@@ -117,6 +99,24 @@ class TestDiscoveryDestinationErrors:
             count += 1
 
         assert count == 0
+
+
+class TestDiscoveryDestinationErrors:
+    """Invalid native destinations retain the public network-error taxonomy."""
+
+    async def test_unresolvable_named_zone_raises_network_error(self) -> None:
+        """Scope resolution cannot leak a bare ``ValueError`` from discovery."""
+        with (
+            patch(
+                "lifx.network.address.socket.if_nametoindex",
+                side_effect=OSError("no such interface"),
+            ),
+            pytest.raises(LifxNetworkError, match="Invalid destination"),
+        ):
+            async for _ in _discover_with_packet(
+                DevicePackets.GetService(), broadcast_address="fe80::1%nosuch0"
+            ):
+                pass
 
 
 def _build_state_service_packet(
