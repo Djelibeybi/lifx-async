@@ -4062,9 +4062,17 @@ class TestMdnsFollowUpAddressQueries:
             sequence = [packet_order[0], b"empty", *packet_order[1:], packet_order[-1]]
             deadline = _fake_deadline()
             transport = _fake_transport()
-            transport.receive = _receive_script(
-                *((packet, ("192.0.2.10", 5353)) for packet in sequence)
-            )
+            scripted_packets = [(packet, ("192.0.2.10", 5353)) for packet in sequence]
+
+            async def receive(
+                timeout: float = 5.0,
+            ) -> tuple[bytes, tuple[str, int]]:
+                if scripted_packets:
+                    return scripted_packets.pop(0)
+                deadline.overall_expired = True
+                raise LifxTimeoutError("script exhausted")
+
+            transport.receive.side_effect = receive
 
             def parse(packet: bytes) -> MagicMock:
                 return self._response_for(packet_records[packet])
