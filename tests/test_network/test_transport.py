@@ -16,6 +16,30 @@ from lifx.exceptions import LifxTimeoutError as TimeoutError
 from lifx.network.transport import PeerInfo, UdpTransport, _UdpProtocol
 
 
+async def _open_mock_transport(
+    ip_address: str,
+) -> tuple[UdpTransport, MagicMock, MagicMock]:
+    """Open a transport against a mocked loop and return its test seams."""
+    transport = UdpTransport(ip_address=ip_address, port=0)
+    raw_socket = MagicMock()
+    datagram_transport = MagicMock()
+    datagram_transport.get_extra_info.return_value = (ip_address, 49152)
+
+    with (
+        patch(
+            "lifx.network.transport._socket_factory",
+            return_value=raw_socket,
+        ) as socket_factory,
+        patch("asyncio.get_running_loop") as mock_loop,
+    ):
+        mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+            return_value=(datagram_transport, MagicMock())
+        )
+        await transport.open()
+
+    return transport, datagram_transport, socket_factory
+
+
 class TestUdpTransport:
     """Test UDP transport."""
 
@@ -702,21 +726,7 @@ class TestSocketFamilySelection:
     @staticmethod
     async def _family_used(ip_address: str) -> socket.AddressFamily:
         """Open a transport against a mocked loop and report the family."""
-        transport = UdpTransport(ip_address=ip_address, port=0)
-        raw_socket = MagicMock()
-        datagram_transport = MagicMock()
-        datagram_transport.get_extra_info.return_value = (ip_address, 49152)
-
-        with (
-            patch(
-                "lifx.network.transport._socket_factory",
-                return_value=raw_socket,
-            ) as socket_factory,
-            patch("asyncio.get_running_loop") as mock_loop,
-        ):
-            endpoint = AsyncMock(return_value=(datagram_transport, MagicMock()))
-            mock_loop.return_value.create_datagram_endpoint = endpoint
-            await transport.open()
+        transport, _, socket_factory = await _open_mock_transport(ip_address)
 
         family = transport._family
         assert family is not None
@@ -875,20 +885,7 @@ class TestSendFamilyAssertion:
         and lets the happy path assert the datagram really was handed to
         ``sendto`` instead of putting a packet on the wire.
         """
-        transport = UdpTransport(ip_address=ip_address, port=0)
-        datagram_transport = MagicMock()
-        datagram_transport.get_extra_info.return_value = (ip_address, 49152)
-        raw_socket = MagicMock()
-
-        with (
-            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
-            patch("asyncio.get_running_loop") as mock_loop,
-        ):
-            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
-                return_value=(datagram_transport, MagicMock())
-            )
-            await transport.open()
-
+        transport, datagram_transport, _ = await _open_mock_transport(ip_address)
         return transport, datagram_transport
 
     async def test_ipv6_destination_on_an_ipv4_socket_raises_immediately(self) -> None:

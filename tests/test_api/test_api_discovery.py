@@ -781,7 +781,7 @@ class _FailOnUseDiscoveryTransport:
 
 
 class TestFindByIpAddressGate:
-    """Public targeted lookup preserves accepted text at its network boundary."""
+    """Public targeted lookup canonicalises accepted text at its send boundary."""
 
     @pytest.mark.parametrize(
         ("literal", "expected_sockaddr"),

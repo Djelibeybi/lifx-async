@@ -770,6 +770,12 @@ async def discover(
     Yields:
         Device instances as they are discovered
 
+    Raises:
+        ValueError: If ``broadcast_address`` is not a usable IPv4 or IPv6
+            literal, including a link-local IPv6 address without a valid zone.
+        LifxNetworkError: If the validated destination cannot be resolved to a
+            native socket address or the discovery transport fails.
+
     Example:
         ```python
         # Process devices as they're discovered
@@ -889,6 +895,12 @@ async def find_by_serial(
 
     Returns:
         Device instance if found, None otherwise
+
+    Raises:
+        ValueError: If ``broadcast_address`` is not a usable IPv4 or IPv6
+            literal, including a link-local IPv6 address without a valid zone.
+        LifxNetworkError: If the validated destination cannot be resolved to a
+            native socket address or the discovery transport fails.
 
     Example:
         ```python
@@ -1019,6 +1031,12 @@ async def find_by_label(
 
     Yields:
         Matching Device instance(s)
+
+    Raises:
+        ValueError: If ``broadcast_address`` is not a usable IPv4 or IPv6
+            literal, including a link-local IPv6 address without a valid zone.
+        LifxNetworkError: If the validated destination cannot be resolved to a
+            native socket address or the discovery transport fails.
 
     Example:
         ```python
