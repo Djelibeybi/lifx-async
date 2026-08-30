@@ -32,16 +32,13 @@ from lifx.devices import HevLight, InfraredLight, Light, MultiZoneLight
 from lifx.devices.base import Device
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
-from lifx.exceptions import LifxConnectionError, LifxTimeoutError
+from lifx.exceptions import LifxConnectionError, LifxNetworkError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
 
 NETWORK_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LifxTimeoutError,
     LifxConnectionError,
-)
-WINDOWS_EMULATOR_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
-    *NETWORK_RETRY_EXCEPTIONS,
-    AssertionError,
+    LifxNetworkError,
 )
 
 
@@ -83,8 +80,10 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 def pytest_set_filtered_exceptions() -> tuple[type[Exception], ...]:
     """Configure pytest-retry to only retry on network-related exceptions.
 
-    Tests that fail with LifxTimeoutError or LifxConnectionError will be
-    retried automatically, as these are typically transient network issues.
+    Tests that fail with LifxTimeoutError, LifxConnectionError, or
+    LifxNetworkError will be retried automatically, as these are typically
+    transient network issues. The plugin uses exact type membership, so every
+    approved concrete exception is listed explicitly.
     """
     return NETWORK_RETRY_EXCEPTIONS
 

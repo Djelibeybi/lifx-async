@@ -150,8 +150,8 @@ class Animator:
             port: UDP port (default: 56700)
 
         Raises:
-            ValueError: If ``ip`` is not a usable IPv4 or IPv6 literal,
-                including a link-local IPv6 address without a valid zone.
+            ValueError: If ``ip`` is not a valid IPv4 or IPv6 literal, including
+                a link-local IPv6 address without a syntactically valid zone.
         """
         self._ip = ip
         self._port = port
@@ -415,28 +415,25 @@ class Animator:
         # address, derived by the one shared rule: Thread devices are
         # IPv6-only, and an AF_INET socket raises gaierror when asked to
         # send to an IPv6 address.
-        if self._socket is None:
-            new_socket: socket.socket | None = None
+        sock = self._socket
+        if sock is None:
             try:
                 addr = sockaddr_for((self._ip, self._port))
                 family = family_for_sockaddr(addr)
-                new_socket = socket.socket(family, socket.SOCK_DGRAM)
-                new_socket.setblocking(False)
+                sock = socket.socket(family, socket.SOCK_DGRAM)
+                sock.setblocking(False)
             except (OSError, ValueError) as error:
-                if new_socket is not None:
-                    new_socket.close()
+                if sock is not None:
+                    sock.close()
                 raise LifxNetworkError(
                     f"Failed to open UDP socket for {self._ip!r}: {error}"
                 ) from error
             self._addr = addr
-            self._socket = new_socket
-            sock = new_socket
-            send_address = addr
-        else:
-            sock = self._socket
-            send_address = self._addr
-            if send_address is None:
-                raise LifxNetworkError("Animator UDP session is incomplete")
+            self._socket = sock
+
+        send_address = self._addr
+        if send_address is None:
+            raise LifxNetworkError("Animator UDP session is incomplete")
         now = time.monotonic()
         self._ack_gate.sweep(sock, self._source, now)
         if self._ack_gate.gated:

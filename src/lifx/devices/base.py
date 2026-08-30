@@ -6,8 +6,9 @@ import asyncio
 import logging
 import time
 import uuid
-from collections.abc import Coroutine
-from contextlib import aclosing
+from collections.abc import Coroutine, Iterator
+from contextlib import aclosing, contextmanager
+from contextvars import ContextVar
 from dataclasses import InitVar, dataclass, field
 from math import floor, log10
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
@@ -49,6 +50,19 @@ if TYPE_CHECKING:
     )
 
 _LOGGER = logging.getLogger(__name__)
+_EMIT_DEVICE_INPUT_WARNINGS: ContextVar[bool] = ContextVar(
+    "lifx_emit_device_input_warnings", default=True
+)
+
+
+@contextmanager
+def _suppress_device_input_warnings() -> Iterator[None]:
+    """Suppress caller advisories while constructing from validated wire data."""
+    token = _EMIT_DEVICE_INPUT_WARNINGS.set(False)
+    try:
+        yield
+    finally:
+        _EMIT_DEVICE_INPUT_WARNINGS.reset(token)
 
 
 @dataclass
@@ -486,7 +500,8 @@ class Device(Generic[StateT]):
         # Validate the address. Every rule about what an address may be
         # lives in lifx.network.address, so this class holds no opinion of
         # its own and cannot drift from the other entry points.
-        validate_address(ip)
+        emit_input_warnings = _EMIT_DEVICE_INPUT_WARNINGS.get()
+        validate_address(ip, emit_warnings=emit_input_warnings)
 
         # Validate port
         if not (1024 <= port <= 65535):
@@ -495,7 +510,7 @@ class Device(Generic[StateT]):
             )  # pragma: no cover
 
         # Warn for non-standard ports
-        if port != LIFX_UDP_PORT:
+        if port != LIFX_UDP_PORT and emit_input_warnings:
             _LOGGER.warning(
                 {
                     "class": "Device",

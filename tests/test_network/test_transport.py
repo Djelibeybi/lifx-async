@@ -19,7 +19,12 @@ from lifx.network.transport import PeerInfo, UdpTransport, _UdpProtocol
 async def _open_mock_transport(
     ip_address: str,
 ) -> tuple[UdpTransport, MagicMock, MagicMock]:
-    """Open a transport against a mocked loop and return its test seams."""
+    """Open against a mocked endpoint without relying on the host IP stack.
+
+    Family-selection tests may need an IPv6 transport on a runner without an
+    IPv6 stack. The mocked endpoint keeps assertions focused on transport
+    behaviour and exposes both ``sendto`` and socket-factory seams.
+    """
     transport = UdpTransport(ip_address=ip_address, port=0)
     raw_socket = MagicMock()
     datagram_transport = MagicMock()
@@ -872,27 +877,9 @@ class TestSendFamilyAssertion:
     #: swallowed error waiting out the retry schedule could never pass.
     _FAST_FAILURE_SECONDS = 0.1
 
-    @staticmethod
-    async def _open_against_mock_endpoint(
-        ip_address: str,
-    ) -> tuple[UdpTransport, MagicMock]:
-        """Open a transport whose endpoint is a mock, and hand back both.
-
-        The family under test follows the bind address, so proving both
-        directions of the mismatch needs an ``AF_INET6`` transport on hosts
-        that may have no IPv6 stack at all. Mocking the endpoint keeps the
-        assertion about the guard rather than about the runner's networking,
-        and lets the happy path assert the datagram really was handed to
-        ``sendto`` instead of putting a packet on the wire.
-        """
-        transport, datagram_transport, _ = await _open_mock_transport(ip_address)
-        return transport, datagram_transport
-
     async def test_ipv6_destination_on_an_ipv4_socket_raises_immediately(self) -> None:
         """The B1 case: an IPv6 target reached through the IPv4 seam."""
-        transport, datagram_transport = await self._open_against_mock_endpoint(
-            "0.0.0.0"
-        )
+        transport, datagram_transport, _ = await _open_mock_transport("0.0.0.0")
 
         started = time.perf_counter()
         with pytest.raises(NetworkError) as excinfo:
@@ -907,7 +894,7 @@ class TestSendFamilyAssertion:
 
     async def test_ipv4_destination_on_an_ipv6_socket_raises_immediately(self) -> None:
         """The mirror case, so the guard is not one-directional."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
 
         started = time.perf_counter()
         with pytest.raises(NetworkError) as excinfo:
@@ -922,9 +909,7 @@ class TestSendFamilyAssertion:
 
     async def test_matching_ipv4_destination_still_sends(self) -> None:
         """The happy path is untouched: a matching family reaches sendto."""
-        transport, datagram_transport = await self._open_against_mock_endpoint(
-            "0.0.0.0"
-        )
+        transport, datagram_transport, _ = await _open_mock_transport("0.0.0.0")
 
         await transport.send(b"x" * 36, ("127.0.0.1", 56700))
 
@@ -934,7 +919,7 @@ class TestSendFamilyAssertion:
 
     async def test_matching_ipv6_destination_uses_canonical_sockaddr(self) -> None:
         """IPv6 sends use the four-field sockaddr required by Windows."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
 
         await transport.send(b"x" * 36, ("fd00:1::", 56700))
 
@@ -944,7 +929,7 @@ class TestSendFamilyAssertion:
 
     async def test_existing_ipv6_sockaddr_preserves_flowinfo_and_scope(self) -> None:
         """A received IPv6 sockaddr can be sent back without losing routing."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
 
         await transport.send(b"x" * 36, ("fe80::1", 56700, 3, 7))
 
@@ -954,7 +939,7 @@ class TestSendFamilyAssertion:
 
     async def test_numeric_zoned_ipv6_destination_uses_scope_id(self) -> None:
         """A numeric zone becomes the native sockaddr scope identifier."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
 
         with patch("lifx.network.address.socket.if_nametoindex") as if_nametoindex:
             await transport.send(b"x" * 36, ("fe80::1%7", 56700))
@@ -966,7 +951,7 @@ class TestSendFamilyAssertion:
 
     async def test_named_zoned_ipv6_destination_resolves_scope_id(self) -> None:
         """A named zone is resolved once before the datagram is sent."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
 
         with patch(
             "lifx.network.address.socket.if_nametoindex", return_value=11
@@ -980,7 +965,7 @@ class TestSendFamilyAssertion:
 
     async def test_unknown_named_ipv6_zone_raises_immediately(self) -> None:
         """An unknown interface is a typed pre-send configuration failure."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
         protocol = transport._protocol
         assert protocol is not None
 
@@ -1012,7 +997,7 @@ class TestSendFamilyAssertion:
         self,
     ) -> None:
         """Socket and codec failures stay inside the Lifx exception hierarchy."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
 
         with pytest.raises(NetworkError, match="destination.*zone identifier"):
             await transport.send(b"x" * 36, ("fe80::1%a\x00b", 56700))
@@ -1021,7 +1006,7 @@ class TestSendFamilyAssertion:
 
     async def test_out_of_range_numeric_ipv6_zone_raises_immediately(self) -> None:
         """A scope outside the native unsigned 32-bit range fails pre-send."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
         protocol = transport._protocol
         assert protocol is not None
 
@@ -1041,7 +1026,7 @@ class TestSendFamilyAssertion:
 
     async def test_zero_numeric_ipv6_zone_raises_immediately(self) -> None:
         """An explicit zero scope cannot become an unscoped link-local send."""
-        transport, datagram_transport = await self._open_against_mock_endpoint("::")
+        transport, datagram_transport, _ = await _open_mock_transport("::")
         protocol = transport._protocol
         assert protocol is not None
 
@@ -1061,9 +1046,7 @@ class TestSendFamilyAssertion:
 
     async def test_ipv4_broadcast_destination_still_sends(self) -> None:
         """Discovery broadcasts to a literal no device owns; it must pass."""
-        transport, datagram_transport = await self._open_against_mock_endpoint(
-            "0.0.0.0"
-        )
+        transport, datagram_transport, _ = await _open_mock_transport("0.0.0.0")
 
         await transport.send(b"x" * 36, ("255.255.255.255", 56700))
 

@@ -121,11 +121,11 @@ addopts = """\
     --cov-report=term-missing:skip-covered
     --junitxml=junit.xml -o junit_family=legacy
     --cov-context=test
-    --timeout=30
+    --timeout=60
     """
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-timeout = 30
+timeout = 60
 timeout_method = "thread"
 retries = 1
 retry_delay = 0

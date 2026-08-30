@@ -787,6 +787,7 @@ def _create_device_from_record(
         (e.g., relay/button-only devices)
 
     """
+    from lifx.devices.base import _suppress_device_input_warnings
     from lifx.devices.ceiling import CeilingLight
     from lifx.devices.hev import HevLight
     from lifx.devices.infrared import InfraredLight
@@ -804,22 +805,25 @@ def _create_device_from_record(
         "max_retries": max_retries,
     }
 
-    # Priority-based selection matching DiscoveredDevice.create_device()
+    # Priority-based selection matching DiscoveredDevice.create_device(). The
+    # record address and port came from the wire and were validated above, so
+    # caller-input advisories must not be emitted again by construction.
     device: Light | None
-    if is_ceiling_product(record.product_id):
-        device = CeilingLight(**kwargs)
-    elif product.has_matrix:
-        device = MatrixLight(**kwargs)
-    elif product.has_multizone:
-        device = MultiZoneLight(**kwargs)
-    elif product.has_infrared:
-        device = InfraredLight(**kwargs)
-    elif product.has_hev:
-        device = HevLight(**kwargs)
-    elif product.has_relays or (product.has_buttons and not product.has_color):
-        device = None
-    else:
-        device = Light(**kwargs)
+    with _suppress_device_input_warnings():
+        if is_ceiling_product(record.product_id):
+            device = CeilingLight(**kwargs)
+        elif product.has_matrix:
+            device = MatrixLight(**kwargs)
+        elif product.has_multizone:
+            device = MultiZoneLight(**kwargs)
+        elif product.has_infrared:
+            device = InfraredLight(**kwargs)
+        elif product.has_hev:
+            device = HevLight(**kwargs)
+        elif product.has_relays or (product.has_buttons and not product.has_color):
+            device = None
+        else:
+            device = Light(**kwargs)
 
     if device is not None:
         device._set_connectivity(record.connectivity)
