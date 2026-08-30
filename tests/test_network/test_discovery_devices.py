@@ -7,7 +7,6 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 from __future__ import annotations
 
 import logging
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,7 +23,6 @@ from lifx.network.discovery import (
     discover_devices,
 )
 from lifx.products.registry import ProductCapability, ProductInfo
-from tests.conftest import WINDOWS_EMULATOR_RETRY_EXCEPTIONS
 
 
 class TestDiscoveryGeneratorOwnership:
@@ -125,14 +123,34 @@ class TestDiscoveredDeviceValidationBoundary:
 
         temporary_device.connection.close.assert_awaited_once_with()
 
+    async def test_wire_address_warning_stays_suppressed_during_construction(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A responder-controlled loopback address cannot flood warnings."""
+        discovered = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="127.0.0.1",
+            port=12345,
+        )
+
+        async def fake_ensure(self: Device) -> None:
+            self._capabilities = None
+            self._version = None
+
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(Device, "ensure_capabilities", fake_ensure),
+            patch(
+                "lifx.network.connection.DeviceConnection.close",
+                new_callable=AsyncMock,
+            ),
+        ):
+            assert await discovered.create_device() is None
+
+        assert caplog.records == []
+
 
 @pytest.mark.emulator
-@pytest.mark.flaky(
-    retries=2,
-    delay=1,
-    condition=sys.platform.startswith("win32"),
-    only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
-)
 class TestDiscoveredDeviceCreateDevice:
     """Tests for DiscoveredDevice.create_device() method.
 
@@ -222,12 +240,6 @@ class TestDiscoveredDeviceCreateDevice:
 
 
 @pytest.mark.emulator
-@pytest.mark.flaky(
-    retries=2,
-    delay=1,
-    condition=sys.platform.startswith("win32"),
-    only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
-)
 class TestDiscoveryEdgeCasesWithEmulator:
     """Additional edge case tests using the emulator server."""
 

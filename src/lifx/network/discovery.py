@@ -88,7 +88,7 @@ class DiscoveredDevice:
                 print(f"Created {type(device).__name__}: {await device.get_label()}")
             ```
         """
-        from lifx.devices.base import Device
+        from lifx.devices.base import Device, _suppress_device_input_warnings
         from lifx.devices.detection import get_device_class_for_product
         from lifx.exceptions import LifxUnsupportedDeviceError
 
@@ -104,7 +104,8 @@ class DiscoveredDevice:
             # Create temporary device to query version. Address validation can
             # fail here, before a connection exists, so keep construction
             # inside the same failure boundary as capability detection.
-            temp_device = Device(**kwargs)
+            with _suppress_device_input_warnings():
+                temp_device = Device(**kwargs)
 
         except ValueError as error:
             _LOGGER.debug(
@@ -127,7 +128,8 @@ class DiscoveredDevice:
                     temp_device.version.product,
                     temp_device.capabilities,
                 )
-                device = device_class(**kwargs)
+                with _suppress_device_input_warnings():
+                    device = device_class(**kwargs)
 
                 # Capability detection already fetched and derived this metadata.
                 # Preserve it on the correctly typed instance so callers do not

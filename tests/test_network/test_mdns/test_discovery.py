@@ -122,6 +122,22 @@ def _receive_script(*packets: tuple[bytes, tuple[str, int]]):
     return receive
 
 
+def _receive_script_until_deadline(
+    clock: _FakeMonotonicClock,
+    *packets: tuple[bytes, tuple[str, int]],
+):
+    """Yield packets, then advance the real deadline by its receive budget."""
+    queue = list(packets)
+
+    async def receive(timeout: float = 5.0) -> tuple[bytes, tuple[str, int]]:
+        if queue:
+            return queue.pop(0)
+        clock.advance(timeout)
+        raise LifxTimeoutError("script exhausted")
+
+    return receive
+
+
 class TestMdnsPublicSurface:
     """Regression coverage for the deliberately narrow mDNS package API."""
 
@@ -2333,13 +2349,13 @@ class TestDiscoverDevicesMdns:
     async def test_record_validation_suppresses_caller_warnings(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """An advertised address cannot emit caller-input warnings."""
+        """Construction cannot re-emit warnings for an advertised address."""
         from lifx.network.mdns.discovery import discover_devices_mdns
 
         record = _LifxServiceRecord(
             serial="d073d5123456",
             ip="127.0.0.1",
-            port=56700,
+            port=12345,
             product_id=27,
             firmware="4.112",
             service_instance="device._lifx._udp.local",
@@ -2349,19 +2365,16 @@ class TestDiscoverDevicesMdns:
             yield record
 
         with (
-            caplog.at_level("WARNING", logger="lifx.network.address"),
+            caplog.at_level("WARNING"),
             patch(
                 "lifx.network.mdns.discovery._discover_lifx_services",
                 return_value=mock_generator(),
             ),
-            patch(
-                "lifx.network.mdns.discovery._create_device_from_record",
-                return_value=None,
-            ),
         ):
             devices = [device async for device in discover_devices_mdns(timeout=0.1)]
 
-        assert devices == []
+        assert len(devices) == 1
+        assert isinstance(devices[0], Light)
         assert caplog.records == []
 
     @pytest.mark.asyncio
@@ -4109,31 +4122,21 @@ class TestMdnsFollowUpAddressQueries:
 
         for packet_order in permutations((b"txt", b"srv", b"addresses")):
             sequence = [packet_order[0], b"empty", *packet_order[1:], packet_order[-1]]
-            deadline = _fake_deadline()
+            clock = _FakeMonotonicClock()
             transport = _fake_transport()
-            scripted_packets = [(packet, ("192.0.2.10", 5353)) for packet in sequence]
-
-            async def receive(
-                timeout: float = 5.0,
-            ) -> tuple[bytes, tuple[str, int]]:
-                if scripted_packets:
-                    return scripted_packets.pop(0)
-                deadline.overall_expired = True
-                raise LifxTimeoutError("script exhausted")
-
-            transport.receive.side_effect = receive
+            transport.receive.side_effect = _receive_script_until_deadline(
+                clock,
+                *((packet, ("192.0.2.10", 5353)) for packet in sequence),
+            )
 
             def parse(packet: bytes) -> MagicMock:
                 return self._response_for(packet_records[packet])
 
             with (
+                patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
                 patch(
                     "lifx.network.mdns.discovery.MdnsTransport",
                     return_value=transport,
-                ),
-                patch(
-                    "lifx.network.mdns.discovery.IdleDeadline",
-                    return_value=deadline,
                 ),
                 patch(
                     "lifx.network.mdns.discovery.parse_dns_response",

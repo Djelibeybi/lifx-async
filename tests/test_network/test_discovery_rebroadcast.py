@@ -9,7 +9,6 @@ message/source reuse across re-sends, and dedup across broadcasts.
 from __future__ import annotations
 
 import asyncio
-import sys
 import time
 from unittest.mock import AsyncMock, patch
 
@@ -18,7 +17,6 @@ import pytest
 from lifx.exceptions import LifxTimeoutError
 from lifx.network.discovery import _discover_with_packet, discover_devices
 from lifx.protocol.packets import Device as DevicePackets
-from tests.conftest import WINDOWS_EMULATOR_RETRY_EXCEPTIONS
 from tests.test_network.test_discovery_errors import _build_state_service_packet
 
 
@@ -489,12 +487,6 @@ class TestConsumerIdleWindow:
 
 
 @pytest.mark.emulator
-@pytest.mark.flaky(
-    retries=2,
-    delay=1,
-    condition=sys.platform.startswith("win32"),
-    only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
-)
 class TestRebroadcastEmulator:
     """DISC-02 integration: dedup holds across a real re-broadcast window."""
 

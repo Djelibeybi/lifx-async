@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from dataclasses import fields
@@ -67,6 +68,20 @@ class TestDevice:
         assert device.ip == "192.168.1.100"
         assert device.port == 56700
         assert device.connection is not None
+
+    def test_direct_loopback_construction_retains_caller_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Wire suppression cannot disable advisories for public construction."""
+        with caplog.at_level(logging.WARNING):
+            Device(serial="d073d5010203", ip="127.0.0.1", port=12345)
+
+        actions = {
+            record.msg["action"]
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+        }
+        assert actions == {"is_loopback", "non_standard_port"}
 
     def test_connectivity_defaults_to_wifi(self) -> None:
         """Direct construction defaults to WiFi connectivity."""

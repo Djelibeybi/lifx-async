@@ -56,6 +56,12 @@ uv run --frozen pytest -v
 uv run pytest
 ```
 
+Pytest retries each test once, with no delay, only when it raises the exact
+`LifxTimeoutError`, `LifxConnectionError`, or `LifxNetworkError` type. Assertion
+failures and all other exceptions fail immediately. The suite-wide 60-second
+timeout covers two complete default 16-second request attempts; emulator tests
+receive a 120-second timeout.
+
 ### Code Quality
 
 ```bash

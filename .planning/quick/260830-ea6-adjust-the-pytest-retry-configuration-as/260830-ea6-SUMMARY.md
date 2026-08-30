@@ -131,6 +131,18 @@ None - no external service configuration required.
 
 The retry policy and deterministic mDNS regression are ready for the cross-platform CI matrix. No blockers remain.
 
+## Post-review correction (2026-08-30)
+
+The implementation recorded above was subsequently corrected after review. The
+five conditional flaky markers were removed because their false condition
+prevented pytest-retry from applying the global policy off Windows, and the
+Windows assertion override could conceal regressions in the sole targeted IPv6
+test. `LifxNetworkError` is now explicitly included because pytest-retry uses
+exact exception-type membership. The committed
+`tests/test_pytest_policy.py` regression replaces the ad-hoc configuration and
+tuple assertions cited above and also proves the suite timeout can contain two
+complete default request attempts.
+
 ## Self-Check: PASSED
 
 - All seven declared modified files exist.

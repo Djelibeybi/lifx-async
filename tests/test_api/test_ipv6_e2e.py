@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import asyncio
 import socket
-import sys
 from dataclasses import dataclass, field
 from unittest.mock import patch
 
@@ -39,7 +38,6 @@ from lifx.network.transport import UdpTransport
 from lifx.protocol.models import Serial
 from tests.conftest import (
     IPV6_DEVICE_SERIAL,
-    WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
     get_free_port6,
     ipv6_probe_outcome,
     targeted_ipv6_emulator_allowed,
@@ -195,12 +193,6 @@ class TestIpv6TargetedDiscovery:
         assert observation.close_completed is True
         assert observation.endpoint.is_closing()
 
-    @pytest.mark.flaky(
-        retries=2,
-        delay=1,
-        condition=sys.platform.startswith("win32"),
-        only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
-    )
     @pytest.mark.targeted_ipv6_windows
     async def test_find_by_ip_over_ipv6(
         self, targeted_emulator_server_ipv6: tuple[int, EmulatedLifxServer]

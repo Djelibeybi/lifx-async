@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import struct
-import sys
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,16 +13,9 @@ from lifx.network.discovery import _discover_with_packet, discover_devices
 from lifx.network.transport import UdpTransport, _UdpProtocol
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device as DevicePackets
-from tests.conftest import WINDOWS_EMULATOR_RETRY_EXCEPTIONS
 
 
 @pytest.mark.emulator
-@pytest.mark.flaky(
-    retries=2,
-    delay=1,
-    condition=sys.platform.startswith("win32"),
-    only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
-)
 class TestDiscoveryMalformedPackets:
     """Test discovery handling of malformed packets."""
 

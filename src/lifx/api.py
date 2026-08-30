@@ -771,8 +771,9 @@ async def discover(
         Device instances as they are discovered
 
     Raises:
-        ValueError: If ``broadcast_address`` is not a usable IPv4 or IPv6
-            literal, including a link-local IPv6 address without a valid zone.
+        ValueError: If ``broadcast_address`` is not a valid IPv4 or IPv6
+            literal, including a link-local IPv6 address without a
+            syntactically valid zone.
         LifxNetworkError: If the validated destination cannot be resolved to a
             native socket address or the discovery transport fails.
 
@@ -897,8 +898,9 @@ async def find_by_serial(
         Device instance if found, None otherwise
 
     Raises:
-        ValueError: If ``broadcast_address`` is not a usable IPv4 or IPv6
-            literal, including a link-local IPv6 address without a valid zone.
+        ValueError: If ``broadcast_address`` is not a valid IPv4 or IPv6
+            literal, including a link-local IPv6 address without a
+            syntactically valid zone.
         LifxNetworkError: If the validated destination cannot be resolved to a
             native socket address or the discovery transport fails.
 
@@ -962,8 +964,8 @@ async def find_by_ip(
         Device instance if found, None otherwise
 
     Raises:
-        ValueError: If ``ip`` is not a usable IPv4 or IPv6 literal, including
-            a link-local IPv6 address without a valid zone identifier.
+        ValueError: If ``ip`` is not a valid IPv4 or IPv6 literal, including a
+            link-local IPv6 address without a syntactically valid zone.
         LifxNetworkError: If the validated destination cannot be resolved to a
             native socket address or the discovery transport fails.
 
@@ -1033,8 +1035,9 @@ async def find_by_label(
         Matching Device instance(s)
 
     Raises:
-        ValueError: If ``broadcast_address`` is not a usable IPv4 or IPv6
-            literal, including a link-local IPv6 address without a valid zone.
+        ValueError: If ``broadcast_address`` is not a valid IPv4 or IPv6
+            literal, including a link-local IPv6 address without a
+            syntactically valid zone.
         LifxNetworkError: If the validated destination cannot be resolved to a
             native socket address or the discovery transport fails.
 
