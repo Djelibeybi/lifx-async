@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-08-27 after opening the v2.0 milestone)
 Phase: 10 — Land the IPv6/Thread Branch
 Plan: 9 of 9
 Status: Ready to ship
-Last activity: 2026-08-29 — Phase 12 complete; Phase 10 remains ready to ship
+Last activity: 2026-08-30 - Completed quick task 260830-ea6: Adjust the pytest retry configuration as described above
 Progress: [██████░░░░] 60%
 
 Execution order: 10 → (11 ∥ 12, file-disjoint) → 13 → 14. Phase 14 is hardware-gated
@@ -137,6 +137,12 @@ Thread hardware endpoint values remain operator-controlled evidence outside the 
 - **`plan-scan.cjs` inflates `completed_plans` for superseded plans (open-gsd/gsd-core#2349).** Read SUMMARY frontmatter (`status: superseded`), not counts.
 - **Do not run `state sync` unchecked.** `cmdStateSync` lacks the ratchet `cmdStateJson` applies, so the write path can regress protected values. When citing the archived predecessor repo, always qualify refs; both repos number issues from 1.
 - PR #219 DCO is blocked by three earlier unsigned Phase 12 documentation commits; history rewrite or repository-owner override requires explicit authorisation.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260830-ea6 | Adjust the pytest retry configuration as described above | 2026-08-30 | e1ba123 | [260830-ea6-adjust-the-pytest-retry-configuration-as](./quick/260830-ea6-adjust-the-pytest-retry-configuration-as/) |
 
 ## Deferred Items
 
