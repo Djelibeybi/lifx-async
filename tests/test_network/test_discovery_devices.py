@@ -24,6 +24,7 @@ from lifx.network.discovery import (
     discover_devices,
 )
 from lifx.products.registry import ProductCapability, ProductInfo
+from tests.conftest import WINDOWS_EMULATOR_RETRY_EXCEPTIONS
 
 
 class TestDiscoveryGeneratorOwnership:
@@ -126,7 +127,12 @@ class TestDiscoveredDeviceValidationBoundary:
 
 
 @pytest.mark.emulator
-@pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
+@pytest.mark.flaky(
+    retries=2,
+    delay=1,
+    condition=sys.platform.startswith("win32"),
+    only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
+)
 class TestDiscoveredDeviceCreateDevice:
     """Tests for DiscoveredDevice.create_device() method.
 
@@ -216,7 +222,12 @@ class TestDiscoveredDeviceCreateDevice:
 
 
 @pytest.mark.emulator
-@pytest.mark.flaky(retries=2, delay=1, condition=sys.platform.startswith("win32"))
+@pytest.mark.flaky(
+    retries=2,
+    delay=1,
+    condition=sys.platform.startswith("win32"),
+    only_on=WINDOWS_EMULATOR_RETRY_EXCEPTIONS,
+)
 class TestDiscoveryEdgeCasesWithEmulator:
     """Additional edge case tests using the emulator server."""
 

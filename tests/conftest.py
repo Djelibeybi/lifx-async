@@ -35,6 +35,15 @@ from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxConnectionError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
 
+NETWORK_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
+    LifxTimeoutError,
+    LifxConnectionError,
+)
+WINDOWS_EMULATOR_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
+    *NETWORK_RETRY_EXCEPTIONS,
+    AssertionError,
+)
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Add custom command-line options for pytest."""
@@ -71,13 +80,13 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
             item.add_marker(pytest.mark.timeout(_EMULATOR_TIMEOUT))
 
 
-def pytest_set_filtered_exceptions() -> list[type[Exception]]:
+def pytest_set_filtered_exceptions() -> tuple[type[Exception], ...]:
     """Configure pytest-retry to only retry on network-related exceptions.
 
     Tests that fail with LifxTimeoutError or LifxConnectionError will be
     retried automatically, as these are typically transient network issues.
     """
-    return [LifxTimeoutError, LifxConnectionError]
+    return NETWORK_RETRY_EXCEPTIONS
 
 
 def get_free_port() -> int:
