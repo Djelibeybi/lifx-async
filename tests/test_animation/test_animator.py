@@ -55,6 +55,18 @@ class TestAnimatorConstruction:
 
         assert animator.pixel_count == 64
 
+    def test_invalid_ip_fails_during_construction(self) -> None:
+        """Permanent address errors do not surface inside the render loop."""
+        with pytest.raises(ValueError, match="Invalid IP address format"):
+            Animator(
+                ip="not-an-ip",
+                serial=Serial.from_string("d073d5123456"),
+                framebuffer=FrameBuffer(pixel_count=64),
+                packet_generator=MatrixPacketGenerator(
+                    tile_count=1, tile_width=8, tile_height=8
+                ),
+            )
+
     def test_canvas_width_property(self) -> None:
         """Test canvas_width property delegation."""
         framebuffer = FrameBuffer(pixel_count=64, canvas_width=8, canvas_height=8)
@@ -292,6 +304,17 @@ class TestAnimatorSendFrame:
         mock_udp_socket.sock.close.assert_called_once_with()
         assert animator._socket is None
         assert animator._addr is None
+
+    def test_incomplete_socket_session_fails_without_assertion(
+        self, animator: Animator, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """The socket/address invariant remains enforced under ``python -O``."""
+        animator._socket = mock_udp_socket.sock
+        animator._addr = None
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        with pytest.raises(LifxNetworkError, match="session is incomplete"):
+            animator.send_frame(hsbk)
 
     def test_close_re_resolves_named_zone_for_next_session(
         self, mock_udp_socket: MockUdpSocket

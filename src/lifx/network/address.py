@@ -14,8 +14,9 @@ The call sites, all of which import from here:
   ``Device.connect()`` gate on :func:`validate_address`
 * :mod:`lifx.api`: ``find_by_ip()`` gates on :func:`validate_address`
 * :mod:`lifx.network.transport`: ``UdpTransport.open()`` derives its socket
-  family with :func:`family_for`, while ``send()`` canonicalises native
-  socket addresses with :func:`sockaddr_for`
+  family with :func:`family_for` and canonicalises its local bind with
+  :func:`sockaddr_for`, while ``send()`` derives the destination family with
+  :func:`family_for_sockaddr`
 * :mod:`lifx.network.connection`: ``DeviceConnection.open()`` derives its
   bind literal with :func:`wildcard_for` and resolves its destination once
   with :func:`sockaddr_for`
@@ -25,17 +26,20 @@ The call sites, all of which import from here:
   caller-input warnings
 * :mod:`lifx.network.mdns.discovery`: mDNS validates caller-supplied device
   addresses with :func:`validate_address`
-* :mod:`lifx.animation.animator`: ``Animator`` resolves its frame destination
-  with :func:`sockaddr_for`; the canonical tuple determines the socket family
+* :mod:`lifx.animation.animator`: ``Animator`` validates its caller-supplied
+  address, resolves its frame destination with :func:`sockaddr_for`, and
+  derives the socket family with :func:`family_for_sockaddr`
 
 **The validate/derive split.** :func:`validate_address` is the entry-point
-gate and applies the caller-facing rules; :func:`family_for` and
-:func:`wildcard_for` only derive, and deliberately apply none of them. The
-two answer different questions: ``"::"`` is an illegal *device* address
-(unspecified) yet a perfectly legitimate *local bind* literal, so the
-transport must be able to ask for its family without being told it is
-invalid. The accepted cost is that an address is parsed twice when a caller
-needs both answers.
+gate and applies the caller-facing rules; :func:`family_for`,
+:func:`family_for_sockaddr`, and :func:`wildcard_for` only derive, and
+deliberately apply none of them. :func:`sockaddr_for` canonicalises both local
+binds and remote destinations; its ``require_routable`` switch applies the
+link-local scope rule only to destinations. These operations answer different
+questions: ``"::"`` and an unscoped link-local literal are illegal *device*
+destinations yet legitimate inputs for a local bind, where the operating
+system owns the final decision. The accepted cost is that an address may be
+parsed twice when a caller needs more than one answer.
 
 **The rules, in the order :func:`validate_address` applies them.** Every
 rejection is evaluated before either warning, so an address on its way to a
@@ -62,6 +66,11 @@ rejection is evaluated before either warning, so an address on its way to a
    on loopback, but the test suite legitimately puts an emulator there.
 8. A non-private address is accepted with a warning: LIFX devices live on the
    local network, so a routable public address is usually a mistake.
+
+Rules 7 and 8 are caller-input advisories and may be suppressed with
+``emit_warnings=False``. Inbound wire validation does this because a responder
+controls its source address, so one warning per datagram would itself be a
+flooding vector. The rejections in rules 1-6 are never suppressed.
 
 This is a near-leaf module by design. Its one import from ``lifx`` is
 :data:`lifx.const.DEFAULT_IP_ADDRESS`, which :func:`wildcard_for` returns.
@@ -123,11 +132,15 @@ def _scope_id_for(zone: str, ip: str) -> int:
     return scope_id
 
 
-def sockaddr_for(address: SocketAddress) -> SocketAddress:
+def sockaddr_for(
+    address: SocketAddress, *, require_routable: bool = True
+) -> SocketAddress:
     """Return the canonical native sockaddr for an IP endpoint.
 
     IPv4 endpoints remain two-tuples. IPv6 endpoints always become four-tuples,
     preserving an existing flowinfo/scope pair or resolving a textual zone once.
+    Remote link-local destinations require a scope by default; local bind
+    callers may defer that routing decision to the operating system.
     """
     host, port = address[0], address[1]
     parsed = ipaddress.ip_address(host)
@@ -154,10 +167,10 @@ def sockaddr_for(address: SocketAddress) -> SocketAddress:
     else:
         scope_id = 0
 
-    if parsed.is_link_local and scope_id == 0:
+    if require_routable and parsed.is_link_local and scope_id == 0:
         raise ValueError(f"IPv6 link-local address requires a zone identifier: {host}")
 
-    unscoped_host = host.partition("%")[0]
+    unscoped_host = str(ipaddress.IPv6Address(parsed.packed))
     return unscoped_host, port, flowinfo, scope_id
 
 
@@ -166,7 +179,8 @@ def host_from_sockaddr(
 ) -> str:
     """Return a host literal that preserves an IPv6 sockaddr's scope.
 
-    A native numeric scope is authoritative. If a platform supplies scope zero
+    A textual zone already attached to the host is preserved. Otherwise a
+    native numeric scope is authoritative. If a platform supplies scope zero
     for a link-local response, the validated destination's textual zone may be
     used as a fallback so targeted discovery does not discard a live response.
     """
@@ -178,7 +192,10 @@ def host_from_sockaddr(
     if not isinstance(parsed, ipaddress.IPv6Address):
         return host
 
-    unscoped_host = host.partition("%")[0]
+    if parsed.scope_id is not None:
+        return str(parsed)
+
+    unscoped_host = str(ipaddress.IPv6Address(parsed.packed))
     if address[3] != 0:
         return f"{unscoped_host}%{address[3]}"
 
@@ -277,6 +294,11 @@ def family_for(ip: str) -> socket.AddressFamily:
     """
     addr = ipaddress.ip_address(ip)
     return socket.AF_INET6 if addr.version == 6 else socket.AF_INET
+
+
+def family_for_sockaddr(address: SocketAddress) -> socket.AddressFamily:
+    """Return the socket family implied by a canonical native sockaddr."""
+    return socket.AF_INET6 if len(address) == 4 else socket.AF_INET
 
 
 def wildcard_for(ip: str) -> str:

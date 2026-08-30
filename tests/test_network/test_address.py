@@ -25,6 +25,7 @@ import pytest
 from lifx.const import DEFAULT_IP_ADDRESS
 from lifx.network.address import (
     family_for,
+    family_for_sockaddr,
     host_from_sockaddr,
     sockaddr_for,
     validate_address,
@@ -205,6 +206,15 @@ class TestValidateAddressAccepts:
 class TestSocketAddressConversion:
     """Native socket tuples preserve valid IPv6 scope information."""
 
+    def test_ipv6_host_is_canonicalised(self) -> None:
+        """Equivalent spellings produce one stable native endpoint."""
+        assert sockaddr_for(("2001:0DB8::0001", 56700)) == (
+            "2001:db8::1",
+            56700,
+            0,
+            0,
+        )
+
     @pytest.mark.parametrize("resolved_scope", [0, 2**32])
     def test_named_zone_resolving_out_of_range_raises(
         self, resolved_scope: int
@@ -226,6 +236,17 @@ class TestSocketAddressConversion:
     def test_already_scoped_native_host_is_preserved(self) -> None:
         """A four-tuple does not append a second zone to a scoped host."""
         assert host_from_sockaddr(("fe80::1%7", 56700, 0, 7)) == "fe80::1%7"
+
+    def test_textual_scope_survives_zero_native_scope(self) -> None:
+        """A platform-provided textual zone is not silently discarded."""
+        assert host_from_sockaddr(("fe80::1%9", 56700, 0, 0)) == "fe80::1%9"
+
+    def test_textual_scope_is_not_replaced_by_target_fallback(self) -> None:
+        """The target route only fills a genuinely absent responder scope."""
+        assert (
+            host_from_sockaddr(("fe80::1%9", 56700, 0, 0), fallback_ip="fe80::2%11")
+            == "fe80::1%9"
+        )
 
     def test_ipv4_host_in_native_four_tuple_is_unchanged(self) -> None:
         """Unexpected extra native fields do not manufacture an IPv6 zone."""
@@ -254,9 +275,11 @@ class TestSocketAddressConversion:
         with pytest.raises(ValueError, match="requires a zone identifier"):
             sockaddr_for(("fe80::1", 56700, 0, 0))
 
-    def test_native_scope_overrides_textual_scope(self) -> None:
-        """The scope field returned by the socket is authoritative."""
-        assert host_from_sockaddr(("fe80::1%8", 56700, 0, 7)) == "fe80::1%7"
+    def test_textual_scope_is_preserved_when_native_scope_is_also_present(
+        self,
+    ) -> None:
+        """A host that already names its route is returned without rewriting."""
+        assert host_from_sockaddr(("fe80::1%8", 56700, 0, 7)) == "fe80::1%8"
 
     def test_target_scope_fills_missing_responder_scope(self) -> None:
         """Targeted discovery keeps the caller's validated link-local zone."""
@@ -298,6 +321,21 @@ class TestFamilyFor:
         assert family_for("::") == socket.AF_INET6
         with pytest.raises(ValueError):
             validate_address("::")
+
+    @pytest.mark.parametrize(
+        ("address", "expected"),
+        [
+            (("192.0.2.1", 56700), socket.AF_INET),
+            (("2001:db8::1", 56700, 0, 0), socket.AF_INET6),
+        ],
+    )
+    def test_canonical_sockaddr_family_is_derived_centrally(
+        self,
+        address: tuple[str, int] | tuple[str, int, int, int],
+        expected: socket.AddressFamily,
+    ) -> None:
+        """Native tuple shape has one shared family-selection rule."""
+        assert family_for_sockaddr(address) == expected
 
     def test_malformed_propagates_value_error(self) -> None:
         """A caller passing rubbish gets the stdlib parse failure."""

@@ -20,7 +20,7 @@ from lifx.const import (
     LIFX_UDP_PORT,
     MAX_RESPONSE_TIME,
 )
-from lifx.exceptions import LifxProtocolError, LifxTimeoutError
+from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
 from lifx.network.address import (
     host_from_sockaddr,
     sockaddr_for,
@@ -259,7 +259,12 @@ async def _discover_with_packet(
 
     validate_address(broadcast_address)
     local_bind = wildcard_for(broadcast_address)
-    send_address = sockaddr_for((broadcast_address, port))
+    try:
+        send_address = sockaddr_for((broadcast_address, port))
+    except ValueError as error:
+        raise LifxNetworkError(
+            f"Invalid destination {broadcast_address!r}: {error}"
+        ) from error
     async with UdpTransport(
         ip_address=local_bind,
         port=0,

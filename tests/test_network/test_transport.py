@@ -739,6 +739,30 @@ class TestSocketFamilySelection:
         """A zoned literal parses, so the family still follows the address."""
         assert await self._family_used("fe80::1%1") == socket.AF_INET6
 
+    async def test_unscoped_link_local_bind_reaches_the_operating_system(self) -> None:
+        """Destination routing rules do not reject a local bind literal."""
+        transport = UdpTransport(ip_address="fe80::1", port=56700)
+        raw_socket = MagicMock()
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = (
+            "fe80::1",
+            56700,
+            0,
+            0,
+        )
+
+        with (
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            await transport.open()
+
+        raw_socket.bind.assert_called_once_with(("fe80::1", 56700, 0, 0))
+        await transport.close()
+
     async def test_ipv6_endpoint_is_explicitly_v6_only(self) -> None:
         """Platform defaults cannot admit IPv4-mapped datagrams."""
         transport = UdpTransport(ip_address="::", port=0)

@@ -19,7 +19,7 @@ import pytest
 from lifx.api import discover, discover_mdns, find_by_ip, find_by_label, find_by_serial
 from lifx.devices import Light
 from lifx.exceptions import LifxTimeoutError
-from lifx.network.address import SocketAddress, sockaddr_for
+from lifx.network.address import SocketAddress
 from lifx.network.discovery import DiscoveredDevice, DiscoveryResponse, discover_devices
 from lifx.network.message import create_message
 from lifx.network.transport import UdpTransport
@@ -784,21 +784,34 @@ class TestFindByIpAddressGate:
     """Public targeted lookup preserves accepted text at its network boundary."""
 
     @pytest.mark.parametrize(
-        "literal",
+        ("literal", "expected_sockaddr"),
         [
-            pytest.param("2001:db8::1", id="compressed-representation"),
+            pytest.param(
+                "2001:db8::1",
+                ("2001:db8::1", 56700, 0, 0),
+                id="compressed-representation",
+            ),
             pytest.param(
                 "2001:0db8:0000:0000:0000:0000:0000:0001",
+                ("2001:db8::1", 56700, 0, 0),
                 id="expanded-representation",
             ),
-            pytest.param("fd00::1", id="ula-representation"),
-            pytest.param("2001:db8:1::1", id="gua-representation"),
-            pytest.param("::1", id="loopback-representation"),
-            pytest.param("fe80::1%7", id="zoned-link-local-representation"),
+            pytest.param("fd00::1", ("fd00::1", 56700, 0, 0), id="ula-representation"),
+            pytest.param(
+                "2001:db8:1::1",
+                ("2001:db8:1::1", 56700, 0, 0),
+                id="gua-representation",
+            ),
+            pytest.param("::1", ("::1", 56700, 0, 0), id="loopback-representation"),
+            pytest.param(
+                "fe80::1%7",
+                ("fe80::1", 56700, 0, 7),
+                id="zoned-link-local-representation",
+            ),
         ],
     )
     async def test_ipv6_representation_reaches_transport_boundary(
-        self, literal: str
+        self, literal: str, expected_sockaddr: tuple[str, int, int, int]
     ) -> None:
         """Every accepted spelling reaches the canonical IPv6 send boundary."""
         _ObservedNoResponseDiscoveryTransport.latest = None
@@ -820,7 +833,7 @@ class TestFindByIpAddressGate:
         assert result is None
         assert observation.ip_address == "::"
         assert observation.broadcast is False
-        assert observation.destinations == [sockaddr_for((literal, 56700))]
+        assert observation.destinations == [expected_sockaddr]
 
     async def test_split_response_scope_reaches_product_construction(self) -> None:
         """Discovery reconstructs the responder's zone without caller rewriting."""
