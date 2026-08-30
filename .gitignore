@@ -98,5 +98,7 @@ Thumbs.db
 .full-review/
 .gsd/
 
-# GSD session lock (transient: carries PID and session id)
+# GSD local files
 .planning/milestone.lock
+.planning/config.claude.json
+.planning/config.codex.json

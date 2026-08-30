@@ -3,11 +3,8 @@
     "enabled": true
   },
   "model_policy": {
-    "provider": "anthropic",
-    "budget": "high",
-    "high": "claude-opus-4-8",
-    "medium": "claude-opus-4-8",
-    "low": "claude-sonnet-5"
+    "provider": "openai",
+    "budget": "high"
   },
   "mode": "interactive",
   "git": {
@@ -49,7 +46,7 @@
   "hooks": {
     "context_warnings": true
   },
-  "context_window": 1000000,
+  "context_window": 200000,
   "review": {
     "models": {
       "codex": "gpt-5.6-sol",
@@ -58,7 +55,7 @@
       "claude": "claude-opus-5"
     },
     "default_reviewers": [
-      "codex",
+      "claude",
       "opencode",
       "antigravity"
     ]
@@ -71,5 +68,6 @@
     "agent_overrides": {
       "gsd-plan-checker": "high"
     }
-  }
+  },
+  "runtime": "codex"
 }
