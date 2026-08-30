@@ -2,6 +2,45 @@
 
 <!-- version list -->
 
+## v7.1.0 (2026-08-30)
+
+### Bug Fixes
+
+- Address IPv6 review follow-ups
+  ([`27db07c`](https://github.com/Djelibeybi/lifx-async/commit/27db07c04f20e85f4f0552399eaeb0c00e80a620))
+
+- Address retry and discovery review findings
+  ([`da52402`](https://github.com/Djelibeybi/lifx-async/commit/da524028233a55bde27d1424639fc03cd7d7b94a))
+
+- Harden network discovery and lifecycle boundaries
+  ([`fcaf57d`](https://github.com/Djelibeybi/lifx-async/commit/fcaf57dc9d098679751c861363497d50ff80e33d))
+
+- **discovery**: Preserve scoped IPv6 endpoints
+  ([`6d949f4`](https://github.com/Djelibeybi/lifx-async/commit/6d949f4f11c63f25f685f9866cf75eb195952aa4))
+
+- **network**: Harden connection lifecycle cleanup
+  ([`6a27dd0`](https://github.com/Djelibeybi/lifx-async/commit/6a27dd0ae1e938cff603f17425ce4eed6d7b7e59))
+
+- **network**: Harden cross-platform IPv6 discovery
+  ([`e01e021`](https://github.com/Djelibeybi/lifx-async/commit/e01e021ac9034b12fe6e02107f1035683080dee1))
+
+- **network**: Strengthen IPv6 discovery boundaries
+  ([`ec808e5`](https://github.com/Djelibeybi/lifx-async/commit/ec808e595bdcc0ed9c51b1a3854e76dbc0e1ed86))
+
+- **tests**: Use portable IPv6 scope identifiers
+  ([`0d30934`](https://github.com/Djelibeybi/lifx-async/commit/0d3093484d03d2bc2fc2ca16cb9373de1b0a2615))
+
+### Documentation
+
+- Record pytest retry quick task
+  ([`5c8fb07`](https://github.com/Djelibeybi/lifx-async/commit/5c8fb076a993715a2920b03807e6dbb64e4b50fb))
+
+### Features
+
+- **discovery**: Support targeted IPv6 lookup
+  ([`9d04e67`](https://github.com/Djelibeybi/lifx-async/commit/9d04e67e5a919ccd030c5468c413ed27d7d6dc88))
+
+
 ## v7.0.1 (2026-08-29)
 
 ### Bug Fixes
