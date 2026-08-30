@@ -143,8 +143,64 @@ def _build_state_service_packet(
     return header.pack() + payload
 
 
+def _build_state_label_packet(source: int, target: bytes, label: bytes) -> bytes:
+    """Build a raw StateLabel response packet for discovery tests."""
+    payload = DevicePackets.StateLabel(label=label.ljust(32, b"\x00")).pack()
+    header = LifxHeader.create(
+        pkt_type=DevicePackets.StateLabel.PKT_TYPE,
+        source=source,
+        target=target,
+        tagged=False,
+        ack_required=False,
+        res_required=False,
+        sequence=0,
+        payload_size=len(payload),
+    )
+    return header.pack() + payload
+
+
 class TestDiscoveryResponderAddressValidation:
     """Invalid responder socket addresses are isolated to one datagram."""
+
+    async def test_invalid_source_port_cannot_hide_later_valid_responder(self) -> None:
+        """A malformed StateLabel source port cannot claim first-wins dedup."""
+        known_source = 42
+        serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        packet = _build_state_label_packet(known_source, serial, b"Synthetic Light")
+        responses = iter(
+            [
+                (packet, ("192.0.2.10", 1)),
+                (packet, ("192.0.2.10", 56700)),
+            ]
+        )
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                return next(responses)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            discovered = [
+                response
+                async for response in _discover_with_packet(
+                    DevicePackets.GetLabel(), timeout=0.5
+                )
+            ]
+
+        assert len(discovered) == 1
+        assert discovered[0].serial == "d073d5010203"
+        assert discovered[0].port == 56700
 
     async def test_unscoped_ipv6_link_local_responder_is_ignored(self) -> None:
         """A native IPv6 four-tuple with scope zero cannot identify a peer."""
@@ -916,6 +972,45 @@ class TestNonUdpServiceHandling:
         assert len(devices) == 1
         assert devices[0].serial == "d073d5010203"
         # Port comes from the UDP StateService payload, not the non-UDP one.
+        assert devices[0].port == 56700
+
+    @pytest.mark.asyncio
+    async def test_invalid_udp_port_does_not_hide_later_valid_service(self) -> None:
+        """An invalid first response cannot claim the serial during deduplication."""
+        known_source = 42
+        serial = b"\xd0\x73\xd5\x01\x02\x03\x00\x00"
+        packets_to_send = [
+            _build_state_service_packet(
+                source=known_source, target=serial, port=70000, service=1
+            ),
+            _build_state_service_packet(
+                source=known_source, target=serial, port=56700, service=1
+            ),
+        ]
+        packet_iter = iter(packets_to_send)
+
+        async def mock_receive(timeout: float = 2.0):
+            try:
+                packet = next(packet_iter)
+                return packet, ("192.0.2.10", 56700)
+            except StopIteration:
+                raise LifxTimeoutError("timeout") from None
+
+        with (
+            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+        ):
+            mock_transport = AsyncMock()
+            mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+            mock_transport.__aexit__ = AsyncMock(return_value=False)
+            mock_transport.send = AsyncMock()
+            mock_transport.receive = mock_receive
+            mock_transport_cls.return_value = mock_transport
+
+            devices = [device async for device in discover_devices(timeout=0.5)]
+
+        assert len(devices) == 1
+        assert devices[0].serial == "d073d5010203"
         assert devices[0].port == 56700
 
     @pytest.mark.asyncio

@@ -20,11 +20,18 @@ from lifx.const import (
     LIFX_UDP_PORT,
     MAX_RESPONSE_TIME,
 )
-from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
+from lifx.exceptions import (
+    LifxError,
+    LifxNetworkError,
+    LifxProtocolError,
+    LifxTimeoutError,
+    LifxUnsupportedDeviceError,
+)
 from lifx.network.address import (
     host_from_sockaddr,
     sockaddr_for,
     validate_address,
+    validate_port,
     wildcard_for,
 )
 from lifx.network.message import create_message, parse_message
@@ -79,6 +86,12 @@ class DiscoveredDevice:
         Returns:
             Device instance of the appropriate type
 
+        Raises:
+            TypeError: If a concrete device constructor no longer accepts the
+                shared discovery arguments.
+            AttributeError: If an internal device capability or metadata
+                contract is broken.
+
         Example:
             ```python
             async for discovered in discover_devices():
@@ -88,24 +101,25 @@ class DiscoveredDevice:
                 print(f"Created {type(device).__name__}: {await device.get_label()}")
             ```
         """
-        from lifx.devices.base import Device, _suppress_device_input_warnings
+        # Intentional local imports preserve the documented layer direction.
+        # Importing the device layer while this network module initialises
+        # creates a cycle when callers reach ``lifx.devices`` before the
+        # top-level package has already populated ``lifx.network``.
+        from lifx.devices.base import Device
         from lifx.devices.detection import get_device_class_for_product
-        from lifx.exceptions import LifxUnsupportedDeviceError
-
-        kwargs = {
-            "serial": self.serial,
-            "ip": self.ip,
-            "port": self.port,
-            "timeout": self.timeout,
-            "max_retries": self.max_retries,
-        }
 
         try:
             # Create temporary device to query version. Address validation can
             # fail here, before a connection exists, so keep construction
             # inside the same failure boundary as capability detection.
-            with _suppress_device_input_warnings():
-                temp_device = Device(**kwargs)
+            temp_device = Device(
+                serial=self.serial,
+                ip=self.ip,
+                port=self.port,
+                timeout=self.timeout,
+                max_retries=self.max_retries,
+                _emit_input_warnings=False,
+            )
 
         except ValueError as error:
             _LOGGER.debug(
@@ -122,32 +136,49 @@ class DiscoveredDevice:
 
         try:
             await temp_device.ensure_capabilities()
-
-            if temp_device.capabilities and temp_device.version:
-                device_class = get_device_class_for_product(
-                    temp_device.version.product,
-                    temp_device.capabilities,
-                )
-                with _suppress_device_input_warnings():
-                    device = device_class(**kwargs)
-
-                # Capability detection already fetched and derived this metadata.
-                # Preserve it on the correctly typed instance so callers do not
-                # immediately repeat the same network work.
-                device.adopt_cached_metadata(temp_device)
-                return device
-
-        except LifxUnsupportedDeviceError:
+        except LifxError as error:
+            _LOGGER.debug(
+                {
+                    "class": "DiscoveredDevice",
+                    "method": "create_device",
+                    "action": "capability_detection_failed",
+                    "error_type": type(error).__name__,
+                }
+            )
             return None
-
-        except Exception:
-            return None
-
         finally:
             # Always close the temporary device connection
             await temp_device.connection.close()
 
-        return None
+        if not temp_device.capabilities or not temp_device.version:
+            return None
+
+        try:
+            device_class = get_device_class_for_product(
+                temp_device.version.product,
+                temp_device.capabilities,
+            )
+        except LifxUnsupportedDeviceError:
+            return None
+
+        # Keep typed-device construction outside the transient network failure
+        # boundary. A missing constructor pass-through is a programming error,
+        # and must fail visibly instead of silently removing that product from
+        # discovery.
+        device = device_class(
+            serial=self.serial,
+            ip=self.ip,
+            port=self.port,
+            timeout=self.timeout,
+            max_retries=self.max_retries,
+            _emit_input_warnings=False,
+        )
+
+        # Capability detection already fetched and derived this metadata.
+        # Preserve it on the correctly typed instance so callers do not
+        # immediately repeat the same network work.
+        device.adopt_cached_metadata(temp_device)
+        return device
 
     def __hash__(self) -> int:
         """Hash based on serial number for deduplication."""
@@ -190,6 +221,8 @@ async def _discover_with_packet(
     port: int = LIFX_UDP_PORT,
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    *,
+    _address_is_prevalidated: bool = False,
 ) -> AsyncGenerator[DiscoveryResponse]:
     """Generic discovery using any Get* packet.
 
@@ -213,6 +246,8 @@ async def _discover_with_packet(
         port: UDP port
         max_response_time: Max response time
         idle_timeout_multiplier: Idle timeout multiplier
+        _address_is_prevalidated: Suppress caller advisories when a public
+            entry point already validated the same destination
 
     Note:
         The idle timer is reset both before a response is yielded and again
@@ -259,7 +294,7 @@ async def _discover_with_packet(
     seen_serials: set[str] = set()
     start_time = time.monotonic()
 
-    validate_address(broadcast_address)
+    validate_address(broadcast_address, emit_warnings=not _address_is_prevalidated)
     local_bind = wildcard_for(broadcast_address)
     try:
         send_address = sockaddr_for((broadcast_address, port))
@@ -446,16 +481,34 @@ async def _discover_with_packet(
                 # (first-wins dedup) nor supply a non-UDP port. The deserialiser
                 # tolerates service values from newer firmware (falls back to a
                 # raw int), so the comparison stays correct for unknown values.
-                if (
-                    isinstance(response_packet, DevicePackets.StateService)
-                    and response_packet.service != DeviceService.UDP
-                ):
+                if isinstance(response_packet, DevicePackets.StateService):
+                    if response_packet.service != DeviceService.UDP:
+                        _LOGGER.debug(
+                            {
+                                "class": "_discover_with_packet",
+                                "action": "ignored_non_udp_service",
+                                "serial": device_serial,
+                                "service": int(response_packet.service),
+                            }
+                        )
+                        continue
+                    endpoint_port = response_packet.port
+                else:
+                    # State packets without an advertised service port expose
+                    # the datagram's source port to callers such as
+                    # find_by_label(). Validate it before first-wins dedup so
+                    # a malformed response cannot hide a later valid endpoint.
+                    endpoint_port = addr[1]
+
+                try:
+                    validate_port(endpoint_port)
+                except ValueError:
                     _LOGGER.debug(
                         {
                             "class": "_discover_with_packet",
-                            "action": "ignored_non_udp_service",
+                            "action": "ignored_invalid_endpoint_port",
                             "serial": device_serial,
-                            "service": int(response_packet.service),
+                            "port": endpoint_port,
                         }
                     )
                     continue
@@ -576,6 +629,8 @@ async def discover_devices(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
+    *,
+    _address_is_prevalidated: bool = False,
 ) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
@@ -612,6 +667,8 @@ async def discover_devices(
         idle_timeout_multiplier: Idle timeout multiplier
         device_timeout: Request timeout set on discovered devices
         max_retries: Max retries per request set on discovered devices
+        _address_is_prevalidated: Internal signal that caller advisories were
+            already emitted for ``broadcast_address``
 
     Yields:
         DiscoveredDevice instances as they are discovered
@@ -636,6 +693,7 @@ async def discover_devices(
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
+        _address_is_prevalidated=_address_is_prevalidated,
     )
     async with aclosing(responses):
         async for resp in responses:

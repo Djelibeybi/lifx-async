@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import struct
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from itertools import permutations
-from typing import Literal
+from typing import Literal, Protocol
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -106,36 +108,50 @@ def _address_record(
     return DnsResourceRecord(host, rtype, rclass, ttl, parsed.packed, str(parsed))
 
 
-def _receive_script(*packets: tuple[bytes, tuple[str, int]]):
-    """Build a receive() mock yielding the given packets, then timing out.
+def _receive_script(
+    *packets: tuple[bytes, tuple[str, int]],
+    on_exhausted: Callable[[float], None] | None = None,
+):
+    """Build a scripted receive mock, then advance and time out when exhausted.
 
     Discovery may call receive() any number of times (query retransmissions
     keep the loop going), so exhaustible side-effect lists are not suitable.
+    ``on_exhausted`` receives the final receive budget before the timeout.
     """
     queue = list(packets)
 
     async def receive(timeout: float = 5.0) -> tuple[bytes, tuple[str, int]]:
         if queue:
             return queue.pop(0)
+        if on_exhausted is not None:
+            on_exhausted(timeout)
         raise LifxTimeoutError("timeout")
 
     return receive
 
 
-def _receive_script_until_deadline(
-    clock: _FakeMonotonicClock,
-    *packets: tuple[bytes, tuple[str, int]],
-):
-    """Yield packets, then advance the real deadline by its receive budget."""
-    queue = list(packets)
+class _MonotonicTime(Protocol):
+    """Small interface shared by module-style and test clock objects."""
 
-    async def receive(timeout: float = 5.0) -> tuple[bytes, tuple[str, int]]:
-        if queue:
-            return queue.pop(0)
-        clock.advance(timeout)
-        raise LifxTimeoutError("script exhausted")
+    def monotonic(self) -> float:
+        """Return the current monotonic time."""
 
-    return receive
+
+@contextmanager
+def _patch_mdns_time(clock: _MonotonicTime) -> Iterator[None]:
+    """Bind one isolated clock to discovery and its real IdleDeadline."""
+    with (
+        patch("lifx.network.mdns.discovery.time", clock),
+        patch("lifx.network.utils.time", clock),
+    ):
+        yield
+
+
+def _fixed_time(value: float) -> MagicMock:
+    """Return a module-shaped clock fixed at ``value``."""
+    clock = MagicMock()
+    clock.monotonic.return_value = value
+    return clock
 
 
 class TestMdnsPublicSurface:
@@ -3015,7 +3031,7 @@ class TestLifxRecordCacheBounds:
             [_txt_record(instance), _srv_record(instance, target="host.local")],
             "192.0.2.10",
         )
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=50.0):
+        with _patch_mdns_time(_fixed_time(50.0)):
             cache.add_packet(
                 [_address_record("host.local", "fd00::1", ttl=0)],
                 "192.0.2.10",
@@ -3309,7 +3325,7 @@ class TestLifxRecordCacheByteBounds:
         goodbye = self._srv_with_retained_cost(instance, 1024, ttl=0)
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=10.0):
+        with _patch_mdns_time(_fixed_time(10.0)):
             cache.add_packet([record, goodbye], "192.0.2.71")
 
         assert cache._retained_payload_bytes == 1024
@@ -3327,7 +3343,7 @@ class TestLifxRecordCacheByteBounds:
         goodbye = self._srv_with_retained_cost(instance, 1024, ttl=0)
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=10.0):
+        with _patch_mdns_time(_fixed_time(10.0)):
             cache.add_packet([record, goodbye], "192.0.2.71")
         cache.records_for(instance, 33)[0].retained_payload_bytes += 1
 
@@ -3344,7 +3360,7 @@ class TestLifxRecordCacheByteBounds:
         goodbye = self._srv_with_retained_cost(instance, 1024, ttl=0)
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=20.0):
+        with _patch_mdns_time(_fixed_time(20.0)):
             cache.add_packet([record, goodbye, record], "192.0.2.72")
 
         assert cache._retained_payload_bytes == 1024
@@ -3422,7 +3438,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         )
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=10.0):
+        with _patch_mdns_time(_fixed_time(10.0)):
             cache.add_packet([goodbye], "192.0.2.10")
             assert cache.records_for(record.name, record.rtype) == ()
             assert cache.next_expiry_delay(10.0) is None
@@ -3446,7 +3462,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         goodbye = _address_record("host.local", "192.0.2.20", ttl=0)
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=4.0):
+        with _patch_mdns_time(_fixed_time(4.0)):
             cache.add_packet([first, second, goodbye], "192.0.2.10")
         assert cache.next_expiry_delay(4.5) == pytest.approx(0.5)
 
@@ -3496,7 +3512,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         )
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=20.0):
+        with _patch_mdns_time(_fixed_time(20.0)):
             cache.add_packet([genuine, conflicting, goodbye], "192.0.2.10")
 
         assert cache.resolve() == []
@@ -3537,7 +3553,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         )
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=30.0):
+        with _patch_mdns_time(_fixed_time(30.0)):
             cache.add_packet(
                 [
                     _txt_record(instance),
@@ -3565,7 +3581,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         cache.add_packet([record], "192.0.2.10")
         assert len(cache.resolve()) == 1
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=40.0):
+        with _patch_mdns_time(_fixed_time(40.0)):
             cache.add_packet(
                 [
                     DnsResourceRecord(
@@ -3618,7 +3634,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         )
         cache = _LifxRecordCache()
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=50.0):
+        with _patch_mdns_time(_fixed_time(50.0)):
             cache.add_packet([*records[:limit], goodbye], "192.0.2.10")
             cache.add_packet([records[-1]], "192.0.2.10")
         assert records[-1].rdata not in {
@@ -3640,7 +3656,7 @@ class TestLifxRecordCacheGoodbyeExpiry:
         ]
         goodbye = _address_record("host.local", "fd00::1", ttl=0)
 
-        with patch("lifx.network.mdns.discovery.time.monotonic", return_value=60.0):
+        with _patch_mdns_time(_fixed_time(60.0)):
             cache.add_packet([*addresses, goodbye], "192.0.2.10")
 
         assert len(cache.addresses_for("host.local")) == 256
@@ -3764,6 +3780,10 @@ class _FakeMonotonicClock:
         self.current = current
 
     def __call__(self) -> float:
+        return self.monotonic()
+
+    def monotonic(self) -> float:
+        """Return the current module-local monotonic time."""
         return self.current
 
     def advance(self, seconds: float) -> None:
@@ -3799,7 +3819,7 @@ class TestMdnsQueryRetransmission:
                 "lifx.network.mdns.discovery.IdleDeadline",
                 return_value=_fake_deadline(),
             ),
-            patch("lifx.network.mdns.discovery.time", clock),
+            _patch_mdns_time(clock),
             patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
         ):
             records = [r async for r in _discover_lifx_services(timeout=5.0)]
@@ -3832,7 +3852,7 @@ class TestMdnsQueryRetransmission:
 
         with (
             patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
-            patch("lifx.network.mdns.discovery.time", clock),
+            _patch_mdns_time(clock),
             patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
         ):
             records = [r async for r in _discover_lifx_services(timeout=5.0)]
@@ -3856,7 +3876,7 @@ class TestMdnsQueryRetransmission:
         transport.send.side_effect = send
 
         with (
-            patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
+            _patch_mdns_time(clock),
             patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
             patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
         ):
@@ -3923,7 +3943,7 @@ class TestMdnsConsumerYieldTiming:
         transport.receive = receive
 
         with (
-            patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
+            _patch_mdns_time(clock),
             patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
         ):
             generator = _discover_lifx_services_sweep(
@@ -4042,7 +4062,7 @@ class TestMdnsGoodbyeExpiryScheduling:
             return original_expire(cache, now)
 
         with (
-            patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
+            _patch_mdns_time(clock),
             patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
             patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
@@ -4124,16 +4144,16 @@ class TestMdnsFollowUpAddressQueries:
             sequence = [packet_order[0], b"empty", *packet_order[1:], packet_order[-1]]
             clock = _FakeMonotonicClock()
             transport = _fake_transport()
-            transport.receive.side_effect = _receive_script_until_deadline(
-                clock,
+            transport.receive.side_effect = _receive_script(
                 *((packet, ("192.0.2.10", 5353)) for packet in sequence),
+                on_exhausted=clock.advance,
             )
 
             def parse(packet: bytes) -> MagicMock:
                 return self._response_for(packet_records[packet])
 
             with (
-                patch("lifx.network.mdns.discovery.time.monotonic", new=clock),
+                _patch_mdns_time(clock),
                 patch(
                     "lifx.network.mdns.discovery.MdnsTransport",
                     return_value=transport,

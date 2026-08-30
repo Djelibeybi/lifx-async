@@ -51,6 +51,13 @@ _RECEIVER_SHUTDOWN_TIMEOUT: float = (
 _RECEIVER_POLL_TIMEOUT: float = 0.1  # How often the background receiver will sleep
 
 
+class _ConnectionClosed:
+    """Queue sentinel waking requests invalidated by connection close."""
+
+
+_CONNECTION_CLOSED = _ConnectionClosed()
+
+
 class DeviceConnection:
     """Connection to a LIFX device.
 
@@ -136,6 +143,7 @@ class DeviceConnection:
         self.timeout = timeout
 
         self._transport: UdpTransport | None = None
+        self._opening_transport: UdpTransport | None = None
         self._is_open = False
         # Flag to prevent concurrent open() calls. Deliberately a plain bool
         # with a poll loop rather than asyncio.Lock: a Lock binds to the event
@@ -143,6 +151,12 @@ class DeviceConnection:
         # and reopened under a different loop (e.g. one connection shared
         # across per-test event loops).
         self._is_opening = False
+        self._is_closing = False
+        # A close increments this synchronously before its first await. Openers
+        # capture the generation at entry and refuse to publish transport state
+        # if any close began after they were requested. An integer is deliberately
+        # loop-agnostic so a closed connection can reopen under another loop.
+        self._state_generation = 0
 
         # Identity handed to the transport for its warning logs. Mutated in
         # place when discovery learns the real serial, so records emitted
@@ -173,7 +187,8 @@ class DeviceConnection:
         # Background receiver task infrastructure
         # Key: (source, sequence, serial) → Queue of (header, payload) tuples
         self._pending_requests: dict[
-            tuple[int, int, str], asyncio.Queue[tuple[LifxHeader, bytes]]
+            tuple[int, int, str],
+            asyncio.Queue[tuple[LifxHeader, bytes] | _ConnectionClosed],
         ] = {}
         self._receiver_task: asyncio.Task[None] | None = None
         self._receiver_shutdown: asyncio.Event | None = None
@@ -210,6 +225,7 @@ class DeviceConnection:
         Opens the UDP transport for sending and receiving packets.
         Called automatically on first request if not already open.
         """
+        generation = self._state_generation
         if self._is_open:
             return
 
@@ -219,21 +235,25 @@ class DeviceConnection:
         # flag. The poll remains loop-agnostic for connections reopened under
         # a different event loop.
         while True:
+            if generation != self._state_generation:
+                return
             if self._is_open:
                 return
+            if self._is_closing:
+                while self._is_closing:
+                    await asyncio.sleep(0.001)
+                continue
             if not self._is_opening:
                 self._is_opening = True
                 break
             while self._is_opening:
                 await asyncio.sleep(0.001)
 
+        transport: UdpTransport | None = None
         try:
             # Double-check after setting flag
             if self._is_open:  # pragma: no cover
                 return
-
-            # Create shutdown event for receiver task
-            self._receiver_shutdown = asyncio.Event()
 
             # Open transport, binding the wildcard that matches the device
             # address family: IPv6 for Thread devices, IPv4 otherwise. The
@@ -246,11 +266,35 @@ class DeviceConnection:
                 raise LifxNetworkError(
                     f"Invalid destination {self.ip!r}: {error}"
                 ) from error
-            self._transport = UdpTransport(
+            transport = UdpTransport(
                 ip_address=local_ip, port=0, broadcast=False, peer=self._peer
             )
-            await self._transport.open()
+            self._opening_transport = transport
+            await transport.open()
+
+            if generation != self._state_generation:
+                if self._opening_transport is transport:
+                    self._opening_transport = None
+                    try:
+                        await transport.close()
+                    except BaseException as cleanup_error:
+                        _LOGGER.debug(
+                            {
+                                "class": "DeviceConnection",
+                                "method": "open",
+                                "action": "invalidated_transport_cleanup_failed",
+                                "serial": self.serial,
+                                "ip": self.ip,
+                                "port": self.port,
+                                "error": str(cleanup_error),
+                            }
+                        )
+                return
+
+            self._opening_transport = None
+            self._transport = transport
             self._send_address = send_address
+            self._receiver_shutdown = asyncio.Event()
             self._is_open = True
 
             # Start background receiver task
@@ -266,7 +310,12 @@ class DeviceConnection:
                 }
             )
         except BaseException:
-            failed_transport, self._transport = self._transport, None
+            failed_transport = (
+                transport if self._opening_transport is transport else None
+            )
+            self._opening_transport = None
+            transport = None
+            self._transport = None
             self._receiver_shutdown = None
             if failed_transport is not None:
                 try:
@@ -289,56 +338,91 @@ class DeviceConnection:
 
     async def close(self) -> None:
         """Close connection to device."""
+        self._state_generation += 1
+        self._invalidate_pending_requests()
         if not self._is_open:
+            opening_transport, self._opening_transport = (
+                self._opening_transport,
+                None,
+            )
+            if opening_transport is not None:
+                await opening_transport.close()
             return
 
+        self._is_closing = True
         self._is_open = False
+        transport = self._transport
+        receiver_task = self._receiver_task
+        cancelled: asyncio.CancelledError | None = None
 
-        # Signal shutdown to receiver task
         if self._receiver_shutdown:
             self._receiver_shutdown.set()
 
-        # Wait for receiver to stop (with timeout)
-        if self._receiver_task:
+        async def _finish_cleanup() -> None:
+            """Finish active-session teardown independently of caller cancellation."""
             try:
-                await asyncio.wait_for(
-                    self._receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
-                )
-            except TIMEOUT_ERRORS:
-                self._receiver_task.cancel()
+                if receiver_task:
+                    try:
+                        await asyncio.wait_for(
+                            receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
+                        )
+                    except TIMEOUT_ERRORS:
+                        receiver_task.cancel()
+                        try:
+                            await receiver_task
+                        except asyncio.CancelledError:
+                            pass
+            finally:
+                if transport is not None:
+                    await transport.close()
+
+        cleanup_task = asyncio.create_task(_finish_cleanup())
+        try:
+            while not cleanup_task.done():
                 try:
-                    await self._receiver_task
-                except asyncio.CancelledError:
-                    pass
+                    await asyncio.shield(cleanup_task)
+                except asyncio.CancelledError as error:
+                    if cancelled is None:
+                        cancelled = error
 
-        # Cleared so _is_alive() cannot mistake a finished receiver from the
-        # previous session for a crashed one in the next.
-        self._receiver_task = None
+            cleanup_task.result()
 
-        # Cancel all pending request queues
-        for queue in self._pending_requests.values():
-            # Drain queue
+            _LOGGER.debug(
+                {
+                    "class": "DeviceConnection",
+                    "method": "close",
+                    "serial": self.serial,
+                    "ip": self.ip,
+                }
+            )
+        finally:
+            self._transport = None
+            self._receiver_task = None
+            self._receiver_shutdown = None
+            self._send_address = None
+            self._is_closing = False
+
+        if cancelled is not None:
+            raise cancelled
+
+    def _invalidate_pending_requests(self) -> None:
+        """Wake and detach every request belonging to the closing session.
+
+        A logical request registers one queue under every retransmission key,
+        so queues are deduplicated before they are drained and signalled. The
+        integer session generation supplies the loop-agnostic invalidation;
+        the queue sentinel only wakes coroutines blocked in the active loop.
+        """
+        queues = {id(queue): queue for queue in self._pending_requests.values()}
+        self._pending_requests.clear()
+
+        for queue in queues.values():
             while not queue.empty():
                 try:
                     queue.get_nowait()
-                except asyncio.QueueEmpty:
+                except asyncio.QueueEmpty:  # pragma: no cover - concurrent guard
                     break
-        self._pending_requests.clear()
-
-        # Close transport
-        if self._transport is not None:
-            await self._transport.close()
-
-        _LOGGER.debug(
-            {
-                "class": "DeviceConnection",
-                "method": "close",
-                "serial": self.serial,
-                "ip": self.ip,
-            }
-        )
-        self._transport = None
-        self._send_address = None
+            queue.put_nowait(_CONNECTION_CLOSED)
 
     def _is_alive(self) -> bool:
         """Report whether the machinery behind an open connection still works.
@@ -712,6 +796,12 @@ class DeviceConnection:
         # correlation RETRY-04/D3-04; max_retries interaction rule D3-05.
         if not self._is_open or self._transport is None:
             raise LifxConnectionError("Connection not open")  # pragma: no cover
+        session_generation = self._state_generation
+
+        def ensure_current_session() -> None:
+            """Reject work retained from a connection that has since closed."""
+            if session_generation != self._state_generation or not self._is_open:
+                raise LifxConnectionError("Connection closed during request")
 
         if timeout is None:
             timeout = self.timeout  # pragma: no cover
@@ -724,8 +814,8 @@ class DeviceConnection:
 
         # Create ONE shared queue for ALL transmissions of this request.
         # Responses from any transmission can satisfy the request (D3-04).
-        response_queue: asyncio.Queue[tuple[LifxHeader, bytes]] = asyncio.Queue(
-            maxsize=100
+        response_queue: asyncio.Queue[tuple[LifxHeader, bytes] | _ConnectionClosed] = (
+            asyncio.Queue(maxsize=100)
         )
 
         # Track all correlation keys for cleanup
@@ -746,6 +836,7 @@ class DeviceConnection:
         try:
             # Transmission #0 (sequence 0), key registered BEFORE send so a
             # response cannot arrive before its key exists.
+            ensure_current_session()
             key = (request_source, 0, self._serial)
             self._pending_requests[key] = response_queue
             correlation_keys.append(key)
@@ -756,12 +847,14 @@ class DeviceConnection:
                 ack_required=ack_required,
                 res_required=res_required,
             )
+            ensure_current_session()
             tx_count = 1
             next_tx_at: float | None = (
                 time.monotonic() + next(gaps, last_gap) if max_retries > 0 else None
             )
 
             while True:
+                ensure_current_session()
                 now = time.monotonic()
 
                 # Wall-time budget (RETRY-03): the only exit that can raise.
@@ -790,6 +883,7 @@ class DeviceConnection:
                 # yielded -- retransmitting mid-stream would duplicate a
                 # whole multi-response set.
                 if next_tx_at is not None and not has_yielded and now >= next_tx_at:
+                    ensure_current_session()
                     sequence = tx_count  # fresh sequence per retransmit
                     key = (request_source, sequence, self._serial)
                     self._pending_requests[key] = response_queue  # SAME queue
@@ -801,6 +895,7 @@ class DeviceConnection:
                         ack_required=ack_required,
                         res_required=res_required,
                     )
+                    ensure_current_session()
                     tx_count += 1
                     next_tx_at = (
                         time.monotonic() + next(gaps, last_gap)
@@ -827,11 +922,16 @@ class DeviceConnection:
                     wait = min(wait, _STREAM_IDLE_TIMEOUT - (now - last_response_time))
 
                 try:
-                    header, payload = await asyncio.wait_for(
+                    response = await asyncio.wait_for(
                         response_queue.get(), timeout=wait
                     )
                 except TIMEOUT_ERRORS:
                     continue  # slice ended -- loop top decides why
+
+                if isinstance(response, _ConnectionClosed):
+                    raise LifxConnectionError("Connection closed during request")
+                ensure_current_session()
+                header, payload = response
 
                 # Validate correlation (defense in depth)
                 # For discovery connections, skip serial validation
@@ -883,7 +983,8 @@ class DeviceConnection:
             # replies then hit _background_receiver's unmatched path, DEBUG
             # logged and silently discarded)
             for key in correlation_keys:
-                self._pending_requests.pop(key, None)
+                if self._pending_requests.get(key) is response_queue:
+                    self._pending_requests.pop(key, None)
 
         # Wall deadline expired without ever yielding a response
         raise LifxTimeoutError(

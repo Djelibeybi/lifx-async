@@ -1,7 +1,7 @@
 """Tests for the shared address rules (`lifx.network.address`).
 
-The module is a leaf rule with three public functions, so every branch is
-reachable directly rather than through a ``Device`` constructor. That is the
+The module is a leaf rule whose shared helpers expose every branch directly,
+rather than through a ``Device`` constructor. That is the
 whole point of the move (D-04): the coverage-exemption markers the rules
 carried while they were inline in ``Device.__init__`` come off, and each
 branch is exercised from both sides here.
@@ -18,17 +18,20 @@ from __future__ import annotations
 
 import logging
 import socket
+from typing import cast
 from unittest.mock import patch
 
 import pytest
 
 from lifx.const import DEFAULT_IP_ADDRESS
 from lifx.network.address import (
+    SocketAddress,
     family_for,
     family_for_sockaddr,
     host_from_sockaddr,
     sockaddr_for,
     validate_address,
+    validate_port,
     wildcard_for,
 )
 
@@ -205,6 +208,36 @@ class TestValidateAddressAccepts:
 
 class TestSocketAddressConversion:
     """Native socket tuples preserve valid IPv6 scope information."""
+
+    @pytest.mark.parametrize("port", [0, 1, 1023, 65536, 70000])
+    def test_remote_port_out_of_range_raises(self, port: int) -> None:
+        """Remote endpoints must use the shared unprivileged port range."""
+        with pytest.raises(ValueError, match="Port must be between 1024 and 65535"):
+            sockaddr_for(("192.0.2.1", port))
+
+    @pytest.mark.parametrize("port", [True, False, 56700.0, "56700"])
+    def test_non_integer_port_raises(self, port: object) -> None:
+        """Booleans and integer-shaped values are not valid native ports."""
+        address = cast(SocketAddress, ("192.0.2.1", port))
+        with pytest.raises(ValueError, match="Port must be an integer"):
+            sockaddr_for(address)
+
+    @pytest.mark.parametrize("host", ["0.0.0.0", "::"])
+    def test_local_bind_allows_ephemeral_port_zero(self, host: str) -> None:
+        """Port zero remains valid only for operating-system-selected binds."""
+        expected: SocketAddress = (host, 0) if ":" not in host else (host, 0, 0, 0)
+        assert sockaddr_for((host, 0), require_routable=False) == expected
+
+    @pytest.mark.parametrize("port", [1024, 65535])
+    def test_remote_port_range_boundaries_are_valid(self, port: int) -> None:
+        """Both endpoints of the shared remote range remain accepted."""
+        assert sockaddr_for(("192.0.2.1", port)) == ("192.0.2.1", port)
+
+    def test_validate_port_uses_the_same_remote_contract(self) -> None:
+        """Device construction can share the normaliser's exact port rule."""
+        assert validate_port(56700) is None
+        with pytest.raises(ValueError, match="Port must be between 1024 and 65535"):
+            validate_port(1023)
 
     def test_ipv6_host_is_canonicalised(self) -> None:
         """Equivalent spellings produce one stable native endpoint."""

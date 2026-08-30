@@ -7,22 +7,56 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from lifx.devices.base import Device, DeviceVersion, FirmwareInfo
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.exceptions import LifxTimeoutError
 from lifx.network.discovery import (
     DiscoveredDevice,
     DiscoveryResponse,
     discover_devices,
 )
 from lifx.products.registry import ProductCapability, ProductInfo
+
+
+def test_devices_can_be_imported_before_the_network_layer_is_populated() -> None:
+    """Import order cannot expose a network-to-device initialisation cycle."""
+    repository = Path(__file__).parents[2]
+    script = textwrap.dedent(
+        """
+        import pathlib
+        import sys
+        import types
+
+        package = types.ModuleType("lifx")
+        package.__path__ = [str(pathlib.Path.cwd() / "src" / "lifx")]
+        package.__package__ = "lifx"
+        sys.modules["lifx"] = package
+        import lifx.devices.base
+        """
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 class TestDiscoveryGeneratorOwnership:
@@ -73,7 +107,8 @@ class TestDiscoveredDeviceValidationBoundary:
         with (
             caplog.at_level(logging.DEBUG, logger="lifx.network.discovery"),
             patch(
-                "lifx.devices.base.Device", side_effect=ValueError("invalid address")
+                "lifx.devices.base.Device",
+                side_effect=ValueError("invalid address"),
             ),
         ):
             assert await discovered.create_device() is None
@@ -123,6 +158,86 @@ class TestDiscoveredDeviceValidationBoundary:
 
         temporary_device.connection.close.assert_awaited_once_with()
 
+    @pytest.mark.parametrize(
+        "error",
+        [TypeError("broken capability call"), AttributeError("missing metadata")],
+    )
+    async def test_capability_programming_error_propagates_after_cleanup(
+        self, error: Exception
+    ) -> None:
+        """Programming errors stay visible and still close the temporary device."""
+        discovered = DiscoveredDevice("d073d5010203", "192.0.2.10")
+        temporary_device = MagicMock()
+        temporary_device.ensure_capabilities = AsyncMock(side_effect=error)
+        temporary_device.connection.close = AsyncMock()
+
+        with patch("lifx.devices.base.Device", return_value=temporary_device):
+            with pytest.raises(type(error), match=str(error)):
+                await discovered.create_device()
+
+        temporary_device.connection.close.assert_awaited_once_with()
+
+    async def test_capability_network_error_is_logged_and_isolated(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Expected LIFX failures skip one responder with a debug diagnostic."""
+        discovered = DiscoveredDevice("d073d5010203", "192.0.2.10")
+        temporary_device = MagicMock()
+        temporary_device.ensure_capabilities = AsyncMock(
+            side_effect=LifxTimeoutError("synthetic timeout")
+        )
+        temporary_device.connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx.network.discovery"),
+            patch("lifx.devices.base.Device", return_value=temporary_device),
+        ):
+            assert await discovered.create_device() is None
+
+        diagnostic = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "capability_detection_failed"
+        )
+        assert diagnostic["error_type"] == "LifxTimeoutError"
+        temporary_device.connection.close.assert_awaited_once_with()
+
+    async def test_typed_constructor_programming_error_propagates(self) -> None:
+        """A concrete subclass signature mismatch cannot hide the product."""
+        discovered = DiscoveredDevice(
+            serial="d073d5010203",
+            ip="192.0.2.10",
+        )
+        color_product = ProductInfo(
+            pid=27,
+            name="LIFX A19",
+            vendor=1,
+            capabilities=ProductCapability.COLOR,
+            temperature_range=None,
+            min_ext_mz_firmware=None,
+        )
+
+        async def fake_ensure(self: Device) -> None:
+            self._capabilities = color_product
+            self._version = DeviceVersion(vendor=1, product=27)
+
+        with (
+            patch.object(Device, "ensure_capabilities", fake_ensure),
+            patch(
+                "lifx.devices.detection.get_device_class_for_product",
+                return_value=MagicMock(side_effect=TypeError("broken subclass")),
+            ),
+            patch(
+                "lifx.network.connection.DeviceConnection.close",
+                new_callable=AsyncMock,
+            ) as close,
+        ):
+            with pytest.raises(TypeError, match="broken subclass"):
+                await discovered.create_device()
+
+        close.assert_awaited_once_with()
+
     async def test_wire_address_warning_stays_suppressed_during_construction(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -132,10 +247,18 @@ class TestDiscoveredDeviceValidationBoundary:
             ip="127.0.0.1",
             port=12345,
         )
+        color_product = ProductInfo(
+            pid=27,
+            name="LIFX A19",
+            vendor=1,
+            capabilities=ProductCapability.COLOR,
+            temperature_range=None,
+            min_ext_mz_firmware=None,
+        )
 
         async def fake_ensure(self: Device) -> None:
-            self._capabilities = None
-            self._version = None
+            self._capabilities = color_product
+            self._version = DeviceVersion(vendor=1, product=27)
 
         with (
             caplog.at_level(logging.WARNING),
@@ -145,8 +268,38 @@ class TestDiscoveredDeviceValidationBoundary:
                 new_callable=AsyncMock,
             ),
         ):
-            assert await discovered.create_device() is None
+            device = await discovered.create_device()
 
+        assert isinstance(device, Light)
+        assert caplog.records == []
+
+    @pytest.mark.parametrize(
+        "device_class",
+        [Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, CeilingLight],
+    )
+    def test_all_concrete_types_accept_explicit_warning_policy(
+        self,
+        device_class: type[Light],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Every type accepts and forwards the complete factory contract."""
+        with caplog.at_level(logging.WARNING):
+            device = device_class(
+                serial="d073d5010203",
+                ip="127.0.0.1",
+                port=12345,
+                timeout=2.5,
+                max_retries=4,
+                fetch_wifi_info=True,
+                fetch_ambient_light=True,
+                _emit_input_warnings=False,
+            )
+
+        assert type(device) is device_class
+        assert device.connection.timeout == 2.5
+        assert device.connection.max_retries == 4
+        assert device.fetch_wifi_info is True
+        assert device.fetch_ambient_light is True
         assert caplog.records == []
 
 

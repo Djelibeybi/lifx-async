@@ -60,7 +60,12 @@ Pytest retries each test once, with no delay, only when it raises the exact
 `LifxTimeoutError`, `LifxConnectionError`, or `LifxNetworkError` type. Assertion
 failures and all other exceptions fail immediately. The suite-wide 60-second
 timeout covers two complete default 16-second request attempts; emulator tests
-receive a 120-second timeout.
+receive a 120-second timeout. The targeted IPv6 emulator lookup retains two
+retries with a one-second delay on Windows because its socket and scheduler
+window can outlast one immediate retry. That targeted override also admits the
+assertion-shaped no-response result. It is applied during collection only on
+Windows; elsewhere the test keeps the global one immediate network retry and
+ordinary assertion failures still fail immediately.
 
 ### Code Quality
 

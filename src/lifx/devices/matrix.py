@@ -400,12 +400,15 @@ class MatrixLight(Light):
         *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
+        _emit_input_warnings: bool = True,
     ) -> None:
         """Initialize MatrixLight device.
 
         See :class:`~lifx.devices.base.Device` for parameter documentation. The
         signature is spelled out rather than forwarded as ``*args, **kwargs`` so
         callers get the same type checking the base class offers.
+        ``_emit_input_warnings`` is an internal construction policy; callers
+        should leave it at its default.
         """
         super().__init__(
             serial,
@@ -415,6 +418,7 @@ class MatrixLight(Light):
             max_retries,
             fetch_wifi_info=fetch_wifi_info,
             fetch_ambient_light=fetch_ambient_light,
+            _emit_input_warnings=_emit_input_warnings,
         )
         # Matrix specific properties
         self._device_chain: list[TileInfo] | None = None

@@ -20,9 +20,11 @@ from lifx.devices.base import (
     FirmwareInfo,
     WifiInfo,
 )
+from lifx.devices.matrix import MatrixLight
 from lifx.network.connection import DeviceConnection
 from lifx.network.discovery import DiscoveredDevice
 from lifx.protocol import packets
+from lifx.protocol.protocol_types import DeviceService
 
 
 class TestDevice:
@@ -1088,6 +1090,78 @@ class TestAddressEntryPointGate:
         assert isinstance(device, Device)
         assert device.ip == self.ZONED
 
+    async def test_from_ip_emits_each_caller_advisory_once(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Factory validation cannot duplicate constructor advisories."""
+        with caplog.at_level(logging.WARNING):
+            await Device.from_ip(ip="127.0.0.1", port=12345, serial=self.SERIAL)
+
+        actions = [
+            record.msg.get("action")
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+        ]
+        assert actions.count("is_loopback") == 1
+        assert actions.count("non_standard_port") == 1
+        port_record = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "non_standard_port"
+        )
+        assert port_record["class"] == "Device"
+        assert port_record["method"] == "from_ip"
+
+    async def test_subclass_factory_advisory_names_the_subclass(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Inherited factories attribute endpoint warnings to their real class."""
+        with caplog.at_level(logging.WARNING):
+            await MatrixLight.from_ip(
+                ip="127.0.0.1",
+                port=12345,
+                serial=self.SERIAL,
+            )
+
+        port_record = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "non_standard_port"
+        )
+        assert port_record["class"] == "MatrixLight"
+        assert port_record["method"] == "from_ip"
+
+    async def test_from_ip_without_serial_suppresses_constructor_advisories(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Serial discovery does not repeat the public factory warnings."""
+        connection = MagicMock()
+        connection.serial = self.SERIAL
+        connection.request = AsyncMock(
+            return_value=packets.Device.StateService(
+                service=DeviceService.UDP,
+                port=12345,
+            )
+        )
+        connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.WARNING),
+            patch("lifx.devices.base.DeviceConnection", return_value=connection),
+        ):
+            device = await Device.from_ip(ip="127.0.0.1", port=12345)
+
+        actions = [
+            record.msg.get("action")
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+        ]
+        assert isinstance(device, Device)
+        assert actions.count("is_loopback") == 1
+        assert actions.count("non_standard_port") == 1
+
     async def test_connect_rejects_zone_less_link_local(self) -> None:
         """`connect()` raises with no DeviceConnection constructed.
 
@@ -1113,6 +1187,35 @@ class TestAddressEntryPointGate:
             device = await Device.connect(ip=self.ZONED, serial=self.SERIAL)
 
         assert device.ip == self.ZONED
+
+    async def test_connect_emits_each_caller_advisory_once(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Temporary and concrete devices do not repeat factory advisories."""
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(
+                Device,
+                "get_version",
+                AsyncMock(return_value=DeviceVersion(vendor=1, product=27)),
+            ),
+        ):
+            await Device.connect(ip="127.0.0.1", port=12345, serial=self.SERIAL)
+
+        actions = [
+            record.msg.get("action")
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+        ]
+        assert actions.count("is_loopback") == 1
+        assert actions.count("non_standard_port") == 1
+        port_record = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "non_standard_port"
+        )
+        assert port_record["method"] == "connect"
 
     @pytest.mark.parametrize(
         ("ip", "message"),

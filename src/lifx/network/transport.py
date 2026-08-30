@@ -312,10 +312,10 @@ class UdpTransport:
                 # lifx.network.address, which is what lets this transport reach
                 # Thread devices that have no IPv4 address.
                 family = family_for(self._ip_address)
+                bind_address = sockaddr_for(
+                    (self._ip_address, self._port), require_routable=False
+                )
                 if family is socket.AF_INET6:
-                    bind_address = sockaddr_for(
-                        (self._ip_address, self._port), require_routable=False
-                    )
                     raw_socket = _socket_factory(socket.AF_INET6, socket.SOCK_DGRAM)
                     raw_socket.setsockopt(
                         socket.IPPROTO_IPV6,
@@ -336,9 +336,10 @@ class UdpTransport:
                     )
                     raw_socket = None  # asyncio owns the descriptor now
                 else:
+                    assert len(bind_address) == 2
                     datagram_transport, _ = await loop.create_datagram_endpoint(
                         lambda: protocol,
-                        local_addr=(self._ip_address, self._port),
+                        local_addr=bind_address,
                         reuse_port=_SO_REUSEPORT is not None,
                         family=family,
                     )
