@@ -273,22 +273,9 @@ class DeviceConnection:
             await transport.open()
 
             if generation != self._state_generation:
-                if self._opening_transport is transport:
-                    self._opening_transport = None
-                    try:
-                        await transport.close()
-                    except BaseException as cleanup_error:
-                        _LOGGER.debug(
-                            {
-                                "class": "DeviceConnection",
-                                "method": "open",
-                                "action": "invalidated_transport_cleanup_failed",
-                                "serial": self.serial,
-                                "ip": self.ip,
-                                "port": self.port,
-                                "error": str(cleanup_error),
-                            }
-                        )
+                # close() synchronously takes ownership from
+                # _opening_transport before its first await, so it also owns
+                # closing this invalidated endpoint.
                 return
 
             self._opening_transport = None
@@ -352,11 +339,13 @@ class DeviceConnection:
         self._is_closing = True
         self._is_open = False
         transport = self._transport
+        assert transport is not None  # _is_open implies a published transport
         receiver_task = self._receiver_task
+        receiver_shutdown = self._receiver_shutdown
+        assert receiver_shutdown is not None  # _is_open implies a shutdown signal
         cancelled: asyncio.CancelledError | None = None
 
-        if self._receiver_shutdown:
-            self._receiver_shutdown.set()
+        receiver_shutdown.set()
 
         async def _finish_cleanup() -> None:
             """Finish active-session teardown independently of caller cancellation."""
@@ -373,8 +362,7 @@ class DeviceConnection:
                         except asyncio.CancelledError:
                             pass
             finally:
-                if transport is not None:
-                    await transport.close()
+                await transport.close()
 
         cleanup_task = asyncio.create_task(_finish_cleanup())
         try:
