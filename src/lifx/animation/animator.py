@@ -51,7 +51,12 @@ from lifx.animation.packets import (
 )
 from lifx.const import LIFX_UDP_PORT
 from lifx.exceptions import LifxNetworkError
-from lifx.network.address import SocketAddress, sockaddr_for
+from lifx.network.address import (
+    SocketAddress,
+    family_for_sockaddr,
+    sockaddr_for,
+    validate_address,
+)
 from lifx.network.utils import allocate_source
 from lifx.protocol.models import Serial
 
@@ -146,14 +151,17 @@ class Animator:
         """
         self._ip = ip
         self._port = port
-        # Socket state exists before any packet-generator work that could
-        # raise, so finalisation is safe even for a partly built instance.
-        # Address resolution is deliberately deferred until the first send:
-        # constructing an animator must stay lightweight, and a named IPv6
-        # interface is re-resolved for each new socket session.
+        # Finalisation state exists before validation or packet-generator work
+        # that could raise, so cleanup is safe for a partly built instance.
         self._addr: SocketAddress | None = None
         self._socket: socket.socket | None = None
         self._ack_gate = AckGate()
+
+        # Scope resolution is deliberately deferred until the first send so
+        # a named IPv6 interface is re-resolved for each new socket session.
+        # The literal itself is still gated here so permanent configuration
+        # errors never reach the render loop.
+        validate_address(ip)
         self._serial = serial
         self._framebuffer = framebuffer
         self._packet_generator = packet_generator
@@ -407,7 +415,7 @@ class Animator:
             new_socket: socket.socket | None = None
             try:
                 addr = sockaddr_for((self._ip, self._port))
-                family = socket.AF_INET6 if len(addr) == 4 else socket.AF_INET
+                family = family_for_sockaddr(addr)
                 new_socket = socket.socket(family, socket.SOCK_DGRAM)
                 new_socket.setblocking(False)
             except (OSError, ValueError) as error:
@@ -419,10 +427,12 @@ class Animator:
             self._addr = addr
             self._socket = new_socket
 
+        sock = self._socket
         send_address = self._addr
-        assert send_address is not None
+        if sock is None or send_address is None:
+            raise LifxNetworkError("Animator UDP session is incomplete")
         now = time.monotonic()
-        self._ack_gate.sweep(self._socket, self._source, now)
+        self._ack_gate.sweep(sock, self._source, now)
         if self._ack_gate.gated:
             return AnimatorStats(
                 packets_sent=0,
@@ -443,7 +453,7 @@ class Animator:
             if i == self._probe_index:
                 self._ack_gate.track(self._sequence, now)
             self._sequence = (self._sequence + 1) % 256
-            self._socket.sendto(tmpl.data, send_address)
+            sock.sendto(tmpl.data, send_address)
 
         end_time = time.perf_counter()
 

@@ -183,12 +183,12 @@ class _Ipv6EmulatedLifxServer(EmulatedLifxServer):
 
 
 @pytest.fixture(scope="session")
-def emulator_available(request: pytest.FixtureRequest) -> bool:
-    """Check if lifx-emulator-core is available.
+def emulator_enabled(request: pytest.FixtureRequest) -> bool:
+    """Decide whether the normal embedded-emulator suite is enabled.
 
-    The library is always available as it's a direct dependency.
-    Emulator tests are enabled on all platforms by default. Use --disable-emulator
-    to disable them if needed.
+    The library is a required development dependency, so pytest collection
+    fails if it is absent. Emulator tests are enabled off Windows by default;
+    use ``--disable-emulator`` to disable them explicitly.
 
     Args:
         request: Pytest fixture request for accessing command-line options
@@ -214,7 +214,9 @@ def targeted_ipv6_emulator_allowed(
     """Decide whether the focused targeted-IPv6 emulator path may run."""
     if disable_emulator:
         return False
-    return platform.startswith("win32") and windows_ci_opt_in == "1"
+    if platform.startswith("win32"):
+        return windows_ci_opt_in == "1"
+    return True
 
 
 @pytest.fixture(scope="session")
@@ -260,7 +262,7 @@ def ipv6_probe_outcome(error: OSError, require_ipv6: str | None) -> bool | str:
 def ipv6_available() -> bool:
     """Check whether an IPv6 loopback socket can be bound.
 
-    Mirrors :func:`emulator_available`: a session-scoped bool, probed once
+    Mirrors :func:`emulator_enabled`: a session-scoped bool, probed once
     and cached. Every ``::1`` fixture gates on it, so all the dependent
     tests skip through a single decision rather than each inventing its own.
 
@@ -283,7 +285,7 @@ def ipv6_available() -> bool:
 
 @pytest.fixture(scope="session")
 def emulator_server(
-    emulator_available: bool,
+    emulator_enabled: bool,
 ) -> Generator[tuple[int, EmulatedLifxServer, HierarchicalScenarioManager]]:
     """Start embedded lifx-emulator for the entire test session.
 
@@ -316,7 +318,7 @@ def emulator_server(
         yield port, None, None  # type: ignore[misc]
         return
 
-    if not emulator_available:
+    if not emulator_enabled:
         pytest.skip("lifx-emulator-core not available")
 
     # Create scenario manager for all devices to share
@@ -365,7 +367,7 @@ def emulator_server(
 
 @pytest.fixture(scope="session")
 def tile_chain_server(
-    emulator_available: bool,
+    emulator_enabled: bool,
 ) -> Generator[int]:
     """Start an emulator hosting a single 5-tile LIFX Tile chain.
 
@@ -378,7 +380,7 @@ def tile_chain_server(
     Yields:
         UDP port the chain emulator is listening on
     """
-    if not emulator_available:
+    if not emulator_enabled:
         pytest.skip("lifx-emulator-core not available")
 
     scenario_manager = HierarchicalScenarioManager()
@@ -496,13 +498,10 @@ def _running_ipv6_emulator() -> Generator[tuple[int, EmulatedLifxServer]]:
 
 
 @pytest.fixture(scope="session")
-def emulator_server_ipv6(
-    emulator_available: bool,
+def _shared_ipv6_emulator_server(
     ipv6_available: bool,
 ) -> Generator[tuple[int, EmulatedLifxServer]]:
-    """Start the normal IPv6 emulator used by the cross-platform suite."""
-    if not emulator_available:
-        pytest.skip("lifx-emulator-core tests are disabled on this platform")
+    """Start the one IPv6 emulator shared by every eligible test path."""
     if not ipv6_available:
         pytest.skip("IPv6 loopback (::1) is not available on this host")
 
@@ -511,23 +510,30 @@ def emulator_server_ipv6(
 
 
 @pytest.fixture(scope="session")
+def emulator_server_ipv6(
+    emulator_enabled: bool,
+    request: pytest.FixtureRequest,
+) -> tuple[int, EmulatedLifxServer]:
+    """Return the shared IPv6 emulator for the normal cross-platform suite."""
+    if not emulator_enabled:
+        pytest.skip("lifx-emulator-core tests are disabled on this platform")
+    return request.getfixturevalue("_shared_ipv6_emulator_server")
+
+
+@pytest.fixture(scope="session")
 def targeted_emulator_server_ipv6(
     targeted_ipv6_emulator_available: bool,
-    ipv6_available: bool,
-) -> Generator[tuple[int, EmulatedLifxServer]]:
-    """Start only the explicitly opted-in Windows targeted-IPv6 server."""
+    request: pytest.FixtureRequest,
+) -> tuple[int, EmulatedLifxServer]:
+    """Return the shared server for cross-platform targeted IPv6 discovery."""
     if not targeted_ipv6_emulator_available:
         if sys.platform == "win32" and os.environ.get("LIFX_REQUIRE_IPV6") == "1":
             pytest.fail(
                 "the required Windows IPv6 check was not opted in; set "
                 "LIFX_WINDOWS_IPV6_DISCOVERY=1"
             )
-        pytest.skip("the focused Windows IPv6 emulator path is not enabled")
-    if not ipv6_available:
-        pytest.skip("IPv6 loopback (::1) is not available on this host")
-
-    with _running_ipv6_emulator() as running_server:
-        yield running_server
+        pytest.skip("the targeted IPv6 emulator path is not enabled")
+    return request.getfixturevalue("_shared_ipv6_emulator_server")
 
 
 @pytest.fixture
@@ -633,7 +639,7 @@ def emulator_devices(
 
 
 @pytest.fixture(autouse=True)
-async def cleanup_device_connections(request, emulator_available):
+async def cleanup_device_connections(request, emulator_enabled):
     """Clean up device connections after each test.
 
     This ensures test isolation by closing all device connections
@@ -646,7 +652,7 @@ async def cleanup_device_connections(request, emulator_available):
     yield
 
     # Skip cleanup if emulator is not available or test doesn't use it
-    if not emulator_available:
+    if not emulator_enabled:
         return
 
     # Get the emulator_devices fixture if it was used

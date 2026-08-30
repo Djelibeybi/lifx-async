@@ -149,7 +149,8 @@ jobs:
 
   # Testing matrix scope:
   # - PRs with source/test/CI workflow changes: full 3-OS matrix
-  # - PRs with documentation-only changes: Ubuntu-only (smoke test)
+  # - PRs touching only codecov.yml or .pre-commit-config.yaml: Ubuntu-only
+  #   (smoke test)
   # - Push to main: Ubuntu-only (PR already validated all OSes)
   test:
     needs: changes

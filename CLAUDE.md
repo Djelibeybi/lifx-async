@@ -328,7 +328,8 @@ uv sync  # Installs lifx-emulator-core automatically
 
 **Running Integration Tests**:
 - Tests marked with `@pytest.mark.emulator` use the embedded emulator
-- If emulator is not available, these tests are automatically skipped
+- The emulator is a required development dependency; pytest collection fails
+  if it is unavailable
 - **Works on all supported Python versions (3.10+)**
 
 **External Emulator Management**:

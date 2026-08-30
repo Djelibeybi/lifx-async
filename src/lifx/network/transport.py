@@ -17,7 +17,12 @@ from lifx.const import (
     TIMEOUT_ERRORS,
 )
 from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
-from lifx.network.address import SocketAddress, family_for, sockaddr_for
+from lifx.network.address import (
+    SocketAddress,
+    family_for,
+    family_for_sockaddr,
+    sockaddr_for,
+)
 
 if TYPE_CHECKING:
     from asyncio import DatagramTransport
@@ -308,7 +313,9 @@ class UdpTransport:
                 # Thread devices that have no IPv4 address.
                 family = family_for(self._ip_address)
                 if family is socket.AF_INET6:
-                    bind_address = sockaddr_for((self._ip_address, self._port))
+                    bind_address = sockaddr_for(
+                        (self._ip_address, self._port), require_routable=False
+                    )
                     raw_socket = _socket_factory(socket.AF_INET6, socket.SOCK_DGRAM)
                     raw_socket.setsockopt(
                         socket.IPPROTO_IPV6,
@@ -490,9 +497,7 @@ class UdpTransport:
                 f"Invalid destination {address[0]!r}: {error}"
             ) from error
 
-        destination_family = (
-            socket.AF_INET6 if len(send_address) == 4 else socket.AF_INET
-        )
+        destination_family = family_for_sockaddr(send_address)
         if destination_family is not self._family:
             _LOGGER.debug(
                 self._log(

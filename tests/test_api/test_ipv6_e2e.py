@@ -139,8 +139,8 @@ def connection_socket_family(light: Light) -> socket.AddressFamily:
 @pytest.mark.parametrize(
     ("disable_emulator", "platform", "windows_ci_opt_in", "expected"),
     [
-        (False, "linux", None, False),
-        (False, "darwin", "0", False),
+        (False, "linux", None, True),
+        (False, "darwin", "0", True),
         (True, "linux", "1", False),
         (True, "win32", "1", False),
         (False, "win32", None, False),
@@ -156,7 +156,7 @@ def test_targeted_ipv6_emulator_allowed(
     windows_ci_opt_in: str | None,
     expected: bool,
 ) -> None:
-    """The focused Windows opt-in is exact and never bypasses disablement."""
+    """Non-Windows runs by default; Windows opt-in never bypasses disablement."""
     assert (
         targeted_ipv6_emulator_allowed(
             disable_emulator,
