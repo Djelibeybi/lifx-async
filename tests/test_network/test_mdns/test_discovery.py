@@ -4060,6 +4060,7 @@ class TestMdnsFollowUpAddressQueries:
 
         for packet_order in permutations((b"txt", b"srv", b"addresses")):
             sequence = [packet_order[0], b"empty", *packet_order[1:], packet_order[-1]]
+            deadline = _fake_deadline()
             transport = _fake_transport()
             transport.receive = _receive_script(
                 *((packet, ("192.0.2.10", 5353)) for packet in sequence)
@@ -4072,6 +4073,10 @@ class TestMdnsFollowUpAddressQueries:
                 patch(
                     "lifx.network.mdns.discovery.MdnsTransport",
                     return_value=transport,
+                ),
+                patch(
+                    "lifx.network.mdns.discovery.IdleDeadline",
+                    return_value=deadline,
                 ),
                 patch(
                     "lifx.network.mdns.discovery.parse_dns_response",
