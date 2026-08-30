@@ -40,6 +40,10 @@ NETWORK_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LifxConnectionError,
     LifxNetworkError,
 )
+WINDOWS_IPV6_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
+    *NETWORK_RETRY_EXCEPTIONS,
+    AssertionError,
+)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -66,9 +70,31 @@ _EMULATOR_FIXTURES = frozenset(
 )
 
 
+def targeted_ipv6_retry_policy(platform: str) -> dict[str, object] | None:
+    """Return the focused Windows retry override, if this platform needs it."""
+    if not platform.startswith("win32"):
+        return None
+    return {
+        "retries": 2,
+        "delay": 1,
+        "only_on": WINDOWS_IPV6_RETRY_EXCEPTIONS,
+    }
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Apply a longer timeout to emulator tests."""
+    """Apply focused retry and timeout policies before plugin defaults."""
+    targeted_retry = targeted_ipv6_retry_policy(sys.platform)
     for item in items:
+        if (
+            targeted_retry is not None
+            and item.get_closest_marker("targeted_ipv6_windows") is not None
+        ):
+            # Run before pytest-retry's collection hook. On Windows this
+            # marker suppresses the global marker; elsewhere no marker is
+            # added here, so the plugin supplies its normal global policy.
+            item.add_marker(pytest.mark.flaky(**targeted_retry))
+
         uses_emulator = item.get_closest_marker("emulator") is not None or (
             hasattr(item, "fixturenames")
             and _EMULATOR_FIXTURES & set(item.fixturenames)

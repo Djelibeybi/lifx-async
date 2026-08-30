@@ -6,9 +6,8 @@ import asyncio
 import logging
 import time
 import uuid
-from collections.abc import Coroutine, Iterator
-from contextlib import aclosing, contextmanager
-from contextvars import ContextVar
+from collections.abc import Coroutine
+from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
 from math import floor, log10
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
@@ -26,7 +25,7 @@ from lifx.exceptions import (
     LifxError,
     LifxUnsupportedCommandError,
 )
-from lifx.network.address import validate_address
+from lifx.network.address import validate_address, validate_port
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
@@ -50,19 +49,30 @@ if TYPE_CHECKING:
     )
 
 _LOGGER = logging.getLogger(__name__)
-_EMIT_DEVICE_INPUT_WARNINGS: ContextVar[bool] = ContextVar(
-    "lifx_emit_device_input_warnings", default=True
-)
 
 
-@contextmanager
-def _suppress_device_input_warnings() -> Iterator[None]:
-    """Suppress caller advisories while constructing from validated wire data."""
-    token = _EMIT_DEVICE_INPUT_WARNINGS.set(False)
-    try:
-        yield
-    finally:
-        _EMIT_DEVICE_INPUT_WARNINGS.reset(token)
+def _validate_device_endpoint(
+    ip: str,
+    port: int,
+    *,
+    emit_warnings: bool,
+    class_name: str,
+    method: str,
+) -> None:
+    """Validate a device endpoint and optionally emit caller advisories."""
+    validate_address(ip, emit_warnings=emit_warnings)
+    validate_port(port)
+
+    if port != LIFX_UDP_PORT and emit_warnings:
+        _LOGGER.warning(
+            {
+                "class": class_name,
+                "method": method,
+                "action": "non_standard_port",
+                "port": port,
+                "default_port": LIFX_UDP_PORT,
+            }
+        )
 
 
 @dataclass
@@ -457,6 +467,7 @@ class Device(Generic[StateT]):
         *,
         fetch_wifi_info: bool = False,
         fetch_ambient_light: bool = False,
+        _emit_input_warnings: bool = True,
     ) -> None:
         """Initialize device.
 
@@ -474,6 +485,11 @@ class Device(Generic[StateT]):
                 initialized or refreshed, leaving ``state.ambient_light`` None
                 when False (the default). Only lights expose the sensor, so this
                 is ignored by the base ``Device`` class.
+            _emit_input_warnings: Emit caller-facing address and port advisories.
+                Internal factories disable these after validating caller input
+                once, or when constructing from already-validated wire data.
+                This is an internal construction policy; callers should leave
+                it at its default.
 
         Raises:
             ValueError: If any parameter is invalid
@@ -497,29 +513,16 @@ class Device(Generic[StateT]):
                 "Broadcast serial number not allowed for device connection"
             )
 
-        # Validate the address. Every rule about what an address may be
-        # lives in lifx.network.address, so this class holds no opinion of
-        # its own and cannot drift from the other entry points.
-        emit_input_warnings = _EMIT_DEVICE_INPUT_WARNINGS.get()
-        validate_address(ip, emit_warnings=emit_input_warnings)
-
-        # Validate port
-        if not (1024 <= port <= 65535):
-            raise ValueError(
-                f"Port must be between 1024 and 65535, got {port}"
-            )  # pragma: no cover
-
-        # Warn for non-standard ports
-        if port != LIFX_UDP_PORT and emit_input_warnings:
-            _LOGGER.warning(
-                {
-                    "class": "Device",
-                    "method": "__init__",
-                    "action": "non_standard_port",
-                    "port": port,
-                    "default_port": LIFX_UDP_PORT,
-                }
-            )
+        # Address rules stay centralised in lifx.network.address. Endpoint
+        # advisories are explicit constructor input, rather than ambient state,
+        # so every internal construction site shows whether it is suppressed.
+        _validate_device_endpoint(
+            ip,
+            port,
+            emit_warnings=_emit_input_warnings,
+            class_name=type(self).__name__,
+            method="__init__",
+        )
 
         # Store normalized serial as 12-digit hex string
         self.serial = serial_obj.to_string()
@@ -618,7 +621,13 @@ class Device(Generic[StateT]):
                 label = await device.get_label()
             ```
         """
-        validate_address(ip)
+        _validate_device_endpoint(
+            ip,
+            port,
+            emit_warnings=True,
+            class_name=cls.__name__,
+            method="from_ip",
+        )
 
         if serial is None:
             temp_conn = DeviceConnection(
@@ -642,6 +651,7 @@ class Device(Generic[StateT]):
                             max_retries=max_retries,
                             fetch_wifi_info=fetch_wifi_info,
                             fetch_ambient_light=fetch_ambient_light,
+                            _emit_input_warnings=False,
                         )
             finally:
                 # Always close the temporary connection to prevent resource leaks
@@ -655,6 +665,7 @@ class Device(Generic[StateT]):
                 max_retries=max_retries,
                 fetch_wifi_info=fetch_wifi_info,
                 fetch_ambient_light=fetch_ambient_light,
+                _emit_input_warnings=False,
             )
 
         raise LifxDeviceNotFoundError()
@@ -720,7 +731,13 @@ class Device(Generic[StateT]):
         # DeviceConnection directly and never reaches Device.__init__, so
         # without this call an unusable address would cost a full silent
         # request timeout here.
-        validate_address(ip)
+        _validate_device_endpoint(
+            ip,
+            port,
+            emit_warnings=True,
+            class_name=cls.__name__,
+            method="connect",
+        )
 
         # Step 1: Get serial if not provided
         if serial is None:
@@ -757,6 +774,7 @@ class Device(Generic[StateT]):
             port=port,
             timeout=timeout,
             max_retries=max_retries,
+            _emit_input_warnings=False,
         )
 
         try:
@@ -783,6 +801,7 @@ class Device(Generic[StateT]):
                 max_retries=max_retries,
                 fetch_wifi_info=fetch_wifi_info,
                 fetch_ambient_light=fetch_ambient_light,
+                _emit_input_warnings=False,
             )
 
             # Type system note: device._state is guaranteed non-None after

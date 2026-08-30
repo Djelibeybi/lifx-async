@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -16,7 +16,7 @@ from lifx.exceptions import (
     LifxUnsupportedCommandError,
 )
 from lifx.exceptions import LifxConnectionError as ConnectionError
-from lifx.network.connection import DeviceConnection
+from lifx.network.connection import DeviceConnection, _ConnectionClosed
 from lifx.network.utils import allocate_source
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
@@ -158,6 +158,203 @@ class TestDeviceConnection:
 
             assert attempts == 1
             assert conn.is_open is True
+            await conn.close()
+
+    async def test_close_during_open_invalidates_transport_publication(self) -> None:
+        """A close request wins while transport opening is suspended."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        entered = asyncio.Event()
+        released = asyncio.Event()
+
+        async def _open_transport() -> None:
+            entered.set()
+            await released.wait()
+
+        with (
+            patch("lifx.network.connection.UdpTransport") as transport_class,
+            patch.object(
+                conn, "_background_receiver", new_callable=AsyncMock
+            ) as receiver,
+        ):
+            transport_class.return_value.open.side_effect = _open_transport
+            transport_class.return_value.close = AsyncMock()
+            opening = asyncio.create_task(conn.open())
+            await entered.wait()
+
+            await conn.close()
+            released.set()
+            await opening
+
+        transport_class.return_value.close.assert_awaited_once_with()
+        receiver.assert_not_awaited()
+        assert conn.is_open is False
+        assert conn._transport is None
+        assert conn._opening_transport is None
+        assert conn._send_address is None
+        assert conn._receiver_task is None
+        assert conn._receiver_shutdown is None
+        assert conn._is_opening is False
+
+    def test_connection_reopens_across_event_loops(self) -> None:
+        """Lifecycle coordination remains independent of any one event loop."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+
+        with (
+            patch("lifx.network.connection.UdpTransport") as transport_class,
+            patch.object(conn, "_background_receiver", new_callable=AsyncMock),
+        ):
+            transport_class.return_value.open = AsyncMock()
+            transport_class.return_value.close = AsyncMock()
+
+            async def _open_and_close() -> None:
+                await conn.open()
+                assert conn.is_open is True
+                await conn.close()
+                assert conn.is_open is False
+
+            asyncio.run(_open_and_close())
+            asyncio.run(_open_and_close())
+
+        assert transport_class.return_value.open.await_count == 2
+        assert transport_class.return_value.close.await_count == 2
+
+    async def test_cancelled_close_finishes_cleanup_and_allows_reopen(self) -> None:
+        """Caller cancellation cannot leak the endpoint or stale loop state."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        first_transport = MagicMock()
+        first_transport.open = AsyncMock()
+        first_transport.close = AsyncMock()
+        second_transport = MagicMock()
+        second_transport.open = AsyncMock()
+        second_transport.close = AsyncMock()
+        first_receiver_started = asyncio.Event()
+        release_first_receiver = asyncio.Event()
+        second_receiver_started = asyncio.Event()
+        release_second_receiver = asyncio.Event()
+        receiver_calls = 0
+
+        async def _blocked_receiver() -> None:
+            nonlocal receiver_calls
+            receiver_calls += 1
+            if receiver_calls == 1:
+                first_receiver_started.set()
+                await release_first_receiver.wait()
+            else:
+                second_receiver_started.set()
+                await release_second_receiver.wait()
+
+        with (
+            patch(
+                "lifx.network.connection.UdpTransport",
+                side_effect=[first_transport, second_transport],
+            ),
+            patch.object(conn, "_background_receiver", side_effect=_blocked_receiver),
+        ):
+            await conn.open()
+            await first_receiver_started.wait()
+            first_receiver = conn._receiver_task
+            pending_queue: asyncio.Queue[
+                tuple[LifxHeader, bytes] | _ConnectionClosed
+            ] = asyncio.Queue()
+            pending_queue.put_nowait(
+                (
+                    LifxHeader(
+                        size=36,
+                        protocol=1024,
+                        source=1,
+                        target=bytes.fromhex(conn.serial),
+                        tagged=False,
+                        ack_required=False,
+                        res_required=False,
+                        sequence=2,
+                        pkt_type=25,
+                    ),
+                    b"pending",
+                )
+            )
+            conn._pending_requests[(1, 2, conn.serial)] = pending_queue
+
+            closing = asyncio.create_task(conn.close())
+            await _wait_for(lambda: conn._is_closing)
+            await asyncio.sleep(0)
+            closing.cancel()
+            release_first_receiver.set()
+
+            with pytest.raises(asyncio.CancelledError):
+                await closing
+
+            first_transport.close.assert_awaited_once_with()
+            assert first_receiver is not None
+            assert first_receiver.done()
+            assert conn._transport is None
+            assert conn._receiver_task is None
+            assert conn._receiver_shutdown is None
+            assert conn._pending_requests == {}
+            assert pending_queue.qsize() == 1
+            assert conn._send_address is None
+            assert conn._is_closing is False
+
+            await conn.open()
+            await second_receiver_started.wait()
+
+            assert conn.is_open is True
+            assert conn._transport is second_transport
+            assert conn._receiver_task is not first_receiver
+
+            release_second_receiver.set()
+            await conn.close()
+
+        second_transport.close.assert_awaited_once_with()
+        assert conn._receiver_task is None
+        assert conn._receiver_shutdown is None
+
+    @pytest.mark.parametrize(
+        "packet",
+        [
+            pytest.param(Device.GetLabel(), id="get"),
+            pytest.param(Device.SetPower(level=65535), id="set"),
+        ],
+    )
+    async def test_close_terminates_request_before_reopen(self, packet: object) -> None:
+        """In-flight GET and SET work cannot cross a close/reopen boundary."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        first_transport = MagicMock(is_open=True)
+        first_transport.open = AsyncMock()
+        first_transport.close = AsyncMock()
+        first_transport.send = AsyncMock()
+        second_transport = MagicMock(is_open=True)
+        second_transport.open = AsyncMock()
+        second_transport.close = AsyncMock()
+        second_transport.send = AsyncMock()
+
+        async def _wait_for_shutdown() -> None:
+            shutdown = conn._receiver_shutdown
+            assert shutdown is not None
+            await shutdown.wait()
+
+        with (
+            patch(
+                "lifx.network.connection.UdpTransport",
+                side_effect=[first_transport, second_transport],
+            ),
+            patch.object(conn, "_background_receiver", side_effect=_wait_for_shutdown),
+            patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.01,)),
+        ):
+            request_task = asyncio.create_task(conn.request(packet, timeout=5.0))
+            await _wait_for_pending(conn)
+
+            await conn.close()
+
+            with pytest.raises(
+                LifxConnectionError, match="Connection closed during request"
+            ):
+                await asyncio.wait_for(request_task, timeout=0.2)
+
+            assert first_transport.send.await_count == 1
+
+            await conn.open()
+            await asyncio.sleep(0.03)
+            second_transport.send.assert_not_awaited()
             await conn.close()
 
     async def test_failed_open_preserves_error_when_cleanup_also_fails(self) -> None:

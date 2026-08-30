@@ -11,7 +11,9 @@ opinion that the other three never consulted.
 The call sites, all of which import from here:
 
 * :mod:`lifx.devices.base`: ``Device.__init__``, ``Device.from_ip()`` and
-  ``Device.connect()`` gate on :func:`validate_address`
+  ``Device.connect()`` gate on :func:`validate_address` and
+  :func:`validate_port`; the public factories validate caller input once and
+  explicitly suppress duplicate constructor advisories
 * :mod:`lifx.api`: ``find_by_ip()`` gates on :func:`validate_address`
 * :mod:`lifx.network.transport`: ``UdpTransport.open()`` derives its socket
   family with :func:`family_for` and canonicalises its local bind with
@@ -24,10 +26,11 @@ The call sites, all of which import from here:
 * :mod:`lifx.network.discovery`: discovery derives bind literals with
   :func:`wildcard_for`, reconstructs responder scope with
   :func:`host_from_sockaddr`, and validates wire addresses without emitting
-  caller-input warnings
+  caller-input warnings; device construction retains that explicit policy
 * :mod:`lifx.network.mdns.discovery`: mDNS validates packet-source and
   advertised device addresses with :func:`validate_address`, suppressing
-  caller-input warnings for both wire-controlled paths
+  caller-input warnings for both wire-controlled paths and for construction
+  from those validated records
 * :mod:`lifx.animation.animator`: ``Animator`` validates its caller-supplied
   address, resolves its frame destination with :func:`sockaddr_for`, and
   derives the socket family with :func:`family_for_sockaddr`
@@ -42,6 +45,11 @@ questions: ``"::"`` and an unscoped link-local literal are illegal *device*
 destinations yet legitimate inputs for a local bind, where the operating
 system owns the final decision. The accepted cost is that an address may be
 parsed twice when a caller needs more than one answer.
+
+Device ports follow the same centralised shape: remote endpoints must use an
+integer in the unprivileged 1024--65535 range, while local binds may additionally
+use zero to request an ephemeral port. :func:`sockaddr_for` applies that rule
+before a destination reaches operating-system socket handling.
 
 **The rules, in the order :func:`validate_address` applies them.** Every
 rejection is evaluated before either warning, so an address on its way to a
@@ -72,7 +80,10 @@ rejection is evaluated before either warning, so an address on its way to a
 Rules 7 and 8 are caller-input advisories and may be suppressed with
 ``emit_warnings=False``. Inbound wire validation does this because a responder
 controls its source address, so one warning per datagram would itself be a
-flooding vector. The rejections in rules 1-6 are never suppressed.
+flooding vector. Device constructors also accept a private, explicit warning
+policy: public factories validate once and suppress duplicate constructor
+advisories, while discovery factories suppress advisories for already-validated
+wire data. The rejections in rules 1-6 are never suppressed.
 
 This is a near-leaf module by design. Its one import from ``lifx`` is
 :data:`lifx.const.DEFAULT_IP_ADDRESS`, which :func:`wildcard_for` returns.
@@ -83,10 +94,14 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
+from typing import Final
 
 from lifx.const import DEFAULT_IP_ADDRESS
 
 _LOGGER = logging.getLogger(__name__)
+
+MIN_DEVICE_PORT: Final[int] = 1024
+MAX_PORT: Final[int] = 65535
 
 #: The IPv6 wildcard bind literal, the counterpart to
 #: :data:`lifx.const.DEFAULT_IP_ADDRESS` on the IPv6 side. Named here rather
@@ -139,6 +154,23 @@ def _unscoped_ipv6_host(address: ipaddress.IPv6Address) -> str:
     return str(ipaddress.IPv6Address(address.packed))
 
 
+def validate_port(port: object, *, allow_zero: bool = False) -> None:
+    """Validate a device port or a local ephemeral-bind sentinel.
+
+    Remote LIFX endpoints use the same unprivileged-port range as device
+    construction. Local socket binds may additionally request port zero so
+    the operating system chooses an ephemeral port.
+    """
+    if isinstance(port, bool) or not isinstance(port, int):
+        raise ValueError(f"Port must be an integer, got {port!r}")
+
+    minimum_port = 0 if allow_zero else MIN_DEVICE_PORT
+    if not minimum_port <= port <= MAX_PORT:
+        raise ValueError(
+            f"Port must be between {minimum_port} and {MAX_PORT}, got {port}"
+        )
+
+
 def sockaddr_for(
     address: SocketAddress, *, require_routable: bool = True
 ) -> SocketAddress:
@@ -150,6 +182,7 @@ def sockaddr_for(
     callers may defer that routing decision to the operating system.
     """
     host, port = address[0], address[1]
+    validate_port(port, allow_zero=not require_routable)
     parsed = ipaddress.ip_address(host)
     if isinstance(parsed, ipaddress.IPv4Address):
         return host, port
@@ -226,7 +259,8 @@ def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
         ip: The device address to check.
         emit_warnings: Emit caller-facing advisories for loopback and public
             addresses. Inbound wire validation disables these warnings to
-            avoid one warning per responder datagram.
+            avoid one warning per responder datagram; device factories also
+            disable them during construction after validation has already run.
 
     Raises:
         ValueError: If the address is empty, unparsable, IPv4-mapped,

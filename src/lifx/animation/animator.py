@@ -401,7 +401,7 @@ class Animator:
                 validation always runs, even when the gate is saturated --
                 a full gate must never suppress input validation.
             LifxNetworkError: If the destination is invalid or the UDP socket
-                cannot be created.
+                cannot be created, or a frame datagram cannot be sent.
         """
         start_time = time.perf_counter()
 
@@ -452,11 +452,18 @@ class Animator:
 
         # Send each packet, updating sequence number
         for i, tmpl in enumerate(self._templates):
-            tmpl.data[SEQUENCE_OFFSET] = self._sequence
+            sequence = self._sequence
+            tmpl.data[SEQUENCE_OFFSET] = sequence
+            try:
+                sock.sendto(tmpl.data, send_address)
+            except OSError as error:
+                raise LifxNetworkError(
+                    f"Failed to send animation frame to {self._ip!r}: {error}"
+                ) from error
+
             if i == self._probe_index:
-                self._ack_gate.track(self._sequence, now)
-            self._sequence = (self._sequence + 1) % 256
-            sock.sendto(tmpl.data, send_address)
+                self._ack_gate.track(sequence, now)
+            self._sequence = (sequence + 1) % 256
 
         end_time = time.perf_counter()
 

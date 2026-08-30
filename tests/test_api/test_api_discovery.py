@@ -11,6 +11,7 @@ This module tests:
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import ClassVar
 from unittest.mock import patch
 
@@ -18,7 +19,7 @@ import pytest
 
 from lifx.api import discover, discover_mdns, find_by_ip, find_by_label, find_by_serial
 from lifx.devices import Light
-from lifx.exceptions import LifxTimeoutError
+from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.address import SocketAddress
 from lifx.network.discovery import DiscoveredDevice, DiscoveryResponse, discover_devices
 from lifx.network.message import create_message
@@ -434,6 +435,40 @@ class TestDiscoveryDelegateLifecycle:
             ),
         ):
             assert [device async for device in discover()] == []
+
+    async def test_discover_logs_constructor_bug_and_continues(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """One broken product class cannot abort the remaining public sweep."""
+        broken = DiscoveredDevice("d073d5123456", "192.0.2.10")
+        healthy = DiscoveredDevice("d073d5123457", "192.0.2.11")
+        expected = Light(healthy.serial, healthy.ip)
+
+        async def _discover_devices(*args, **kwargs):
+            yield broken
+            yield healthy
+
+        async def _create_device(discovered: DiscoveredDevice) -> Light:
+            if discovered is broken:
+                raise TypeError("broken concrete constructor")
+            return expected
+
+        with (
+            caplog.at_level(logging.ERROR, logger="lifx.api"),
+            patch("lifx.api.discover_devices", side_effect=_discover_devices),
+            patch.object(DiscoveredDevice, "create_device", _create_device),
+        ):
+            devices = [device async for device in discover()]
+
+        assert devices == [expected]
+        diagnostic = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "device_construction_failed"
+        )
+        assert diagnostic["method"] == "discover"
+        assert diagnostic["error_type"] == "TypeError"
 
     async def test_discover_close_finalises_device_discovery(self) -> None:
         """Closing ``discover`` immediately closes ``discover_devices``."""
@@ -938,3 +973,39 @@ class TestFindByIpAddressGate:
         ):
             with pytest.raises(ValueError, match=message):
                 await find_by_ip(literal)
+
+    async def test_invalid_port_fails_before_transport(self) -> None:
+        """A permanent endpoint error cannot acquire a discovery socket."""
+        with patch(
+            "lifx.network.discovery.UdpTransport",
+            _FailOnUseDiscoveryTransport,
+        ):
+            with pytest.raises(LifxNetworkError, match="Port must be between"):
+                await find_by_ip("192.0.2.1", port=70000)
+
+    async def test_loopback_advisory_is_emitted_once(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Public validation owns the one advisory for a targeted lookup."""
+        with (
+            patch(
+                "lifx.network.discovery.UdpTransport",
+                _ObservedNoResponseDiscoveryTransport,
+            ),
+            caplog.at_level(logging.WARNING, logger="lifx.network.address"),
+        ):
+            result = await find_by_ip(
+                "::1",
+                timeout=0.05,
+                max_response_time=0.01,
+                idle_timeout_multiplier=1.0,
+            )
+
+        assert result is None
+        advisories = [
+            record
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "is_loopback"
+        ]
+        assert len(advisories) == 1

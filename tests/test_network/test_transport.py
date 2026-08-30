@@ -754,6 +754,26 @@ class TestSocketFamilySelection:
         """A zoned literal parses, so the family still follows the address."""
         assert await self._family_used("fe80::1%1") == socket.AF_INET6
 
+    @pytest.mark.parametrize("ip_address", ["0.0.0.0", "::"])
+    async def test_invalid_local_port_fails_before_endpoint_creation(
+        self, ip_address: str
+    ) -> None:
+        """Both bind families reject invalid ports before touching a socket."""
+        transport = UdpTransport(ip_address=ip_address, port=70000)
+
+        with (
+            patch("lifx.network.transport._socket_factory") as socket_factory,
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            endpoint_factory = AsyncMock()
+            mock_loop.return_value.create_datagram_endpoint = endpoint_factory
+
+            with pytest.raises(NetworkError, match="Port must be between"):
+                await transport.open()
+
+        socket_factory.assert_not_called()
+        endpoint_factory.assert_not_awaited()
+
     async def test_unscoped_link_local_bind_reaches_the_operating_system(self) -> None:
         """Destination routing rules do not reject a local bind literal."""
         transport = UdpTransport(ip_address="fe80::1", port=56700)
@@ -876,6 +896,18 @@ class TestSendFamilyAssertion:
     #: Generous enough to survive a loaded CI runner, tight enough that a
     #: swallowed error waiting out the retry schedule could never pass.
     _FAST_FAILURE_SECONDS = 0.1
+
+    async def test_invalid_port_raises_before_datagram_send(self) -> None:
+        """A bad remote port stays inside the typed pre-send boundary."""
+        transport, datagram_transport, _ = await _open_mock_transport("0.0.0.0")
+
+        try:
+            with pytest.raises(NetworkError, match="Port must be between"):
+                await transport.send(b"x" * 36, ("192.0.2.1", 70000))
+        finally:
+            await transport.close()
+
+        datagram_transport.sendto.assert_not_called()
 
     async def test_ipv6_destination_on_an_ipv4_socket_raises_immediately(self) -> None:
         """The B1 case: an IPv6 target reached through the IPv4 seam."""

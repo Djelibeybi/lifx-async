@@ -111,7 +111,7 @@ All four commits are GPG-signed and include the developer sign-off.
 
 ## Decisions Made
 
-- Kept the global filter exactly `LifxTimeoutError` and `LifxConnectionError` so arbitrary assertions do not become flaky suite-wide.
+- Kept the global filter exactly `LifxTimeoutError`, `LifxConnectionError`, and `LifxNetworkError` so arbitrary assertions do not become flaky suite-wide.
 - Included both network exceptions and `AssertionError` in the Windows tuple because an explicit `only_on` replaces pytest-retry's global filter.
 - Preserved the Windows markers' existing two retries and one-second delay; only their eligible exception set changed.
 
@@ -142,6 +142,16 @@ exact exception-type membership. The committed
 `tests/test_pytest_policy.py` regression replaces the ad-hoc configuration and
 tuple assertions cited above and also proves the suite timeout can contain two
 complete default request attempts.
+
+A second review follow-up restored the targeted IPv6 emulator lookup's two
+retries and one-second spacing. Later review established that pytest-retry does
+not fall back to its global marker when a per-test marker has a false condition.
+The focused Windows policy is therefore applied dynamically during collection:
+Windows gets two spaced attempts and the assertion-shaped no-response exception,
+while other platforms retain the global one immediate network retry. The other
+four former Windows markers remain removed; those emulator tests skip on Windows
+and receive the global policy where they run. The 60-second suite timeout has one
+authoritative ini setting rather than a second override in ``addopts``.
 
 ## Self-Check: PASSED
 

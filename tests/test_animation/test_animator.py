@@ -291,6 +291,29 @@ class TestAnimatorSendFrame:
         assert animator._socket is None
         assert animator._addr is None
 
+    def test_invalid_port_fails_before_socket_creation(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """An impossible endpoint is rejected without opening or using a socket."""
+        animator = Animator(
+            ip="192.0.2.1",
+            port=70000,
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=64),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=8, tile_height=8
+            ),
+        )
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+
+        with pytest.raises(LifxNetworkError, match="Port must be between"):
+            animator.send_frame(hsbk)
+
+        mock_udp_socket.socket_class.assert_not_called()
+        mock_udp_socket.sock.sendto.assert_not_called()
+        assert animator._socket is None
+        assert animator._addr is None
+
     def test_socket_setup_failure_closes_partial_socket(
         self, animator: Animator, mock_udp_socket: MockUdpSocket
     ) -> None:
@@ -304,6 +327,59 @@ class TestAnimatorSendFrame:
         mock_udp_socket.sock.close.assert_called_once_with()
         assert animator._socket is None
         assert animator._addr is None
+
+    def test_probe_send_failure_preserves_sequence_and_ack_state(
+        self, animator: Animator, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """Repeated probe failures stay typed and cannot poison the ACK gate."""
+        mock_udp_socket.sock.sendto.side_effect = OSError("forced send failure")
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
+        initial_sequence = animator._sequence
+
+        for _ in range(2):
+            with pytest.raises(
+                LifxNetworkError, match="Failed to send animation frame"
+            ):
+                animator.send_frame(hsbk)
+
+        assert animator._sequence == initial_sequence
+        assert animator._ack_gate.outstanding_count == 0
+        assert mock_udp_socket.sock.sendto.call_count == 2
+
+    def test_later_probe_failure_preserves_successful_packet_state(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        """Earlier sends advance, while a failed final probe stays untracked."""
+        animator = Animator(
+            ip="192.0.2.1",
+            serial=Serial.from_string("d073d5123456"),
+            framebuffer=FrameBuffer(pixel_count=128),
+            packet_generator=MatrixPacketGenerator(
+                tile_count=1, tile_width=16, tile_height=8
+            ),
+        )
+        assert animator._probe_index == 2
+        mock_udp_socket.sock.sendto.side_effect = [
+            None,
+            None,
+            OSError("forced final send failure"),
+        ]
+        hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 128
+        initial_sequence = animator._sequence
+
+        with pytest.raises(LifxNetworkError, match="Failed to send animation frame"):
+            animator.send_frame(hsbk)
+
+        sent_sequences = [
+            call.args[0][23] for call in mock_udp_socket.sock.sendto.call_args_list
+        ]
+        assert sent_sequences == [
+            initial_sequence,
+            (initial_sequence + 1) % 256,
+            (initial_sequence + 2) % 256,
+        ]
+        assert animator._sequence == (initial_sequence + 2) % 256
+        assert animator._ack_gate.outstanding_count == 0
 
     def test_incomplete_socket_session_fails_without_assertion(
         self, animator: Animator, mock_udp_socket: MockUdpSocket
@@ -438,6 +514,7 @@ class TestAnimatorProbeBaking:
         device = MagicMock()
         device.ip = "192.168.1.100"
         device.serial = "d073d5123456"
+        device.port = 56700
 
         animator = Animator.for_light(device)
 
@@ -681,6 +758,7 @@ class TestAnimatorForMatrixFactory:
         device = MagicMock()
         device.ip = "192.168.1.100"
         device.serial = "d073d5123456"
+        device.port = 56700
         device.device_chain = None  # Not loaded yet
         device.capabilities = MagicMock()
         device.capabilities.has_chain = False
@@ -742,6 +820,7 @@ class TestAnimatorForLightFactory:
         device = MagicMock()
         device.ip = "192.168.1.100"
         device.serial = "d073d5123456"
+        device.port = 56700
 
         animator = Animator.for_light(device)
 
@@ -756,6 +835,7 @@ class TestAnimatorForLightFactory:
         device = MagicMock()
         device.ip = "192.168.1.100"
         device.serial = "d073d5123456"
+        device.port = 56700
 
         animator = Animator.for_light(device)
         hsbk: list[tuple[int, int, int, int]] = [(65535, 65535, 65535, 3500)]
@@ -776,6 +856,7 @@ class TestAnimatorForLightFactory:
         device = MagicMock()
         device.ip = "192.168.1.100"
         device.serial = "d073d5123456"
+        device.port = 56700
 
         animator = Animator.for_light(device, duration_ms=500)
 

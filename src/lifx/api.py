@@ -10,6 +10,7 @@ This module provides simplified interfaces for common operations:
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Iterator, Sequence
 from contextlib import aclosing
@@ -43,6 +44,8 @@ from lifx.network.discovery import (
 )
 from lifx.protocol import packets
 from lifx.theme import Theme
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -748,6 +751,27 @@ class DeviceGroup:
         self._group_metadata = None
 
 
+async def _create_discovered_device(
+    discovered: DiscoveredDevice,
+    *,
+    method: str,
+) -> Device | None:
+    """Construct one device without letting a class bug abort a public sweep."""
+    try:
+        return await discovered.create_device()
+    except (AttributeError, TypeError) as error:
+        _LOGGER.error(
+            {
+                "module": "lifx.api",
+                "method": method,
+                "action": "device_construction_failed",
+                "error_type": type(error).__name__,
+            },
+            exc_info=True,
+        )
+        return None
+
+
 async def discover(
     timeout: float = DISCOVERY_TIMEOUT,
     broadcast_address: str = "255.255.255.255",
@@ -769,6 +793,10 @@ async def discover(
         max_retries: max retries per request set on discovered devices
     Yields:
         Device instances as they are discovered
+
+    Note:
+        Internal device-class construction errors are logged and isolated to
+        that responder so the remaining discovery sweep can continue.
 
     Raises:
         ValueError: If ``broadcast_address`` is not a valid IPv4 or IPv6
@@ -802,7 +830,7 @@ async def discover(
     )
     async with aclosing(devices):
         async for discovered in devices:
-            device = await discovered.create_device()
+            device = await _create_discovered_device(discovered, method="discover")
             if device is not None:
                 yield device
 
@@ -897,6 +925,10 @@ async def find_by_serial(
     Returns:
         Device instance if found, None otherwise
 
+    Note:
+        Internal device-class construction errors are logged and return
+        ``None`` rather than escaping this lookup.
+
     Raises:
         ValueError: If ``broadcast_address`` is not a valid IPv4 or IPv6
             literal, including a link-local IPv6 address without a
@@ -929,7 +961,7 @@ async def find_by_serial(
         async for disc in devices:
             if disc.serial.lower() == serial_str:
                 # Detect device type and return appropriate class
-                return await disc.create_device()
+                return await _create_discovered_device(disc, method="find_by_serial")
 
     return None
 
@@ -963,6 +995,10 @@ async def find_by_ip(
     Returns:
         Device instance if found, None otherwise
 
+    Note:
+        Internal device-class construction errors are logged and return
+        ``None`` rather than escaping this lookup.
+
     Raises:
         ValueError: If ``ip`` is not a valid IPv4 or IPv6 literal, including a
             link-local IPv6 address without a syntactically valid zone.
@@ -992,11 +1028,12 @@ async def find_by_ip(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
+        _address_is_prevalidated=True,
     )
     async with aclosing(devices):
         async for discovered in devices:
             # Should only get one response (or none)
-            return await discovered.create_device()
+            return await _create_discovered_device(discovered, method="find_by_ip")
 
     return None
 
@@ -1033,6 +1070,10 @@ async def find_by_label(
 
     Yields:
         Matching Device instance(s)
+
+    Note:
+        Internal device-class construction errors are logged and isolated to
+        that responder so remaining matches can still be yielded.
 
     Raises:
         ValueError: If ``broadcast_address`` is not a valid IPv4 or IPv6
@@ -1087,7 +1128,10 @@ async def find_by_label(
                     max_retries=max_retries,
                 )
 
-                device = await disc.create_device()
+                device = await _create_discovered_device(
+                    disc,
+                    method="find_by_label",
+                )
                 if device is not None:
                     yield device
                     if exact_match:
