@@ -195,6 +195,92 @@ class TestDeviceConnection:
         assert conn._receiver_shutdown is None
         assert conn._is_opening is False
 
+    async def test_waiting_open_is_invalidated_by_close(self) -> None:
+        """Every opener from the closing generation returns without reopening."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        entered = asyncio.Event()
+        released = asyncio.Event()
+        attempts = 0
+
+        async def _open_transport() -> None:
+            nonlocal attempts
+            attempts += 1
+            entered.set()
+            await released.wait()
+
+        with patch("lifx.network.connection.UdpTransport") as transport_class:
+            transport_class.return_value.open.side_effect = _open_transport
+            transport_class.return_value.close = AsyncMock()
+            opening = asyncio.create_task(conn.open())
+            await entered.wait()
+            waiting = asyncio.create_task(conn.open())
+            await asyncio.sleep(0)
+
+            await conn.close()
+            released.set()
+            await asyncio.gather(opening, waiting)
+
+        assert attempts == 1
+        transport_class.return_value.close.assert_awaited_once_with()
+        assert conn.is_open is False
+        assert conn._transport is None
+        assert conn._opening_transport is None
+
+    async def test_open_waits_for_close_then_starts_a_new_session(self) -> None:
+        """An opener created during active cleanup waits and then reopens."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        first_transport = MagicMock()
+        first_transport.open = AsyncMock()
+        first_transport.close = AsyncMock()
+        second_transport = MagicMock()
+        second_transport.open = AsyncMock()
+        second_transport.close = AsyncMock()
+        first_receiver_started = asyncio.Event()
+        release_first_receiver = asyncio.Event()
+        second_receiver_started = asyncio.Event()
+        release_second_receiver = asyncio.Event()
+        receiver_calls = 0
+
+        async def _blocked_receiver() -> None:
+            nonlocal receiver_calls
+            receiver_calls += 1
+            if receiver_calls == 1:
+                first_receiver_started.set()
+                await release_first_receiver.wait()
+            else:
+                second_receiver_started.set()
+                await release_second_receiver.wait()
+
+        with (
+            patch(
+                "lifx.network.connection.UdpTransport",
+                side_effect=[first_transport, second_transport],
+            ),
+            patch.object(conn, "_background_receiver", side_effect=_blocked_receiver),
+        ):
+            await conn.open()
+            await first_receiver_started.wait()
+            closing = asyncio.create_task(conn.close())
+            await _wait_for(lambda: conn._is_closing)
+            reopening = asyncio.create_task(conn.open())
+            await asyncio.sleep(0)
+
+            assert reopening.done() is False
+
+            release_first_receiver.set()
+            await closing
+            await reopening
+            await second_receiver_started.wait()
+
+            assert conn.is_open is True
+            assert conn._transport is second_transport
+
+            release_second_receiver.set()
+            await conn.close()
+
+        first_transport.close.assert_awaited_once_with()
+        second_transport.close.assert_awaited_once_with()
+
     def test_connection_reopens_across_event_loops(self) -> None:
         """Lifecycle coordination remains independent of any one event loop."""
         conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
@@ -278,6 +364,10 @@ class TestDeviceConnection:
             await _wait_for(lambda: conn._is_closing)
             await asyncio.sleep(0)
             closing.cancel()
+            await asyncio.sleep(0)
+            assert closing.done() is False
+            closing.cancel()
+            await asyncio.sleep(0)
             release_first_receiver.set()
 
             with pytest.raises(asyncio.CancelledError):
@@ -307,6 +397,52 @@ class TestDeviceConnection:
         second_transport.close.assert_awaited_once_with()
         assert conn._receiver_task is None
         assert conn._receiver_shutdown is None
+
+    async def test_close_cancels_receiver_that_ignores_shutdown(self) -> None:
+        """A receiver exceeding the shutdown deadline is cancelled and awaited."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        transport = MagicMock()
+        transport.open = AsyncMock()
+        transport.close = AsyncMock()
+        receiver_started = asyncio.Event()
+
+        async def _stuck_receiver() -> None:
+            receiver_started.set()
+            await asyncio.Event().wait()
+
+        with (
+            patch("lifx.network.connection.UdpTransport", return_value=transport),
+            patch.object(conn, "_background_receiver", side_effect=_stuck_receiver),
+            patch("lifx.network.connection._RECEIVER_SHUTDOWN_TIMEOUT", 0.001),
+        ):
+            await conn.open()
+            await receiver_started.wait()
+            receiver_task = conn._receiver_task
+
+            await conn.close()
+
+        assert receiver_task is not None
+        assert receiver_task.cancelled()
+        transport.close.assert_awaited_once_with()
+        assert conn._receiver_task is None
+        assert conn._receiver_shutdown is None
+
+    async def test_close_without_receiver_still_closes_transport(self) -> None:
+        """Teardown closes the endpoint even when no receiver task survives."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        transport = MagicMock(is_open=True)
+        transport.close = AsyncMock()
+        conn._is_open = True
+        conn._transport = transport
+        conn._receiver_task = None
+        conn._receiver_shutdown = asyncio.Event()
+
+        await conn.close()
+
+        transport.close.assert_awaited_once_with()
+        assert conn.is_open is False
+        assert conn._transport is None
+        assert conn._receiver_task is None
 
     @pytest.mark.parametrize(
         "packet",
@@ -356,6 +492,45 @@ class TestDeviceConnection:
             await asyncio.sleep(0.03)
             second_transport.send.assert_not_awaited()
             await conn.close()
+
+    async def test_close_during_send_rejects_stale_request_after_send(self) -> None:
+        """A request suspended in send cannot continue in a closed session."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        transport = MagicMock(is_open=True)
+        transport.open = AsyncMock()
+        transport.close = AsyncMock()
+        send_started = asyncio.Event()
+        release_send = asyncio.Event()
+
+        async def _blocked_send(*_args: object, **_kwargs: object) -> None:
+            send_started.set()
+            await release_send.wait()
+
+        async def _wait_for_shutdown() -> None:
+            shutdown = conn._receiver_shutdown
+            assert shutdown is not None
+            await shutdown.wait()
+
+        transport.send = AsyncMock(side_effect=_blocked_send)
+        with (
+            patch("lifx.network.connection.UdpTransport", return_value=transport),
+            patch.object(conn, "_background_receiver", side_effect=_wait_for_shutdown),
+        ):
+            request_task = asyncio.create_task(
+                conn.request(Device.GetLabel(), timeout=5.0)
+            )
+            await send_started.wait()
+
+            await conn.close()
+            release_send.set()
+
+            with pytest.raises(
+                LifxConnectionError, match="Connection closed during request"
+            ):
+                await asyncio.wait_for(request_task, timeout=0.2)
+
+        transport.close.assert_awaited_once_with()
+        assert conn._pending_requests == {}
 
     async def test_failed_open_preserves_error_when_cleanup_also_fails(self) -> None:
         """Cleanup failure is logged without replacing the opening failure."""
