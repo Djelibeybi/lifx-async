@@ -89,7 +89,7 @@ addressed, controlled and animated without the caller needing to know it is on T
 v1.1 wire-reliability findings are then revalidated over Thread, because every one of them
 was measured on WiFi/IPv4.
 
-- [ ] **Phase 10: Land the IPv6/Thread Branch** - Reconcile `feat/ipv6-thread-support` from `main` on its phase branch, so IPv6-only devices can be controlled and animated; merge only in the post-phase shipment workflow
+- [x] **Phase 10: Land the IPv6/Thread Branch** - Reconcile `feat/ipv6-thread-support` from `main` on its phase branch, so IPv6-only devices can be controlled and animated; merge only in the post-phase shipment workflow (completed 2026-08-28 through PR #210)
 - [x] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port proof, private connectivity internals under D-16, synthetic mesh-scale tests, bounded fail-closed address admission under D-15, validation and honest docs (completed 2026-08-29)
 - [x] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture (completed 2026-08-29)
 - [x] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial, explicit UDP-only and mDNS-only APIs remain available, overlapping UDP callers share one active sweep, and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement (completed 2026-08-31)
@@ -97,8 +97,8 @@ was measured on WiFi/IPv4.
 
 **Execution notes:**
 
-- **Phase 10 is the critical path.** Nothing else in the milestone is testable on Thread
-  hardware until the branch merges.
+- **Phase 10 was the critical path and shipped through PR #210.** Nothing else in the
+  milestone was testable on Thread hardware until the branch merged.
 
 - **Phases 11 and 12 are file-disjoint and can run in parallel** once Phase 10 lands.
   Phase 11 lives in `network/mdns/`; Phase 12 lives in `network/discovery.py`, `api.py`'s
@@ -129,7 +129,7 @@ was measured on WiFi/IPv4.
   4. An `MdnsTransport.open()` that fails partway through endpoint creation leaves no socket behind
   5. The exact phase branch is functionally green, signed and ready for the post-phase shipment merge; patch coverage is advisory and operator-overridable, and the branch remains off `main` until shipment
 
-**Plans**: 9/9 plans executed
+**Plans**: 9/9 plans complete
 
 Plans:
 **Wave 1**
@@ -326,7 +326,7 @@ Plans:
 | 7. Taxonomy & Legacy Dispositions | v1.2 | 3/3 | Complete | 2026-08-15 |
 | 8. Hardware Fidelity Validation | v1.2 | 4/4 | Complete | 2026-08-16 |
 | 9. Theme Data Contract & Docs | v1.2 | 2/2 | Complete | 2026-08-27 |
-| 10. Land the IPv6/Thread Branch | v2.0 | 9/9 | Ready to ship | 2026-08-28 |
+| 10. Land the IPv6/Thread Branch | v2.0 | 9/9 | Complete | 2026-08-28 |
 | 11. mDNS Hardening | v2.0 | 14/14 | Complete    | 2026-08-29 |
 | 12. IPv6 Discovery Plumbing | v2.0 | 5/5 | Complete    | 2026-08-29 |
 | 13. Merged Discovery | v2.0 | 7/7 | Complete    | 2026-08-31 |
