@@ -1,0 +1,88 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v2.0 — Thread/IPv6 Support",
+  "phases": [
+    {
+      "number": "1",
+      "name": "Ceiling Save-on-Exit",
+      "status": "complete"
+    },
+    {
+      "number": "1",
+      "name": "Unify duplicated discovery loops",
+      "status": "complete"
+    },
+    {
+      "number": "2",
+      "name": "Discovery Re-broadcast",
+      "status": "complete"
+    },
+    {
+      "number": "3",
+      "name": "Retry Schedule Reshape",
+      "status": "complete"
+    },
+    {
+      "number": "4",
+      "name": "Animation Flow Control",
+      "status": "complete"
+    },
+    {
+      "number": "5",
+      "name": "Reliability Documentation",
+      "status": "complete"
+    },
+    {
+      "number": "6",
+      "name": "Generated Theme Library",
+      "status": "complete"
+    },
+    {
+      "number": "7",
+      "name": "Taxonomy & Legacy Dispositions",
+      "status": "complete"
+    },
+    {
+      "number": "8",
+      "name": "Hardware Fidelity Validation",
+      "status": "complete"
+    },
+    {
+      "number": "9",
+      "name": "Theme Data Contract & Docs",
+      "status": "complete"
+    },
+    {
+      "number": "10",
+      "name": "Land the IPv6/Thread Branch",
+      "status": "pending"
+    },
+    {
+      "number": "11",
+      "name": "mDNS Hardening",
+      "status": "complete"
+    },
+    {
+      "number": "12",
+      "name": "IPv6 Discovery Plumbing",
+      "status": "complete"
+    },
+    {
+      "number": "13",
+      "name": "Merged Discovery",
+      "status": "complete"
+    },
+    {
+      "number": "14",
+      "name": "Thread Revalidation and Docs",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 14)",
+    "reason": "Phase 14 of 5 — needs a plan"
+  },
+  "updated_at": "2026-08-31T04:38:45.000Z"
+}

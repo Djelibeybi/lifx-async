@@ -92,7 +92,7 @@ was measured on WiFi/IPv4.
 - [ ] **Phase 10: Land the IPv6/Thread Branch** - Reconcile `feat/ipv6-thread-support` from `main` on its phase branch, so IPv6-only devices can be controlled and animated; merge only in the post-phase shipment workflow
 - [x] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port proof, private connectivity internals under D-16, synthetic mesh-scale tests, bounded fail-closed address admission under D-15, validation and honest docs (completed 2026-08-29)
 - [x] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture (completed 2026-08-29)
-- [ ] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement
+- [x] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial, explicit UDP-only and mDNS-only APIs remain available, overlapping UDP callers share one active sweep, and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement (completed 2026-08-31)
 - [ ] **Phase 14: Thread Revalidation and Docs** - SEED-001 measurements over Thread hardware, per-device-class evidence records or named gaps, and the consumer guidance and corrections docs
 
 **Execution notes:**
@@ -254,9 +254,9 @@ Plans:
 
 ### Phase 13: Merged Discovery
 
-**Goal**: Thread devices are found by default: `discover()` runs broadcast and mDNS legs concurrently merged by serial, `find_by_serial()` races both legs, and the existing discovery contract survives measurably intact
+**Goal**: Thread devices are found by default without making dual discovery mandatory: `discover()` runs broadcast and mDNS legs concurrently merged by serial, `discover_udp()` and `discover_mdns()` expose explicit source-specific enumeration, overlapping UDP callers share one active sweep, `find_by_serial()` races both legs, and the existing discovery contract survives measurably intact
 **Depends on**: Phase 11 and Phase 12 (both merged functions live in `api.py` and consume the record-level generator shapes those phases finalise)
-**Requirements**: FIND-01, FIND-02, FIND-03, FIND-04, FIND-05, FIND-07, FIND-08
+**Requirements**: FIND-01, FIND-02, FIND-03, FIND-04, FIND-05, FIND-07, FIND-08, FIND-09, FIND-10
 **Success Criteria** (what must be TRUE):
 
   1. ENTRY GATE, satisfied before any merge code lands: the invariant test suite (overall timeout, idle timeout resetting on consumer resume, first-wins per-serial dedup, DoS source and serial validation) and the before-and-after measurement harness both exist and pass against the pre-merge `discover()`
@@ -264,8 +264,36 @@ Plans:
   3. An mDNS-sourced device is unicast-verified before it is yielded, so `discover()` never yields a device that is not answering right now, closing both the SRP stale-lease liveness hole and the mDNS spoofing exposure
   4. `find_by_serial()` races a broadcast leg and an mDNS leg, first hit wins, and the losing leg is cancelled and reaped with no leaked task or socket
   5. The timing change imposed on existing callers is a measured before-and-after number against the fleet including emulator CI wall time, and the TXT `id` versus broadcast serial check for firmware 3.70 to 3.99 WiFi devices is recorded as the low-priority, non-gating verification it is
+  6. `discover_udp()` and `discover_mdns()` remain explicit UDP-only and mDNS-only public entry points while `discover()` defaults to both; compatible overlapping `discover()` and `discover_udp()` callers produce exactly one UDP broadcast schedule, replay already-seen records from that active sweep to late subscribers, and retain no completed-sweep cache
 
-**Plans**: TBD
+**Plans**: 5/7 plans executed
+
+Plans:
+
+**Wave 1**
+
+- [x] 13-01-PLAN.md — Establish the pre-merge invariant and append-only measurement entry gate behind public `discover_udp()`
+
+**Wave 2** *(blocked on Wave 1; file-disjoint)*
+
+- [x] 13-02-PLAN.md — Share one process-wide active raw UDP sweep with ordered replay and deterministic subscriber cleanup
+- [x] 13-03-PLAN.md — Directly verify mDNS candidates and adopt StateColor construction state without caching volatile getters
+
+**Wave 3** *(blocked on both Wave 2 plans)*
+
+- [x] 13-04-PLAN.md — Merge shared UDP and verified mDNS into the default stream with explicit failure isolation and source-specific APIs
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [x] 13-05-PLAN.md — Race both validated sources in `find_by_serial()` and reap the loser before return
+
+**Wave 5** *(blocked on Wave 4; exact-head CI followed by physical-fleet preparation checkpoint)*
+
+- [x] 13-06-PLAN.md — Commit and validate the paired emulator CI path, consume immutable PR-head evidence automatically, then pause only for private fleet preparation
+
+**Wave 6** *(blocked on Wave 5 and its fleet-preparation checkpoint)*
+
+- [x] 13-07-PLAN.md — Collect six paired fleet rounds automatically, finalise pseudonymised evidence, and close privacy, cross-platform, and full quality gates
 
 ### Phase 14: Thread Revalidation and Docs
 
@@ -301,5 +329,5 @@ Plans:
 | 10. Land the IPv6/Thread Branch | v2.0 | 9/9 | Ready to ship | 2026-08-28 |
 | 11. mDNS Hardening | v2.0 | 14/14 | Complete    | 2026-08-29 |
 | 12. IPv6 Discovery Plumbing | v2.0 | 5/5 | Complete    | 2026-08-29 |
-| 13. Merged Discovery | v2.0 | 0/TBD | Not started | - |
+| 13. Merged Discovery | v2.0 | 7/7 | Complete    | 2026-08-31 |
 | 14. Thread Revalidation and Docs | v2.0 | 0/TBD | Not started | - |

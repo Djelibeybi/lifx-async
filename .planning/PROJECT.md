@@ -30,6 +30,12 @@ Phase 7 lacked operator sign-off, was withdrawn: the sign-off had been recorded 
 trigger condition, LIFX Thread firmware shipping, was met during the v1.2 close-out, when
 probing confirmed Thread devices answer over IPv6 and located the gaps that v2.0 closes.
 
+**Merged discovery completed 2026-08-31.** `discover()` now merges shared UDP and verified
+mDNS discovery under one caller deadline, while `discover_udp()` and `discover_mdns()`
+retain explicit source control. Unsupported products are filtered before the public API
+yields devices, so relay-only Switches remain outside the library's lighting-device fleet.
+Phase 14 now owns the remaining Thread hardware revalidation and consumer guidance.
+
 **Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) and v1.1 Wire Reliability
 (2026-07-26). See `.planning/MILESTONES.md`.
 **Also shipped post-v1.0:** Phase 1 discovery unification (verified 2026-06-13), which
@@ -60,6 +66,12 @@ measured on WiFi/IPv4.
   Thread, so it earns a test of its own rather than riding along uncredited
 - **`discover()` runs broadcast and mDNS together**, merging by serial, so every existing
   caller reaches Thread devices without opting in
+- **Source-specific discovery remains public.** `discover_udp()` exposes UDP-only
+  enumeration alongside the existing mDNS-only `discover_mdns()`, while `discover()`
+  remains the dual-source default
+- **Overlapping UDP enumeration is single-flight.** Compatible `discover()` and
+  `discover_udp()` callers share one active broadcast sweep and its already-seen records,
+  so caller bursts cannot multiply the measured rebroadcast response load
 - **`find_by_serial()` runs both legs concurrently, first hit wins.** Neither alone is
   sufficient: broadcast covers WiFi devices whose firmware does not advertise over mDNS,
   mDNS covers Thread devices that have no IPv4 address to broadcast to
@@ -204,13 +216,15 @@ by name looks like the theme of that name in the LIFX app.
 
 - [ ] Land `feat/ipv6-thread-support` onto `main` with the network, mDNS and animation
       changes intact
-- [ ] mDNS ephemeral-port bind, regression-tested in its own right as an IPv4 defect
-- [ ] `discover()` runs a broadcast leg and an mDNS leg, merged by serial
-- [ ] `find_by_serial()` runs both legs concurrently, first hit wins
-- [ ] `find_by_ip()` resolves a device from an IPv6 literal
-- [ ] `Device.connectivity` exposes `"thread"` for exact private TXT `tm=2` and `"wifi"`
+- [x] mDNS ephemeral-port bind, regression-tested in its own right as an IPv4 defect
+- [x] `discover()` runs a broadcast leg and an mDNS leg, merged by serial
+- [x] `discover_udp()` preserves explicit UDP-only enumeration, and overlapping compatible
+      `discover()` / `discover_udp()` calls share one active UDP sweep
+- [x] `find_by_serial()` runs both legs concurrently, first hit wins
+- [x] `find_by_ip()` resolves a device from an IPv6 literal
+- [x] `Device.connectivity` exposes `"thread"` for exact private TXT `tm=2` and `"wifi"`
       otherwise; the low-level mDNS record and generator are explicitly private
-- [ ] Synthetic multi-packet mDNS tests for cross-packet accumulation and follow-up
+- [x] Synthetic multi-packet mDNS tests for cross-packet accumulation and follow-up
       A/AAAA queries
 - [ ] THREAD-01 / SEED-001: revalidate discovery coverage, retry schedule and animation
       flow control over Thread, evidenced per device class as hardware becomes available
@@ -360,6 +374,8 @@ Carried-forward candidates, not in v2.0 scope:
 | Maintain the capture and resync tooling outside this repository | It talks to undocumented internal endpoints and needs adb, hardware and private data; none of that belongs in a zero-dependency library | ✓ Applied 2026-08-19. TOOL-01..03 withdrawn from v1.2; `lifx-theme-resync` owns them, and this library keeps only the importable contract (TOOL-04) |
 | Keep Phase 8's ceiling record as history rather than regenerating it | Its selection rule re-derives to nothing post-resync, but the 25 rows and the finding were correct when made, and the finding is still true about devices | ✓ Applied at the v1.2 close. Restamped `status: historical`, pinned to `data/themes.jsonl@291e7e6~1`, with a connected guard replacing the archived harness |
 | `discover()` gains an mDNS leg rather than staying broadcast-only | Thread devices have no IPv4 address, so a broadcast-only `discover()` returns an incomplete fleet with no error. Measured: `discover()` found 25 devices and neither Thread serial; `discover_mdns()` found both. Requiring every consumer to opt in means the obvious default silently under-reports | Decided 2026-08-27 (option 2 of 3). Accepted cost: `discover()`'s timing and network behaviour change for every existing caller |
+| Preserve explicit source-specific discovery and single-flight overlapping UDP sweeps | Default dual discovery must not remove operational control when a caller specifically needs UDP-only or mDNS-only enumeration. The measured rebroadcast schedule already produces hundreds of replies on a large WiFi fleet, so concurrent callers must not multiply it | Decided 2026-08-30 during Phase 13 specification. Add public `discover_udp()` beside `discover_mdns()`; compatible overlapping `discover()` and `discover_udp()` callers share one active UDP sweep, with no unmeasured post-completion cache |
+| Filter unsupported products before public discovery yields them | The package controls lighting devices, so relay-only Switches must not appear in `discover()` merely because their UDP or mDNS records are visible. Raw observations remain available only to the private measurement boundary and are intersected with yielded devices before fleet analysis | ✓ Shipped — Phase 13. Both UDP and mDNS paths apply the supported-product classifier before public yield; unsupported serials need no alias-map entry |
 | `find_by_serial()` runs both legs, not mDNS alone | An mDNS-only lookup would miss a WiFi device whose firmware does not advertise over mDNS. Neither leg alone covers the fleet | Decided 2026-08-27, revising the original option 3, which proposed mDNS as a fallback only |
 | `find_by_ip()` accepts IPv6; `find_by_label()` does not change | A caller passing an IPv6 literal got `None`, which reads as "no such device" rather than "wrong function". `find_by_label()` needs nothing of its own once `discover()` carries mDNS | Decided 2026-08-27. `Device.from_ip()` already proved the IPv6 connection path, so this is the targeted-lookup leg, not new transport work |
 | Prove the fleet-scale mDNS paths synthetically first, on hardware later | Cross-packet record accumulation and follow-up A/AAAA queries never fired with two Thread devices, and they are the claims most likely to break at mesh scale. Blocking the milestone on hardware not yet purchased would stall it | Decided 2026-08-27. Hardware confirmation follows once the Home Assistant path works and more of the fleet is migrated |
@@ -386,4 +402,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-28 during Phase 11 context discussion*
+*Last updated: 2026-08-31 after Phase 13 completion*

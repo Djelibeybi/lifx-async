@@ -2,38 +2,38 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Thread/IPv6 Support
-current_phase: 10
-current_phase_name: Land the IPv6/Thread Branch
-status: ready_to_ship
-stopped_at: Phase 12 complete; Phase 10 remains ready to ship
-last_updated: "2026-08-29T13:34:05.481Z"
-last_activity: 2026-08-29
-last_activity_desc: Phase 12 complete; Phase 10 remains ready to ship
-state_head: 0b5e57cb908d6904768a08de282d731fd91e14bb
+current_phase: 14
+current_phase_name: Thread Revalidation and Docs
+status: planning
+stopped_at: Phase 13 complete, ready to plan Phase 14
+last_updated: "2026-08-31T04:38:45.000Z"
+last_activity: 2026-08-31
+last_activity_desc: Phase 13 complete, transitioned to Phase 14
+state_head: 39bad58c42627ac3612868503bb5fb9305b04cc3
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 28
-  completed_plans: 28
-  percent: 60
+  completed_phases: 4
+  total_plans: 35
+  completed_plans: 35
+  percent: 80
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-27 after opening the v2.0 milestone)
+See: .planning/PROJECT.md (updated 2026-08-31 after Phase 13 completion)
 
 **Core value:** Commands stick, devices are found, streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 10 — Land the IPv6/Thread Branch
+**Current focus:** Phase 14 — Thread Revalidation and Docs
 
 ## Current Position
 
-Phase: 10 — Land the IPv6/Thread Branch
-Plan: 9 of 9
-Status: Ready to ship
-Last activity: 2026-08-30 - Completed quick task 260830-ea6: Adjust the pytest retry configuration as described above
-Progress: [██████░░░░] 60%
+Phase: 14 — Thread Revalidation and Docs
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-31 — Phase 13 complete, transitioned to Phase 14
+Progress: [████████░░] 80%
 
 Execution order: 10 → (11 ∥ 12, file-disjoint) → 13 → 14. Phase 14 is hardware-gated
 and must not block CI or any other phase.
@@ -70,6 +70,11 @@ and must not block CI or any other phase.
 | Phase 12 P03 | 4 min | 2 tasks | 1 files |
 | Phase 12 P04 | 15 min | 3 tasks | 5 files |
 | Phase 12 P05 | 32 min | 3 tasks | 2 files |
+| Phase 13 P01 | 29 min | 3 tasks | 10 files |
+| Phase 13 P02 | 23 min | 2 tasks | 5 files |
+| Phase 13 P03 | 29 min | 2 tasks | 6 files |
+| Phase 13 P04 | 20 min | 2 tasks | 6 files |
+| Phase 13 P05 | 15 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -114,6 +119,26 @@ this milestone (all 2026-08-27 unless noted):
 - [Phase 12]: Normalise AF_INET6 datagram destinations to canonical four-field socket addresses at send time.
 - [Phase 12]: Resolve numeric and named IPv6 zones at the UDP send boundary and pass scope in the native sockaddr field.
 - [Phase 12]: Report invalid IPv6 zone resolution as an immediate LifxNetworkError while keeping the endpoint reusable.
+- [Phase 13]: Keep discover() UDP-only at the entry gate while exposing the identical path as discover_udp().
+- [Phase 13]: Pass caller-selected discovery observation sinks explicitly to producers instead of relying on ContextVar propagation.
+- [Phase 13]: Keep the canonical measurement baseline on direct discover_devices() so coordinator overhead remains measurable.
+- [Phase 13]: Keep emulator mDNS injection private, context-local, and generator-owned to exclude ambient multicast I/O.
+- [Phase 13]: Store and replay only accepted raw DiscoveryResponse records; construct caller-specific devices after fan-out.
+- [Phase 13]: Keep compatible UDP sharing process-wide and active-only across caller event loops.
+- [Phase 13]: Carry observation sinks and caller deadlines explicitly on subscriptions.
+- [Phase 13]: Share discover and discover_udp while preserving direct find_by_ip and discover_devices paths.
+- [Phase 13]: Use GetColor for every current supported classifier outcome; unsupported products drop locally and exact Echo remains synthetic future-proofing.
+- [Phase 13]: Treat sixteen concurrent probes as a reasoned D-07 safety bound, not a measured optimum.
+- [Phase 13]: Start one caller deadline before consuming mDNS records so queue wait, retries, and cleanup cannot receive fresh windows.
+- [Phase 13]: Preserve standalone mDNS propagation and detail logging while merged typed failures retain only bounded fields.
+- [Phase 13]: Merged discovery uses one caller-origin deadline across shared UDP and verified mDNS.
+- [Phase 13]: First-valid canonical serial wins; later source occurrences emit duplicate observations.
+- [Phase 13]: Typed mDNS failure events suppress the defensive outer fallback to preserve exactly-once diagnostics.
+- [Phase 13]: Repeated cancellation is re-raised only after shielded cleanup finalises both source generators.
+- [Phase 13]: Canonicalise serial lookup input once before creating either discovery source.
+- [Phase 13]: Race shared UDP records and verified mDNS devices under one caller-origin wall deadline.
+- [Phase 13]: Construct UDP winners only after both source legs have been cancelled and reaped.
+- [Phase 13]: Suspend winner pumps at the yield boundary until aggregate cleanup owns finalisation.
 
 ### v2.0 Working Notes
 
@@ -161,8 +186,8 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-29T12:50:45.012Z
-Stopped at: Phase 12 complete; Phase 10 remains ready to ship
+Last session: 2026-08-31T04:38:45.000Z
+Stopped at: Phase 13 complete, ready to plan Phase 14
 Resume file: None
 
 ## Operator Next Steps

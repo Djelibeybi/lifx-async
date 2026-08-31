@@ -103,28 +103,28 @@ discovery path.
 
 ### Discovery and Lookup
 
-- [ ] **FIND-01**: `discover()` finds Thread devices without the caller opting in, running
+- [x] **FIND-01**: `discover()` finds Thread devices without the caller opting in, running
       a broadcast leg and an mDNS leg concurrently and merging by serial, first wins.
       Measured today: `discover()` returns 25 devices and neither Thread serial, while
       `discover_mdns()` returns both
 
-- [ ] **FIND-02**: `discover()`'s existing contract survives the merge, specifically its
+- [x] **FIND-02**: `discover()`'s existing contract survives the merge, specifically its
       overall timeout, its idle timeout resetting on consumer resume, first-wins
       per-serial dedup, and DoS source and serial validation. The invariant tests are
       written before the merge, as its entry gate, not after it
 
-- [ ] **FIND-03**: An mDNS leg that fails or is unavailable degrades `discover()` to
+- [x] **FIND-03**: An mDNS leg that fails or is unavailable degrades `discover()` to
       today's broadcast-only behaviour rather than ending discovery. `asyncio.TaskGroup`
       is unavailable regardless (Python 3.11 or later; this library ships 3.10 for LedFx),
       and its cancel-siblings semantics would be wrong here anyway
 
-- [ ] **FIND-04**: An mDNS-sourced device is unicast-verified before it is yielded, so
+- [x] **FIND-04**: An mDNS-sourced device is unicast-verified before it is yielded, so
       `discover()` never yields a device that is not answering. A border router's SRP
       registration can outlive the device by up to a 2 hour default lease, and `discover()`
       has never broken that liveness contract. Verification also closes the mDNS leg's
       spoofing exposure, since it carries none of the broadcast leg's validation
 
-- [ ] **FIND-05**: `find_by_serial()` races a broadcast leg and an mDNS leg, first hit
+- [x] **FIND-05**: `find_by_serial()` races a broadcast leg and an mDNS leg, first hit
       wins, and the losing leg is cancelled and reaped so no task or socket leaks. Both
       legs are required: broadcast covers WiFi devices whose firmware does not advertise
       over mDNS, mDNS covers Thread devices with no IPv4 address to broadcast to
@@ -132,15 +132,26 @@ discovery path.
 - [x] **FIND-06**: `find_by_ip()` resolves a device from an IPv6 literal instead of
       returning `None`
 
-- [ ] **FIND-07**: The timing change merged discovery imposes on existing callers is a
+- [x] **FIND-07**: The timing change merged discovery imposes on existing callers is a
       measured before-and-after number against the fleet, not an assumption. Emulator CI
       wall time is part of that measurement
 
-- [ ] **FIND-08**: The mDNS TXT `id` is confirmed to match the broadcast serial for
+- [x] **FIND-08**: The mDNS TXT `id` is confirmed to match the broadcast serial for
       firmware 3.70 to 3.99 WiFi devices, the only population where the two could diverge.
       Low priority and not a gate: Thread requires firmware 4 or later, and
       `Device.get_mac_address()` fires only on `version_major == 3 and version_minor >= 70`,
       so a Thread device structurally cannot exhibit the off-by-one quirk
+
+- [x] **FIND-09**: Source-specific enumeration remains public: `discover_udp()` provides
+      UDP-only discovery, the existing `discover_mdns()` remains mDNS-only, and
+      `discover()` is the default dual-source path. `find_by_serial()` remains a
+      dual-source lookup without a source selector
+
+- [x] **FIND-10**: Compatible overlapping `discover()` and `discover_udp()` callers share
+      one active UDP broadcast sweep and its already-seen results, so N overlapping
+      callers produce the same wire schedule and response load as one caller. Sharing is
+      limited to the active sweep: completed positive, empty, and failed outcomes are not
+      retained behind an unmeasured cache lifetime
 
 ### Thread Revalidation
 
@@ -224,7 +235,7 @@ Deferred beyond v2.0. Tracked, not in this roadmap.
 | Fleet-scale Thread hardware validation | Deferred until enough of the fleet is migrated. Covered synthetically under MDNS-03 and MDNS-04 in the meantime, and recorded as a named gap (user decision, 2026-08-27) |
 | Rejoining the mDNS multicast group | The ephemeral-port fix came from LIFX, so LIFX devices honouring RFC 6762 section 6.7 unicast replies is vendor-stated. Rejoining would reintroduce the shared-socket exposure the fix was made to escape, with nothing needing it (user decision, 2026-08-27) |
 | An IPv6 multicast mDNS query leg | The query leg is IPv4 multicast by design and the unicast-reply path carries Thread devices fine. Would require per-interface `IPV6_MULTICAST_IF` iteration, which macOS demands and CPython gives no `getifaddrs` for. Documented limitation under DOCS-05, revisit on demand |
-| Transport-specific entry points, `transport=` parameters, or routing control traffic by `tm` | No comparable library does this. Transport is read-only diagnostics; a caller choosing a transport is the anti-feature the merged `discover()` exists to remove |
+| A `transport=` selector or routing control traffic by `tm` | Source-specific enumeration uses the explicit `discover_udp()` and `discover_mdns()` APIs. Connectivity remains read-only diagnostics and never changes routing, retry, or tuning behaviour |
 | Consumer-facing Thread tuning knobs | Contradicts the locked decision of 2026-07-16 that the animation library owns delivery strategy, not downstream consumers |
 | Thread commissioning or border-router management | Out of a device-control library's remit entirely |
 | Retuning any WiFi-measured constant before SEED-001 measures it | The project's own spike-first discipline. Constants change on evidence, in the Revalidate phase, never in Land or Merge |
@@ -247,14 +258,16 @@ Populated at roadmap creation, 2026-08-27.
 | MDNS-06 | Phase 11 | Complete |
 | MDNS-07 | Phase 11 | Complete |
 | MDNS-08 | Phase 11 | Complete |
-| FIND-01 | Phase 13 | Pending |
-| FIND-02 | Phase 13 | Pending |
-| FIND-03 | Phase 13 | Pending |
-| FIND-04 | Phase 13 | Pending |
-| FIND-05 | Phase 13 | Pending |
+| FIND-01 | Phase 13 | Complete |
+| FIND-02 | Phase 13 | Complete |
+| FIND-03 | Phase 13 | Complete |
+| FIND-04 | Phase 13 | Complete |
+| FIND-05 | Phase 13 | Complete |
 | FIND-06 | Phase 12 | Complete |
-| FIND-07 | Phase 13 | Pending |
-| FIND-08 | Phase 13 | Pending |
+| FIND-07 | Phase 13 | Complete |
+| FIND-08 | Phase 13 | Complete |
+| FIND-09 | Phase 13 | Complete |
+| FIND-10 | Phase 13 | Complete |
 | THREAD-01 | Phase 14 | Pending |
 | THREAD-02 | Phase 14 | Pending |
 | THREAD-03 | Phase 14 | Pending |

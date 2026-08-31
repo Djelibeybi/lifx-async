@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 0
 waived_count: 0
-fixed_count: 21
-total_count: 21
-last_updated: 2026-08-29T11:03:01.137Z
+fixed_count: 41
+total_count: 41
+last_updated: 2026-08-30T21:40:23.059Z
 ---
 
 # Broken Windows Ledger
@@ -36,6 +36,26 @@ last_updated: 2026-08-29T11:03:01.137Z
 | 19 | 11 | deviation | .planning/STATE.md |  | Corrected stale Plan 2 position and gap-planning prose emitted by closeout handlers | fixed |  | 2026-08-28T20:45:00.819Z | 2026-08-28T20:45:00.933Z |
 | 20 | 11 | deviation | .planning/STATE.md |  | Reconciled partial Plan 11 close-out handler updates across STATE, ROADMAP, and REQUIREMENTS | fixed |  | 2026-08-28T21:17:12.229Z | 2026-08-28T21:17:27.556Z |
 | 21 | 12 | deviation | src/lifx/network/transport.py |  | Windows asyncio requires canonical four-field IPv6 datagram destinations | fixed |  | 2026-08-29T11:02:38.890Z | 2026-08-29T11:03:01.137Z |
+| 22 | 13 | deviation | tests/test_api/test_api_discovery.py |  | Corrected obsolete discovery-default expectations in the initial RED test before committing the entry gate | fixed |  | 2026-08-30T14:53:37.103Z | 2026-08-30T14:54:14.206Z |
+| 23 | 13 | deviation | .planning/STATE.md |  | Reconciled stale plan activity text, metric spacing, and roadmap table spacing emitted by closeout handlers | fixed |  | 2026-08-30T14:55:32.193Z | 2026-08-30T14:55:36.654Z |
+| 24 | 13 | deviation | .planning/phases/13-merged-discovery/13-01-SUMMARY.md |  | The GSD metadata commit helper signed the final commit but omitted the required DCO trailer | fixed |  | 2026-08-30T14:56:26.541Z | 2026-08-30T14:56:26.647Z |
+| 25 | 13 | deviation | src/lifx/network/discovery_coordinator.py |  | Concurrent coordinator starters now wait for the shared readiness handshake | fixed |  | 2026-08-30T15:28:36.249Z | 2026-08-30T15:29:05.624Z |
+| 26 | 13 | deviation | src/lifx/network/discovery_coordinator.py |  | Idle-stop requests are coalesced and shutdown tolerates concurrent loop closure | fixed |  | 2026-08-30T15:28:36.355Z | 2026-08-30T15:29:05.733Z |
+| 27 | 13 | deviation | tests/test_network/test_discovery_coordinator.py |  | Late-subscriber tests await replay receipt instead of assuming registration timing | fixed |  | 2026-08-30T15:28:36.461Z | 2026-08-30T15:29:05.840Z |
+| 28 | 13 | deviation | .planning/STATE.md | 11 | Reconciled stale activity prose, duplicated decision prefixes, and malformed roadmap spacing emitted by closeout handlers | fixed |  | 2026-08-30T15:29:44.020Z | 2026-08-30T15:29:44.128Z |
+| 29 | 13 | deviation | .planning/phases/13-merged-discovery/13-02-SUMMARY.md | 190 | Restored the mandatory DCO trailer omitted by the GSD metadata commit helper | fixed |  | 2026-08-30T15:31:50.928Z | 2026-08-30T15:31:54.973Z |
+| 30 | 13 | deviation | src/lifx/network/mdns/discovery.py |  | Restored the context-manager transport seam required by adjacent mDNS compatibility tests. | fixed |  | 2026-08-30T16:00:48.566Z | 2026-08-30T16:01:16.820Z |
+| 31 | 13 | unrun-verify | tests/test_network/test_discovery_coordinator.py |  | Whole-suite assertions pass, but pytest cannot exit because a pre-existing coordinator test leaves Event.wait blocked in a default-executor worker. | fixed |  | 2026-08-30T16:00:48.571Z | 2026-08-30T16:11:10.722Z |
+| 32 | 13 | deviation | src/lifx/devices/light.py |  | Generated StateColor label typing required an explicit decoded-string cast at the private adoption boundary. | fixed |  | 2026-08-30T16:01:12.272Z | 2026-08-30T16:01:17.013Z |
+| 33 | 13 | deviation | .planning/STATE.md |  | Reconciled stale Plan 13-02 activity prose, realised duration, and malformed roadmap spacing emitted by closeout handlers. | fixed |  | 2026-08-30T16:03:27.690Z | 2026-08-30T16:03:27.879Z |
+| 34 | 13 | deviation | .planning/phases/13-merged-discovery/13-03-SUMMARY.md |  | Restored the mandatory DCO trailer omitted by the GSD metadata commit helper. | fixed |  | 2026-08-30T16:04:12.129Z | 2026-08-30T16:04:12.329Z |
+| 35 | 13 | deviation | src/lifx/network/discovery_observation.py |  | Private source seams expanded to carry the exact merged deadline and observation dispositions. | fixed |  | 2026-08-30T16:34:19.049Z | 2026-08-30T16:34:39.092Z |
+| 36 | 13 | deviation | .planning/STATE.md |  | Reconciled stale Plan 13-03 activity prose, duration spacing, and malformed roadmap spacing emitted by closeout handlers. | fixed |  | 2026-08-30T16:35:21.465Z | 2026-08-30T16:35:24.958Z |
+| 37 | 13 | deviation | .planning/phases/13-merged-discovery/13-04-SUMMARY.md |  | Restored the mandatory DCO trailer omitted by the GSD metadata commit helper. | fixed |  | 2026-08-30T16:36:03.962Z | 2026-08-30T16:36:07.092Z |
+| 38 | 13 | deviation | src/lifx/api.py |  | Held winning source pumps at the yield boundary so aggregate cleanup cannot interrupt async generator finalisers. | fixed |  | 2026-08-30T16:56:28.695Z | 2026-08-30T16:56:52.937Z |
+| 39 | 13 | deviation | .planning/STATE.md |  | Reconciled stale Plan 13-04 activity prose, duration spacing, and malformed roadmap spacing emitted by closeout handlers. | fixed |  | 2026-08-30T16:58:47.096Z | 2026-08-30T16:58:52.188Z |
+| 40 | 13 | deviation | .planning/phases/13-merged-discovery/13-05-SUMMARY.md |  | Restored the mandatory DCO trailer omitted by the GSD metadata commit helper. | fixed |  | 2026-08-30T16:59:36.117Z | 2026-08-30T16:59:39.218Z |
+| 41 | 13 | deviation | .planning/phases/13-merged-discovery/13-06-PLAN.md |  | Phase 13-specific CI measurement was replaced by exact-head ordinary CI qualification followed by executor-run hermetic evidence | fixed |  | 2026-08-30T21:39:56.701Z | 2026-08-30T21:40:23.059Z |
 
 ````json
 [
@@ -290,6 +310,246 @@ last_updated: 2026-08-29T11:03:01.137Z
     "reason": "",
     "recorded_at": "2026-08-29T11:02:38.890Z",
     "resolved_at": "2026-08-29T11:03:01.137Z"
+  },
+  {
+    "id": 22,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "tests/test_api/test_api_discovery.py",
+    "line": null,
+    "description": "Corrected obsolete discovery-default expectations in the initial RED test before committing the entry gate",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T14:53:37.103Z",
+    "resolved_at": "2026-08-30T14:54:14.206Z"
+  },
+  {
+    "id": 23,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/STATE.md",
+    "line": null,
+    "description": "Reconciled stale plan activity text, metric spacing, and roadmap table spacing emitted by closeout handlers",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T14:55:32.193Z",
+    "resolved_at": "2026-08-30T14:55:36.654Z"
+  },
+  {
+    "id": 24,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/phases/13-merged-discovery/13-01-SUMMARY.md",
+    "line": null,
+    "description": "The GSD metadata commit helper signed the final commit but omitted the required DCO trailer",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T14:56:26.541Z",
+    "resolved_at": "2026-08-30T14:56:26.647Z"
+  },
+  {
+    "id": 25,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "src/lifx/network/discovery_coordinator.py",
+    "line": null,
+    "description": "Concurrent coordinator starters now wait for the shared readiness handshake",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T15:28:36.249Z",
+    "resolved_at": "2026-08-30T15:29:05.624Z"
+  },
+  {
+    "id": 26,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "src/lifx/network/discovery_coordinator.py",
+    "line": null,
+    "description": "Idle-stop requests are coalesced and shutdown tolerates concurrent loop closure",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T15:28:36.355Z",
+    "resolved_at": "2026-08-30T15:29:05.733Z"
+  },
+  {
+    "id": 27,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "tests/test_network/test_discovery_coordinator.py",
+    "line": null,
+    "description": "Late-subscriber tests await replay receipt instead of assuming registration timing",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T15:28:36.461Z",
+    "resolved_at": "2026-08-30T15:29:05.840Z"
+  },
+  {
+    "id": 28,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/STATE.md",
+    "line": 11,
+    "description": "Reconciled stale activity prose, duplicated decision prefixes, and malformed roadmap spacing emitted by closeout handlers",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T15:29:44.020Z",
+    "resolved_at": "2026-08-30T15:29:44.128Z"
+  },
+  {
+    "id": 29,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/phases/13-merged-discovery/13-02-SUMMARY.md",
+    "line": 190,
+    "description": "Restored the mandatory DCO trailer omitted by the GSD metadata commit helper",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T15:31:50.928Z",
+    "resolved_at": "2026-08-30T15:31:54.973Z"
+  },
+  {
+    "id": 30,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "src/lifx/network/mdns/discovery.py",
+    "line": null,
+    "description": "Restored the context-manager transport seam required by adjacent mDNS compatibility tests.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:00:48.566Z",
+    "resolved_at": "2026-08-30T16:01:16.820Z"
+  },
+  {
+    "id": 31,
+    "kind": "unrun-verify",
+    "phase": "13",
+    "file": "tests/test_network/test_discovery_coordinator.py",
+    "line": null,
+    "description": "Whole-suite assertions pass, but pytest cannot exit because a pre-existing coordinator test leaves Event.wait blocked in a default-executor worker.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:00:48.571Z",
+    "resolved_at": "2026-08-30T16:11:10.722Z"
+  },
+  {
+    "id": 32,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "src/lifx/devices/light.py",
+    "line": null,
+    "description": "Generated StateColor label typing required an explicit decoded-string cast at the private adoption boundary.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:01:12.272Z",
+    "resolved_at": "2026-08-30T16:01:17.013Z"
+  },
+  {
+    "id": 33,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/STATE.md",
+    "line": null,
+    "description": "Reconciled stale Plan 13-02 activity prose, realised duration, and malformed roadmap spacing emitted by closeout handlers.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:03:27.690Z",
+    "resolved_at": "2026-08-30T16:03:27.879Z"
+  },
+  {
+    "id": 34,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/phases/13-merged-discovery/13-03-SUMMARY.md",
+    "line": null,
+    "description": "Restored the mandatory DCO trailer omitted by the GSD metadata commit helper.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:04:12.129Z",
+    "resolved_at": "2026-08-30T16:04:12.329Z"
+  },
+  {
+    "id": 35,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "src/lifx/network/discovery_observation.py",
+    "line": null,
+    "description": "Private source seams expanded to carry the exact merged deadline and observation dispositions.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:34:19.049Z",
+    "resolved_at": "2026-08-30T16:34:39.092Z"
+  },
+  {
+    "id": 36,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/STATE.md",
+    "line": null,
+    "description": "Reconciled stale Plan 13-03 activity prose, duration spacing, and malformed roadmap spacing emitted by closeout handlers.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:35:21.465Z",
+    "resolved_at": "2026-08-30T16:35:24.958Z"
+  },
+  {
+    "id": 37,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/phases/13-merged-discovery/13-04-SUMMARY.md",
+    "line": null,
+    "description": "Restored the mandatory DCO trailer omitted by the GSD metadata commit helper.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:36:03.962Z",
+    "resolved_at": "2026-08-30T16:36:07.092Z"
+  },
+  {
+    "id": 38,
+    "kind": "deviation",
+    "phase": "13",
+    "file": "src/lifx/api.py",
+    "line": null,
+    "description": "Held winning source pumps at the yield boundary so aggregate cleanup cannot interrupt async generator finalisers.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:56:28.695Z",
+    "resolved_at": "2026-08-30T16:56:52.937Z"
+  },
+  {
+    "id": 39,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/STATE.md",
+    "line": null,
+    "description": "Reconciled stale Plan 13-04 activity prose, duration spacing, and malformed roadmap spacing emitted by closeout handlers.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:58:47.096Z",
+    "resolved_at": "2026-08-30T16:58:52.188Z"
+  },
+  {
+    "id": 40,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/phases/13-merged-discovery/13-05-SUMMARY.md",
+    "line": null,
+    "description": "Restored the mandatory DCO trailer omitted by the GSD metadata commit helper.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T16:59:36.117Z",
+    "resolved_at": "2026-08-30T16:59:39.218Z"
+  },
+  {
+    "id": 41,
+    "kind": "deviation",
+    "phase": "13",
+    "file": ".planning/phases/13-merged-discovery/13-06-PLAN.md",
+    "line": null,
+    "description": "Phase 13-specific CI measurement was replaced by exact-head ordinary CI qualification followed by executor-run hermetic evidence",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-30T21:39:56.701Z",
+    "resolved_at": "2026-08-30T21:40:23.059Z"
   }
 ]
 ````
