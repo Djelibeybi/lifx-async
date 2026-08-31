@@ -142,7 +142,9 @@ this milestone (all 2026-08-27 unless noted):
 
 ### v2.0 Working Notes
 
-- Branch to land: `feat/ipv6-thread-support` (`b49400b`, `b88cdb9`, `2f884f5`); pre-rebase state preserved on `backup/ipv6-thread-pre-rebase`
+- Phase 10 shipped through PR #210 as `7f54ad7`; its feature, phase and backup branches
+  have been cleaned up. The source commits (`b49400b`, `b88cdb9`, `2f884f5`) and Phase 10
+  artefacts retain the reconciliation history.
 
 Thread hardware endpoint values remain operator-controlled evidence outside the repository and must be re-derived before Phase 14 validation; this planning state intentionally records no serial, address, hostname, or mapping value.
 
@@ -192,5 +194,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Resolve PR #219's pre-existing DCO history failure, then ship the verified Phase 12 branch.
-- Ship the already verified Phase 10 branch separately when ready.
+- Discuss and plan Phase 14, Thread Revalidation and Docs.

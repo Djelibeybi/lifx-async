@@ -26,7 +26,7 @@ Phase 7 lacked operator sign-off, was withdrawn: the sign-off had been recorded 
 `07-UAT.md` all along and only a stale body line suggested otherwise. See
 `milestones/v1.2-MILESTONE-AUDIT.md`.
 
-**Next milestone: v2.0 Thread/IPv6 Support** (opened 2026-08-27). SEED-001 has fired: its
+**Current milestone: v2.0 Thread/IPv6 Support** (opened 2026-08-27). SEED-001 has fired: its
 trigger condition, LIFX Thread firmware shipping, was met during the v1.2 close-out, when
 probing confirmed Thread devices answer over IPv6 and located the gaps that v2.0 closes.
 
@@ -55,11 +55,11 @@ measured on WiFi/IPv4.
 
 **Target features:**
 
-- **Land `feat/ipv6-thread-support`** (3 commits, roughly 1100 lines, not yet on `main`):
-  IPv6 device addresses, socket family following the target address, AAAA parsing that
-  prefers routable addresses over link-local, per-instance mDNS record accumulation across
-  packets, PTR retransmit per RFC 6762 5.2, follow-up A/AAAA queries for SRV targets whose
-  address records did not fit one reply, and the animator frame-socket family fix
+- **IPv6/Thread transport landed through Phase 10 and PR #210:** IPv6 device addresses,
+  socket family following the target address, AAAA parsing that prefers routable addresses
+  over link-local, per-instance mDNS record accumulation across packets, PTR retransmit per
+  RFC 6762 5.2, follow-up A/AAAA queries for SRV targets whose address records did not fit
+  one reply, and the animator frame-socket family fix
 - **mDNS ephemeral-port bind as its own regression-tested requirement.** Measured 25
   devices found bound ephemeral against 9 bound on 5353 with `SO_REUSEPORT`: system mDNS
   daemons were stealing legacy-unicast replies. This is an IPv4 defect that predates
@@ -214,8 +214,8 @@ by name looks like the theme of that name in the LIFX app.
 
 **Milestone v2.0: Thread/IPv6 Support.** Full detail in `## Current Milestone` above.
 
-- [ ] Land `feat/ipv6-thread-support` onto `main` with the network, mDNS and animation
-      changes intact
+- [x] Land `feat/ipv6-thread-support` onto `main` with the network, mDNS and animation
+      changes intact (Phase 10, PR #210, 2026-08-28)
 - [x] mDNS ephemeral-port bind, regression-tested in its own right as an IPv4 defect
 - [x] `discover()` runs a broadcast leg and an mDNS leg, merged by serial
 - [x] `discover_udp()` preserves explicit UDP-only enumeration, and overlapping compatible
@@ -331,10 +331,11 @@ Carried-forward candidates, not in v2.0 scope:
   pattern: a class closes when evidenced, and an unavailable class closes as a named gap
   rather than staying open indefinitely. The v1.2 lesson applies directly, where a capture
   taken entirely from one product left product-invariance assumed rather than tested.
-- Prior Thread work lives on `feat/ipv6-thread-support`: `b49400b` (network and mDNS),
-  `b88cdb9` (`scripts/ipv6_thread_probe.py`, a three-stage records/ports/connect hardware
-  probe driving the library's own primitives), `2f884f5` (animator frame-socket family).
-  `backup/ipv6-thread-pre-rebase` holds the pre-rebase state.
+- Phase 10 shipped the prior Thread work through PR #210 as `7f54ad7`: `b49400b`
+  (network and mDNS), `b88cdb9` (`scripts/ipv6_thread_probe.py`, a three-stage
+  records/ports/connect hardware probe driving the library's own primitives), and `2f884f5`
+  (animator frame-socket family). The temporary feature and backup branches were removed
+  after merge; the Phase 10 artefacts retain the reconciliation record.
 
 ## Constraints
 

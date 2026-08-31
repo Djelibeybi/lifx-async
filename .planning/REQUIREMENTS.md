@@ -15,10 +15,10 @@ ARCHITECTURE and PITFALLS in the same directory.
 
 ### IPv6 Transport
 
-Preparing `feat/ipv6-thread-support` (`b49400b`, `b88cdb9`, `2f884f5`) for shipment from its
-phase branch. The accepted tree merges to `main` only in the post-phase shipment workflow.
-Research verdict: the branch's stdlib primitives and address-family seam are correct, so this
-is a rebase plus a reconciled fix list, not a runtime rewrite.
+Shipped `feat/ipv6-thread-support` through Phase 10 and PR #210 as `7f54ad7`. The accepted
+tree merged to `main` through the post-phase shipment workflow. Research established that
+the branch's stdlib primitives and address-family seam were correct, so the work remained a
+rebase plus a reconciled fix list rather than a runtime rewrite.
 
 - [x] **IPV6-01**: A caller can connect to, control and send animation frames to a device
       that has only an IPv6 address. The socket family follows the target address at every
@@ -246,10 +246,10 @@ Populated at roadmap creation, 2026-08-27.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| IPV6-01 | Phase 10 | Verified |
-| IPV6-02 | Phase 10 | Verified |
-| IPV6-03 | Phase 10 | Verified |
-| IPV6-04 | Phase 10 | Verified |
+| IPV6-01 | Phase 10 | Complete |
+| IPV6-02 | Phase 10 | Complete |
+| IPV6-03 | Phase 10 | Complete |
+| IPV6-04 | Phase 10 | Complete |
 | MDNS-01 | Phase 11 | Complete |
 | MDNS-02 | Phase 11 | Complete |
 | MDNS-03 | Phase 11 | Complete |
