@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-from lifx.network.discovery import _discover_with_packet, discover_devices
+from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
+from lifx.network.discovery.udp import _discover_with_packet, discover_devices
 from lifx.network.transport import UdpTransport, _UdpProtocol
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device as DevicePackets
@@ -159,6 +159,113 @@ def _build_state_label_packet(source: int, target: bytes, label: bytes) -> bytes
     return header.pack() + payload
 
 
+async def _collect_direct_responses(
+    packet: object,
+    datagrams: list[bytes],
+    *,
+    source: int = 42,
+):
+    """Run the private generator against a finite synthetic datagram stream."""
+    responses = iter(datagrams)
+
+    async def mock_receive(timeout: float = 2.0):
+        try:
+            return next(responses), ("192.0.2.10", 56700)
+        except StopIteration:
+            raise LifxTimeoutError("timeout") from None
+
+    with (
+        patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+        patch("lifx.network.discovery.udp.allocate_source", return_value=source),
+    ):
+        mock_transport = AsyncMock()
+        mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
+        mock_transport.__aexit__ = AsyncMock(return_value=False)
+        mock_transport.send = AsyncMock()
+        mock_transport.receive = mock_receive
+        mock_transport_cls.return_value = mock_transport
+
+        return [
+            response async for response in _discover_with_packet(packet, timeout=0.01)
+        ]
+
+
+class TestDiscoveryProtocolBoundaries:
+    """Directly exercise defensive packet-classification branches."""
+
+    async def test_request_without_state_type_is_rejected(self) -> None:
+        """Only request packets declaring their response type are accepted."""
+        generator = _discover_with_packet(object(), timeout=0.01)
+
+        with pytest.raises(ValueError, match="must have STATE_TYPE"):
+            await anext(generator)
+
+    async def test_unexpected_response_type_is_ignored(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A valid response for another request cannot enter this result set."""
+        packet = _build_state_label_packet(
+            42,
+            b"\xd0\x73\xd5\x01\x02\x03\x00\x00",
+            b"Synthetic Light",
+        )
+
+        with caplog.at_level(logging.DEBUG, logger="lifx.network.discovery.udp"):
+            responses = await _collect_direct_responses(
+                DevicePackets.GetService(), [packet]
+            )
+
+        assert responses == []
+        assert any(
+            isinstance(record.msg, dict)
+            and record.msg.get("action") == "unexpected_packet_type"
+            for record in caplog.records
+        )
+
+    async def test_unknown_expected_response_class_is_ignored(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A missing packet registry entry is isolated to its datagram."""
+        packet = _build_state_service_packet(42, b"\xd0\x73\xd5\x01\x02\x03\x00\x00")
+
+        with (
+            caplog.at_level(logging.WARNING, logger="lifx.network.discovery.udp"),
+            patch("lifx.network.discovery.udp.get_packet_class", return_value=None),
+        ):
+            responses = await _collect_direct_responses(
+                DevicePackets.GetService(), [packet]
+            )
+
+        assert responses == []
+        assert any(
+            isinstance(record.msg, dict)
+            and record.msg.get("action") == "unknown_packet_type"
+            for record in caplog.records
+        )
+
+    async def test_malformed_parsed_response_is_ignored(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A parser-level protocol error cannot abort the discovery sweep."""
+        with (
+            caplog.at_level(logging.WARNING, logger="lifx.network.discovery.udp"),
+            patch(
+                "lifx.network.discovery.udp.parse_message",
+                side_effect=LifxProtocolError("synthetic malformed response"),
+            ),
+        ):
+            responses = await _collect_direct_responses(
+                DevicePackets.GetService(), [b"\x00" * 36]
+            )
+
+        assert responses == []
+        assert any(
+            isinstance(record.msg, dict)
+            and record.msg.get("action") == "malformed_response"
+            for record in caplog.records
+        )
+
+
 class TestDiscoveryResponderAddressValidation:
     """Invalid responder socket addresses are isolated to one datagram."""
 
@@ -181,8 +288,10 @@ class TestDiscoveryResponderAddressValidation:
                 raise LifxTimeoutError("timeout") from None
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -218,8 +327,10 @@ class TestDiscoveryResponderAddressValidation:
                 raise LifxTimeoutError("timeout") from None
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -253,8 +364,10 @@ class TestDiscoveryResponderAddressValidation:
                 raise LifxTimeoutError("timeout") from None
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -291,10 +404,12 @@ class TestDiscoveryResponderAddressValidation:
                 raise LifxTimeoutError("timeout") from None
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
             patch(
-                "lifx.network.discovery.IdleDeadline.mark_response", autospec=True
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
+            patch(
+                "lifx.network.discovery.udp.IdleDeadline.mark_response", autospec=True
             ) as mark_response,
         ):
             mock_transport = AsyncMock()
@@ -332,10 +447,12 @@ class TestDiscoveryResponderAddressValidation:
 
         with (
             caplog.at_level(logging.DEBUG, logger="lifx.network.discovery"),
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
             patch(
-                "lifx.network.discovery.host_from_sockaddr",
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
+            patch(
+                "lifx.network.discovery.udp.host_from_sockaddr",
                 side_effect=ValueError("invalid native scope"),
             ),
         ):
@@ -381,8 +498,10 @@ class TestDiscoveryResponderAddressValidation:
 
         with (
             caplog.at_level(logging.WARNING, logger="lifx.network.address"),
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -431,8 +550,10 @@ class TestDiscoverySourceValidation:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -474,8 +595,10 @@ class TestDiscoverySourceValidation:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -517,8 +640,10 @@ class TestDiscoverySourceValidation:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -579,8 +704,10 @@ class TestMalformedPayloadHandling:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -655,8 +782,10 @@ class TestMalformedSizeDatagramHandling:
         )
 
         with (
-            patch("lifx.network.discovery.UdpTransport", return_value=transport),
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             devices = []
             async for device in discover_devices(timeout=0.5):
@@ -685,8 +814,10 @@ class TestMalformedSizeDatagramHandling:
         )
 
         with (
-            patch("lifx.network.discovery.UdpTransport", return_value=transport),
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             devices = []
             async for device in discover_devices(timeout=0.5):
@@ -730,8 +861,10 @@ class TestDiscoverWithPacketSerialValidation:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -772,8 +905,10 @@ class TestDiscoverWithPacketSerialValidation:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -816,8 +951,10 @@ class TestDiscoverWithPacketSerialValidation:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -861,8 +998,10 @@ class TestDiscoverWithPacketSerialValidation:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -955,8 +1094,10 @@ class TestNonUdpServiceHandling:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -997,8 +1138,10 @@ class TestNonUdpServiceHandling:
                 raise LifxTimeoutError("timeout") from None
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -1036,8 +1179,10 @@ class TestNonUdpServiceHandling:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -1074,9 +1219,9 @@ class TestRemainingNonPositiveGuard:
         fake._last_response = 0.0
 
         with (
-            patch("lifx.network.discovery.IdleDeadline", return_value=fake),
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.IdleDeadline", return_value=fake),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -1121,8 +1266,10 @@ class TestNonZeroTargetPadding:
                 raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)

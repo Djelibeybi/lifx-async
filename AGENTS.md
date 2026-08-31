@@ -162,23 +162,27 @@ gh workflow run docs.yml
 2. **Network Layer** (`src/lifx/network/`)
 
    - `transport.py`: UDP transport using asyncio
-   - `discovery.py`: Device discovery via broadcast with `DiscoveredDevice` dataclass
+   - `discovery/`: Canonical discovery implementation package
+     - `__init__.py`: Compatibility umbrella for documented low-level UDP imports
+     - `udp.py`: UDP discovery with `DiscoveredDevice` and `DiscoveryResponse`
+     - `coordinator.py`: Process-wide active UDP sweep coordination
+     - `mdns/`: mDNS/DNS-SD implementation (zero-dependency, stdlib only)
+       - `discovery.py`: Per-call service-record assembly and supported device construction.
+         Each sweep sends an initial DNS-SD PTR service query, may retransmit that PTR query
+         once at one second and once at three seconds within the caller's deadline, and
+         assembles valid legacy-unicast replies during the quiet window. When a valid SRV
+         target still lacks a usable address, it conditionally sends bounded A/AAAA follow-ups:
+         one successful send, or no more than two failed attempts, for each of at most 64
+         targets
+       - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
+       - `transport.py`: `MdnsTransport` sends IPv4 multicast queries from an ephemeral port and
+         receives only direct legacy-unicast replies; it does not join the multicast group or
+         receive unsolicited announcements
+       - `types.py`: Internal service-record model; record cache state belongs to one discovery
+         call and is never reused
    - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
-   - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
-     - `discovery.py`: Per-call service-record assembly and supported device construction.
-       Each sweep sends an initial DNS-SD PTR service query, may retransmit that PTR query
-       once at one second and once at three seconds within the caller's deadline, and
-       assembles valid legacy-unicast replies during the quiet window. When a valid SRV
-       target still lacks a usable address, it conditionally sends bounded A/AAAA follow-ups:
-       one successful send, or no more than two failed attempts, for each of at most 64
-       targets
-     - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
-     - `transport.py`: `MdnsTransport` sends IPv4 multicast queries from an ephemeral port and
-       receives only direct legacy-unicast replies; it does not join the multicast group or
-       receive unsolicited announcements
-     - `types.py`: Internal service-record model; record cache state belongs to one discovery
-       call and is never reused
+   - `mdns/`: Thin compatibility re-exports for the former mDNS import paths
    - Lazy connection opening (auto-opens on first request)
 
 3. **Device Layer** (`src/lifx/devices/`)

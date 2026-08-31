@@ -29,6 +29,18 @@ Response dataclass from custom discovery broadcasts (using packets other than Ge
       members_order: source
       show_if_no_docstring: false
 
+## mDNS discovery
+
+The canonical low-level mDNS namespace is `lifx.network.discovery.mdns`.
+The former `lifx.network.mdns` package remains as a thin import-compatibility
+surface and contains no duplicate implementation.
+
+::: lifx.network.discovery.mdns.discover_devices_mdns
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+
 ## UDP Transport
 
 Low-level UDP transport for sending and receiving LIFX protocol messages.

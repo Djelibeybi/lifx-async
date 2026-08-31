@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 import lifx
-import lifx.network.mdns as mdns
+import lifx.network.discovery.mdns as mdns
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC_PATHS = (
@@ -25,8 +25,8 @@ _REQUIRED_QUERY_MODEL_PATHS = (
 _QUERY_MODEL_PATHS = _REQUIRED_QUERY_MODEL_PATHS
 _PUBLIC_GUIDANCE_PATH = Path("docs/user-guide/advanced-usage.md")
 _MIGRATION_GUIDANCE_PATH = Path("docs/migration/mdns-low-level-api-7.0.0.md")
-_PRIVATE_GUIDANCE_PATH = Path("src/lifx/network/mdns/transport.py")
-_MDNS_SOURCE_PATH = Path("src/lifx/network/mdns")
+_PRIVATE_GUIDANCE_PATH = Path("src/lifx/network/discovery/mdns/transport.py")
+_MDNS_SOURCE_PATH = Path("src/lifx/network/discovery/mdns")
 
 
 def _normalised_prose(relative_path: Path) -> str:

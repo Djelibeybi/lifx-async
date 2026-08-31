@@ -6,7 +6,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from lifx.color import HSBK
 from lifx.const import (
@@ -72,6 +72,15 @@ class LightState(DeviceState):
         return state
 
 
+@dataclass(frozen=True)
+class _DiscoveryLightSnapshot:
+    """Immutable colour, power, and label adopted during discovery."""
+
+    colour: HSBK
+    power: int
+    label: str
+
+
 class Light(Device[LightState]):
     """LIFX light device with color control.
 
@@ -104,6 +113,8 @@ class Light(Device[LightState]):
         ```
     """
 
+    _discovery_snapshot: _DiscoveryLightSnapshot | None = None
+
     @property
     def state(self) -> LightState:
         """Get light state (guaranteed to be initialized when using Device.connect()).
@@ -117,6 +128,33 @@ class Light(Device[LightState]):
         if self._state is None:
             raise RuntimeError("State not found.")
         return self._state
+
+    def _adopt_state_color(
+        self, state: packets.Light.StateColor
+    ) -> tuple[HSBK, int, str]:
+        """Decode and adopt a validated StateColor response."""
+        colour = HSBK.from_protocol(state.color)
+        power = state.power
+        # DeviceConnection decodes protocol labels before returning packets.
+        label = cast(str, state.label)
+
+        self._label = label
+        self._discovery_snapshot = _DiscoveryLightSnapshot(
+            colour=colour,
+            power=power,
+            label=label,
+        )
+
+        if self._state is not None:
+            self._state.power = power
+            self._state.label = label
+
+            if hasattr(self._state, "color"):
+                self._state.color = colour
+
+            self._state.last_updated = time.time()
+
+        return colour, power, label
 
     async def get_color(self) -> tuple[HSBK, int, str]:
         """Get current light color, power, and label.
@@ -148,24 +186,7 @@ class Light(Device[LightState]):
         state = await self.connection.request(packets.Light.GetColor())
         self._raise_if_unhandled(state)
 
-        # Convert from protocol HSBK to user-friendly HSBK
-        color = HSBK.from_protocol(state.color)
-        power = state.power
-        label = state.label
-
-        # Store label from StateColor response
-        self._label = label  # Already decoded to string
-
-        # Update state if it exists (including all subclasses)
-        if self._state is not None:
-            # Update base fields available on all device states
-            self._state.power = power
-            self._state.label = label
-
-            if hasattr(self._state, "color"):
-                self._state.color = color
-
-            self._state.last_updated = time.time()
+        color, power, label = self._adopt_state_color(state)
 
         _LOGGER.debug(
             {

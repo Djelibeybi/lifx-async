@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Iterator, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterator, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass
 from types import TracebackType
@@ -36,16 +37,270 @@ from lifx.devices import (
     MatrixLight,
     MultiZoneLight,
 )
-from lifx.network.address import validate_address
-from lifx.network.discovery import (
+from lifx.exceptions import LifxNetworkError
+from lifx.network.address import validate_address, validate_port
+from lifx.network.discovery.mdns.discovery import (
+    _discover_verified_devices_mdns,
+    _MdnsFailure,
+    _MdnsSweepFailure,
+)
+from lifx.network.discovery.udp import (
     DiscoveredDevice,
+    _current_discovery_observer,
     _discover_with_packet,
+    _DiscoveryObserver,
+    _emit_discovery_event,
     discover_devices,
+    discover_devices_shared,
 )
 from lifx.protocol import packets
+from lifx.protocol.models import Serial
 from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
+
+_DiscoverySource = Literal["udp", "mdns"]
+_DiscoveryEventKind = Literal["device", "absorbed", "fatal", "leg_done"]
+
+
+@dataclass(frozen=True)
+class _DiscoveryEvent:
+    """One value-bounded event from an owned discovery source pump."""
+
+    kind: _DiscoveryEventKind
+    source: _DiscoverySource
+    device: Device | None = None
+    discovered: DiscoveredDevice | None = None
+    error_type: str | None = None
+    stage: str | None = None
+    reason: str | None = None
+
+
+async def _cancel_and_reap(tasks: Sequence[asyncio.Task[None]]) -> None:
+    """Cancel and await every owned task despite repeated caller cancellation."""
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+    if not tasks:
+        return
+
+    async def reap() -> None:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    cleanup_task = asyncio.create_task(reap())
+    cancellation: asyncio.CancelledError | None = None
+    while not cleanup_task.done():
+        try:
+            await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError as error:
+            if cancellation is None:
+                cancellation = error
+    cleanup_task.result()
+    if cancellation is not None:
+        raise cancellation
+
+
+async def _pump_udp_discovery(
+    devices: AsyncGenerator[DiscoveredDevice, None],
+    queue: asyncio.Queue[_DiscoveryEvent],
+    *,
+    deadline: float,
+    fatal_errors: dict[_DiscoverySource, BaseException],
+) -> None:
+    """Construct shared UDP results one at a time and enqueue valid devices."""
+    try:
+        async with aclosing(devices):
+            async for discovered in devices:
+                if time.monotonic() >= deadline:
+                    return
+                device = await _create_discovered_device(
+                    discovered,
+                    method="discover",
+                    deadline=deadline,
+                )
+                if time.monotonic() >= deadline:
+                    return
+                if device is not None:
+                    queue.put_nowait(
+                        _DiscoveryEvent(kind="device", source="udp", device=device)
+                    )
+    except asyncio.CancelledError:
+        raise
+    except BaseException as error:
+        fatal_errors["udp"] = error
+        queue.put_nowait(
+            _DiscoveryEvent(
+                kind="fatal",
+                source="udp",
+                error_type=type(error).__name__,
+            )
+        )
+    finally:
+        queue.put_nowait(_DiscoveryEvent(kind="leg_done", source="udp"))
+
+
+async def _pump_mdns_discovery(
+    source_factory: Callable[
+        [Callable[[_MdnsFailure], None]], AsyncGenerator[Device, None]
+    ],
+    queue: asyncio.Queue[_DiscoveryEvent],
+    *,
+    deadline: float,
+    fatal_errors: dict[_DiscoverySource, BaseException],
+) -> None:
+    """Enqueue verified mDNS devices and typed absorbed failures."""
+    failure_emitted = False
+
+    def failure_sink(failure: _MdnsFailure) -> None:
+        nonlocal failure_emitted
+        failure_emitted = True
+        queue.put_nowait(
+            _DiscoveryEvent(
+                kind="absorbed",
+                source="mdns",
+                error_type=failure.error_type,
+                stage=failure.stage,
+                reason=failure.reason,
+            )
+        )
+
+    devices = source_factory(failure_sink)
+    try:
+        async with aclosing(devices):
+            async for device in devices:
+                if time.monotonic() >= deadline:
+                    return
+                queue.put_nowait(
+                    _DiscoveryEvent(kind="device", source="mdns", device=device)
+                )
+    except asyncio.CancelledError:
+        raise
+    except LifxNetworkError as error:
+        if not failure_emitted:
+            failure_sink(
+                _MdnsSweepFailure(
+                    stage="source",
+                    reason="sweep_receive_network",
+                    error_type=type(error).__name__,
+                )
+            )
+    except BaseException as error:
+        fatal_errors["mdns"] = error
+        queue.put_nowait(
+            _DiscoveryEvent(
+                kind="fatal",
+                source="mdns",
+                error_type=type(error).__name__,
+            )
+        )
+    finally:
+        queue.put_nowait(_DiscoveryEvent(kind="leg_done", source="mdns"))
+
+
+async def _pump_udp_serial_lookup(
+    devices: AsyncGenerator[DiscoveredDevice, None],
+    queue: asyncio.Queue[_DiscoveryEvent],
+    *,
+    serial: str,
+    deadline: float,
+    fatal_errors: dict[_DiscoverySource, BaseException],
+) -> None:
+    """Enqueue only the exact validated UDP record for one serial lookup."""
+    try:
+        async with aclosing(devices):
+            async for discovered in devices:
+                if time.monotonic() >= deadline:
+                    return
+                candidate = Serial.from_string(discovered.serial).to_string()
+                if candidate == serial:
+                    queue.put_nowait(
+                        _DiscoveryEvent(
+                            kind="device",
+                            source="udp",
+                            discovered=discovered,
+                        )
+                    )
+                    # The race owner initiates teardown after accepting this
+                    # event. Stay suspended outside the generator finaliser so
+                    # that cancellation enters its close path exactly once.
+                    await asyncio.Event().wait()
+    except asyncio.CancelledError:
+        raise
+    except BaseException as error:
+        fatal_errors["udp"] = error
+        queue.put_nowait(
+            _DiscoveryEvent(
+                kind="fatal",
+                source="udp",
+                error_type=type(error).__name__,
+            )
+        )
+    finally:
+        queue.put_nowait(_DiscoveryEvent(kind="leg_done", source="udp"))
+
+
+async def _pump_mdns_serial_lookup(
+    source_factory: Callable[
+        [Callable[[_MdnsFailure], None]], AsyncGenerator[Device, None]
+    ],
+    queue: asyncio.Queue[_DiscoveryEvent],
+    *,
+    serial: str,
+    deadline: float,
+    fatal_errors: dict[_DiscoverySource, BaseException],
+) -> None:
+    """Enqueue only the exact verified mDNS device for one serial lookup."""
+    failure_emitted = False
+
+    def failure_sink(failure: _MdnsFailure) -> None:
+        nonlocal failure_emitted
+        failure_emitted = True
+        queue.put_nowait(
+            _DiscoveryEvent(
+                kind="absorbed",
+                source="mdns",
+                error_type=failure.error_type,
+                stage=failure.stage,
+                reason=failure.reason,
+            )
+        )
+
+    devices = source_factory(failure_sink)
+    try:
+        async with aclosing(devices):
+            async for device in devices:
+                if time.monotonic() >= deadline:
+                    return
+                candidate = Serial.from_string(device.serial).to_string()
+                if candidate == serial:
+                    queue.put_nowait(
+                        _DiscoveryEvent(kind="device", source="mdns", device=device)
+                    )
+                    # Keep the source suspended at its yield boundary until
+                    # the race owner performs cancellation-resistant teardown.
+                    await asyncio.Event().wait()
+    except asyncio.CancelledError:
+        raise
+    except LifxNetworkError as error:
+        if not failure_emitted:
+            failure_sink(
+                _MdnsSweepFailure(
+                    stage="source",
+                    reason="sweep_receive_network",
+                    error_type=type(error).__name__,
+                )
+            )
+    except BaseException as error:
+        fatal_errors["mdns"] = error
+        queue.put_nowait(
+            _DiscoveryEvent(
+                kind="fatal",
+                source="mdns",
+                error_type=type(error).__name__,
+            )
+        )
+    finally:
+        queue.put_nowait(_DiscoveryEvent(kind="leg_done", source="mdns"))
 
 
 @dataclass
@@ -755,10 +1010,26 @@ async def _create_discovered_device(
     discovered: DiscoveredDevice,
     *,
     method: str,
+    deadline: float | None = None,
 ) -> Device | None:
     """Construct one device without letting a class bug abort a public sweep."""
+    construction: asyncio.Task[Device | None] | None = None
     try:
-        return await discovered.create_device()
+        if deadline is None:
+            return await discovered.create_device()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        construction = asyncio.create_task(discovered.create_device())
+        done, _pending = await asyncio.wait({construction}, timeout=remaining)
+        if done:
+            return construction.result()
+        await _cancel_device_construction(discovered, construction)
+        return None
+    except asyncio.CancelledError:
+        if construction is not None:
+            await _cancel_device_construction(discovered, construction)
+        raise
     except (AttributeError, TypeError) as error:
         _LOGGER.error(
             {
@@ -770,6 +1041,18 @@ async def _create_discovered_device(
             exc_info=True,
         )
         return None
+
+
+async def _cancel_device_construction(
+    discovered: DiscoveredDevice,
+    construction: asyncio.Task[Device | None],
+) -> None:
+    """Force-close construction resources, then cancel and reap their owner."""
+    discovered._force_close_construction(construction)
+    while not construction.done():
+        construction.cancel()
+        await asyncio.sleep(0)
+    await asyncio.gather(construction, return_exceptions=True)
 
 
 async def discover(
@@ -819,7 +1102,14 @@ async def discover(
             devices.append(device)
         ```
     """
-    devices = discover_devices(
+    validate_address(broadcast_address)
+    validate_port(port)
+    deadline = time.monotonic() + max(0.0, timeout)
+    observer: _DiscoveryObserver | None = _current_discovery_observer()
+    queue: asyncio.Queue[_DiscoveryEvent] = asyncio.Queue()
+    fatal_errors: dict[_DiscoverySource, BaseException] = {}
+
+    udp_devices = discover_devices_shared(
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
@@ -827,10 +1117,150 @@ async def discover(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
+        _address_is_prevalidated=True,
+        _caller_deadline=deadline,
+        _observer=observer,
+    )
+
+    def mdns_source(
+        failure_sink: Callable[[_MdnsFailure], None],
+    ) -> AsyncGenerator[Device, None]:
+        return _discover_verified_devices_mdns(
+            timeout=timeout,
+            max_response_time=max_response_time,
+            idle_timeout_multiplier=idle_timeout_multiplier,
+            device_timeout=device_timeout,
+            max_retries=max_retries,
+            failure_sink=failure_sink,
+            _deadline=deadline,
+            _observer=observer,
+        )
+
+    tasks = [
+        asyncio.create_task(
+            _pump_udp_discovery(
+                udp_devices,
+                queue,
+                deadline=deadline,
+                fatal_errors=fatal_errors,
+            )
+        ),
+        asyncio.create_task(
+            _pump_mdns_discovery(
+                mdns_source,
+                queue,
+                deadline=deadline,
+                fatal_errors=fatal_errors,
+            )
+        ),
+    ]
+    completed_legs = 0
+    seen_serials: set[str] = set()
+    try:
+        while completed_legs < 2:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=remaining)
+            except asyncio.TimeoutError:
+                return
+
+            if event.kind == "leg_done":
+                completed_legs += 1
+                continue
+            if event.kind == "absorbed":
+                _LOGGER.debug(
+                    {
+                        "module": "lifx.api",
+                        "method": "discover",
+                        "action": "mdns_unavailable",
+                        "stage": event.stage,
+                        "reason": event.reason,
+                        "error_type": event.error_type,
+                    }
+                )
+                continue
+            if event.kind == "fatal":
+                raise fatal_errors[event.source]
+
+            device = event.device
+            if device is None:
+                raise RuntimeError("discovery device event contained no device")
+            serial = Serial.from_string(device.serial).to_string()
+            disposition: Literal["winner", "duplicate"]
+            if serial in seen_serials:
+                disposition = "duplicate"
+            else:
+                seen_serials.add(serial)
+                disposition = "winner"
+            _emit_discovery_event(
+                observer,
+                source=event.source,
+                stage=disposition,
+                raw_identity=serial,
+            )
+            if disposition == "winner" and time.monotonic() < deadline:
+                yield device
+    finally:
+        await _cancel_and_reap(tasks)
+
+
+async def discover_udp(
+    timeout: float = DISCOVERY_TIMEOUT,
+    broadcast_address: str = "255.255.255.255",
+    port: int = LIFX_UDP_PORT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> AsyncGenerator[Device, None]:
+    """Discover LIFX devices via UDP and yield them as they are found.
+
+    This is the explicit name for the established broadcast discovery path.
+    Compatible overlapping ``discover()`` and ``discover_udp()`` calls share
+    one active validated wire sweep process-wide. The coordinator drains that
+    producer independently, so a slow consumer cannot compress re-broadcast
+    timing or consume the producer's idle window.
+
+    A late caller receives the active sweep's accepted prefix and remaining
+    suffix. The active producer keeps its original wire deadline and may end
+    before that caller's timeout, while the caller's own timeout still bounds
+    replay, device construction, and delivery.
+
+    Args:
+        timeout: Discovery timeout in seconds (default 15.0)
+        broadcast_address: Broadcast address to use (default "255.255.255.255")
+        port: Port to use (default LIFX_UDP_PORT)
+        max_response_time: Max time to wait for responses
+        idle_timeout_multiplier: Idle timeout multiplier
+        device_timeout: request timeout set on discovered devices
+        max_retries: max retries per request set on discovered devices
+
+    Yields:
+        Device instances as they are discovered via UDP
+    """
+    validate_address(broadcast_address)
+    validate_port(port)
+    deadline = time.monotonic() + max(0.0, timeout)
+    devices = discover_devices_shared(
+        timeout=timeout,
+        broadcast_address=broadcast_address,
+        port=port,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+        device_timeout=device_timeout,
+        max_retries=max_retries,
+        _address_is_prevalidated=True,
+        _caller_deadline=deadline,
     )
     async with aclosing(devices):
         async for discovered in devices:
-            device = await _create_discovered_device(discovered, method="discover")
+            device = await _create_discovered_device(
+                discovered,
+                method="discover_udp",
+                deadline=deadline,
+            )
             if device is not None:
                 yield device
 
@@ -886,7 +1316,7 @@ async def discover_mdns(
             devices.append(device)
         ```
     """
-    from lifx.network.mdns.discovery import discover_devices_mdns
+    from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
     devices = discover_devices_mdns(
         timeout=timeout,
@@ -898,6 +1328,126 @@ async def discover_mdns(
     async with aclosing(devices):
         async for device in devices:
             yield device
+
+
+async def _race_serial_sources(
+    serial: str,
+    *,
+    timeout: float,
+    broadcast_address: str,
+    port: int,
+    max_response_time: float,
+    idle_timeout_multiplier: float,
+    device_timeout: float,
+    max_retries: int,
+) -> Device | None:
+    """Return the first exact serial match after both source legs are reaped."""
+    validate_address(broadcast_address)
+    validate_port(port)
+    deadline = time.monotonic() + max(0.0, timeout)
+    observer: _DiscoveryObserver | None = _current_discovery_observer()
+    queue: asyncio.Queue[_DiscoveryEvent] = asyncio.Queue()
+    fatal_errors: dict[_DiscoverySource, BaseException] = {}
+
+    udp_devices = discover_devices_shared(
+        timeout=timeout,
+        broadcast_address=broadcast_address,
+        port=port,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+        device_timeout=device_timeout,
+        max_retries=max_retries,
+        _address_is_prevalidated=True,
+        _caller_deadline=deadline,
+        _observer=observer,
+    )
+
+    def mdns_source(
+        failure_sink: Callable[[_MdnsFailure], None],
+    ) -> AsyncGenerator[Device, None]:
+        return _discover_verified_devices_mdns(
+            timeout=timeout,
+            max_response_time=max_response_time,
+            idle_timeout_multiplier=idle_timeout_multiplier,
+            device_timeout=device_timeout,
+            max_retries=max_retries,
+            failure_sink=failure_sink,
+            _deadline=deadline,
+            _observer=observer,
+        )
+
+    tasks = [
+        asyncio.create_task(
+            _pump_udp_serial_lookup(
+                udp_devices,
+                queue,
+                serial=serial,
+                deadline=deadline,
+                fatal_errors=fatal_errors,
+            )
+        ),
+        asyncio.create_task(
+            _pump_mdns_serial_lookup(
+                mdns_source,
+                queue,
+                serial=serial,
+                deadline=deadline,
+                fatal_errors=fatal_errors,
+            )
+        ),
+    ]
+    completed_legs = 0
+    winner: _DiscoveryEvent | None = None
+    try:
+        while completed_legs < 2:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=remaining)
+            except asyncio.TimeoutError:
+                return None
+
+            if event.kind == "leg_done":
+                completed_legs += 1
+                continue
+            if event.kind == "absorbed":
+                _LOGGER.debug(
+                    {
+                        "module": "lifx.api",
+                        "method": "find_by_serial",
+                        "action": "mdns_unavailable",
+                        "stage": event.stage,
+                        "reason": event.reason,
+                        "error_type": event.error_type,
+                    }
+                )
+                continue
+            if event.kind == "fatal":
+                raise fatal_errors[event.source]
+
+            winner = event
+            break
+    finally:
+        await _cancel_and_reap(tasks)
+
+    if winner is None or time.monotonic() >= deadline:
+        return None
+    if winner.source == "mdns":
+        if winner.device is None:
+            raise RuntimeError("mDNS serial lookup event contained no device")
+        return winner.device
+
+    if winner.discovered is None:
+        raise RuntimeError("UDP serial lookup event contained no discovery record")
+    device = await _create_discovered_device(
+        winner.discovered,
+        method="find_by_serial",
+        deadline=deadline,
+    )
+    if time.monotonic() >= deadline:
+        return None
+    return device
 
 
 async def find_by_serial(
@@ -945,10 +1495,16 @@ async def find_by_serial(
                 await device.set_power(True)
         ```
     """
-    # Normalize serial to string format (12-digit hex, no separators)
-    serial_str = serial.replace(":", "").replace("-", "").lower()
+    # Serial.from_string intentionally removes ASCII spaces as well as the
+    # documented colon/hyphen separators. Preserve that established parsing
+    # contract while rejecting malformed text before any source is created.
+    try:
+        serial_str = Serial.from_string(serial).to_string()
+    except ValueError:
+        return None
 
-    devices = discover_devices(
+    return await _race_serial_sources(
+        serial_str,
         timeout=timeout,
         broadcast_address=broadcast_address,
         port=port,
@@ -957,13 +1513,6 @@ async def find_by_serial(
         device_timeout=device_timeout,
         max_retries=max_retries,
     )
-    async with aclosing(devices):
-        async for disc in devices:
-            if disc.serial.lower() == serial_str:
-                # Detect device type and return appropriate class
-                return await _create_discovered_device(disc, method="find_by_serial")
-
-    return None
 
 
 async def find_by_ip(
@@ -1143,6 +1692,7 @@ __all__ = [
     "LocationGrouping",
     "GroupGrouping",
     "discover",
+    "discover_udp",
     "discover_mdns",
     "find_by_serial",
     "find_by_ip",

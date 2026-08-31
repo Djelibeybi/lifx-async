@@ -175,7 +175,7 @@ class TestIpv6TargetedDiscovery:
         observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
         observed_transport = _make_observed_discovery_transport(observations)
 
-        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+        with patch("lifx.network.discovery.udp.UdpTransport", observed_transport):
             device = await find_by_ip(
                 "127.0.0.1",
                 port=emulator_port,
@@ -202,7 +202,7 @@ class TestIpv6TargetedDiscovery:
         observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
         observed_transport = _make_observed_discovery_transport(observations)
 
-        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+        with patch("lifx.network.discovery.udp.UdpTransport", observed_transport):
             device = await find_by_ip(
                 "::1",
                 port=port,
@@ -234,7 +234,7 @@ class TestIpv6TargetedDiscoveryLifecycle:
         observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
         observed_transport = _make_observed_discovery_transport(observations)
 
-        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+        with patch("lifx.network.discovery.udp.UdpTransport", observed_transport):
             first_lookup = asyncio.create_task(
                 find_by_ip(
                     "::1",
@@ -287,7 +287,7 @@ class TestIpv6TargetedDiscoveryLifecycle:
         observations: asyncio.Queue[_DiscoveryObservation] = asyncio.Queue()
         observed_transport = _make_observed_discovery_transport(observations)
 
-        with patch("lifx.network.discovery.UdpTransport", observed_transport):
+        with patch("lifx.network.discovery.udp.UdpTransport", observed_transport):
             lookup = asyncio.create_task(
                 find_by_ip(
                     "::1",

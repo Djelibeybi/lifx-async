@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 import pytest
 
 import lifx
-import lifx.network.mdns as mdns
+import lifx.network.discovery.mdns as mdns
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
@@ -22,18 +22,18 @@ from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-from lifx.network.mdns.discovery import (
+from lifx.network.discovery.mdns.discovery import (
     _create_device_from_record,
     _discover_lifx_services_sweep,
     _LifxRecordCache,
 )
-from lifx.network.mdns.dns import (
+from lifx.network.discovery.mdns.dns import (
     DnsResourceRecord,
     SrvData,
     TxtData,
     build_address_query,
 )
-from lifx.network.mdns.types import _LifxServiceRecord
+from lifx.network.discovery.mdns.types import _LifxServiceRecord
 
 
 def _txt(
@@ -141,7 +141,7 @@ class _MonotonicTime(Protocol):
 def _patch_mdns_time(clock: _MonotonicTime) -> Iterator[None]:
     """Bind one isolated clock to discovery and its real IdleDeadline."""
     with (
-        patch("lifx.network.mdns.discovery.time", clock),
+        patch("lifx.network.discovery.mdns.discovery.time", clock),
         patch("lifx.network.utils.time", clock),
     ):
         yield
@@ -561,7 +561,7 @@ class TestLifxRecordCache:
         )
 
         with patch(
-            "lifx.network.mdns.discovery._LifxServiceRecord",
+            "lifx.network.discovery.mdns.discovery._LifxServiceRecord",
             wraps=_LifxServiceRecord,
         ) as record_factory:
             resolved = cache.resolve()
@@ -594,7 +594,7 @@ class TestLifxRecordCache:
         )
 
         with patch(
-            "lifx.network.mdns.discovery._connectivity_from_txt",
+            "lifx.network.discovery.mdns.discovery._connectivity_from_txt",
             side_effect=AssertionError("later metadata was processed"),
         ):
             assert cache.resolve() == []
@@ -631,7 +631,7 @@ class TestLifxRecordCache:
         )
 
         with patch(
-            "lifx.network.mdns.discovery._LifxServiceRecord",
+            "lifx.network.discovery.mdns.discovery._LifxServiceRecord",
             wraps=_LifxServiceRecord,
         ) as record_factory:
             assert cache.resolve() == []
@@ -1514,7 +1514,7 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_yields_records(self) -> None:
         """Test that discovery yields service records."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         # Create mock response data
         mock_response_data = b"\x00" * 100  # Synthetic response bytes
@@ -1539,7 +1539,9 @@ class TestDiscoverPrivateLifxServices:
             _txt_record("device._lifx._udp.local", txt_data),
         ]
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1547,7 +1549,9 @@ class TestDiscoverPrivateLifxServices:
                 (mock_response_data, ("192.0.2.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_parsed_response
 
                 records = []
@@ -1562,9 +1566,11 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_idle_timeout(self) -> None:
         """Test that discovery stops on idle timeout."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1595,9 +1601,11 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_overall_timeout(self) -> None:
         """Test that discovery stops on overall timeout."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1625,7 +1633,9 @@ class TestDiscoverPrivateLifxServices:
 
             mock_transport.receive.side_effect = receive_with_delay
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_parsed_response
 
                 records = []
@@ -1639,12 +1649,14 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_skips_non_response(self) -> None:
         """Test that discovery skips DNS queries (non-responses)."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         mock_query_response = MagicMock()
         mock_query_response.header.is_response = False  # This is a query, not response
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1652,7 +1664,9 @@ class TestDiscoverPrivateLifxServices:
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_query_response
 
                 records = []
@@ -1665,7 +1679,7 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_skips_non_lifx_response(self) -> None:
         """Test that discovery skips non-LIFX mDNS responses."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         # Response without LIFX PTR or TXT records
         mock_response = MagicMock()
@@ -1674,7 +1688,9 @@ class TestDiscoverPrivateLifxServices:
             MagicMock(rtype=1, name="some.other.local", parsed_data="192.168.1.1"),
         ]
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1682,7 +1698,9 @@ class TestDiscoverPrivateLifxServices:
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_response
 
                 records = []
@@ -1694,7 +1712,7 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_skips_invalid_record(self) -> None:
         """Test that discovery skips responses that can't be parsed as LIFX records."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         # Response with LIFX PTR but invalid TXT data (missing required fields)
         txt_data = TxtData(
@@ -1710,7 +1728,9 @@ class TestDiscoverPrivateLifxServices:
             MagicMock(rtype=16, parsed_data=txt_data),
         ]
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1718,7 +1738,9 @@ class TestDiscoverPrivateLifxServices:
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_response
 
                 records = []
@@ -1731,9 +1753,11 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_handles_parse_error(self) -> None:
         """Test that discovery handles DNS parsing errors gracefully."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1741,7 +1765,9 @@ class TestDiscoverPrivateLifxServices:
                 (b"\x00" * 50, ("192.168.1.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 # Parsing fails with an exception
                 mock_parse.side_effect = ValueError("Invalid DNS data")
 
@@ -1755,7 +1781,7 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_with_lifx_txt_but_no_ptr(self) -> None:
         """Test discovery with LIFX TXT record but no PTR record."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         # Response with LIFX TXT but no PTR
         txt_data = TxtData(
@@ -1768,7 +1794,9 @@ class TestDiscoverPrivateLifxServices:
             _txt_record("device._lifx._udp.local", txt_data),
         ]
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1776,7 +1804,9 @@ class TestDiscoverPrivateLifxServices:
                 (b"\x00" * 50, ("192.0.2.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_response
 
                 records = []
@@ -1790,7 +1820,7 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_deduplicates_by_serial(self) -> None:
         """Test that discovery deduplicates by serial."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         txt_data = TxtData(
             strings=["id=d073d5123456", "p=27", "fw=4.112"],
@@ -1811,7 +1841,9 @@ class TestDiscoverPrivateLifxServices:
             _txt_record("device._lifx._udp.local", txt_data),
         ]
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1821,7 +1853,9 @@ class TestDiscoverPrivateLifxServices:
                 (b"\x00" * 100, ("192.0.2.100", 5353)),
             )
 
-            with patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse:
+            with patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response"
+            ) as mock_parse:
                 mock_parse.return_value = mock_parsed_response
 
                 records = []
@@ -1840,7 +1874,7 @@ class TestDiscoverPrivateLifxServices:
         flood from one device cannot cause premature idle expiry while slower
         devices have not yet answered.
         """
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
         from lifx.network.utils import IdleDeadline
 
         txt_data = TxtData(
@@ -1862,7 +1896,9 @@ class TestDiscoverPrivateLifxServices:
             _txt_record("device._lifx._udp.local", txt_data),
         ]
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1873,7 +1909,9 @@ class TestDiscoverPrivateLifxServices:
             )
 
             with (
-                patch("lifx.network.mdns.discovery.parse_dns_response") as mock_parse,
+                patch(
+                    "lifx.network.discovery.mdns.discovery.parse_dns_response"
+                ) as mock_parse,
                 patch.object(IdleDeadline, "mark_response", autospec=True) as mock_mark,
             ):
                 mock_parse.return_value = mock_parsed_response
@@ -1890,9 +1928,11 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_network_error_does_not_propagate(self) -> None:
         """Test that LifxNetworkError breaks the loop without propagating (D-08)."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1908,9 +1948,11 @@ class TestDiscoverPrivateLifxServices:
     @pytest.mark.asyncio
     async def test_discover_unexpected_error_propagates(self) -> None:
         """Test that unexpected receive exceptions are logged and re-raised (D-08)."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
-        with patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls:
+        with patch(
+            "lifx.network.discovery.mdns.discovery.MdnsTransport"
+        ) as mock_transport_cls:
             mock_transport = AsyncMock()
             mock_transport_cls.return_value.__aenter__.return_value = mock_transport
 
@@ -1943,14 +1985,17 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_diagnostic_summary_is_emitted_once_when_empty(self, caplog) -> None:
         """Normal timeout finalises one stable zero-count event."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         transport = _fake_transport()
         transport.receive = AsyncMock(side_effect=LifxTimeoutError("timeout"))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             assert [
                 record async for record in _discover_lifx_services(timeout=0.1)
@@ -1967,7 +2012,7 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_diagnostic_summary_is_ordered_and_privacy_safe(self, caplog) -> None:
         """Only fixed reason, type, and integer count scalars are retained."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         instance = "private-device._lifx._udp.local"
         invalid = _txt_record(
@@ -1980,11 +2025,15 @@ class TestMdnsRejectionDiagnostics:
         transport.receive = _receive_script((b"private-packet", ("192.0.2.44", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             assert [
                 record async for record in _discover_lifx_services(timeout=0.1)
@@ -2016,7 +2065,7 @@ class TestMdnsRejectionDiagnostics:
         self, caplog
     ) -> None:
         """The legacy-unicast high class bit has no cache semantics."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response(
             [_txt_record("device._lifx._udp.local", rclass=0x8001)]
@@ -2025,11 +2074,15 @@ class TestMdnsRejectionDiagnostics:
         transport.receive = _receive_script((b"packet", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             found = [record async for record in _discover_lifx_services(timeout=0.1)]
 
@@ -2041,7 +2094,7 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_invalid_srv_port_does_not_abort_later_device(self, caplog) -> None:
         """One invalid endpoint is aggregated while unrelated discovery continues."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         invalid_instance = "invalid._lifx._udp.local"
         valid_instance = "valid._lifx._udp.local"
@@ -2066,12 +2119,15 @@ class TestMdnsRejectionDiagnostics:
         )
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 side_effect=[invalid_response, valid_response],
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             found = [record async for record in _discover_lifx_services(timeout=0.1)]
 
@@ -2094,15 +2150,21 @@ class TestMdnsRejectionDiagnostics:
         self, error: Exception, caplog
     ) -> None:
         """Parser wire failures aggregate without exception text or source."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         transport = _fake_transport()
         transport.receive = _receive_script((b"bad", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
-            patch("lifx.network.mdns.discovery.parse_dns_response", side_effect=error),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                side_effect=error,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             assert [
                 record async for record in _discover_lifx_services(timeout=0.1)
@@ -2116,7 +2178,7 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_connectivity_fallback_has_no_diagnostic(self, caplog) -> None:
         """Non-2 private connectivity values are valid WiFi outcomes."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response(
             [
@@ -2130,11 +2192,15 @@ class TestMdnsRejectionDiagnostics:
         transport.receive = _receive_script((b"packet", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             found = [record async for record in _discover_lifx_services(timeout=0.1)]
 
@@ -2144,7 +2210,7 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_concurrent_diagnostic_summaries_are_isolated(self, caplog) -> None:
         """Two calls cannot share reason counts or cache-flush observations."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         invalid = self._response(
             [
@@ -2170,11 +2236,14 @@ class TestMdnsRejectionDiagnostics:
 
         with (
             patch(
-                "lifx.network.mdns.discovery.MdnsTransport",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
                 side_effect=[first, second],
             ),
-            patch("lifx.network.mdns.discovery.parse_dns_response", side_effect=parse),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                side_effect=parse,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             results = await asyncio.gather(collect(), collect())
 
@@ -2188,18 +2257,22 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_early_generator_close_emits_summary_once(self, caplog) -> None:
         """GeneratorExit runs the synchronous final summary path."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response([_txt_record("device._lifx._udp.local")])
         transport = _fake_transport()
         transport.receive = _receive_script((b"packet", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             generator = _discover_lifx_services(timeout=0.1)
             await anext(generator)
@@ -2212,23 +2285,27 @@ class TestMdnsRejectionDiagnostics:
         self, caplog
     ) -> None:
         """Implementation defects are never relabelled as malformed input."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response([_txt_record("device._lifx._udp.local")])
         transport = _fake_transport()
         transport.receive = _receive_script((b"packet", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
             ),
             patch.object(
                 _LifxRecordCache,
                 "add_packet",
                 side_effect=RuntimeError("cache defect"),
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
             pytest.raises(RuntimeError, match="cache defect"),
         ):
             async for _record in _discover_lifx_services(timeout=0.1):
@@ -2242,7 +2319,7 @@ class TestMdnsRejectionDiagnostics:
         self, caplog
     ) -> None:
         """Rejected replay changes count magnitude, never key cardinality."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         instance = "device._lifx._udp.local"
         records = [
@@ -2254,11 +2331,15 @@ class TestMdnsRejectionDiagnostics:
         transport.receive = _receive_script((b"packet", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             assert [
                 record async for record in _discover_lifx_services(timeout=0.1)
@@ -2271,18 +2352,22 @@ class TestMdnsRejectionDiagnostics:
     @pytest.mark.asyncio
     async def test_invalid_packet_source_fallback_is_aggregated(self, caplog) -> None:
         """A malformed fallback never reaches record or device construction."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response([_txt_record("device._lifx._udp.local")])
         transport = _fake_transport()
         transport.receive = _receive_script((b"packet", ("not-an-address", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response", return_value=response
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
+                return_value=response,
+            ),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             assert [
                 record async for record in _discover_lifx_services(timeout=0.1)
@@ -2299,7 +2384,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_close_synchronously_finalises_service_discovery(self) -> None:
         """Closing device discovery closes its service-record delegate."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         finalised = False
         record = _LifxServiceRecord(
@@ -2319,7 +2404,7 @@ class TestDiscoverDevicesMdns:
                 finalised = True
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services",
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services",
             return_value=mock_generator(),
         ):
             generator = discover_devices_mdns(timeout=0.1)
@@ -2332,7 +2417,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_discover_yields_device_instances(self) -> None:
         """Test that discovery yields device instances."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         # Create a mock service record
         mock_record = _LifxServiceRecord(
@@ -2345,7 +2430,7 @@ class TestDiscoverDevicesMdns:
         )
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services"
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services"
         ) as mock_discover:
 
             async def mock_generator():
@@ -2366,7 +2451,7 @@ class TestDiscoverDevicesMdns:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Construction cannot re-emit warnings for an advertised address."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         record = _LifxServiceRecord(
             serial="d073d5123456",
@@ -2383,7 +2468,7 @@ class TestDiscoverDevicesMdns:
         with (
             caplog.at_level("WARNING"),
             patch(
-                "lifx.network.mdns.discovery._discover_lifx_services",
+                "lifx.network.discovery.mdns.discovery._discover_lifx_services",
                 return_value=mock_generator(),
             ),
         ):
@@ -2398,7 +2483,7 @@ class TestDiscoverDevicesMdns:
         self,
     ) -> None:
         """A valid ULA survives an earlier unspecified IPv4 advertisement."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         instance = "device._lifx._udp.local"
         host = "synthetic-host.local"
@@ -2419,7 +2504,7 @@ class TestDiscoverDevicesMdns:
                 yield record
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services",
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services",
             return_value=mock_generator(),
         ):
             devices = [device async for device in discover_devices_mdns(timeout=0.1)]
@@ -2431,7 +2516,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_unusable_only_cache_yields_no_public_device(self) -> None:
         """An unusable-only address set cannot escape through public discovery."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         instance = "device._lifx._udp.local"
         host = "synthetic-host.local"
@@ -2455,11 +2540,11 @@ class TestDiscoverDevicesMdns:
 
         with (
             patch(
-                "lifx.network.mdns.discovery._discover_lifx_services",
+                "lifx.network.discovery.mdns.discovery._discover_lifx_services",
                 return_value=mock_generator(),
             ),
             patch(
-                "lifx.network.mdns.discovery._create_device_from_record"
+                "lifx.network.discovery.mdns.discovery._create_device_from_record"
             ) as mock_create,
         ):
             devices = [device async for device in discover_devices_mdns(timeout=0.1)]
@@ -2471,7 +2556,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_discover_filters_relay_devices(self) -> None:
         """Test that relay devices are filtered out."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         # Create a mock relay device record
         mock_record = _LifxServiceRecord(
@@ -2484,7 +2569,7 @@ class TestDiscoverDevicesMdns:
         )
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services"
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services"
         ) as mock_discover:
 
             async def mock_generator():
@@ -2502,7 +2587,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_invalid_address_does_not_end_device_sweep(self, caplog) -> None:
         """A bare link-local record is skipped while later records are yielded."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         records = (
             _LifxServiceRecord(
@@ -2528,10 +2613,12 @@ class TestDiscoverDevicesMdns:
                 yield record
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services",
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services",
             return_value=mock_generator(),
         ):
-            with caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"):
+            with caplog.at_level(
+                "DEBUG", logger="lifx.network.discovery.mdns.discovery"
+            ):
                 devices = [
                     device async for device in discover_devices_mdns(timeout=0.1)
                 ]
@@ -2546,7 +2633,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_invalid_address_adjacent_to_relay_filters_both(self) -> None:
         """Invalid addresses do not interfere with normal relay filtering."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         records = (
             _LifxServiceRecord(
@@ -2572,7 +2659,7 @@ class TestDiscoverDevicesMdns:
                 yield record
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services",
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services",
             return_value=mock_generator(),
         ):
             devices = [device async for device in discover_devices_mdns(timeout=0.1)]
@@ -2582,7 +2669,7 @@ class TestDiscoverDevicesMdns:
     @pytest.mark.asyncio
     async def test_constructor_value_error_propagates(self) -> None:
         """Only address-validation errors degrade; constructor defects propagate."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         record = _LifxServiceRecord(
             "d073d5000001",
@@ -2598,11 +2685,11 @@ class TestDiscoverDevicesMdns:
 
         with (
             patch(
-                "lifx.network.mdns.discovery._discover_lifx_services",
+                "lifx.network.discovery.mdns.discovery._discover_lifx_services",
                 return_value=mock_generator(),
             ),
             patch(
-                "lifx.network.mdns.discovery._create_device_from_record",
+                "lifx.network.discovery.mdns.discovery._create_device_from_record",
                 side_effect=ValueError("constructor defect"),
             ),
             pytest.raises(ValueError, match="constructor defect"),
@@ -2615,7 +2702,7 @@ class TestDiscoverDevicesMdns:
         self,
     ) -> None:
         """Mixed-case exact service provenance survives the complete boundary."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         instance = "Synthetic._LiFx._UdP.LoCaL."
         cache = _LifxRecordCache()
@@ -2634,7 +2721,7 @@ class TestDiscoverDevicesMdns:
             yield records[0]
 
         with patch(
-            "lifx.network.mdns.discovery._discover_lifx_services",
+            "lifx.network.discovery.mdns.discovery._discover_lifx_services",
             return_value=mock_generator(),
         ):
             devices = [device async for device in discover_devices_mdns(timeout=0.1)]
@@ -2652,7 +2739,7 @@ class TestDiscoverDevicesMdns:
         self, service_instance: str | None
     ) -> None:
         """Forged or legacy private records cannot cross the public boundary."""
-        from lifx.network.mdns.discovery import discover_devices_mdns
+        from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
         record = _LifxServiceRecord(
             "d073d5000001",
@@ -2668,11 +2755,11 @@ class TestDiscoverDevicesMdns:
 
         with (
             patch(
-                "lifx.network.mdns.discovery._discover_lifx_services",
+                "lifx.network.discovery.mdns.discovery._discover_lifx_services",
                 return_value=mock_generator(),
             ),
             patch(
-                "lifx.network.mdns.discovery._create_device_from_record"
+                "lifx.network.discovery.mdns.discovery._create_device_from_record"
             ) as converter,
         ):
             devices = [device async for device in discover_devices_mdns(timeout=0.1)]
@@ -2686,7 +2773,7 @@ class TestMdnsRemainingNonPositiveGuard:
 
     @pytest.mark.asyncio
     async def test_remaining_nonpositive_breaks_before_receive(self) -> None:
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         fake = MagicMock()
         fake.idle_expired = False
@@ -2696,8 +2783,12 @@ class TestMdnsRemainingNonPositiveGuard:
         fake._last_response = 0.0
 
         with (
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=fake),
-            patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.mdns.discovery.IdleDeadline", return_value=fake
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport"
+            ) as mock_transport_cls,
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -2714,7 +2805,7 @@ class TestMdnsRemainingNonPositiveGuard:
     @pytest.mark.asyncio
     async def test_idle_expired_breaks_with_debug(self) -> None:
         """idle_expired True takes the idle-timeout break (covers the True side)."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         fake = MagicMock()
         fake.idle_expired = True
@@ -2722,8 +2813,12 @@ class TestMdnsRemainingNonPositiveGuard:
         fake._last_response = 0.0
 
         with (
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=fake),
-            patch("lifx.network.mdns.discovery.MdnsTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.mdns.discovery.IdleDeadline", return_value=fake
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport"
+            ) as mock_transport_cls,
         ):
             mock_transport = AsyncMock()
             mock_transport.__aenter__ = AsyncMock(return_value=mock_transport)
@@ -3802,7 +3897,7 @@ class TestMdnsQueryRetransmission:
     @pytest.mark.asyncio
     async def test_each_slot_re_sends_the_query_once(self) -> None:
         """Crossing both slots sends the query twice more, then stops."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         clock = MagicMock()
         # start_time, loop timing, freshly recomputed pre-receive timing, and
@@ -3816,11 +3911,14 @@ class TestMdnsQueryRetransmission:
 
         with (
             patch(
-                "lifx.network.mdns.discovery.IdleDeadline",
+                "lifx.network.discovery.mdns.discovery.IdleDeadline",
                 return_value=_fake_deadline(),
             ),
             _patch_mdns_time(clock),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
         ):
             records = [r async for r in _discover_lifx_services(timeout=5.0)]
 
@@ -3836,7 +3934,7 @@ class TestMdnsQueryRetransmission:
         out means "the slot arrived", not "nothing more is coming". Ending
         there would drop every responder that had not yet answered.
         """
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         clock = MagicMock()
         # Never reaches a slot, so the schedule stays non-empty and every
@@ -3851,9 +3949,15 @@ class TestMdnsQueryRetransmission:
         transport.receive = AsyncMock(side_effect=LifxTimeoutError("timeout"))
 
         with (
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
+            patch(
+                "lifx.network.discovery.mdns.discovery.IdleDeadline",
+                return_value=deadline,
+            ),
             _patch_mdns_time(clock),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
         ):
             records = [r async for r in _discover_lifx_services(timeout=5.0)]
 
@@ -3877,8 +3981,14 @@ class TestMdnsQueryRetransmission:
 
         with (
             _patch_mdns_time(clock),
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.mdns.discovery.IdleDeadline",
+                return_value=deadline,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
         ):
             records = [
                 record
@@ -3916,8 +4026,14 @@ class TestMdnsConsumerYieldTiming:
         transport.receive = AsyncMock(side_effect=LifxNetworkError("stop"))
 
         with (
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.mdns.discovery.IdleDeadline",
+                return_value=deadline,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
         ):
             records = [
                 record
@@ -3944,7 +4060,10 @@ class TestMdnsConsumerYieldTiming:
 
         with (
             _patch_mdns_time(clock),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
         ):
             generator = _discover_lifx_services_sweep(
                 self._ready_cache(),
@@ -3979,10 +4098,16 @@ class TestMdnsConsumerYieldTiming:
         transport.receive = _receive_script((b"response", ("192.0.2.10", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.IdleDeadline",
+                return_value=deadline,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=response,
             ),
         ):
@@ -4004,7 +4129,7 @@ class TestMdnsGoodbyeExpiryScheduling:
         self,
     ) -> None:
         """One timeout processes expiry then retransmit at the same instant."""
-        from lifx.network.mdns.discovery import (
+        from lifx.network.discovery.mdns.discovery import (
             _discover_lifx_services,
             _LifxRecordCache,
         )
@@ -4063,10 +4188,16 @@ class TestMdnsGoodbyeExpiryScheduling:
 
         with (
             _patch_mdns_time(clock),
-            patch("lifx.network.mdns.discovery.IdleDeadline", return_value=deadline),
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.IdleDeadline",
+                return_value=deadline,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 side_effect=[positive_response, goodbye_response],
             ),
             patch.object(_LifxRecordCache, "expire", new=tracked_expire),
@@ -4120,7 +4251,7 @@ class TestMdnsFollowUpAddressQueries:
         self,
     ) -> None:
         """TXT/SRV/A/AAAA packet order, empties, and replay cannot choose output."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         instance = "synthetic._lifx._udp.local"
         target = "synthetic-host.local"
@@ -4155,11 +4286,11 @@ class TestMdnsFollowUpAddressQueries:
             with (
                 _patch_mdns_time(clock),
                 patch(
-                    "lifx.network.mdns.discovery.MdnsTransport",
+                    "lifx.network.discovery.mdns.discovery.MdnsTransport",
                     return_value=transport,
                 ),
                 patch(
-                    "lifx.network.mdns.discovery.parse_dns_response",
+                    "lifx.network.discovery.mdns.discovery.parse_dns_response",
                     side_effect=parse,
                 ),
             ):
@@ -4181,7 +4312,7 @@ class TestMdnsFollowUpAddressQueries:
         self, caplog
     ) -> None:
         """Every cache, target ledger, serial set, and summary belongs to one call."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         first_instance = "first._lifx._udp.local"
         second_instance = "second._lifx._udp.local"
@@ -4225,14 +4356,14 @@ class TestMdnsFollowUpAddressQueries:
 
         with (
             patch(
-                "lifx.network.mdns.discovery.MdnsTransport",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
                 side_effect=[first_transport, second_transport],
             ),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 side_effect=lambda packet: responses[packet],
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             first, second = await asyncio.gather(collect(), collect())
 
@@ -4271,7 +4402,7 @@ class TestMdnsFollowUpAddressQueries:
         expected_ip: str,
     ) -> None:
         """The combined A/AAAA query bytes precede later target completion."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         pending = self._response_for(self._pending_records(1))
         address = self._response_for([address_record])
@@ -4282,9 +4413,12 @@ class TestMdnsFollowUpAddressQueries:
         )
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 side_effect=[pending, address],
             ),
         ):
@@ -4302,7 +4436,7 @@ class TestMdnsFollowUpAddressQueries:
         self,
     ) -> None:
         """An unusable cached AAAA cannot deny the direct address query."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         pending = self._response_for(
             [
@@ -4318,9 +4452,12 @@ class TestMdnsFollowUpAddressQueries:
         )
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 side_effect=[pending, address],
             ),
         ):
@@ -4336,15 +4473,18 @@ class TestMdnsFollowUpAddressQueries:
     @pytest.mark.asyncio
     async def test_a_target_with_no_address_record_is_queried_directly(self) -> None:
         """The instance stays unresolved, so its host is asked about."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         transport = _fake_transport()
         transport.receive = _receive_script((b"\x00" * 100, ("192.168.1.100", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=self._response_for(self._pending_records(1)),
             ),
         ):
@@ -4362,15 +4502,18 @@ class TestMdnsFollowUpAddressQueries:
     @pytest.mark.asyncio
     async def test_follow_up_queries_stop_at_sixty_four_targets(self) -> None:
         """A hostile responder cannot turn one reply into unbounded traffic."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         transport = _fake_transport()
         transport.receive = _receive_script((b"\x00" * 100, ("192.168.1.100", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=self._response_for(self._pending_records(65)),
             ),
         ):
@@ -4389,7 +4532,7 @@ class TestMdnsFollowUpAddressQueries:
         self, caplog
     ) -> None:
         """Resolved records are delivered before a pending target's send fails."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         records = [
             *self._pending_records(2),
@@ -4408,12 +4551,15 @@ class TestMdnsFollowUpAddressQueries:
         ]
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=response,
             ),
-            caplog.at_level("DEBUG", logger="lifx.network.mdns.discovery"),
+            caplog.at_level("DEBUG", logger="lifx.network.discovery.mdns.discovery"),
         ):
             found = [record async for record in _discover_lifx_services(timeout=0.1)]
 
@@ -4437,7 +4583,7 @@ class TestMdnsFollowUpAddressQueries:
     @pytest.mark.asyncio
     async def test_transient_query_failure_retries_once_then_stops(self) -> None:
         """A failed target retries once and a successful retry is final."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response_for(self._pending_records(1))
         transport = _fake_transport()
@@ -4449,9 +4595,12 @@ class TestMdnsFollowUpAddressQueries:
         transport.send.side_effect = [None, LifxNetworkError("transient"), None]
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=response,
             ),
         ):
@@ -4464,7 +4613,7 @@ class TestMdnsFollowUpAddressQueries:
     @pytest.mark.asyncio
     async def test_persistent_query_failure_stops_after_two_attempts(self) -> None:
         """Duplicate packets cannot generate more than two failed sends per target."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         response = self._response_for(self._pending_records(1))
         transport = _fake_transport()
@@ -4478,9 +4627,12 @@ class TestMdnsFollowUpAddressQueries:
         ]
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=response,
             ),
         ):
@@ -4493,7 +4645,7 @@ class TestMdnsFollowUpAddressQueries:
     @pytest.mark.asyncio
     async def test_failed_targets_still_count_towards_sixty_four_cap(self) -> None:
         """The distinct-target cap applies before sends can succeed."""
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         transport = _fake_transport()
         transport.receive = _receive_script((b"packet", ("192.168.1.1", 5353)))
@@ -4506,9 +4658,12 @@ class TestMdnsFollowUpAddressQueries:
         transport.send.side_effect = fail_address_queries
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=self._response_for(self._pending_records(65)),
             ),
         ):
@@ -4532,7 +4687,7 @@ class TestMdnsSerialDeduplication:
         border router re-advertising a device that also answers for itself
         looks like on the wire.
         """
-        from lifx.network.mdns.discovery import _discover_lifx_services
+        from lifx.network.discovery.mdns.discovery import _discover_lifx_services
 
         serial = "d073d5123456"
         records = []
@@ -4564,9 +4719,12 @@ class TestMdnsSerialDeduplication:
         transport.receive = _receive_script((b"\x00" * 100, ("192.168.1.100", 5353)))
 
         with (
-            patch("lifx.network.mdns.discovery.MdnsTransport", return_value=transport),
             patch(
-                "lifx.network.mdns.discovery.parse_dns_response",
+                "lifx.network.discovery.mdns.discovery.MdnsTransport",
+                return_value=transport,
+            ),
+            patch(
+                "lifx.network.discovery.mdns.discovery.parse_dns_response",
                 return_value=response,
             ),
         ):

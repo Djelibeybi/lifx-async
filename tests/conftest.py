@@ -34,6 +34,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxConnectionError, LifxNetworkError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
+from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
 
 NETWORK_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LifxTimeoutError,
@@ -44,6 +45,45 @@ WINDOWS_IPV6_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     *NETWORK_RETRY_EXCEPTIONS,
     AssertionError,
 )
+
+
+@pytest.fixture
+def _allow_public_mdns_discovery() -> None:
+    """Opt one public-API test out of the default empty mDNS source."""
+
+
+@pytest.fixture(autouse=True)
+def _empty_mdns_for_public_discovery(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[None]:
+    """Keep public discovery tests independent of ambient multicast traffic."""
+    if request.node.path.name != "test_api_discovery.py" or (
+        "_allow_public_mdns_discovery" in request.fixturenames
+    ):
+        yield
+        return
+
+    async def empty_source():
+        return
+        yield  # noqa: B901 - retain the async-generator ownership shape
+
+    class FailOnAmbientMdnsTransport:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("ambient MdnsTransport was constructed")
+
+        async def __aenter__(self) -> None:
+            raise AssertionError("ambient mDNS socket was opened")
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "lifx.network.discovery.mdns.discovery.MdnsTransport",
+        FailOnAmbientMdnsTransport,
+    )
+    with _override_mdns_service_source(empty_source):
+        yield
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

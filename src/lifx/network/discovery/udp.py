@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from itertools import accumulate
-from typing import TYPE_CHECKING, Any
+from typing import Any, cast
 
 from lifx.const import (
     DEFAULT_IP_ADDRESS,
@@ -34,6 +35,8 @@ from lifx.network.address import (
     validate_port,
     wildcard_for,
 )
+from lifx.network.connection import DeviceConnection
+from lifx.network.discovery.coordinator import _UdpSweepKey, subscribe_udp_sweep
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import UdpTransport
 from lifx.network.utils import IdleDeadline, allocate_source
@@ -43,11 +46,44 @@ from lifx.protocol.packets import Device as DevicePackets
 from lifx.protocol.packets import get_packet_class
 from lifx.protocol.protocol_types import DeviceService
 
-if TYPE_CHECKING:
-    from lifx.devices.base import Device
-
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_SEQUENCE_START: int = 0
+_DISCOVERY_OBSERVER_TASK_ATTRIBUTE = "_lifx_discovery_observer"
+_DiscoveryObserver = Callable[[str, str, str, int | None, int | None, str | None], None]
+
+
+def _current_discovery_observer() -> _DiscoveryObserver | None:
+    """Return the repository harness callback attached to the current task."""
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        return None
+    return cast(
+        _DiscoveryObserver | None,
+        getattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE, None),
+    )
+
+
+def _emit_discovery_event(
+    observer: _DiscoveryObserver | None,
+    *,
+    source: str,
+    stage: str,
+    raw_identity: str,
+    firmware_major: int | None = None,
+    firmware_minor: int | None = None,
+    connectivity: str | None = None,
+) -> None:
+    """Call an explicitly injected repository observer when one is present."""
+    if observer is not None:
+        observer(
+            source,
+            stage,
+            raw_identity,
+            firmware_major,
+            firmware_minor,
+            connectivity,
+        )
 
 
 @dataclass
@@ -71,8 +107,16 @@ class DiscoveredDevice:
     max_retries: int = DEFAULT_MAX_RETRIES
     first_seen: float = field(default_factory=time.time)
     response_time: float = 0.0
+    _construction_connections: dict[asyncio.Task[Any], DeviceConnection] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
-    async def create_device(self) -> Device | None:
+    # Pyright infers the concrete device union from the local factory imports.
+    # A module-level Device import would create a devices.base -> network cycle.
+    async def create_device(self):
         """Create appropriate device instance based on product capabilities.
 
         Queries the device for its product ID and uses the product registry
@@ -120,6 +164,11 @@ class DiscoveredDevice:
                 max_retries=self.max_retries,
                 _emit_input_warnings=False,
             )
+            construction_task = asyncio.current_task()
+            if construction_task is not None:
+                self._construction_connections[construction_task] = (
+                    temp_device.connection
+                )
 
         except ValueError as error:
             _LOGGER.debug(
@@ -148,7 +197,11 @@ class DiscoveredDevice:
             return None
         finally:
             # Always close the temporary device connection
-            await temp_device.connection.close()
+            try:
+                await temp_device.connection.close()
+            finally:
+                if construction_task is not None:
+                    self._construction_connections.pop(construction_task, None)
 
         if not temp_device.capabilities or not temp_device.version:
             return None
@@ -179,6 +232,12 @@ class DiscoveredDevice:
         # immediately repeat the same network work.
         device.adopt_cached_metadata(temp_device)
         return device
+
+    def _force_close_construction(self, task: asyncio.Task[Any]) -> None:
+        """Force-close temporary discovery resources owned by ``task``."""
+        connection = self._construction_connections.get(task)
+        if connection is not None:
+            connection._force_close()
 
     def __hash__(self) -> int:
         """Hash based on serial number for deduplication."""
@@ -223,6 +282,7 @@ async def _discover_with_packet(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     *,
     _address_is_prevalidated: bool = False,
+    _observer: _DiscoveryObserver | None = None,
 ) -> AsyncGenerator[DiscoveryResponse]:
     """Generic discovery using any Get* packet.
 
@@ -248,6 +308,9 @@ async def _discover_with_packet(
         idle_timeout_multiplier: Idle timeout multiplier
         _address_is_prevalidated: Suppress caller advisories when a public
             entry point already validated the same destination
+        _observer: Explicit caller-owned measurement observer. The
+            repository harness selector is captured by ``discover_devices`` and is
+            never consulted inside this wire producer.
 
     Note:
         The idle timer is reset both before a response is yielded and again
@@ -552,6 +615,13 @@ async def _discover_with_packet(
                     continue
                 seen_serials.add(device_serial)
 
+                _emit_discovery_event(
+                    _observer,
+                    source="udp",
+                    stage="accepted",
+                    raw_identity=device_serial,
+                )
+
                 yield discovery_resp
 
                 # Control has come back from the consumer. Reset the idle timer
@@ -686,6 +756,7 @@ async def discover_devices(
             devices.append(device)
         ```
     """
+    observer = _current_discovery_observer()
     responses = _discover_with_packet(
         DevicePackets.GetService(),
         timeout=timeout,
@@ -694,6 +765,7 @@ async def discover_devices(
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
         _address_is_prevalidated=_address_is_prevalidated,
+        _observer=observer,
     )
     async with aclosing(responses):
         async for resp in responses:
@@ -709,3 +781,81 @@ async def discover_devices(
                 timeout=device_timeout,
                 max_retries=max_retries,
             )
+
+
+async def discover_devices_shared(
+    timeout: float = DISCOVERY_TIMEOUT,
+    broadcast_address: str = "255.255.255.255",
+    port: int = LIFX_UDP_PORT,
+    max_response_time: float = MAX_RESPONSE_TIME,
+    idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
+    device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    *,
+    _address_is_prevalidated: bool = False,
+    _caller_deadline: float | None = None,
+    _observer: _DiscoveryObserver | None = None,
+) -> AsyncGenerator[DiscoveredDevice, None]:
+    """Share one compatible active UDP sweep across enumeration callers.
+
+    The coordinator eagerly drains the validated raw producer, so consumer
+    pacing cannot shift its re-broadcast schedule or consume its idle window.
+    A late compatible caller receives the producer's accepted prefix followed
+    by its suffix, but never extends the producer-origin wire deadline. Its own
+    caller-origin ``timeout`` independently bounds registration, replay,
+    construction, and delivery.
+
+    ``device_timeout`` and ``max_retries`` remain caller-specific. They are
+    applied only after raw fan-out and therefore do not split a compatible wire
+    sweep or leak one subscriber's settings into another.
+    """
+    validate_address(broadcast_address, emit_warnings=not _address_is_prevalidated)
+    validate_port(port)
+    caller_deadline = (
+        time.monotonic() + max(0.0, timeout)
+        if _caller_deadline is None
+        else _caller_deadline
+    )
+    observer = _current_discovery_observer() if _observer is None else _observer
+    key = _UdpSweepKey(
+        broadcast_address=broadcast_address,
+        port=port,
+        timeout=timeout,
+        max_response_time=max_response_time,
+        idle_timeout_multiplier=idle_timeout_multiplier,
+    )
+
+    def _producer() -> AsyncGenerator[DiscoveryResponse, None]:
+        return _discover_with_packet(
+            DevicePackets.GetService(),
+            timeout=timeout,
+            broadcast_address=broadcast_address,
+            port=port,
+            max_response_time=max_response_time,
+            idle_timeout_multiplier=idle_timeout_multiplier,
+            _address_is_prevalidated=True,
+            _observer=None,
+        )
+
+    responses = subscribe_udp_sweep(
+        key,
+        _producer,
+        caller_deadline=caller_deadline,
+        observer=observer,
+    )
+    async with aclosing(responses):
+        async for resp in responses:
+            if time.monotonic() >= caller_deadline:
+                return
+            device_port: int = resp.response_payload["port"]
+            discovered = DiscoveredDevice(
+                serial=resp.serial,
+                ip=resp.ip,
+                port=device_port,
+                response_time=resp.response_time,
+                timeout=device_timeout,
+                max_retries=max_retries,
+            )
+            if time.monotonic() >= caller_deadline:
+                return
+            yield discovered

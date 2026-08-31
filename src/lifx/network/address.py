@@ -27,7 +27,7 @@ The call sites, all of which import from here:
   :func:`wildcard_for`, reconstructs responder scope with
   :func:`host_from_sockaddr`, and validates wire addresses without emitting
   caller-input warnings; device construction retains that explicit policy
-* :mod:`lifx.network.mdns.discovery`: mDNS validates packet-source and
+* :mod:`lifx.network.discovery.mdns.discovery`: mDNS validates packet-source and
   advertised device addresses with :func:`validate_address`, suppressing
   caller-input warnings for both wire-controlled paths and for construction
   from those validated records

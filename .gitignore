@@ -92,6 +92,7 @@ Thumbs.db
 # Local storage
 .notes/
 /.planning/local/phase-08-theme-fidelity/
+/.planning/local/phase-13-merged-discovery/
 .claude/settings.local.json
 .mcp.json
 .serena/

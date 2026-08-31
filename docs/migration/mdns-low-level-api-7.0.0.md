@@ -14,6 +14,8 @@ The following names are no longer public:
 
 Their replacements inside the mDNS implementation are private and are not
 compatibility APIs. Code should not import their underscore-prefixed equivalents.
+The canonical implementation now lives below `lifx.network.discovery.mdns`;
+`lifx.network.mdns` retains only the supported public compatibility re-exports.
 
 ## Migration
 

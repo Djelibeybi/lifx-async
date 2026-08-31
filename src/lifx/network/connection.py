@@ -393,6 +393,27 @@ class DeviceConnection:
         if cancelled is not None:
             raise cancelled
 
+    def _force_close(self) -> None:
+        """Synchronously tear down connection resources during deadline cleanup."""
+        self._state_generation += 1
+        self._invalidate_pending_requests()
+        self._is_open = False
+
+        opening_transport, self._opening_transport = self._opening_transport, None
+        transport, self._transport = self._transport, None
+        receiver_task, self._receiver_task = self._receiver_task, None
+        receiver_shutdown, self._receiver_shutdown = self._receiver_shutdown, None
+        self._send_address = None
+
+        if receiver_shutdown is not None:
+            receiver_shutdown.set()
+        if receiver_task is not None and not receiver_task.done():
+            receiver_task.cancel()
+        if opening_transport is not None:
+            opening_transport._close_immediately()
+        if transport is not None and transport is not opening_transport:
+            transport._close_immediately()
+
     def _invalidate_pending_requests(self) -> None:
         """Wake and detach every request belonging to the closing session.
 

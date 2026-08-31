@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import gc
+import logging
 import socket
 import warnings
 from typing import Any
@@ -14,7 +15,21 @@ import pytest
 
 from lifx.const import MDNS_ADDRESS, MDNS_PORT
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-from lifx.network.mdns.transport import MdnsTransport
+from lifx.network.discovery.mdns import transport as mdns_transport_module
+from lifx.network.discovery.mdns.transport import (
+    MdnsTransport,
+    _select_mdns_ipv4_address,
+)
+
+
+@pytest.fixture(autouse=True)
+def _select_loopback_mdns_interface(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep transport lifecycle tests independent of the host routing table."""
+    monkeypatch.setattr(
+        mdns_transport_module,
+        "_select_mdns_ipv4_address",
+        lambda: "127.0.0.1",
+    )
 
 
 class _SocketLedger:
@@ -96,6 +111,69 @@ def _recording_socket_factory(ledger: _SocketLedger, fail_at: str | None = None)
     return factory
 
 
+class TestMdnsIpv4AddressSelection:
+    """Tests for selecting one concrete IPv4 mDNS interface."""
+
+    def test_selects_route_to_mdns_destination(self) -> None:
+        """The route probe returns the concrete source chosen by the OS."""
+        probe = MagicMock(spec=socket.socket)
+        probe.__enter__.return_value = probe
+        probe.getsockname.return_value = ("192.0.2.10", 43210)
+
+        with patch.object(
+            mdns_transport_module.socket,
+            "socket",
+            return_value=probe,
+        ) as socket_factory:
+            assert _select_mdns_ipv4_address() == "192.0.2.10"
+
+        socket_factory.assert_called_once_with(
+            socket.AF_INET,
+            socket.SOCK_DGRAM,
+            socket.IPPROTO_UDP,
+        )
+        probe.connect.assert_called_once_with((MDNS_ADDRESS, MDNS_PORT))
+        probe.getsockname.assert_called_once_with()
+        probe.__exit__.assert_called_once()
+
+    @pytest.mark.parametrize("selected_address", [None, "", "0.0.0.0"])
+    def test_rejects_unspecified_route_address(self, selected_address: object) -> None:
+        """A route probe must fail closed instead of recreating a wildcard bind."""
+        probe = MagicMock(spec=socket.socket)
+        probe.__enter__.return_value = probe
+        probe.getsockname.return_value = (selected_address, 0)
+
+        with (
+            patch.object(
+                mdns_transport_module.socket,
+                "socket",
+                return_value=probe,
+            ),
+            pytest.raises(OSError, match="concrete IPv4 mDNS interface"),
+        ):
+            _select_mdns_ipv4_address()
+
+        probe.__exit__.assert_called_once()
+
+    def test_route_probe_failure_closes_socket(self) -> None:
+        """A failed route lookup does not strand the temporary descriptor."""
+        probe = MagicMock(spec=socket.socket)
+        probe.__enter__.return_value = probe
+        probe.connect.side_effect = OSError("No route")
+
+        with (
+            patch.object(
+                mdns_transport_module.socket,
+                "socket",
+                return_value=probe,
+            ),
+            pytest.raises(OSError, match="No route"),
+        ):
+            _select_mdns_ipv4_address()
+
+        probe.__exit__.assert_called_once()
+
+
 class TestMdnsTransportInit:
     """Tests for MdnsTransport initialization."""
 
@@ -167,7 +245,7 @@ class TestMdnsTransportOpen:
 
     @pytest.mark.asyncio
     async def test_open_binds_ephemeral_port(self) -> None:
-        """Test that open() binds to an ephemeral port (legacy unicast mode).
+        """Test that open() binds one interface and an ephemeral port.
 
         Binding to 5353 would share the port with a system mDNS daemon
         (mDNSResponder, Avahi), which steals unicast responses.
@@ -187,12 +265,71 @@ class TestMdnsTransportOpen:
 
                 await transport.open()
 
-                # Verify bind was called once, to an ephemeral port
-                assert mock_socket.bind.call_count == 1
-                assert mock_socket.bind.call_args_list[0][0][0] == ("", 0)
+                mock_socket.bind.assert_called_once_with(("127.0.0.1", 0))
+                mock_socket.setsockopt.assert_any_call(
+                    socket.IPPROTO_IP,
+                    socket.IP_MULTICAST_IF,
+                    socket.inet_aton("127.0.0.1"),
+                )
 
                 assert transport.is_open is True
 
+        await transport.close()
+
+    @pytest.mark.asyncio
+    async def test_open_route_selection_failure_is_network_error(self) -> None:
+        """A missing concrete IPv4 route fails before a listener is created."""
+        transport = MdnsTransport()
+
+        with (
+            patch.object(
+                mdns_transport_module,
+                "_select_mdns_ipv4_address",
+                side_effect=OSError("No mDNS route"),
+            ),
+            patch.object(mdns_transport_module.socket, "socket") as socket_factory,
+            pytest.raises(LifxNetworkError, match="Failed to open mDNS socket"),
+        ):
+            await transport.open()
+
+        socket_factory.assert_not_called()
+        assert transport.is_open is False
+        assert transport._socket is None
+        assert transport._protocol is None
+        assert transport._transport is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("log_failure_details", [True, False])
+    async def test_open_bound_log_respects_detail_policy(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        log_failure_details: bool,
+    ) -> None:
+        """The ephemeral port is logged only when detailed logging is enabled."""
+        transport = MdnsTransport(log_failure_details=log_failure_details)
+        mock_socket = MagicMock(spec=socket.socket)
+        mock_socket.getsockname.return_value = ("", 12345)
+        datagram_transport = MagicMock()
+
+        with (
+            caplog.at_level(
+                logging.DEBUG, logger="lifx.network.discovery.mdns.transport"
+            ),
+            patch("socket.socket", return_value=mock_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, None)
+            )
+            await transport.open()
+
+        bound_log = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "bound_to_ephemeral_port"
+        )
+        assert ("port" in bound_log) is log_failure_details
         await transport.close()
 
     @pytest.mark.asyncio
@@ -219,6 +356,34 @@ class TestMdnsTransportOpen:
                 await transport.open()
 
         assert transport.is_open is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("log_failure_details", [True, False])
+    async def test_open_failure_log_respects_detail_policy(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        log_failure_details: bool,
+    ) -> None:
+        """Socket failure text is omitted when detailed logging is disabled."""
+        transport = MdnsTransport(log_failure_details=log_failure_details)
+
+        with (
+            caplog.at_level(
+                logging.DEBUG, logger="lifx.network.discovery.mdns.transport"
+            ),
+            patch("socket.socket", side_effect=OSError("synthetic open failure")),
+            pytest.raises(LifxNetworkError, match="Failed to open mDNS socket"),
+        ):
+            await transport.open()
+
+        failure_log = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("method") == "open"
+            and record.msg.get("action") == "failed"
+        )
+        assert ("error" in failure_log) is log_failure_details
 
 
 class TestMdnsTransportContextManager:
@@ -272,7 +437,8 @@ class TestMdnsTransportLegacyUnicast:
         try:
             async with transport:
                 assert transport._socket is not None
-                local_port = transport._socket.getsockname()[1]
+                local_address, local_port = transport._socket.getsockname()
+                assert local_address == "127.0.0.1"
                 assert 1 <= local_port <= 65535
                 assert local_port != MDNS_PORT
 
@@ -334,6 +500,42 @@ class TestMdnsTransportSend:
         with pytest.raises(LifxNetworkError, match="Failed to send"):
             await transport.send(b"test")
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("log_failure_details", [True, False])
+    @pytest.mark.parametrize("send_fails", [True, False])
+    async def test_send_log_respects_detail_policy(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        log_failure_details: bool,
+        send_fails: bool,
+    ) -> None:
+        """Send destinations and errors follow the explicit detail policy."""
+        transport = MdnsTransport(log_failure_details=log_failure_details)
+        transport._protocol = MagicMock()
+        transport._transport = MagicMock()
+        if send_fails:
+            transport._transport.sendto.side_effect = OSError("synthetic send failure")
+
+        with caplog.at_level(
+            logging.DEBUG, logger="lifx.network.discovery.mdns.transport"
+        ):
+            if send_fails:
+                with pytest.raises(LifxNetworkError, match="Failed to send"):
+                    await transport.send(b"test")
+            else:
+                await transport.send(b"test")
+
+        action = "failed" if send_fails else "sent"
+        send_log = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("method") == "send"
+            and record.msg.get("action") == action
+        )
+        assert ("destination" in send_log) is log_failure_details
+        assert ("error" in send_log) is (log_failure_details and send_fails)
+
 
 class TestMdnsTransportReceive:
     """Tests for receiving data."""
@@ -388,6 +590,38 @@ class TestMdnsTransportReceive:
 
         with pytest.raises(LifxNetworkError, match="Failed to receive"):
             await transport.receive()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("log_failure_details", [True, False])
+    async def test_receive_failure_log_respects_detail_policy(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        log_failure_details: bool,
+    ) -> None:
+        """Receive failure text follows the explicit detail policy."""
+        transport = MdnsTransport(log_failure_details=log_failure_details)
+        transport._protocol = MagicMock()
+        transport._protocol.queue = MagicMock()
+        transport._protocol.queue.get = AsyncMock(
+            side_effect=OSError("synthetic receive failure")
+        )
+
+        with (
+            caplog.at_level(
+                logging.DEBUG, logger="lifx.network.discovery.mdns.transport"
+            ),
+            pytest.raises(LifxNetworkError, match="Failed to receive"),
+        ):
+            await transport.receive()
+
+        failure_log = next(
+            record.msg
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("method") == "receive"
+            and record.msg.get("action") == "failed"
+        )
+        assert ("error" in failure_log) is log_failure_details
 
 
 class TestMdnsTransportClose:
@@ -699,7 +933,7 @@ class TestMdnsTransportOpenConcurrency:
             patch("socket.socket", return_value=sock),
             patch("asyncio.get_running_loop") as mock_loop,
             patch(
-                "lifx.network.mdns.transport._LOGGER.debug",
+                "lifx.network.discovery.mdns.transport._LOGGER.debug",
                 side_effect=[None, failure, None],
             ),
         ):

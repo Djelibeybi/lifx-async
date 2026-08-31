@@ -1,34 +1,21 @@
-"""mDNS/DNS-SD discovery for LIFX devices.
+"""Compatibility exports for the canonical discovery mDNS package."""
 
-This module provides mDNS-based discovery using the _lifx._udp.local service type.
-It uses only Python stdlib (no external dependencies).
-
-Example:
-    High-level API (device instances):
-    ```python
-    async for device in discover_devices_mdns():
-        print(f"Found {type(device).__name__}: {device.serial}")
-    ```
-"""
-
-from lifx.network.mdns.discovery import discover_devices_mdns
-from lifx.network.mdns.dns import (
+from lifx.network.discovery.mdns import (
     DnsHeader,
     DnsResourceRecord,
+    MdnsTransport,
     ParsedDnsResponse,
     SrvData,
     TxtData,
     build_ptr_query,
+    discover_devices_mdns,
     parse_dns_response,
     parse_name,
     parse_txt_record,
 )
-from lifx.network.mdns.transport import MdnsTransport
 
 __all__ = [
-    # Discovery functions
     "discover_devices_mdns",
-    # DNS parsing
     "DnsHeader",
     "DnsResourceRecord",
     "ParsedDnsResponse",
@@ -38,6 +25,5 @@ __all__ = [
     "parse_dns_response",
     "parse_name",
     "parse_txt_record",
-    # Transport
     "MdnsTransport",
 ]

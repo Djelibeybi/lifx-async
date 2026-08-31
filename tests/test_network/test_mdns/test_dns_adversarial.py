@@ -11,7 +11,7 @@ import struct
 
 import pytest
 
-from lifx.network.mdns.dns import (
+from lifx.network.discovery.mdns.dns import (
     _parse_resource_record,
     parse_dns_response,
     parse_name,

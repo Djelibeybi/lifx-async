@@ -33,8 +33,8 @@ from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixEffect, MatrixLight
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-from lifx.network.mdns.dns import DnsResourceRecord, SrvData, TxtData
-from lifx.network.mdns.types import _LifxServiceRecord
+from lifx.network.discovery.mdns.dns import DnsResourceRecord, SrvData, TxtData
+from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.products import get_product
 from lifx.protocol.protocol_types import FirmwareEffect, MultiZoneApplicationRequest
 from scripts import ipv6_thread_probe as probe

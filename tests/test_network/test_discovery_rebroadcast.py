@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from lifx.exceptions import LifxTimeoutError
-from lifx.network.discovery import _discover_with_packet, discover_devices
+from lifx.network.discovery.udp import _discover_with_packet, discover_devices
 from lifx.protocol.packets import Device as DevicePackets
 from tests.test_network.test_discovery_errors import _build_state_service_packet
 
@@ -73,8 +73,8 @@ class TestRebroadcastSchedule:
         send_times: list[float] = []
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), _make_quiet_receive()
@@ -92,8 +92,8 @@ class TestRebroadcastSchedule:
         send_times: list[float] = []
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), _make_quiet_receive()
@@ -111,9 +111,11 @@ class TestRebroadcastSchedule:
         send_times: list[float] = []
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05, 0.05)),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
+            patch(
+                "lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.05, 0.05)
+            ),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), _make_quiet_receive()
@@ -134,9 +136,9 @@ class TestRebroadcastSchedule:
         send_times: list[float] = []
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.1,)),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.1,)),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), _make_quiet_receive()
@@ -164,9 +166,9 @@ class TestRebroadcastSchedule:
         send_times: list[float] = []
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.1,)),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.1,)),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), _make_quiet_receive()
@@ -190,9 +192,9 @@ class TestRebroadcastSchedule:
         send_times: list[float] = []
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.allocate_source", return_value=42),
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.35,)),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.35,)),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), _make_quiet_receive()
@@ -233,9 +235,11 @@ class TestRebroadcastSchedule:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05, 0.05)),
-            patch("lifx.network.discovery.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch(
+                "lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.05, 0.05)
+            ),
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), mock_receive
@@ -258,9 +262,9 @@ class TestRebroadcastSchedule:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.1, 0.1)),
-            patch("lifx.network.discovery.allocate_source", return_value=42),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.1, 0.1)),
+            patch("lifx.network.discovery.udp.allocate_source", return_value=42),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 send_mock, quiet_receive
@@ -299,9 +303,11 @@ class TestRebroadcastDedup:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.15,)),
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.15,)),
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_recording_send(send_times), mock_receive
@@ -358,9 +364,11 @@ class TestConsumerIdleWindow:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_ignoring_send(), mock_receive
@@ -409,9 +417,11 @@ class TestConsumerIdleWindow:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_ignoring_send(), mock_receive
@@ -458,9 +468,11 @@ class TestConsumerIdleWindow:
             raise LifxTimeoutError("timeout")
 
         with (
-            patch("lifx.network.discovery.UdpTransport") as mock_transport_cls,
-            patch("lifx.network.discovery.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
-            patch("lifx.network.discovery.allocate_source", return_value=known_source),
+            patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
+            patch("lifx.network.discovery.udp.DISCOVERY_REBROADCAST_GAPS", (0.05,)),
+            patch(
+                "lifx.network.discovery.udp.allocate_source", return_value=known_source
+            ),
         ):
             mock_transport_cls.return_value = _build_mock_transport(
                 _make_ignoring_send(), mock_receive

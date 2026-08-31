@@ -444,6 +444,59 @@ class TestDeviceConnection:
         assert conn._transport is None
         assert conn._receiver_task is None
 
+    async def test_force_close_synchronously_invalidates_owned_resources(self) -> None:
+        """Deadline cleanup closes endpoints and cancels the receiver immediately."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        opening_transport = MagicMock()
+        transport = MagicMock()
+        receiver_shutdown = asyncio.Event()
+        receiver_task = asyncio.create_task(asyncio.Event().wait())
+        queue: asyncio.Queue[object] = asyncio.Queue()
+        conn._pending_requests[(1, 1, conn.serial)] = queue  # type: ignore[assignment]
+        conn._is_open = True
+        conn._opening_transport = opening_transport
+        conn._transport = transport
+        conn._receiver_task = receiver_task
+        conn._receiver_shutdown = receiver_shutdown
+        conn._send_address = ("192.0.2.1", 56700)
+
+        conn._force_close()
+
+        assert conn.is_open is False
+        assert conn._opening_transport is None
+        assert conn._transport is None
+        assert conn._receiver_task is None
+        assert conn._receiver_shutdown is None
+        assert conn._send_address is None
+        assert receiver_shutdown.is_set()
+        opening_transport._close_immediately.assert_called_once_with()
+        transport._close_immediately.assert_called_once_with()
+        assert isinstance(await queue.get(), _ConnectionClosed)
+
+        with pytest.raises(asyncio.CancelledError):
+            await receiver_task
+
+    def test_force_close_deduplicates_shared_opening_transport(self) -> None:
+        """One endpoint referenced by both opening and open state closes once."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        transport = MagicMock()
+        conn._opening_transport = transport
+        conn._transport = transport
+
+        conn._force_close()
+
+        transport._close_immediately.assert_called_once_with()
+
+    def test_force_close_closes_live_transport_without_opening_transport(self) -> None:
+        """An established endpoint is closed without an in-progress opener."""
+        conn = DeviceConnection(serial="d073d5001234", ip="192.0.2.1")
+        transport = MagicMock()
+        conn._transport = transport
+
+        conn._force_close()
+
+        transport._close_immediately.assert_called_once_with()
+
     @pytest.mark.parametrize(
         "packet",
         [

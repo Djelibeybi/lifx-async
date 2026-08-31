@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from lifx.color import HSBK
+from lifx.devices.base import CollectionInfo, DeviceState, FirmwareInfo
+from lifx.devices.infrared import InfraredLightState
 from lifx.devices.light import LightState
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
@@ -22,6 +24,149 @@ class TestLightStateManagement:
         # Light fixture has no state initialized
         with pytest.raises(RuntimeError, match="State not found."):
             _ = light.state
+
+    def test_discovery_adoption_seeds_snapshot_without_partial_state(self, light):
+        """Discovery seeding must not fabricate an incomplete public state."""
+        response = packets.Light.StateColor(
+            color=LightHsbk(
+                hue=21845,
+                saturation=32768,
+                brightness=49151,
+                kelvin=4000,
+            ),
+            power=65535,
+            label="Discovery Light",
+        )
+
+        colour, power, label = light._adopt_state_color(response)
+
+        assert colour.hue == pytest.approx(120.0, abs=0.01)
+        assert colour.saturation == pytest.approx(0.5, abs=0.01)
+        assert colour.brightness == pytest.approx(0.75, abs=0.01)
+        assert colour.kelvin == 4000
+        assert power == 65535
+        assert label == "Discovery Light"
+        assert light._label == "Discovery Light"
+        assert light._state is None
+        assert light._discovery_snapshot.colour == colour
+        assert light._discovery_snapshot.power == power
+        assert light._discovery_snapshot.label == label
+
+    def test_discovery_adoption_preserves_subclass_state(
+        self, light, mock_product_info
+    ):
+        """Adoption updates common fields without replacing subclass state."""
+        firmware = FirmwareInfo(build=0, version_major=2, version_minor=80)
+        location = CollectionInfo(uuid="00" * 16, label="Home", updated_at=0)
+        group = CollectionInfo(uuid="11" * 16, label="Room", updated_at=0)
+        original_state = InfraredLightState(
+            model="Test LIFX Device",
+            label="Before",
+            serial=light.serial,
+            mac_address="d0:73:d5:01:02:03",
+            capabilities=mock_product_info(has_infrared=True),
+            power=0,
+            host_firmware=firmware,
+            wifi_firmware=firmware,
+            location=location,
+            group=group,
+            color=HSBK(0, 0, 1, 3500),
+            infrared=0.625,
+            last_updated=100.0,
+        )
+        light._state = original_state
+        response = packets.Light.StateColor(
+            color=LightHsbk(
+                hue=43690,
+                saturation=65535,
+                brightness=32768,
+                kelvin=5000,
+            ),
+            power=65535,
+            label="After",
+        )
+
+        colour, power, label = light._adopt_state_color(response)
+
+        assert light._state is original_state
+        assert original_state.infrared == 0.625
+        assert original_state.color == colour
+        assert original_state.power == power
+        assert original_state.label == label
+        assert original_state.last_updated > 100.0
+
+    def test_discovery_adoption_updates_state_without_colour_field(
+        self, light, mock_product_info
+    ) -> None:
+        """Common state fields update without fabricating a colour attribute."""
+        firmware = FirmwareInfo(build=0, version_major=2, version_minor=80)
+        original_state = DeviceState(
+            model="Synthetic LIFX Device",
+            label="Before",
+            serial=light.serial,
+            mac_address="d0:73:d5:01:02:03",
+            capabilities=mock_product_info(has_color=False),
+            power=0,
+            host_firmware=firmware,
+            wifi_firmware=firmware,
+            location=CollectionInfo(uuid="00" * 16, label="Home", updated_at=0),
+            group=CollectionInfo(uuid="11" * 16, label="Room", updated_at=0),
+            last_updated=100.0,
+        )
+        light._state = original_state
+        response = packets.Light.StateColor(
+            color=LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500),
+            power=65535,
+            label="After",
+        )
+
+        _colour, power, label = light._adopt_state_color(response)
+
+        assert light._state is original_state
+        assert not hasattr(original_state, "color")
+        assert original_state.power == power
+        assert original_state.label == label
+        assert original_state.last_updated > 100.0
+
+    @pytest.mark.asyncio
+    async def test_discovery_snapshot_does_not_cache_volatile_getters(self, light):
+        """Colour and power getters still perform I/O after discovery seeding."""
+        seeded = packets.Light.StateColor(
+            color=LightHsbk(hue=0, saturation=0, brightness=0, kelvin=3500),
+            power=0,
+            label="Seeded",
+        )
+        refreshed = packets.Light.StateColor(
+            color=LightHsbk(
+                hue=21845,
+                saturation=65535,
+                brightness=65535,
+                kelvin=4500,
+            ),
+            power=65535,
+            label="Refreshed",
+        )
+        light._adopt_state_color(seeded)
+        light.connection.request.side_effect = [
+            refreshed,
+            packets.Light.StatePower(level=32768),
+        ]
+
+        colour, power, label = await light.get_color()
+        current_power = await light.get_power()
+
+        assert colour.hue == pytest.approx(120.0, abs=0.01)
+        assert power == 65535
+        assert label == "Refreshed"
+        assert current_power == 32768
+        assert isinstance(
+            light.connection.request.call_args_list[0].args[0],
+            packets.Light.GetColor,
+        )
+        assert isinstance(
+            light.connection.request.call_args_list[1].args[0],
+            packets.Light.GetPower,
+        )
 
     @pytest.mark.asyncio
     async def test_initialize_state_creates_light_state(self, light, mock_product_info):

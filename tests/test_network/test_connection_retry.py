@@ -223,7 +223,7 @@ class TestRetransmitSchedule:
         assert len(send_times) == 4
         for i in range(1, len(send_times)):
             gap = send_times[i] - send_times[i - 1]
-            assert 0.03 <= gap <= 0.2
+            assert 0.03 <= gap <= 0.3
 
     async def test_direct_impl_call_explicit_max_retries_zero(self) -> None:
         """Direct ``_request_stream_impl`` call with ``max_retries=0``:

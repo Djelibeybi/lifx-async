@@ -12,6 +12,7 @@ from lifx.api import (
     DeviceGroup,
     discover,
     discover_mdns,
+    discover_udp,
     find_by_ip,
     find_by_label,
     find_by_serial,
@@ -153,6 +154,7 @@ __all__ = [
     # High-level API
     "DeviceGroup",
     "discover",
+    "discover_udp",
     "discover_mdns",
     "find_by_serial",
     "find_by_label",

@@ -590,8 +590,8 @@ class UdpTransport:
 
         return data, addr
 
-    async def close(self) -> None:
-        """Close the UDP socket."""
+    def _close_immediately(self) -> None:
+        """Synchronously invalidate and close the owned asyncio endpoint."""
         self._state_generation += 1
         transport, self._transport = self._transport, None
         self._protocol = None
@@ -613,6 +613,10 @@ class UdpTransport:
                     "action": "closed",
                 }
             )
+
+    async def close(self) -> None:
+        """Close the UDP socket."""
+        self._close_immediately()
 
     @property
     def is_open(self) -> bool:

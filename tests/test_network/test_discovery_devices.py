@@ -6,6 +6,7 @@ focusing on device creation, label-based discovery, and protocol edge cases.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import subprocess
 import sys
@@ -29,6 +30,16 @@ from lifx.network.discovery import (
     discover_devices,
 )
 from lifx.products.registry import ProductCapability, ProductInfo
+
+
+def test_discovered_device_identity_uses_serial() -> None:
+    """Discovered devices deduplicate by serial and reject unrelated values."""
+    first = DiscoveredDevice("d073d5010203", "192.0.2.10")
+    same_serial = DiscoveredDevice("d073d5010203", "192.0.2.11")
+
+    assert hash(first) == hash(first.serial)
+    assert first == same_serial
+    assert first != object()
 
 
 def test_devices_can_be_imported_before_the_network_layer_is_populated() -> None:
@@ -81,7 +92,7 @@ class TestDiscoveryGeneratorOwnership:
                 finalised = True
 
         with patch(
-            "lifx.network.discovery._discover_with_packet",
+            "lifx.network.discovery.udp._discover_with_packet",
             return_value=packet_discovery(),
         ):
             generator = discover_devices(timeout=0.1)
@@ -157,6 +168,56 @@ class TestDiscoveredDeviceValidationBoundary:
             assert await discovered.create_device() is None
 
         temporary_device.connection.close.assert_awaited_once_with()
+
+    async def test_construction_without_current_task_needs_no_registration(
+        self,
+    ) -> None:
+        """Defensive task lookup failure still closes the temporary connection."""
+        discovered = DiscoveredDevice("d073d5010203", "192.0.2.10")
+        temporary_device = MagicMock()
+        temporary_device.ensure_capabilities = AsyncMock()
+        temporary_device.capabilities = None
+        temporary_device.version = None
+        temporary_device.connection.close = AsyncMock()
+
+        with (
+            patch("lifx.devices.base.Device", return_value=temporary_device),
+            patch(
+                "lifx.network.discovery.udp.asyncio.current_task",
+                return_value=None,
+            ),
+        ):
+            assert await discovered.create_device() is None
+
+        temporary_device.connection.close.assert_awaited_once_with()
+        assert discovered._construction_connections == {}
+
+    async def test_force_close_targets_the_active_construction_task(self) -> None:
+        """Deadline cleanup closes only the temporary connection for its task."""
+        discovered = DiscoveredDevice("d073d5010203", "192.0.2.10")
+        capability_started = asyncio.Event()
+        temporary_device = MagicMock()
+
+        async def ensure_capabilities() -> None:
+            capability_started.set()
+            await asyncio.Event().wait()
+
+        temporary_device.ensure_capabilities = ensure_capabilities
+        temporary_device.connection.close = AsyncMock()
+        construction = asyncio.create_task(discovered.create_device())
+
+        with patch("lifx.devices.base.Device", return_value=temporary_device):
+            await asyncio.wait_for(capability_started.wait(), timeout=0.1)
+            assert construction in discovered._construction_connections
+
+            discovered._force_close_construction(construction)
+            temporary_device.connection._force_close.assert_called_once_with()
+
+            construction.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await construction
+
+        assert discovered._construction_connections == {}
 
     @pytest.mark.parametrize(
         "error",

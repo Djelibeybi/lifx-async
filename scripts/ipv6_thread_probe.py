@@ -39,9 +39,9 @@ The control stage mutates a real device, so it is opt-in per device: without
 not_run. A fleet-wide write is exactly what this probe must never do.
 
 This is a diagnostic and deliberately reaches into the private record cache
-of lifx.network.mdns.discovery: the point is to show what the library parsed,
-not to re-implement the parsing (scripts/mdns_probe.py already does that, and
-so tests nothing about the library).
+of ``lifx.network.discovery.mdns.discovery``: the point is to show what the
+library parsed, not to re-implement the parsing (``scripts/mdns_probe.py``
+already does that, and so tests nothing about the library).
 """
 
 from __future__ import annotations
@@ -76,13 +76,13 @@ from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixEffect, MatrixLight
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
 from lifx.exceptions import LifxError, LifxNetworkError, LifxTimeoutError
-from lifx.network.mdns import discovery as mdns_discovery
-from lifx.network.mdns.discovery import (
+from lifx.network.discovery.mdns import discovery as mdns_discovery
+from lifx.network.discovery.mdns.discovery import (
     _create_device_from_record,
     _discover_lifx_services,
     _LifxRecordCache,
 )
-from lifx.network.mdns.dns import (
+from lifx.network.discovery.mdns.dns import (
     DNS_TYPE_A,
     DNS_TYPE_AAAA,
     DNS_TYPE_SRV,
@@ -93,8 +93,8 @@ from lifx.network.mdns.dns import (
     build_ptr_query,
     parse_dns_response,
 )
-from lifx.network.mdns.transport import MdnsTransport
-from lifx.network.mdns.types import _LifxServiceRecord
+from lifx.network.discovery.mdns.transport import MdnsTransport
+from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.network.transport import _UdpProtocol
 from lifx.network.utils import IdleDeadline
 from lifx.products import get_product
