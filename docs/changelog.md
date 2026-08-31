@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v7.1.1 (2026-08-31)
+
+### Bug Fixes
+
+- **discovery**: Merge UDP and mDNS discovery
+  ([`39bad58`](https://github.com/Djelibeybi/lifx-async/commit/39bad58c42627ac3612868503bb5fb9305b04cc3))
+
+### Documentation
+
+- **discovery**: Plan merged discovery
+  ([`813d97b`](https://github.com/Djelibeybi/lifx-async/commit/813d97bdc2f4ea45f821f61fae7e33c92d0f3e2e))
+
+- **discovery**: Record Phase 13 evidence
+  ([`0be78e6`](https://github.com/Djelibeybi/lifx-async/commit/0be78e68894c0a977a49a84e1b006a26f66d8b36))
+
+
 ## v7.1.0 (2026-08-30)
 
 ### Bug Fixes
