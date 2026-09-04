@@ -33,6 +33,7 @@ from lifx.network.discovery.mdns.transport import MdnsTransport
 from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
+from tests.conftest import PROGRESS_TIMEOUT
 from tests.test_discovery_observation import _capture_discovery_observations
 
 _FIRST_SERIAL = "d073d5123456"
@@ -676,7 +677,9 @@ async def test_probe_cap_and_original_deadline_include_queue_wait(
         active += 1
         maximum_active = max(maximum_active, active)
         try:
-            await asyncio.sleep(0.05)
+            # Must outlast the caller's deadline below so every probe is still
+            # in flight when that deadline cancels them.
+            await asyncio.sleep(PROGRESS_TIMEOUT * 5)
             return _state_color()
         finally:
             active -= 1
@@ -696,7 +699,10 @@ async def test_probe_cap_and_original_deadline_include_queue_wait(
         )(),
     )
 
-    assert await _collect_verified(timeout=0.02) == []
+    # This deadline has to do both jobs: outlive the queue wait that starts
+    # two probes, then fire while they are still running. Below one Windows
+    # timer tick it can only manage the second.
+    assert await _collect_verified(timeout=PROGRESS_TIMEOUT) == []
     assert maximum_active == 2
     assert len(connections) == 2
     assert all(connection.closed for connection in connections)
@@ -861,7 +867,9 @@ async def test_real_sweep_catches_emit_one_private_failure_and_close(
         results = [
             record
             async for record in mdns_discovery._discover_lifx_services_sweep(
-                _LifxRecordCache(), timeout=0.01, failure_sink=events.append
+                _LifxRecordCache(),
+                timeout=PROGRESS_TIMEOUT,
+                failure_sink=events.append,
             )
         ]
 

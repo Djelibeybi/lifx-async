@@ -27,6 +27,7 @@ from lifx.exceptions import (
 )
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
+from tests.conftest import PROGRESS_TIMEOUT
 
 
 def _state_request_handler(
@@ -573,7 +574,10 @@ class TestRefreshState:
         await light._initialize_state()
 
         old_timestamp = light._state.last_updated
-        await asyncio.sleep(0.01)  # Small delay to ensure timestamp difference
+        # last_updated is stamped from time.time(), whose Windows resolution is
+        # ~15.6 ms before Python 3.13. A 10 ms sleep can leave both stamps on
+        # the same tick and turn the strict comparison below into a flake.
+        await asyncio.sleep(PROGRESS_TIMEOUT)
 
         # Refresh
         await light.refresh_state()

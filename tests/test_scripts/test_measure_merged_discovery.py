@@ -42,6 +42,7 @@ from scripts.measurement_support import (
     _current_discovery_observation_sink,
     _DiscoveryObservation,
 )
+from tests.conftest import PROGRESS_TIMEOUT
 
 
 def _row(
@@ -625,7 +626,7 @@ class TestObservationScopeIsolation:
             yield
 
         async def _consume() -> None:
-            async for _ in discover_devices(timeout=0.01):
+            async for _ in discover_devices(timeout=PROGRESS_TIMEOUT):
                 pass
 
         with patch(
@@ -749,7 +750,7 @@ class TestEmbeddedEmulatorMeasurement:
             environment="emulator",
             rounds=1,
             timeout=0.25,
-            max_response_time=0.05,
+            max_response_time=PROGRESS_TIMEOUT,
             idle_timeout_multiplier=1.0,
             quiescence="quiesced",
             confound=[],
@@ -827,7 +828,7 @@ class TestEmbeddedEmulatorMeasurement:
             environment="emulator",
             rounds=1,
             timeout=0.5,
-            max_response_time=0.05,
+            max_response_time=PROGRESS_TIMEOUT,
             idle_timeout_multiplier=1.0,
             quiescence="quiesced",
             confound=[],
@@ -920,7 +921,7 @@ class TestEmbeddedEmulatorMeasurement:
                     confounds=[],
                     aliases=emulator.aliases,
                     timeout=0.5,
-                    max_response_time=0.05,
+                    max_response_time=PROGRESS_TIMEOUT,
                     idle_timeout_multiplier=1.0,
                     emulator=emulator,
                 )
@@ -963,7 +964,7 @@ class TestEmbeddedEmulatorMeasurement:
                         confounds=[],
                         aliases=emulator.aliases,
                         timeout=1.0,
-                        max_response_time=0.05,
+                        max_response_time=PROGRESS_TIMEOUT,
                         idle_timeout_multiplier=1.0,
                         emulator=emulator,
                     )

@@ -46,6 +46,22 @@ WINDOWS_IPV6_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     AssertionError,
 )
 
+# Windows' default timer granularity is ~15.6 ms, and its scheduler quantum is
+# the same order. A test that hands real work a wall-clock budget at or below
+# that figure is asking the platform to be more precise than it is: one timer
+# rounding or one preemption and the budget expires before the work it was
+# meant to bound has happened. The failure is a flake, not a defect, and it
+# only ever appears on the Windows CI legs.
+#
+# Use PROGRESS_TIMEOUT for any deadline a test needs to *survive* -- a
+# discovery sweep that must observe its response, a sweep that must reach its
+# failure sink, a poll that must see a device. It is several timer ticks wide,
+# so a single stall cannot decide the outcome.
+#
+# A deadline a test needs to *expire* needs no such floor: expiring promptly is
+# the behaviour those tests assert, and they stay at their own small literals.
+PROGRESS_TIMEOUT = 0.1  # ~6 Windows timer ticks
+
 
 @pytest.fixture
 def _allow_public_mdns_discovery() -> None:

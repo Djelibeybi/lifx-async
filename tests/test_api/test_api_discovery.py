@@ -48,7 +48,7 @@ from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device as DevicePackets
 from lifx.protocol.packets import Light as LightPackets
 from lifx.protocol.protocol_types import DeviceService, LightHsbk
-from tests.conftest import get_free_port
+from tests.conftest import PROGRESS_TIMEOUT, get_free_port
 from tests.test_discovery_observation import (
     _capture_discovery_observations,
 )
@@ -200,7 +200,7 @@ class TestDiscoverUdpEntryGate:
                 device
                 async for device in discover_udp(
                     timeout=0.3,
-                    max_response_time=0.01,
+                    max_response_time=PROGRESS_TIMEOUT,
                     idle_timeout_multiplier=1.0,
                 )
             ]
@@ -2763,8 +2763,8 @@ class TestFindByIpAddressGate:
             result = await find_by_ip(
                 "fe80::1%11",
                 port=56700,
-                timeout=0.05,
-                max_response_time=0.01,
+                timeout=PROGRESS_TIMEOUT,
+                max_response_time=PROGRESS_TIMEOUT,
                 idle_timeout_multiplier=1.0,
             )
 
@@ -2794,8 +2794,8 @@ class TestFindByIpAddressGate:
             result = await find_by_ip(
                 "255.255.255.255",
                 port=56700,
-                timeout=0.05,
-                max_response_time=0.01,
+                timeout=PROGRESS_TIMEOUT,
+                max_response_time=PROGRESS_TIMEOUT,
                 idle_timeout_multiplier=1.0,
             )
 
