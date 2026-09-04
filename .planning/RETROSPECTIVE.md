@@ -119,6 +119,45 @@
 
 ---
 
+## Milestone: v2.0 — Thread/IPv6 Support
+
+**Shipped:** 2026-09-05
+**Phases:** 5 (10–14) | **Plans:** 41 | **Tasks:** 93 | **Commits:** ~40 over 9 days (2026-08-27 → 2026-09-04)
+
+### What Was Built
+- IPv6/Thread transport landed onto `main` (Phase 10, PR #210): socket family follows the target address everywhere, including the animator's direct-UDP frame socket; a zone-less link-local address raises an immediate `ValueError` instead of a silent 16s timeout
+- mDNS hardened to broadcast-grade quality (Phase 11): ephemeral-port bind fixed a plain IPv4 defect (25 devices found vs. 9 with `SO_REUSEPORT` contention), `Device.connectivity` exposes WiFi/Thread with the low-level record made private, cross-packet record accumulation and follow-up A/AAAA queries proven synthetically, bounded fail-closed address admission against attacker-controlled payloads
+- IPv6 targeted lookup (Phase 12): `find_by_ip()` resolves an IPv6 literal, family-aware bind at every socket-creation site, concurrent/cancellation-safe on both Windows and Ubuntu CI
+- Merged discovery (Phase 13): `discover()` runs UDP and unicast-verified mDNS concurrently merged by serial with the pre-existing contract proven intact by an entry-gate invariant suite; `discover_udp()`/`discover_mdns()` stay explicit; overlapping UDP callers share one active sweep; `find_by_serial()` races both legs
+- Thread revalidation (Phase 14): every v1.1 wire-reliability finding measured against a real 8-device Thread fleet — discovery coverage held across repeated rounds, retry constants held against measured ack RTT, staleness measured directly by unplugging a device, every device class closed evidence-backed or as a named gap. Animation throughput recorded as a scope boundary rather than measured, seeding SEED-003 (lock `Animator` to WiFi) for a future milestone
+
+### What Worked
+- **Entry-gate invariants before merge code.** Phase 13 wrote the pre-merge invariant and before/after measurement harness first, as its own plan, so the existing `discover()` contract had a proof it survived the merge rather than a hope.
+- **Spike-first discipline held for a full milestone.** No WiFi-tuned constant was retuned before Phase 14 measured it on Thread — a rule stated at the milestone's opening in 2026-07-16 and honoured through four phases that touched the exact code the constants live in.
+- **Named gaps instead of open-ended blocking.** THREAD-05's six-class ledger closed on schedule because `HevLight`/`InfraredLight` recorded "no Thread-capable hardware exists" as a terminal disposition rather than leaving the phase waiting on hardware that doesn't exist yet — the same lesson v1.2's FIDELITY pattern established, reapplied deliberately.
+- **Gap-closure waves stayed disciplined.** Phase 10 and Phase 11 both absorbed post-ship review findings as numbered waves (10-07..09, 11-07..14) rather than reopening earlier plans, keeping each wave's diff reviewable on its own.
+
+### What Was Inefficient
+- **Phase 11 took 14 plans against an 8-plan original estimate**, largely from a privacy/history-rewrite decision point (11-07..09) that needed its own operator sign-off cycle mid-phase — a security-sensitive call that couldn't be pre-planned away.
+- **The Phase 13 coordinator teardown test hang was deferred rather than fixed inline**, and its `deferred-items.md` entry was never reconciled against a later commit that appears to fix the same symptom under a different test name — acknowledged at this milestone's close rather than resolved, see Key Lessons.
+- **Two seeds (SEED-002, SEED-003) fired conceptually during Phase 14 but were not implemented in v2.0** — the animation-lock decision and the WiFi-control staleness experiment were both identified as necessary follow-ups but scoped out to keep Phase 14 hardware-gated work from expanding further.
+
+### Patterns Established
+- A milestone-opening spike-first rule (SEED-001 style) can hold across multiple phases and multiple authors when it's restated in each phase's SPEC rather than assumed from context
+- Cross-cutting infra work (address-family selection, mDNS record admission) gets its own leaf module (`lifx.network.address`) the first time it's needed at more than one call site, rather than after the second duplication is noticed
+- A revalidation phase against real hardware produces its evidence as append-only JSONL journals with a generated report, never hand-edited prose, so the report can't drift from what was actually observed
+
+### Key Lessons
+1. **A deferred item needs a closing check, not just an acknowledgement.** The Phase 13 coordinator-teardown hang was deferred with full root-cause detail, but nothing re-verified it before milestone close even though a plausible fix commit (`fc61b98`, a different test name, same symptom class) had already landed. Acknowledging at close is not the same as confirming closed.
+2. **Security/privacy decision points inside a phase cost more than planned for.** Phase 11's history-rewrite disposition (11-07..09) nearly doubled its plan count over the original estimate; a decision this consequential deserves its own planning slot rather than riding inside a phase sized for feature work.
+3. **"Proven synthetically, validated on hardware later" is a real phase boundary, not a hedge.** Phase 11's mesh-scale claims and Phase 14's hardware revalidation were planned as separate, sequenced concerns from the start, and neither blocked the other — the discipline that let Phase 14 be hardware-gated without blocking CI or any other phase.
+
+### Cost Observations
+- Model mix: planner/executor on `gpt-5.6-sol` (per `.planning/config.json`); review and gap-closure checkpoints on the stronger tier
+- Notable: Phase 10 was the correct critical-path call — nothing else in the milestone was testable on real Thread hardware until it merged, and Phases 11/12 ran genuinely in parallel once it did (file-disjoint: `network/mdns/` vs `network/discovery.py`+`api.py`)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -128,6 +167,7 @@
 | v1.0 | ~4 | 1 | First GSD milestone on this repo; full pipeline (map → discuss → plan → execute → review → audit) exercised end-to-end |
 | v1.1 | many | 4 | Spike-first planning (5 hardware experiments before any phase); hardware UAT checkpoints as blocking gates; close-out audit with cross-phase integration checking against source |
 | v1.2 | many | 4 | Generated data with a CI regen-and-diff gate; docs bound to code by drift tests; two locked decisions reversed in flight and recorded; one phase executed outside the loop and reconstructed afterwards |
+| v2.0 | many | 5 | Entry-gate invariant suites written before merge code, not after; named-gap closure pattern reused deliberately from v1.2's FIDELITY precedent; hardware revalidation phase evidenced via append-only JSONL journals with a generated (never hand-edited) report; milestone close acknowledged known-open items via a structured audit rather than silently absorbing them |
 
 ### Cumulative Quality
 
@@ -136,6 +176,7 @@
 | v1.0 | 2500 (suite green) | — | 0 (still zero runtime deps) |
 | v1.1 | 2629 (suite green) | 96% overall, 100% branch patch in CI | 0 (still zero runtime deps) |
 | v1.2 | 3520 (suite green) | 97% overall, 100% branch patch in CI | 0 (still zero runtime deps) |
+| v2.0 | 4856 collected (4844 run, 12 deselected benchmark) | 100% branch patch in CI per phase | 0 (still zero runtime deps) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -143,3 +184,4 @@
 2. **Review catches what planning decided wrongly.** Both milestones' most valuable defects — blocking I/O on the event loop, whole-file clobbering, the large-tile chunking bug, the discovery idle-window hazard — came from review or audit, not from execution.
 3. **Planning artefacts outweigh code on small changes.** True for v1.0 (25 docs commits vs 2 files) and for v1.1's quick tasks. Match the track to the change size.
 4. **Unexamined constraints cost whole phases.** v1.1 calibrated a gate from one measurement round and paid for it in re-runs; v1.2 scoped a phase around a capture rule nobody tested until the phase after it. In both cases the expensive part was an assumption that was never cheap to check.
+5. **Acknowledging a deferred item at close is not the same as confirming it's actually closed.** v2.0 acknowledged a known test-hang defect at milestone close without re-checking whether a later, differently-named commit had already fixed the same symptom. A close-out acknowledgement should trigger one verification pass, not just a disclosure entry.

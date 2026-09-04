@@ -2,40 +2,36 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Thread/IPv6 Support
-current_phase: 14
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 14 complete — all phases complete
-last_updated: "2026-09-04T12:00:03.566Z"
-last_activity: 2026-09-04
-last_activity_desc: Phase 14 complete
-state_head: ed6a04d8197527a7291d17cfe0168440bc0a0ba4
+last_updated: "2026-09-04T23:23:19.487Z"
+last_activity: 2026-09-05
+last_activity_desc: Milestone v2.0 completed and archived
+state_head: 7ff97e3c3cc4cfe1a3611a07e2a4caed85a920f7
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 41
   completed_plans: 41
   percent: 100
+current_phase: 14
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-31 after Phase 13 completion)
+See: .planning/PROJECT.md (updated 2026-09-05 after v2.0 milestone)
 
-**Core value:** Commands stick, devices are found, streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 14 — Thread Revalidation and Docs
+**Core value:** Commands stick, devices are found — over WiFi or Thread, transparently — streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
+**Current focus:** Planning next milestone (v2.1/v3.0 not yet opened)
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-09-04 — Phase 14 complete
-Progress: [████████░░] 80%
-
-Execution order: 10 → (11 ∥ 12, file-disjoint) → 13 → 14. Phase 14 is hardware-gated
-and must not block CI or any other phase.
+Phase: Milestone v2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-05 — Milestone v2.0 completed and archived
 
 ## Performance Metrics
 
@@ -167,7 +163,6 @@ Thread hardware endpoint values remain operator-controlled evidence outside the 
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260830-ea6 | Adjust the pytest retry configuration as described above | 2026-08-30 | e1ba123 | [260830-ea6-adjust-the-pytest-retry-configuration-as](./quick/260830-ea6-adjust-the-pytest-retry-configuration-as/) |
 
 ## Deferred Items
 
@@ -183,6 +178,9 @@ Items acknowledged and carried forward from previous milestone closes:
 | Verification | v1.1 `override_closeout` overrides (3): Phase 2 and Phase 4 resolver-stale false negatives (open-gsd/gsd-core#2348) and Phase 3's `human_needed` manual UAT | Recorded at close | 2026-07-26 |
 | Style | No-em-dash house style: roughly 200 em dashes across `docs/`, deferred by the user during v1.2 Phase 7 UAT. Recast each sentence rather than swapping the character | Open, repo-wide | 2026-08-27 |
 | Verification | v1.2 `override_closeout` overrides (1): SEED-001 acknowledged at close. Phase 8 retains its operator-approved exception (Tile restoration unverified, `08-UAT-RESULTS.json` deliberately absent, synthetic merge prohibited) | Recorded at close | 2026-08-27 |
+| Seed | SEED-002-wifi-advertisement-staleness-control: run the staleness experiment against WiFi bulbs as a control, still dormant | Acknowledged, deferred | 2026-09-05 |
+| Seed | SEED-003-lock-animation-to-wifi: lock `Animator` to WiFi devices, still dormant | Acknowledged, deferred | 2026-09-05 |
+| Verification | Phase 13 deferred item: coordinator teardown test left a blocked executor worker in `test_discovery_coordinator.py` (`test_non_last_detach_preserves_producer_and_last_detach_reaps_it`); a fix is recorded in the plan's resolution notes but `deferred-items.md` was never updated to close it out | Acknowledged, deferred | 2026-09-05 |
 
 ## Session Continuity
 
@@ -192,4 +190,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Discuss and plan Phase 14, Thread Revalidation and Docs.
+- Start the next milestone with $gsd-new-milestone

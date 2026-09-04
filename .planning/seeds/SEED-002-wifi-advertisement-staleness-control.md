@@ -2,6 +2,10 @@
 seed: 002
 planted_during: v2.0 Thread/IPv6 Support (2026-09-04)
 trigger_when: A milestone touches discovery liveness, cache TTLs, or consumer guidance about device reachability
+audit_acknowledged:
+  milestone: v2.0
+  at: 2026-09-04
+  status: dormant
 ---
 
 # SEED-002: Run the staleness experiment against WiFi bulbs as a control
