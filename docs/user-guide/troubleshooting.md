@@ -438,6 +438,11 @@ async with await Device.connect("192.168.1.100") as light:
 
 ### Enable Debug Logging
 
+The library follows the standard library's convention for logging in libraries: it
+attaches a `logging.NullHandler()` to the top-level `lifx` logger and never configures
+handlers or levels itself. Nothing is written to stderr unless your application
+configures logging, and any configuration you apply is respected.
+
 ```python
 import logging
 
@@ -451,6 +456,69 @@ logging.basicConfig(
 logging.getLogger('lifx.network').setLevel(logging.DEBUG)
 logging.getLogger('lifx.devices').setLevel(logging.DEBUG)
 ```
+
+#### Debug logging in a downstream application
+
+Most applications already configure logging for themselves and only want the extra
+detail from `lifx-async` while chasing a problem. Because the library never touches
+handlers or levels, you can turn on `DEBUG` for the `lifx` logger alone and leave the
+rest of your application at its normal level:
+
+```python
+import asyncio
+import logging
+
+from lifx import discover
+
+# Your application's normal logging configuration. Everything not covered by a
+# more specific logger below is reported at INFO and above.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+)
+
+# Turn on DEBUG for the whole lifx-async package. The level is inherited by every
+# lifx.* logger, so this covers discovery, connections, devices and effects.
+logging.getLogger("lifx").setLevel(logging.DEBUG)
+
+# Quieten a chatty part of the library while keeping DEBUG for the rest. The
+# transport logger records every packet, so drop it back to INFO unless you are
+# investigating wire-level behaviour.
+logging.getLogger("lifx.network.transport").setLevel(logging.INFO)
+
+logger = logging.getLogger(__name__)
+
+
+async def main() -> None:
+    async for device in discover(timeout=4.0):
+        logger.info("Found %s at %s", device.serial, device.ip)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+If you would rather keep the library's debug output out of your application's log,
+give the `lifx` logger its own handler and stop records propagating to the root
+logger:
+
+```python
+import logging
+
+lifx_logger = logging.getLogger("lifx")
+lifx_logger.setLevel(logging.DEBUG)
+lifx_logger.propagate = False
+
+handler = logging.FileHandler("lifx-debug.log")
+handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+)
+lifx_logger.addHandler(handler)
+```
+
+Debug output from `lifx.network.connection` and `lifx.network.transport` includes
+device serials and IP addresses, so treat the resulting log as private before sharing
+it in a bug report.
 
 ### Check Product Registry
 

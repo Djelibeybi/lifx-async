@@ -5,6 +5,7 @@ Modern, type-safe async library for controlling LIFX devices.
 
 from __future__ import annotations
 
+import logging
 from importlib.metadata import version as get_version
 
 from lifx.animation import Animator, AnimatorStats
@@ -87,6 +88,9 @@ from lifx.protocol.protocol_types import (
 from lifx.theme import Theme, ThemeLibrary, get_theme
 
 __version__ = get_version("lifx-async")  # type: ignore
+
+# See https://docs.python.org/3/howto/logging.html#configuring-logging-for-a-library
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     # Version
