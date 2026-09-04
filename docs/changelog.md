@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.1.3 (2026-09-04)
+
+### Bug Fixes
+
+- Restore the zero runtime dependency guarantee
+  ([`b81fbd3`](https://github.com/Djelibeybi/lifx-async/commit/b81fbd333d4b6f021d366851c29ecf3380a9835f))
+
+
 ## v7.1.2 (2026-09-04)
 
 ### Bug Fixes
