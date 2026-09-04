@@ -448,6 +448,7 @@ def test_forked_child_lazily_starts_a_fresh_coordinator() -> None:
         import os
         import threading
         import time
+        import traceback
 
         from lifx.network.discovery import DiscoveryResponse
         from lifx.network.discovery.coordinator import _UdpSweepKey, subscribe_udp_sweep
@@ -468,7 +469,17 @@ def test_forked_child_lazily_starts_a_fresh_coordinator() -> None:
         async def parent_producer():
             yield response("d073d5000001")
             started.set()
-            await asyncio.to_thread(release.wait)
+            # Deliberately not asyncio.to_thread: that call lazily imports
+            # concurrent.futures.thread, which registers its own fork handlers
+            # (before=_global_shutdown_lock.acquire,
+            # after_in_parent=_global_shutdown_lock.release). Registering them
+            # races the os.fork() below, so after_in_parent can release a lock
+            # whose before never ran and the parent dies with
+            # "RuntimeError: release unlocked lock" -- roughly 5% of runs on
+            # Linux. The sweep is held open here for the fork to land inside;
+            # a thread pool is not part of what this test covers.
+            while not release.is_set():
+                await asyncio.sleep(0.005)
 
         async def child_producer():
             yield response("d073d5000002")
@@ -503,12 +514,13 @@ def test_forked_child_lazily_starts_a_fresh_coordinator() -> None:
                 records = asyncio.run(collect(child_producer))
                 os._exit(0 if records == ["d073d5000002"] else 2)
             except BaseException:
+                traceback.print_exc()
                 os._exit(3)
 
         release.set()
         parent_thread.join(5)
         assert not parent_thread.is_alive()
-        assert parent_errors == []
+        assert not parent_errors, parent_errors
         assert parent_records == ["d073d5000001"]
         _, status = os.waitpid(pid, 0)
         assert os.waitstatus_to_exitcode(status) == 0
