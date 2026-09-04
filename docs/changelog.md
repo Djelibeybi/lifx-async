@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.2.0 (2026-09-04)
+
+### Features
+
+- Attach a NullHandler to the package logger
+  ([`7ff97e3`](https://github.com/Djelibeybi/lifx-async/commit/7ff97e3c3cc4cfe1a3611a07e2a4caed85a920f7))
+
+
 ## v7.1.3 (2026-09-04)
 
 ### Bug Fixes
