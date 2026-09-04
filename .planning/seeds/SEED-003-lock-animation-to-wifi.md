@@ -2,6 +2,10 @@
 seed: 003
 planted_during: v2.0 Thread/IPv6 Support (2026-09-04)
 trigger_when: A milestone touches src/lifx/animation/ or extends the animation public API
+audit_acknowledged:
+  milestone: v2.0
+  at: 2026-09-04
+  status: dormant
 ---
 
 # SEED-003: Lock `Animator` to WiFi devices

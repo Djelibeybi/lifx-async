@@ -1,5 +1,51 @@
 # Milestones
 
+## v2.0 Thread/IPv6 Support (Shipped: 2026-09-05)
+
+**Phases completed:** 5 phases, 41 plans, 93 tasks
+
+**Key accomplishments:**
+
+- `feat/ipv6-thread-support` replayed onto `main` byte-identically across all 11 branch paths, signatures and DCO trailers intact, 3526 tests green, an IPv6-only `Light` driven end-to-end against an emulator on `::1`, and 16 uncovered lines plus 10 partial branches of patch-coverage debt measured and assigned to plans 10-02, 10-03 and 10-05.
+- `lifx.network.address` created as the single implementation of address-family selection and address validation, adopted at all three socket-creation sites and gating all four public entry points, so a zone-less IPv6 link-local address now raises a named `ValueError` in microseconds instead of costing a silent 16 second timeout, with the helper at 100% line and branch coverage and three coverage-exemption markers removed rather than carried across.
+- A send-time address-family assertion that turns a swallowed `gaierror` timeout into a typed sub-millisecond failure, a leak-safe and reopenable `MdnsTransport.open()`, honest mDNS docstrings, and `lifx.network.mdns` taken to 100% branch coverage with zero partials
+- A second emulator on `::1` with `IPV6_V6ONLY` set before bind, an end-to-end suite that asserts the socket family every call actually used and proves frame arrival by reading the device's state back, and one CI cell that fails rather than skips when IPv6 is missing
+- `scripts/ipv6_thread_probe.py` grew a `--serial`-targeted control UAT with full matrix-image and firmware-effect restore in a `finally`, an opt-in non-gating `--stream` stage, and `--uat-output` emitting the record plan 10-06's merge gate reads, backed by 38 hardware-free tests whose assertions were each proven able to fail.
+- Resilient mDNS delivery now skips unusable records, preserves already-resolved devices across auxiliary send failures, and proves every changed executable line and branch from one immutable base.
+- Cancellation-safe mDNS and UDP endpoint creation now restores coherent closed state, releases owned resources, preserves exception semantics, and remains reusable across IPv4 and IPv6 paths.
+- Device-level WiFi/Thread classification with exact private metadata mapping, adoption-safe propagation, and real ephemeral-socket legacy-unicast receipt proof
+- Complete live DNS record retention with lossless advertised addresses, locked address-class selection, and fail-closed TXT/SRV construction consensus
+- Exact-RR goodbye grace with monotonic rescue, one privacy-safe rejection aggregate, and bounded isolated receive-loop completion across packet permutations
+- Device-level WiFi/Thread discovery guidance now matches the ephemeral legacy-unicast implementation while raw service records remain absent from public documentation and examples.
+- Raw mDNS records and the record-yielding generator are now private implementation details, while the supported device discovery APIs and separately exported record-to-device factory retain full class and connectivity behaviour.
+- Phase 11 now has an executable public-surface and documentation contract, a passing immutable-base 100% patch-coverage gate, an anti-weakening proof, and a complete privacy-reviewed regression suite.
+- Value-suppressed current-file recovery with D-15/D-16 guidance, complete source coverage, and branch-history authority deferred to Plan 11-08.
+- Value-suppressed reachability evidence with an operator-approved no-rewrite disposition and every pre-existing commit preserved.
+- Authorised no-rewrite preservation with bounded privacy evidence and fresh green Phase 11 quality gates.
+- Exact LIFX service ownership now gates every mDNS construction boundary, and TXT metadata reaches one bounded linear consensus without Cartesian expansion.
+- mDNS discovery now bounds retained attacker-controlled payload bytes through their exact cache lifetime and ranks only usable endpoints, allowing a valid Thread ULA to survive unusable IPv4 evidence.
+- The IPv6/Thread diagnostic sweep now matches production mDNS deadline, goodbye, retransmission, and bounded follow-up-query semantics without touching hardware or the broadcast path.
+- Repository, agent, and quickstart guidance now describe the actual bounded mDNS query sequence and are protected by semantic anti-drift tests.
+- Supported-device failures are now unskippable, and the complete Phase 11 gap tree has current 100%-patch-covered, privacy-safe, signed and DCO-verified evidence.
+- Public IPv4 and IPv6 targeted lookups now select, exercise, and synchronously close the correct real UDP discovery endpoint while preserving the established discovery loop.
+- Concurrent and cancelled public IPv6 targeted lookups now have deterministic real-socket evidence for per-call isolation, endpoint cleanup, and immediate path reuse.
+- A narrowly opted-in Windows tracer and the unchanged Ubuntu full suite now prove public IPv6 targeted discovery across runners, with canonical datagram destinations for Windows asyncio compatibility.
+- Numeric and named IPv6 zones now survive the real UDP send conversion, while invalid zones fail immediately with a typed network error and current-revision Windows and Ubuntu jobs prove the repaired path.
+- UDP-only public enumeration with explicit source observation, a hermetic paired-measurement harness, and immutable privacy-safe pre-merge evidence
+- Process-wide active UDP single-flight with ordered raw replay, subscriber-owned deadlines and observations, and deterministic cross-loop lifecycle cleanup
+- Current-call, product-directed mDNS verification with one bounded deadline, privacy-safe failure events, and pre-yield StateColor adoption
+- Concurrent UDP and verified mDNS discovery with first-valid serial winners, bounded degradation, and cancellation-safe cleanup
+- Exact serial lookup now races shared UDP and verified mDNS under one deadline, reaping both source legs before returning any result
+- Ordinary exact-head PR CI and 100.00% patch coverage qualify a locally executed hermetic UDP/mDNS emulator pair without permanent Phase 13 CI machinery
+- Current-revision fleet evidence closes merged discovery while preserving confounds, filtering unsupported products, and retaining exact 100% patch coverage
+- A private, opt-in request observer on `DeviceConnection`'s retry engine emits identity-free logical-start/sent/accepted/timeout/send_error/cancelled/cleanup events on a `time.monotonic_ns()` metadata clock, proven end to end by tracing a retransmitted fake `SetPower` acknowledgement through `scripts/thread_revalidation.py` into a validated, append-only, privacy-safe JSONL journal that round-trips losslessly.
+- An immutable, create-exclusive session manifest plus five closed-schema, privacy-validated, append-only JSONL journals (discovery/requests/animation/staleness/closure), with exact D-01..D-08 seeded schedules and statistics, deterministic order-independent summary/ledger/report generation, and a minimal init/validate CLI -- schema-only, no hardware I/O, ready for Plan 14-06 to feed real rows.
+- One canonical `scripts/measurement_support.py` now owns both discovery and request observation plus a shared `capture_device_state()`/`restore_and_verify_device_state()` pair that proves restoration with a fresh recapture instead of trusting acknowledged commands, with a `power_out_of_range` preflight that refuses mutation on an intermediate captured power -- backed by explicit Pyright and patch-coverage evidence with a fully accounted, non-weakened residual gap.
+- Every THREAD-01..05 physical mode (discovery, request, animation, staleness) is now a production-quality, hermetically fake-fleet-proven driver, plus a roster-driven six-class ledger derivation and a Git-index staged-evidence validator that never echoes a matched private value -- ready for Plan 14-06 to drive against real Thread hardware.
+- One executable-example discovery guide (docs/user-guide/discovery.md + examples/discovery_progressive.py) replacing duplicated UDP/mDNS prose across advanced-usage.md/network.md/troubleshooting.md, strict pymdownx.snippets path checking in mkdocs.yml, a corrected Python 3.10 asyncio.gather()/create_task() story in place of the false asyncio.TaskGroup claim, and CLAUDE.md reduced to a literal @AGENTS.md import.
+
+---
+
 ## v1.2 Theme Library Update (Shipped: 2026-08-27)
 
 **Phases completed:** 4 phases (6–9), 11 plans, 28 tasks

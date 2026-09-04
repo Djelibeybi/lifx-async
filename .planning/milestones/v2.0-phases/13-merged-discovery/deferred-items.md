@@ -15,3 +15,4 @@ None.
 - **Resolution:** Replaced the test-only executor wait with cancellation-safe asynchronous polling of the cross-thread event. The final-detach test additionally asserts that the release gate remains unset, preserving proof that subscriber cancellation itself closes the producer.
 - **Verification:** The bounded focused reproducer exits normally with 1 passed; the affected Wave 2 selection exits with 186 passed and 1 skipped; the full repository suite exits with 4,232 passed, 1 skipped, and 12 deselected.
 - **Scope decision:** Deferred under the executor scope boundary because the defect predates Plan 13-03 and is in the Plan 13-02 coordinator test surface. Plan 13-03 assertions, focused verification, Ruff, and Pyright are green.
+  status: acknowledged

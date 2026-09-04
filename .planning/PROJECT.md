@@ -1,43 +1,39 @@
 # lifx-async
 
-## Current State (post-v1.2)
+## Current State (post-v2.0)
 
-**v1.2 Theme Library Update shipped 2026-08-27.** Phases 6 to 9 delivered and verified;
-all 16 live requirements satisfied. The hand-written 366-line palette table is gone.
-`data/themes.jsonl` (166 committed records) is the source of truth,
-`scripts/generate_theme_data.py` emits `src/lifx/theme/data.py` (169 resolvable keys), and
-`ThemeLibrary` reads the generated dict alone. Every record carries a machine-readable
-fate, the app's nine-category taxonomy is queryable, and the record contract ships as the
-importable, independently tested `lifx.theme.schema`.
+**v2.0 Thread/IPv6 Support shipped 2026-09-05.** Phases 10 to 14 delivered and verified;
+all 28 live requirements satisfied, 41/41 plans. A Thread device is now a first-class
+device: found by default (`discover()` merges a UDP broadcast leg and a unicast-verified
+mDNS leg by serial), addressed by IPv6 literal (`find_by_ip()`), raced concurrently in
+`find_by_serial()`, and self-identified via `Device.connectivity` (`"wifi"` or
+`"thread"`). The mDNS leg reached broadcast-grade quality along the way: an IPv4-defect
+ephemeral-port fix (25 devices found vs. 9 with `SO_REUSEPORT` contention), RFC
+6762-compliant goodbye/cache-flush handling, and bounded fail-closed record admission
+against attacker-controlled payloads.
 
-Two locked decisions reversed mid-milestone, both recorded in Key Decisions below. The
-`*_legacy` aliases were retired before Phase 6 shipped. The second reversal mattered more:
-the "device readback is the only capture source" rule was set aside in Phase 9, when the
-palettes were resynced from an internal LIFX HTTP API endpoint. That resync answered the
-16-colour question the milestone opened with: the 25 themes the protocol had clipped at 16
-now ship at their true lengths, 18 to 68 colours.
+Every v1.1 wire-reliability finding was then revalidated against a real 8-device Thread
+fleet in Phase 14 (SEED-001, planted 2026-07-16, fired at the v1.2 close). Discovery
+coverage held across repeated rounds; the WiFi-tuned retry schedule needed no change
+against measured Thread ack RTT (medians 37-57ms across 8 aliases); advertisement
+staleness was measured directly by unplugging a device (69s from disappearance to
+confirmed expiry). Every device class now carries either Thread evidence
+(`CeilingLight`, `Light`, `MatrixLight`, `MultiZoneLight`) or a named gap (`HevLight`,
+`InfraredLight` — no Thread-capable hardware of either class exists in the fleet).
+Thread animation throughput was recorded as an explicit scope boundary rather than
+measured: the mesh doesn't have the bandwidth to sustain animation usably, so `Animator`
+is intended to be locked to WiFi devices in a future milestone (SEED-003) rather than
+chasing Thread animation performance.
 
-The close-out audit found no unsatisfied requirements and no orphans. It returned
-`tech_debt` over two bookkeeping findings at the Phase 8 to Phase 9 seam, both closed
-before archiving. The ceiling determinations were restamped as a historical record pinned
-to the pre-resync blob, and `tests/test_theme/test_ceiling_supersession.py` now pins the
-supersession that the archived Phase 8 harness can no longer check. A third finding, that
-Phase 7 lacked operator sign-off, was withdrawn: the sign-off had been recorded in
-`07-UAT.md` all along and only a stale body line suggested otherwise. See
-`milestones/v1.2-MILESTONE-AUDIT.md`.
+Close-out acknowledged three items rather than blocking on them: two still-dormant seeds
+(SEED-002 WiFi-control staleness experiment, SEED-003 lock `Animator` to WiFi) and one
+Phase 13 deferred item (a coordinator teardown test's blocked-executor-worker hang, whose
+`deferred-items.md` entry wasn't updated when a later commit likely already fixed it —
+worth a quick recheck next session). See `.planning/STATE.md` Deferred Items and
+`milestones/v2.0-ROADMAP.md`.
 
-**Current milestone: v2.0 Thread/IPv6 Support** (opened 2026-08-27). SEED-001 has fired: its
-trigger condition, LIFX Thread firmware shipping, was met during the v1.2 close-out, when
-probing confirmed Thread devices answer over IPv6 and located the gaps that v2.0 closes.
-
-**Merged discovery completed 2026-08-31.** `discover()` now merges shared UDP and verified
-mDNS discovery under one caller deadline, while `discover_udp()` and `discover_mdns()`
-retain explicit source control. Unsupported products are filtered before the public API
-yields devices, so relay-only Switches remain outside the library's lighting-device fleet.
-Phase 14 now owns the remaining Thread hardware revalidation and consumer guidance.
-
-**Shipped:** v1.0 Ceiling Save-on-Exit (2026-06-12) and v1.1 Wire Reliability
-(2026-07-26). See `.planning/MILESTONES.md`.
+**v1.2 Theme Library Update shipped 2026-08-27** and **v1.1 Wire Reliability shipped
+2026-07-26** — see the collapsed history below and `.planning/MILESTONES.md`.
 **Also shipped post-v1.0:** Phase 1 discovery unification (verified 2026-06-13), which
 rebuilt `discover_devices()` on `_discover_with_packet()` with hoisted DoS serial
 validation and first-wins per-serial dedup.
@@ -46,46 +42,84 @@ validation and first-wins per-serial dedup.
 `spike-findings-lifx-async` skill): five real-hardware experiments that disproved the
 "switch to threading" hypothesis and located the actual reliability levers.
 
-## Current Milestone: v2.0 Thread/IPv6 Support
+## Next Milestone Goals
+
+No v2.1/v3.0 milestone is open yet. Candidates carried forward or surfaced during v2.0:
+
+- **SEED-003**: Lock `Animator` to WiFi devices — Thread doesn't have the bandwidth for
+  usable animation frame rates (recorded as a scope boundary in Phase 14, THREAD-03)
+- **SEED-002**: Run the staleness experiment against WiFi bulbs as a control, to know
+  whether THREAD-04's 69s expiry figure is Thread-specific or a general mDNS TTL/goodbye
+  artefact
+- **FLEET-01/FLEET-02**: Cross-packet mDNS accumulation, follow-up A/AAAA queries, and
+  multi-border-router topologies — currently proven only synthetically; revalidate once
+  the fleet or network grows enough to exercise them on hardware
+- Seven open GitHub issues deferred from PR #211 (mDNS) and PR #196 (themes) review that
+  are still unresolved: [#217](https://github.com/Djelibeybi/lifx-async/issues/217),
+  [#216](https://github.com/Djelibeybi/lifx-async/issues/216),
+  [#215](https://github.com/Djelibeybi/lifx-async/issues/215),
+  [#214](https://github.com/Djelibeybi/lifx-async/issues/214),
+  [#213](https://github.com/Djelibeybi/lifx-async/issues/213),
+  [#212](https://github.com/Djelibeybi/lifx-async/issues/212),
+  [#209](https://github.com/Djelibeybi/lifx-async/issues/209) (mDNS test/docs/coverage
+  cleanup), plus theme issues
+  [#201](https://github.com/Djelibeybi/lifx-async/issues/201),
+  [#199](https://github.com/Djelibeybi/lifx-async/issues/199),
+  [#198](https://github.com/Djelibeybi/lifx-async/issues/198), and
+  [#191](https://github.com/Djelibeybi/lifx-async/issues/191) (typed Move-effect API)
+- **PERS-01, SPIKE-006, STYLE-01**: long-carried candidates, see Active requirements below
+
+## Shipped Milestone: v2.0 Thread/IPv6 Support (2026-09-05)
 
 **Goal:** A Thread device becomes a first-class device in this library: found, addressed,
 controlled and animated without the caller needing to know it is on Thread. The v1.1
 wire-reliability findings are then revalidated over Thread, because every one of them was
 measured on WiFi/IPv4.
 
-**Target features:**
+**Delivered:**
 
 - **IPv6/Thread transport landed through Phase 10 and PR #210:** IPv6 device addresses,
   socket family following the target address, AAAA parsing that prefers routable addresses
   over link-local, per-instance mDNS record accumulation across packets, PTR retransmit per
   RFC 6762 5.2, follow-up A/AAAA queries for SRV targets whose address records did not fit
-  one reply, and the animator frame-socket family fix
+  one reply, and the animator frame-socket family fix (IPV6-01..04)
 - **mDNS ephemeral-port bind as its own regression-tested requirement.** Measured 25
   devices found bound ephemeral against 9 bound on 5353 with `SO_REUSEPORT`: system mDNS
   daemons were stealing legacy-unicast replies. This is an IPv4 defect that predates
-  Thread, so it earns a test of its own rather than riding along uncredited
+  Thread, so it earns a test of its own rather than riding along uncredited (MDNS-01)
 - **`discover()` runs broadcast and mDNS together**, merging by serial, so every existing
-  caller reaches Thread devices without opting in
+  caller reaches Thread devices without opting in (FIND-01..04)
 - **Source-specific discovery remains public.** `discover_udp()` exposes UDP-only
   enumeration alongside the existing mDNS-only `discover_mdns()`, while `discover()`
-  remains the dual-source default
-- **Overlapping UDP enumeration is single-flight.** Compatible `discover()` and
-  `discover_udp()` callers share one active broadcast sweep and its already-seen records,
-  so caller bursts cannot multiply the measured rebroadcast response load
-- **`find_by_serial()` runs both legs concurrently, first hit wins.** Neither alone is
-  sufficient: broadcast covers WiFi devices whose firmware does not advertise over mDNS,
-  mDNS covers Thread devices that have no IPv4 address to broadcast to
-- **`find_by_ip()` accepts an IPv6 literal** instead of returning `None`
+  remains the dual-source default; overlapping compatible callers share one active
+  broadcast sweep (FIND-09, FIND-10)
+- **`find_by_serial()` runs both legs concurrently, first hit wins** (FIND-05); **`find_by_ip()`
+  accepts an IPv6 literal** instead of returning `None` (FIND-06)
 - **Every `Device` exposes `connectivity` as `"wifi"` or `"thread"`.** Exact private TXT
   `tm=2` means Thread; every other case means WiFi. The low-level mDNS record and generator
-  become explicitly private in Phase 11
+  are explicitly private (MDNS-02, D-16)
 - **Synthetic multi-packet mDNS tests** exercising cross-packet record accumulation and
-  the follow-up A/AAAA path, neither of which two Thread devices can trigger
-- **Thread revalidation (SEED-001)** of discovery coverage, retry schedule and animation
-  flow control, evidenced per device class as hardware becomes available
-- **Consumer guidance docs** for broadcast-first integrations
+  the follow-up A/AAAA path, neither of which two Thread devices can trigger (MDNS-03, MDNS-04)
+- **Thread revalidation (SEED-001, THREAD-01..05)** measured against a real 8-device
+  fleet: discovery coverage held across repeated rounds, WiFi-tuned retry constants held
+  against measured Thread ack RTT, advertisement staleness measured directly (69s
+  disappearance-to-expiry on one alias), and every device class closed evidence-backed or
+  as a named gap. Animation throughput was recorded as a scope boundary, not measured
+  (THREAD-03) — `Animator` is intended to be locked to WiFi devices in a future milestone
+  (SEED-003)
+- **Consumer guidance docs**: one executable discovery guide replacing duplicated
+  UDP/mDNS prose, and the false `asyncio.TaskGroup` claim in `CLAUDE.md`/`AGENTS.md`
+  corrected for the Python 3.10 floor (DOCS-04..06)
 
-## Shipped Milestone: v1.2 Theme Library Update (2026-08-27)
+**Closed with 3 acknowledged items** (override closeout): SEED-002 and SEED-003 remain
+dormant seeds for a future milestone, and one Phase 13 deferred item (coordinator teardown
+test hang) whose `deferred-items.md` entry wasn't confirmed against a later possible fix.
+See `.planning/STATE.md` Deferred Items.
+
+Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
+
+<details>
+<summary>Shipped Milestone: v1.2 Theme Library Update (2026-08-27)</summary>
 
 **Goal:** Resync `lifx.theme.library` with the LIFX app's live theme set without silently
 changing colours existing callers already depend on.
@@ -120,6 +154,8 @@ shipping it here stopped being a requirement of this milestone.
 
 **Retired 2026-08-14:** COMPAT-02 (`*_legacy` aliases). See Key Decisions.
 
+</details>
+
 <details>
 <summary>Shipped Milestone: v1.1 Wire Reliability (2026-07-26)</summary>
 
@@ -152,12 +188,17 @@ its wire behaviour measurably as reliable as the best reference clients. v1.2 tu
 what the library *renders*: the built-in palettes, transcribed from photons years ago and
 never resynced, had drifted until most shared names no longer matched the app. They are
 now generated from committed data rather than hand-written, carry the app's own names,
-categories and dispositions, and ship at their full untruncated lengths.
+categories and dispositions, and ship at their full untruncated lengths. v2.0 turned to
+*what the library can reach*: a Thread device — IPv6-only, mDNS-advertised, no broadcast
+address — is now found, addressed, controlled and animated exactly like a WiFi device,
+with every existing caller's wire behaviour revalidated on real Thread hardware rather
+than assumed to transfer from WiFi/IPv4.
 
 ## Core Value
 
-Commands stick, devices are found, streaming never starves control traffic — and a theme
-by name looks like the theme of that name in the LIFX app.
+Commands stick, devices are found — over WiFi or Thread, transparently — streaming never
+starves control traffic, and a theme by name looks like the theme of that name in the
+LIFX app.
 
 ## Requirements
 
@@ -206,32 +247,33 @@ by name looks like the theme of that name in the LIFX app.
 - ✓ Theme documentation lists the themes and categories and records that the redefined
   pre-6.4.0 palettes were not carried forward, bound to the library by a drift test
   (DOCS-03) — v1.2 Phase 9
+- ✓ IPv6/Thread transport: any socket-creation site derives family from the target
+  address, a zone-less link-local address raises immediately instead of a silent 16s
+  timeout (IPV6-01..04) — v2.0 Phase 10
+- ✓ mDNS hardened to broadcast-grade quality: ephemeral-port bind, `Device.connectivity`,
+  cross-packet record accumulation, bounded fail-closed address admission, RFC
+  6762-compliant goodbye/cache-flush handling (MDNS-01..08) — v2.0 Phase 11
+- ✓ IPv6 targeted lookup: `find_by_ip()` resolves an IPv6 literal, family-aware bind,
+  proven concurrent/cancellation-safe on Windows and Ubuntu (FIND-06) — v2.0 Phase 12
+- ✓ Merged discovery: `discover()` runs UDP and verified mDNS legs concurrently merged by
+  serial with the pre-existing contract intact; `discover_udp()`/`discover_mdns()` stay
+  explicit; overlapping UDP callers share one active sweep; `find_by_serial()` races both
+  legs (FIND-01..05, FIND-07..10) — v2.0 Phase 13
+- ✓ Every v1.1 wire-reliability finding revalidated against a real 8-device Thread fleet;
+  every device class evidence-backed or a named gap; consumer guidance and doc
+  corrections shipped (THREAD-01..05, DOCS-04..06) — v2.0 Phase 14
 
 ### Active
 
-<!-- v2.0 Thread/IPv6 Support. Authoritative REQ-IDs live in .planning/REQUIREMENTS.md;
-     the list below is the milestone's scope in prose. -->
+<!-- Next milestone not yet opened. Candidates carried forward from v2.0 close; see
+     "Next Milestone Goals" above for the full list with links. -->
 
-**Milestone v2.0: Thread/IPv6 Support.** Full detail in `## Current Milestone` above.
-
-- [x] Land `feat/ipv6-thread-support` onto `main` with the network, mDNS and animation
-      changes intact (Phase 10, PR #210, 2026-08-28)
-- [x] mDNS ephemeral-port bind, regression-tested in its own right as an IPv4 defect
-- [x] `discover()` runs a broadcast leg and an mDNS leg, merged by serial
-- [x] `discover_udp()` preserves explicit UDP-only enumeration, and overlapping compatible
-      `discover()` / `discover_udp()` calls share one active UDP sweep
-- [x] `find_by_serial()` runs both legs concurrently, first hit wins
-- [x] `find_by_ip()` resolves a device from an IPv6 literal
-- [x] `Device.connectivity` exposes `"thread"` for exact private TXT `tm=2` and `"wifi"`
-      otherwise; the low-level mDNS record and generator are explicitly private
-- [x] Synthetic multi-packet mDNS tests for cross-packet accumulation and follow-up
-      A/AAAA queries
-- [ ] THREAD-01 / SEED-001: revalidate discovery coverage, retry schedule and animation
-      flow control over Thread, evidenced per device class as hardware becomes available
-- [ ] Consumer guidance docs for broadcast-first integrations
-
-Carried-forward candidates, not in v2.0 scope:
-
+- [ ] SEED-003: lock `Animator` to WiFi devices — Thread lacks the bandwidth for usable
+      animation frame rates (recorded as a scope boundary in v2.0 Phase 14, THREAD-03)
+- [ ] SEED-002: run the staleness experiment against WiFi bulbs as a control
+- [ ] FLEET-01: cross-packet mDNS accumulation and follow-up A/AAAA queries confirmed on
+      real hardware, once the fleet is large enough to overflow one legacy-unicast reply
+- [ ] FLEET-02: multi-address and multi-border-router topologies revalidated
 - [ ] PERS-01: generalise `state_file` persistence into a reusable mixin (deferred since
       2026-06-11)
 - [ ] Spike 006: measure the impact of publishing tuning constants vs behaviour only.
@@ -320,6 +362,16 @@ Carried-forward candidates, not in v2.0 scope:
 
   `InfraredLight` and `HevLight` hardware in the fleet is too old for Thread, so both
   close as named gaps under THREAD-05.
+- Phase 14's THREAD-05 six-class ledger closed against an 8-alias fleet (`LIFX-Candle-C-1`,
+  `LIFX-Ceiling-13x26-1`, `LIFX-DL-Intl-1`, `LIFX-DL-Intl-2`, `LIFX-Luna-1`, `LIFX-Mini-1`,
+  `LIFX-Mini-2`, `LIFX-Tube-1`): `CeilingLight`, `Light`, `MatrixLight` and
+  `MultiZoneLight` are `evidence_backed`; `HevLight` and `InfraredLight` are `named_gap`
+  (no Thread-capable hardware of either class exists in the fleet). See
+  `milestones/v2.0-phases/14-thread-revalidation-and-docs/14-EVIDENCE/14-REPORT.md`.
+- Current size post-v2.0: ~44,700 lines of library source (`src/`), 4,856 tests
+  collected (4,844 run + 12 deselected benchmark tests), zero runtime dependencies.
+  Version at close: 7.1.3 published, `v7.2.0` tag cut by semantic-release for the
+  NullHandler feat commit.
 - **The Thread OMR prefix is not an identifier. Match on serial.** It measured
   `fd00:2::/64` on 2026-08-28, distinct from the WiFi fleet's
   `fd00:3::`, but a Thread OMR prefix is an auto-generated ULA that the border
@@ -384,6 +436,10 @@ Carried-forward candidates, not in v2.0 scope:
 | Expose connectivity on `Device`, not the low-level mDNS record | Consumers care whether a device is on WiFi or Thread, not about a DNS cache hand-off object. Exact private `tm=2` means `"thread"`; every other case means `"wifi"` | Decided 2026-08-28 in Phase 11 discussion. Supersedes the 2026-08-27 record-level `tm` decision; `LifxServiceRecord`, `discover_lifx_services()` and any transport enum become explicitly private without aliases |
 | Treat retained mDNS addresses as an unordered internal set | Address membership and the selected address class matter; byte-for-byte tuple ordering does not once the record is private. Packet-source fallback is transport evidence and remains separate | Decided 2026-08-28 in Phase 11 discussion |
 | Apply RFC 6762's legacy-unicast cache rules exactly | TTL-zero goodbyes receive one-second grace/rescue without extending discovery deadlines. Cache-flush is forbidden on legacy-unicast replies, so its semantics are ignored and an unexpected bit is counted in a privacy-safe debug summary | Decided 2026-08-28 in Phase 11 discussion; supersedes the initial immediate-eviction/cache-flush SPEC contract |
+| Resolve numeric and named IPv6 zones at the UDP send boundary, in the native sockaddr field | A caller's scoped link-local literal (`fe80::1%en0`) must survive the real send call, not just address parsing; an invalid zone should fail immediately rather than silently drop | ✓ Shipped — Phase 12. Reports invalid zone resolution as a typed `LifxNetworkError` while keeping the endpoint reusable |
+| Measure Thread discovery and retry timing before changing any constant, never assume | The project's spike-first discipline (2026-07-16 lineage): a WiFi-tuned constant only changes on Thread-measured evidence, not on suspicion that Thread is slower | ✓ Applied — Phase 14. Discovery coverage held across repeated rounds; ack RTT medians (37-57ms across 8 aliases) did not warrant retuning any constant |
+| Record Thread animation as an explicit scope boundary, not a throughput measurement | Thread doesn't have the bandwidth to sustain animation at usable frame rates, and pushing that volume onto a mesh is bad practice regardless of what a measurement would show | Decided in Phase 14 (THREAD-03). One alias completing 1/2/5 FPS without failing is preserved as evidence Thread carries frames, explicitly not evidence of usable animation. `Animator` is intended to be locked to WiFi devices in a future milestone (SEED-003) |
+| Close v2.0 with 3 acknowledged items rather than blocking on them | SEED-002 and SEED-003 are genuinely future-milestone work, not v2.0 scope; the Phase 13 deferred item's underlying test-hang bug appears already fixed by a later commit but `deferred-items.md` was never confirmed against it | Accepted 2026-09-05 at milestone close (override_closeout). Recorded in `.planning/STATE.md` Deferred Items; worth a `/gsd-audit-uat` recheck next session |
 
 ## Evolution
 
@@ -403,4 +459,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-31 after Phase 13 completion*
+*Last updated: 2026-09-05 after v2.0 milestone*
