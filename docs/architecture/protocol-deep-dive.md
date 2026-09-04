@@ -78,7 +78,9 @@ header = LifxHeader(
 | reserved | 6 bytes | Reserved for future use |
 | res_required | 1 bit | Response required flag |
 | ack_required | 1 bit | Acknowledgment required flag |
-| reserved | 6 bits | Reserved |
+| reserved | 1 bit | Reserved |
+| thread_connection | 1 bit | Set by the device when the message was sent over a Thread connection |
+| reserved | 4 bits | Reserved |
 | sequence | 1 byte | Wrap-around sequence number |
 | reserved | 8 bytes | Reserved |
 | pkt_type | 2 bytes | Message type identifier |

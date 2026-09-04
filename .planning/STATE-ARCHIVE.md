@@ -31,3 +31,25 @@ Pruned entries from STATE.md. Recoverable but no longer loaded into agent contex
 - [Phase 10]: Patch coverage remains recorded but is advisory and operator-overridable because it does not affect runtime functionality
 - [Phase 10]: Transport lifecycle races and DeviceConnection opener-waiter failures are blocking defects and require deterministic regression fixes
 - [Phase 10]: UAT state restoration is best-effort operator hygiene and does not gate the control result or phase completion
+
+## Pruned 2026-09-04 (phases 1-11, kept recent 3)
+
+### Decisions
+
+- [Phase 11]: Connectivity is adopted with registry-derived metadata — Future serial de-duplication must preserve Thread classification without changing address, routing, retry, or tuning behaviour
+- [Phase 11, superseded 2026-08-28 by D-15]: The earlier decision treated admitted addresses as lossless within the 1,024-owner cache. D-15 now exact-deduplicates A/AAAA identities, admits at most 256 per owner and 1,024 per sweep, rejects and privacy-safely counts unseen excess identities without eviction, makes owner overflow or sweep exhaustion permanent for the call, and refuses selection, resolution, or follow-up from incomplete state while leaving caller deadlines unchanged.
+- [Phase 11, supersession recorded 2026-08-28 as D-16]: The earlier D-03 integration interpretation preserved a public factory. D-16 keeps `_LifxServiceRecord`, `_discover_lifx_services`, and `_create_device_from_record` private together with no public or compatibility alias; supported callers use `discover_devices_mdns()` or `lifx.api.discover_mdns()`.
+- [Phase 11]: mDNS TXT construction metadata and SRV endpoints resolve only through full live-set consensus; record ordering never selects a trusted winner.
+- [Phase 11]: Goodbye scheduling indexes only complete RR identities under TTL-zero grace; ordinary retained addresses stay outside timer traversal.
+- [Phase 11]: Recoverable mDNS parsing is limited to ValueError, IndexError, and struct.error, followed by one privacy-safe rejection summary per sweep.
+- [Phase 11]: Packet-source fallback is validated and deferred until sweep completion so later advertised endpoints win without arrival-order bias.
+- [Phase 11]: Deletion-only source files remain anti-weakening and public-surface inputs but are excluded from changed-executable coverage.
+- [Phase 11]: IPv4 UDP loopback availability is mandatory evidence for the MDNS-01 legacy-unicast transport proof.
+- [Phase 11]: Preserve the completed D-15 and D-16 authority commits without replay or amendment. — Current-file and draft recovery is distinct from historical authority work.
+- [Phase 11]: Keep branch-history disposition in Plan 11-08 and fresh full gates in Plan 11-09. — Plan 11-07 is limited to current-file sanitisation, draft guidance, and structural closeout.
+- [Phase 11]: Preserve history under the Plan 11-08 `no-rewrite` disposition. — The operator confirmed the historical candidate is an approved stable pseudonym; Plan 11-09 owns fresh privacy and full gates.
+- [Phase 11]: Only exact canonical LIFX service-instance ownership creates mDNS construction provenance.
+- [Phase 11]: A and AAAA records remain bounded candidates until linked by a live exact-service SRV record.
+- [Phase 11]: TXT construction metadata uses one-pass effective-value consensus with immediate conflict rejection.
+- [Phase 11]: Charge only exact retained variable payload and release the stored cost only when expiry removes the cached identity.
+- [Phase 11]: Filter unusable mDNS addresses before the IPv4, ULA, GUA, scoped-link-local ranking and use lexical same-class order.

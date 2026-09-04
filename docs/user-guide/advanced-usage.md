@@ -15,100 +15,11 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 
 ## Discovery Methods
 
-lifx-async provides two discovery methods with different trade-offs:
-
-### UDP Broadcast Discovery
-
-The traditional discovery method broadcasts to all devices on the network:
-
-```python
-from lifx import discover
-
-async def broadcast_discovery():
-    async for device in discover(timeout=5.0):
-        async with device:
-            color, power, label = await device.get_color()
-            print(f"Found: {label} ({type(device).__name__})")
-```
-
-**Characteristics:**
-
-- Sends one initial broadcast, then schedules re-broadcasts 0.6, 1.8, 3.6,
-  5.6 and 7.6 seconds later; the five-second example schedules the first three,
-  then performs per-device type detection
-- Works on any local network
-- May miss devices on other subnets
-
-The offsets are fixed constants; they are not scaled to the requested discovery
-timeout. A due re-broadcast is sent only while discovery remains active. Later
-sends do not occur after the overall or idle deadline, when the caller closes or
-cancels the generator, or when a transport failure aborts the sweep. A valid
-response resets the four-second idle window; it does not extend the overall
-timeout.
-
-### Targeted UDP Discovery
-
-When the device address is already known, `find_by_ip()` sends the discovery
-request directly to that IPv4 or IPv6 literal and returns the responding device:
-
-```python
-from lifx import find_by_ip
-
-device = await find_by_ip("2001:db8::10")
-
-# Link-local IPv6 addresses must identify their interface.
-link_local_device = await find_by_ip("fe80::10%en0")
-```
-
-The address is validated before a socket is opened. Invalid literals, IPv4-mapped
-IPv6 literals, wildcard addresses and link-local IPv6 addresses without a zone ID
-raise `ValueError` immediately. A named zone that the host cannot resolve, or a
-transport failure, raises `LifxNetworkError`.
-
-### mDNS Discovery
-
-mDNS discovery uses DNS-SD to find devices with an IPv4 multicast query:
-
-```python
-from lifx import discover_mdns
-
-async def mdns_discovery():
-    async for device in discover_mdns(timeout=5.0):
-        async with device:
-            color, power, label = await device.get_color()
-            print(
-                f"Found: {label} ({type(device).__name__}, "
-                f"{device.connectivity})"
-            )
-```
-
-**Characteristics:**
-
-- Device type metadata arrives in DNS-SD responses, avoiding a separate LIFX
-  product query for every device
-- Starts with an IPv4 multicast query and may send bounded retransmissions or
-  address follow-up queries within the discovery timeout
-- May work across subnets when the network provides an mDNS reflector
-- Zero dependencies (uses Python stdlib only)
-
-`discover_mdns()` sends its query from an **ephemeral source port** and accepts
-**legacy-unicast replies** addressed directly to that socket. The socket
-**does not join the multicast group** and **does not receive unsolicited announcements**,
-so each call observes only direct traffic delivered to its per-call socket during
-the sweep and does not reuse DNS cache state from an earlier call. Discovery
-**does not authenticate or correlate responders** with its outstanding queries.
-Large-mesh packet assembly and follow-up behaviour are covered by deterministic
-multi-packet tests: **mesh scale is proven synthetically**.
-
-An IPv6 link-local address needs a zone ID identifying its network interface,
-but a DNS AAAA record cannot carry that ID. An mDNS response containing only an
-unscoped link-local AAAA address therefore cannot produce a usable device route;
-use `discover()` as the compatibility fallback on such networks.
-
-Every yielded device exposes `connectivity` as `"thread"` only after an exact
-positive Thread report. Every other construction or discovery outcome is
-`"wifi"`. This metadata describes how the device was reported; it does not
-authenticate the device or change routing and retry behaviour.
+Discovery has its own canonical guide. See the **[Discovery Guide](discovery.md)**
+for the unchanged `discover()` migration path, explicit `discover_udp()` and
+`discover_mdns()` source control, targeted `find_by_ip()` lookup (including
+IPv6 zone handling), a method-selection table, the four mDNS limitations, and
+discovery-specific troubleshooting.
 
 ### Opt-In State Fields on Discovered Devices
 
@@ -151,14 +62,8 @@ The same ordering applies to `discover_mdns()`, `find_by_serial()`,
 `find_by_ip()` and `find_by_label()` — all of them return devices that have not
 been entered yet — and to `fetch_ambient_light` on lights.
 
-### Choosing a Discovery Method
-
-| Scenario | Recommended Method |
-|----------|-------------------|
-| General use | `discover()` or `discover_mdns()` |
-| Known device address | `find_by_ip()` |
-| Cross-subnet (with reflector) | `discover_mdns()` |
-| Maximum compatibility | `discover()` |
+See the [Discovery Guide](discovery.md#choosing-a-discovery-method) for the
+full method-selection table.
 
 ## Storing State
 
@@ -235,8 +140,8 @@ async def use_cached_or_fetch():
 - `Device.wifi_firmware` - Major and minor wifi firmware version and build number
 - `Device.location` - Device location name/label
 - `Device.group` - Device group name/label
-- `Device.connectivity` - `"thread"` for an exact positive Thread report,
-  otherwise `"wifi"`
+- `Device.connectivity` - `Connectivity.THREAD` or `Connectivity.WIFI`; the
+  device's own frame address report wins once it has answered a request
 
 ##### Non-State Properties
 
@@ -661,6 +566,7 @@ For sustained high-frame-rate streaming, prefer the [Animation Guide](animation.
 
 ## Next Steps
 
+- [Discovery Guide](discovery.md) — Discovery methods, limitations and troubleshooting
 - [Troubleshooting Guide](troubleshooting.md) — Common issues and solutions
 - [Network Layer API](../api/network.md) — Low-level discovery, connection, and transport reference
 - [Protocol Reference](../api/protocol.md) — Protocol layer and packet structures

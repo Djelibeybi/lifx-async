@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
+import inspect
 import re
 from pathlib import Path
 
@@ -15,18 +17,46 @@ _PUBLIC_PATHS = (
     Path("docs/api/network.md"),
     Path("docs/api/index.md"),
     Path("docs/user-guide/advanced-usage.md"),
+    Path("docs/user-guide/discovery.md"),
     Path("examples/discovery_mdns.py"),
+    Path("examples/discovery_progressive.py"),
 )
+# D-24 (Phase 14): CLAUDE.md is deliberately removed from this audit. It is
+# reduced to a literal `@AGENTS.md` import plus only Claude-specific content,
+# so the shared mDNS query-model prose this contract checks now lives in
+# AGENTS.md alone (the canonical source) and is reachable from CLAUDE.md only
+# through that import, not by duplication. See
+# tests/test_repository_guidance.py for the import/no-duplication contract.
 _REQUIRED_QUERY_MODEL_PATHS = (
     Path("AGENTS.md"),
-    Path("CLAUDE.md"),
     Path("docs/getting-started/quickstart.md"),
 )
 _QUERY_MODEL_PATHS = _REQUIRED_QUERY_MODEL_PATHS
-_PUBLIC_GUIDANCE_PATH = Path("docs/user-guide/advanced-usage.md")
+# Task 2 (DOCS-05): the exact mDNS limitation phrases now live on the
+# canonical discovery guide, not the advanced-usage summary that links to it.
+_PUBLIC_GUIDANCE_PATH = Path("docs/user-guide/discovery.md")
 _MIGRATION_GUIDANCE_PATH = Path("docs/migration/mdns-low-level-api-7.0.0.md")
 _PRIVATE_GUIDANCE_PATH = Path("src/lifx/network/discovery/mdns/transport.py")
 _MDNS_SOURCE_PATH = Path("src/lifx/network/discovery/mdns")
+
+# Task 1 (DOCS-04): the canonical discovery guide and its single executable
+# source. Kept as module-level constants so the drift-protection tests below
+# and any future contract addition share one definition of "the guide" and
+# "the example".
+_DISCOVERY_GUIDE_PATH = Path("docs/user-guide/discovery.md")
+_PROGRESSIVE_EXAMPLE_PATH = Path("examples/discovery_progressive.py")
+_PROGRESSIVE_EXAMPLE_REGIONS = (
+    "merged",
+    "explicit-udp",
+    "explicit-mdns",
+    "targeted",
+)
+_PROGRESSIVE_EXAMPLE_FUNCTIONS = (
+    "merged_discovery",
+    "explicit_udp_discovery",
+    "explicit_mdns_discovery",
+    "targeted_lookup",
+)
 
 
 def _normalised_prose(relative_path: Path) -> str:
@@ -251,3 +281,161 @@ class TestPhase11SurfaceContract:
 
         quickstart = _normalised_prose(Path("docs/getting-started/quickstart.md"))
         assert re.search(r'connectivity.{0,80}"wifi".{0,20}"thread"', quickstart)
+
+
+class TestPhase14DiscoveryGuideContract:
+    """DOCS-04: one executable example is the sole source of guide snippets."""
+
+    def _load_progressive_example(self):
+        """Import the example from its file path without executing `main()`."""
+        module_path = _REPO_ROOT / _PROGRESSIVE_EXAMPLE_PATH
+        spec = importlib.util.spec_from_file_location(
+            "discovery_progressive_example", module_path
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_progressive_example_defines_every_migration_region(self) -> None:
+        """Each guide snippet has a matching start/end region in the example."""
+        source = (_REPO_ROOT / _PROGRESSIVE_EXAMPLE_PATH).read_text(encoding="utf-8")
+
+        for region in _PROGRESSIVE_EXAMPLE_REGIONS:
+            assert f"--8<-- [start:{region}]" in source, (
+                f"missing start marker for {region!r}"
+            )
+            assert f"--8<-- [end:{region}]" in source, (
+                f"missing end marker for {region!r}"
+            )
+
+    def test_progressive_example_imports_and_exposes_every_flow(self) -> None:
+        """The example imports cleanly and defines all four migration flows."""
+        module = self._load_progressive_example()
+
+        for function_name in _PROGRESSIVE_EXAMPLE_FUNCTIONS:
+            function = getattr(module, function_name, None)
+            assert function is not None, f"missing {function_name}()"
+            assert inspect.iscoroutinefunction(function)
+
+    def test_discovery_guide_snippets_reference_the_progressive_example(
+        self,
+    ) -> None:
+        """The guide includes every region from the one executable source,
+        rather than hand-copying code that could drift from it."""
+        guide = (_REPO_ROOT / _DISCOVERY_GUIDE_PATH).read_text(encoding="utf-8")
+
+        for region in _PROGRESSIVE_EXAMPLE_REGIONS:
+            assert f'"examples/discovery_progressive.py:{region}"' in guide, (
+                f"guide does not include the {region!r} snippet"
+            )
+
+    def test_discovery_guide_covers_the_full_consumer_journey(self) -> None:
+        """The guide names all three public discovery APIs and the required
+        D-22 journey sections."""
+        guide = (_REPO_ROOT / _DISCOVERY_GUIDE_PATH).read_text(encoding="utf-8")
+
+        for api_name in ("discover(", "discover_udp(", "discover_mdns(", "find_by_ip("):
+            assert api_name in guide
+
+        journey_headings = (
+            "unchanged",
+            "explicit control",
+            "targeted lookup and ipv6",
+            "choosing a discovery method",
+            "limitations",
+            "troubleshooting",
+        )
+        folded_guide = guide.casefold()
+        for heading in journey_headings:
+            assert heading in folded_guide, f"missing journey section: {heading}"
+
+    def test_discovery_surfaces_make_no_obsolete_default_mdns_claim(self) -> None:
+        """The Phase 11 claim that default discovery is mDNS-only never
+        returns to the canonical guide or its example."""
+        unsupported_claims = (
+            "default discovery uses mdns",
+            "discover() automatically uses mdns",
+            "only replies to its own queries",
+        )
+
+        for relative_path in (_DISCOVERY_GUIDE_PATH, _PROGRESSIVE_EXAMPLE_PATH):
+            prose = _normalised_prose(relative_path)
+            for claim in unsupported_claims:
+                assert claim not in prose, f"{claim!r} present in {relative_path}"
+
+    def test_discovery_surfaces_use_only_documentation_safe_addresses(self) -> None:
+        """No raw/live identifier or private-infrastructure example reaches
+        the canonical guide or its executable source."""
+        private_ipv4_patterns = (
+            r"\b192\.168\.\d{1,3}\.\d{1,3}\b",
+            r"\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b",
+            r"\b172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\b",
+        )
+
+        for relative_path in (_DISCOVERY_GUIDE_PATH, _PROGRESSIVE_EXAMPLE_PATH):
+            text = (_REPO_ROOT / relative_path).read_text(encoding="utf-8")
+            for pattern in private_ipv4_patterns:
+                assert not re.search(pattern, text), (
+                    f"private-looking IPv4 literal found in {relative_path}"
+                )
+
+
+class TestPhase14DiscoveryLinkingContract:
+    """DOCS-05/DOCS-06: the guide is linked and moved content is not
+    duplicated across advanced-usage.md, the API reference and
+    troubleshooting.md."""
+
+    _ADVANCED_USAGE_PATH = Path("docs/user-guide/advanced-usage.md")
+    _NETWORK_API_PATH = Path("docs/api/network.md")
+    _TROUBLESHOOTING_PATH = Path("docs/user-guide/troubleshooting.md")
+    _MOVED_MDNS_LIMITATION_PHRASES = (
+        "does not join the multicast group",
+        "does not receive unsolicited announcements",
+        "mesh scale is proven synthetically",
+    )
+    _MOVED_UDP_SCHEDULE_PHRASE = (
+        "schedules re-broadcasts 0.6, 1.8, 3.6, 5.6 and 7.6 seconds later"
+    )
+
+    def test_advanced_usage_links_to_the_discovery_guide_without_duplicating_it(
+        self,
+    ) -> None:
+        """D-21: advanced-usage.md keeps a summary and link, not the moved
+        substantive UDP/mDNS material."""
+        text = (_REPO_ROOT / self._ADVANCED_USAGE_PATH).read_text(encoding="utf-8")
+        prose = _normalised_prose(self._ADVANCED_USAGE_PATH)
+
+        assert "discovery.md" in text
+        for phrase in self._MOVED_MDNS_LIMITATION_PHRASES:
+            assert phrase not in prose, (
+                f"{phrase!r} still duplicated in {self._ADVANCED_USAGE_PATH}"
+            )
+        assert self._MOVED_UDP_SCHEDULE_PHRASE not in prose
+
+    def test_network_api_page_links_to_the_discovery_guide_and_stays_concise(
+        self,
+    ) -> None:
+        """The low-level API reference points at the consumer journey rather
+        than re-narrating it."""
+        text = (_REPO_ROOT / self._NETWORK_API_PATH).read_text(encoding="utf-8")
+        assert "user-guide/discovery.md" in text
+
+    def test_troubleshooting_gives_python_310_compatible_fan_out_advice(
+        self,
+    ) -> None:
+        """DOCS-06 (troubleshooting scope): the 3.10-compatible replacement
+        for the removed TaskGroup recommendation is present."""
+        text = (_REPO_ROOT / self._TROUBLESHOOTING_PATH).read_text(encoding="utf-8")
+        prose = _normalised_prose(self._TROUBLESHOOTING_PATH)
+
+        assert "asyncio.create_task()" in text
+        assert "python 3.10" in prose
+        assert "unavailable" in prose
+        assert "cancel" in prose
+
+    def test_troubleshooting_never_recommends_taskgroup(self) -> None:
+        """A bare `asyncio.TaskGroup` recommendation must not resurface."""
+        prose = _normalised_prose(self._TROUBLESHOOTING_PATH)
+        assert "with `asyncio.create_task()` or `asyncio.taskgroup`" not in prose
+        assert "or asyncio.taskgroup` — no extra coordination" not in prose

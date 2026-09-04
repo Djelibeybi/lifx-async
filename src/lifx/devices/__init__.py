@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from lifx.devices.base import (
     CollectionInfo,
+    Connectivity,
     Device,
     DeviceCapabilities,
     DeviceInfo,
@@ -22,6 +23,7 @@ __all__ = [
     "CeilingLight",
     "CeilingLightState",
     "CollectionInfo",
+    "Connectivity",
     "Device",
     "DeviceCapabilities",
     "DeviceInfo",

@@ -9,6 +9,7 @@ import uuid
 from collections.abc import Coroutine
 from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
+from enum import Enum
 from math import floor, log10
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
@@ -73,6 +74,26 @@ def _validate_device_endpoint(
                 "default_port": LIFX_UDP_PORT,
             }
         )
+
+
+class Connectivity(str, Enum):
+    """How a device's radio reaches the network.
+
+    A LIFX device operates in either WiFi or Thread mode. Changing between
+    them requires a firmware crossgrade, so the value is invariant for a
+    given device rather than a per-request transport choice.
+
+    The enum derives from ``str``, so existing comparisons such as
+    ``device.connectivity == "thread"`` continue to hold.
+    """
+
+    WIFI = "wifi"
+    THREAD = "thread"
+
+    # Render as the bare value on every supported Python version. Without
+    # this, a (str, Enum) member formats as "Connectivity.THREAD" on some
+    # versions and "thread" on others.
+    __str__ = str.__str__
 
 
 @dataclass
@@ -532,7 +553,7 @@ class Device(Generic[StateT]):
         self._max_retries = max_retries
         self._fetch_wifi_info = fetch_wifi_info
         self._fetch_ambient_light = fetch_ambient_light
-        self._connectivity: Literal["wifi", "thread"] = "wifi"
+        self._connectivity: Connectivity = Connectivity.WIFI
 
         # Create lightweight connection handle - connection pooling is internal
         self.connection = DeviceConnection(
@@ -564,11 +585,19 @@ class Device(Generic[StateT]):
         self._refresh_lock = asyncio.Lock()
         self._is_closed = False
 
-    def _set_connectivity(self, value: Literal["wifi", "thread"]) -> None:
-        """Set validated discovery connectivity metadata."""
-        if value not in ("wifi", "thread"):
-            raise ValueError(f"Invalid connectivity value: {value!r}")
-        self._connectivity = value
+    def _set_connectivity(
+        self, value: Connectivity | Literal["wifi", "thread"]
+    ) -> None:
+        """Set validated discovery connectivity metadata.
+
+        Accepts a :class:`Connectivity` member or its bare string value. This
+        is discovery-derived metadata only; a correlated response's frame
+        address report supersedes it (see :attr:`connectivity`).
+        """
+        try:
+            self._connectivity = Connectivity(value)
+        except ValueError:
+            raise ValueError(f"Invalid connectivity value: {value!r}") from None
 
     def adopt_cached_metadata(self, source: Device) -> None:
         """Adopt metadata already fetched by a temporary device instance.
@@ -584,6 +613,13 @@ class Device(Generic[StateT]):
         self._mac_address = source._mac_address
         self._mac_address_firmware = source._mac_address_firmware
         self._connectivity = source._connectivity
+
+        # Discovery observes the transport on the temporary device, whose
+        # connection is closed before this instance is built. Without this the
+        # authoritative frame address report is discarded on every discovery
+        # path and connectivity silently falls back to discovery metadata.
+        # An unobserved donor never erases an observation already made here.
+        self.connection._adopt_thread_connection(source.connection.thread_connection)
 
     @classmethod
     async def from_ip(
@@ -2265,8 +2301,25 @@ class Device(Generic[StateT]):
         return None
 
     @property
-    def connectivity(self) -> Literal["wifi", "thread"]:
-        """Get the device's reported network connectivity."""
+    def connectivity(self) -> Connectivity:
+        """How this device's radio reaches the network.
+
+        The device's own frame address report is authoritative: once any
+        correlated response has been observed, its ``thread_connection`` bit
+        determines the value in both directions. Until then the value comes
+        from discovery metadata (the mDNS TXT record), defaulting to
+        :attr:`Connectivity.WIFI`.
+
+        This makes the value correct for devices found over UDP broadcast,
+        :meth:`from_ip`, or a won ``find_by_serial()`` race, none of which
+        carry an mDNS TXT record.
+
+        This is descriptive metadata. It does not authenticate the device or
+        change its routing, retry, or tuning behaviour.
+        """
+        observed = self.connection.thread_connection
+        if observed is not None:
+            return Connectivity.THREAD if observed else Connectivity.WIFI
         return self._connectivity
 
     @property

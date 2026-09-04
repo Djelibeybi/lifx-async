@@ -159,26 +159,37 @@ SEED-001, planted 2026-07-16 and dormant through the v1.1 and v1.2 closes. Its t
 condition, LIFX Thread firmware shipping, was met during the v1.2 close-out. Every v1.1
 reliability finding was measured on WiFi/IPv4 and none of them transfers unexamined.
 
-- [ ] **THREAD-01**: Discovery coverage over Thread is measured across repeated rounds.
+- [x] **THREAD-01**: Discovery coverage over Thread is measured across repeated rounds.
       Single rounds mislead, which is the Spike 005 lesson this project already paid for
 
-- [ ] **THREAD-02**: The retry schedule's WiFi-tuned constants are measured against Thread
+- [x] **THREAD-02**: The retry schedule's WiFi-tuned constants are measured against Thread
       ack RTT. The 200 ms "an acked bulb has answered by now" floor exists because of WiFi
       timing; no constant changes without evidence
 
-- [ ] **THREAD-03**: The achievable animation frame rate over Thread is measured, and the
-      measured ceiling is the deliverable. Published arithmetic suggests 20 FPS full-frame
-      matrix streaming is infeasible sustained (roughly 89 kbps for `Set64` at 20 FPS, and
-      roughly 179 kbps for a Ceiling's two `Set64` per frame, against a 250 kbps gross
-      802.15.4 PHY and a measured single-hop ceiling near 100 kbps), and the ack gate's
-      designed degradation floor is exactly 2 FPS. Those are other people's networks;
-      this requirement replaces them with a number from this fleet
+- [x] **THREAD-03**: Recorded as a scope boundary, not a measurement to complete. Thread
+      does not have the bandwidth to sustain animation at usable or smooth frame rates, and
+      pushing that volume of data onto a Thread mesh is bad practice regardless of measured
+      throughput. `Animator` is planned to be locked to WiFi devices (SEED-003); Thread
+      animation performance is therefore not a gap to be filled later, it is a measurement of
+      something the library will not support. One physical observation exists and is
+      preserved as evidence: alias `LIFX-Candle-C-1` completed all three declared rate
+      observations (1, 2 and 5 FPS) without failing. That shows Thread carries the frames
+      without falling over -- it is explicitly NOT evidence that Thread animation is usable,
+      and no further alias needs one. Class closure (THREAD-05) never depends on an animation
+      attempt
 
-- [ ] **THREAD-04**: Border router advertisement staleness is measured directly, by
-      unplugging a Thread device and timing when it stops being advertised. This settles
-      LIFX's actual SRP lease, which is unverified; OpenThread's default is 2 hours
+- [x] **THREAD-04**: Observed advertisement staleness is measured directly, by unplugging
+      a Thread device and timing how long a consumer keeps seeing it advertised. The
+      measurement is the composite of LIFX firmware's requested SRP lease, the border
+      router's granted lease and its mDNS TTL on the infrastructure link; it cannot
+      decompose them, so it does not settle LIFX's SRP lease as a device property. It
+      records what a `lifx-async` consumer observes on this fleet and this border-router
+      set, which is the behaviour the library must cope with and cannot change.
+      OpenThread's default lease is 2 hours; whether this fleet resembles that is the
+      open question, and the library's mDNS TTL and goodbye handling is currently proven
+      only synthetically
 
-- [ ] **THREAD-05**: Every device class has either a Thread evidence record or a named
+- [x] **THREAD-05**: Every device class has either a Thread evidence record or a named
       gap, following the v1.2 FIDELITY pattern so that an unavailable class closes rather
       than staying open indefinitely. `MatrixLight` closes now on two devices;
       `CeilingLight`, `MultiZoneLight` and single-zone `Light` close as migrations land;
@@ -187,15 +198,15 @@ reliability finding was measured on WiFi/IPv4 and none of them transfers unexami
 
 ### Documentation
 
-- [ ] **DOCS-04**: A broadcast-first consumer can read what changes for them, what Thread
+- [x] **DOCS-04**: A broadcast-first consumer can read what changes for them, what Thread
       support does and does not give them, and how to reach Thread devices
 
-- [ ] **DOCS-05**: Known limitations are documented rather than discovered: the mDNS query
+- [x] **DOCS-05**: Known limitations are documented rather than discovered: the mDNS query
       leg is IPv4 multicast by design, there are no unsolicited announcements, reception
       is unicast-only, and fleet-scale mesh behaviour is proven synthetically rather than
       on hardware
 
-- [ ] **DOCS-06**: The repository's own architecture documentation is corrected where it
+- [x] **DOCS-06**: The repository's own architecture documentation is corrected where it
       is factually wrong. `CLAUDE.md` states that operations on multiple devices execute
       in parallel via `asyncio.TaskGroup`; `grep` finds no `TaskGroup` anywhere in `src/`,
       and it would not run on the Python 3.10 floor this library supports. Left standing,
@@ -268,14 +279,14 @@ Populated at roadmap creation, 2026-08-27.
 | FIND-08 | Phase 13 | Complete |
 | FIND-09 | Phase 13 | Complete |
 | FIND-10 | Phase 13 | Complete |
-| THREAD-01 | Phase 14 | Pending |
-| THREAD-02 | Phase 14 | Pending |
-| THREAD-03 | Phase 14 | Pending |
-| THREAD-04 | Phase 14 | Pending |
-| THREAD-05 | Phase 14 | Pending |
-| DOCS-04 | Phase 14 | Pending |
-| DOCS-05 | Phase 14 | Pending |
-| DOCS-06 | Phase 14 | Pending |
+| THREAD-01 | Phase 14 | Complete |
+| THREAD-02 | Phase 14 | Complete |
+| THREAD-03 | Phase 14 | Complete |
+| THREAD-04 | Phase 14 | Complete |
+| THREAD-05 | Phase 14 | Complete |
+| DOCS-04 | Phase 14 | Complete |
+| DOCS-05 | Phase 14 | Complete |
+| DOCS-06 | Phase 14 | Complete |
 
 **Coverage:**
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Any, TypeVar
+from collections.abc import AsyncGenerator, Callable
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -49,6 +49,36 @@ _RECEIVER_SHUTDOWN_TIMEOUT: float = (
     2.0  # How long to wait for the receiver to shutdown gracefully
 )
 _RECEIVER_POLL_TIMEOUT: float = 0.1  # How often the background receiver will sleep
+
+# Private request-observation seam (Phase 14 THREAD-02). No public export: a
+# repository measurement script selects itself onto the current task before
+# issuing a request (see scripts/measurement_support.py), and each thin
+# request wrapper below reads that selection ONCE and passes it explicitly
+# into _transmit_and_listen() rather than the retry loop reading ambient
+# state itself. The callback receives (category, sequence, timestamp_ns,
+# thread_connection) -- bounded categories, integer monotonic-clock
+# timestamps and a value-only transport flag, never identity, packet
+# content or exception text.
+_RequestObserver = Callable[[str, int | None, int, bool | None], None]
+_REQUEST_OBSERVER_TASK_ATTRIBUTE = "_lifx_request_observer"
+
+
+def _current_request_observer() -> _RequestObserver | None:
+    """Return the repository measurement callback attached to the current task.
+
+    ``None`` on every ordinary call -- only a repository measurement script
+    that has explicitly attached itself via
+    ``scripts.measurement_support._capture_request_observations()`` ever
+    sees a non-``None`` return here.
+    """
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        return None
+    return cast(
+        "_RequestObserver | None",
+        getattr(task, _REQUEST_OBSERVER_TASK_ATTRIBUTE, None),
+    )
 
 
 class _ConnectionClosed:
@@ -184,6 +214,9 @@ class DeviceConnection:
         else:
             self._send_target: bytes = b"\x00" * 8
 
+        # Device-reported transport, learned from correlated responses
+        self._thread_connection: bool | None = None
+
         # Background receiver task infrastructure
         # Key: (source, sequence, serial) → Queue of (header, payload) tuples
         self._pending_requests: dict[
@@ -192,6 +225,32 @@ class DeviceConnection:
         ] = {}
         self._receiver_task: asyncio.Task[None] | None = None
         self._receiver_shutdown: asyncio.Event | None = None
+
+    @property
+    def thread_connection(self) -> bool | None:
+        """The device's own report of whether replies travel over Thread.
+
+        ``None`` until a correlated response has been observed. Set from
+        ``LifxHeader.thread_connection`` (frame address byte 22, bit 3) only
+        after source/sequence/serial validation succeeds, so stray traffic on
+        the shared socket can never assert a transport for this device.
+
+        A device's radio operates in either WiFi or Thread mode and cannot
+        change without a firmware crossgrade, so this value is invariant for
+        a given device once observed.
+        """
+        return self._thread_connection
+
+    def _adopt_thread_connection(self, value: bool | None) -> None:
+        """Carry a transport observation over from a discarded connection.
+
+        Discovery probes a device on a short-lived connection and then builds
+        the returned device with a fresh one. Without this the authoritative
+        frame address report is lost and connectivity falls back to discovery
+        metadata. An absent observation never erases one already made here.
+        """
+        if value is not None:
+            self._thread_connection = value
 
     @property
     def serial(self) -> str:
@@ -745,6 +804,7 @@ class DeviceConnection:
         ack_required: bool,
         res_required: bool,
         timeout_noun: str,
+        observer: _RequestObserver | None = None,
     ) -> AsyncGenerator[tuple[LifxHeader, bytes], None]:
         """Shared wall-deadline retransmit-while-listening engine.
 
@@ -791,6 +851,12 @@ class DeviceConnection:
             res_required: Value of the response-required header flag to send
             timeout_noun: Noun used in the timeout message ("response" or
                 "acknowledgement")
+            observer: Private repository measurement callback, selected once
+                by the calling thin wrapper via
+                ``_current_request_observer()`` (Phase 14 THREAD-02). ``None``
+                on every ordinary call -- this parameter carries no public
+                meaning and must never be exposed on ``request()``/
+                ``request_stream()``.
 
         Yields:
             Tuple of (LifxHeader, payload bytes) for each accepted response
@@ -842,6 +908,14 @@ class DeviceConnection:
         last_response_time = start
         tx_count = 0
 
+        # Observer-only metadata clock (D-07/D-19): time.monotonic_ns() is
+        # sampled purely for the private measurement callback above and
+        # never feeds scheduling, deadline arithmetic or retransmission
+        # decisions -- those stay on the time.monotonic() float clock.
+        logical_start_ns = time.monotonic_ns()
+        if observer is not None:
+            observer("logical_start", None, logical_start_ns, None)
+
         try:
             # Transmission #0 (sequence 0), key registered BEFORE send so a
             # response cannot arrive before its key exists.
@@ -849,13 +923,20 @@ class DeviceConnection:
             key = (request_source, 0, self._serial)
             self._pending_requests[key] = response_queue
             correlation_keys.append(key)
-            await self.send_packet(
-                request,
-                source=request_source,
-                sequence=0,
-                ack_required=ack_required,
-                res_required=res_required,
-            )
+            try:
+                await self.send_packet(
+                    request,
+                    source=request_source,
+                    sequence=0,
+                    ack_required=ack_required,
+                    res_required=res_required,
+                )
+            except Exception:
+                if observer is not None:
+                    observer("send_error", 0, time.monotonic_ns(), None)
+                raise
+            if observer is not None:
+                observer("sent", 0, time.monotonic_ns(), None)
             ensure_current_session()
             tx_count = 1
             next_tx_at: float | None = (
@@ -870,6 +951,8 @@ class DeviceConnection:
                 if now >= deadline:
                     if has_yielded:
                         return
+                    if observer is not None:
+                        observer("timeout", None, time.monotonic_ns(), None)
                     break
 
                 # Idle-streaming exit (only meaningful after the first
@@ -897,13 +980,20 @@ class DeviceConnection:
                     key = (request_source, sequence, self._serial)
                     self._pending_requests[key] = response_queue  # SAME queue
                     correlation_keys.append(key)
-                    await self.send_packet(
-                        request,
-                        source=request_source,
-                        sequence=sequence,
-                        ack_required=ack_required,
-                        res_required=res_required,
-                    )
+                    try:
+                        await self.send_packet(
+                            request,
+                            source=request_source,
+                            sequence=sequence,
+                            ack_required=ack_required,
+                            res_required=res_required,
+                        )
+                    except Exception:
+                        if observer is not None:
+                            observer("send_error", sequence, time.monotonic_ns(), None)
+                        raise
+                    if observer is not None:
+                        observer("sent", sequence, time.monotonic_ns(), None)
                     ensure_current_session()
                     tx_count += 1
                     next_tx_at = (
@@ -936,6 +1026,14 @@ class DeviceConnection:
                     )
                 except TIMEOUT_ERRORS:
                     continue  # slice ended -- loop top decides why
+
+                # Sampled immediately after the queue get returns, before any
+                # validation below. This deliberately includes background-
+                # receiver queueing and event-loop wake latency; it becomes
+                # accepted_ns unchanged (not resampled) if validation passes,
+                # so accepted_ns excludes the validation work itself
+                # (D-07/D-19).
+                dequeued_ns = time.monotonic_ns()
 
                 if isinstance(response, _ConnectionClosed):
                     raise LifxConnectionError("Connection closed during request")
@@ -974,11 +1072,24 @@ class DeviceConnection:
                         f"got {header.sequence}, max expected {max_expected}"
                     )
 
+                # Record the device's own transport report. Taken here,
+                # after correlation validation, so only a response this
+                # connection owns can label its transport.
+                self._thread_connection = header.thread_connection
+
                 # Learn the serial of a connection opened without one. Done
                 # here rather than in request_stream() so ACK-only traffic
                 # (SET, Echo) names its device too: a connection driven purely
                 # by SETs would otherwise log the placeholder forever.
                 self._note_learned_serial(header)
+
+                if observer is not None:
+                    observer(
+                        "accepted",
+                        header.sequence,
+                        dequeued_ns,
+                        header.thread_connection,
+                    )
 
                 # Yield response (can be from any transmission)
                 has_yielded = True
@@ -987,7 +1098,13 @@ class DeviceConnection:
 
                 # Continue loop to wait for more responses
 
+        except asyncio.CancelledError:
+            if observer is not None:
+                observer("cancelled", None, time.monotonic_ns(), None)
+            raise
         finally:
+            if observer is not None:
+                observer("cleanup", None, time.monotonic_ns(), None)
             # Cleanup: remove ALL correlation keys at once (D3-04 -- late
             # replies then hit _background_receiver's unmatched path, DEBUG
             # logged and silently discarded)
@@ -995,7 +1112,9 @@ class DeviceConnection:
                 if self._pending_requests.get(key) is response_queue:
                     self._pending_requests.pop(key, None)
 
-        # Wall deadline expired without ever yielding a response
+        # Wall deadline expired without ever yielding a response. The
+        # "timeout" observation was already emitted at the break point above
+        # (before "cleanup", which is the more useful causal order).
         raise LifxTimeoutError(
             f"No {timeout_noun} from {self.ip} after {tx_count} attempts"
         )
@@ -1026,6 +1145,9 @@ class DeviceConnection:
             LifxProtocolError: If response correlation validation fails
             LifxTimeoutError: If no response after all retries
         """
+        # Selected ONCE here (Phase 14 THREAD-02), not read inside the retry
+        # loop -- see _current_request_observer().
+        observer = _current_request_observer()
         async for header, payload in self._transmit_and_listen(
             request,
             timeout,
@@ -1033,6 +1155,7 @@ class DeviceConnection:
             ack_required=False,
             res_required=True,
             timeout_noun="response",
+            observer=observer,
         ):
             yield header, payload
 
@@ -1069,6 +1192,9 @@ class DeviceConnection:
         # and falls through normally, so the loop's natural-exhaustion arc
         # is structurally unreachable -- pragma below suppresses that one
         # partial branch, not line coverage of the loop itself.
+        # Selected ONCE here (Phase 14 THREAD-02), not read inside the retry
+        # loop -- see _current_request_observer().
+        observer = _current_request_observer()
         async for header, _payload in self._transmit_and_listen(  # pragma: no branch
             request,
             timeout,
@@ -1076,6 +1202,7 @@ class DeviceConnection:
             ack_required=True,
             res_required=False,
             timeout_noun="acknowledgement",
+            observer=observer,
         ):
             if header.pkt_type == _STATE_UNHANDLED_PKT_TYPE:
                 raise LifxUnsupportedCommandError(

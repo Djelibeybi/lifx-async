@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib.util
 import ipaddress
 import json
 import re
@@ -18,8 +17,7 @@ from collections import defaultdict
 from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from contextlib import aclosing, asynccontextmanager, nullcontext
 from pathlib import Path
-from types import ModuleType
-from typing import TYPE_CHECKING, Literal, cast
+from typing import Literal, cast
 
 from lifx_emulator import EmulatedLifxServer
 from lifx_emulator.devices import DeviceManager
@@ -40,33 +38,9 @@ from lifx.network.discovery import discover_devices
 from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
 from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.protocol.models import Serial
-
-if TYPE_CHECKING:
-    from tests.test_discovery_observation import _DiscoveryObservation
-
-
-def _load_discovery_observation_helper() -> ModuleType:
-    """Load the repository-only observation helper by its anchored path."""
-    helper_path = (
-        Path(__file__).resolve().parents[1] / "tests" / "test_discovery_observation.py"
-    )
-    module_name = "_lifx_measurement_discovery_observation"
-    spec = importlib.util.spec_from_file_location(module_name, helper_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("cannot load repository discovery observation helper")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    try:
-        spec.loader.exec_module(module)
-    except BaseException:
-        sys.modules.pop(module_name, None)
-        raise
-    return module
-
-
-_DISCOVERY_OBSERVATION_HELPER = _load_discovery_observation_helper()
-_capture_discovery_observations = getattr(
-    _DISCOVERY_OBSERVATION_HELPER, "_capture_discovery_observations"
+from scripts.measurement_support import (
+    _capture_discovery_observations,
+    _DiscoveryObservation,
 )
 
 _SCHEMA_VERSION = 1

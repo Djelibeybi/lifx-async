@@ -53,7 +53,10 @@ targets.
 
 This opt-in discovery path may be unavailable on networks or devices that do not expose the
 required DNS-SD service records. Use `discover()` as the broadcast fallback when mDNS is not
-available. Each yielded device reports `connectivity` as either `"wifi"` or `"thread"`.
+available. Each yielded device reports `connectivity` as `"wifi"` or
+`"thread"`. These are members of the `Connectivity` enum (`Connectivity.WIFI`
+and `Connectivity.THREAD`), which derives from `str`, so plain string
+comparisons still work.
 
 ### 2. Control a Light
 

@@ -3,19 +3,18 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Thread/IPv6 Support
 current_phase: 14
-current_phase_name: Thread Revalidation and Docs
-status: planning
-stopped_at: Phase 13 complete, ready to plan Phase 14
-last_updated: "2026-08-31T04:38:45.000Z"
-last_activity: 2026-08-31
-last_activity_desc: Phase 13 complete, transitioned to Phase 14
-state_head: 39bad58c42627ac3612868503bb5fb9305b04cc3
+status: completed
+stopped_at: Phase 14 complete — all phases complete
+last_updated: "2026-09-04T12:00:03.566Z"
+last_activity: 2026-09-04
+last_activity_desc: Phase 14 complete
+state_head: ed6a04d8197527a7291d17cfe0168440bc0a0ba4
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 35
-  completed_plans: 35
-  percent: 80
+  completed_phases: 5
+  total_plans: 41
+  completed_plans: 41
+  percent: 100
 ---
 
 # Project State
@@ -29,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-31 after Phase 13 completion)
 
 ## Current Position
 
-Phase: 14 — Thread Revalidation and Docs
+Phase: 14
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-31 — Phase 13 complete, transitioned to Phase 14
+Status: All phases complete
+Last activity: 2026-09-04 — Phase 14 complete
 Progress: [████████░░] 80%
 
 Execution order: 10 → (11 ∥ 12, file-disjoint) → 13 → 14. Phase 14 is hardware-gated
@@ -75,6 +74,11 @@ and must not block CI or any other phase.
 | Phase 13 P03 | 29 min | 2 tasks | 6 files |
 | Phase 13 P04 | 20 min | 2 tasks | 6 files |
 | Phase 13 P05 | 15 min | 2 tasks | 2 files |
+| Phase 14 P01 | 34 min | 2 tasks | 6 files |
+| Phase 14 P05 | 25 min | 3 tasks | 10 files |
+| Phase 14 P02 | 40 min | 2 tasks | 4 files |
+| Phase 14 P03 | 49min | 3 tasks | 10 files |
+| Phase 14 P04 | 45min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -90,23 +94,6 @@ this milestone (all 2026-08-27 unless noted):
 - The mDNS ephemeral-port bind is a requirement in its own right (MDNS-01): an IPv4 defect, not a Thread feature
 - `LifxServiceRecord` keeps the wire name `tm`; no expansion of the undocumented key may be asserted anywhere
 - No WiFi-measured constant is retuned before Phase 14 measures it over Thread (spike-first discipline, 2026-07-16 lineage)
-- [Phase 11]: Connectivity is adopted with registry-derived metadata — Future serial de-duplication must preserve Thread classification without changing address, routing, retry, or tuning behaviour
-- [Phase 11, superseded 2026-08-28 by D-15]: The earlier decision treated admitted addresses as lossless within the 1,024-owner cache. D-15 now exact-deduplicates A/AAAA identities, admits at most 256 per owner and 1,024 per sweep, rejects and privacy-safely counts unseen excess identities without eviction, makes owner overflow or sweep exhaustion permanent for the call, and refuses selection, resolution, or follow-up from incomplete state while leaving caller deadlines unchanged.
-- [Phase 11, supersession recorded 2026-08-28 as D-16]: The earlier D-03 integration interpretation preserved a public factory. D-16 keeps `_LifxServiceRecord`, `_discover_lifx_services`, and `_create_device_from_record` private together with no public or compatibility alias; supported callers use `discover_devices_mdns()` or `lifx.api.discover_mdns()`.
-- [Phase 11]: mDNS TXT construction metadata and SRV endpoints resolve only through full live-set consensus; record ordering never selects a trusted winner.
-- [Phase 11]: Goodbye scheduling indexes only complete RR identities under TTL-zero grace; ordinary retained addresses stay outside timer traversal.
-- [Phase 11]: Recoverable mDNS parsing is limited to ValueError, IndexError, and struct.error, followed by one privacy-safe rejection summary per sweep.
-- [Phase 11]: Packet-source fallback is validated and deferred until sweep completion so later advertised endpoints win without arrival-order bias.
-- [Phase 11]: Deletion-only source files remain anti-weakening and public-surface inputs but are excluded from changed-executable coverage.
-- [Phase 11]: IPv4 UDP loopback availability is mandatory evidence for the MDNS-01 legacy-unicast transport proof.
-- [Phase 11]: Preserve the completed D-15 and D-16 authority commits without replay or amendment. — Current-file and draft recovery is distinct from historical authority work.
-- [Phase 11]: Keep branch-history disposition in Plan 11-08 and fresh full gates in Plan 11-09. — Plan 11-07 is limited to current-file sanitisation, draft guidance, and structural closeout.
-- [Phase 11]: Preserve history under the Plan 11-08 `no-rewrite` disposition. — The operator confirmed the historical candidate is an approved stable pseudonym; Plan 11-09 owns fresh privacy and full gates.
-- [Phase 11]: Only exact canonical LIFX service-instance ownership creates mDNS construction provenance.
-- [Phase 11]: A and AAAA records remain bounded candidates until linked by a live exact-service SRV record.
-- [Phase 11]: TXT construction metadata uses one-pass effective-value consensus with immediate conflict rejection.
-- [Phase 11]: Charge only exact retained variable payload and release the stored cost only when expiry removes the cached identity.
-- [Phase 11]: Filter unusable mDNS addresses before the IPv4, ULA, GUA, scoped-link-local ranking and use lexical same-class order.
 - [Phase 12]: Select the wildcard and IPv4-only broadcast capability from the validated target family, close both generator ownership layers with `aclosing`, and prove behaviour from the actual endpoint without replacing emulator traffic.
 - [Phase 12]: Targeted find_by_ip preserves the already validated caller literal through device construction.
 - [Phase 12]: Representation tests exercise the public API and real discovery parser while replacing only transport delivery.
@@ -139,6 +126,17 @@ this milestone (all 2026-08-27 unless noted):
 - [Phase 13]: Race shared UDP records and verified mDNS devices under one caller-origin wall deadline.
 - [Phase 13]: Construct UDP winners only after both source legs have been cancelled and reaped.
 - [Phase 13]: Suspend winner pumps at the yield boundary until aggregate cleanup owns finalisation.
+- [Phase 14]: THREAD-02 request-observer seam: private task-attribute selector on DeviceConnection, propagated explicitly into _transmit_and_listen(), never read from ambient state — Mirrors the existing discovery-observer pattern; accepted_ns sampled at dequeue (before validation) so it excludes validation work but includes receiver queueing/wake latency
+- [Phase 14]: Removed CLAUDE.md from test_phase_contract.py's _REQUIRED_QUERY_MODEL_PATHS rather than scoping the new no-duplication test around it — The two requirements on the same file were mutually exclusive once D-24 made CLAUDE.md import-only; AGENTS.md alone now carries the shared mDNS query-model prose the contract checks
+- [Phase 14]: CLAUDE.md is reduced to a literal @AGENTS.md import plus one Claude-specific note about Skill() invocation — No other genuinely Claude-only guidance was found in the original file after removing ~460 lines of drifted architecture duplication
+- [Phase 14]: [Phase 14] Staleness absence is defined as BOTH discover() and discover_mdns() missing the target on one poll, never either leg alone — discover() reflects unicast-verified liveness and can go absent within one poll of disconnect, while discover_mdns() reflects border-router advertisement and can keep reporting the device far longer; an either-leg predicate would confirm expiry at unicast-liveness speed and publish that as the SRP lease, a materially different and smaller number than THREAD-04 actually asks for
+- [Phase 14]: Animation evidence names only the four AnimatorStats fields that exist (packets_sent, total_time_ms, gated, acks_outstanding); acks_outstanding is never narrated as ACK-received/expiry evidence — AckGate.sweep() prunes expired probes silently, so a falling acks_outstanding is ambiguous between "the device acknowledged" and "the probe expired unacknowledged"; the closed animation-rate schema has no field that could hold such a narration, proven by a dedicated negative test
+- [Phase 14]: Plan 14-02 built the manifest, five journals, schedules, statistics and deterministic products as one coherent unit rather than splitting Task 1/Task 2 into separate RED-then-GREEN commits — The manifest (Task 1) must freeze the exact generated D-02/D-06 jitter schedules (Task 2), so the two tasks are load-bearing on each other; most new tests define a schema contract rather than catch a pre-existing defect, so a traditional RED-first bug-catching phase does not cleanly apply
+- [Phase 14]: restore_and_verify_device_state() requires exact post-command readback (protocol-normalised equality), never acknowledgement alone -- fixes ipv6_thread_probe.py's prior silent-success-on-command-only restoration bug; a captured power outside {0, 65535} refuses mutation before any command as a distinct power_out_of_range outcome (D-05/D-16)
+- [Phase 14]: check_patch_coverage.py's changed-excluded-line rule cannot pass for a brand-new script's own if __name__ == "__main__": guard (a pre-existing, static exclude_lines pattern applied regardless of execution) -- documented rather than gamed by restructuring the guard's literal text to dodge the regex
+- [Phase 14]: Removed thread_revalidation.py's only if TYPE_CHECKING: block for ordinary top-level Light/AnimatorStats imports — Avoided colliding with pyproject.toml's pre-existing 'if TYPE_CHECKING' coverage exclude_lines pattern on two brand-new lines, the same false-positive class already documented for the module's if __name__ guard
+- [Phase 14]: derive_class_ledger_from_roster() is the Task 3 authoritative six-class ledger, derived from the frozen roster and journals only — An evidence_backed class requires every expected alias's physical discovery, all 100 physical request trials and one physical animation attempt -- never a caller-supplied closure claim or the subset of devices one sweep observed
+- [Phase 14]: New generate CLI subcommand is additive and distinct from the unchanged validate — Keeps the 14-02/14-03 validate contract and its tests intact while generate requires roster completeness and writes products atomically only after validation passes
 
 ### v2.0 Working Notes
 
@@ -188,8 +186,8 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-08-31T04:38:45.000Z
-Stopped at: Phase 13 complete, ready to plan Phase 14
+Last session: 2026-09-04T05:59:29.447Z
+Stopped at: Phase 14 complete — all phases complete
 Resume file: None
 
 ## Operator Next Steps

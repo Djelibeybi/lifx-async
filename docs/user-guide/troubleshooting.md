@@ -12,6 +12,10 @@ Common issues and solutions when working with lifx.
 
 ## Discovery Issues
 
+See the [Discovery Guide troubleshooting section](discovery.md#troubleshooting)
+for mDNS-specific and IPv6 zone issues. The general UDP broadcast issues below
+apply to `discover()` and `discover_udp()` alike.
+
 ### No Devices Found
 
 **Symptom:** `discover()` returns an empty group
@@ -365,11 +369,35 @@ async def keep_awake(light: Light) -> None:
         await asyncio.sleep(15)  # 10-15 s keeps the wake tail away
 ```
 
-Run it alongside your application with `asyncio.create_task()` or
-`asyncio.TaskGroup` — no extra coordination is needed, because the library
-serialises requests per connection. The poll is read-only, so it is safe to
-run continuously, and one request every 15 seconds stays far below the
-~20 msg/sec a device can handle.
+lifx-async supports Python 3.10, where `asyncio.TaskGroup` (added in 3.11) is
+unavailable, so run the poll alongside your application with
+`asyncio.create_task()` instead:
+
+```python
+poll_task = asyncio.create_task(keep_awake(light))
+try:
+    await run_your_application(light)
+finally:
+    poll_task.cancel()
+    try:
+        await poll_task
+    except asyncio.CancelledError:
+        pass
+```
+
+Keep a reference to the task the way `poll_task` does above — an unreferenced
+task can be garbage-collected mid-run. Cancel it and await the cancellation in
+a `finally` block so the poll stops cleanly on every exit path and any
+exception it raised is observed rather than silently dropped as a "Task
+exception was never retrieved" warning. No extra coordination beyond that is
+needed, because the library serialises requests per connection. The poll is
+read-only, so it is safe to run continuously, and one request every 15
+seconds stays far below the ~20 msg/sec a device can handle.
+
+Controlling several devices at once follows the same 3.10-compatible pattern
+with `asyncio.gather()` — see
+[Multi-Device Control](advanced-usage.md#multi-device-control) for a worked
+example.
 
 !!! note "lifx-async deliberately ships no keepalive daemon"
     Measured on real hardware, idle devices lose zero packets on healthy
@@ -480,6 +508,7 @@ If you're still experiencing issues:
 
 ## Next Steps
 
+- [Discovery Guide](discovery.md) — Discovery methods, limitations and mDNS/IPv6 troubleshooting
 - [Effects Troubleshooting](effects-troubleshooting.md) — Issues specific to the effects framework
 - [Advanced Usage](advanced-usage.md) — Optimisation patterns
 - [API Reference](../api/index.md) — Complete API documentation

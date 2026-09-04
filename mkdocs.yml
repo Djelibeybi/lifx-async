@@ -125,6 +125,7 @@ plugins:
       - getting-started/built-in-themes.md
       - getting-started/effects.md
       User Guide:
+      - user-guide/discovery.md
       - user-guide/themes.md
       - user-guide/ceiling-lights.md
       - user-guide/animation.md
@@ -170,7 +171,9 @@ markdown_extensions:
     line_spans: __span
     pygments_lang_class: true
 - pymdownx.inlinehilite
-- pymdownx.snippets
+- pymdownx.snippets:
+    check_paths: true
+    base_path: [.]
 - pymdownx.tabbed:
     alternate_style: true
 - pymdownx.tasklist:
@@ -201,6 +204,7 @@ nav:
   - Built-in Theme Catalogue: getting-started/built-in-themes.md
   - Light Effects: getting-started/effects.md
 - User Guide:
+  - Discovery: user-guide/discovery.md
   - Light Effects: user-guide/effects.md
   - Effects Gallery: user-guide/effects-gallery.md
   - Custom Effects: user-guide/effects-custom.md

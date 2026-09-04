@@ -1403,6 +1403,10 @@ async def _verify_mdns_candidate(
             _emit_input_warnings=False,
         )
         device._set_connectivity(record.connectivity)
+        # The liveness probe already elicited a correlated response, so the
+        # device's own report supersedes the advertised TXT sentinel without
+        # the caller issuing a request of their own.
+        device.connection._adopt_thread_connection(connection.thread_connection)
         if isinstance(device, Light):
             device._adopt_state_color(cast(packets.Light.StateColor, response))
         return device

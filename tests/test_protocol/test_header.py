@@ -161,3 +161,161 @@ class TestLifxHeader:
         assert "LifxHeader" in repr_str
         assert "type=101" in repr_str
         assert "seq=5" in repr_str
+
+
+class TestThreadConnectionFlag:
+    """Test the frame address thread_connection bit (byte 22, bit 3).
+
+    LIFX documents byte 22 of the packet (byte 14 of the frame address) as
+    res_required (bit 0), ack_required (bit 1), one reserved bit (bit 2),
+    thread_connection (bit 3), then four reserved bits (bits 4-7).
+
+    thread_connection is set by the device to report that the message was
+    sent over a Thread connection, so it is an inbound-only observation:
+    create() does not expose it and a client never asserts it.
+    """
+
+    FLAGS_OFFSET = 22
+    THREAD_BIT = 0b1000
+
+    def test_defaults_false(self) -> None:
+        """A header built by create() never claims a Thread connection."""
+        header = LifxHeader.create(pkt_type=2, source=1)
+
+        assert header.thread_connection is False
+        assert not (header.pack()[self.FLAGS_OFFSET] & self.THREAD_BIT)
+
+    def test_unpack_reads_thread_bit(self) -> None:
+        """An inbound packet with bit 3 set is reported as Thread-sent."""
+        packed = bytearray(LifxHeader.create(pkt_type=2, source=1).pack())
+        packed[self.FLAGS_OFFSET] |= self.THREAD_BIT
+
+        assert LifxHeader.unpack(bytes(packed)).thread_connection is True
+
+    def test_unpack_absent_thread_bit(self) -> None:
+        """An inbound packet without bit 3 is not reported as Thread-sent."""
+        packed = LifxHeader.create(pkt_type=2, source=1).pack()
+
+        assert LifxHeader.unpack(packed).thread_connection is False
+
+    def test_roundtrip_preserves_thread_connection(self) -> None:
+        """pack() re-emits an observed thread_connection unchanged."""
+        for thread_connection in (True, False):
+            header = LifxHeader(
+                size=LifxHeader.HEADER_SIZE,
+                protocol=LifxHeader.PROTOCOL_NUMBER,
+                source=1,
+                target=b"\x00" * 6,
+                tagged=False,
+                ack_required=True,
+                res_required=True,
+                sequence=7,
+                pkt_type=2,
+                thread_connection=thread_connection,
+            )
+
+            unpacked = LifxHeader.unpack(header.pack())
+
+            assert unpacked.thread_connection is thread_connection
+            assert unpacked.ack_required is True
+            assert unpacked.res_required is True
+
+    def test_thread_bit_independent_of_other_flags(self) -> None:
+        """thread_connection does not disturb res_required or ack_required."""
+        for ack, res, thread in [
+            (a, r, t)
+            for a in (True, False)
+            for r in (True, False)
+            for t in (True, False)
+        ]:
+            header = LifxHeader(
+                size=LifxHeader.HEADER_SIZE,
+                protocol=LifxHeader.PROTOCOL_NUMBER,
+                source=1,
+                target=b"\x00" * 6,
+                tagged=False,
+                ack_required=ack,
+                res_required=res,
+                sequence=0,
+                pkt_type=2,
+                thread_connection=thread,
+            )
+
+            unpacked = LifxHeader.unpack(header.pack())
+
+            assert unpacked.ack_required is ack
+            assert unpacked.res_required is res
+            assert unpacked.thread_connection is thread
+
+    def test_reserved_bits_are_not_emitted(self) -> None:
+        """pack() leaves reserved bits 2 and 4-7 of the flags byte zero."""
+        header = LifxHeader(
+            size=LifxHeader.HEADER_SIZE,
+            protocol=LifxHeader.PROTOCOL_NUMBER,
+            source=1,
+            target=b"\x00" * 6,
+            tagged=False,
+            ack_required=True,
+            res_required=True,
+            sequence=0,
+            pkt_type=2,
+            thread_connection=True,
+        )
+
+        assert header.pack()[self.FLAGS_OFFSET] == 0b1011
+
+    def test_reserved_bits_are_ignored_on_unpack(self) -> None:
+        """Reserved bits set by a peer do not corrupt the parsed flags."""
+        packed = bytearray(LifxHeader.create(pkt_type=2, source=1).pack())
+        packed[self.FLAGS_OFFSET] |= 0b1111_0100
+
+        unpacked = LifxHeader.unpack(bytes(packed))
+
+        assert unpacked.res_required is True
+        assert unpacked.ack_required is False
+        assert unpacked.thread_connection is False
+
+    def test_repr_reports_thread_connection(self) -> None:
+        """The header repr surfaces the Thread observation for debugging."""
+        packed = bytearray(LifxHeader.create(pkt_type=2, source=1).pack())
+        packed[self.FLAGS_OFFSET] |= self.THREAD_BIT
+
+        assert "thread=True" in repr(LifxHeader.unpack(bytes(packed)))
+
+
+class TestHeaderValidation:
+    """Test the header's rejection of malformed frames."""
+
+    def _valid_header(self) -> LifxHeader:
+        return LifxHeader.create(pkt_type=2, source=1)
+
+    def test_wrong_protocol_number_raises(self) -> None:
+        """A header must carry the LIFX protocol number."""
+        with pytest.raises(ValueError, match="Protocol must be 1024"):
+            LifxHeader(
+                size=LifxHeader.HEADER_SIZE,
+                protocol=1023,
+                source=1,
+                target=b"\x00" * 6,
+                tagged=False,
+                ack_required=False,
+                res_required=True,
+                sequence=0,
+                pkt_type=2,
+            )
+
+    def test_nonzero_origin_raises(self) -> None:
+        """The origin bits (14-15 of the protocol field) must be zero."""
+        packed = bytearray(self._valid_header().pack())
+        packed[3] |= 0b0100_0000  # set origin bit 14
+
+        with pytest.raises(ValueError, match="Invalid origin"):
+            LifxHeader.unpack(bytes(packed))
+
+    def test_unset_addressable_bit_raises(self) -> None:
+        """The addressable bit (12 of the protocol field) must be set."""
+        packed = bytearray(self._valid_header().pack())
+        packed[3] &= ~0b0001_0000 & 0xFF  # clear addressable bit 12
+
+        with pytest.raises(ValueError, match="Addressable bit must be set"):
+            LifxHeader.unpack(bytes(packed))
