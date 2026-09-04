@@ -4601,18 +4601,27 @@ def _as_cmd(body: str) -> str:
     """Translate the small shell vocabulary these tests use into cmd.exe.
 
     Pattern-matched rather than looked up in a table, so a test that adds a
-    new `exit N` or `sleep N` cannot silently fall through untranslated and
-    pass on Windows for the wrong reason. Anything outside the vocabulary
-    raises here instead.
+    new line cannot silently fall through untranslated and pass on Windows
+    for the wrong reason. Anything outside the vocabulary raises here
+    instead, which is how the `touch` marker line was caught rather than
+    quietly skipped.
     """
-    if match := re.fullmatch(r"exit (\d+)", body):
+    return "\n".join(_as_cmd_line(line) for line in body.splitlines())
+
+
+def _as_cmd_line(line: str) -> str:
+    if match := re.fullmatch(r"exit (\d+)", line):
         return f"exit /b {match.group(1)}"
-    if match := re.fullmatch(r"sleep (\d+)", body):
+    if match := re.fullmatch(r"sleep (\d+)", line):
         # ping's count is one more than the seconds it waits.
         return f"ping -n {int(match.group(1)) + 1} 127.0.0.1 >nul"
-    if match := re.fullmatch(r"echo (.+)", body):
+    if match := re.fullmatch(r"touch (.+)", line):
+        # `type nul >` is cmd.exe's create-empty-file; quoted because a
+        # Windows temp path routinely contains spaces.
+        return f'type nul > "{match.group(1)}"'
+    if match := re.fullmatch(r"echo (.+)", line):
         return f"echo {match.group(1)}"
-    raise AssertionError(f"no cmd.exe translation for shell body: {body!r}")
+    raise AssertionError(f"no cmd.exe translation for shell line: {line!r}")
 
 
 class _RestorationDiscoverStub:
@@ -5738,6 +5747,38 @@ class TestValidateStagedEvidence:
             failures = validate_staged_evidence(str(evidence_dir.relative_to(tmp_path)))
 
         assert failures == []
+
+    def test_a_native_windows_style_dir_validates_identically(
+        self, tmp_path: Path
+    ) -> None:
+        """Backslashes must normalise at EVERY site, not most of them.
+
+        Runs on any platform: the point is that the argument's separators do
+        not change the outcome, and a backslash string is what a Windows
+        operator and `str(Path(...))` both produce there.
+
+        The first fix normalised the expected-path set and the staged-path
+        prefix but missed the blob-read construction, which rebuilt the path
+        from the raw argument. Windows CI went from reporting all nine paths
+        missing to reporting all nine blobs unreadable -- a different symptom
+        with the same cause and no less broken. This asserts equality against
+        the forward-slash result rather than merely asserting success, so a
+        future site that forgets to normalise fails here too.
+        """
+        _init_bare_git_repo(tmp_path)
+        manifest = _manifest_for_roster()
+        evidence_dir = tmp_path / "evidence" / "session-alpha"
+        _stage_full_evidence(tmp_path, evidence_dir, manifest)
+        relative = evidence_dir.relative_to(tmp_path).as_posix()
+
+        with _chdir(tmp_path):
+            forward = validate_staged_evidence(relative)
+            backslash = validate_staged_evidence(relative.replace("/", "\\"))
+            trailing = validate_staged_evidence(relative + "/")
+
+        assert forward == []
+        assert backslash == forward
+        assert trailing == forward
 
     def test_unreadable_staged_blob_is_reported(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

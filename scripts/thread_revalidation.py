@@ -2707,9 +2707,13 @@ def validate_staged_evidence(evidence_dir: str) -> list[StagedValidationFailure]
     Schema, roster-completeness and closure-ledger failures are reported by
     filename and a bounded category only -- never by matched content.
     """
-    expected = {
-        f"{_posix_evidence_dir(evidence_dir)}/{name}" for name in _EVIDENCE_FILENAMES
-    }
+    # Normalise ONCE, then use only this. Every path in this function is
+    # compared against or handed to Git, which speaks forward slashes on
+    # every platform, so a second construction from the raw argument is a
+    # latent Windows bug -- exactly the one that made all nine blobs
+    # unreadable when only two of the three sites here were normalised.
+    posix_dir = _posix_evidence_dir(evidence_dir)
+    expected = {f"{posix_dir}/{name}" for name in _EVIDENCE_FILENAMES}
     staged = set(_staged_paths_under(evidence_dir))
 
     failures = [
@@ -2725,7 +2729,7 @@ def validate_staged_evidence(evidence_dir: str) -> list[StagedValidationFailure]
 
     blobs: dict[str, bytes] = {}
     for name in _EVIDENCE_FILENAMES:
-        path = f"{evidence_dir.rstrip('/')}/{name}"
+        path = f"{posix_dir}/{name}"
         try:
             blobs[name] = _read_staged_blob(path)
         except subprocess.CalledProcessError:
