@@ -13,6 +13,7 @@ from lifx.network.discovery.udp import _discover_with_packet, discover_devices
 from lifx.network.transport import UdpTransport, _UdpProtocol
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device as DevicePackets
+from tests.conftest import PROGRESS_TIMEOUT
 
 
 @pytest.mark.emulator
@@ -186,7 +187,10 @@ async def _collect_direct_responses(
         mock_transport_cls.return_value = mock_transport
 
         return [
-            response async for response in _discover_with_packet(packet, timeout=0.01)
+            response
+            async for response in _discover_with_packet(
+                packet, timeout=PROGRESS_TIMEOUT
+            )
         ]
 
 
@@ -380,7 +384,7 @@ class TestDiscoveryResponderAddressValidation:
                 response
                 async for response in _discover_with_packet(
                     DevicePackets.GetService(),
-                    timeout=0.01,
+                    timeout=PROGRESS_TIMEOUT,
                     broadcast_address="fe80::2%11",
                 )
             ]
@@ -422,7 +426,7 @@ class TestDiscoveryResponderAddressValidation:
             assert [
                 response
                 async for response in _discover_with_packet(
-                    DevicePackets.GetService(), timeout=0.01
+                    DevicePackets.GetService(), timeout=PROGRESS_TIMEOUT
                 )
             ] == []
 
@@ -466,7 +470,7 @@ class TestDiscoveryResponderAddressValidation:
             assert [
                 response
                 async for response in _discover_with_packet(
-                    DevicePackets.GetService(), timeout=0.01
+                    DevicePackets.GetService(), timeout=PROGRESS_TIMEOUT
                 )
             ] == []
 
@@ -513,7 +517,7 @@ class TestDiscoveryResponderAddressValidation:
             discovered = [
                 response
                 async for response in _discover_with_packet(
-                    DevicePackets.GetService(), timeout=0.01
+                    DevicePackets.GetService(), timeout=PROGRESS_TIMEOUT
                 )
             ]
 
