@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v7.1.2 (2026-09-04)
+
+### Bug Fixes
+
+- Revalidate Thread support against real hardware
+  ([`1780768`](https://github.com/Djelibeybi/lifx-async/commit/1780768994a7bfbb406d23c806f75b90218cbe82))
+
+- **scripts**: Make the Thread revalidation harness work on Windows
+  ([`8b744c8`](https://github.com/Djelibeybi/lifx-async/commit/8b744c8408ca56b3733c179d28acf0b500ef603b))
+
+- **scripts**: Normalise every staged path, translate every script line
+  ([`625ac4c`](https://github.com/Djelibeybi/lifx-async/commit/625ac4c620ffcc9199a1f99a2126becdc6ee2521))
+
+### Documentation
+
+- Mark IPv6 transport phase complete
+  ([`427bae5`](https://github.com/Djelibeybi/lifx-async/commit/427bae5ec4f80459ae559997939ae9aba2edc64f))
+
+
 ## v7.1.1 (2026-08-31)
 
 ### Bug Fixes
