@@ -4,9 +4,7 @@ version = "7.1.2"
 description = "A modern, type-safe, async Python library for controlling LIFX lights"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "pyrefly>=0.60.0",
-]
+dependencies = []
 license = "UPL-1.0"
 license-files = ["LICENSE"]
 authors = [
