@@ -903,6 +903,10 @@ class TestMergedDiscoveryFailures:
                 return result
 
         class FakeConnection:
+            # Mirrors DeviceConnection: the device's own transport report,
+            # None until a correlated response has been observed.
+            thread_connection: bool | None = None
+
             def __init__(self, **kwargs: object) -> None:
                 self.serial = cast(str, kwargs["serial"])
 
@@ -2876,3 +2880,46 @@ class TestFindByIpAddressGate:
             and record.msg.get("action") == "is_loopback"
         ]
         assert len(advisories) == 1
+
+
+@pytest.mark.emulator
+class TestDiscoveredDeviceTransportObservation:
+    """Discovery yields devices whose transport report survives type selection.
+
+    ``create_device()`` observes the transport on a temporary device and then
+    builds the typed instance with a fresh connection. This proves the
+    observation reaches the returned device without the caller issuing a
+    request.
+
+    The emulator has no Thread concept and never sets the frame address bit,
+    so this asserts only that an observation was made and carried across. It
+    is not Thread coverage; only real hardware can exercise a set bit.
+    """
+
+    async def test_created_device_carries_the_observed_transport(
+        self, emulator_port: int
+    ) -> None:
+        """A discovered device carries an observation made during discovery."""
+        first_disc = None
+        async for disc in discover_devices(
+            timeout=1.0,
+            broadcast_address="127.0.0.1",
+            port=emulator_port,
+            idle_timeout_multiplier=0.5,
+        ):
+            first_disc = disc
+            break
+
+        assert first_disc is not None
+
+        device = await first_disc.create_device()
+        assert device is not None, "Supported emulator product must construct a device"
+
+        try:
+            # The capability query already elicited a correlated response, so
+            # the observation must have survived adopt_cached_metadata().
+            # Asserting the value itself would only restate that the emulator
+            # is not a Thread device, so assert the observation exists.
+            assert device.connection.thread_connection is not None
+        finally:
+            await device.connection.close()

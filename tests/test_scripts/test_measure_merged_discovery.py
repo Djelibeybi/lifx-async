@@ -37,7 +37,7 @@ from scripts.measure_merged_discovery import (
     _validate_measurements,
     main_async,
 )
-from tests.test_discovery_observation import (
+from scripts.measurement_support import (
     _capture_discovery_observations,
     _current_discovery_observation_sink,
     _DiscoveryObservation,

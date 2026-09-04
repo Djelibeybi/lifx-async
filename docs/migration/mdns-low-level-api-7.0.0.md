@@ -31,8 +31,10 @@ async def discover_devices():
             print(device.serial, device.ip, device.connectivity)
 ```
 
-`Device.connectivity` is `"thread"` only when discovery receives an exact positive
-Thread report; it is `"wifi"` otherwise. Alternative advertised addresses, raw DNS
+`Device.connectivity` returns a `Connectivity` enum member. Discovery reports
+`Connectivity.THREAD` only on an exact positive Thread report and
+`Connectivity.WIFI` otherwise; the device's own frame address report supersedes
+that once it has answered a request. Alternative advertised addresses, raw DNS
 records and the private connectivity field are intentionally not exposed.
 
 An IPv6 link-local address also needs a zone ID identifying its network interface,

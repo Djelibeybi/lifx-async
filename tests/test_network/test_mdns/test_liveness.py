@@ -93,10 +93,15 @@ def _source(
 def _connection_factory(
     responder: Callable[[str, object, float | None], Any],
     ledger: list[SimpleNamespace],
+    thread_connection: bool | None = None,
 ) -> type:
     """Build a bounded fake at the external UDP request boundary."""
 
     class FakeConnection:
+        # Mirrors DeviceConnection: the device's own transport report, learned
+        # from a correlated response and None until one arrives.
+        thread_connection: bool | None = None
+
         def __init__(
             self,
             serial: str,
@@ -112,6 +117,7 @@ def _connection_factory(
             self.timeout = timeout
             self.closed = False
             self.requests: list[tuple[object, float | None]] = []
+            self.thread_connection = thread_connection
             ledger.append(self)
 
         async def request(self, packet: object, timeout: float | None = None) -> object:
@@ -1107,3 +1113,37 @@ def test_transport_detail_logging_flag_defaults_to_standalone_compatibility() ->
     """The private suppression switch must be opt-in for merged discovery."""
     assert MdnsTransport()._log_failure_details is True
     assert MdnsTransport(log_failure_details=False)._log_failure_details is False
+
+
+@pytest.mark.asyncio
+async def test_verified_candidate_carries_observed_transport(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The liveness probe's transport observation reaches the built device.
+
+    Verification issues a real request on a local connection and then builds
+    the device with a fresh one. Without carrying the observation across, the
+    authoritative frame address report is discarded and connectivity falls
+    back to the advertised TXT sentinel.
+    """
+    connections: list[SimpleNamespace] = []
+    monkeypatch.setattr(
+        mdns_discovery,
+        "DeviceConnection",
+        _connection_factory(
+            lambda _serial, _packet, _timeout: _state_color(),
+            connections,
+            thread_connection=True,
+        ),
+        raising=False,
+    )
+
+    device = await mdns_discovery._verify_mdns_candidate(
+        _record(),
+        deadline=mdns_discovery.time.monotonic() + 5.0,
+        device_timeout=1.0,
+        max_retries=1,
+    )
+
+    assert device is not None
+    assert device.connection.thread_connection is True

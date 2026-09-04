@@ -2,6 +2,11 @@
 
 The network layer provides low-level operations for communicating with LIFX devices over UDP.
 
+For the consumer-facing discovery journey (`discover()`, `discover_udp()`,
+`discover_mdns()`, targeted lookup, method selection and limitations), see the
+[Discovery Guide](../user-guide/discovery.md). This page documents the
+low-level discovery, transport and connection primitives underneath it.
+
 ## Discovery
 
 Functions for discovering LIFX devices on the local network.

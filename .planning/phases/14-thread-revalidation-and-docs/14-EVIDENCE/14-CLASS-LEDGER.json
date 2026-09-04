@@ -1,0 +1,56 @@
+{
+  "classes": {
+    "CeilingLight": {
+      "aliases": [
+        "LIFX-Ceiling-13x26-1"
+      ],
+      "disposition": "evidence_backed",
+      "gap_reason": null,
+      "gap_recorded_date": null
+    },
+    "HevLight": {
+      "aliases": [],
+      "disposition": "named_gap",
+      "gap_reason": "no Thread-capable hardware of this class in the fleet; the fleet's devices of this class predate Thread",
+      "gap_recorded_date": "2026-09-04"
+    },
+    "InfraredLight": {
+      "aliases": [],
+      "disposition": "named_gap",
+      "gap_reason": "no Thread-capable hardware of this class in the fleet; the fleet's devices of this class predate Thread",
+      "gap_recorded_date": "2026-09-04"
+    },
+    "Light": {
+      "aliases": [
+        "LIFX-DL-Intl-1",
+        "LIFX-DL-Intl-2",
+        "LIFX-Mini-1",
+        "LIFX-Mini-2"
+      ],
+      "disposition": "evidence_backed",
+      "gap_reason": null,
+      "gap_recorded_date": null
+    },
+    "MatrixLight": {
+      "aliases": [
+        "LIFX-Candle-C-1",
+        "LIFX-Luna-1"
+      ],
+      "disposition": "evidence_backed",
+      "gap_reason": null,
+      "gap_recorded_date": null
+    },
+    "MultiZoneLight": {
+      "aliases": [
+        "LIFX-Tube-1"
+      ],
+      "disposition": "evidence_backed",
+      "gap_reason": null,
+      "gap_recorded_date": null
+    }
+  },
+  "complete": true,
+  "kind": "class_ledger",
+  "missing_classes": [],
+  "schema_version": 1
+}

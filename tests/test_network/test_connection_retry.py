@@ -25,10 +25,14 @@ from unittest.mock import patch
 
 import pytest
 
-from lifx.exceptions import LifxProtocolError, LifxTimeoutError
-from lifx.network.connection import DeviceConnection
+from lifx.exceptions import LifxConnectionError, LifxProtocolError, LifxTimeoutError
+from lifx.network.connection import DeviceConnection, _current_request_observer
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
+from scripts.measurement_support import (
+    _capture_request_observations,
+    _RequestObservationSink,
+)
 
 _STATE_POWER_PKT_TYPE = 22
 _ACKNOWLEDGEMENT_PKT_TYPE = 45
@@ -58,13 +62,21 @@ def _send_spy(
 
 
 def _header(
-    *, source: int, sequence: int, target: bytes, pkt_type: int, payload_len: int
+    *,
+    source: int,
+    sequence: int,
+    target: bytes,
+    pkt_type: int,
+    payload_len: int,
+    thread_connection: bool = False,
 ) -> LifxHeader:
     """Build a valid header for direct queue injection.
 
     Mirrors ``TestRequestStreamDebugLogging._header`` in test_connection.py,
     parameterised on source/sequence/target/pkt_type so mismatch variants
-    can be constructed for the correlation branch matrix.
+    can be constructed for the correlation branch matrix. ``thread_connection``
+    defaults to ``False`` (the dataclass default) and is exposed so Phase 14
+    THREAD-02 observer tests can construct a Thread-flagged reply.
     """
     return LifxHeader(
         size=36 + payload_len,
@@ -76,6 +88,7 @@ def _header(
         res_required=False,
         sequence=sequence,
         pkt_type=pkt_type,
+        thread_connection=thread_connection,
     )
 
 
@@ -709,3 +722,533 @@ class TestCorrelationContract:
             await conn.close()
         assert hasattr(response, "level")
         assert conn._pending_requests == {}
+
+
+class TestRequestObservation:
+    """Phase 14 THREAD-02 (D-07/D-17/D-19): private request-observer seam.
+
+    No observer is attached by any test elsewhere in this file or in the
+    rest of the suite, so every pre-existing test in this module already
+    proves the no-observer path is unaffected byte-for-byte. These tests
+    cover the opt-in observer itself.
+    """
+
+    async def test_no_observer_outside_capture_context(self) -> None:
+        """The selector returns None on every ordinary call (no-observer arm)."""
+        assert _current_request_observer() is None
+
+    async def test_observes_logical_start_sent_and_accepted_in_order(self) -> None:
+        """A single successful GET response observes logical_start, sent(0)
+        and accepted(0) in that order, with accepted_ns >= sent_ns >=
+        logical_start_ns and the device's unflagged Thread report carried."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
+        )
+        sink: _RequestObservationSink | None = None
+        task: asyncio.Task[Any] | None = None
+        try:
+            await conn.open()
+            with patch("lifx.network.connection._STREAM_IDLE_TIMEOUT", 0.2):
+
+                async def _drive() -> None:
+                    nonlocal sink
+                    with _capture_request_observations() as active_sink:
+                        sink = active_sink
+                        async for _ in conn._request_stream_impl(
+                            Device.GetPower(), timeout=5.0
+                        ):
+                            pass
+
+                task = asyncio.create_task(_drive())
+                await _wait_for_keys(conn, 1)
+                (key,) = conn._pending_requests.keys()
+                source, sequence, _serial = key
+                header = _header(
+                    source=source,
+                    sequence=sequence,
+                    target=bytes.fromhex(conn.serial) + b"\x00\x00",
+                    pkt_type=_STATE_POWER_PKT_TYPE,
+                    payload_len=len(_STATE_POWER_PAYLOAD),
+                )
+                conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
+                await asyncio.wait_for(task, timeout=1.0)
+                task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+        assert sink is not None
+        categories = [obs.category for obs in sink.observations]
+        assert categories == ["logical_start", "sent", "accepted", "cleanup"]
+        logical_start, sent, accepted, cleanup = sink.observations
+        assert sent.sequence == 0
+        assert accepted.sequence == 0
+        assert accepted.thread_connection is False
+        assert (
+            logical_start.timestamp_ns
+            <= sent.timestamp_ns
+            <= accepted.timestamp_ns
+            <= cleanup.timestamp_ns
+        )
+
+    async def test_observes_thread_flagged_accepted_response(self) -> None:
+        """A Thread-flagged reply is distinguished from an unflagged one, and
+        the flag changes nothing about correlation or timing (T-14 scope)."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
+        )
+        sink: _RequestObservationSink | None = None
+        task: asyncio.Task[Any] | None = None
+        try:
+            await conn.open()
+            with patch("lifx.network.connection._STREAM_IDLE_TIMEOUT", 0.2):
+
+                async def _drive() -> None:
+                    nonlocal sink
+                    with _capture_request_observations() as active_sink:
+                        sink = active_sink
+                        async for _ in conn._request_stream_impl(
+                            Device.GetPower(), timeout=5.0
+                        ):
+                            pass
+
+                task = asyncio.create_task(_drive())
+                await _wait_for_keys(conn, 1)
+                (key,) = conn._pending_requests.keys()
+                source, sequence, _serial = key
+                header = _header(
+                    source=source,
+                    sequence=sequence,
+                    target=bytes.fromhex(conn.serial) + b"\x00\x00",
+                    pkt_type=_STATE_POWER_PKT_TYPE,
+                    payload_len=len(_STATE_POWER_PAYLOAD),
+                    thread_connection=True,
+                )
+                conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
+                await asyncio.wait_for(task, timeout=1.0)
+                task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+        assert sink is not None
+        accepted = next(o for o in sink.observations if o.category == "accepted")
+        assert accepted.thread_connection is True
+        assert conn.thread_connection is True
+
+    async def test_retransmission_yields_distinct_logical_and_ack_rtt(self) -> None:
+        """The winning (retransmitted) sequence's sent_ns, not the first
+        transmission's, is what the accepted event's sequence resolves to --
+        proving logical_latency_ns and ack_rtt_ns are computable as distinct
+        values (D-07 acceptance criterion)."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
+        )
+        sink: _RequestObservationSink | None = None
+        task: asyncio.Task[Any] | None = None
+        try:
+            await conn.open()
+            with patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.05,)):
+
+                async def _drive() -> None:
+                    nonlocal sink
+                    with _capture_request_observations() as active_sink:
+                        sink = active_sink
+                        await conn.request(Device.GetPower(), timeout=2.0)
+
+                task = asyncio.create_task(_drive())
+                await _wait_for_keys(conn, 2)
+                key1 = max(conn._pending_requests, key=lambda k: k[1])
+                source, sequence, _serial = key1
+                assert sequence == 1
+                header = _header(
+                    source=source,
+                    sequence=sequence,
+                    target=bytes.fromhex(conn.serial) + b"\x00\x00",
+                    pkt_type=_STATE_POWER_PKT_TYPE,
+                    payload_len=len(_STATE_POWER_PAYLOAD),
+                )
+                conn._pending_requests[key1].put_nowait((header, _STATE_POWER_PAYLOAD))
+                await asyncio.wait_for(task, timeout=1.0)
+                task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+        assert sink is not None
+        logical_start = next(
+            o for o in sink.observations if o.category == "logical_start"
+        )
+        sent_events = {
+            o.sequence: o.timestamp_ns
+            for o in sink.observations
+            if o.category == "sent"
+        }
+        accepted = next(o for o in sink.observations if o.category == "accepted")
+        assert set(sent_events) == {0, 1}
+        assert accepted.sequence == 1
+        logical_latency_ns = accepted.timestamp_ns - logical_start.timestamp_ns
+        ack_rtt_ns = accepted.timestamp_ns - sent_events[1]
+        assert ack_rtt_ns < logical_latency_ns
+        assert ack_rtt_ns >= 0
+
+    async def test_late_ack_to_earlier_sequence_uses_matching_sent(self) -> None:
+        """A reply accepted against the FIRST transmission after a second
+        has already gone out still resolves ack_rtt_ns from sequence 0's
+        sent_ns, not sequence 1's (RETRY-04 correlation contract preserved
+        under observation)."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
+        )
+        sink: _RequestObservationSink | None = None
+        task: asyncio.Task[Any] | None = None
+        try:
+            await conn.open()
+            with patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.05,)):
+
+                async def _drive() -> None:
+                    nonlocal sink
+                    with _capture_request_observations() as active_sink:
+                        sink = active_sink
+                        await conn.request(Device.GetPower(), timeout=2.0)
+
+                task = asyncio.create_task(_drive())
+                await _wait_for_keys(conn, 2)
+                key0 = min(conn._pending_requests, key=lambda k: k[1])
+                source, sequence, _serial = key0
+                assert sequence == 0
+                header = _header(
+                    source=source,
+                    sequence=sequence,
+                    target=bytes.fromhex(conn.serial) + b"\x00\x00",
+                    pkt_type=_STATE_POWER_PKT_TYPE,
+                    payload_len=len(_STATE_POWER_PAYLOAD),
+                )
+                conn._pending_requests[key0].put_nowait((header, _STATE_POWER_PAYLOAD))
+                await asyncio.wait_for(task, timeout=1.0)
+                task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+        assert sink is not None
+        accepted = next(o for o in sink.observations if o.category == "accepted")
+        assert accepted.sequence == 0
+
+    async def test_timeout_observes_timeout_and_no_accepted(self) -> None:
+        """No response ever arrives: exactly one send, no accepted event,
+        and a terminal timeout + cleanup pair."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.15, max_retries=2
+        )
+        sink: _RequestObservationSink | None = None
+        try:
+            await conn.open()
+
+            async def _drive() -> None:
+                nonlocal sink
+                with _capture_request_observations() as active_sink:
+                    sink = active_sink
+                    with pytest.raises(LifxTimeoutError):
+                        await conn.request(Device.GetPower(), timeout=0.15)
+
+            await asyncio.wait_for(asyncio.create_task(_drive()), timeout=1.0)
+        finally:
+            await conn.close()
+        assert sink is not None
+        categories = [obs.category for obs in sink.observations]
+        assert categories == ["logical_start", "sent", "timeout", "cleanup"]
+        assert not any(o.category == "accepted" for o in sink.observations)
+
+    async def test_send_error_observes_send_error_not_sent(self) -> None:
+        """A ``send_packet()`` failure on the initial transmission emits
+        send_error (not sent) and no exception text is ever captured -- the
+        observation carries only the bounded category, sequence and
+        timestamp (T-14-02)."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=2
+        )
+        sink: _RequestObservationSink | None = None
+        try:
+            await conn.open()
+
+            async def _boom(*args: Any, **kwargs: Any) -> None:
+                raise LifxConnectionError("boom -- must never reach the observation")
+
+            async def _drive() -> None:
+                nonlocal sink
+                with _capture_request_observations() as active_sink:
+                    sink = active_sink
+                    with (
+                        patch.object(conn, "send_packet", side_effect=_boom),
+                        pytest.raises(LifxConnectionError),
+                    ):
+                        await conn.request(Device.GetPower(), timeout=2.0)
+
+            await asyncio.wait_for(asyncio.create_task(_drive()), timeout=1.0)
+        finally:
+            await conn.close()
+        assert sink is not None
+        categories = [obs.category for obs in sink.observations]
+        assert categories == ["logical_start", "send_error", "cleanup"]
+        send_error = next(o for o in sink.observations if o.category == "send_error")
+        assert send_error.sequence == 0
+        assert "boom" not in repr(send_error)
+        assert "boom" not in repr(sink)
+
+    async def test_cancellation_observes_cancelled_then_cleanup(self) -> None:
+        """Cancelling the awaiting task mid-wait emits cancelled then
+        cleanup, and CancelledError still propagates."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
+        )
+        sink: _RequestObservationSink | None = None
+        task: asyncio.Task[Any] | None = None
+        try:
+            await conn.open()
+
+            async def _drive() -> None:
+                nonlocal sink
+                with _capture_request_observations() as active_sink:
+                    sink = active_sink
+                    await conn.request(Device.GetPower(), timeout=5.0)
+
+            task = asyncio.create_task(_drive())
+            await _wait_for_keys(conn, 1)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+        assert sink is not None
+        categories = [obs.category for obs in sink.observations]
+        assert categories == ["logical_start", "sent", "cancelled", "cleanup"]
+
+    def test_sink_repr_suppresses_observation_values(self) -> None:
+        """The sink's repr exposes a count only -- never category, sequence
+        or timestamp values, even after several observations (T-14-02)."""
+        sink = _RequestObservationSink()
+        sink.observe("logical_start", None, 1_000, None)
+        sink.observe("sent", 0, 1_500, None)
+        sink.observe("accepted", 0, 2_000, True)
+        rendered = repr(sink)
+        assert rendered == "_RequestObservationSink(count=3)"
+        assert "1000" not in rendered
+        assert "1500" not in rendered
+        assert "sent" not in rendered
+        assert "accepted" not in rendered
+
+    def test_no_running_loop_returns_none(self) -> None:
+        """``_current_request_observer()`` is safe to call with no running
+        event loop at all -- the RuntimeError arm of the selector."""
+        assert _current_request_observer() is None
+
+    async def test_send_error_without_observer_is_a_noop(self) -> None:
+        """No observer attached: a send failure on the initial transmission
+        still propagates normally (the "observer is None" arm of the
+        send_error branch, exercised with nothing listening)."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=2
+        )
+
+        async def _boom(*args: Any, **kwargs: Any) -> None:
+            raise LifxConnectionError("boom")
+
+        try:
+            await conn.open()
+            with (
+                patch.object(conn, "send_packet", side_effect=_boom),
+                pytest.raises(LifxConnectionError),
+            ):
+                await conn.request(Device.GetPower(), timeout=2.0)
+        finally:
+            await conn.close()
+        assert _current_request_observer() is None
+
+    async def test_retransmit_send_error_observes_send_error(self) -> None:
+        """The initial send succeeds (observed: sent(0)); the retransmitted
+        send then fails, observing send_error(1) -- not sent(1) -- and no
+        accepted event (the retransmit branch's send_error arm, distinct
+        from the initial-send arm covered above)."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
+        )
+        sink: _RequestObservationSink | None = None
+        real_send = conn.send_packet
+        call_count = 0
+
+        async def _flaky(*args: Any, **kwargs: Any) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await real_send(*args, **kwargs)
+                return
+            raise LifxConnectionError("retransmit boom")
+
+        try:
+            await conn.open()
+            with patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.05,)):
+
+                async def _drive() -> None:
+                    nonlocal sink
+                    with _capture_request_observations() as active_sink:
+                        sink = active_sink
+                        with (
+                            patch.object(conn, "send_packet", side_effect=_flaky),
+                            pytest.raises(LifxConnectionError),
+                        ):
+                            await conn.request(Device.GetPower(), timeout=2.0)
+
+                await asyncio.wait_for(asyncio.create_task(_drive()), timeout=1.0)
+        finally:
+            await conn.close()
+        assert sink is not None
+        categories = [obs.category for obs in sink.observations]
+        assert categories == ["logical_start", "sent", "send_error", "cleanup"]
+        send_error = next(o for o in sink.observations if o.category == "send_error")
+        assert send_error.sequence == 1
+        assert not any(o.category == "accepted" for o in sink.observations)
+
+    async def test_cancellation_without_observer_is_a_noop(self) -> None:
+        """No observer attached: cancelling mid-wait still raises
+        CancelledError normally -- the "observer is None" arm of the
+        cancellation handler."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
+        )
+        task: asyncio.Task[Any] | None = None
+        try:
+            await conn.open()
+            task = asyncio.create_task(conn.request(Device.GetPower(), timeout=5.0))
+            await _wait_for_keys(conn, 1)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            task = None
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+            await conn.close()
+        assert _current_request_observer() is None
+
+    async def test_retransmit_send_error_without_observer_is_a_noop(self) -> None:
+        """No observer attached: a retransmitted send failure still
+        propagates normally -- the "observer is None" arm of the
+        retransmit-branch send_error handler."""
+        conn = DeviceConnection(
+            serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
+        )
+        real_send = conn.send_packet
+        call_count = 0
+
+        async def _flaky(*args: Any, **kwargs: Any) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await real_send(*args, **kwargs)
+                return
+            raise LifxConnectionError("retransmit boom")
+
+        try:
+            await conn.open()
+            with (
+                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.05,)),
+                patch.object(conn, "send_packet", side_effect=_flaky),
+                pytest.raises(LifxConnectionError),
+            ):
+                await conn.request(Device.GetPower(), timeout=2.0)
+        finally:
+            await conn.close()
+        assert call_count == 2
+        assert _current_request_observer() is None
+
+    def test_observer_insertion_leaves_public_surface_unchanged(self) -> None:
+        """Regression gate (T-14-03): the observer seam must never appear on
+        a public signature, and the retransmit schedule constant is
+        untouched by this plan (source-level anti-weakening check for the
+        Task 2 coverage/estimate concern in 14-REVIEWS.md)."""
+        import inspect
+
+        from lifx.const import REQUEST_RETRANSMIT_GAPS
+
+        assert REQUEST_RETRANSMIT_GAPS == (
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.7,
+            0.9,
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+        )
+
+        request_params = list(inspect.signature(DeviceConnection.request).parameters)
+        assert request_params == ["self", "packet", "timeout"]
+        request_stream_params = list(
+            inspect.signature(DeviceConnection.request_stream).parameters
+        )
+        assert request_stream_params == ["self", "packet", "timeout"]
+        for params in (request_params, request_stream_params):
+            assert "observer" not in params
+
+        # observer is keyword-only with a None default -- every existing
+        # caller of _transmit_and_listen() (both thin wrappers) keeps
+        # working with no source change if this default were ever removed.
+        transmit_params = inspect.signature(
+            DeviceConnection._transmit_and_listen
+        ).parameters
+        assert transmit_params["observer"].default is None
+        assert transmit_params["observer"].kind == inspect.Parameter.KEYWORD_ONLY
+
+    def test_observe_rejects_an_unknown_category(self) -> None:
+        """`_RequestObservationSink.observe()` validates every category it
+        receives -- a defensive gate against a future production caller
+        passing a value outside the seven bounded categories."""
+        sink = _RequestObservationSink()
+
+        with pytest.raises(ValueError, match="unknown request observation category"):
+            sink.observe("not_a_real_category", None, 0, None)
+
+    async def test_capture_outside_a_task_raises_when_current_task_is_none(
+        self,
+    ) -> None:
+        """`asyncio.current_task()` can return `None` from inside a running
+        loop when the calling code is not itself a Task (rather than raising
+        `RuntimeError` outright, which only happens with no loop at all)."""
+        import scripts.measurement_support as measurement_support
+
+        with patch.object(
+            measurement_support.asyncio, "current_task", return_value=None
+        ):
+            with pytest.raises(
+                RuntimeError, match="request observation capture requires an asyncio"
+            ):
+                with _capture_request_observations():
+                    pass
+
+    async def test_nested_capture_restores_the_outer_observer(self) -> None:
+        """A second, nested capture must not clobber the first one's selection
+        once it exits -- the `finally` block's `had_previous` restore arm."""
+        from lifx.network.connection import _REQUEST_OBSERVER_TASK_ATTRIBUTE
+
+        task = asyncio.current_task()
+        assert task is not None
+
+        with _capture_request_observations() as outer:
+            outer_observer = getattr(task, _REQUEST_OBSERVER_TASK_ATTRIBUTE)
+            with _capture_request_observations() as inner:
+                inner_observer = getattr(task, _REQUEST_OBSERVER_TASK_ATTRIBUTE)
+                assert inner_observer is not outer_observer
+                inner_observer("logical_start", None, 1, None)
+            restored_observer = getattr(task, _REQUEST_OBSERVER_TASK_ATTRIBUTE)
+            assert restored_observer is outer_observer
+            outer_observer("logical_start", None, 2, None)
+
+        assert [obs.timestamp_ns for obs in inner.observations] == [1]
+        assert [obs.timestamp_ns for obs in outer.observations] == [2]

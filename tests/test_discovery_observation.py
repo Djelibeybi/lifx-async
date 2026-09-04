@@ -1,131 +1,160 @@
-"""Repository-only value-suppressed observations for discovery measurements."""
+"""Discovery observation tests importing the canonical scripts-layer helper.
+
+The event/sink/capture-context primitives themselves moved to
+``scripts/measurement_support.py`` (Plan 14-03, D-17/D-19): no script may
+import a helper from ``tests/``, and
+``scripts/measure_merged_discovery.py`` previously loaded this module by
+anchored ``importlib`` path specifically to work around that rule. This file
+now only re-exports the canonical private names (so existing test imports
+keep working unchanged) and proves the properties the measurement scripts
+depend on: caller isolation, repr suppression, arrival order, and
+deterministic cleanup.
+"""
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from dataclasses import dataclass, field
-from typing import Literal, cast
+from unittest.mock import patch
 
-_DiscoverySource = Literal["udp", "mdns"]
-_DiscoveryStage = Literal["accepted", "winner", "duplicate"]
-_OBSERVER_TASK_ATTRIBUTE = "_lifx_discovery_observer"
+import pytest
 
-
-@dataclass(frozen=True, repr=False)
-class _DiscoveryObservation:
-    """One in-memory discovery event whose identity is omitted from repr."""
-
-    source: _DiscoverySource
-    stage: _DiscoveryStage
-    raw_identity: str = field(repr=False)
-    firmware_major: int | None = None
-    firmware_minor: int | None = None
-    connectivity: str | None = field(default=None, repr=False)
-
-    def __repr__(self) -> str:
-        """Render categories only so logs cannot expose a hardware identity."""
-        return f"{type(self).__name__}(source={self.source!r}, stage={self.stage!r})"
-
-
-@dataclass(repr=False)
-class _DiscoveryObservationSink:
-    """Caller-owned append-only sink for one measured discovery call."""
-
-    _observations: list[_DiscoveryObservation] = field(
-        default_factory=list,
-        init=False,
-        repr=False,
-    )
-
-    @property
-    def observations(self) -> tuple[_DiscoveryObservation, ...]:
-        """Return an immutable snapshot of observations in arrival order."""
-        return tuple(self._observations)
-
-    def emit(self, observation: _DiscoveryObservation) -> None:
-        """Append one already validated in-memory observation."""
-        self._observations.append(observation)
-
-    def observe(
-        self,
-        source: str,
-        stage: str,
-        raw_identity: str,
-        firmware_major: int | None,
-        firmware_minor: int | None,
-        connectivity: str | None,
-    ) -> None:
-        """Receive the production callable's value-only event payload."""
-        _emit_discovery_observation(
-            self,
-            source=source,
-            stage=stage,
-            raw_identity=raw_identity,
-            firmware_major=firmware_major,
-            firmware_minor=firmware_minor,
-            connectivity=connectivity,
-        )
-
-    def __repr__(self) -> str:
-        """Suppress all observation values while retaining a useful count."""
-        return f"{type(self).__name__}(count={len(self._observations)})"
-
-
-_DISCOVERY_OBSERVATION_SINK: ContextVar[_DiscoveryObservationSink | None] = ContextVar(
-    "lifx_discovery_observation_sink", default=None
+import scripts.measurement_support as measurement_support
+from scripts.measurement_support import (
+    _DISCOVERY_OBSERVER_TASK_ATTRIBUTE,
+    _capture_discovery_observations,
+    _current_discovery_observation_sink,
+    _DiscoveryObservation,
+    _DiscoveryObservationSink,
+    _emit_discovery_observation,
 )
 
-
-@contextmanager
-def _capture_discovery_observations() -> Iterator[_DiscoveryObservationSink]:
-    """Attach one caller-local repository observer for the exact async call."""
-    task = asyncio.current_task()
-    if task is None:
-        raise RuntimeError("discovery observation capture requires an asyncio task")
-    sink = _DiscoveryObservationSink()
-    token = _DISCOVERY_OBSERVATION_SINK.set(sink)
-    previous = getattr(task, _OBSERVER_TASK_ATTRIBUTE, None)
-    had_previous = hasattr(task, _OBSERVER_TASK_ATTRIBUTE)
-
-    setattr(task, _OBSERVER_TASK_ATTRIBUTE, sink.observe)
-    try:
-        yield sink
-    finally:
-        if had_previous:
-            setattr(task, _OBSERVER_TASK_ATTRIBUTE, previous)
-        else:
-            delattr(task, _OBSERVER_TASK_ATTRIBUTE)
-        _DISCOVERY_OBSERVATION_SINK.reset(token)
+__all__ = [
+    "_DiscoveryObservation",
+    "_DiscoveryObservationSink",
+    "_capture_discovery_observations",
+    "_current_discovery_observation_sink",
+    "_emit_discovery_observation",
+]
 
 
-def _current_discovery_observation_sink() -> _DiscoveryObservationSink | None:
-    """Return the sink selected by the current caller context, if any."""
-    return _DISCOVERY_OBSERVATION_SINK.get()
+class TestDiscoveryObservation:
+    """Repr suppresses identity while keeping the categories useful."""
 
-
-def _emit_discovery_observation(
-    sink: _DiscoveryObservationSink | None,
-    *,
-    source: _DiscoverySource,
-    stage: _DiscoveryStage,
-    raw_identity: str,
-    firmware_major: int | None = None,
-    firmware_minor: int | None = None,
-    connectivity: str | None = None,
-) -> None:
-    """Emit one observation only when an explicit sink was supplied."""
-    if sink is None:
-        return
-    sink.emit(
-        _DiscoveryObservation(
-            source=cast(_DiscoverySource, source),
-            stage=cast(_DiscoveryStage, stage),
-            raw_identity=raw_identity,
-            firmware_major=firmware_major,
-            firmware_minor=firmware_minor,
-            connectivity=connectivity,
+    def test_repr_omits_raw_identity_and_connectivity(self) -> None:
+        observation = _DiscoveryObservation(
+            source="udp",
+            stage="accepted",
+            raw_identity="d073d5aa11bb",
+            firmware_major=3,
+            firmware_minor=70,
+            connectivity="wifi",
         )
-    )
+
+        rendered = repr(observation)
+
+        assert "d073d5aa11bb" not in rendered
+        assert "wifi" not in rendered
+        assert "source='udp'" in rendered
+        assert "stage='accepted'" in rendered
+
+    def test_sink_repr_reveals_only_a_count(self) -> None:
+        sink = _DiscoveryObservationSink()
+        sink.emit(
+            _DiscoveryObservation(source="mdns", stage="winner", raw_identity="abc")
+        )
+
+        rendered = repr(sink)
+
+        assert "abc" not in rendered
+        assert "count=1" in rendered
+
+
+class TestCaptureDiscoveryObservations:
+    """The context manager attaches, isolates, and cleans up deterministically."""
+
+    async def test_observations_arrive_in_emitted_order(self) -> None:
+        with _capture_discovery_observations() as sink:
+            task = asyncio.current_task()
+            assert task is not None
+            observer = getattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE)
+            observer("udp", "accepted", "first", None, None, None)
+            observer("mdns", "winner", "second", None, None, None)
+            observer("udp", "duplicate", "third", None, None, None)
+
+        stages = [observation.stage for observation in sink.observations]
+        assert stages == ["accepted", "winner", "duplicate"]
+
+    async def test_cleanup_restores_the_task_attribute_via_finally(self) -> None:
+        task = asyncio.current_task()
+        assert task is not None
+        assert not hasattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE)
+
+        with pytest.raises(RuntimeError):
+            with _capture_discovery_observations():
+                assert hasattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE)
+                raise RuntimeError("boom")
+
+        assert not hasattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE)
+        assert _current_discovery_observation_sink() is None
+
+    async def test_nested_capture_restores_the_outer_observer(self) -> None:
+        with _capture_discovery_observations() as outer:
+            outer_observer = getattr(
+                asyncio.current_task(), _DISCOVERY_OBSERVER_TASK_ATTRIBUTE
+            )
+            with _capture_discovery_observations() as inner:
+                inner_observer = getattr(
+                    asyncio.current_task(), _DISCOVERY_OBSERVER_TASK_ATTRIBUTE
+                )
+                assert inner_observer is not outer_observer
+                inner_observer("udp", "accepted", "inner-only", None, None, None)
+            restored_observer = getattr(
+                asyncio.current_task(), _DISCOVERY_OBSERVER_TASK_ATTRIBUTE
+            )
+            assert restored_observer is outer_observer
+            outer_observer("mdns", "winner", "outer-only", None, None, None)
+
+        assert [o.raw_identity for o in inner.observations] == ["inner-only"]
+        assert [o.raw_identity for o in outer.observations] == ["outer-only"]
+
+    async def test_concurrent_tasks_do_not_share_a_sink(self) -> None:
+        """Caller isolation: each task's capture only ever sees its own task."""
+        results: dict[str, tuple[str, ...]] = {}
+
+        async def _run(label: str) -> None:
+            with _capture_discovery_observations() as sink:
+                observer = getattr(
+                    asyncio.current_task(), _DISCOVERY_OBSERVER_TASK_ATTRIBUTE
+                )
+                await asyncio.sleep(0)
+                observer("udp", "accepted", label, None, None, None)
+                await asyncio.sleep(0)
+            results[label] = tuple(o.raw_identity for o in sink.observations)
+
+        await asyncio.gather(_run("task-a"), _run("task-b"))
+
+        assert results == {"task-a": ("task-a",), "task-b": ("task-b",)}
+
+    def test_capture_outside_a_running_loop_raises(self) -> None:
+        """No task can be selected without a running loop at all."""
+        with pytest.raises(RuntimeError, match="no running event loop"):
+            with _capture_discovery_observations():
+                pass
+
+    async def test_capture_when_current_task_is_none_raises(self) -> None:
+        """`asyncio.current_task()` can return `None` from inside a running
+        loop when the calling code is not itself a Task (rather than raising
+        `RuntimeError` outright, which only happens with no loop at all)."""
+        with patch.object(
+            measurement_support.asyncio, "current_task", return_value=None
+        ):
+            with pytest.raises(
+                RuntimeError, match="discovery observation capture requires an asyncio"
+            ):
+                with _capture_discovery_observations():
+                    pass
+
+    async def test_emit_without_a_sink_is_a_no_op(self) -> None:
+        _emit_discovery_observation(
+            None, source="udp", stage="accepted", raw_identity="unsunk"
+        )

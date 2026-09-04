@@ -103,3 +103,4 @@ Thumbs.db
 .planning/milestone.lock
 .planning/config.claude.json
 .planning/config.codex.json
+.planning/phases/*/.review-diagnostics/

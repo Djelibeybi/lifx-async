@@ -1,0 +1,393 @@
+{
+  "animation": {
+    "LIFX-Candle-C-1": {
+      "rates": [
+        {
+          "failed": 0,
+          "fps": 1,
+          "gated": 0,
+          "offered": 11,
+          "outcome": "completed",
+          "packets_sent": 11
+        },
+        {
+          "failed": 0,
+          "fps": 2,
+          "gated": 0,
+          "offered": 21,
+          "outcome": "completed",
+          "packets_sent": 21
+        },
+        {
+          "failed": 0,
+          "fps": 5,
+          "gated": 0,
+          "offered": 51,
+          "outcome": "completed",
+          "packets_sent": 51
+        }
+      ],
+      "restoration_verified": false,
+      "restored": true
+    }
+  },
+  "class_ledger": {
+    "classes": {
+      "CeilingLight": {
+        "aliases": [
+          "LIFX-Ceiling-13x26-1"
+        ],
+        "disposition": "evidence_backed",
+        "gap_reason": null,
+        "gap_recorded_date": null
+      },
+      "HevLight": {
+        "aliases": [],
+        "disposition": "named_gap",
+        "gap_reason": "no Thread-capable hardware of this class in the fleet; the fleet's devices of this class predate Thread",
+        "gap_recorded_date": "2026-09-04"
+      },
+      "InfraredLight": {
+        "aliases": [],
+        "disposition": "named_gap",
+        "gap_reason": "no Thread-capable hardware of this class in the fleet; the fleet's devices of this class predate Thread",
+        "gap_recorded_date": "2026-09-04"
+      },
+      "Light": {
+        "aliases": [
+          "LIFX-DL-Intl-1",
+          "LIFX-DL-Intl-2",
+          "LIFX-Mini-1",
+          "LIFX-Mini-2"
+        ],
+        "disposition": "evidence_backed",
+        "gap_reason": null,
+        "gap_recorded_date": null
+      },
+      "MatrixLight": {
+        "aliases": [
+          "LIFX-Candle-C-1",
+          "LIFX-Luna-1"
+        ],
+        "disposition": "evidence_backed",
+        "gap_reason": null,
+        "gap_recorded_date": null
+      },
+      "MultiZoneLight": {
+        "aliases": [
+          "LIFX-Tube-1"
+        ],
+        "disposition": "evidence_backed",
+        "gap_reason": null,
+        "gap_recorded_date": null
+      }
+    },
+    "complete": true,
+    "kind": "class_ledger",
+    "missing_classes": [],
+    "schema_version": 1
+  },
+  "discovery": {
+    "discover": {
+      "devices": {
+        "LIFX-Candle-C-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Ceiling-13x26-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-DL-Intl-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-DL-Intl-2": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Luna-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Mini-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Mini-2": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Tube-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "rounds_attempted": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "discover_mdns": {
+      "devices": {
+        "LIFX-Candle-C-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Ceiling-13x26-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-DL-Intl-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-DL-Intl-2": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Luna-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Mini-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Mini-2": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "LIFX-Tube-1": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "rounds_attempted": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    }
+  },
+  "kind": "session_summary",
+  "requests": {
+    "LIFX-Candle-C-1": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 125882542,
+        "median_ns": 44071604.5,
+        "p95_ns": 70718375
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 126050667,
+        "median_ns": 44352583.5,
+        "p95_ns": 70898959
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-Ceiling-13x26-1": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 287616583,
+        "median_ns": 56411042.0,
+        "p95_ns": 134552000
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 287808000,
+        "median_ns": 56947333.5,
+        "p95_ns": 146568542
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-DL-Intl-1": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 126004833,
+        "median_ns": 39271708.0,
+        "p95_ns": 66669333
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 236034333,
+        "median_ns": 39732187.5,
+        "p95_ns": 67238333
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-DL-Intl-2": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 326801209,
+        "median_ns": 39504854.5,
+        "p95_ns": 71194584
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 326974334,
+        "median_ns": 39707875.0,
+        "p95_ns": 80335208
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-Luna-1": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 241823250,
+        "median_ns": 47683583.0,
+        "p95_ns": 94306250
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 241985250,
+        "median_ns": 47853333.0,
+        "p95_ns": 94467000
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-Mini-1": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 132937583,
+        "median_ns": 44505646.0,
+        "p95_ns": 90942709
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 133450666,
+        "median_ns": 44963187.5,
+        "p95_ns": 91108417
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-Mini-2": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 273186250,
+        "median_ns": 37891437.5,
+        "p95_ns": 74752708
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 273634250,
+        "median_ns": 38309500.0,
+        "p95_ns": 74954792
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    },
+    "LIFX-Tube-1": {
+      "ack_rtt": {
+        "count": 100,
+        "max_ns": 273991084,
+        "median_ns": 44650937.5,
+        "p95_ns": 62178750
+      },
+      "logical_latency": {
+        "count": 100,
+        "max_ns": 274426417,
+        "median_ns": 45022042.0,
+        "p95_ns": 62446958
+      },
+      "outcomes": {
+        "completed": 100
+      }
+    }
+  },
+  "schema_version": 1,
+  "staleness": {
+    "LIFX-Ceiling-13x26-1": {
+      "confirmed_expiry_poll": 72,
+      "disposition": "confirmed_expiry",
+      "first_absence_poll": 70,
+      "restoration_duration_s": 69.35774216699065,
+      "restored_available_ns": 162593033821416
+    }
+  }
+}

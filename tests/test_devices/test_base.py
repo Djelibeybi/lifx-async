@@ -14,6 +14,7 @@ from lifx.devices.base import (
     LIFX_GROUP_NAMESPACE,
     LIFX_LOCATION_NAMESPACE,
     CollectionInfo,
+    Connectivity,
     Device,
     DeviceInfo,
     DeviceVersion,
@@ -1247,3 +1248,132 @@ class TestAddressEntryPointGate:
 
         with pytest.raises(ValueError, match="Port must be between 1024 and 65535"):
             Device(serial=self.SERIAL, ip="192.168.1.10", port=1023)
+
+
+class TestConnectivityEnum:
+    """The public Connectivity enum and header-authoritative reporting.
+
+    A LIFX device's radio operates in either WiFi or Thread mode and cannot
+    change without a firmware crossgrade, so the value is invariant for a
+    given device. The frame address bit is the device's own report and takes
+    precedence over discovery metadata once any correlated response arrives.
+    """
+
+    def test_members_compare_equal_to_their_strings(self) -> None:
+        """Connectivity is str-based, so existing string comparisons hold."""
+        assert Connectivity.WIFI == "wifi"
+        assert Connectivity.THREAD == "thread"
+
+    def test_str_and_format_render_the_bare_value(self) -> None:
+        """Rendering never leaks the ``Connectivity.`` class prefix."""
+        assert str(Connectivity.THREAD) == "thread"
+        assert f"{Connectivity.THREAD}" == "thread"
+        assert Connectivity.THREAD.value == "thread"
+
+    def test_defaults_to_wifi(self) -> None:
+        """Direct construction reports WiFi until something says otherwise."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+
+        assert device.connectivity is Connectivity.WIFI
+
+    def test_set_connectivity_accepts_enum_members(self) -> None:
+        """The private discovery hand-off accepts enum members."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+
+        device._set_connectivity(Connectivity.THREAD)
+
+        assert device.connectivity is Connectivity.THREAD
+
+    def test_set_connectivity_still_accepts_plain_strings(self) -> None:
+        """Existing string call sites keep working unchanged."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+
+        device._set_connectivity("thread")
+
+        assert device.connectivity is Connectivity.THREAD
+
+    def test_observed_thread_flag_overrides_discovery_wifi(self) -> None:
+        """A Thread-flagged response promotes a device discovered as WiFi.
+
+        This closes the gap where a Thread device found over UDP broadcast,
+        from_ip(), or a won find_by_serial() race reported WiFi because no
+        mDNS TXT record was ever seen.
+        """
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+        device._set_connectivity("wifi")
+
+        device.connection._thread_connection = True
+
+        assert device.connectivity is Connectivity.THREAD
+
+    def test_observed_unflagged_response_overrides_discovery_thread(self) -> None:
+        """The header is authoritative in both directions."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+        device._set_connectivity("thread")
+
+        device.connection._thread_connection = False
+
+        assert device.connectivity is Connectivity.WIFI
+
+    def test_discovery_value_used_until_a_response_arrives(self) -> None:
+        """Before any correlated response the discovery report still stands."""
+        device = Device(serial="d073d5010203", ip="192.0.2.10")
+        device._set_connectivity("thread")
+
+        assert device.connection.thread_connection is None
+        assert device.connectivity is Connectivity.THREAD
+
+
+class TestAdoptedThreadObservation:
+    """Discovery observes the transport on a temporary device.
+
+    ``DiscoveredDevice.create_device()`` queries capabilities through a
+    temporary ``Device``, closes that connection, then builds the correctly
+    typed instance with a fresh one. The device's own transport report must
+    survive that hand-off, or every discovery path discards an authoritative
+    observation it already made and falls back to discovery metadata.
+    """
+
+    def test_adopts_observed_thread_transport(self) -> None:
+        """A Thread observation survives the typed-instance hand-off."""
+        donor = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient = Device(serial="d073d5010203", ip="192.0.2.10")
+        donor.connection._thread_connection = True
+
+        recipient.adopt_cached_metadata(donor)
+
+        assert recipient.connection.thread_connection is True
+        assert recipient.connectivity is Connectivity.THREAD
+
+    def test_adopts_observed_wifi_transport(self) -> None:
+        """A non-Thread observation survives the hand-off too."""
+        donor = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient = Device(serial="d073d5010203", ip="192.0.2.10")
+        donor._set_connectivity("thread")
+        donor.connection._thread_connection = False
+
+        recipient.adopt_cached_metadata(donor)
+
+        assert recipient.connection.thread_connection is False
+        assert recipient.connectivity is Connectivity.WIFI
+
+    def test_unobserved_donor_leaves_recipient_unobserved(self) -> None:
+        """A donor that never got a response adopts no observation."""
+        donor = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient = Device(serial="d073d5010203", ip="192.0.2.10")
+        donor._set_connectivity("thread")
+
+        recipient.adopt_cached_metadata(donor)
+
+        assert recipient.connection.thread_connection is None
+        assert recipient.connectivity is Connectivity.THREAD
+
+    def test_adoption_never_clobbers_an_existing_observation(self) -> None:
+        """An unobserved donor cannot erase the recipient's own observation."""
+        donor = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient = Device(serial="d073d5010203", ip="192.0.2.10")
+        recipient.connection._thread_connection = True
+
+        recipient.adopt_cached_metadata(donor)
+
+        assert recipient.connection.thread_connection is True

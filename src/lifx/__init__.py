@@ -23,6 +23,7 @@ from lifx.devices import (
     CeilingLight,
     CeilingLightState,
     CollectionInfo,
+    Connectivity,
     Device,
     DeviceCapabilities,
     DeviceInfo,
@@ -109,6 +110,7 @@ __all__ = [
     "Colors",
     # Device info
     "CollectionInfo",
+    "Connectivity",
     "DeviceCapabilities",
     "DeviceInfo",
     "DeviceVersion",

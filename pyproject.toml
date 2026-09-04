@@ -4,7 +4,9 @@ version = "7.1.1"
 description = "A modern, type-safe, async Python library for controlling LIFX lights"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "pyrefly>=0.60.0",
+]
 license = "UPL-1.0"
 license-files = ["LICENSE"]
 authors = [
@@ -91,8 +93,19 @@ ignore = []
 typeCheckingMode = "standard"
 pythonVersion = "3.10"
 # scripts/generate_theme_data.py is hand-written validation and path handling,
-# so it stays type-checked even though it lives outside the package.
-include = ["src", "scripts/generate_theme_data.py"]
+# so it stays type-checked even though it lives outside the package. The Phase
+# 14 measurement scripts (scripts/measurement_support.py,
+# scripts/thread_revalidation.py, scripts/measure_merged_discovery.py,
+# scripts/ipv6_thread_probe.py) are likewise hand-written, not generated,
+# so they stay type-checked too.
+include = [
+    "src",
+    "scripts/generate_theme_data.py",
+    "scripts/measurement_support.py",
+    "scripts/thread_revalidation.py",
+    "scripts/measure_merged_discovery.py",
+    "scripts/ipv6_thread_probe.py",
+]
 exclude = [
     "**/__pycache__",
     # The two mechanical emitters over remote YAML/JSON.
@@ -116,6 +129,8 @@ addopts = """\
     -m "not benchmark"
     --cov=lifx
     --cov=generate_theme_data
+    --cov=scripts.measurement_support
+    --cov=scripts.thread_revalidation
     --cov-branch
     --cov-report=xml
     --cov-report=term-missing:skip-covered

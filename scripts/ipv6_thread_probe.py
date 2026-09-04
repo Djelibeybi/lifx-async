@@ -73,8 +73,8 @@ from lifx.const import (
     MDNS_PORT,
 )
 from lifx.devices.light import Light
-from lifx.devices.matrix import MatrixEffect, MatrixLight
-from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxError, LifxNetworkError, LifxTimeoutError
 from lifx.network.discovery.mdns import discovery as mdns_discovery
 from lifx.network.discovery.mdns.discovery import (
@@ -98,7 +98,8 @@ from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.network.transport import _UdpProtocol
 from lifx.network.utils import IdleDeadline
 from lifx.products import get_product
-from lifx.protocol.protocol_types import FirmwareEffect
+from scripts.measurement_support import CapturedState, restore_and_verify_device_state
+from scripts.measurement_support import capture_device_state as _capture_device_state
 
 _ULA_NETWORK = ipaddress.ip_network("fc00::/7")
 
@@ -645,24 +646,6 @@ class TargetNotFound:
 
 
 @dataclass
-class CapturedState:
-    """A device's pre-run state, in the shape that device actually holds.
-
-    A `MatrixLight` holds a per-pixel image and possibly a running firmware
-    effect; `get_color()` returns a single triple and cannot represent either.
-    Capturing the wrong shape means the probe cannot put the device back.
-    """
-
-    kind: str
-    power: int
-    tiles: list[list[HSBK]] | None = None
-    effect: MatrixEffect | None = None
-    zones: list[HSBK] | None = None
-    multizone_effect: MultiZoneEffect | None = None
-    color: HSBK | None = None
-
-
-@dataclass
 class TargetOutcome:
     """Per-stage results for the named target.
 
@@ -716,85 +699,56 @@ def _select_target(
     return device
 
 
-async def _capture_device_state(device: Light) -> CapturedState:
-    """Read back everything the control and streaming stages will overwrite.
-
-    For a matrix device that means every tile's colours, the power level and
-    any running firmware effect. For a plain light it is the `get_color()`
-    triple, which carries the power level in the same round trip.
-
-    Args:
-        device: The connected target.
-
-    Returns:
-        The captured state, naming which shape it holds.
-    """
-    if isinstance(device, MatrixLight):
-        tiles = await device.get_all_tile_colors()
-        power = await device.get_power()
-        effect = await device.get_effect()
-        running = effect if effect.effect_type != FirmwareEffect.OFF else None
-        return CapturedState(kind="matrix", power=power, tiles=tiles, effect=running)
-
-    if isinstance(device, MultiZoneLight):
-        zones = await device.get_all_color_zones()
-        power = await device.get_power()
-        effect = await device.get_effect()
-        return CapturedState(
-            kind="multizone",
-            power=power,
-            zones=zones,
-            multizone_effect=effect,
-        )
-
-    color, power, _label = await device.get_color()
-    return CapturedState(kind="light", power=power, color=color)
-
-
 async def _restore_device_state(device: Light, state: CapturedState) -> bool:
-    """Put a device back exactly as it was found. Never raises.
+    """Put a device back exactly as it was found, and PROVE it. Never raises.
 
-    A restore failure is reported loudly and returned as False rather than
-    propagated: the caller is already in a `finally` block, and swallowing the
-    report would hide a device left mid-run from the operator.
+    Delegates command execution, fresh recapture, and exact comparison to
+    `scripts.measurement_support.restore_and_verify_device_state()` (D-14/
+    D-16): commands completing is not enough on its own, a fresh capture must
+    also compare exactly equal to what was captured before the mutation. Any
+    raw exception text or device identity printed here is this adapter's own
+    private diagnostic -- the shared helper itself never prints or persists
+    it (D-17/T-14-08).
+
+    A restore failure -- whether the commands themselves failed, the
+    intermediate captured power made mutation unsafe, or the readback did not
+    match -- is reported loudly and returned as False rather than propagated:
+    the caller is already in a `finally` block, and swallowing the report
+    would hide a device left mid-run from the operator.
 
     Args:
         device: The connected target.
         state: What `_capture_device_state()` recorded before the mutation.
 
     Returns:
-        True when the device was fully restored, False otherwise.
+        True only when every restore command completed AND a fresh capture
+        compared exactly equal to `state`.
     """
-    try:
-        if isinstance(device, MatrixLight) and state.tiles is not None:
-            for index, colors in enumerate(state.tiles):
-                await device.set_matrix_colors(tile_index=index, colors=colors)
-            await device.set_power(state.power)
-            if state.effect is not None:
-                await device.set_effect(
-                    effect_type=state.effect.effect_type,
-                    speed=state.effect.speed / 1000,
-                    duration=state.effect.duration,
-                    palette=state.effect.palette,
-                    sky_type=state.effect.sky_type,
-                    cloud_saturation_min=state.effect.cloud_saturation_min,
-                    cloud_saturation_max=state.effect.cloud_saturation_max,
-                )
-        elif isinstance(device, MultiZoneLight) and state.zones is not None:
-            await device.set_all_color_zones(state.zones)
-            if state.multizone_effect is not None:
-                await device.set_effect(state.multizone_effect)
-            await device.set_power(state.power)
-        else:
-            if state.color is not None:
-                await device.set_color(state.color)
-            await device.set_power(state.power)
-    except Exception as exc:
+
+    def _report(exc: BaseException) -> None:
         print(f"\n  WARNING: could not restore {device.serial} at {device.ip}")
         print(f"           {type(exc).__name__}: {exc}")
         print("           The device has been left mid-run. Put it right by hand.")
-        return False
-    return True
+
+    result = await restore_and_verify_device_state(
+        device, state, on_command_exception=_report
+    )
+
+    if result.detail == "power_out_of_range":
+        print(
+            f"\n  WARNING: {device.serial} at {device.ip} was captured at an "
+            "intermediate (mid-fade) power level; restoration was refused "
+            "rather than attempted, and the device has been left as-is."
+        )
+    elif result.restored and not result.restoration_verified:
+        print(
+            f"\n  WARNING: restore commands completed for {device.serial} at "
+            f"{device.ip}, but a fresh readback did not match the captured "
+            "state."
+        )
+        print("           The device has been left mid-run. Put it right by hand.")
+
+    return result.restored and result.restoration_verified
 
 
 def _stage_result(outcome: bool | BaseException | None) -> str:
@@ -1303,6 +1257,10 @@ async def main_async(args: argparse.Namespace) -> int:
                     await stage_target(target, outcome, stream=args.stream)
     finally:
         if args.uat_output is not None:
+            # main() already enforces --uat-output requires --serial before
+            # main_async() is ever reached; narrow the type for that
+            # invariant rather than re-deriving a fallback value here.
+            assert args.serial is not None, "--uat-output requires --serial"
             _write_uat_record(
                 _build_uat_record(
                     args.device_alias,

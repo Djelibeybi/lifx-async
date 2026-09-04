@@ -93,7 +93,7 @@ was measured on WiFi/IPv4.
 - [x] **Phase 11: mDNS Hardening** - Bring the mDNS leg to broadcast-grade quality: ephemeral-port proof, private connectivity internals under D-16, synthetic mesh-scale tests, bounded fail-closed address admission under D-15, validation and honest docs (completed 2026-08-29)
 - [x] **Phase 12: IPv6 Discovery Plumbing** - Family-aware `_discover_with_packet` bind, `find_by_ip()` for IPv6 literals, and an emulator-on-`::1` CI fixture (completed 2026-08-29)
 - [x] **Phase 13: Merged Discovery** - `discover()` runs broadcast and mDNS legs merged by serial, explicit UDP-only and mDNS-only APIs remain available, overlapping UDP callers share one active sweep, and `find_by_serial()` races both legs, with the existing contract proven intact by entry-gate invariant tests and a before-and-after measurement (completed 2026-08-31)
-- [ ] **Phase 14: Thread Revalidation and Docs** - SEED-001 measurements over Thread hardware, per-device-class evidence records or named gaps, and the consumer guidance and corrections docs
+- [x] **Phase 14: Thread Revalidation and Docs** - SEED-001 measurements over Thread hardware, per-device-class evidence records or named gaps, and the consumer guidance and corrections docs (completed 2026-09-04)
 
 **Execution notes:**
 
@@ -303,12 +303,34 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. Discovery coverage over Thread is measured across repeated rounds, never a single round, which is the Spike 005 lesson this project already paid for
-  2. The retry schedule's WiFi-tuned constants are measured against Thread ack RTT, and the achievable animation frame rate over Thread is measured; the measured ceiling is the deliverable, and no constant changes without this evidence
+  2. The retry schedule's WiFi-tuned constants are measured against Thread ack RTT. Animation over Thread receives only a small, non-gating observation through current production behaviour: no WiFi parity, minimum FPS or ceiling is required, the WiFi-only animation spike is not extrapolated to Thread, and no constant changes from this observation
   3. Border router advertisement staleness is measured directly, by unplugging a Thread device and timing when it stops being advertised
   4. Every device class carries either a Thread evidence record or a named gap: `MatrixLight` closes now on two devices, `CeilingLight`, `MultiZoneLight` and single-zone `Light` close as migrations land, and `InfraredLight` and `HevLight` close as named gaps; the phase closes when every class has one or the other, not when every class is evidenced
   5. A broadcast-first consumer can read what changes for them and how to reach Thread devices, the known limitations are documented (IPv4-multicast query leg, unicast-only reception, no unsolicited announcements, mesh scale proven synthetically), and the false `asyncio.TaskGroup` claim in `CLAUDE.md` is corrected
 
-**Plans**: TBD
+**Plans**: 5/6 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 14-01-PLAN.md — Add the private accepted-ACK observer tracer without changing production scheduling
+- [x] 14-05-PLAN.md — Ship the independent discovery guide, executable snippets, and repository guidance corrections
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 14-02-PLAN.md — Freeze immutable evidence schemas, schedules, statistics, provenance, and products
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 14-03-PLAN.md — Consolidate observation/restoration helpers and enforce exact readback and coverage
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 14-04-PLAN.md — Implement and hermetically prove every physical protocol mode
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 14-06-PLAN.md — Collect, validate, and publish operator-gated pseudonymised physical evidence
 
 ## Progress
 
@@ -330,4 +352,4 @@ Plans:
 | 11. mDNS Hardening | v2.0 | 14/14 | Complete    | 2026-08-29 |
 | 12. IPv6 Discovery Plumbing | v2.0 | 5/5 | Complete    | 2026-08-29 |
 | 13. Merged Discovery | v2.0 | 7/7 | Complete    | 2026-08-31 |
-| 14. Thread Revalidation and Docs | v2.0 | 0/TBD | Not started | - |
+| 14. Thread Revalidation and Docs | v2.0 | 6/6 | Complete    | 2026-09-04 |

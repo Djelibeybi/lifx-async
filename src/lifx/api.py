@@ -1286,10 +1286,13 @@ async def discover_mdns(
     does not authenticate or correlate responders with outstanding queries.
     Mesh scale is proven synthetically.
 
-    Each yielded device reports ``connectivity`` as ``"thread"`` only after an
-    exact positive Thread report. Every other construction or discovery
-    outcome is ``"wifi"``. This descriptive value does not authenticate the
-    device or change its routing, retry, or tuning behaviour.
+    Each yielded device reports ``connectivity`` from its mDNS TXT record:
+    ``Connectivity.THREAD`` only after an exact positive Thread report, and
+    ``Connectivity.WIFI`` for every other construction or discovery outcome.
+    Once the device answers any request, its own frame address report
+    supersedes this in both directions. This descriptive value does not
+    authenticate the device or change its routing, retry, or tuning
+    behaviour.
 
     Args:
         timeout: Discovery timeout in seconds (default 15.0)

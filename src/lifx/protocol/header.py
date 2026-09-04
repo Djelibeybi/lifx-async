@@ -31,6 +31,10 @@ class LifxHeader:
         res_required: Request response from device
         sequence: Sequence number for matching requests/responses
         pkt_type: Packet type identifier
+        thread_connection: True if the device reported that the message was sent
+                over a Thread connection. Inbound-only: the device sets this bit
+                on its replies, so ``create()`` does not expose it and a client
+                never asserts it.
     """
 
     HEADER_SIZE: ClassVar[int] = 36
@@ -47,6 +51,7 @@ class LifxHeader:
     res_required: bool
     sequence: int
     pkt_type: int
+    thread_connection: bool = False
 
     def __post_init__(self) -> None:
         """Validate header fields and auto-pad serial number if needed."""
@@ -135,10 +140,18 @@ class LifxHeader:
         # Frame Address (16 bytes)
         # Byte 0-7: target (uint64)
         # Byte 8-13: reserved (6 bytes)
-        # Byte 14: res_required (bit 0) + ack_required (bit 1) + reserved (6 bits)
+        # Byte 14: res_required (bit 0) + ack_required (bit 1) + reserved (bit 2)
+        #          + thread_connection (bit 3) + reserved (bits 4-7)
         # Byte 15: sequence (uint8)
 
-        flags = (int(self.res_required) & 0b1) | ((int(self.ack_required) & 0b1) << 1)
+        # Reserved bits 2 and 4-7 are always emitted as zero. thread_connection
+        # is re-emitted so an unpacked header round-trips, but create() never
+        # sets it: the flag is a device-side report, not a client assertion.
+        flags = (
+            (int(self.res_required) & 0b1)
+            | ((int(self.ack_required) & 0b1) << 1)
+            | ((int(self.thread_connection) & 0b1) << 3)
+        )
 
         frame_addr = struct.pack(
             "<8s6sBB",
@@ -193,6 +206,7 @@ class LifxHeader:
 
         res_required = bool(flags & 0b1)
         ack_required = bool((flags >> 1) & 0b1)
+        thread_connection = bool((flags >> 3) & 0b1)
 
         # Unpack Protocol Header (12 bytes)
         _reserved1, pkt_type, _reserved2 = struct.unpack("<QHH", data[24:36])
@@ -207,6 +221,7 @@ class LifxHeader:
             res_required=res_required,
             sequence=sequence,
             pkt_type=pkt_type,
+            thread_connection=thread_connection,
         )
 
     def __repr__(self) -> str:
@@ -216,5 +231,6 @@ class LifxHeader:
             f"LifxHeader(type={self.pkt_type}, size={self.size}, "
             f"source={self.source:#x}, target={target_serial_str}, "
             f"seq={self.sequence}, tagged={self.tagged}, "
-            f"ack={self.ack_required}, res={self.res_required})"
+            f"ack={self.ack_required}, res={self.res_required}, "
+            f"thread={self.thread_connection})"
         )

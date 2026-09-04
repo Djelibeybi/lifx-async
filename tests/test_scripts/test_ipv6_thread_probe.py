@@ -1722,7 +1722,12 @@ class TestRestoreDeviceState:
     """_restore_device_state() puts a device back exactly as it was found."""
 
     async def test_restores_each_tile_then_power_then_the_effect(self) -> None:
-        """Order matters: paint, then power, then re-arm the firmware effect."""
+        """Order matters: paint, then power, then re-arm the firmware effect.
+
+        Restoration is now evidence-backed (D-14/D-16): the four write
+        commands are followed by a fresh readback (`get_all_tile_colors`,
+        `get_power`, `get_effect`) that the comparison proves matches exactly.
+        """
         device = FakeMatrix(power=65535, effect_type=FirmwareEffect.MORPH)
         state = await probe._capture_device_state(device)
         device.calls.clear()
@@ -1736,6 +1741,9 @@ class TestRestoreDeviceState:
             "set_matrix_colors",
             "set_power",
             "set_effect",
+            "get_all_tile_colors",
+            "get_power",
+            "get_effect",
         ]
         writes = [
             payload for name, payload in device.calls if name == "set_matrix_colors"
@@ -1766,7 +1774,7 @@ class TestRestoreDeviceState:
         assert "set_effect" not in [name for name, _ in device.calls]
 
     async def test_a_plain_light_is_restored_by_colour_and_power(self) -> None:
-        """The light path writes the captured triple back."""
+        """The light path writes the captured triple back, then reads it back."""
         device = FakeLight()
         state = await probe._capture_device_state(device)
         device.calls.clear()
@@ -1774,7 +1782,11 @@ class TestRestoreDeviceState:
         restored = await probe._restore_device_state(device, state)
 
         assert restored is True
-        assert [name for name, _ in device.calls] == ["set_color", "set_power"]
+        assert [name for name, _ in device.calls] == [
+            "set_color",
+            "set_power",
+            "get_color",
+        ]
         assert device.calls[0][1] == HSBK(200.0, 0.4, 0.6, 3000)
         assert device.calls[1][1] == 65535
 
@@ -1802,8 +1814,15 @@ class TestRestoreDeviceState:
         assert device._power_level == 65535
 
     async def test_restores_multizone_without_rearming_an_absent_effect(self) -> None:
-        """A capture without a firmware effect restores zones and power only."""
+        """A capture without a firmware effect restores zones and power only.
+
+        `device.saved_effect` is set to `None` (a shape `_capture_device_state()`
+        never produces in practice, see the module docstring) so the readback
+        taken after restoring can still compare exactly equal to the
+        synthetic captured state below.
+        """
         device = FakeMultiZone()
+        device.saved_effect = None  # type: ignore[assignment]
         state = probe.CapturedState(
             kind="multizone",
             power=65535,
@@ -1814,24 +1833,36 @@ class TestRestoreDeviceState:
         restored = await probe._restore_device_state(device, state)
 
         assert restored is True
-        assert "set_effect" not in [name for name, _ in device.calls]
-        assert [name for name, _ in device.calls][-1] == "set_power"
+        names = [name for name, _ in device.calls]
+        assert "set_effect" not in names
+        # The last write command is set_power; the readback triad follows it.
+        assert names[-4:] == [
+            "set_power",
+            "get_all_color_zones",
+            "get_power",
+            "get_effect",
+        ]
 
     async def test_power_alone_is_restored_when_no_colour_was_captured(self) -> None:
-        """The defensive arm: a colourless capture still restores power.
+        """The defensive arm: a colourless capture still issues a power write.
 
-        `_capture_device_state()` never produces this today, so the guard is
-        purely defensive. Covering it here keeps the helper free of partial
-        branches, which is the standard the rest of this project holds
-        (auto-memory project_codecov_branch_patch).
+        `_capture_device_state()` never produces this today, so the `color is
+        None` guard inside the restore-command path is purely defensive.
+        Covering it here keeps the helper free of partial branches, which is
+        the standard the rest of this project holds (auto-memory
+        project_codecov_branch_patch). `FakeLight.get_color()` always reports
+        a fixed 65535, so a capture at power=0 cannot verify -- proving the
+        readback comparison actually looks at power, not just whether a
+        command was sent.
         """
         device = FakeLight()
         state = probe.CapturedState(kind="light", power=0, color=None)
 
         restored = await probe._restore_device_state(device, state)
 
-        assert restored is True
-        assert [name for name, _ in device.calls] == ["set_power"]
+        assert restored is False
+        assert [name for name, _ in device.calls] == ["set_power", "get_color"]
+        assert device.calls[0][1] == 0
 
     async def test_a_failing_restore_is_reported_and_returns_false(
         self, capsys: pytest.CaptureFixture[str]
@@ -2068,7 +2099,10 @@ class TestStageTarget:
         assert ("set_color_zones" in called) != extended
         assert device._zones == ZONE_COLOURS
         assert device.saved_effect == original_effect
-        assert device.calls[-1] == ("set_power", 65535)
+        assert ("set_power", 65535) in device.calls
+        # The write commands are followed by the fresh readback triad that
+        # proves the restore (D-14/D-16).
+        assert called[-3:] == ["get_all_color_zones", "get_power", "get_effect"]
 
     async def test_restoration_runs_after_a_keyboard_interrupt(self) -> None:
         """An interrupt must not leave a production light mid-run.

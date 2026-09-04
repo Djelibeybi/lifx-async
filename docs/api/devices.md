@@ -344,11 +344,23 @@ The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specif
 
 ### Connectivity
 
-The `connectivity` property is always one of two lowercase strings. It is
-`"thread"` only when mDNS discovery receives an exact positive Thread report,
-and `"wifi"` for every other outcome, including devices constructed directly
-or discovered without that report. The value is descriptive metadata; it does
-not change the device's address, routing, retry, or tuning behaviour.
+The `connectivity` property returns a `Connectivity` enum member, either
+`Connectivity.WIFI` or `Connectivity.THREAD`. The enum derives from `str`, so
+`device.connectivity == "thread"` still holds.
+
+A LIFX device's radio operates in either WiFi or Thread mode, and changing
+between them requires a firmware crossgrade. The value is therefore invariant
+for a given device rather than a per-request transport choice.
+
+Once the device answers any request, its own report in the frame address
+(`thread_connection`, byte 22 bit 3) is authoritative and determines the value
+in both directions. Until then the value comes from the mDNS TXT record,
+defaulting to `Connectivity.WIFI`. This means a Thread device found over UDP
+broadcast, `from_ip()`, or a won `find_by_serial()` race reports correctly
+once it has answered, even though it carries no mDNS TXT record.
+
+The value is descriptive metadata; it does not change the device's address,
+routing, retry, or tuning behaviour.
 
 ### MAC Address
 
