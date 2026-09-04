@@ -2468,6 +2468,17 @@ def _run_power_script(
         )
     except subprocess.TimeoutExpired as error:
         raise PowerScriptError(stage=stage, path=str(path), reason="timeout") from error
+    except OSError as error:
+        # The operator hands us an arbitrary path and the OS decides whether
+        # it is runnable. Windows raises WinError 193 for a file it cannot
+        # execute (a shebang script, say -- Windows has no shebang support),
+        # and os.access(X_OK) cannot predict that because it reports every
+        # existing file as executable there. An unrunnable script must be a
+        # hard stop reported like every other one, not a raw traceback out of
+        # a verb whose contract is one JSON object.
+        raise PowerScriptError(
+            stage=stage, path=str(path), reason="not_executable"
+        ) from error
     if completed.returncode != 0:
         raise PowerScriptError(
             stage=stage,
@@ -2656,10 +2667,23 @@ def _run_git(*args: str) -> subprocess.CompletedProcess[bytes]:
     )
 
 
+def _posix_evidence_dir(evidence_dir: str) -> str:
+    """Normalise a caller-supplied directory to Git's own path vocabulary.
+
+    Git reports index paths with forward slashes on every platform, including
+    Windows. An operator there naturally supplies a native path with
+    backslashes, and `str(Path(...))` produces them too, so comparing the two
+    directly matches nothing and every one of the nine evidence paths is
+    reported missing. That is not a staging error, and reporting it as one
+    would send someone hunting a file that is correctly staged.
+    """
+    return evidence_dir.replace("\\", "/").rstrip("/")
+
+
 def _staged_paths_under(evidence_dir: str) -> list[str]:
     """Return every staged (index) path under ``evidence_dir``, as recorded by Git."""
     completed = _run_git("diff", "--cached", "--name-only")
-    prefix = evidence_dir.rstrip("/") + "/"
+    prefix = _posix_evidence_dir(evidence_dir) + "/"
     return [
         line
         for line in completed.stdout.decode("utf-8").splitlines()
@@ -2683,7 +2707,9 @@ def validate_staged_evidence(evidence_dir: str) -> list[StagedValidationFailure]
     Schema, roster-completeness and closure-ledger failures are reported by
     filename and a bounded category only -- never by matched content.
     """
-    expected = {f"{evidence_dir.rstrip('/')}/{name}" for name in _EVIDENCE_FILENAMES}
+    expected = {
+        f"{_posix_evidence_dir(evidence_dir)}/{name}" for name in _EVIDENCE_FILENAMES
+    }
     staged = set(_staged_paths_under(evidence_dir))
 
     failures = [

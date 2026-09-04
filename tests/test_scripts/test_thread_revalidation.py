@@ -13,6 +13,7 @@ import copy
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -63,6 +64,7 @@ from scripts.thread_revalidation import (
     PowerScriptError,
     RosterDriftError,
     _load_target_alias_map,
+    _posix_evidence_dir,
     _run_power_script,
     _validate_request_event,
     append_animation_event,
@@ -4578,9 +4580,39 @@ class TestCliHardwareModeJsonOutput:
 
 
 def _write_executable_script(path: Path, body: str) -> Path:
+    """Write a script the host OS can actually execute as argv[0].
+
+    Windows has no shebang support, so a `#!/bin/sh` file handed to
+    subprocess raises WinError 193 rather than running. Writing a `.cmd`
+    there keeps these tests exercising the real `_run_power_script` path on
+    both platforms instead of skipping the one where an operator is most
+    likely to supply something the OS refuses to run.
+    """
+    if sys.platform == "win32":
+        cmd = path.with_suffix(".cmd")
+        cmd.write_text(f"@echo off\n{_as_cmd(body)}\n", encoding="utf-8")
+        return cmd
     path.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
     path.chmod(0o755)
     return path
+
+
+def _as_cmd(body: str) -> str:
+    """Translate the small shell vocabulary these tests use into cmd.exe.
+
+    Pattern-matched rather than looked up in a table, so a test that adds a
+    new `exit N` or `sleep N` cannot silently fall through untranslated and
+    pass on Windows for the wrong reason. Anything outside the vocabulary
+    raises here instead.
+    """
+    if match := re.fullmatch(r"exit (\d+)", body):
+        return f"exit /b {match.group(1)}"
+    if match := re.fullmatch(r"sleep (\d+)", body):
+        # ping's count is one more than the seconds it waits.
+        return f"ping -n {int(match.group(1)) + 1} 127.0.0.1 >nul"
+    if match := re.fullmatch(r"echo (.+)", body):
+        return f"echo {match.group(1)}"
+    raise AssertionError(f"no cmd.exe translation for shell body: {body!r}")
 
 
 class _RestorationDiscoverStub:
@@ -4619,12 +4651,21 @@ class TestRunPowerScript:
         assert exc_info.value.stage == "off"
 
     def test_rejects_a_non_executable_script(self, tmp_path: Path) -> None:
+        """Unrunnable is a PowerScriptError on both platforms, by two routes.
+
+        POSIX catches it up front: os.access(X_OK) is false on a file that
+        was never chmod'd, so nothing is ever spawned. Windows cannot -- it
+        reports every existing file as executable -- so the refusal comes
+        from the OS instead, as WinError 193 on a shebang script it has no
+        way to run. Both must surface as the same hard stop rather than a
+        raw OSError escaping a verb that promises one JSON object.
+        """
         script = tmp_path / "script.sh"
         script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         # Deliberately not chmod'd executable.
         with pytest.raises(PowerScriptError) as exc_info:
             _run_power_script(script, stage="on")
-        assert exc_info.value.reason == "missing_or_not_executable"
+        assert exc_info.value.reason in {"missing_or_not_executable", "not_executable"}
 
     def test_rejects_a_nonzero_exit(self, tmp_path: Path) -> None:
         script = _write_executable_script(tmp_path / "script.sh", "exit 3")
@@ -5656,6 +5697,34 @@ class TestCliAllFlag:
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+class TestPosixEvidenceDir:
+    """Git speaks forward slashes everywhere; the caller may not.
+
+    On Windows an operator supplies a native path and `str(Path(...))`
+    produces backslashes, but `git diff --cached --name-only` reports index
+    paths with forward slashes on every platform. Comparing the two directly
+    matched nothing, so all nine correctly-staged evidence files were
+    reported `missing_evidence_path`. Normalising the caller's separators is
+    what makes the comparison meaningful.
+    """
+
+    def test_backslash_paths_normalise_to_git_s_vocabulary(self) -> None:
+        assert (
+            _posix_evidence_dir(r".planning\phases\14-thread\14-EVIDENCE")
+            == ".planning/phases/14-thread/14-EVIDENCE"
+        )
+
+    def test_forward_slash_paths_are_unchanged(self) -> None:
+        assert (
+            _posix_evidence_dir(".planning/phases/14-thread/14-EVIDENCE")
+            == ".planning/phases/14-thread/14-EVIDENCE"
+        )
+
+    def test_a_trailing_separator_of_either_kind_is_stripped(self) -> None:
+        assert _posix_evidence_dir("a/b/") == "a/b"
+        assert _posix_evidence_dir("a\\b\\") == "a/b"
+
+
 class TestValidateStagedEvidence:
     """D-19/T-14-11: the staged INDEX is authoritative, never the working tree."""
 
