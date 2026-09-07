@@ -1,0 +1,22 @@
+{
+  "node": "tests/test_network/test_discovery_coordinator.py::test_non_last_detach_preserves_producer_and_last_detach_reaps_it",
+  "child_argv": [
+    "<venv>/bin/python3",
+    "-c",
+    "\nimport faulthandler\nimport sys\n\nnode = sys.argv[1]\ntimeout = float(sys.argv[2])\n# Armed before pytest is imported: the recorded hang happens after pytest\n# reports its result, inside interpreter shutdown, where pytest-timeout's\n# thread-based watchdog can no longer fire.\nfaulthandler.dump_traceback_later(timeout, exit=True)\n\nimport pytest\n\n# Deliberately not a bare `pytest.main(...)` call. pytest.main() returns its\n# exit status rather than raising; discarding that return value would leave\n# this child exiting 0 whatever pytest reported, turning every invocation\n# into an uninformative clean exit. Propagating it through SystemExit makes\n# the child's exit code the evidence signal the parent records.\nraise SystemExit(pytest.main([node, \"--no-cov\", \"-p\", \"no:cacheprovider\"]))\n",
+    "tests/test_network/test_discovery_coordinator.py::test_non_last_detach_preserves_producer_and_last_detach_reaps_it",
+    "60.0"
+  ],
+  "repo_root": "<worktree>",
+  "head_sha": "fdcbbc449aa0157d371138f3831571cd16713247",
+  "test_file_dirty": true,
+  "watchdog_seconds": 60.0,
+  "backstop_seconds": 90.0,
+  "bound_fired": "child_watchdog",
+  "exit_code": 1,
+  "elapsed_seconds": 60.05346504203044,
+  "faulthandler_banner": true,
+  "stderr_tail": "Timeout (0:01:00)!\nThread 0x000000016fbeb000 [asyncio_0] (most recent call first):\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 369 in wait\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 670 in wait\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/concurrent/futures/thread.py\", line 73 in run\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/concurrent/futures/thread.py\", line 86 in run\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/concurrent/futures/thread.py\", line 119 in _worker\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 1024 in run\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 1082 in _bootstrap_inner\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 1044 in _bootstrap\n\nThread 0x00000001f691a180 (most recent call first):\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 1133 in join\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/concurrent/futures/thread.py\", line 31 in _python_exit\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 1548 in <lambda>\n  File \"<home>/.local/share/uv/python/cpython-3.14.7-macos-aarch64-none/lib/python3.14/threading.py\", line 1577 in _shutdown\n",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "python_version": "3.14.7"
+}

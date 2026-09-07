@@ -10,9 +10,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import check_patch_coverage as checker
 import pytest
 
-from scripts import check_patch_coverage as checker
+pytestmark = pytest.mark.tooling
 
 
 def _git(repo: Path, *args: str) -> str:

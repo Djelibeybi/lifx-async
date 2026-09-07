@@ -27,8 +27,8 @@ structures from a YAML specification. Published on PyPI as `lifx-async` (`pip in
   retain the identity assertion as operator-controlled evidence outside the repository.
 - Raw probe output may exist transiently in the local terminal or an ignored temporary file, but it
   must be sanitised before being copied into any tracked file. Tools such as
-  `scripts/ipv6_thread_probe.py` may emit live identifiers, so treat their output as private by
-  default.
+  `.planning/scripts/ipv6_thread_probe.py` may emit live identifiers, so treat their output as
+  private by default.
 - Tests and documentation must use clearly synthetic identifiers and non-live example addresses.
   Preserve stable aliases across related artefacts so evidence remains correlatable without
   revealing the underlying device or network.
@@ -36,6 +36,17 @@ structures from a YAML specification. Published on PyPI as `lifx-async` (`pip in
   IP addresses, hostnames and other PII. If a raw identifier reaches a local commit, amend or rewrite
   it before any push; a later redaction commit is insufficient because the identifier remains in
   history.
+
+## Measured Tree
+
+- Coverage measures the shipped library, `src/lifx`, plus any code a CI job executes to produce or
+  validate a shipped artefact. Today that second category is exactly one file,
+  `scripts/generate_theme_data.py`.
+- Operator and maintainer tooling is never measured, even when a CI job runs it. Everything under
+  `.planning/scripts/` and the maintainer tooling under `.github/` sits outside the measured tree
+  regardless of its own test coverage.
+- The rule yields exactly two coverage targets, `--cov=lifx` and `--cov=generate_theme_data`.
+  A change to that list is a change to the rule.
 
 ## Git Commits
 
@@ -98,6 +109,43 @@ assertion-shaped no-response result. It is applied during collection only on
 Windows; elsewhere the test keeps the global one immediate network retry and
 ordinary assertion failures still fail immediately.
 
+Two opt-in categories, `tooling` (the relocated scripts under `.planning/scripts/tests/`) and
+`benchmark` (performance baselines), are deselected from the default run and re-admitted by their
+own flag:
+
+```bash
+# Run the whole suite plus the tooling tests
+uv run --frozen pytest --tooling
+
+# Run the tooling tests alone
+uv run --frozen pytest .planning/scripts/tests
+
+# Run the whole suite plus the benchmark tests
+uv run --frozen pytest --benchmark
+```
+
+`.planning/scripts/tests` needs no flag, because the deselection hook lives in the library suite's
+`conftest.py` and is not loaded for that path. No CI job runs any of these three forms; all are run
+by hand. A default run still imports the tooling test modules before deselecting them, because
+`pytest_collection_modifyitems` runs after collection has already imported them: a tooling test
+that fails at import breaks the default run, and the deselected count reported in the summary is
+what makes the exclusion visible rather than silent.
+
+Two `sys.path` inserts reach wider than their location suggests:
+
+- `.planning/scripts/tests/conftest.py` is reached through `testpaths`, so it is an
+  initial-argument conftest that pytest loads on every run using `testpaths`, including the
+  default one. Its three inserts, `.planning/scripts`, `.github` and the repository root, are
+  therefore session-wide: `measurement_support`, `check_patch_coverage` and `tests.*` become
+  importable for the whole run, not only while the tooling tests execute.
+- the root `tests/conftest.py` inserts `.planning/scripts` as well, deliberately and for a
+  narrower reason: `tests/test_discovery_observation.py` and
+  `tests/test_network/test_connection_retry.py` exercise the request and discovery observation
+  seams through `measurement_support`, and a targeted single-file invocation such as
+  `uv run --frozen pytest tests/test_network/test_connection_retry.py` suppresses `testpaths` and
+  never loads the tooling conftest. This entry can be removed once the last of those two
+  consumers no longer needs it.
+
 ### Code Quality
 
 ```bash
@@ -113,21 +161,22 @@ uv run pyright
 
 ### Running the measurement scripts
 
-`scripts/measurement_support.py` owns the shared discovery, request-observation, capture
-and restore primitives. The three scripts that import it must be run as modules, not as
-files:
+`.planning/scripts/measurement_support.py` owns the shared discovery, request-observation,
+capture and restore primitives. The scripts that import it are run directly:
 
 ```bash
-uv run --frozen python -m scripts.thread_revalidation <subcommand>
-uv run --frozen python -m scripts.ipv6_thread_probe
-uv run --frozen python -m scripts.measure_merged_discovery
+uv run .planning/scripts/thread_revalidation.py <subcommand>
+uv run .planning/scripts/ipv6_thread_probe.py
+uv run .planning/scripts/measure_merged_discovery.py
 ```
 
-`from scripts.measurement_support import ...` resolves only when the repository root is on
-`sys.path`. `python -m` puts it there; running the file directly puts `scripts/` there
-instead and fails with `ModuleNotFoundError: No module named 'scripts'`. Adding
-`scripts/__init__.py` does not change this. Every other script in `scripts/` has no such
-import and still runs as `uv run <script-name>.py`.
+Each is a standalone PEP 723 script. Python places a directly executed script's own directory on
+`sys.path[0]`, so the flat sibling import (`from measurement_support import ...`) resolves with
+nothing added and no `sys.path` bootstrap is required. Each script's `[tool.uv.sources]` block
+binds `lifx-async` to the working tree as an editable install, so a run exercises the checkout
+rather than the published package. `.planning/**` is absent from `ci.yml`'s `pull_request.paths`
+filter, so a change confined to these scripts does not trigger CI, a deliberate consequence of
+where they now live.
 
 ### Protocol Update
 
@@ -310,7 +359,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 
 ### Key Gotchas
 
-- **Serial vs MAC**: Serial number usually matches MAC address. The one exception is firmware with `version_major == 3 and version_minor >= 70`, whose MAC is the serial with the final octet incremented (wrapping at 256). Both components are compared as integers — minor `9` is *below* minor `70`, so treating the version as a decimal misclassifies 3.9. Earlier 3.x builds (e.g. 3.50) match their serial. MAC calculation logic is in `devices/base.py`; `scripts/serial_mac_audit.py` audits the rule against real hardware via the ARP table.
+- **Serial vs MAC**: Serial number usually matches MAC address. The one exception is firmware with `version_major == 3 and version_minor >= 70`, whose MAC is the serial with the final octet incremented (wrapping at 256). Both components are compared as integers: minor `9` is *below* minor `70`, so treating the version as a decimal misclassifies 3.9. Earlier 3.x builds (e.g. 3.50) match their serial. MAC calculation logic is in `devices/base.py`; `.planning/scripts/serial_mac_audit.py` audits the rule against real hardware via the ARP table.
 - **HSBK dual formats**: User-facing `HSBK` uses float (hue 0-360, sat/bright 0.0-1.0, kelvin 1500-9000). Protocol/animation layer uses raw uint16 (0-65535 for H/S/B). Don't mix them.
 - **`user_x`/`user_y` are not pixels**: A chain reports tile positions in tile-position units where 1.0 is always **8 pixels** — the width of the original Tile — regardless of the reporting tile's own size. Photons proves the constant twice: `rearrange.py` lays parts out with `user_x += part.width / 8`, and the arranger converts a dragged pixel back with `new_user_x / 8`. Scaling by the tile's own width instead is wrong for any mixed-geometry chain. `user_y` also grows **upwards** while canvas rows grow downwards, so it must be negated. One helper owns both rules — `lifx/geometry.py` (`TILE_POSITION_UNIT_PIXELS`, `tile_position_to_pixels()`, `tile_origin_pixels()`) — used by `MatrixLight.apply_theme()`, `MatrixGenerator.from_tiles()` and `FrameBuffer._for_multi_tile()`. It rounds where photons truncates, deliberately: the value only picks a canvas pixel and never goes on the wire. Halves round away from zero, not to even, so two tiles a pixel apart never collapse onto one origin. Tile *sizes* are equally not-8x8 — Candle is 5x6, Ceiling reports 16x8 — so `Canvas.add_points_for_tile()` and `Canvas.points_for_tile()` require explicit width/height and have no defaults. `Canvas` is an internal rendering primitive: it is importable but deliberately absent from `lifx.theme.__all__` and the published API docs, so its signatures can change without a major version.
 - **`get_color()` returns a triple**: `(color, power, label)` — most efficient single-request way to get color + power state

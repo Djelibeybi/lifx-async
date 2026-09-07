@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["lifx-async", "lifx-emulator-core"]
+#
+# [tool.uv.sources]
+# lifx-async = { path = "../../", editable = true }
+# ///
 """Measure direct UDP and public merged discovery with privacy-safe JSONL."""
 
 from __future__ import annotations
@@ -24,6 +31,10 @@ from lifx_emulator.devices import DeviceManager
 from lifx_emulator.factories import create_color_light
 from lifx_emulator.repositories import DeviceRepository
 from lifx_emulator.scenarios import HierarchicalScenarioManager
+from measurement_support import (
+    _capture_discovery_observations,
+    _DiscoveryObservation,
+)
 
 from lifx.api import discover
 from lifx.const import (
@@ -38,10 +49,6 @@ from lifx.network.discovery import discover_devices
 from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
 from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.protocol.models import Serial
-from scripts.measurement_support import (
-    _capture_discovery_observations,
-    _DiscoveryObservation,
-)
 
 _SCHEMA_VERSION = 1
 _KIND = "merged_discovery_measurement"
@@ -723,7 +730,7 @@ def _normalise_find08_observations(
 
 def _load_alias_map(path: Path) -> dict[str, str]:
     """Load an external raw-identity-to-alias mapping only into memory."""
-    repository = Path(__file__).resolve().parents[1]
+    repository = Path(__file__).resolve().parents[2]
     resolved = path.expanduser().resolve()
     if resolved == repository or repository in resolved.parents:
         raise ValueError("--alias-map must be outside the repository")

@@ -42,32 +42,57 @@ validation and first-wins per-serial dedup.
 `spike-findings-lifx-async` skill): five real-hardware experiments that disproved the
 "switch to threading" hypothesis and located the actual reliability levers.
 
-## Next Milestone Goals
+## Current Milestone: v2.1 Spring Cleaning
 
-No v2.1/v3.0 milestone is open yet. Candidates carried forward or surfaced during v2.0:
+**Goal:** Clear every accumulated small item so nothing carried forward is left
+unaddressed: all 11 open GitHub issues, both dormant seeds, the repo-wide em dash style
+debt, and the one unclosed deferred item from v2.0 Phase 13.
 
-- **SEED-003**: Lock `Animator` to WiFi devices — Thread doesn't have the bandwidth for
-  usable animation frame rates (recorded as a scope boundary in Phase 14, THREAD-03)
-- **SEED-002**: Run the staleness experiment against WiFi bulbs as a control, to know
-  whether THREAD-04's 69s expiry figure is Thread-specific or a general mDNS TTL/goodbye
-  artefact
-- **FLEET-01/FLEET-02**: Cross-packet mDNS accumulation, follow-up A/AAAA queries, and
-  multi-border-router topologies — currently proven only synthetically; revalidate once
-  the fleet or network grows enough to exercise them on hardware
-- Seven open GitHub issues deferred from PR #211 (mDNS) and PR #196 (themes) review that
-  are still unresolved: [#217](https://github.com/Djelibeybi/lifx-async/issues/217),
-  [#216](https://github.com/Djelibeybi/lifx-async/issues/216),
-  [#215](https://github.com/Djelibeybi/lifx-async/issues/215),
-  [#214](https://github.com/Djelibeybi/lifx-async/issues/214),
-  [#213](https://github.com/Djelibeybi/lifx-async/issues/213),
-  [#212](https://github.com/Djelibeybi/lifx-async/issues/212),
-  [#209](https://github.com/Djelibeybi/lifx-async/issues/209) (mDNS test/docs/coverage
-  cleanup), plus theme issues
-  [#201](https://github.com/Djelibeybi/lifx-async/issues/201),
-  [#199](https://github.com/Djelibeybi/lifx-async/issues/199),
-  [#198](https://github.com/Djelibeybi/lifx-async/issues/198), and
-  [#191](https://github.com/Djelibeybi/lifx-async/issues/191) (typed Move-effect API)
-- **PERS-01, SPIKE-006, STYLE-01**: long-carried candidates, see Active requirements below
+**Target features:**
+
+- **mDNS correctness**: owner-name normalisation in `selected_address_for`, so a
+  trailing-dot owner cannot bypass the fail-closed unusable-address check
+  ([#213](https://github.com/Djelibeybi/lifx-async/issues/213)); the IPv6 Thread probe reporting cached-but-unusable link-local
+  evidence accurately instead of "pending address records", with the unreachable
+  `linklocal_chosen` counter and the TXT assertion resolved ([#212](https://github.com/Djelibeybi/lifx-async/issues/212))
+- **mDNS docs and tests**: discovery test imports moved to module scope
+  ([#217](https://github.com/Djelibeybi/lifx-async/issues/217)); `Device.connectivity` documented as a non-state property rather than
+  a cached one ([#216](https://github.com/Djelibeybi/lifx-async/issues/216)); caller-facing guidance replacing synthetic-proof jargon
+  in the discovery docstrings ([#215](https://github.com/Djelibeybi/lifx-async/issues/215))
+- **CI and coverage**: the measured-tree rule states what coverage measures, the shipped
+  library plus code a CI job executes, never operator or maintainer tooling; on that basis
+  `.planning/scripts/ipv6_thread_probe.py` stays out of coverage collection and CI-01 is
+  recorded as reversed ([#214](https://github.com/Djelibeybi/lifx-async/issues/214)); the `codecov/patch`
+  gate that passed without scoring any lines on PR #208 is corrected with a cause-agnostic
+  guard rather than the unsupported documentation-only-head-commit theory
+  ([#209](https://github.com/Djelibeybi/lifx-async/issues/209))
+- **Theme API and data**: primaries distinguishable from rename aliases in
+  `get_available_themes()` ([#201](https://github.com/Djelibeybi/lifx-async/issues/201)); digit-leading display names representable
+  as slugs before the app ships one ([#199](https://github.com/Djelibeybi/lifx-async/issues/199)); the `earth`/`coral_reef` palette
+  substitution enumerated in the changelog ([#198](https://github.com/Djelibeybi/lifx-async/issues/198))
+- **Effects API**: a typed Move-effect API, so callers stop hand-encoding the eight-slot
+  `parameters` list ([#191](https://github.com/Djelibeybi/lifx-async/issues/191))
+- **SEED-002**: the advertisement-staleness experiment run against WiFi bulbs, giving
+  v2.0's 69s Thread figure a control instead of leaving it to stand alone
+- **SEED-003**: `Animator` locked to WiFi devices, refusing or clearly degrading when
+  handed a Thread device
+- **Style debt**: roughly 200 em dashes across `docs/`, recast rather than substituted
+- **Deferred item**: the v2.0 Phase 13 coordinator teardown test verified, then closed or
+  fixed. The commit assumed at the v2.0 close to have fixed it (`fc61b98`) fixed a
+  different test (`test_forked_child_lazily_starts_a_fresh_coordinator`), so that
+  assumption does not hold and the item needs checking rather than clearing
+
+**Explicitly not in this milestone:**
+
+- **PERS-01** stays deferred, now with a named second consumer: Mirror Light on
+  `feat/mirror-light` will use `state_file`, so the mixin stops being speculative
+  generality once that hardware arrives (user decision, 2026-09-05)
+- **Spike 006** stays unscheduled and D5-09 remains an OPEN decision. Flagged as a
+  stretch if the milestone finishes early, not planned as a requirement (user decision,
+  2026-09-05)
+- **[#1](https://github.com/Djelibeybi/lifx-async/issues/1) Dependency Dashboard** is Renovate-owned and never closes
+- **FLEET-01 / FLEET-02** still wait on a fleet large enough to overflow one
+  legacy-unicast reply
 
 ## Shipped Milestone: v2.0 Thread/IPv6 Support (2026-09-05)
 
@@ -265,22 +290,33 @@ LIFX app.
 
 ### Active
 
-<!-- Next milestone not yet opened. Candidates carried forward from v2.0 close; see
-     "Next Milestone Goals" above for the full list with links. -->
+<!-- v2.1 Spring Cleaning scope. Full REQ-IDs in .planning/REQUIREMENTS.md; the
+     "Current Milestone" section above carries the per-item detail and issue links. -->
 
-- [ ] SEED-003: lock `Animator` to WiFi devices — Thread lacks the bandwidth for usable
-      animation frame rates (recorded as a scope boundary in v2.0 Phase 14, THREAD-03)
-- [ ] SEED-002: run the staleness experiment against WiFi bulbs as a control
+- [ ] Eleven open GitHub issues resolved: #213, #212 (mDNS correctness); #217, #216, #215
+      (mDNS docs and tests); #214, #209 (CI and coverage); #201, #199, #198 (theme API and
+      data); #191 (typed Move-effect API)
+- [ ] SEED-002: the staleness experiment run against WiFi bulbs as a control for v2.0's
+      69s Thread figure
+- [ ] SEED-003: `Animator` locked to WiFi devices, since Thread lacks the bandwidth for
+      usable animation frame rates (recorded as a scope boundary in v2.0 Phase 14,
+      THREAD-03)
+- [ ] No-em-dash house style: roughly 200 em dashes across `docs/`, deferred by the user
+      during v1.2 Phase 7 UAT. Recast each sentence rather than swapping the character
+- [ ] v2.0 Phase 13 deferred item: the coordinator teardown test verified, then closed or
+      fixed
+
+**Carried forward, not in v2.1 scope:**
+
+- [ ] PERS-01: generalise `state_file` persistence into a reusable mixin (deferred since
+      2026-06-11). No longer speculative: Mirror Light on `feat/mirror-light` is the
+      second consumer, so this waits on that branch landing
 - [ ] FLEET-01: cross-packet mDNS accumulation and follow-up A/AAAA queries confirmed on
       real hardware, once the fleet is large enough to overflow one legacy-unicast reply
 - [ ] FLEET-02: multi-address and multi-border-router topologies revalidated
-- [ ] PERS-01: generalise `state_file` persistence into a reusable mixin (deferred since
-      2026-06-11)
 - [ ] Spike 006: measure the impact of publishing tuning constants vs behaviour only.
-      The D5-09 rule is disputed and remains an OPEN decision
-- [ ] No-em-dash house style: roughly 200 em dashes across `docs/`, deferred by the user
-      during Phase 7 UAT. Preference is to recast each sentence rather than swap the
-      character
+      The D5-09 rule is disputed and remains an OPEN decision. Unscheduled; a stretch if
+      v2.1 finishes early
 
 ### Out of Scope
 
@@ -384,9 +420,10 @@ LIFX app.
   rather than staying open indefinitely. The v1.2 lesson applies directly, where a capture
   taken entirely from one product left product-invariance assumed rather than tested.
 - Phase 10 shipped the prior Thread work through PR #210 as `7f54ad7`: `b49400b`
-  (network and mDNS), `b88cdb9` (`scripts/ipv6_thread_probe.py`, a three-stage
-  records/ports/connect hardware probe driving the library's own primitives), and `2f884f5`
-  (animator frame-socket family). The temporary feature and backup branches were removed
+  (network and mDNS), `b88cdb9` (`.planning/scripts/ipv6_thread_probe.py`, now relocated
+  there by Phase 15; a three-stage records/ports/connect hardware probe driving the
+  library's own primitives), and `2f884f5` (animator frame-socket family). The temporary
+  feature and backup branches were removed
   after merge; the Phase 10 artefacts retain the reconciliation record.
 
 ## Constraints
@@ -459,4 +496,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after v2.0 milestone*
+*Last updated: 2026-09-05 after v2.1 milestone start*

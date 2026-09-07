@@ -72,7 +72,7 @@ repos:
   - id: bandit
     args: [-c, pyproject.toml]
     additional_dependencies: ['bandit[toml]']
-    exclude: ^tests/
+    exclude: ^(tests/|\.planning/scripts/tests/)
 
   # Spell checking
 - repo: https://github.com/codespell-project/codespell

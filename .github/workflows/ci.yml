@@ -15,7 +15,10 @@ on:
     - pyproject.toml
     - uv.lock
     - .pre-commit-config.yaml
-    - .github/workflows/ci.yml
+    # The whole of .github, not only this workflow: the vacuous-gate guard and
+    # its import sibling live here, so a pull request confined to
+    # .github/*.py must still run the suite, ruff, pyright and bandit.
+    - .github/**
     - codecov.yml
   workflow_dispatch:
     inputs:
@@ -156,13 +159,27 @@ jobs:
     needs: changes
     name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # contents: read is the workflow default; statuses: read is added so the
+    # vacuous-gate guard can read the codecov/patch combined status for its
+    # best-effort cross-check.
+    permissions:
+      contents: read
+      statuses: read
     strategy:
       fail-fast: false
       matrix:
         os: ${{ needs.changes.outputs.source == 'true' && github.event_name == 'pull_request' && fromJSON('["ubuntu-latest","macos-latest","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
+    # Only the designated ubuntu-latest + Python 3.10 cell needs full
+    # history: the vacuous-gate guard computes its own merge base there.
+    # Both results are quoted strings, matching the LIFX_REQUIRE_IPV6
+    # rendering below, because GitHub's expression language treats the
+    # number zero as falsy and would otherwise collapse this ternary to the
+    # shallow fallback for every cell, including the designated one.
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        fetch-depth: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10') && '0' || '1' }}
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -211,6 +228,37 @@ jobs:
         report_type: coverage
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
+
+    # D-06: runs immediately after the coverage upload above, the point
+    # coverage.xml is guaranteed present. D-07: the designated ubuntu-latest
+    # + Python 3.10 cell, present in every matrix configuration. The live
+    # codecov/patch cross-check here is best-effort: it is computed only
+    # after Codecov has merged the uploads from every matrix cell, and this
+    # step runs inside one of those cells, so an UNUSABLE (pending) result is
+    # the expected common outcome, not a defect. That is why this invocation
+    # passes --status-timeout 0 (one bounded read, no polling): polling for
+    # a result this plan predicts will not exist yet would spend up to two
+    # minutes per pull request on this cell, which is also the
+    # LIFX_REQUIRE_IPV6 cell and therefore a required path. The guard's
+    # polling branch stays available for a manual run after CI has settled,
+    # by passing a non-zero --status-timeout. D-08: this is a single-report
+    # evaluation; matrix cells cannot union their coverage without
+    # artefacts. The gap is bounded by measurement (one version-gated site,
+    # zero platform-gated sites); the upgrade path is artefact uploads plus a
+    # union job. The step carries no failure-tolerance key: it must be able
+    # to fail the job exactly like the unit test step above it.
+    - name: Guard against a vacuous coverage gate
+      if: ${{ !cancelled() && github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10' }}
+      run: >-
+        uv run --frozen python .github/patch_coverage_guard.py
+        --base ${{ github.event.pull_request.base.sha }}
+        --coverage coverage.xml
+        --head ${{ github.event.pull_request.head.sha }}
+        --repo ${{ github.repository }}
+        --status-timeout 0
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      timeout-minutes: 5
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}

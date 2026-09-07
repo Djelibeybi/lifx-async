@@ -53,3 +53,40 @@ Pruned entries from STATE.md. Recoverable but no longer loaded into agent contex
 - [Phase 11]: TXT construction metadata uses one-pass effective-value consensus with immediate conflict rejection.
 - [Phase 11]: Charge only exact retained variable payload and release the stored cost only when expiry removes the cached identity.
 - [Phase 11]: Filter unusable mDNS addresses before the IPv4, ULA, GUA, scoped-link-local ranking and use lexical same-class order.
+
+## Pruned 2026-09-07 (phases 1-13, kept recent 3)
+
+### Decisions
+
+- [Phase 12]: Select the wildcard and IPv4-only broadcast capability from the validated target family, close both generator ownership layers with `aclosing`, and prove behaviour from the actual endpoint without replacing emulator traffic.
+- [Phase 12]: Targeted find_by_ip preserves the already validated caller literal through device construction.
+- [Phase 12]: Representation tests exercise the public API and real discovery parser while replacing only transport delivery.
+- [Phase 12]: Invalid-target regressions use a fail-on-construction transport sentinel to prove validation precedes network setup.
+- [Phase 12]: Retain concrete discovery transports and endpoints in per-test observations so lifecycle assertions use actual OS-managed objects.
+- [Phase 12]: Synchronise cancellation on real endpoint-open, receive-started, and close-completed events without sleeps or polling.
+- [Phase 12]: Keep concurrent independence and cancellation/reuse in separate public-API tests.
+- [Phase 12]: Keep Windows IPv6 emulator eligibility behind exact opt-in and exact CI node selection.
+- [Phase 12]: Require exact current-revision CI job logs, not aggregate green status, for D-10.
+- [Phase 12]: Normalise AF_INET6 datagram destinations to canonical four-field socket addresses at send time.
+- [Phase 12]: Resolve numeric and named IPv6 zones at the UDP send boundary and pass scope in the native sockaddr field.
+- [Phase 12]: Report invalid IPv6 zone resolution as an immediate LifxNetworkError while keeping the endpoint reusable.
+- [Phase 13]: Keep discover() UDP-only at the entry gate while exposing the identical path as discover_udp().
+- [Phase 13]: Pass caller-selected discovery observation sinks explicitly to producers instead of relying on ContextVar propagation.
+- [Phase 13]: Keep the canonical measurement baseline on direct discover_devices() so coordinator overhead remains measurable.
+- [Phase 13]: Keep emulator mDNS injection private, context-local, and generator-owned to exclude ambient multicast I/O.
+- [Phase 13]: Store and replay only accepted raw DiscoveryResponse records; construct caller-specific devices after fan-out.
+- [Phase 13]: Keep compatible UDP sharing process-wide and active-only across caller event loops.
+- [Phase 13]: Carry observation sinks and caller deadlines explicitly on subscriptions.
+- [Phase 13]: Share discover and discover_udp while preserving direct find_by_ip and discover_devices paths.
+- [Phase 13]: Use GetColor for every current supported classifier outcome; unsupported products drop locally and exact Echo remains synthetic future-proofing.
+- [Phase 13]: Treat sixteen concurrent probes as a reasoned D-07 safety bound, not a measured optimum.
+- [Phase 13]: Start one caller deadline before consuming mDNS records so queue wait, retries, and cleanup cannot receive fresh windows.
+- [Phase 13]: Preserve standalone mDNS propagation and detail logging while merged typed failures retain only bounded fields.
+- [Phase 13]: Merged discovery uses one caller-origin deadline across shared UDP and verified mDNS.
+- [Phase 13]: First-valid canonical serial wins; later source occurrences emit duplicate observations.
+- [Phase 13]: Typed mDNS failure events suppress the defensive outer fallback to preserve exactly-once diagnostics.
+- [Phase 13]: Repeated cancellation is re-raised only after shielded cleanup finalises both source generators.
+- [Phase 13]: Canonicalise serial lookup input once before creating either discovery source.
+- [Phase 13]: Race shared UDP records and verified mDNS devices under one caller-origin wall deadline.
+- [Phase 13]: Construct UDP winners only after both source legs have been cancelled and reaped.
+- [Phase 13]: Suspend winner pumps at the yield boundary until aggregate cleanup owns finalisation.

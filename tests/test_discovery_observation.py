@@ -1,13 +1,13 @@
 """Discovery observation tests importing the canonical scripts-layer helper.
 
 The event/sink/capture-context primitives themselves moved to
-``scripts/measurement_support.py`` (Plan 14-03, D-17/D-19): no script may
-import a helper from ``tests/``, and
-``scripts/measure_merged_discovery.py`` previously loaded this module by
-anchored ``importlib`` path specifically to work around that rule. This file
-now only re-exports the canonical private names (so existing test imports
-keep working unchanged) and proves the properties the measurement scripts
-depend on: caller isolation, repr suppression, arrival order, and
+``.planning/scripts/measurement_support.py`` (Plan 14-03, D-17/D-19): no
+script may import a helper from ``tests/``, and
+``.planning/scripts/measure_merged_discovery.py`` previously loaded this
+module by anchored ``importlib`` path specifically to work around that rule.
+This file now only re-exports the canonical private names (so existing test
+imports keep working unchanged) and proves the properties the measurement
+scripts depend on: caller isolation, repr suppression, arrival order, and
 deterministic cleanup.
 """
 
@@ -16,10 +16,9 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import patch
 
+import measurement_support
 import pytest
-
-import scripts.measurement_support as measurement_support
-from scripts.measurement_support import (
+from measurement_support import (
     _DISCOVERY_OBSERVER_TASK_ATTRIBUTE,
     _capture_discovery_observations,
     _current_discovery_observation_sink,

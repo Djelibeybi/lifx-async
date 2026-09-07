@@ -76,7 +76,7 @@ The Phase 14 tooling works unchanged against WiFi hardware. Freeze a roster nami
 WiFi devices, then use the same power-script driven experiment:
 
 ```
-uv run --frozen python -m scripts.thread_revalidation staleness \
+uv run .planning/scripts/thread_revalidation.py staleness \
   --session-dir <dir> --alias-map <map> --alias <wifi-alias> \
   --power-off <off.sh> --power-on <on.sh>
 ```

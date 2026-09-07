@@ -9,6 +9,7 @@ import sys
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from lifx_emulator import EmulatedLifxServer
@@ -35,6 +36,20 @@ from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxConnectionError, LifxNetworkError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
 from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
+
+# tests/test_discovery_observation.py and
+# tests/test_network/test_connection_retry.py import the shared operator
+# measurement helper flatly (`import measurement_support`). That helper lives
+# outside the measured tree at .planning/scripts/measurement_support.py, so
+# it is on no import path by default. Adding its directory here, rather than
+# to pyproject.toml's pythonpath, keeps the entry inside test infrastructure
+# (D-02/D-05): pytest loads this conftest for any collection under tests/,
+# including a targeted single-file run that never loads the tooling conftest
+# beside .planning/scripts/tests/, which is the case those two tests need to
+# keep working.
+_MEASUREMENT_SCRIPTS_DIR = Path(__file__).resolve().parents[1] / ".planning" / "scripts"
+if str(_MEASUREMENT_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_MEASUREMENT_SCRIPTS_DIR))
 
 NETWORK_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LifxTimeoutError,
@@ -110,6 +125,28 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Disable lifx-emulator tests for this test run",
     )
+    parser.addoption(
+        "--tooling",
+        action="store_true",
+        default=False,
+        help="run relocated tooling tests under .planning/scripts/tests",
+    )
+    parser.addoption(
+        "--benchmark",
+        action="store_true",
+        default=False,
+        help="run performance benchmark tests",
+    )
+
+
+#: Maps an opt-in marker name to the flag that re-admits it into collection.
+#: A category deselected by default belongs here, and only here: adding a
+#: marker without a flag, or a flag without a marker, is a policy gap that
+#: tests/test_pytest_policy.py asserts against directly.
+_OPT_IN_MARKER_FLAGS: dict[str, str] = {
+    "tooling": "--tooling",
+    "benchmark": "--benchmark",
+}
 
 
 # Give emulator tests more time on slow CI runners (especially Windows)
@@ -138,8 +175,10 @@ def targeted_ipv6_retry_policy(platform: str) -> dict[str, object] | None:
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Apply focused retry and timeout policies before plugin defaults."""
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Apply focused retry/timeout policies, then deselect opt-in categories."""
     targeted_retry = targeted_ipv6_retry_policy(sys.platform)
     for item in items:
         if (
@@ -157,6 +196,30 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         )
         if uses_emulator and item.get_closest_marker("timeout") is None:
             item.add_marker(pytest.mark.timeout(_EMULATOR_TIMEOUT))
+
+    # Deselect any item carrying an opt-in marker whose flag was not passed.
+    # Reporting through config.hook.pytest_deselected keeps a deselected item
+    # visible in the summary ("N deselected") instead of silently vanishing,
+    # which matters because a hook that silently drops library tests would
+    # produce exactly the false-green defect this phase repairs.
+    deselected: list[pytest.Item] = []
+    selected: list[pytest.Item] = []
+    for item in items:
+        drop = False
+        for marker_name, flag in _OPT_IN_MARKER_FLAGS.items():
+            if item.get_closest_marker(marker_name) is not None and not (
+                config.getoption(flag)
+            ):
+                drop = True
+                break
+        if drop:
+            deselected.append(item)
+        else:
+            selected.append(item)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = selected
 
 
 def pytest_set_filtered_exceptions() -> tuple[type[Exception], ...]:

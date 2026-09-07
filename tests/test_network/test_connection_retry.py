@@ -24,15 +24,15 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from measurement_support import (
+    _capture_request_observations,
+    _RequestObservationSink,
+)
 
 from lifx.exceptions import LifxConnectionError, LifxProtocolError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection, _current_request_observer
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
-from scripts.measurement_support import (
-    _capture_request_observations,
-    _RequestObservationSink,
-)
 
 _STATE_POWER_PKT_TYPE = 22
 _ACKNOWLEDGEMENT_PKT_TYPE = 45
@@ -1221,7 +1221,7 @@ class TestRequestObservation:
         """`asyncio.current_task()` can return `None` from inside a running
         loop when the calling code is not itself a Task (rather than raising
         `RuntimeError` outright, which only happens with no loop at all)."""
-        import scripts.measurement_support as measurement_support
+        import measurement_support
 
         with patch.object(
             measurement_support.asyncio, "current_task", return_value=None

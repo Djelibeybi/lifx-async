@@ -7,6 +7,7 @@
 - ✅ **v1.1 Wire Reliability**: Phases 2–5, shipped 2026-07-26 ([archive](milestones/v1.1-ROADMAP.md))
 - ✅ **v1.2 Theme Library Update**: Phases 6–9, shipped 2026-08-27 ([archive](milestones/v1.2-ROADMAP.md))
 - ✅ **v2.0 Thread/IPv6 Support**: Phases 10–14, shipped 2026-09-05 ([archive](milestones/v2.0-ROADMAP.md))
+- 🚧 **v2.1 Spring Cleaning**: Phases 15–20, in progress
 
 ## Phases
 
@@ -108,7 +109,187 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
 </details>
 
+### 🚧 v2.1 Spring Cleaning (Phases 15–20, In Progress)
+
+**Milestone Goal:** Clear every accumulated small item so nothing carried forward is left
+unaddressed: all 11 open GitHub issues, both dormant seeds, the repo-wide em dash style
+debt, and the one unclosed deferred item from v2.0 Phase 13.
+
+This is a cleanup round, not a feature milestone. Most requirements are small, independent
+fixes; the phases group them by the code and review surface they touch and by what can be
+verified together, not by size.
+
+- [x] **Phase 15: Coverage Gate and Test-Suite Health** - Make the project's own verification machinery honest before it measures anything else: the `codecov/patch` gate cannot pass without scoring a pull request's changed range, the `scripts/` tree triage and measured-tree rule state which code coverage measures, and the v2.0 Phase 13 coordinator teardown item is settled either way (completed 2026-09-07)
+- [ ] **Phase 16: mDNS Correctness, Docs and Test Hygiene** - Close the fail-closed address-check bypass in `selected_address_for()`, and make the mDNS surface describe itself to callers: `Device.connectivity` classified as a derived rather than cached property, caller-facing discovery docstrings, and module-scope test imports
+- [ ] **Phase 17: Fleet Diagnostics and the Staleness Control** - Make the IPv6 Thread probe report what it actually observed, and give v2.0's 69s Thread disappearance-to-expiry figure a WiFi control measured with the same protocol
+- [ ] **Phase 18: Animator Connectivity Guard and Typed Move Effect** - The milestone's two public API changes: `Animator` stops silently accepting a Thread device, and a caller builds the firmware Move effect through typed arguments instead of an eight-slot `parameters` list
+- [ ] **Phase 19: Theme Library API and Data** - Primary themes distinguishable from rename aliases with canonical-slug resolution, a digit-leading display name representable as a slug, and the v1.2 palette substitutions named in the changelog
+- [ ] **Phase 20: Documentation Prose Sweep** - Roughly 200 em dashes across `docs/` recast sentence by sentence rather than substituted, run last so it cannot collide with any other change to `docs/`
+
+**Constraints that bind every phase:**
+
+- CI requires **100% branch patch coverage**, not just line coverage. Branch partials count.
+- Zero runtime dependencies, Python 3.10 floor, so no `asyncio.TaskGroup`.
+- Generated files (`src/lifx/protocol/*`, `src/lifx/products/registry.py`) are never
+  hand-edited.
+- `docs/changelog.md` is produced by the release workflow. Nothing in this milestone edits
+  it directly; changelog content reaches it through Conventional Commit messages and
+  release notes.
+- No live device serial, MAC address, IP address or hostname reaches a committed artefact.
+  Phase 17 is the only phase producing hardware evidence and uses format-preserving
+  pseudonyms from the operator's private mapping.
+- Australian English in all prose and comments.
+
+**Execution notes:**
+
+- **Phase 15 runs first because it changes what "verified" means.** Phase 15 reverses CI-01:
+  the probe is operator tooling, so it leaves the measured tree entirely rather than being
+  added to it, and Phase 17 inherits it at its relocated `.planning/scripts/` path, outside
+  coverage collection. CI-02 must land before any phase leans on a green `codecov/patch`
+  badge.
+
+- **Phase 17 is serial after Phase 16.** The probe drives the library's own mDNS
+  primitives, including `selected_address_for()`, so MDNS-09's owner-name normalisation
+  settles before MDNS-10 changes what the probe reports about a cached but unusable
+  address.
+
+- **Phases 16, 18 and 19 are file-disjoint and can run in parallel.** Phase 16 lives in
+  `src/lifx/network/discovery/mdns/`, `src/lifx/devices/base.py` docstrings and
+  `tests/test_network/`; Phase 18 lives in `src/lifx/animation/` and
+  `src/lifx/devices/multizone.py`; Phase 19 lives in `src/lifx/theme/` and
+  `data/themes.jsonl`.
+
+- **Phase 20 is last on purpose.** A ~200-occurrence prose pass across `docs/` conflicts
+  textually with every other phase that adds or edits documentation, so it sweeps what the
+  earlier phases have already landed rather than racing them.
+
+- **Phase 17's DISC-04 is hardware-gated** and cannot be verified by the emulator suite: it
+  needs a real WiFi bulb and a physical unplug, mirroring v2.0's THREAD-04. It must not
+  block CI or any other phase.
+
+- **TEST-02's outcome is unknown by design.** The test may already be correct, in which
+  case the deliverable is the recorded verification plus the `deferred-items.md` update,
+  not a code change. `fc61b98` fixed a different test, so the v2.0 close assumption does
+  not carry.
+
+## Phase Details
+
+### Phase 15: Coverage Gate and Test-Suite Health
+
+**Goal**: The project's own verification machinery tells the truth, so every later phase in
+this milestone is measured rather than assumed
+**Depends on**: Nothing (first phase of v2.1; v2.0 shipped 2026-09-05)
+**Requirements**: CI-01, CI-02, TEST-02
+**Success Criteria** (what must be TRUE):
+
+  1. A pull request whose head commit changes only documentation can no longer report a passing `codecov/patch` gate against zero scored lines: the case is either prevented outright or fails loudly with a message naming it, reproducing PR #208's 184 unmeasured executable lines as a failure
+  2. Coverage measures the shipped library plus code a CI job executes, and nothing else: `scripts/` holds only `generate_theme_data.py`, the five operator measurement scripts relocate to `.planning/scripts/` outside the measured tree, and CI-01 is recorded as reversed rather than met, since the probe it asked to add is operator tooling
+  3. `test_non_last_detach_preserves_producer_and_last_detach_reaps_it` is run under conditions that would expose a blocked executor worker, and the observed outcome is recorded as evidence rather than inferred from a later commit
+  4. `deferred-items.md` records the v2.0 Phase 13 item as verified-clean or as fixed, naming the evidence, so no unclosed assumption carries past this milestone
+
+**Plans**: 5/5 plans executed
+**Wave 1**
+
+- [x] 15-01-PLAN.md: tracer that relocates `check_patch_coverage.py` and proves the opt-in tooling-test collection mechanism end to end (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 15-02-PLAN.md: relocate the five measurement scripts, delete the two dead ones, flat sibling imports including the two default-suite consumers, PEP 723 headers, and the two-target `--cov` rule (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 15-03-PLAN.md: the vacuous-gate guard, its fixture-driven tests, and the CI step in the designated ubuntu cell (wave 3)
+- [x] 15-04-PLAN.md: TEST-02 coordinator teardown evidence in both directions, and reconciliation of `deferred-items.md` with `STATE.md` (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 15-05-PLAN.md: `AGENTS.md` measured-tree rule and corrected invocations, CI-01 reversal on the record including Phase 17's dependency reason, the R2 exclusion boundary amended into the spec, and the #214 and #209 issue corrections (wave 4)
+
+### Phase 16: mDNS Correctness, Docs and Test Hygiene
+
+**Goal**: The mDNS surface behaves correctly at its fail-closed boundary and describes
+itself to callers in caller-facing terms
+**Depends on**: Phase 15 (the patch gate must score a changed range before later work
+relies on it); file-disjoint from Phases 18 and 19 and can run in parallel with them
+**Requirements**: MDNS-09, DOCS-07, DOCS-08, TEST-01
+**Success Criteria** (what must be TRUE):
+
+  1. An owner name supplied with a trailing dot resolves to the same address decision as the same name without one, so an unusable address is refused in both forms; a regression test fails if the normalisation is removed from `selected_address_for()`
+  2. A caller reading `Device.connectivity` learns it is derived from request outcomes rather than stored device state, and no repository or published guidance lists it among the state-backed cached properties
+  3. The mDNS discovery docstrings and related pages state bounded discovery behaviour, proxy responses and testing limitations in terms a caller can act on, with no internal validation language such as mesh scale being "proven synthetically" remaining
+  4. The mDNS discovery tests import at module scope, ruff and the complete mDNS discovery suite pass, and any retained function-local import carries a named circular-import or patching reason rather than being left unexplained
+
+**Plans**: TBD
+
+### Phase 17: Fleet Diagnostics and the Staleness Control
+
+**Goal**: The hardware-facing diagnostics report what they actually observed, and v2.0's
+69s Thread staleness figure gains a WiFi control instead of standing alone
+**Depends on**: Phase 15 (the probe lands at its relocated `.planning/scripts/` path, outside the measured tree) and Phase 16
+(the probe drives the library's address selection, so MDNS-09 settles first)
+**Requirements**: MDNS-10, DISC-04
+**Success Criteria** (what must be TRUE):
+
+  1. The probe distinguishes an instance holding no address data at all from one holding a cached but unusable unscoped link-local AAAA record, and says which it saw instead of reporting "pending address records" for both
+  2. The `linklocal_chosen` summary counter and its warning are reachable and truthful, or removed; a partially assembled instance no longer terminates diagnostics through the TXT assertion, and instead produces defensive diagnostic output
+  3. Advertisement staleness is measured against a WiFi bulb using the same disappearance-to-expiry protocol THREAD-04 used on Thread, producing a figure directly comparable with the recorded 69s
+  4. The recorded result states whether 69s is Thread-specific or a general mDNS TTL and goodbye artefact, so the library can answer that question rather than leaving one measurement uncontrolled
+  5. Every committed artefact from both runs carries format-preserving pseudonyms from the operator's private mapping, with no live serial, MAC address, IP address or hostname anywhere in the staged diff
+
+**Plans**: TBD
+
+### Phase 18: Animator Connectivity Guard and Typed Move Effect
+
+**Goal**: The milestone's two public API changes land: a caller cannot silently push
+animation frames onto a Thread mesh, and a caller builds the firmware Move effect without
+knowing the protocol layout
+**Depends on**: Phase 15; file-disjoint from Phases 16 and 19 and can run in parallel with
+them
+**Requirements**: ANIM-05, EFFECT-01
+**Success Criteria** (what must be TRUE):
+
+  1. `Animator.for_light()`, `for_multizone()` and `for_matrix()` refuse or clearly degrade when handed a Thread device, naming connectivity as the reason at construction time rather than failing opaquely later during frame delivery
+  2. A WiFi device constructs and drives an `Animator` exactly as before, so existing callers including LedFx see no signature or behaviour change
+  3. A caller starts the firmware Move effect by naming direction, speed and duration through typed arguments, without constructing the eight-slot `parameters` list or knowing which slot carries direction
+  4. The typed Move API appears in the published API documentation with an example that runs, and the existing `MultiZoneEffect` construction path keeps working for callers already using it
+
+**Plans**: TBD
+
+### Phase 19: Theme Library API and Data
+
+**Goal**: A caller can tell a primary theme from a rename alias, a digit-leading app name
+cannot abort the generator, and the v1.2 palette substitutions are named where an upgrading
+caller will find them
+**Depends on**: Phase 15; file-disjoint from Phases 16 and 18 and can run in parallel with
+them
+**Requirements**: THEME-05, THEME-06, THEME-07
+**Success Criteria** (what must be TRUE):
+
+  1. A caller can enumerate the primary themes separately from the rename aliases, instead of receiving 168 flat names for 166 themes with nothing marking the two aliases
+  2. Any accepted theme name, primary or alias, resolves back to its canonical slug through a documented call
+  3. A display name beginning with a digit, such as `80s Neon`, is representable as a slug and regenerates `src/lifx/theme/data.py` without aborting, so the conflict between `validate_key()`'s identifier rule and the `slug == derive_slug(name)` rule has an escape hatch before the app ships such a name
+  4. The changelog enumerates every pre-v1.2 key whose palette changed value, `earth` and `coral_reef` included, reaching `docs/changelog.md` through the release process rather than by editing that generated file
+
+**Plans**: TBD
+
+### Phase 20: Documentation Prose Sweep
+
+**Goal**: The published documentation reads in the project's house style, with every em
+dash recast rather than substituted
+**Depends on**: Phases 15 to 19 (every other change touching `docs/` lands first, so this
+sweep cannot collide with them)
+**Requirements**: DOCS-09
+**Success Criteria** (what must be TRUE):
+
+  1. A repository-wide search of `docs/` finds no em dash character, covering the roughly 200 occurrences deferred during v1.2 Phase 7 UAT
+  2. Each affected sentence is recast so its meaning survives, with no occurrence replaced by a spaced hyphen, an en dash or a comma standing in for the same construction
+  3. The documentation still builds clean under `--strict` with zero warnings, and the theme catalogue and discovery guide drift tests stay green, so the sweep changes prose without breaking the bindings between docs and library
+
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
@@ -117,3 +298,15 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 | v1.1 Wire Reliability | 2–5 | Complete | 2026-07-26 |
 | v1.2 Theme Library Update | 6–9 | Complete | 2026-08-27 |
 | v2.0 Thread/IPv6 Support | 10–14 | Complete | 2026-09-05 |
+| v2.1 Spring Cleaning | 15–20 | In progress | - |
+
+### v2.1 Phases
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 15. Coverage Gate and Test-Suite Health | 5/5 | Not started |  |
+| 16. mDNS Correctness, Docs and Test Hygiene | 0/? | Not started | - |
+| 17. Fleet Diagnostics and the Staleness Control | 0/? | Not started | - |
+| 18. Animator Connectivity Guard and Typed Move Effect | 0/? | Not started | - |
+| 19. Theme Library API and Data | 0/? | Not started | - |
+| 20. Documentation Prose Sweep | 0/? | Not started | - |

@@ -1,88 +1,43 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v2.0 — Thread/IPv6 Support",
+  "milestone": "v2.1 — Spring Cleaning",
   "phases": [
     {
-      "number": "1",
-      "name": "Ceiling Save-on-Exit",
-      "status": "complete"
+      "number": "15",
+      "name": "Coverage Gate and Test-Suite Health",
+      "status": "pending"
     },
     {
-      "number": "1",
-      "name": "Unify duplicated discovery loops",
-      "status": "complete"
+      "number": "16",
+      "name": "mDNS Correctness, Docs and Test Hygiene",
+      "status": "pending"
     },
     {
-      "number": "2",
-      "name": "Discovery Re-broadcast",
-      "status": "complete"
+      "number": "17",
+      "name": "Fleet Diagnostics and the Staleness Control",
+      "status": "pending"
     },
     {
-      "number": "3",
-      "name": "Retry Schedule Reshape",
-      "status": "complete"
+      "number": "18",
+      "name": "Animator Connectivity Guard and Typed Move Effect",
+      "status": "pending"
     },
     {
-      "number": "4",
-      "name": "Animation Flow Control",
-      "status": "complete"
+      "number": "19",
+      "name": "Theme Library API and Data",
+      "status": "pending"
     },
     {
-      "number": "5",
-      "name": "Reliability Documentation",
-      "status": "complete"
-    },
-    {
-      "number": "6",
-      "name": "Generated Theme Library",
-      "status": "complete"
-    },
-    {
-      "number": "7",
-      "name": "Taxonomy & Legacy Dispositions",
-      "status": "complete"
-    },
-    {
-      "number": "8",
-      "name": "Hardware Fidelity Validation",
-      "status": "complete"
-    },
-    {
-      "number": "9",
-      "name": "Theme Data Contract & Docs",
-      "status": "complete"
-    },
-    {
-      "number": "10",
-      "name": "Land the IPv6/Thread Branch",
-      "status": "complete"
-    },
-    {
-      "number": "11",
-      "name": "mDNS Hardening",
-      "status": "complete"
-    },
-    {
-      "number": "12",
-      "name": "IPv6 Discovery Plumbing",
-      "status": "complete"
-    },
-    {
-      "number": "13",
-      "name": "Merged Discovery",
-      "status": "complete"
-    },
-    {
-      "number": "14",
-      "name": "Thread Revalidation and Docs",
-      "status": "complete"
+      "number": "20",
+      "name": "Documentation Prose Sweep",
+      "status": "pending"
     }
   ],
   "next": {
-    "command": "/gsd:progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 16)",
+    "reason": "Phase 16 of 6 — needs a plan"
   },
-  "updated_at": "2026-09-04T23:23:19.516Z"
+  "updated_at": "2026-09-06T23:59:17.167Z"
 }

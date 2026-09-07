@@ -1,3 +1,15 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["lifx-async"]
+#
+# [tool.uv.sources]
+# lifx-async = { path = "../../", editable = true }
+#
+# Any third-party distribution declared here must also be declared in the
+# dependencies list of every script that imports this module, because a PEP
+# 723 environment contains only what its own header names. A future import
+# added here requires the same addition in all three consumer headers.
+# ///
 """Private request-observation event, sink, and capture context (Phase 14).
 
 Owns the request-engine measurement primitives per D-17/D-19: a script that
@@ -162,7 +174,7 @@ def _capture_request_observations() -> Iterator[_RequestObservationSink]:
 # ---------------------------------------------------------------------------
 # Private discovery-observation event, sink, and capture context (Plan 14-03,
 # D-17/D-19). Moved out of tests/test_discovery_observation.py, which
-# scripts/measure_merged_discovery.py previously loaded by anchored path with
+# .planning/scripts/measure_merged_discovery.py previously loaded by anchored path with
 # importlib: no script may import a helper from tests/. Mirrors the request-
 # observation primitives above exactly -- lifx.network.discovery.udp reads
 # _DISCOVERY_OBSERVER_TASK_ATTRIBUTE from the current task ONCE per sweep and
@@ -307,7 +319,7 @@ def _emit_discovery_observation(
 # statistics primitives (D-17/D-18/D-19/D-20 -- 14-02).
 #
 # Every Phase 14 evidence artefact (the immutable session manifest plus the
-# five append-only journals owned by scripts/thread_revalidation.py) is built
+# five append-only journals owned by .planning/scripts/thread_revalidation.py) is built
 # from the helpers below: a closed privacy-safe alias grammar, a recursive
 # forbidden-key/forbidden-value scan that runs BEFORE any output file is
 # opened, generic line-numbered JSONL append/load, deterministic seeded
@@ -317,7 +329,7 @@ def _emit_discovery_observation(
 # ---------------------------------------------------------------------------
 
 # Alias-shaped only: alphanumeric plus hyphen, never a raw serial/MAC. Mirrors
-# scripts/measure_merged_discovery.py's `_ALIAS_PATTERN`/`_SERIAL_PATTERN`.
+# .planning/scripts/measure_merged_discovery.py's `_ALIAS_PATTERN`/`_SERIAL_PATTERN`.
 _ALIAS_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9-]{0,63}\Z")
 _SERIAL_PATTERN = re.compile(
     r"(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\Z|[0-9a-fA-F]{12}\Z"
@@ -326,7 +338,7 @@ _REVISION_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
 _IPV4_PATTERN = re.compile(r"(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9])")
 
 # Forbidden key names anywhere in a row -- mirrors
-# scripts/measure_merged_discovery.py's `_FORBIDDEN_KEYS` (AGENTS.md privacy
+# .planning/scripts/measure_merged_discovery.py's `_FORBIDDEN_KEYS` (AGENTS.md privacy
 # posture: never track serials, MACs, addresses, hostnames, ports, packet
 # content or raw exceptions).
 _FORBIDDEN_KEYS: frozenset[str] = frozenset(
@@ -463,7 +475,7 @@ ANIMATION_SCHEDULE: tuple[tuple[int, float], ...] = ((1, 10.0), (2, 10.0), (5, 1
 # phase (the absolute-cadence poll loop before disposition is determined);
 # the restoration-detection phase that follows a power-on edge is
 # deliberately unbounded (T-14-06 change 2) -- see
-# `scripts.thread_revalidation._cli_staleness`'s `_restore_available()`.
+# `thread_revalidation._cli_staleness`'s `_restore_available()`.
 STALENESS_POLL_INTERVAL_S: float = 60.0
 STALENESS_CONFIRM_ABSENT_POLLS: Literal[3] = 3
 STALENESS_CAP_S: float = 3.0 * 60.0 * 60.0
@@ -539,7 +551,7 @@ def git_revision() -> str:
 
 # ---------------------------------------------------------------------------
 # Shared device-state capture, restoration and exact comparison (D-05/D-14/
-# D-16 -- 14-03). Moved out of scripts/ipv6_thread_probe.py's private
+# D-16 -- 14-03). Moved out of .planning/scripts/ipv6_thread_probe.py's private
 # CapturedState/_capture_device_state()/_restore_device_state() so the legacy
 # probe and any future Phase 14 orchestrator restore stage share one
 # implementation. Comparison is exact equality of protocol-normalised values

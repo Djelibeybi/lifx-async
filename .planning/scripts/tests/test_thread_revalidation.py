@@ -25,20 +25,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-
-from lifx.animation.animator import AnimatorStats
-from lifx.color import HSBK
-from lifx.const import REQUEST_RETRANSMIT_GAPS
-from lifx.devices.ceiling import CeilingLight
-from lifx.devices.light import Light
-from lifx.devices.matrix import MatrixEffect, MatrixLight
-from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
-from lifx.exceptions import LifxNetworkError, LifxTimeoutError
-from lifx.network.connection import DeviceConnection
-from lifx.protocol.header import LifxHeader
-from lifx.protocol.packets import Device
-from lifx.protocol.protocol_types import FirmwareEffect
-from scripts.measurement_support import (
+from measurement_support import (
     ANIMATION_SCHEDULE,
     DISCOVERY_ROUNDS,
     REQUEST_TRIALS,
@@ -60,7 +47,7 @@ from scripts.measurement_support import (
     validate_revision,
     validate_session_id,
 )
-from scripts.thread_revalidation import (
+from thread_revalidation import (
     PowerScriptError,
     RosterDriftError,
     _load_target_alias_map,
@@ -105,9 +92,24 @@ from scripts.thread_revalidation import (
     validate_expected_roster,
     validate_staged_evidence,
 )
-from scripts.thread_revalidation import (
+from thread_revalidation import (
     main as thread_revalidation_main,
 )
+
+from lifx.animation.animator import AnimatorStats
+from lifx.color import HSBK
+from lifx.const import REQUEST_RETRANSMIT_GAPS
+from lifx.devices.ceiling import CeilingLight
+from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixEffect, MatrixLight
+from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.exceptions import LifxNetworkError, LifxTimeoutError
+from lifx.network.connection import DeviceConnection
+from lifx.protocol.header import LifxHeader
+from lifx.protocol.packets import Device
+from lifx.protocol.protocol_types import FirmwareEffect
+
+pytestmark = pytest.mark.tooling
 
 _REVISION = "a" * 40
 _REVISION_B = "b" * 40
@@ -646,7 +648,7 @@ class TestTraceRequestEndToEnd:
         """build_request_event() output already satisfies
         _validate_request_event() -- no separate manual construction path
         can silently drift from the schema it is supposed to produce."""
-        from scripts.measurement_support import _RequestObservation
+        from measurement_support import _RequestObservation
 
         observation = _RequestObservation(
             category="accepted",
@@ -666,7 +668,7 @@ class TestTraceRequestEndToEnd:
         raises before yielding -- the `finally` block's `if sink is not
         None:` guard must skip the journal loop entirely rather than crash
         on a `None` sink, and the caller's own exception still propagates."""
-        import scripts.measurement_support as measurement_support
+        import measurement_support as measurement_support
 
         monkeypatch.setattr(measurement_support.asyncio, "current_task", lambda: None)
         journal_path = tmp_path / "request-events.jsonl"
@@ -828,7 +830,7 @@ class TestManifest:
     def test_init_rejects_constant_drift(self, tmp_path: Path) -> None:
         init_manifest(tmp_path, **_manifest_kwargs())
         with patch(
-            "scripts.thread_revalidation.REQUEST_RETRANSMIT_GAPS",
+            "thread_revalidation.REQUEST_RETRANSMIT_GAPS",
             (REQUEST_RETRANSMIT_GAPS[0] + 1.0, *REQUEST_RETRANSMIT_GAPS[1:]),
         ):
             with pytest.raises(ValueError, match="does not match"):
@@ -876,7 +878,7 @@ class TestManifest:
 
 def _validate_manifest_public(manifest: dict[str, Any]) -> None:
     """Reach the module-private validator through its one call site."""
-    from scripts.thread_revalidation import _validate_manifest
+    from thread_revalidation import _validate_manifest
 
     _validate_manifest(manifest)
 
@@ -1759,7 +1761,7 @@ class TestModuleEntryPoint:
         monkeypatch.setattr(sys, "argv", ["thread_revalidation.py"])
 
         with pytest.raises(SystemExit) as excinfo:
-            runpy.run_module("scripts.thread_revalidation", run_name="__main__")
+            runpy.run_module("thread_revalidation", run_name="__main__")
 
         assert excinfo.value.code == 2
 
@@ -1838,7 +1840,7 @@ class TestSharedPrivacyPrimitives:
             load_jsonl(path)
 
     def test_git_revision_raises_without_git(self) -> None:
-        with patch("scripts.measurement_support.shutil.which", return_value=None):
+        with patch("measurement_support.shutil.which", return_value=None):
             with pytest.raises(RuntimeError, match="git is required"):
                 git_revision()
 
@@ -1984,7 +1986,7 @@ _VALIDATOR_BY_BUILDER = {
 
 def _revalidate(builder: Any, record: dict[str, Any]) -> None:
     """Re-run the exact private validator paired with ``builder`` on a tampered row."""
-    import scripts.thread_revalidation as module
+    import thread_revalidation as module
 
     validator = getattr(module, _VALIDATOR_BY_BUILDER[builder])
     validator(record)
@@ -2374,7 +2376,7 @@ class TestGenerateReportPopulatedSections:
 # ---------------------------------------------------------------------------
 # Plan 14-03: shared device-state capture, restoration and exact comparison
 # (D-05/D-14/D-16). These fakes are device-shape doubles for the SHARED
-# measurement_support primitive, independent of scripts/ipv6_thread_probe.py's
+# measurement_support primitive, independent of .planning/scripts/ipv6_thread_probe.py's
 # own fakes -- proving the helper works across Light, MultiZoneLight, and both
 # Matrix-shaped classes (MatrixLight and its CeilingLight subclass) with no
 # probe-specific behaviour in the loop.
@@ -3225,7 +3227,7 @@ class TestRunOneRequestTrial:
         """derive_request_result() raising ValueError is a send-side anomaly,
         not a fabricated latency (defensive branch; production sequence
         correlation already guarantees a matching sent event)."""
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         device = Light(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
@@ -4219,7 +4221,7 @@ class TestRunGitFailsClosedWithoutAGitExecutable:
     def test_raises_when_git_is_not_on_path(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         monkeypatch.setattr(
             thread_revalidation_module.shutil, "which", lambda _name: None
@@ -4352,7 +4354,7 @@ class TestCliHardwareModeJsonOutput:
     def test_discover_emits_json_result(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -4405,7 +4407,7 @@ class TestCliHardwareModeJsonOutput:
     def test_request_emits_json_result(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -4462,7 +4464,7 @@ class TestCliHardwareModeJsonOutput:
     def test_animation_emits_json_result(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -4522,7 +4524,7 @@ class TestCliHardwareModeJsonOutput:
     def test_staleness_emits_json_result(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -4695,7 +4697,7 @@ class TestRunPowerScript:
     def test_never_invokes_a_shell_and_passes_an_argv_list(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         script = _write_executable_script(tmp_path / "script.sh", "exit 0")
         captured: dict[str, Any] = {}
@@ -4834,7 +4836,7 @@ class TestCliStalenessPowerScripts:
     def test_power_off_failure_is_a_hard_stop_and_mutates_nothing(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir, _manifest, alias_map_path = self._session(tmp_path)
         power_off = _write_executable_script(tmp_path / "off.sh", "exit 9")
@@ -4885,7 +4887,7 @@ class TestCliStalenessPowerScripts:
     def test_power_on_failure_persists_the_row_and_says_the_device_is_dark(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir, manifest, alias_map_path = self._session(tmp_path)
         power_off = _write_executable_script(tmp_path / "off.sh", "exit 0")
@@ -4950,8 +4952,9 @@ class TestCliStalenessPowerScripts:
     def test_power_off_captures_disconnect_and_power_on_polls_unbounded(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
+        import thread_revalidation as thread_revalidation_module
+
         import lifx.api as lifx_api_module
-        import scripts.thread_revalidation as thread_revalidation_module
 
         session_dir, manifest, alias_map_path = self._session(tmp_path)
         power_off = _write_executable_script(tmp_path / "off.sh", "exit 0")
@@ -5036,7 +5039,7 @@ class TestCliStalenessPowerScripts:
     ) -> None:
         """A same-alias resume must never cut power on an already-measured
         device (Rule 2: missing critical functionality otherwise)."""
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir, manifest, alias_map_path = self._session(tmp_path)
         existing = build_staleness_event(
@@ -5164,7 +5167,7 @@ class TestCliAllFlag:
     def test_request_all_runs_every_inventory_alias_in_sorted_order(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5226,7 +5229,7 @@ class TestCliAllFlag:
     def test_request_all_continues_past_power_out_of_range(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5299,7 +5302,7 @@ class TestCliAllFlag:
     def test_request_all_continues_past_a_per_alias_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5366,7 +5369,7 @@ class TestCliAllFlag:
         responsibility (exercised directly in ``TestRunRequestTrials``);
         this wiring test proves ``--all`` does not bypass or duplicate it.
         """
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5437,7 +5440,7 @@ class TestCliAllFlag:
     def test_animation_all_runs_every_inventory_alias_in_sorted_order(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5500,7 +5503,7 @@ class TestCliAllFlag:
     def test_animation_all_halts_immediately_on_restoration_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5567,7 +5570,7 @@ class TestCliAllFlag:
     def test_animation_all_halts_on_a_per_alias_error_without_attempting_the_next(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
     ) -> None:
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5637,7 +5640,7 @@ class TestCliAllFlag:
         in ``TestRunAnimationObservation``); this wiring test proves
         ``--all`` does not bypass or duplicate it.
         """
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         session_dir = tmp_path / "session"
         manifest = init_manifest(
@@ -5788,7 +5791,7 @@ class TestValidateStagedEvidence:
         evidence_dir = tmp_path / "evidence" / "session-alpha"
         _stage_full_evidence(tmp_path, evidence_dir, manifest)
 
-        import scripts.thread_revalidation as thread_revalidation_module
+        import thread_revalidation as thread_revalidation_module
 
         original_read = thread_revalidation_module._read_staged_blob
 
