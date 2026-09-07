@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v7.2.1 (2026-09-07)
+
+### Bug Fixes
+
+- **discovery**: Make DNS name normalisation idempotent
+  ([`f060a90`](https://github.com/Djelibeybi/lifx-async/commit/f060a903613889d01f49e59186a185c39b038371))
+
+- **discovery**: Normalise mDNS owner names at the fail-closed guard
+  ([`ba43c37`](https://github.com/Djelibeybi/lifx-async/commit/ba43c375547305992ba8c222fea792b82fc9ab8e))
+
+
 ## v7.2.0 (2026-09-04)
 
 ### Features
