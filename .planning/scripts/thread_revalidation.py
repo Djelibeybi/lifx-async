@@ -1,7 +1,14 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["lifx-async"]
+#
+# [tool.uv.sources]
+# lifx-async = { path = "../../", editable = true }
+# ///
 """Phase 14 THREAD-02 request-observation tracer: production send to validated JSONL.
 
 Traces one real production ``DeviceConnection`` request end to end through
-``scripts.measurement_support``'s private observer seam, validates each
+``measurement_support``'s private observer seam, validates each
 observed event against a closed privacy-safe schema, appends it as one JSONL
 row, and reloads + deterministically re-derives the same logical completion
 latency and winning-sequence acknowledgement RTT from the appended journal
@@ -31,19 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from lifx.animation.animator import AnimatorStats
-from lifx.const import DISCOVERY_TIMEOUT, REQUEST_RETRANSMIT_GAPS
-from lifx.devices.light import Light
-from lifx.exceptions import (
-    LifxConnectionError,
-    LifxError,
-    LifxNetworkError,
-    LifxProtocolError,
-    LifxTimeoutError,
-)
-from lifx.network.connection import DeviceConnection
-from lifx.protocol.models import Serial
-from scripts.measurement_support import (
+from measurement_support import (
     ANIMATION_SCHEDULE,
     DISCOVERY_ROUNDS,
     REQUEST_TRIALS,
@@ -69,6 +64,19 @@ from scripts.measurement_support import (
     validate_revision,
     validate_session_id,
 )
+
+from lifx.animation.animator import AnimatorStats
+from lifx.const import DISCOVERY_TIMEOUT, REQUEST_RETRANSMIT_GAPS
+from lifx.devices.light import Light
+from lifx.exceptions import (
+    LifxConnectionError,
+    LifxError,
+    LifxNetworkError,
+    LifxProtocolError,
+    LifxTimeoutError,
+)
+from lifx.network.connection import DeviceConnection
+from lifx.protocol.models import Serial
 
 _SCHEMA_VERSION = 1
 _KIND = "request_observation_event"
@@ -96,7 +104,7 @@ _ROW_KEYS: frozenset[str] = frozenset(
 )
 # Alias-shaped only: alphanumeric plus hyphen/underscore, never a raw serial
 # or address. Mirrors the alias-safety pattern used by
-# scripts/measure_merged_discovery.py's _validate_alias().
+# .planning/scripts/measure_merged_discovery.py's _validate_alias().
 _SESSION_ID_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
 # Rejects an alias-shaped string that is ALSO serial-shaped (all-hex, colon-
 # or hyphen-separated MAC form, or bare 12-digit hex) -- an identifier must
@@ -262,7 +270,7 @@ async def trace_request(
     Drives ``connection.request(packet)`` through the real retry/correlation
     engine (:meth:`DeviceConnection._transmit_and_listen`), captures its
     private observation events via
-    :func:`scripts.measurement_support._capture_request_observations`,
+    :func:`measurement_support._capture_request_observations`,
     validates and appends every one of them to ``journal_path``, then
     reloads the appended rows for this session and derives the request
     result -- proving the full validate/append/reload/derive round trip
@@ -327,7 +335,7 @@ _AVAILABLE_DEVICE_CLASSES: frozenset[str] = frozenset(
 )
 _NAMED_GAP_DEVICE_CLASSES: frozenset[str] = frozenset({"InfraredLight", "HevLight"})
 
-# Closed confounder vocabulary, mirrors scripts/measure_merged_discovery.py's
+# Closed confounder vocabulary, mirrors .planning/scripts/measure_merged_discovery.py's
 # `_CONFOUNDS` (an unquiesced/interfered environment is still evidence -- it
 # is recorded, never silently dropped).
 _CONFOUNDERS: frozenset[str] = frozenset(
@@ -3062,7 +3070,7 @@ def _cli_validate_staged(args: argparse.Namespace) -> int:
 def _load_target_alias_map(path: Path) -> dict[str, str]:
     """Load an external raw-serial-to-alias mapping only into memory (D-19).
 
-    Mirrors ``scripts/measure_merged_discovery.py``'s alias-map precedent:
+    Mirrors ``.planning/scripts/measure_merged_discovery.py``'s alias-map precedent:
     the file lives outside the repository, is read once into memory, and
     its raw identities never reach any tracked evidence.
     """

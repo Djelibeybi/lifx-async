@@ -52,7 +52,7 @@ _RECEIVER_POLL_TIMEOUT: float = 0.1  # How often the background receiver will sl
 
 # Private request-observation seam (Phase 14 THREAD-02). No public export: a
 # repository measurement script selects itself onto the current task before
-# issuing a request (see scripts/measurement_support.py), and each thin
+# issuing a request (see .planning/scripts/measurement_support.py), and each thin
 # request wrapper below reads that selection ONCE and passes it explicitly
 # into _transmit_and_listen() rather than the retry loop reading ambient
 # state itself. The callback receives (category, sequence, timestamp_ns,
@@ -68,7 +68,7 @@ def _current_request_observer() -> _RequestObserver | None:
 
     ``None`` on every ordinary call -- only a repository measurement script
     that has explicitly attached itself via
-    ``scripts.measurement_support._capture_request_observations()`` ever
+    ``measurement_support._capture_request_observations()`` ever
     sees a non-``None`` return here.
     """
     try:

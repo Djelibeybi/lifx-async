@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["lifx-async"]
+#
+# [tool.uv.sources]
+# lifx-async = { path = "../../", editable = true }
+# ///
 """Hardware probe for the IPv6/Thread mDNS discovery path.
 
 Thread-connected LIFX devices have no IPv4 address and are advertised over
@@ -27,10 +34,10 @@ independently:
             Its result is recorded as an artefact and gates nothing.
 
 Usage:
-    uv run scripts/ipv6_thread_probe.py
-    uv run scripts/ipv6_thread_probe.py --stage records --timeout 20
-    uv run scripts/ipv6_thread_probe.py --stage ports
-    uv run scripts/ipv6_thread_probe.py --serial d073d5123456 \\
+    uv run .planning/scripts/ipv6_thread_probe.py
+    uv run .planning/scripts/ipv6_thread_probe.py --stage records --timeout 20
+    uv run .planning/scripts/ipv6_thread_probe.py --stage ports
+    uv run .planning/scripts/ipv6_thread_probe.py --serial d073d5123456 \\
         --device-alias thread-target-alpha \\
         --uat-output .planning/phases/11-mdns-hardening/11-UAT-RESULTS.json
 
@@ -40,8 +47,8 @@ not_run. A fleet-wide write is exactly what this probe must never do.
 
 This is a diagnostic and deliberately reaches into the private record cache
 of ``lifx.network.discovery.mdns.discovery``: the point is to show what the
-library parsed, not to re-implement the parsing (``scripts/mdns_probe.py``
-already does that, and so tests nothing about the library).
+library parsed, not to re-implement the parsing, which tests nothing about
+the library.
 """
 
 from __future__ import annotations
@@ -62,6 +69,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypeVar
+
+from measurement_support import CapturedState, restore_and_verify_device_state
+from measurement_support import capture_device_state as _capture_device_state
 
 from lifx.animation.animator import Animator
 from lifx.color import HSBK
@@ -98,8 +108,6 @@ from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.network.transport import _UdpProtocol
 from lifx.network.utils import IdleDeadline
 from lifx.products import get_product
-from scripts.measurement_support import CapturedState, restore_and_verify_device_state
-from scripts.measurement_support import capture_device_state as _capture_device_state
 
 _ULA_NETWORK = ipaddress.ip_network("fc00::/7")
 
@@ -525,7 +533,7 @@ async def stage_ports(timeout: float) -> None:
     print(f"      found {len(ephemeral)} device(s)")
 
     print("  [B] port 5353 with SO_REUSEPORT (pre-fix behaviour)...")
-    original = mdns_discovery.MdnsTransport
+    original = mdns_discovery.MdnsTransport  # type: ignore[reportPrivateImportUsage]
     mdns_discovery.MdnsTransport = _LegacyMdnsTransport  # type: ignore[misc]
     try:
         legacy = {r.serial: r for r in await _collect(timeout)}
@@ -703,7 +711,7 @@ async def _restore_device_state(device: Light, state: CapturedState) -> bool:
     """Put a device back exactly as it was found, and PROVE it. Never raises.
 
     Delegates command execution, fresh recapture, and exact comparison to
-    `scripts.measurement_support.restore_and_verify_device_state()` (D-14/
+    `measurement_support.restore_and_verify_device_state()` (D-14/
     D-16): commands completing is not enough on its own, a fresh capture must
     also compare exactly equal to what was captured before the mutation. Any
     raw exception text or device identity printed here is this adapter's own

@@ -1,0 +1,14 @@
+diff --git a/tests/test_network/test_discovery_coordinator.py b/tests/test_network/test_discovery_coordinator.py
+index cba8cb7..9c97d4b 100644
+--- a/tests/test_network/test_discovery_coordinator.py
++++ b/tests/test_network/test_discovery_coordinator.py
+@@ -72,8 +72,7 @@ class _GatedDiscoveryProducer:
+                 for record in self.prefix:
+                     yield record
+                 self.started.set()
+-                while not self.release.is_set():
+-                    await asyncio.sleep(0.001)
++                await asyncio.to_thread(self.release.wait)
+                 for record in self.suffix:
+                     yield record
+             finally:

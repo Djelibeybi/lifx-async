@@ -4,7 +4,7 @@
 # dependencies = ["rich>=15.0.0", "lifx-async"]
 #
 # [tool.uv.sources]
-# lifx-async = { path = "../", editable = true }
+# lifx-async = { path = "../../", editable = true }
 # ///
 """Ground-truth audit of the serial-to-MAC derivation rule.
 
@@ -16,7 +16,7 @@ dataset (grouped by product and firmware) confirms, refines, or refutes the
 ``version_major == 3`` off-by-one rule in ``src/lifx/devices/base.py``.
 
 Usage:
-    uv run scripts/serial_mac_audit.py [--csv] [--timeout N] [--self-test]
+    uv run .planning/scripts/serial_mac_audit.py [--csv] [--timeout N] [--self-test]
 
 Caveats:
     - Rows cover responders only: devices that never answer the broadcast (or

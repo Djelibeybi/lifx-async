@@ -1,14 +1,16 @@
 """Tests for the IPv6/Thread hardware probe's UAT harness.
 
-`scripts/ipv6_thread_probe.py` talks to real Thread devices, so none of its
-network stages can be tested here. What *is* testable is everything the UAT
-harness added around them: target selection, full-state capture and restore,
-the record's shape, and the rule that streaming never gates. Every test below
-drives a fake device or a fake animator, and none of them opens a socket.
+`.planning/scripts/ipv6_thread_probe.py` talks to real Thread devices, so
+none of its network stages can be tested here. What *is* testable is
+everything the UAT harness added around them: target selection, full-state
+capture and restore, the record's shape, and the rule that streaming never
+gates. Every test below drives a fake device or a fake animator, and none of
+them opens a socket.
 
-The probe is imported by module name because `pyproject.toml` puts `scripts`
-on `pythonpath`, the same route `tests/test_theme/test_theme_generator.py`
-uses for `scripts/generate_theme_data.py`.
+The probe is imported by module name because the conftest.py beside these
+tests inserts `.planning/scripts` on `sys.path` at collection: these tests
+import their subject rather than executing it, so the interpreter's own
+`sys.path[0]` placement (which serves direct execution) does not help them.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import ipv6_thread_probe as probe
 import pytest
 
 from lifx.animation.animator import AnimatorStats
@@ -37,7 +40,8 @@ from lifx.network.discovery.mdns.dns import DnsResourceRecord, SrvData, TxtData
 from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.products import get_product
 from lifx.protocol.protocol_types import FirmwareEffect, MultiZoneApplicationRequest
-from scripts import ipv6_thread_probe as probe
+
+pytestmark = pytest.mark.tooling
 
 # A matrix product (LIFX Candle C), a plain colour bulb, and a switch, so that
 # _create_device_from_record() returns a MatrixLight, a Light and None

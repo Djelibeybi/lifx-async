@@ -9,18 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-from lifx.const import MDNS_ADDRESS, MDNS_PORT
-from lifx.network.connection import DeviceConnection
-from lifx.network.discovery import discover_devices
-from lifx.network.discovery.mdns.discovery import (
-    _current_mdns_service_source_override,
-    _discover_lifx_services,
-    _override_mdns_service_source,
-)
-from lifx.network.discovery.mdns.transport import MdnsTransport
-from lifx.network.discovery.mdns.types import _LifxServiceRecord
-from scripts.measure_merged_discovery import (
+from measure_merged_discovery import (
     _append_measurement_row,
     _arms_for_mode,
     _build_measurement_row,
@@ -37,12 +26,25 @@ from scripts.measure_merged_discovery import (
     _validate_measurements,
     main_async,
 )
-from scripts.measurement_support import (
+from measurement_support import (
     _capture_discovery_observations,
     _current_discovery_observation_sink,
     _DiscoveryObservation,
 )
+
+from lifx.const import MDNS_ADDRESS, MDNS_PORT
+from lifx.network.connection import DeviceConnection
+from lifx.network.discovery import discover_devices
+from lifx.network.discovery.mdns.discovery import (
+    _current_mdns_service_source_override,
+    _discover_lifx_services,
+    _override_mdns_service_source,
+)
+from lifx.network.discovery.mdns.transport import MdnsTransport
+from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from tests.conftest import PROGRESS_TIMEOUT
+
+pytestmark = pytest.mark.tooling
 
 
 def _row(

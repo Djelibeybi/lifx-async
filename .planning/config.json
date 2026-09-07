@@ -1,64 +1,74 @@
 {
-  "intel": {
-    "enabled": true
-  },
-  "model_policy": {
-    "provider": "openai",
-    "budget": "high"
-  },
-  "mode": "interactive",
-  "git": {
-    "create_tag": false,
-    "branching_strategy": "phase"
-  },
-  "granularity": "standard",
-  "parallelization": true,
-  "commit_docs": true,
   "model_profile": "adaptive",
+  "context_window": 1000000,
+  "commit_docs": true,
+  "parallelization": false,
+  "search_gitignored": false,
+  "brave_search": false,
+  "firecrawl": false,
+  "exa_search": false,
+  "git": {
+    "branching_strategy": "phase",
+    "phase_branch_template": "gsd/phase-{phase}-{slug}",
+    "milestone_branch_template": "gsd/{milestone}-{slug}",
+    "quick_branch_template": "gsd/quick-{slug}",
+    "create_tag": false
+  },
   "workflow": {
     "research": true,
     "plan_check": true,
     "verifier": true,
     "nyquist_validation": false,
     "auto_advance": false,
-    "_auto_chain_active": false,
-    "code_review": true,
-    "code_review_depth": "deep",
-    "pattern_mapper": true,
-    "ui_phase": false,
-    "ui_safety_gate": false,
-    "ui_review": false,
-    "ai_integration_phase": false,
-    "tdd_mode": false,
+    "node_repair": true,
+    "node_repair_budget": 2,
+    "ui_phase": true,
+    "ui_safety_gate": true,
+    "text_mode": false,
+    "research_before_questions": false,
+    "discuss_mode": "discuss",
     "skip_discuss": false,
-    "research_before_questions": true,
-    "use_worktrees": true,
-    "auto_prune_state": true
+    "use_worktrees": false,
+    "_auto_chain_active": false,
+    "ai_integration_phase": true,
+    "plan_review_convergence": true,
+    "auto_prune_state": true,
+    "max_discuss_passes": 5,
+    "cross_ai_execution": false,
+    "cross_ai_command": "",
+    "cross_ai_timeout": 1200,
+    "tdd_mode": false,
+    "code_review_depth": "deep"
   },
-  "plan_review": {
-    "source_grounding": true,
-    "source_grounding_authority": "lsp"
+  "hooks": {
+    "context_warnings": true
+  },
+  "resolve_model_ids": false,
+  "mode": "interactive",
+  "granularity": "standard",
+  "intel": {
+    "enabled": true
   },
   "graphify": {
     "enabled": true,
     "auto_update": true
   },
-  "hooks": {
-    "context_warnings": true
-  },
-  "context_window": 200000,
   "review": {
+    "parallel_lanes": true,
+    "default_reviewers": [
+      "codex",
+      "opencode",
+      "antigravity"
+    ],
     "models": {
       "codex": "gpt-5.6-sol",
       "opencode": "openrouter/z-ai/glm-5.3",
-      "agy": "gemini-3.1-pro-high",
-      "claude": "claude-opus-5"
-    },
-    "default_reviewers": [
-      "claude",
-      "opencode",
-      "antigravity"
-    ]
+      "agy": "gemini-3.1-pro-high"
+    }
+  },
+  "plan_review": {
+    "source_grounding": true,
+    "source_grounding_authority": "lsp"
   },
   "agent_skills": {
     "gsd-executor": "spike-findings-lifx-async",
@@ -68,6 +78,5 @@
     "agent_overrides": {
       "gsd-plan-checker": "high"
     }
-  },
-  "runtime": "codex"
+  }
 }
