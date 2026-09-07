@@ -129,13 +129,17 @@ under load or on a congested network.
 A Thread border router advertises every device on its mesh over mDNS,
 whether or not each advertised device is currently reachable. An mDNS
 result therefore proves an advertisement exists, not that the advertised
-device is currently reachable. The next action is to confirm it with a request, or to use `discover()`, whose mDNS candidates must answer a correlated device request before they are yielded.
+device is currently reachable. The next action is to confirm it with a
+request, or to use `discover()`, whose mDNS candidates must answer a
+correlated device request before they are yielded.
 
 Behaviour on a large or congested network is not characterised by this
-documentation. Any Phase 14 physical observations of Thread/mDNS behaviour,
-where referenced in this documentation set, describe the specific fleet
-measured at that time, not a universal benchmark or a performance guarantee
-for every network or every LIFX firmware revision. Do not size timeouts or retry policy from this documentation; measure them against your own network instead.
+documentation. Any physical observations of Thread/mDNS behaviour, where
+referenced in this documentation set, describe the specific fleet measured
+at that time, not a universal benchmark or a performance guarantee for
+every network or every LIFX firmware revision. Do not size timeouts or
+retry policy from this documentation; measure them against your own
+network instead.
 
 ## Troubleshooting
 

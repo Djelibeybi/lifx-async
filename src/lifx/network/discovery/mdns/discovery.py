@@ -144,14 +144,17 @@ def _current_mdns_service_source_override() -> _MdnsServiceSourceOverride | None
 def _normalise_dns_name(name: str) -> str:
     """Canonicalise a DNS name without changing its label structure.
 
-    Strips exactly one trailing dot and is therefore not idempotent: a name
-    carrying two or more trailing dots still has one left after a single
-    application. Apply this to raw wire data exactly once; it is not a
-    general-purpose canonicaliser safe to call repeatedly on the same value.
+    Strips every trailing dot and is therefore idempotent: applying this to
+    an already-normalised value is a no-op, so a caller never has to know
+    whether the name it holds has been through here before. Idempotence is
+    load bearing rather than incidental. A guard keyed on one application
+    and a lookup keyed on two would name different owners, and a fail-closed
+    guard that misses while its lookup hits returns the very addresses the
+    guard exists to withhold. Wire data reaches that case: a DNS label is
+    length-prefixed arbitrary bytes, so a label whose own bytes contain dots
+    decodes to a name with more than one trailing dot.
     """
-    if name.endswith("."):
-        name = name[:-1]
-    return name.casefold()
+    return name.rstrip(".").casefold()
 
 
 _LIFX_MDNS_SERVICE_CANONICAL = _normalise_dns_name(LIFX_MDNS_SERVICE)
@@ -352,12 +355,14 @@ class _LifxRecordCache:
         return frozenset(self._addresses_in_order(owner))
 
     def _owner_is_unusable(self, owner: str) -> bool:
-        """Return whether an already-normalised owner fails a fail-closed guard.
+        """Return whether a normalised owner fails a fail-closed guard.
 
-        Takes an owner already normalised by the caller and must not call
-        the normalisation helper itself. Shared by
-        ``_selected_address_for_normalised()`` and ``pending_targets()`` so
-        the next guard added lands in both places.
+        Takes an owner already normalised by the caller, which every caller
+        satisfies for free: ``_normalise_dns_name()`` is idempotent, so an
+        owner that has been through it once is unchanged by a second pass
+        and the guard key always matches the lookup key. Shared by
+        ``selected_address_for()`` and ``pending_targets()`` so the next
+        guard added lands in both places.
         """
         return (
             not owner
@@ -368,34 +373,22 @@ class _LifxRecordCache:
             or (owner, DNS_TYPE_AAAA) in self._byte_incomplete_owner_types
         )
 
-    def _selected_address_for_normalised(self, owner: str) -> str | None:
-        """Select a usable address for an owner already normalised once.
-
-        This method's own body applies no normalisation of its own. Its
-        lookup chain reaches ``records_for()``, which normalises again; for
-        every owner form this phase covers (bare, one trailing dot,
-        uppercase, mixed case) that second application is a no-op on an
-        already-normalised value, so the guard key and the lookup key
-        agree. For an owner carrying two or more trailing dots the two
-        normalisations diverge and the target stays permanently pending:
-        that is a recorded, permanent residual of D-02's decision not to
-        make ``_normalise_dns_name()`` idempotent, not something this
-        method mitigates.
-        """
-        if self._owner_is_unusable(owner):
-            return None
-        return _pick_address(self._addresses_in_order(owner))
-
     def selected_address_for(self, owner: str) -> str | None:
         """Select a usable address without exposing same-class ordering.
 
-        The public entry point owns normalisation: *owner* is routed
-        through ``_normalise_dns_name()`` before it reaches the fail-closed
-        guards or the address lookup, so a trailing-dot or differently-cased
-        owner reaches the identical guard set and selection result as its
-        bare casefolded form.
+        *owner* is normalised before it reaches either the fail-closed
+        guards or the address lookup, so any trailing-dot or
+        differently-cased owner reaches the identical guard set and
+        selection result as its bare casefolded form. An owner an internal
+        caller has already normalised is unaffected by the second pass,
+        because ``_normalise_dns_name()`` is idempotent; there is no
+        normalisation the caller has to skip, and so no reason for one to
+        reach the guards by any other route.
         """
-        return self._selected_address_for_normalised(_normalise_dns_name(owner))
+        owner = _normalise_dns_name(owner)
+        if self._owner_is_unusable(owner):
+            return None
+        return _pick_address(self._addresses_in_order(owner))
 
     def _admit_owner(self, owner: str, rtype: int) -> bool:
         """Admit one owner within its construction or address budget."""
@@ -823,11 +816,12 @@ class _LifxRecordCache:
             addresses = frozenset[str]()
             if srv_endpoint is not None:
                 target = srv_endpoint[0]
-                addresses = self.addresses_for(target)
-                # target was already normalised once, at the SRV-target
-                # normalisation site in _resolve_srv_endpoint(); call the
-                # private delegate directly to avoid renormalising it.
-                ip = self._selected_address_for_normalised(target)
+                # Build the ordered address list once: the membership set
+                # and the selected address are two views of it, and this
+                # loop runs for every unresolved instance on every packet.
+                ordered = self._addresses_in_order(target)
+                addresses = frozenset(ordered)
+                ip = None if self._owner_is_unusable(target) else _pick_address(ordered)
             elif allow_fallback:
                 ip = self._fallback_ip_by_instance.get(instance)
             if ip is None:
@@ -877,15 +871,15 @@ class _LifxRecordCache:
             if srv_endpoint is None:
                 continue
             target = srv_endpoint[0]
-            # The early return above makes the retained-payload term of
-            # _owner_is_unusable() unreachable here; adopting the shared
-            # five-condition predicate is behaviour preserving.
+            # Six terms, of which the early return above makes the
+            # retained-payload one unreachable here. Four match the guard
+            # this call site used to inline. The sixth, `not owner`, is new
+            # behaviour: an SRV target of the DNS root normalises to the
+            # empty string, and such a target used to be appended and then
+            # queried as build_address_query(""), a malformed root question.
             if self._owner_is_unusable(target):
                 continue
-            # target was already normalised once, at the SRV-target
-            # normalisation site in _resolve_srv_endpoint(); call the
-            # private delegate directly to avoid renormalising it.
-            if self._selected_address_for_normalised(target) is not None:
+            if self.selected_address_for(target) is not None:
                 continue
             targets.append(target)
 

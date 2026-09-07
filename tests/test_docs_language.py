@@ -1,7 +1,8 @@
 """Repository-wide prose contract for DOCS-08.
 
-Guards two concerns, walking every `.py` under `src/` and every `.md` under
-`docs/` (excluding the generated `docs/changelog.md`):
+Guards two concerns across every `.py` under `src/`, every `.md` under `docs/`
+(excluding the generated `docs/changelog.md`) and the repository-root Markdown
+that `tests/test_repository_guidance.py` treats as canonical guidance:
 
 1. The internal validation language DOCS-08 removes (`"proven synthetically"`,
    `"mesh scale"`) must never reappear anywhere in the walked tree.
@@ -16,12 +17,15 @@ published documentation, which every pull request can regress, and
 deselecting it by default would let a docs regression reach `main`
 unchallenged.
 
-Scans raw file text rather than reusing `test_phase_contract.py`'s
-`.md`-shaped `_normalised_prose()` helper. That helper drops every line
-starting with `#`, which under `src/**/*.py` would drop Python comments and
-under `docs/**/*.md` would drop headings, and this contract must catch the
-phrase wherever it appears, including in a comment or a heading
-(16-CONTEXT.md leaves this choice to discretion).
+Scans file text with whitespace collapsed but headings and comments retained,
+rather than reusing `test_phase_contract.py`'s `.md`-shaped
+`_normalised_prose()` helper. That helper drops every line starting with `#`,
+which under `src/**/*.py` would drop Python comments and under `docs/**/*.md`
+would drop headings, and this contract must catch the phrase wherever it
+appears, including in a comment or a heading (16-CONTEXT.md leaves this choice
+to discretion). Collapsing whitespace is not optional: this repository hard
+wraps prose, so a two-word phrase split across a line break would otherwise
+slip past a raw substring scan.
 
 Phase 20's DOCS-09 em-dash sweep should extend this module rather than
 create another, per 16-CONTEXT.md's `<deferred>` note.
@@ -30,6 +34,8 @@ create another, per 16-CONTEXT.md's `<deferred>` note.
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -41,13 +47,13 @@ _FORBIDDEN_INTERNAL_VALIDATION_PHRASES = (
 )
 
 # The false verification attribution the Phase 16 cross-AI plan review found:
-# `discover()`'s UDP leg consumes `discover_devices_shared()` directly at
-# `src/lifx/api.py:1112` and verifies nothing; it is `discover()`'s mDNS leg,
-# via `_discover_verified_devices_mdns()` at `src/lifx/api.py:1125`, that
-# requires a correlated device response before yielding, per
-# `src/lifx/network/discovery/mdns/discovery.py:1361`. Cover the exact
-# clause naming the UDP leg as unicast-verified and the same clause without
-# the `unicast-` qualifier. Casefolded.
+# `discover()`'s UDP leg consumes `discover_devices_shared()` directly and
+# verifies nothing; it is `discover()`'s mDNS leg, via
+# `_discover_verified_devices_mdns()`, that requires a correlated device
+# response before yielding, per `_verify_mdns_candidate()` in
+# `src/lifx/network/discovery/mdns/discovery.py`. Cover the exact clause
+# naming the UDP leg as unicast-verified and the same clause without the
+# `unicast-` qualifier. Casefolded.
 _FORBIDDEN_VERIFICATION_ATTRIBUTION_PHRASES = (
     "udp leg is unicast-verified",
     "udp leg is verified",
@@ -62,39 +68,50 @@ _FORBIDDEN_PHRASES = (
 # satisfies the prohibition structurally.
 _GENERATED_DOCS = (Path("docs/changelog.md"),)
 
+# Each entry is (directory, glob). The repository root is walked
+# non-recursively so the canonical guidance files are covered without
+# reaching into `.planning/`, which records the retired phrases deliberately.
+_WALKED_TREES = (
+    ("src", "**/*.py"),
+    ("docs", "**/*.md"),
+    (".", "*.md"),
+)
 
-def test_src_carries_no_internal_validation_language() -> None:
-    """Neither forbidden concern appears anywhere under `src/`."""
-    for source_path in sorted((_REPO_ROOT / "src").rglob("*.py")):
-        text = source_path.read_text(encoding="utf-8").casefold()
-        relative_path = source_path.relative_to(_REPO_ROOT)
-        for phrase in _FORBIDDEN_PHRASES:
-            assert phrase not in text, f"{phrase!r} found in {relative_path}"
+
+def _scannable_text(path: Path) -> str:
+    """Return the file's text with runs of whitespace collapsed to one space.
+
+    Headings and comments are deliberately retained; only the line breaks
+    this repository's hard wrapping introduces are removed, so a forbidden
+    two-word phrase is caught whether or not it straddles a line break.
+    """
+    return " ".join(path.read_text(encoding="utf-8").split()).casefold()
 
 
-def test_docs_carry_no_internal_validation_language() -> None:
-    """Neither forbidden concern appears anywhere under `docs/`, excluding
-    the generated `docs/changelog.md`."""
-    for doc_path in sorted((_REPO_ROOT / "docs").rglob("*.md")):
-        relative_path = doc_path.relative_to(_REPO_ROOT)
-        if relative_path in _GENERATED_DOCS:
-            continue
-        text = doc_path.read_text(encoding="utf-8").casefold()
-        for phrase in _FORBIDDEN_PHRASES:
-            assert phrase not in text, f"{phrase!r} found in {relative_path}"
+@pytest.mark.parametrize(("directory", "pattern"), _WALKED_TREES)
+def test_tree_carries_no_internal_validation_language(
+    directory: str, pattern: str
+) -> None:
+    """Neither forbidden concern appears anywhere in a walked tree."""
+    paths = sorted((_REPO_ROOT / directory).glob(pattern))
+    assert paths, (
+        f"{directory}/{pattern} matched no files; the walk is vacuous and "
+        "would pass whether or not the forbidden phrases were present"
+    )
+
+    offences = [
+        (str(path.relative_to(_REPO_ROOT)), phrase)
+        for path in paths
+        if path.relative_to(_REPO_ROOT) not in _GENERATED_DOCS
+        for phrase in _FORBIDDEN_PHRASES
+        if phrase in _scannable_text(path)
+    ]
+    assert not offences, f"forbidden phrases found: {offences}"
 
 
 def test_generated_changelog_is_excluded_by_name() -> None:
-    """The exclusion is a live structural exemption, not a stale name."""
-    assert _GENERATED_DOCS == (Path("docs/changelog.md"),)
-    assert (_REPO_ROOT / "docs/changelog.md").exists()
-
-
-def test_forbidden_phrase_set_covers_both_concerns() -> None:
-    """Neither source tuple can be dropped from the walk silently."""
-    assert _FORBIDDEN_INTERNAL_VALIDATION_PHRASES
-    assert _FORBIDDEN_VERIFICATION_ATTRIBUTION_PHRASES
-    for phrase in _FORBIDDEN_INTERNAL_VALIDATION_PHRASES:
-        assert phrase in _FORBIDDEN_PHRASES
-    for phrase in _FORBIDDEN_VERIFICATION_ATTRIBUTION_PHRASES:
-        assert phrase in _FORBIDDEN_PHRASES
+    """The exclusion names a file that exists, so it is not a stale name."""
+    for excluded in _GENERATED_DOCS:
+        assert (_REPO_ROOT / excluded).exists(), (
+            f"{excluded} is excluded by name but does not exist; the exemption is stale"
+        )

@@ -140,15 +140,20 @@ class TestStateCachingCategories:
                 "state-caching category bullets to be present"
             )
 
-    def test_connectivity_appears_in_exactly_one_caching_category(self) -> None:
+    def test_connectivity_appears_only_in_the_derived_caching_category(self) -> None:
+        """Naming the category, not just counting, is what guards DOCS-07.
+
+        A cardinality-only assertion stays green when `connectivity` is
+        moved back onto the `Cached (semi-static)` bullet, which is the one
+        regression this requirement exists to prevent.
+        """
         text = _read(_AGENTS_PATH)
         matching_categories = [
             marker
             for marker in _STATE_CACHING_CATEGORY_MARKERS
             if "connectivity" in _bullet_line_for_marker(text, marker)
         ]
-        assert len(matching_categories) == 1, (
-            "expected connectivity to appear in exactly one AGENTS.md "
-            f"state-caching category, found {len(matching_categories)}: "
-            f"{matching_categories!r}"
+        assert matching_categories == ["**Derived, not cached**"], (
+            "expected connectivity on the '**Derived, not cached**' AGENTS.md "
+            f"state-caching bullet and no other, found {matching_categories!r}"
         )
