@@ -20,6 +20,13 @@ on:
     # .github/*.py must still run the suite, ruff, pyright and bandit.
     - .github/**
     - codecov.yml
+    # tests/test_docs_language.py and tests/test_repository_guidance.py are
+    # prose contracts over published documentation and the root guidance
+    # files. Without these two entries a pull request that touches only
+    # docs/ or AGENTS.md never triggers this workflow, and the contracts
+    # are green by absence for exactly the change class they guard.
+    - docs/**
+    - '*.md'
   workflow_dispatch:
     inputs:
       release_tag:

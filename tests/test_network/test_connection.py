@@ -24,7 +24,6 @@ from lifx.protocol import packets
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device
-from lifx.protocol.packets import Device as DevicePackets
 
 
 async def _wait_for(predicate, deadline: float = 2.0) -> None:
@@ -932,7 +931,7 @@ class TestDeviceConnectionRequestStream:
             ),
         ):
             # Create EchoRequest packet
-            echo_request = DevicePackets.EchoRequest(
+            echo_request = Device.EchoRequest(
                 payload=b"\x01\x02\x03\x04" + (b"\x00" * 60)
             )
 
@@ -943,7 +942,7 @@ class TestDeviceConnectionRequestStream:
                 # Don't break - let generator return naturally
 
             assert len(responses) == 1
-            assert isinstance(responses[0], DevicePackets.EchoResponse)
+            assert isinstance(responses[0], Device.EchoResponse)
 
     async def test_unsupported_packet_kind_error(self) -> None:
         """Test error when packet kind is not GET or SET."""
@@ -1040,7 +1039,7 @@ class TestDeviceConnectionRequestStream:
             ),
         ):
             # Create GET packet
-            get_packet = DevicePackets.GetLabel()
+            get_packet = Device.GetLabel()
 
             # Test that request_stream yields unpacked response
             responses = []
@@ -1049,7 +1048,7 @@ class TestDeviceConnectionRequestStream:
                 break
 
             assert len(responses) == 1
-            assert isinstance(responses[0], DevicePackets.StateLabel)
+            assert isinstance(responses[0], Device.StateLabel)
             assert responses[0].label == "TestLight"
 
     async def test_unknown_packet_type_in_response(self) -> None:
@@ -1081,7 +1080,7 @@ class TestDeviceConnectionRequestStream:
             ),
         ):
             # Create GET packet
-            get_packet = DevicePackets.GetLabel()
+            get_packet = Device.GetLabel()
 
             with pytest.raises(LifxProtocolError, match="Unknown packet type"):
                 async for _ in conn.request_stream(get_packet):
@@ -1096,9 +1095,7 @@ class TestDeviceConnectionRequestStream:
         task: asyncio.Task[object] | None = None
         try:
             await conn.open()
-            task = asyncio.create_task(
-                conn.request(DevicePackets.GetLabel(), timeout=2.0)
-            )
+            task = asyncio.create_task(conn.request(Device.GetLabel(), timeout=2.0))
             await _wait_for_pending(conn)
             (key,) = conn._pending_requests.keys()
             source, sequence, _serial = key
@@ -1143,7 +1140,7 @@ class TestDeviceConnectionRequestStream:
                 conn, "_request_stream_impl", side_effect=mock_request_stream_impl
             ),
         ):
-            get_packet = DevicePackets.GetLabel()
+            get_packet = Device.GetLabel()
 
             with pytest.raises(LifxTimeoutError, match="No response from"):
                 await conn.request(get_packet)

@@ -334,7 +334,12 @@ def _encode_name(name: str) -> bytes:
     """Encode a DNS name as length-prefixed labels."""
     encoded = b""
     for label in name.split("."):
-        encoded += bytes([len(label)]) + label.encode("utf-8")
+        # The length prefix counts bytes, not characters: a non-ASCII label
+        # encodes to more bytes than it has characters, and prefixing the
+        # character count would understate the payload and put every
+        # following label at the wrong offset.
+        label_bytes = label.encode("utf-8")
+        encoded += bytes([len(label_bytes)]) + label_bytes
     return encoded + b"\x00"  # Root label
 
 
