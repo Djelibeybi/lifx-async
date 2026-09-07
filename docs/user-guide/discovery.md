@@ -116,11 +116,8 @@ group** and **does not receive unsolicited announcements**, so each call
 observes only direct traffic delivered to its per-call socket during the sweep
 and does not reuse DNS cache state from an earlier call. Discovery **does not
 authenticate or correlate responders** with its outstanding queries.
-Large-mesh packet assembly and follow-up behaviour are covered by deterministic
-multi-packet tests: **mesh scale is proven synthetically**, not against a
-current physical fleet at that scale.
 
-These four properties combine into one practical rule: merged `discover()`
+These properties combine into one practical rule: merged `discover()`
 visibility and single-source `discover_mdns()` visibility are not the same
 fact. A device absent from a `discover_mdns()` result may still answer
 `discover()` (or `discover_udp()`) a moment later, because the two legs observe
@@ -129,11 +126,16 @@ of silence during that window, not proof of absence — treat a short or
 censored discovery call as inconclusive, not as a negative result, especially
 under load or on a congested network.
 
-Phase 14 physical observations of Thread/mDNS behaviour, where referenced in
-this documentation set, describe the specific fleet measured at that time.
-They are fleet-specific findings, not universal benchmarks that generalise to
-every network or every LIFX firmware revision — treat them as one data point,
-not a performance guarantee.
+A Thread border router advertises every device on its mesh over mDNS,
+whether or not each advertised device is currently reachable. An mDNS
+result therefore proves an advertisement exists, not that the advertised
+device is currently reachable. The next action is to confirm it with a request, or to use `discover()`, whose mDNS candidates must answer a correlated device request before they are yielded.
+
+Behaviour on a large or congested network is not characterised by this
+documentation. Any Phase 14 physical observations of Thread/mDNS behaviour,
+where referenced in this documentation set, describe the specific fleet
+measured at that time, not a universal benchmark or a performance guarantee
+for every network or every LIFX firmware revision. Do not size timeouts or retry policy from this documentation; measure them against your own network instead.
 
 ## Troubleshooting
 

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.plasma2d import EffectPlasma2D
@@ -305,8 +306,6 @@ class TestPlasma2DGenerateFrame:
         colors = effect.generate_frame(ctx)
 
         # All colors should be valid HSBK instances
-        from lifx.color import HSBK
-
         for color in colors:
             assert isinstance(color, HSBK)
 

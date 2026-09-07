@@ -10,11 +10,13 @@ noticed. These two checks close that gap from both ends: the declaration in
 
 from __future__ import annotations
 
-import sys
 from importlib.metadata import requires
 from pathlib import Path
 
-import pytest
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 lacks the stdlib tomllib module.
+    import tomli as tomllib
 
 DISTRIBUTION = "lifx-async"
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
@@ -22,11 +24,6 @@ PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 def test_pyproject_declares_no_runtime_dependencies() -> None:
     """``[project].dependencies`` is the source of truth and must be empty."""
-    if sys.version_info < (3, 11):
-        pytest.skip("tomllib requires Python 3.11; CI covers 3.11 through 3.14")
-
-    import tomllib
-
     manifest = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
     assert manifest["project"]["dependencies"] == []
 

@@ -1,5 +1,6 @@
 """Tests for Conductor dynamic light management (add_lights/remove_lights)."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -619,8 +620,6 @@ async def test_get_last_frame_non_frame_effect(conductor, light1) -> None:
         power=True,
         color=HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500),
     )
-    import asyncio
-
     task = asyncio.create_task(asyncio.sleep(10))
     conductor._running[light1.serial] = RunningEffect(
         effect=effect, prestate=prestate, task=task

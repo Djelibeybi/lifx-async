@@ -241,8 +241,6 @@ class TestDeviceGroupApplyTheme:
 
     async def test_apply_theme_only_lights(self) -> None:
         """Test apply_theme on group with only lights."""
-        from lifx.devices.light import Light
-
         light1 = Light(serial="d073d5010001", ip="192.168.1.1", port=56700)
         light2 = Light(serial="d073d5010002", ip="192.168.1.2", port=56700)
         group = DeviceGroup([light1, light2])

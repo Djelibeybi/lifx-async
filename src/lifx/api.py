@@ -1284,7 +1284,10 @@ async def discover_mdns(
     announcements. Each call observes direct traffic delivered to its per-call
     socket during the sweep and has its own non-reusable discovery cache, but it
     does not authenticate or correlate responders with outstanding queries.
-    Mesh scale is proven synthetically.
+    An mDNS result proves an advertisement exists, not that the device is
+    currently reachable; see the discovery guide's Limitations section for
+    detail, including how discover()'s mDNS candidates verify reachability
+    with a correlated device request.
 
     Each yielded device reports ``connectivity`` from its mDNS TXT record:
     ``Connectivity.THREAD`` only after an exact positive Thread report, and

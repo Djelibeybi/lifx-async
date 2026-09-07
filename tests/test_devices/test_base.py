@@ -676,8 +676,6 @@ class TestLocationAndGroupManagement:
         Note: This is a protocol-level behavior that clients must implement, not
         enforced by the set_location/set_group methods themselves.
         """
-        import time
-
         # Simulate two devices with the same location UUID but different timestamps
         location_uuid = uuid.uuid5(LIFX_LOCATION_NAMESPACE, "Kitchen").bytes
         older_timestamp = int(time.time() * 1e9) - 1000000000  # 1 second ago
@@ -709,8 +707,6 @@ class TestLocationAndGroupManagement:
         Note: This is a protocol-level behavior that clients must implement, not
         enforced by the set_location/set_group methods themselves.
         """
-        import time
-
         # Simulate two devices with the same group UUID but different timestamps
         group_uuid = uuid.uuid5(LIFX_GROUP_NAMESPACE, "Bedroom").bytes
         older_timestamp = int(time.time() * 1e9) - 1000000000  # 1 second ago

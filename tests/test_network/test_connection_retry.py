@@ -18,19 +18,26 @@ per-test RED/coincidental-pass breakdown.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 from unittest.mock import patch
 
+import measurement_support
 import pytest
 from measurement_support import (
     _capture_request_observations,
     _RequestObservationSink,
 )
 
+from lifx.const import REQUEST_RETRANSMIT_GAPS
 from lifx.exceptions import LifxConnectionError, LifxProtocolError, LifxTimeoutError
-from lifx.network.connection import DeviceConnection, _current_request_observer
+from lifx.network.connection import (
+    _REQUEST_OBSERVER_TASK_ATTRIBUTE,
+    DeviceConnection,
+    _current_request_observer,
+)
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
 
@@ -1170,10 +1177,6 @@ class TestRequestObservation:
         a public signature, and the retransmit schedule constant is
         untouched by this plan (source-level anti-weakening check for the
         Task 2 coverage/estimate concern in 14-REVIEWS.md)."""
-        import inspect
-
-        from lifx.const import REQUEST_RETRANSMIT_GAPS
-
         assert REQUEST_RETRANSMIT_GAPS == (
             0.2,
             0.3,
@@ -1221,8 +1224,6 @@ class TestRequestObservation:
         """`asyncio.current_task()` can return `None` from inside a running
         loop when the calling code is not itself a Task (rather than raising
         `RuntimeError` outright, which only happens with no loop at all)."""
-        import measurement_support
-
         with patch.object(
             measurement_support.asyncio, "current_task", return_value=None
         ):
@@ -1235,8 +1236,6 @@ class TestRequestObservation:
     async def test_nested_capture_restores_the_outer_observer(self) -> None:
         """A second, nested capture must not clobber the first one's selection
         once it exits -- the `finally` block's `had_previous` restore arm."""
-        from lifx.network.connection import _REQUEST_OBSERVER_TASK_ATTRIBUTE
-
         task = asyncio.current_task()
         assert task is not None
 

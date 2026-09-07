@@ -78,7 +78,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
+select = ["E", "F", "I", "N", "W", "UP", "PLC0415"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
@@ -87,6 +87,21 @@ ignore = []
 "src/lifx/products/registry.py" = ["E501"]
 "benchmarks/*.py" = ["E501"]
 "tests/benchmarks/*.py" = ["E501"]
+# PLC0415 (import-outside-top-level) is enabled repository-wide, but these
+# seven paths are not yet swept. Each entry is a visible, deletable line
+# rather than a silent exclusion, so the owning phase removes its own line
+# when it sweeps its files: Phase 18 deletes "tests/test_animation/**" and
+# "tests/test_devices/test_multizone.py"; Phase 19 deletes
+# "tests/test_theme/**". "src/**" and ".planning/**" remain for a future
+# phase. ".agents/skills/**" and ".claude/skills/**" cover two archived
+# spike harnesses preserved verbatim as evidence sources.
+"src/**" = ["PLC0415"]
+".planning/**" = ["PLC0415"]
+"tests/test_animation/**" = ["PLC0415"]
+"tests/test_theme/**" = ["PLC0415"]
+"tests/test_devices/test_multizone.py" = ["PLC0415"]
+".agents/skills/**" = ["PLC0415"]
+".claude/skills/**" = ["PLC0415"]
 
 [tool.pyright]
 typeCheckingMode = "standard"

@@ -41,6 +41,7 @@ from lifx.network.discovery.mdns.discovery import (
     _MdnsSweepFailure,
 )
 from lifx.network.discovery.mdns.dns import DnsResourceRecord, SrvData, TxtData
+from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.network.discovery.udp import _DiscoveryObserver
 from lifx.network.message import create_message
 from lifx.network.transport import UdpTransport
@@ -2528,8 +2529,6 @@ class TestDiscoverMdns:
     @pytest.mark.asyncio
     async def test_discover_mdns_yields_devices(self) -> None:
         """Test that discover_mdns() yields device instances."""
-        from lifx.network.discovery.mdns.types import _LifxServiceRecord
-
         mock_record = _LifxServiceRecord(
             serial="d073d5123456",
             ip="192.0.2.10",
@@ -2559,8 +2558,6 @@ class TestDiscoverMdns:
     @pytest.mark.asyncio
     async def test_discover_mdns_filters_relay_devices(self) -> None:
         """Test that discover_mdns() filters out relay-only devices."""
-        from lifx.network.discovery.mdns.types import _LifxServiceRecord
-
         mock_record = _LifxServiceRecord(
             serial="d073d5123456",
             ip="192.168.1.100",

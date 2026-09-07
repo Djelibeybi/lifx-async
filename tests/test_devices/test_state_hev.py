@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
 
@@ -252,8 +253,6 @@ class TestHevAcknowledgementBasedStateUpdates:
     @pytest.mark.asyncio
     async def test_set_hev_config_no_update_without_ack(self, emulator_devices) -> None:
         """Test set_hev_config() does NOT update state when ack not received."""
-        from unittest.mock import patch
-
         template: HevLight = emulator_devices[3]  # d073d5000004
 
         async with await HevLight.connect(

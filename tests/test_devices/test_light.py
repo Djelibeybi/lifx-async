@@ -9,6 +9,7 @@ import pytest
 from lifx.color import HSBK
 from lifx.const import KELVIN_SATURATED
 from lifx.devices.light import Light
+from lifx.exceptions import LifxUnsupportedCommandError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk, LightWaveform
 
@@ -534,8 +535,6 @@ class TestLightStateUnhandled:
         Switch devices don't support Light commands, so get_color() should
         raise LifxUnsupportedCommandError when the device returns StateUnhandled.
         """
-        from lifx.exceptions import LifxUnsupportedCommandError
-
         # Create a Light instance using the switch connection (without context manager)
         light = Light(
             serial=switch_device.serial,
@@ -563,8 +562,6 @@ class TestLightStateUnhandled:
         Switch devices don't support Light commands, so set_color() should
         raise LifxUnsupportedCommandError when the device returns StateUnhandled.
         """
-        from lifx.exceptions import LifxUnsupportedCommandError
-
         # Create a Light instance using the switch connection (without context manager)
         light = Light(
             serial=switch_device.serial,
