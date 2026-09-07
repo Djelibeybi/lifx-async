@@ -4,8 +4,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
+from lifx.effects.aurora import EffectAurora
 from lifx.effects.colorloop import EffectColorloop
+from lifx.effects.flame import EffectFlame
+from lifx.effects.progress import EffectProgress
 from lifx.effects.pulse import EffectPulse
 from lifx.effects.rainbow import EffectRainbow
 from lifx.effects.registry import (
@@ -16,6 +22,7 @@ from lifx.effects.registry import (
     _classify_device,
     get_effect_registry,
 )
+from lifx.effects.sunrise import EffectSunrise, EffectSunset
 
 
 class TestEffectRegistry:
@@ -208,11 +215,6 @@ class TestDefaultRegistry:
 
     def test_builtin_effect_classes(self) -> None:
         """Test that built-in effects reference the correct classes."""
-        from lifx.effects.aurora import EffectAurora
-        from lifx.effects.flame import EffectFlame
-        from lifx.effects.progress import EffectProgress
-        from lifx.effects.sunrise import EffectSunrise, EffectSunset
-
         registry = get_effect_registry()
         assert registry.get_effect("pulse").effect_class is EffectPulse
         assert registry.get_effect("colorloop").effect_class is EffectColorloop
@@ -288,29 +290,21 @@ class TestDeviceClassification:
 
     def test_classify_multizone(self) -> None:
         """Test that a MultiZoneLight is classified as MULTIZONE."""
-        from lifx.devices.multizone import MultiZoneLight
-
         light = MagicMock(spec=MultiZoneLight)
         assert _classify_device(light) is DeviceType.MULTIZONE
 
     def test_classify_matrix(self) -> None:
         """Test that a MatrixLight is classified as MATRIX."""
-        from lifx.devices.matrix import MatrixLight
-
         light = MagicMock(spec=MatrixLight)
         assert _classify_device(light) is DeviceType.MATRIX
 
     def test_classify_infrared_as_light(self) -> None:
         """Test that an InfraredLight is classified as LIGHT."""
-        from lifx.devices.infrared import InfraredLight
-
         light = MagicMock(spec=InfraredLight)
         assert _classify_device(light) is DeviceType.LIGHT
 
     def test_get_effects_for_device_integration(self) -> None:
         """Test get_effects_for_device with a mock device."""
-        from lifx.devices.multizone import MultiZoneLight
-
         registry = get_effect_registry()
         device = MagicMock(spec=MultiZoneLight)
         results = registry.get_effects_for_device(device)

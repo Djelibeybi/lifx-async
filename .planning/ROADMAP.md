@@ -120,7 +120,7 @@ fixes; the phases group them by the code and review surface they touch and by wh
 verified together, not by size.
 
 - [x] **Phase 15: Coverage Gate and Test-Suite Health** - Make the project's own verification machinery honest before it measures anything else: the `codecov/patch` gate cannot pass without scoring a pull request's changed range, the `scripts/` tree triage and measured-tree rule state which code coverage measures, and the v2.0 Phase 13 coordinator teardown item is settled either way (completed 2026-09-07)
-- [ ] **Phase 16: mDNS Correctness, Docs and Test Hygiene** - Close the fail-closed address-check bypass in `selected_address_for()`, and make the mDNS surface describe itself to callers: `Device.connectivity` classified as a derived rather than cached property, caller-facing discovery docstrings, and module-scope test imports
+- [x] **Phase 16: mDNS Correctness, Docs and Test Hygiene** - Close the fail-closed address-check bypass in `selected_address_for()`, and make the mDNS surface describe itself to callers: `Device.connectivity` classified as a derived rather than cached property, caller-facing discovery docstrings, and module-scope test imports (completed 2026-09-07)
 - [ ] **Phase 17: Fleet Diagnostics and the Staleness Control** - Make the IPv6 Thread probe report what it actually observed, and give v2.0's 69s Thread disappearance-to-expiry figure a WiFi control measured with the same protocol
 - [ ] **Phase 18: Animator Connectivity Guard and Typed Move Effect** - The milestone's two public API changes: `Animator` stops silently accepting a Thread device, and a caller builds the firmware Move effect through typed arguments instead of an eight-slot `parameters` list
 - [ ] **Phase 19: Theme Library API and Data** - Primary themes distinguishable from rename aliases with canonical-slug resolution, a digit-leading display name representable as a slug, and the v1.2 palette substitutions named in the changelog
@@ -219,7 +219,22 @@ relies on it); file-disjoint from Phases 18 and 19 and can run in parallel with 
   3. The mDNS discovery docstrings and related pages state bounded discovery behaviour, proxy responses and testing limitations in terms a caller can act on, with no internal validation language such as mesh scale being "proven synthetically" remaining
   4. The mDNS discovery tests import at module scope, ruff and the complete mDNS discovery suite pass, and any retained function-local import carries a named circular-import or patching reason rather than being left unexplained
 
-**Plans**: TBD
+**Plans**: 4/4 plans executed
+
+Plans:
+
+**Wave 1**
+
+- [x] 16-01-PLAN.md: MDNS-09 tracer, the owner-name normalisation split and the extracted fail-closed guard predicate, with the named regression test and the owner-form invariant matrix (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 16-02-PLAN.md: DOCS-08 caller-facing mDNS prose, both `test_phase_contract.py` phrase lists moved in the same commit, and the new repository-wide `tests/test_docs_language.py` contract (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion; the two plans are file-disjoint and run in parallel)*
+
+- [x] 16-03-PLAN.md: DOCS-07 `Device.connectivity` reclassified as a derived non-state property, with a third `AGENTS.md` caching category and the two contract assertions split by file (wave 3)
+- [x] 16-04-PLAN.md: TEST-01 the 166-import sweep across 27 files as one commit, then the `PLC0415` ruff enablement with per-file-ignores that hand off to Phases 18 and 19 (wave 3)
 
 ### Phase 17: Fleet Diagnostics and the Staleness Control
 
@@ -305,7 +320,7 @@ sweep cannot collide with them)
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 15. Coverage Gate and Test-Suite Health | 5/5 | Not started |  |
-| 16. mDNS Correctness, Docs and Test Hygiene | 0/? | Not started | - |
+| 16. mDNS Correctness, Docs and Test Hygiene | 4/4 | Not started |  |
 | 17. Fleet Diagnostics and the Staleness Control | 0/? | Not started | - |
 | 18. Animator Connectivity Guard and Typed Move Effect | 0/? | Not started | - |
 | 19. Theme Library API and Data | 0/? | Not started | - |

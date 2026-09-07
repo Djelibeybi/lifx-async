@@ -348,6 +348,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 
 - Cached (semi-static): `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
 - **Never cached** (volatile): `power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level` — always use `get_*()` methods
+- **Derived, not cached** (computed on every read): `connectivity` is recomputed on every read from the device's own transport report in the most recent correlated response, and comes from discovery metadata until one has been observed, so there is no stored value to refresh or invalidate
 - `get_color()` returns `(color, power, label)` in a single request/response pair — most efficient way to get color + power
 - No automatic expiration — application controls when to refresh
 

@@ -13,8 +13,10 @@ from lifx.network.discovery.mdns.dns import (
     DNS_TYPE_SRV,
     DNS_TYPE_TXT,
     DnsHeader,
+    DnsResourceRecord,
     SrvData,
     TxtData,
+    _parse_resource_record,
     build_address_query,
     build_ptr_query,
     parse_dns_response,
@@ -307,8 +309,6 @@ class TestParseResourceRecord:
 
     def test_resource_record_header_incomplete(self) -> None:
         """Test parsing resource record with incomplete header."""
-        from lifx.network.discovery.mdns.dns import _parse_resource_record
-
         # Name followed by incomplete header (less than 10 bytes)
         data = b"\x04test\x05local\x00" + b"\x00\x01"  # Only type, missing rest
         with pytest.raises(ValueError, match="Resource record header incomplete"):
@@ -316,8 +316,6 @@ class TestParseResourceRecord:
 
     def test_resource_record_data_incomplete(self) -> None:
         """Test parsing resource record with incomplete rdata."""
-        from lifx.network.discovery.mdns.dns import _parse_resource_record
-
         # Name + complete header + incomplete rdata
         name = b"\x04test\x05local\x00"
         # Type=A, Class=IN, TTL=120, RDLength=10 (but only 4 bytes available)
@@ -330,11 +328,6 @@ class TestParseResourceRecord:
 
     def test_aaaa_record_parsing(self) -> None:
         """Test parsing AAAA (IPv6) record."""
-        from lifx.network.discovery.mdns.dns import (
-            DNS_TYPE_AAAA,
-            _parse_resource_record,
-        )
-
         # Build an AAAA record for ::1 (loopback)
         name = b"\x04test\x05local\x00"
         # Type=AAAA (28), Class=IN, TTL=120, RDLength=16
@@ -381,8 +374,6 @@ class TestDnsResourceRecord:
 
     def test_type_name_known(self) -> None:
         """Test type_name for known types."""
-        from lifx.network.discovery.mdns.dns import DnsResourceRecord
-
         record = DnsResourceRecord("test.local", DNS_TYPE_A, 1, 120, b"")
         assert record.type_name == "A"
 
@@ -397,8 +388,6 @@ class TestDnsResourceRecord:
 
     def test_type_name_unknown(self) -> None:
         """Test type_name for unknown types."""
-        from lifx.network.discovery.mdns.dns import DnsResourceRecord
-
         record = DnsResourceRecord("test.local", 999, 1, 120, b"")
         assert record.type_name == "TYPE999"
 

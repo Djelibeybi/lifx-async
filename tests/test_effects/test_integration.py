@@ -6,9 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from lifx.animation.animator import Animator
 from lifx.color import HSBK
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
 from lifx.effects import Conductor, EffectColorloop, EffectPulse
+from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 
@@ -517,8 +521,6 @@ async def test_conductor_exception_during_effect() -> None:
 @pytest.mark.asyncio
 async def test_conductor_exception_during_async_perform() -> None:
     """Test conductor handles exception raised during async_perform."""
-    from lifx.effects.base import LIFXEffect
-
     conductor = Conductor()
 
     # Create a custom effect that raises exception during async_perform
@@ -780,10 +782,6 @@ async def test_conductor_closes_animators_on_error(conductor, mock_light) -> Non
 @pytest.mark.asyncio
 async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     """Test Conductor creates appropriate animators for different device types."""
-    from lifx.animation.animator import Animator
-    from lifx.devices.matrix import MatrixLight
-    from lifx.devices.multizone import MultiZoneLight
-
     conductor = Conductor()
 
     # Create mock devices of different types

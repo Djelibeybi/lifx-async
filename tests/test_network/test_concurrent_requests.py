@@ -7,10 +7,12 @@ user-facing DeviceConnection API.
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 
 from lifx.exceptions import LifxTimeoutError
+from lifx.network.connection import DeviceConnection
 from lifx.protocol.packets import Device
 
 
@@ -19,8 +21,6 @@ class TestConcurrentRequests:
 
     async def test_timeout_behavior(self):
         """Test that timeout raises LifxTimeoutError with no server response."""
-        from lifx.network.connection import DeviceConnection
-
         conn = DeviceConnection(
             serial="d073d5000001", ip="192.168.1.100", timeout=0.1, max_retries=0
         )
@@ -52,8 +52,6 @@ class TestErrorHandling:
             },
         )
 
-        from lifx.network.connection import DeviceConnection
-
         conn = DeviceConnection(
             serial="d073d5000001",
             ip="127.0.0.1",
@@ -83,8 +81,6 @@ class TestErrorHandling:
                 }
             },
         )
-
-        from lifx.network.connection import DeviceConnection
 
         conn = DeviceConnection(
             serial="d073d5000001",
@@ -134,8 +130,6 @@ class TestAsyncGeneratorRequests:
             scenarios={},
         )
 
-        from lifx.network.connection import DeviceConnection
-
         conn = DeviceConnection(
             serial="d073d5000001",
             ip="127.0.0.1",
@@ -166,8 +160,6 @@ class TestAsyncGeneratorRequests:
             scenarios={},
         )
 
-        from lifx.network.connection import DeviceConnection
-
         conn = DeviceConnection(
             serial="d073d5000001",
             ip="127.0.0.1",
@@ -190,8 +182,6 @@ class TestAsyncGeneratorRequests:
             serial="d073d5000001",
             scenarios={},
         )
-
-        from lifx.network.connection import DeviceConnection
 
         conn = DeviceConnection(
             serial="d073d5000001",
@@ -238,10 +228,6 @@ class TestRetryTimeoutBudget:
         "after 6 attempts" (max_retries + 1) regardless of jitter, so the
         message assertion is deterministic RED independent of randomness.
         """
-        import time
-
-        from lifx.network.connection import DeviceConnection
-
         # Create a scenario that drops all packets to force full timeout
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
@@ -291,8 +277,6 @@ class TestRetryTimeoutBudget:
         delegate to the same retransmit/wall-deadline engine, so both paths
         honour the wall budget within the same bounds.
         """
-        import time
-
         # Create a scenario that drops packets for both GET and SET
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
@@ -304,8 +288,6 @@ class TestRetryTimeoutBudget:
                 }
             },
         )
-
-        from lifx.network.connection import DeviceConnection
 
         timeout = 1.5
         max_retries = 2  # 3 total attempts
@@ -366,8 +348,6 @@ class TestRetryTimeoutBudget:
                 }
             },
         )
-
-        from lifx.network.connection import DeviceConnection
 
         timeout = 2.0
         max_retries = 2

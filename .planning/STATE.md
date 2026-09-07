@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Spring Cleaning
-current_phase: 16
-current_phase_name: mDNS Correctness, Docs and Test Hygiene
-status: planning
-stopped_at: Phase 15 complete, ready to plan Phase 16
-last_updated: "2026-09-07T00:10:13.393Z"
+current_phase: 17
+current_phase_name: Fleet Diagnostics and the Staleness Control
+status: "Phase 16 shipped — PR #228"
+stopped_at: Phase 16 complete, ready to plan Phase 17
+last_updated: "2026-09-07T09:40:31.067Z"
 last_activity: 2026-09-07
-state_head: e21ef649c6c4014b71d7582deb72bd13625d5e61
+state_head: 7616656b0303506c58d6d624debb92a80d830034
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
-  percent: 17
+  completed_phases: 2
+  total_plans: 9
+  completed_plans: 9
+  percent: 33
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after v2.0 milestone)
 
 **Core value:** Commands stick, devices are found — over WiFi or Thread, transparently — streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 15, Coverage Gate and Test-Suite Health
+**Current focus:** Phase 16 — mDNS Correctness, Docs and Test Hygiene
 
 ## Current Position
 
-Phase: 16 of 20 (mDNS Correctness, Docs and Test Hygiene)
+Phase: 17 — Fleet Diagnostics and the Staleness Control
 Plan: Not started
-Status: Ready to plan (Phase 15 shipped as PR #227)
-Total Plans in Phase: 5
+Status: Phase 16 shipped — PR #228
+Total Plans in Phase: 4
 Last activity: 2026-09-07
 
 **v2.1 phase order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20
@@ -92,6 +92,10 @@ Last activity: 2026-09-07
 | Phase 15 P03 | 33min | 3 tasks | 4 files |
 | Phase 15 P04 | 24 min | 3 tasks | 7 files |
 | Phase 15 P05 | ~20min (continuation) | 5 tasks | 12 files |
+| Phase 16 P01 | 12 min | 2 tasks | 2 files |
+| Phase 16 P02 | 18min | 2 tasks | 4 files |
+| Phase 16 P03 | 12 min | 2 tasks | 4 files |
+| Phase 16 P04 | 24min | 2 tasks | 28 files |
 
 ## Accumulated Context
 
@@ -107,17 +111,6 @@ this milestone (all 2026-08-27 unless noted):
 - The mDNS ephemeral-port bind is a requirement in its own right (MDNS-01): an IPv4 defect, not a Thread feature
 - `LifxServiceRecord` keeps the wire name `tm`; no expansion of the undocumented key may be asserted anywhere
 - No WiFi-measured constant is retuned before Phase 14 measures it over Thread (spike-first discipline, 2026-07-16 lineage)
-- [Phase 14]: THREAD-02 request-observer seam: private task-attribute selector on DeviceConnection, propagated explicitly into _transmit_and_listen(), never read from ambient state — Mirrors the existing discovery-observer pattern; accepted_ns sampled at dequeue (before validation) so it excludes validation work but includes receiver queueing/wake latency
-- [Phase 14]: Removed CLAUDE.md from test_phase_contract.py's _REQUIRED_QUERY_MODEL_PATHS rather than scoping the new no-duplication test around it — The two requirements on the same file were mutually exclusive once D-24 made CLAUDE.md import-only; AGENTS.md alone now carries the shared mDNS query-model prose the contract checks
-- [Phase 14]: CLAUDE.md is reduced to a literal @AGENTS.md import plus one Claude-specific note about Skill() invocation — No other genuinely Claude-only guidance was found in the original file after removing ~460 lines of drifted architecture duplication
-- [Phase 14]: [Phase 14] Staleness absence is defined as BOTH discover() and discover_mdns() missing the target on one poll, never either leg alone — discover() reflects unicast-verified liveness and can go absent within one poll of disconnect, while discover_mdns() reflects border-router advertisement and can keep reporting the device far longer; an either-leg predicate would confirm expiry at unicast-liveness speed and publish that as the SRP lease, a materially different and smaller number than THREAD-04 actually asks for
-- [Phase 14]: Animation evidence names only the four AnimatorStats fields that exist (packets_sent, total_time_ms, gated, acks_outstanding); acks_outstanding is never narrated as ACK-received/expiry evidence — AckGate.sweep() prunes expired probes silently, so a falling acks_outstanding is ambiguous between "the device acknowledged" and "the probe expired unacknowledged"; the closed animation-rate schema has no field that could hold such a narration, proven by a dedicated negative test
-- [Phase 14]: Plan 14-02 built the manifest, five journals, schedules, statistics and deterministic products as one coherent unit rather than splitting Task 1/Task 2 into separate RED-then-GREEN commits — The manifest (Task 1) must freeze the exact generated D-02/D-06 jitter schedules (Task 2), so the two tasks are load-bearing on each other; most new tests define a schema contract rather than catch a pre-existing defect, so a traditional RED-first bug-catching phase does not cleanly apply
-- [Phase 14]: restore_and_verify_device_state() requires exact post-command readback (protocol-normalised equality), never acknowledgement alone -- fixes ipv6_thread_probe.py's prior silent-success-on-command-only restoration bug; a captured power outside {0, 65535} refuses mutation before any command as a distinct power_out_of_range outcome (D-05/D-16)
-- [Phase 14]: check_patch_coverage.py's changed-excluded-line rule cannot pass for a brand-new script's own if __name__ == "__main__": guard (a pre-existing, static exclude_lines pattern applied regardless of execution) -- documented rather than gamed by restructuring the guard's literal text to dodge the regex
-- [Phase 14]: Removed thread_revalidation.py's only if TYPE_CHECKING: block for ordinary top-level Light/AnimatorStats imports — Avoided colliding with pyproject.toml's pre-existing 'if TYPE_CHECKING' coverage exclude_lines pattern on two brand-new lines, the same false-positive class already documented for the module's if __name__ guard
-- [Phase 14]: derive_class_ledger_from_roster() is the Task 3 authoritative six-class ledger, derived from the frozen roster and journals only — An evidence_backed class requires every expected alias's physical discovery, all 100 physical request trials and one physical animation attempt -- never a caller-supplied closure claim or the subset of devices one sweep observed
-- [Phase 14]: New generate CLI subcommand is additive and distinct from the unchanged validate — Keeps the 14-02/14-03 validate contract and its tests intact while generate requires roster completeness and writes products atomically only after validation passes
 - [Phase 15]: D-09: deselection via opt-in flags through the existing collection hook, not a growing -m negation
 - [Phase 15]: Extended bandit's pre-commit exclude to also cover .planning/scripts/tests/, since those test files were only ever exempted by their old tests/ path
 - [Phase 15]: [Phase 15] Accepted a pre-commit-forced isort reorder in Task 1's pure-rename commit rather than fighting an unavoidable, mechanically-identical re-trigger caused by ruff no longer treating scripts.* as first-party from the new .planning/scripts/ location
@@ -127,6 +120,12 @@ this milestone (all 2026-08-27 unless noted):
 - [Phase 15]: TEST-02: coordinator teardown fix (39bad58) confirmed load-bearing by reproducing the pre-fix hang in a scratch worktree; deferred-items.md and STATE.md reconciled to the same outcome
 - [Phase 15]: [Phase 15] Operator selected publish-both-close-209 at the Task 4 checkpoint: both drafted issue comments published verbatim, #214 closed on the CI-01 reversal reasoning, and #209 also closed even though 15-SPEC.md R5 expected it to stay open
 - [Phase 15]: [Phase 15] 15-SPEC.md's locked amendment scope widened from one region to an allowlist of five, because the spec restates its commitments twice and four phase-global restatements contradicted the delivered mechanism
+- [Phase 16]: MDNS-09: extracted _owner_is_unusable() as a shared six-term fail-closed predicate (adds a leading 'not owner' term) used by both selected_address_for() and pending_targets(), closing the trailing-dot and empty/root-owner guard bypasses — Cross-AI plan review found the naive single-caller fix left the empty/DNS-root owner and duplicated pending_targets() guard unrepaired; the shared predicate makes the next guard added land in both places automatically
+- [Phase 16]: Accepted a permanent, documented residual: an owner with two or more trailing dots still diverges between guard key and lookup key (D-02 declines to make _normalise_dns_name() idempotent) — No SPEC acceptance criterion or edge-coverage row covers a multi-dot owner form; recorded in the helper's docstring and the plan rather than widened out of scope
+- [Phase 16]: [Phase 16]: DOCS-08: proxy-response verification attributed to discover()'s mDNS candidates (via _discover_verified_devices_mdns()), not its UDP leg, correcting D-14's original clause which was false against src/lifx/api.py:1112/:1125
+- [Phase 16]: [Phase 16] DOCS-07: split the connectivity caching contract by file per D-09, and scoped the new AGENTS.md derived-not-cached category to a correlated response rather than a broader request outcome, matching connection.py:1075's correlation-gated assignment — Timeouts, connection failures, and uncorrelated replies are request outcomes that leave the cached value unchanged, so the broader phrasing would have overstated what the implementation guarantees
+- [Phase 16]: TEST-01: swept 166 function-local imports to module scope across 27 files in one mechanical commit, then enabled ruff PLC0415 with seven per-file-ignore handoff entries in a separate later commit — D-08 sequencing keeps every commit green under ruff check; zero imports needed retention, so no noqa marks exist under tests/
+- [Phase 16]: tests/test_packaging.py's Python 3.10 skip replaced with a module-scope tomli/tomllib compatibility import over the existing tomli dev dependency, gaining coverage rather than needing a suppression — Neither hoisting a bare tomllib nor retaining it under D-06/D-07's permitted noqa reasons was available; the existing tomli>=2.0.1 dev dependency closes the gap with no new dependency
 
 ### v2.1 Working Notes
 
@@ -209,8 +208,8 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-09-06T22:52:25.623Z
-Stopped at: Phase 15 complete, ready to plan Phase 16
+Last session: 2026-09-07T08:01:02.872Z
+Stopped at: Phase 16 complete, ready to plan Phase 17
 Resume file: None
 
 ## Operator Next Steps

@@ -25,6 +25,11 @@ from lifx.exceptions import (
     LifxUnsupportedCommandError,
     LifxUnsupportedDeviceError,
 )
+from lifx.products.registry import (
+    ProductCapability,
+    ProductInfo,
+    TemperatureRange,
+)
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 from tests.conftest import PROGRESS_TIMEOUT
@@ -1781,8 +1786,6 @@ class TestProcessCapabilities:
 
     def test_process_capabilities_sets_capabilities(self, mock_product_info):
         """Test _process_capabilities() sets device capabilities from version."""
-        from lifx.devices.base import DeviceVersion, FirmwareInfo
-
         device = Device(serial="d073d5010203", ip="192.168.1.100")
         product_info = mock_product_info(has_color=True)
 
@@ -1796,8 +1799,6 @@ class TestProcessCapabilities:
 
     def test_process_capabilities_noop_when_already_set(self, mock_product_info):
         """Test _process_capabilities() is a no-op when capabilities already set."""
-        from lifx.devices.base import DeviceVersion, FirmwareInfo
-
         device = Device(serial="d073d5010203", ip="192.168.1.100")
         existing_info = mock_product_info(has_color=True, name="Existing")
         device._capabilities = existing_info
@@ -1814,13 +1815,6 @@ class TestProcessCapabilities:
 
     def test_process_capabilities_strips_extended_multizone_for_old_firmware(self):
         """Test _process_capabilities() strips extended_multizone for old firmware."""
-        from lifx.devices.base import DeviceVersion, FirmwareInfo
-        from lifx.products.registry import (
-            ProductCapability,
-            ProductInfo,
-            TemperatureRange,
-        )
-
         device = Device(serial="d073d5010203", ip="192.168.1.100")
 
         # Create product with extended_multizone and a minimum firmware requirement
@@ -1985,8 +1979,6 @@ class TestDeviceInitializeStateParallel:
     ):
         """Test _initialize_state() cancels version_task if gather
         raises."""
-        from lifx.exceptions import LifxTimeoutError
-
         device = Device(serial="d073d5010203", ip="192.168.1.100")
         mock_conn = MagicMock()
         mock_conn.request = AsyncMock()
@@ -2020,8 +2012,6 @@ class TestDeviceInitializeStateParallel:
         through awaiting them leaves the rest pending. Without the cancel they
         would surface later as "exception was never retrieved".
         """
-        from lifx.exceptions import LifxTimeoutError
-
         device._capabilities = mock_product_info(has_color=False)
         cancelled = asyncio.Event()
         handler = _state_request_handler()

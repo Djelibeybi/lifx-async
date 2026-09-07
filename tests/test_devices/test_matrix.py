@@ -18,12 +18,18 @@ from lifx.products import (
 )
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
+    DeviceStateHostFirmware,
+    DeviceStateVersion,
     FirmwareEffect,
     LightHsbk,
+    TileAccelMeas,
     TileBufferRect,
     TileEffectParameter,
     TileEffectSettings,
     TileEffectSkyType,
+)
+from lifx.protocol.protocol_types import (
+    TileStateDevice as LifxProtocolTileDevice,
 )
 
 
@@ -971,15 +977,6 @@ class TestTileInfo:
 
     def test_tile_info_total_zones(self) -> None:
         """Test total_zones property calculation."""
-        from lifx.protocol.protocol_types import (
-            DeviceStateHostFirmware,
-            DeviceStateVersion,
-            TileAccelMeas,
-        )
-        from lifx.protocol.protocol_types import (
-            TileStateDevice as LifxProtocolTileDevice,
-        )
-
         protocol_tile = LifxProtocolTileDevice(
             accel_meas=TileAccelMeas(x=0, y=0, z=0),
             user_x=0.0,
@@ -998,15 +995,6 @@ class TestTileInfo:
 
     def test_tile_info_requires_frame_buffer_false(self) -> None:
         """Test requires_frame_buffer for tile with ≤64 zones."""
-        from lifx.protocol.protocol_types import (
-            DeviceStateHostFirmware,
-            DeviceStateVersion,
-            TileAccelMeas,
-        )
-        from lifx.protocol.protocol_types import (
-            TileStateDevice as LifxProtocolTileDevice,
-        )
-
         protocol_tile = LifxProtocolTileDevice(
             accel_meas=TileAccelMeas(x=0, y=0, z=0),
             user_x=0.0,
@@ -1025,15 +1013,6 @@ class TestTileInfo:
 
     def test_tile_info_requires_frame_buffer_true(self) -> None:
         """Test requires_frame_buffer for tile with >64 zones."""
-        from lifx.protocol.protocol_types import (
-            DeviceStateHostFirmware,
-            DeviceStateVersion,
-            TileAccelMeas,
-        )
-        from lifx.protocol.protocol_types import (
-            TileStateDevice as LifxProtocolTileDevice,
-        )
-
         # 16x8 tile = 128 zones
         protocol_tile = LifxProtocolTileDevice(
             accel_meas=TileAccelMeas(x=0, y=0, z=0),

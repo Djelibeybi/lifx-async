@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from lifx.devices.infrared import InfraredLight, InfraredLightState
@@ -178,8 +180,6 @@ class TestInfraredAcknowledgementBasedStateUpdates:
     @pytest.mark.asyncio
     async def test_set_infrared_no_update_without_ack(self, emulator_devices) -> None:
         """Test set_infrared() does NOT update state when ack not received."""
-        from unittest.mock import patch
-
         template: InfraredLight = emulator_devices[2]  # d073d5000003
 
         async with await InfraredLight.connect(

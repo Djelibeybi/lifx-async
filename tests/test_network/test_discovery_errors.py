@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import struct
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -549,8 +549,6 @@ class TestDiscoverySourceValidation:
             if call_count == 1:
                 return crafted_packet, ("192.168.1.100", 56700)
             # Subsequent calls timeout to end discovery
-            from lifx.exceptions import LifxTimeoutError
-
             raise LifxTimeoutError("timeout")
 
         with (
@@ -594,8 +592,6 @@ class TestDiscoverySourceValidation:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -639,8 +635,6 @@ class TestDiscoverySourceValidation:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -703,8 +697,6 @@ class TestMalformedPayloadHandling:
             call_count += 1
             if call_count == 1:
                 return crafted_packet, ("192.168.1.100", 56700)
-            from lifx.exceptions import LifxTimeoutError
-
             raise LifxTimeoutError("timeout")
 
         with (
@@ -860,8 +852,6 @@ class TestDiscoverWithPacketSerialValidation:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -904,8 +894,6 @@ class TestDiscoverWithPacketSerialValidation:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -950,8 +938,6 @@ class TestDiscoverWithPacketSerialValidation:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -997,8 +983,6 @@ class TestDiscoverWithPacketSerialValidation:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -1093,8 +1077,6 @@ class TestNonUdpServiceHandling:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -1178,8 +1160,6 @@ class TestNonUdpServiceHandling:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (
@@ -1213,8 +1193,6 @@ class TestRemainingNonPositiveGuard:
 
     @pytest.mark.asyncio
     async def test_remaining_nonpositive_breaks_before_receive(self) -> None:
-        from unittest.mock import MagicMock
-
         fake = MagicMock()
         fake.idle_expired = False
         fake.overall_expired = False
@@ -1265,8 +1243,6 @@ class TestNonZeroTargetPadding:
                 pkt = next(packet_iter)
                 return pkt, ("192.168.1.100", 56700)
             except StopIteration:
-                from lifx.exceptions import LifxTimeoutError
-
                 raise LifxTimeoutError("timeout")
 
         with (

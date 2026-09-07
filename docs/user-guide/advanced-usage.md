@@ -140,11 +140,11 @@ async def use_cached_or_fetch():
 - `Device.wifi_firmware` - Major and minor wifi firmware version and build number
 - `Device.location` - Device location name/label
 - `Device.group` - Device group name/label
-- `Device.connectivity` - `Connectivity.THREAD` or `Connectivity.WIFI`; the
-  device's own frame address report wins once it has answered a request
 
 ##### Non-State Properties
 
+- `Device.connectivity` - `Connectivity.THREAD` or `Connectivity.WIFI`; the
+  device's own frame address report wins once it has answered a request
 - `Device.model` - Device product model
 
 #### Light properties

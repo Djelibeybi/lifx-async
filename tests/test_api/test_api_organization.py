@@ -15,6 +15,8 @@ that require specific custom metadata.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from lifx.api import DeviceGroup
@@ -219,8 +221,6 @@ class TestOrganizeEdgeCases:
         self, emulator_devices: DeviceGroup
     ):
         """Test that concurrent organization operations work correctly."""
-        import asyncio
-
         group = emulator_devices
 
         # Run both operations concurrently

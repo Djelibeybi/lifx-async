@@ -466,8 +466,6 @@ class TestDiscoveryEdgeCasesWithEmulator:
         This tests that create_device() works correctly when called
         multiple times concurrently.
         """
-        import asyncio
-
         discovered_list = []
         async for disc in discover_devices(
             timeout=2.0,

@@ -551,8 +551,6 @@ class TestMdnsTransportReceive:
     @pytest.mark.asyncio
     async def test_receive_timeout_raises(self) -> None:
         """Test that receive raises LifxTimeoutError on timeout."""
-        import asyncio
-
         transport = MdnsTransport()
         transport._protocol = MagicMock()
         transport._protocol.queue = asyncio.Queue()
@@ -640,8 +638,6 @@ class TestMdnsTransportClose:
     @pytest.mark.asyncio
     async def test_close_clears_state(self) -> None:
         """Test that close clears internal state."""
-        import socket
-
         transport = MdnsTransport()
         transport._protocol = MagicMock()
         transport._transport = MagicMock()

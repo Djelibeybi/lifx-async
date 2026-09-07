@@ -33,9 +33,26 @@ _SHARED_ARCHITECTURE_MARKERS = (
     "### Concurrency Considerations",
 )
 
+# DOCS-07/D-09: the leading substring of each of AGENTS.md's three
+# `### State Caching` category bullets, as delivered by this requirement.
+# `connectivity` must appear on exactly one of these three bullet lines.
+_STATE_CACHING_CATEGORY_MARKERS = (
+    "Cached (semi-static)",
+    "**Never cached**",
+    "**Derived, not cached**",
+)
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _bullet_line_for_marker(text: str, marker: str) -> str:
+    """Return the single AGENTS.md bullet line starting with `marker`."""
+    for line in text.splitlines():
+        if line.startswith(f"- {marker}"):
+            return line
+    raise AssertionError(f"no AGENTS.md bullet line starts with {marker!r}")
 
 
 class TestClaudeImportsAgents:
@@ -109,3 +126,29 @@ class TestDiscoveryQueryModelAccuracy:
         assert "find_by_ip()" in text
         assert "targeted broadcast" not in text
         assert "IPv4 or IPv6 literal" in text
+
+
+class TestStateCachingCategories:
+    """DOCS-07/D-09: `connectivity` is derived, not state-backed, and
+    AGENTS.md's three caching categories stay mutually exclusive."""
+
+    def test_agents_md_declares_three_state_caching_categories(self) -> None:
+        text = _read(_AGENTS_PATH)
+        for marker in _STATE_CACHING_CATEGORY_MARKERS:
+            assert marker in text, (
+                f"{marker!r} missing from AGENTS.md; expected all three "
+                "state-caching category bullets to be present"
+            )
+
+    def test_connectivity_appears_in_exactly_one_caching_category(self) -> None:
+        text = _read(_AGENTS_PATH)
+        matching_categories = [
+            marker
+            for marker in _STATE_CACHING_CATEGORY_MARKERS
+            if "connectivity" in _bullet_line_for_marker(text, marker)
+        ]
+        assert len(matching_categories) == 1, (
+            "expected connectivity to appear in exactly one AGENTS.md "
+            f"state-caching category, found {len(matching_categories)}: "
+            f"{matching_categories!r}"
+        )

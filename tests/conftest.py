@@ -10,6 +10,7 @@ import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from lifx_emulator import EmulatedLifxServer
@@ -1012,8 +1013,6 @@ async def emulator_server_with_scenarios(
             )
             # Test code using server.port and device info
     """
-    from types import SimpleNamespace
-
     port, server, sm = emulator_server
 
     if server is None:

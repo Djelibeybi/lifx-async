@@ -1829,9 +1829,7 @@ class TestCeilingLightContextManager:
             return ceiling
 
         # Patch the super().__aenter__ call
-        import lifx.devices.matrix as matrix_module
-
-        original_aenter = matrix_module.MatrixLight.__aenter__
+        original_aenter = MatrixLight.__aenter__
 
         async def patched_aenter(self: CeilingLight) -> CeilingLight:
             self._version = MagicMock()
@@ -1840,13 +1838,13 @@ class TestCeilingLightContextManager:
             self._state.power = 65535
             return self
 
-        matrix_module.MatrixLight.__aenter__ = patched_aenter
+        MatrixLight.__aenter__ = patched_aenter
 
         try:
             with pytest.raises(LifxError, match="not a supported Ceiling light"):
                 await ceiling.__aenter__()
         finally:
-            matrix_module.MatrixLight.__aenter__ = original_aenter
+            MatrixLight.__aenter__ = original_aenter
 
     async def test_aenter_loads_state_file(self) -> None:
         """Test __aenter__ loads state from file when configured."""
@@ -1874,8 +1872,6 @@ class TestCeilingLightContextManager:
             ceiling.connection = AsyncMock()
 
             # Mock parent __aenter__ to set version
-            import lifx.devices.matrix as matrix_module
-
             async def patched_aenter(self: CeilingLight) -> CeilingLight:
                 self._version = MagicMock()
                 self._version.product = 176  # Valid ceiling product
@@ -1883,8 +1879,8 @@ class TestCeilingLightContextManager:
                 self._state.power = 65535
                 return self
 
-            original_aenter = matrix_module.MatrixLight.__aenter__
-            matrix_module.MatrixLight.__aenter__ = patched_aenter
+            original_aenter = MatrixLight.__aenter__
+            MatrixLight.__aenter__ = patched_aenter
 
             try:
                 await ceiling.__aenter__()
@@ -1898,7 +1894,7 @@ class TestCeilingLightContextManager:
                     0.7, abs=0.01
                 )
             finally:
-                matrix_module.MatrixLight.__aenter__ = original_aenter
+                MatrixLight.__aenter__ = original_aenter
 
 
 class TestCeilingLightSetDownlightSingleZeroBrightness:
@@ -3092,9 +3088,6 @@ class TestCeilingLightStateCoverage:
 
     async def test_load_state_from_file_with_downlight_data(self) -> None:
         """Test _load_state_from_file loads both uplight and downlight data."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             state_file = Path(tmpdir) / "state.json"
             state_data = {
@@ -3138,9 +3131,6 @@ class TestCeilingLightStateCoverage:
 
     async def test_load_state_from_file_uplight_only(self) -> None:
         """Test _load_state_from_file with uplight data but no downlight."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             state_file = Path(tmpdir) / "state.json"
             state_data = {
@@ -3171,9 +3161,6 @@ class TestCeilingLightStateCoverage:
 
     async def test_load_state_from_file_downlight_only(self) -> None:
         """Test _load_state_from_file with downlight data but no uplight."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             state_file = Path(tmpdir) / "state.json"
             state_data = {
@@ -3206,9 +3193,6 @@ class TestCeilingLightStateCoverage:
 
     async def test_load_state_ignores_wrong_zone_count(self) -> None:
         """Test _load_state_from_file ignores downlight with wrong zone count."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             state_file = Path(tmpdir) / "state.json"
             # Product 176 expects 63 downlight zones, provide only 10

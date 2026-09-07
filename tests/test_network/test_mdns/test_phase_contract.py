@@ -127,7 +127,11 @@ class TestPhase11SurfaceContract:
             "does not join the multicast group",
             "does not receive unsolicited announcements",
             "does not authenticate or correlate responders",
-            "mesh scale is proven synthetically",
+            "advertises every device on its mesh",
+            "proves an advertisement exists",
+            "confirm it with a request",
+            "answer a correlated device request",
+            "size timeouts or retry policy",
             "A DNS AAAA record cannot carry that ID",
             "use `discover()` as the compatibility fallback",
             "schedules re-broadcasts 0.6, 1.8, 3.6, 5.6 and 7.6 seconds later",
@@ -392,7 +396,7 @@ class TestPhase14DiscoveryLinkingContract:
     _MOVED_MDNS_LIMITATION_PHRASES = (
         "does not join the multicast group",
         "does not receive unsolicited announcements",
-        "mesh scale is proven synthetically",
+        "advertises every device on its mesh",
     )
     _MOVED_UDP_SCHEDULE_PHRASE = (
         "schedules re-broadcasts 0.6, 1.8, 3.6, 5.6 and 7.6 seconds later"
@@ -439,3 +443,33 @@ class TestPhase14DiscoveryLinkingContract:
         prose = _normalised_prose(self._TROUBLESHOOTING_PATH)
         assert "with `asyncio.create_task()` or `asyncio.taskgroup`" not in prose
         assert "or asyncio.taskgroup` — no extra coordination" not in prose
+
+    def test_connectivity_is_not_listed_among_the_state_backed_device_properties(
+        self,
+    ) -> None:
+        """DOCS-07/D-09: `Device.connectivity` is derived, not state-backed,
+        so it must sit under the first `##### Non-State Properties` heading
+        rather than in the `#### Device Properties` list above it.
+
+        Reads raw file text rather than `_normalised_prose()`: this
+        assertion is positional and the helper strips the heading lines
+        that define the positions being compared.
+        """
+        text = (_REPO_ROOT / self._ADVANCED_USAGE_PATH).read_text(encoding="utf-8")
+        device_properties_index = text.index("#### Device Properties")
+        non_state_index = text.index(
+            "##### Non-State Properties", device_properties_index
+        )
+        next_heading_index = text.index("\n#### ", non_state_index)
+
+        state_backed_region = text[device_properties_index:non_state_index]
+        non_state_region = text[non_state_index:next_heading_index]
+
+        assert "Device.connectivity" not in state_backed_region, (
+            "Device.connectivity still listed among the state-backed "
+            f"properties in {self._ADVANCED_USAGE_PATH}"
+        )
+        assert "Device.connectivity" in non_state_region, (
+            "Device.connectivity missing from the Non-State Properties "
+            f"list in {self._ADVANCED_USAGE_PATH}"
+        )

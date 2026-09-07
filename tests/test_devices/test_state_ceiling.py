@@ -9,6 +9,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from lifx.color import HSBK
+from lifx.devices.base import (
+    CollectionInfo,
+    DeviceCapabilities,
+    FirmwareInfo,
+    WifiInfo,
+)
 from lifx.devices.ceiling import CeilingLight, CeilingLightState
 from lifx.devices.matrix import MatrixLightState
 
@@ -19,13 +25,6 @@ class TestCeilingLightStateDataclass:
     def test_from_matrix_state_creates_ceiling_state(self) -> None:
         """Test from_matrix_state creates CeilingLightState from MatrixLightState."""
         # Create a minimal MatrixLightState for testing
-        from lifx.devices.base import (
-            CollectionInfo,
-            DeviceCapabilities,
-            FirmwareInfo,
-            WifiInfo,
-        )
-
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
             label="Test Ceiling",
@@ -105,13 +104,6 @@ class TestCeilingLightStateDataclass:
 
     def test_uplight_is_on_false_when_brightness_zero(self) -> None:
         """Test uplight_is_on is False when uplight brightness is 0."""
-        from lifx.devices.base import (
-            CollectionInfo,
-            DeviceCapabilities,
-            FirmwareInfo,
-            WifiInfo,
-        )
-
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
             label="Test",
@@ -168,13 +160,6 @@ class TestCeilingLightStateDataclass:
 
     def test_downlight_is_on_false_when_all_zero_brightness(self) -> None:
         """Test downlight_is_on is False when all zones have zero brightness."""
-        from lifx.devices.base import (
-            CollectionInfo,
-            DeviceCapabilities,
-            FirmwareInfo,
-            WifiInfo,
-        )
-
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
             label="Test",
@@ -233,13 +218,6 @@ class TestCeilingLightStateDataclass:
 
     def test_as_dict_returns_dictionary(self) -> None:
         """Test as_dict property returns a dictionary representation."""
-        from lifx.devices.base import (
-            CollectionInfo,
-            DeviceCapabilities,
-            FirmwareInfo,
-            WifiInfo,
-        )
-
         matrix_state = MatrixLightState(
             model="LIFX Ceiling",
             label="Test",

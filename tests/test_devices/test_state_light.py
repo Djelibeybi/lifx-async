@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -11,6 +11,7 @@ from lifx.color import HSBK
 from lifx.devices.base import CollectionInfo, DeviceState, FirmwareInfo
 from lifx.devices.infrared import InfraredLightState
 from lifx.devices.light import LightState
+from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 
@@ -684,8 +685,6 @@ class TestLightInitializeStateParallel:
     ):
         """Test Light._initialize_state() includes get_version()
         when capabilities not loaded."""
-        from unittest.mock import patch
-
         product_info = mock_product_info(has_color=True)
 
         # Track which packet types were requested
@@ -796,9 +795,6 @@ class TestLightInitializeStateParallel:
     async def test_light_initialize_state_cancels_version_task_on_error(self, light):
         """Test Light._initialize_state() cancels version_task if
         gather raises."""
-        from unittest.mock import MagicMock
-
-        from lifx.exceptions import LifxTimeoutError
 
         async def mock_request(packet):
             if isinstance(packet, packets.Device.GetVersion):
@@ -817,9 +813,6 @@ class TestLightInitializeStateParallel:
     @pytest.mark.asyncio
     async def test_light_initialize_state_wraps_lifx_error(self, light):
         """Test Light._initialize_state() wraps LifxError with serial context."""
-        from unittest.mock import MagicMock
-
-        from lifx.exceptions import LifxError
 
         async def mock_request(packet):
             if isinstance(packet, packets.Device.GetVersion):

@@ -17,7 +17,7 @@ categories.
 
 ### mDNS Correctness
 
-- [ ] **MDNS-09**: `selected_address_for()` normalises owner names through the same
+- [x] **MDNS-09**: `selected_address_for()` normalises owner names through the same
       DNS-name normalisation helper used to build the cached owner sets, so an owner
       supplied with a trailing dot cannot bypass the fail-closed unusable-address check.
       Covered by a regression test.
@@ -76,12 +76,12 @@ categories.
 
 ### Documentation
 
-- [ ] **DOCS-07**: `Device.connectivity` is documented as a non-state property rather than
+- [x] **DOCS-07**: `Device.connectivity` is documented as a non-state property rather than
       listed among the state-backed cached properties, with repository guidance about state
       caching aligned. It is derived from request outcomes, not stored device state, so the
       current classification misleads callers about caching and refresh behaviour.
       ([#216](https://github.com/Djelibeybi/lifx-async/issues/216), PR #211 finding 14)
-- [ ] **DOCS-08**: mDNS discovery docstrings and related documentation state caller-facing
+- [x] **DOCS-08**: mDNS discovery docstrings and related documentation state caller-facing
       behaviour and limitations (bounded discovery, proxy responses, testing limitations)
       instead of internal validation language such as mesh scale being "proven
       synthetically".
@@ -92,7 +92,7 @@ categories.
 
 ### Tests and CI
 
-- [ ] **TEST-01**: mDNS discovery test imports sit at module scope, with function-local
+- [x] **TEST-01**: mDNS discovery test imports sit at module scope, with function-local
       imports retained only where a demonstrated circular-import or patching constraint
       requires them. Ruff and the complete mDNS discovery suite pass afterwards.
       ([#217](https://github.com/Djelibeybi/lifx-async/issues/217), PR #211 finding 15)
@@ -170,7 +170,7 @@ v2.0, which ended at Phase 14.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MDNS-09 | Phase 16 | Pending |
+| MDNS-09 | Phase 16 | Complete |
 | MDNS-10 | Phase 17 | Pending |
 | DISC-04 | Phase 17 | Pending |
 | ANIM-05 | Phase 18 | Pending |
@@ -178,10 +178,10 @@ v2.0, which ended at Phase 14.
 | THEME-05 | Phase 19 | Pending |
 | THEME-06 | Phase 19 | Pending |
 | THEME-07 | Phase 19 | Pending |
-| DOCS-07 | Phase 16 | Pending |
-| DOCS-08 | Phase 16 | Pending |
+| DOCS-07 | Phase 16 | Complete |
+| DOCS-08 | Phase 16 | Complete |
 | DOCS-09 | Phase 20 | Pending |
-| TEST-01 | Phase 16 | Pending |
+| TEST-01 | Phase 16 | Complete |
 | TEST-02 | Phase 15 | Complete |
 | CI-01 | Phase 15 | Reversed |
 | CI-02 | Phase 15 | Complete |

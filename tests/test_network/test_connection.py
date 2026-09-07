@@ -7,9 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from lifx.color import HSBK
 from lifx.const import DEFAULT_IP_ADDRESS
 from lifx.exceptions import (
     LifxConnectionError,
+    LifxError,
     LifxNetworkError,
     LifxProtocolError,
     LifxTimeoutError,
@@ -18,8 +20,11 @@ from lifx.exceptions import (
 from lifx.exceptions import LifxConnectionError as ConnectionError
 from lifx.network.connection import DeviceConnection, _ConnectionClosed
 from lifx.network.utils import allocate_source
+from lifx.protocol import packets
 from lifx.protocol.header import LifxHeader
+from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device
+from lifx.protocol.packets import Device as DevicePackets
 
 
 async def _wait_for(predicate, deadline: float = 2.0) -> None:
@@ -685,8 +690,6 @@ class TestDeviceConnection:
 
     async def test_different_connections_concurrent(self) -> None:
         """Test that different connections can operate concurrently."""
-        import time
-
         serial1 = "d073d5001111"
         serial2 = "d073d5002222"
 
@@ -743,8 +746,6 @@ class TestDeviceConnection:
         assert "does not support" in str(error).lower()
 
         # Verify it's a subclass of LifxError
-        from lifx.exceptions import LifxError
-
         assert issubclass(LifxUnsupportedCommandError, LifxError)
 
         # Verify it can be raised and caught
@@ -780,8 +781,6 @@ class TestSendTargetPrecomputed:
 
     async def test_send_target_precomputed_for_normal_connection(self) -> None:
         """Test _send_target is pre-computed correctly for normal connections."""
-        from lifx.protocol.models import Serial
-
         conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
         expected = Serial.from_string("d073d5001234").to_protocol()
         assert conn._send_target == expected
@@ -793,18 +792,13 @@ class TestSendTargetPrecomputed:
 
     async def test_send_packet_uses_precomputed_target(self) -> None:
         """Test send_packet() uses _send_target instead of re-parsing serial."""
-        from unittest.mock import AsyncMock
-        from unittest.mock import patch as mock_patch
-
         conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
         await conn.open()
 
         try:
             packet = Device.GetLabel()
 
-            with mock_patch(
-                "lifx.network.connection.create_message"
-            ) as mock_create_msg:
+            with patch("lifx.network.connection.create_message") as mock_create_msg:
                 mock_create_msg.return_value = b"\x00" * 36
                 # Mock transport.send to avoid actual network I/O
                 conn._transport.send = AsyncMock()  # type: ignore[union-attr]
@@ -829,8 +823,6 @@ class TestAsyncGeneratorStreaming:
         GetColorZones requests can stream multiple responses through the
         async generator interface.
         """
-        from lifx.protocol import packets
-
         # Get multizone devices from the cached emulator devices
         multizone_devices = emulator_devices.multizone_lights
 
@@ -858,8 +850,6 @@ class TestAsyncGeneratorStreaming:
         Single-response requests like GetLabel return the packet directly
         as a single object when using the request() convenience wrapper.
         """
-        from lifx.protocol import packets
-
         # Get lights from the cached emulator devices
         lights = emulator_devices.lights
 
@@ -913,8 +903,6 @@ class TestDeviceConnectionRequestStream:
 
     async def test_echo_request_handling(self) -> None:
         """Test EchoRequest special case in request_stream()."""
-        from lifx.protocol.packets import Device as DevicePackets
-
         conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
@@ -1023,8 +1011,6 @@ class TestDeviceConnectionRequestStream:
 
     async def test_get_packet_response_handling(self) -> None:
         """Test GET packet handling yields unpacked response."""
-        from lifx.protocol.packets import Device as DevicePackets
-
         conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
@@ -1068,8 +1054,6 @@ class TestDeviceConnectionRequestStream:
 
     async def test_unknown_packet_type_in_response(self) -> None:
         """Test error when response contains unknown packet type."""
-        from lifx.protocol.packets import Device as DevicePackets
-
         conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
@@ -1105,8 +1089,6 @@ class TestDeviceConnectionRequestStream:
 
     async def test_serial_update_from_response(self) -> None:
         """Test serial is updated from response when unknown."""
-        from lifx.protocol.packets import Device as DevicePackets
-
         conn = DeviceConnection(
             serial="000000000000",  # Unknown serial
             ip="192.168.1.100",
@@ -1145,8 +1127,6 @@ class TestDeviceConnectionRequestStream:
 
     async def test_request_no_response_error(self) -> None:
         """Test request() raises error when no response received."""
-        from lifx.protocol.packets import Device as DevicePackets
-
         conn = DeviceConnection(
             serial="d073d5001234",
             ip="192.168.1.100",
@@ -1181,8 +1161,6 @@ class TestStateUnhandledResponses:
         Switch devices don't support Light commands, so GetColor should
         return a StateUnhandled packet instead of raising an exception.
         """
-        from lifx.protocol import packets
-
         async with switch_device:
             # Send GetColor to a Switch - should return StateUnhandled
             response = await switch_device.request(packets.Light.GetColor())
@@ -1200,9 +1178,6 @@ class TestStateUnhandledResponses:
         raise LifxUnsupportedCommandError. We don't return False, because
         that means the Acknowledgement timed out.
         """
-        from lifx.color import HSBK
-        from lifx.protocol import packets
-
         async with switch_device:
             # Create a SetColor packet
             color = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
@@ -1240,8 +1215,6 @@ class TestRequestStreamDebugLogging:
 
     async def test_get_path_debug_logging(self, caplog) -> None:
         """GET path logs the request/reply cycle at DEBUG."""
-        import logging
-
         conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
         # StateLabel payload is a 32-byte label field.
         payload = b"Test".ljust(32, b"\x00")
@@ -1265,8 +1238,6 @@ class TestRequestStreamDebugLogging:
 
     async def test_set_path_debug_logging(self, caplog) -> None:
         """SET path logs the request/ack cycle at DEBUG."""
-        import logging
-
         conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
 
         async def ack_impl(packet, timeout=None, max_retries=None):
@@ -1287,8 +1258,6 @@ class TestRequestStreamDebugLogging:
 
     async def test_echo_path_debug_logging(self, caplog) -> None:
         """Echo (OTHER) path logs the request/reply cycle at DEBUG."""
-        import logging
-
         conn = DeviceConnection(serial="d073d5001234", ip="192.168.1.100")
         echo_payload = b"\x01\x02\x03\x04" + (b"\x00" * 60)
         header = self._header(Device.EchoResponse.PKT_TYPE, len(echo_payload))
@@ -1672,8 +1641,6 @@ class TestTransportDeathRecovery:
         self, emulator_devices
     ) -> None:
         """The next request recovers instead of timing out at max_retries."""
-        from lifx.protocol import packets
-
         lights = emulator_devices.lights
         if not lights:
             pytest.skip("No lights available in emulator")

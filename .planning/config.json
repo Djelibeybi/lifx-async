@@ -38,7 +38,8 @@
     "cross_ai_command": "",
     "cross_ai_timeout": 1200,
     "tdd_mode": false,
-    "code_review_depth": "deep"
+    "code_review_depth": "deep",
+    "api_coverage_gate": false
   },
   "hooks": {
     "context_warnings": true

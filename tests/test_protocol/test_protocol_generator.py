@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from lifx.protocol import packets
 from lifx.protocol.generator import (
     TypeRegistry,
     camel_to_snake_upper,
@@ -22,6 +23,14 @@ from lifx.protocol.generator import (
     parse_field_type,
     to_snake_case,
     validate_protocol_spec,
+)
+from lifx.protocol.packets import PACKET_REGISTRY, get_packet_class
+from lifx.protocol.protocol_types import (
+    FIELD_MAPPINGS,
+    DeviceStateHostFirmware,
+    DeviceStateVersion,
+    LightHsbk,
+    LightWaveform,
 )
 
 
@@ -267,11 +276,6 @@ class TestGeneratorIntegration:
 
     def test_generator_handles_packets_as_fields(self):
         """Test that generator creates types for packets used as fields."""
-        from lifx.protocol.protocol_types import (
-            DeviceStateHostFirmware,
-            DeviceStateVersion,
-        )
-
         # These should be defined and usable
         assert "vendor" in DeviceStateVersion.__annotations__
         assert "product" in DeviceStateVersion.__annotations__
@@ -280,8 +284,6 @@ class TestGeneratorIntegration:
 
     def test_no_import_collisions(self):
         """Test that import collisions are resolved."""
-        from lifx.protocol import packets
-
         # Light category class should exist
         assert hasattr(packets, "Light")
         # And it should have nested packet classes
@@ -290,14 +292,6 @@ class TestGeneratorIntegration:
 
     def test_generated_code_compiles(self):
         """Test that generated code compiles without errors."""
-        # This test passes if imports work
-        from lifx.protocol.packets import PACKET_REGISTRY, get_packet_class
-        from lifx.protocol.protocol_types import (
-            FIELD_MAPPINGS,
-            LightHsbk,
-            LightWaveform,
-        )
-
         # Verify critical structures exist
         assert PACKET_REGISTRY is not None
         assert FIELD_MAPPINGS is not None
