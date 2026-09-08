@@ -22,7 +22,7 @@ categories.
       supplied with a trailing dot cannot bypass the fail-closed unusable-address check.
       Covered by a regression test.
       ([#213](https://github.com/Djelibeybi/lifx-async/issues/213), PR #211 finding 11)
-- [ ] **MDNS-10**: The IPv6 Thread probe distinguishes an instance with no address data
+- [x] **MDNS-10**: The IPv6 Thread probe distinguishes an instance with no address data
       from one holding a cached but unusable unscoped link-local AAAA record; the
       `linklocal_chosen` summary counter and its warning are made truthful and reachable
       or removed; the TXT assertion is replaced with defensive diagnostic handling so a
@@ -32,10 +32,11 @@ categories.
 
 ### Discovery
 
-- [ ] **DISC-04**: Advertisement staleness is measured against a WiFi bulb using the same
-      protocol THREAD-04 used on Thread, so the 69s Thread disappearance-to-expiry figure
-      has a control and the library can say whether that number is Thread-specific or a
-      general mDNS TTL/goodbye artefact.
+- [x] **DISC-04**: Advertisement staleness is measured against a WiFi bulb using the same
+      protocol THREAD-04 used on Thread, so the Thread disappearance-to-expiry interval of
+      4140 to 4200 s (not its separately measured 69.4 s restoration duration) has a control
+      and the library can say whether that interval is Thread-specific or a general mDNS
+      TTL/goodbye artefact.
       (SEED-002, planted 2026-09-04)
 
 ### Animation
@@ -171,8 +172,8 @@ v2.0, which ended at Phase 14.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | MDNS-09 | Phase 16 | Complete |
-| MDNS-10 | Phase 17 | Pending |
-| DISC-04 | Phase 17 | Pending |
+| MDNS-10 | Phase 17 | Complete |
+| DISC-04 | Phase 17 | Complete |
 | ANIM-05 | Phase 18 | Pending |
 | EFFECT-01 | Phase 18 | Pending |
 | THEME-05 | Phase 19 | Pending |

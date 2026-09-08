@@ -63,12 +63,20 @@ becomes load-bearing for a library decision. Right now it is descriptive only.
 
 ## Consumer-Facing Consequence Already Established
 
-Both directions are hazards, and neither is currently documented:
+Both directions are hazards, and neither is currently documented with a measured duration:
 
-- A dead bulb stays discoverable for over an hour. `discover()` yielding a device is not
-  evidence it is reachable.
-- A live bulb stays undiscoverable for 69 seconds after power returns. A power blip
-  means more than a minute of a device that exists but cannot be found.
+- A dead bulb keeps being advertised for over an hour, so `discover_mdns()` can keep
+  yielding it. `discover()` and `find_by_serial()` do not: they verify an mDNS candidate
+  with a correlated device request before yielding it, so a stale advertisement costs them
+  time rather than correctness.
+- A live bulb stays undiscoverable for 69 seconds after power returns, by any method. A
+  power blip means more than a minute of a device that exists but cannot be found.
+
+*Corrected 2026-09-08, during `/gsd-plan-phase 17`. The first bullet originally read
+"`discover()` yielding a device is not evidence it is reachable", which is false for the
+shipped library and had propagated into the phase 17 SPEC's R7. `discover()` routes its mDNS
+candidates through `_verify_mdns_candidate`; only `discover_mdns()` yields unverified
+advertisements. See amendment A3 in `17-SPEC.md`.*
 
 ## How to Run It
 

@@ -330,9 +330,36 @@ _DEVICE_CLASSES: frozenset[str] = frozenset(
         "HevLight",
     }
 )
-_AVAILABLE_DEVICE_CLASSES: frozenset[str] = frozenset(
-    {"Light", "MultiZoneLight", "MatrixLight", "CeilingLight"}
-)
+# T-17-XX change 4 (phase 17, operator-authorised): InfraredLight/HevLight
+# used to be permanently gap-only -- no operator in this fleet's history
+# ever owned one, so the manifest schema rejected them from inventory
+# outright. That assumption is now false (the operator owns real
+# InfraredLight/HevLight hardware), so `_AVAILABLE_DEVICE_CLASSES` widens to
+# every device class: any class may now be NAMED in a roster and closed
+# `evidence_backed`. `_NAMED_GAP_DEVICE_CLASSES` stays exactly the two
+# classes it always was -- they are the only classes a roster may EVER omit
+# and still validate/close (`_REQUIRED_SINGLE_ALIAS_CLASSES`, below, is
+# deliberately NOT widened to include them: requiring them would reject a
+# roster from an operator who genuinely has none, which is the whole reason
+# named_gap exists).
+#
+# Widening both inventory-eligibility (line ~423) and evidence_backed
+# eligibility (line ~1386) off the SAME set closes the half of the gap the
+# task calls out ("widening only the inventory check would let these
+# classes be named in a roster but never close with evidence"): both must
+# move together, or a real InfraredLight/HevLight in a roster could never
+# be evidenced.
+#
+# The other half -- an available class in the roster laundering itself as a
+# named_gap instead of doing the evidence work -- is now schema-legal per
+# row (since `_NAMED_GAP_DEVICE_CLASSES` is unchanged and closure rows are
+# validated in isolation from any manifest), so per-row validation alone
+# can no longer close it. `derive_class_ledger_from_roster()` closes it at
+# the ledger level instead: an optional class is only eligible for the
+# `named_gap` branch when the roster names ZERO aliases for it; a named_gap
+# row that appears despite roster aliases existing is treated as an
+# inconsistent session and rejected there, never silently accepted.
+_AVAILABLE_DEVICE_CLASSES: frozenset[str] = frozenset(_DEVICE_CLASSES)
 _NAMED_GAP_DEVICE_CLASSES: frozenset[str] = frozenset({"InfraredLight", "HevLight"})
 
 # Closed confounder vocabulary, mirrors .planning/scripts/measure_merged_discovery.py's
@@ -1089,6 +1116,22 @@ _STALENESS_ROW_KEYS: frozenset[str] = frozenset(
         "confounders",
     }
 )
+# T-17-XX change 3: restoration now closes on the FIRST leg to report
+# present (OR) rather than requiring both simultaneously, and separately,
+# boundedly, keeps polling for the OTHER leg so the two transports'
+# individual restoration times are distinguishable -- a WiFi bulb with no
+# Thread Border Router may never re-advertise over mDNS within a session,
+# and that is a real, recorded outcome rather than a hang. These two fields
+# postdate the v2.0 THREAD-04 evidence (`14-STALENESS.jsonl`), which has
+# neither key at all -- not merely a null value for it. To keep that
+# committed row loading unchanged, the two fields are OPTIONAL keys layered
+# on top of the closed `_STALENESS_ROW_KEYS` schema instead of being folded
+# into it: a row may omit them entirely (legacy, pre-T-17-XX) or carry both
+# together with a null/non-negative-number value each (T-17-XX onward). No
+# other key, recognised or not, is ever accepted outside these two sets.
+_STALENESS_OPTIONAL_ROW_KEYS: frozenset[str] = frozenset(
+    {"restoration_discover_s", "restoration_mdns_s"}
+)
 _STALENESS_POLL_KEYS: frozenset[str] = frozenset(
     {"poll", "elapsed_s", "discover_present", "discover_mdns_present"}
 )
@@ -1111,9 +1154,17 @@ def _poll_is_absent(poll: Mapping[str, Any]) -> bool:
 
 def _validate_staleness_event(record: Mapping[str, Any]) -> None:
     keys = set(record.keys())
-    if keys != _STALENESS_ROW_KEYS:
+    missing_keys = _STALENESS_ROW_KEYS - keys
+    unexpected_keys = keys - _STALENESS_ROW_KEYS - _STALENESS_OPTIONAL_ROW_KEYS
+    if missing_keys or unexpected_keys:
         raise ValueError(
-            f"staleness event has unexpected keys: {keys ^ _STALENESS_ROW_KEYS}"
+            f"staleness event has unexpected keys: {missing_keys | unexpected_keys}"
+        )
+    has_discover_leg_key = "restoration_discover_s" in record
+    has_mdns_leg_key = "restoration_mdns_s" in record
+    if has_discover_leg_key != has_mdns_leg_key:
+        raise ValueError(
+            "staleness event must carry both or neither per-leg restoration fields"
         )
     if record.get("schema_version") != _STALENESS_SCHEMA_VERSION:
         raise ValueError("staleness event has wrong schema_version")
@@ -1142,14 +1193,24 @@ def _validate_staleness_event(record: Mapping[str, Any]) -> None:
         if poll["poll"] != index:
             raise ValueError("staleness poll numbers must be contiguous starting at 1")
         elapsed_s = poll["elapsed_s"]
+        # elapsed_s is the MEASURED wall-clock time since the experiment
+        # started (T-17-XX change 2), not the nominal poll_index * interval_s
+        # schedule. A poll that overran interval_s -- expected on a
+        # contested WiFi network where both discovery legs run sequentially
+        # -- can therefore push the FINAL poll's measured time past
+        # STALENESS_CAP_S; the loop only ever breaks after appending that
+        # poll, so every earlier poll is still bounded by the cap.
+        is_last_poll = index == len(polls)
         if (
             isinstance(elapsed_s, bool)
             or not isinstance(elapsed_s, (int, float))
             or elapsed_s < previous_elapsed
-            or elapsed_s > STALENESS_CAP_S
+            or (elapsed_s > STALENESS_CAP_S and not is_last_poll)
         ):
             raise ValueError(
-                "staleness poll elapsed_s must be non-decreasing and within the cap"
+                "staleness poll elapsed_s must be non-decreasing, and may "
+                "exceed the cap only on the final poll (a measured overrun "
+                "past the cap boundary)"
             )
         previous_elapsed = elapsed_s
         if not isinstance(poll["discover_present"], bool) or not isinstance(
@@ -1223,11 +1284,16 @@ def _validate_staleness_event(record: Mapping[str, Any]) -> None:
         )
 
     # `restoration_duration_s` is the T-14-06 change 2 rediscovery figure:
-    # wall time from the power-on edge (script exit) to both discovery legs
-    # reporting present, which is the actually interesting measurement --
-    # `restored_available_ns - disconnect_ns` is dominated by the expiry
-    # wait and is not. It is present if and only if restoration was
-    # confirmed (i.e. exactly when `restored_available_ns` is present).
+    # wall time from the power-on edge (script exit) to a discovery leg
+    # reporting present. T-17-XX change 3 redefines "a discovery leg" from
+    # BOTH legs simultaneously to the FIRST leg (OR) -- closing the moment
+    # restoration is observed by either transport, rather than waiting on
+    # whichever leg is slower (unbounded, for a WiFi bulb whose mDNS
+    # advertisement may never return this session). This is the actually
+    # interesting measurement -- `restored_available_ns - disconnect_ns` is
+    # dominated by the expiry wait and is not. It is present if and only if
+    # restoration was confirmed (i.e. exactly when `restored_available_ns`
+    # is present).
     restoration_duration_s = record["restoration_duration_s"]
     if restored_available_ns is None:
         if restoration_duration_s is not None:
@@ -1244,6 +1310,44 @@ def _validate_staleness_event(record: Mapping[str, Any]) -> None:
             "staleness event restoration_duration_s must be a non-negative "
             "number when restored_available_ns is present"
         )
+
+    # `restoration_discover_s`/`restoration_mdns_s` (T-17-XX change 3):
+    # each leg's own elapsed time, in seconds from the same restoration
+    # start as `restoration_duration_s`, to first reporting the device
+    # present -- or null when that specific leg never reported present
+    # within the bounded second-leg wait (a real, recorded outcome, not a
+    # hang). Only validated when both keys are present at all (see the
+    # both-or-neither key check above); legacy rows that predate T-17-XX
+    # carry neither key and skip this block entirely.
+    if has_discover_leg_key:
+        for leg_key in ("restoration_discover_s", "restoration_mdns_s"):
+            leg_value = record[leg_key]
+            if leg_value is not None and (
+                isinstance(leg_value, bool)
+                or not isinstance(leg_value, (int, float))
+                or leg_value < 0
+            ):
+                raise ValueError(
+                    f"staleness event {leg_key} must be null or a non-negative number"
+                )
+        # Restoration under OR semantics means AT LEAST one leg reported
+        # present -- so at least one of the two per-leg times must be
+        # populated exactly when restoration was confirmed, and neither may
+        # be populated when it was not.
+        any_leg_populated = (
+            record["restoration_discover_s"] is not None
+            or record["restoration_mdns_s"] is not None
+        )
+        if restored_available_ns is not None and not any_leg_populated:
+            raise ValueError(
+                "staleness event restored_available_ns requires at least "
+                "one per-leg restoration time"
+            )
+        if restored_available_ns is None and any_leg_populated:
+            raise ValueError(
+                "staleness event per-leg restoration times require "
+                "restored_available_ns"
+            )
 
     if record["provenance"] not in _PROVENANCE:
         raise ValueError("staleness event has an unknown provenance")
@@ -1265,6 +1369,8 @@ def build_staleness_event(
     disposition: str,
     restored_available_ns: int | None = None,
     restoration_duration_s: float | None = None,
+    restoration_discover_s: float | None = None,
+    restoration_mdns_s: float | None = None,
     provenance: str,
     confounders: Sequence[str] = (),
 ) -> dict[str, Any]:
@@ -1293,6 +1399,8 @@ def build_staleness_event(
         "disposition": disposition,
         "restored_available_ns": restored_available_ns,
         "restoration_duration_s": restoration_duration_s,
+        "restoration_discover_s": restoration_discover_s,
+        "restoration_mdns_s": restoration_mdns_s,
         "provenance": provenance,
         "confounders": sorted(set(confounders)),
     }
@@ -1383,6 +1491,13 @@ def _validate_closure_event(record: Mapping[str, Any]) -> None:
     if disposition == "evidence_backed":
         if not aliases:
             raise ValueError("evidence_backed closure requires at least one alias")
+        # T-17-XX change 4: _AVAILABLE_DEVICE_CLASSES now equals every
+        # known device_class, so this is vacuously true for any class that
+        # already passed the _DEVICE_CLASSES check above -- kept as the
+        # single per-row guard for a HYPOTHETICAL future device class that
+        # is gap-only from the start (exactly InfraredLight/HevLight's
+        # pre-T-17-XX state), rather than assuming that can never happen
+        # again.
         if device_class not in _AVAILABLE_DEVICE_CLASSES:
             raise ValueError(
                 "only a currently available device class may close evidence_backed"
@@ -1593,6 +1708,11 @@ def generate_summary(
             "confirmed_expiry_poll": row["confirmed_expiry_poll"],
             "restored_available_ns": row["restored_available_ns"],
             "restoration_duration_s": row["restoration_duration_s"],
+            # WR-02: carried through with .get() so legacy rows (committed
+            # before T-17-XX change 3 added these two keys) still summarise
+            # without a KeyError, rather than being silently dropped.
+            "restoration_discover_s": row.get("restoration_discover_s"),
+            "restoration_mdns_s": row.get("restoration_mdns_s"),
         }
         for row in sorted(staleness_rows, key=lambda row: row["alias"])
     }
@@ -1723,10 +1843,17 @@ class RosterDriftError(ValueError):
 # THREAD-05 inventory authority: these three classes must each have at least
 # one expected alias, and MatrixLight must have at least two DISTINCT
 # aliases (the roster covers two physically different MatrixLight products).
-# InfraredLight/HevLight are never inventory entries -- the manifest schema
-# already restricts every entry's device_class to _AVAILABLE_DEVICE_CLASSES
-# -- so they can only ever close via a named_gap disposition, never a roster
-# omission mistaken for one.
+#
+# T-17-XX change 4: InfraredLight/HevLight are deliberately NOT in this set,
+# even though the manifest schema now permits them as inventory entries
+# (`_AVAILABLE_DEVICE_CLASSES` widened to all six classes). They are
+# OPTIONAL, not required: an operator who genuinely owns none may still
+# validate a roster that omits them and close them as a named gap, and an
+# operator who does own them names real aliases here and closes them
+# `evidence_backed` instead (see `derive_class_ledger_from_roster`, which
+# decides per-roster which of the two applies). Adding them here would
+# reject every roster from an operator without that hardware -- the whole
+# reason named_gap exists.
 _REQUIRED_SINGLE_ALIAS_CLASSES: frozenset[str] = frozenset(
     {"Light", "MultiZoneLight", "CeilingLight"}
 )
@@ -1761,7 +1888,10 @@ def validate_expected_roster(inventory: Sequence[Mapping[str, Any]]) -> None:
     that omits a required class or names only one MatrixLight alias is
     rejected outright -- collection must never start against an incomplete
     roster and later launder the gap as a named gap, since named gaps are
-    schema-restricted to InfraredLight/HevLight alone.
+    only ever legitimate for InfraredLight/HevLight, and even then only
+    when the roster names zero aliases for the class in question
+    (``derive_class_ledger_from_roster`` enforces that second half; see its
+    docstring, T-17-XX change 4).
     """
     by_class = expected_roster_by_class(inventory)
     missing = sorted(
@@ -2245,7 +2375,9 @@ async def run_staleness_experiment(
     alias: str,
     disconnect_ns: int,
     poll: Callable[[], Awaitable[tuple[bool, bool]]],
-    restore_available: Callable[[], Awaitable[tuple[int, float] | None]],
+    restore_available: Callable[
+        [], Awaitable[tuple[int, float, float | None, float | None] | None]
+    ],
     should_stop_early: Callable[[], Awaitable[bool]] | None = None,
     on_poll: Callable[[Sequence[Mapping[str, Any]]], Awaitable[None]] | None = None,
     now: Callable[[], float] = time.monotonic,
@@ -2270,9 +2402,15 @@ async def run_staleness_experiment(
     cancellation mid-poll is recorded as ``interrupted`` with whatever polls
     were already collected, then re-raised. Restoration detection (the
     ``restore_available`` call, made only once disposition is otherwise
-    determined) is deliberately unbounded on this module's side (T-14-06
-    change 2): it returns ``(restored_available_ns, restoration_duration_s)``
-    once both discovery legs report present, or ``None`` only when the
+    determined) is deliberately unbounded on this module's side for the
+    FIRST leg to report present (T-14-06 change 2, redefined under OR
+    semantics by T-17-XX change 3): it returns ``(restored_available_ns,
+    restoration_duration_s, restoration_discover_s, restoration_mdns_s)``
+    once EITHER discovery leg reports present, with the two per-leg times
+    independently recording each transport's own elapsed time to
+    first-present, or ``None`` for a leg's own field when that leg never
+    reported present within its own caller-enforced bound -- a real,
+    recorded outcome, not a hang. The whole tuple is ``None`` only when the
     caller could not attempt restoration at all (for example an
     operator-supplied power-on script hard-failing). A cancellation raised
     from inside ``restore_available`` -- an operator's Ctrl-C during an
@@ -2311,15 +2449,26 @@ async def run_staleness_experiment(
     try:
         while True:
             poll_index += 1
-            elapsed_s = poll_index * interval_s
-            target = start + elapsed_s
+            # Absolute-cadence scheduling uses the NOMINAL target -- a slow
+            # poll() never compounds delay across the run, because the next
+            # poll's target is always this fixed schedule, not "last poll
+            # plus interval_s". Only the schedule stays nominal; what gets
+            # RECORDED per poll is the measured wall-clock elapsed time
+            # below (T-17-XX change 2), because a poll() that runs both
+            # legs sequentially against a contested network can overrun
+            # interval_s, and nominal elapsed_s would then understate the
+            # real expiry bound.
+            nominal_elapsed_s = poll_index * interval_s
+            target = start + nominal_elapsed_s
             wait = target - now()
             if wait > 0:
                 await sleep(wait)
             poll_started = now()
             discover_present, discover_mdns_present = await poll()
-            if now() - poll_started > interval_s:
+            poll_finished = now()
+            if poll_finished - poll_started > interval_s:
                 overrun_detected = True
+            elapsed_s = poll_finished - start
             polls.append(
                 {
                     "poll": poll_index,
@@ -2353,6 +2502,8 @@ async def run_staleness_experiment(
             disposition=disposition,
             restored_available_ns=None,
             restoration_duration_s=None,
+            restoration_discover_s=None,
+            restoration_mdns_s=None,
             provenance="physical",
             confounders=confounders,
         )
@@ -2383,6 +2534,8 @@ async def run_staleness_experiment(
             disposition=disposition,
             restored_available_ns=None,
             restoration_duration_s=None,
+            restoration_discover_s=None,
+            restoration_mdns_s=None,
             provenance="physical",
             confounders=confounders,
         )
@@ -2392,8 +2545,15 @@ async def run_staleness_experiment(
     if restore_result is None:
         restored_available_ns: int | None = None
         restoration_duration_s: float | None = None
+        restoration_discover_s: float | None = None
+        restoration_mdns_s: float | None = None
     else:
-        restored_available_ns, restoration_duration_s = restore_result
+        (
+            restored_available_ns,
+            restoration_duration_s,
+            restoration_discover_s,
+            restoration_mdns_s,
+        ) = restore_result
 
     effective_confounders = set(confounders)
     if overrun_detected:
@@ -2409,6 +2569,8 @@ async def run_staleness_experiment(
         disposition=disposition,
         restored_available_ns=restored_available_ns,
         restoration_duration_s=restoration_duration_s,
+        restoration_discover_s=restoration_discover_s,
+        restoration_mdns_s=restoration_mdns_s,
         provenance="physical",
         confounders=sorted(effective_confounders),
     )
@@ -2572,6 +2734,20 @@ def derive_class_ledger_from_roster(
     currently available class (schema already enforces this at the row
     level; this derivation enforces it at the ledger level too).
 
+    T-17-XX change 4: ``InfraredLight``/``HevLight`` are OPTIONAL classes --
+    a roster may legitimately name real aliases for them (an operator who
+    owns that hardware) or omit them entirely (one who doesn't). Which of
+    the two applies is decided HERE, from the roster itself, not from a
+    fixed permanent set: zero aliases for the class routes it down the
+    ``named_gap`` branch exactly as before; one or more aliases routes it
+    down the same evidence-completeness check every other class uses. A
+    ``named_gap`` closure row alongside roster aliases for that same class
+    is rejected outright -- the schema alone can no longer prevent that
+    (both dispositions are now schema-legal for these two classes), so this
+    is the one place left that closes the laundering path
+    ``validate_expected_roster()``'s docstring describes: claiming a gap
+    for a class the operator actually has evidence-capable hardware for.
+
     Animation evidence plays no part in this derivation. Thread animation is
     a recorded scope boundary, not a closure requirement (THREAD-03): the
     library will not support sustained Thread animation, so an animation
@@ -2599,8 +2775,12 @@ def derive_class_ledger_from_roster(
     classes: dict[str, dict[str, Any]] = {}
     missing: list[str] = []
     for device_class in sorted(_DEVICE_CLASSES):
-        if device_class in _NAMED_GAP_DEVICE_CLASSES:
-            gap_row = named_gap_rows.get(device_class)
+        aliases = sorted(by_class.get(device_class, frozenset()))
+        gap_row = named_gap_rows.get(device_class)
+
+        if device_class in _NAMED_GAP_DEVICE_CLASSES and not aliases:
+            # No roster aliases for this optional class -- the only
+            # legitimate closure is a named gap.
             if gap_row is None:
                 missing.append(device_class)
                 continue
@@ -2612,7 +2792,17 @@ def derive_class_ledger_from_roster(
             }
             continue
 
-        aliases = sorted(by_class.get(device_class, frozenset()))
+        if gap_row is not None:
+            # This class has roster aliases (whether required or an
+            # optional class the operator actually owns) but ALSO a
+            # named_gap closure row -- exactly the laundering path a
+            # per-row schema check can no longer prevent on its own.
+            raise ValueError(
+                f"{device_class} has roster aliases but also a named_gap "
+                "closure row -- a class with real inventory must close "
+                "with evidence, never a named gap"
+            )
+
         if aliases and all(
             _alias_has_physical_discovery_evidence(alias, discovery_rows)
             and _alias_has_complete_physical_requests(alias, request_rows)
@@ -3406,6 +3596,47 @@ async def _device_is_live(device: Light) -> bool:
     return True
 
 
+# Phase 17 WiFi staleness arm (operator-authorised, see 17-04-PLAN.md): the
+# WiFi fleet sits on a contested network (all four closed confounders apply),
+# unlike the uncontested Thread network THREAD-04 was originally proven
+# against. The library's DISCOVERY_TIMEOUT default (see lifx.const, 15.0s)
+# can miss a sweep on that contested network, so the staleness poll below
+# supplies a longer timeout explicitly at the discover()/discover_mdns()
+# call site rather than by reassigning or shadowing the imported library
+# constant -- lifx.const.DISCOVERY_TIMEOUT is untouched and still the
+# default for every other call site in this module that wants it.
+_STALENESS_DISCOVERY_TIMEOUT_S = 45.0
+
+# T-17-XX change 3: once the FIRST leg confirms restoration, keep polling
+# for the OTHER leg for up to this long before giving up on it. 15 minutes
+# is generous relative to a normal SRP re-registration on rejoin (typically
+# well under a minute) while staying a small fraction of the 3-hour
+# STALENESS_CAP_S -- long enough that a genuinely slow second leg still
+# gets observed, short enough that one alias's restoration can never
+# meaningfully stall the rest of a session.
+_RESTORATION_SECOND_LEG_BOUND_S = 900.0
+
+# IN-03: _poll() runs discover() then discover_mdns() sequentially, each
+# with its own _STALENESS_DISCOVERY_TIMEOUT_S ceiling, so one call can take
+# up to this long when the missing leg never answers. The phase-2 loop below
+# uses this as headroom so it never STARTS a poll that could itself finish
+# past _RESTORATION_SECOND_LEG_BOUND_S, rather than checking the deadline
+# only after the fact.
+_POLL_WORST_CASE_S = 2 * _STALENESS_DISCOVERY_TIMEOUT_S
+
+
+def _second_leg_poll_would_overrun_bound(
+    now: float, deadline: float, poll_worst_case_s: float = _POLL_WORST_CASE_S
+) -> bool:
+    """Whether starting another ``_poll()`` now could finish past ``deadline``.
+
+    A pure predicate (IN-03) so the boundary arithmetic is unit-testable
+    without controlling the real monotonic clock or asyncio's own loop
+    timing, neither of which the phase-2 restoration loop otherwise exposes.
+    """
+    return now + poll_worst_case_s > deadline
+
+
 def _cli_staleness(args: argparse.Namespace) -> int:
     """Run the THREAD-04 staleness experiment, driving the power cycle itself.
 
@@ -3490,7 +3721,7 @@ def _cli_staleness(args: argparse.Namespace) -> int:
 
     async def _poll() -> tuple[bool, bool]:
         async def _present(source: Callable[..., Any]) -> bool:
-            async for device in source(timeout=DISCOVERY_TIMEOUT):
+            async for device in source(timeout=_STALENESS_DISCOVERY_TIMEOUT_S):
                 serial = Serial.from_string(device.serial).to_string()
                 if alias_map.get(serial) == args.alias:
                     return True
@@ -3527,14 +3758,29 @@ def _cli_staleness(args: argparse.Namespace) -> int:
 
     power_on_failed = False
 
-    async def _restore_available() -> tuple[int, float] | None:
-        """Poll both legs with NO deadline until restored, or the power-on script fails.
+    async def _restore_available() -> (
+        tuple[int, float, float | None, float | None] | None
+    ):
+        """Poll both legs until EITHER restores (OR), or the power-on script fails.
 
-        The only exit besides "both legs present" is the operator's
-        Ctrl-C: ``asyncio.CancelledError`` raised from inside ``await
-        _poll()`` propagates unchanged out of this closure, through
-        ``run_staleness_experiment``'s ``except asyncio.CancelledError``
-        branch, which persists an ``interrupted`` row and re-raises.
+        T-17-XX change 3: restoration used to require BOTH legs present on
+        the same poll, which hangs forever for a WiFi bulb that answers
+        broadcast discovery in seconds but has no Thread Border Router to
+        re-advertise it over mDNS this session. The FIRST leg to report
+        present now closes the primary restoration measurement (still
+        deliberately unbounded, T-14-06 change 2, for the same reason a
+        slow-booting bulb must never be falsely censored) -- but polling
+        continues, BOUNDED by ``_RESTORATION_SECOND_LEG_BOUND_S`` from that
+        moment, purely to also observe the OTHER leg's own restoration
+        time. If the second leg never returns within the bound, that is
+        recorded as ``None`` -- a real outcome, not a hang.
+
+        The only exit besides "a leg present"/hitting the second-leg bound
+        is the operator's Ctrl-C: ``asyncio.CancelledError`` raised from
+        inside ``await _poll()`` propagates unchanged out of this closure,
+        through ``run_staleness_experiment``'s
+        ``except asyncio.CancelledError`` branch, which persists an
+        ``interrupted`` row and re-raises.
         """
         nonlocal power_on_failed
         if args.power_on is not None:
@@ -3553,17 +3799,67 @@ def _cli_staleness(args: argparse.Namespace) -> int:
                 f"[staleness] power on: {args.power_on} -> ok, polling for restoration"
             )
         restore_start = time.monotonic()
-        while True:
+        discover_elapsed_s: float | None = None
+        mdns_elapsed_s: float | None = None
+        restored_available_ns: int | None = None
+        restoration_duration_s: float | None = None
+
+        # Phase 1 (unbounded): wait for the FIRST leg to report present.
+        while restoration_duration_s is None:
             discover_present, mdns_present = await _poll()
             elapsed_s = time.monotonic() - restore_start
-            if discover_present and mdns_present:
-                _progress(f"[staleness] restored after {int(elapsed_s)}s")
-                return time.monotonic_ns(), elapsed_s
-            _progress(
-                f"[staleness] waiting for restoration... t+{int(elapsed_s)}s  "
-                f"discover={'present' if discover_present else 'absent'}  "
-                f"mdns={'present' if mdns_present else 'absent'}"
-            )
+            if discover_present and discover_elapsed_s is None:
+                discover_elapsed_s = elapsed_s
+            if mdns_present and mdns_elapsed_s is None:
+                mdns_elapsed_s = elapsed_s
+            if discover_elapsed_s is not None or mdns_elapsed_s is not None:
+                restored_available_ns = time.monotonic_ns()
+                restoration_duration_s = elapsed_s
+                leg = "discover" if discover_present else "mdns"
+                _progress(f"[staleness] restored after {int(elapsed_s)}s ({leg} leg)")
+            else:
+                _progress(
+                    f"[staleness] waiting for restoration... t+{int(elapsed_s)}s  "
+                    f"discover={'present' if discover_present else 'absent'}  "
+                    f"mdns={'present' if mdns_present else 'absent'}"
+                )
+
+        # Phase 2 (bounded): keep polling only for whichever leg is still
+        # missing, up to _RESTORATION_SECOND_LEG_BOUND_S past restoration.
+        # IN-03: the deadline check includes _POLL_WORST_CASE_S headroom so
+        # a poll is never STARTED unless it could still finish inside the
+        # bound -- a plain "deadline already passed" check would let the
+        # last iteration itself run up to a full _poll() duration (~90s)
+        # past the documented bound before the overrun was even noticed.
+        second_leg_deadline = time.monotonic() + _RESTORATION_SECOND_LEG_BOUND_S
+        while discover_elapsed_s is None or mdns_elapsed_s is None:
+            if _second_leg_poll_would_overrun_bound(
+                time.monotonic(), second_leg_deadline
+            ):
+                missing_leg = "discover" if discover_elapsed_s is None else "mdns"
+                _progress(
+                    f"[staleness] {missing_leg} leg did not return within "
+                    f"{int(_RESTORATION_SECOND_LEG_BOUND_S)}s of restoration -- "
+                    "recording as not observed"
+                )
+                break
+            discover_present, mdns_present = await _poll()
+            elapsed_s = time.monotonic() - restore_start
+            if discover_present and discover_elapsed_s is None:
+                discover_elapsed_s = elapsed_s
+                _progress(f"[staleness] discover leg restored after {int(elapsed_s)}s")
+            if mdns_present and mdns_elapsed_s is None:
+                mdns_elapsed_s = elapsed_s
+                _progress(f"[staleness] mdns leg restored after {int(elapsed_s)}s")
+
+        assert restored_available_ns is not None
+        assert restoration_duration_s is not None
+        return (
+            restored_available_ns,
+            restoration_duration_s,
+            discover_elapsed_s,
+            mdns_elapsed_s,
+        )
 
     row = asyncio.run(
         run_staleness_experiment(
@@ -3615,6 +3911,8 @@ def _cli_staleness(args: argparse.Namespace) -> int:
         first_absence_poll=row["first_absence_poll"],
         confirmed_expiry_poll=row["confirmed_expiry_poll"],
         restoration_duration_s=row["restoration_duration_s"],
+        restoration_discover_s=row["restoration_discover_s"],
+        restoration_mdns_s=row["restoration_mdns_s"],
     )
     return 0
 

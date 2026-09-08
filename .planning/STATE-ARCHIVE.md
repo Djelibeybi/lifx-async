@@ -106,3 +106,17 @@ Pruned entries from STATE.md. Recoverable but no longer loaded into agent contex
 - [Phase 14]: Removed thread_revalidation.py's only if TYPE_CHECKING: block for ordinary top-level Light/AnimatorStats imports — Avoided colliding with pyproject.toml's pre-existing 'if TYPE_CHECKING' coverage exclude_lines pattern on two brand-new lines, the same false-positive class already documented for the module's if __name__ guard
 - [Phase 14]: derive_class_ledger_from_roster() is the Task 3 authoritative six-class ledger, derived from the frozen roster and journals only — An evidence_backed class requires every expected alias's physical discovery, all 100 physical request trials and one physical animation attempt -- never a caller-supplied closure claim or the subset of devices one sweep observed
 - [Phase 14]: New generate CLI subcommand is additive and distinct from the unchanged validate — Keeps the 14-02/14-03 validate contract and its tests intact while generate requires roster completeness and writes products atomically only after validation passes
+
+## Pruned 2026-09-08 (phases 1-15, kept recent 3)
+
+### Decisions
+
+- [Phase 15]: D-09: deselection via opt-in flags through the existing collection hook, not a growing -m negation
+- [Phase 15]: Extended bandit's pre-commit exclude to also cover .planning/scripts/tests/, since those test files were only ever exempted by their old tests/ path
+- [Phase 15]: [Phase 15] Accepted a pre-commit-forced isort reorder in Task 1's pure-rename commit rather than fighting an unavoidable, mechanically-identical re-trigger caused by ruff no longer treating scripts.* as first-party from the new .planning/scripts/ location
+- [Phase 15]: [Phase 15] Suppressed a reportPrivateImportUsage diagnostic surfaced by adding the locked [tool.pyright] extraPaths entry with a targeted type: ignore rather than exporting the private symbol from library code
+- [Phase 15]: [Phase 15] Fixed a hardcoded parents[1] directory-depth bug in measure_merged_discovery.py's _load_alias_map(), one level too shallow after the script moved one directory deeper to .planning/scripts/
+- [Phase 15]: The vacuous-gate guard derives its authoritative changed-measured denominator from coverage.py's own source analysis (analysis2), never from the coverage.xml report under judgement. A report-derived denominator let a report classifying nothing score a false pass; the source-derived denominator closes that while still passing docstring/comment/configured-exclusion-only changes
+- [Phase 15]: TEST-02: coordinator teardown fix (39bad58) confirmed load-bearing by reproducing the pre-fix hang in a scratch worktree; deferred-items.md and STATE.md reconciled to the same outcome
+- [Phase 15]: [Phase 15] Operator selected publish-both-close-209 at the Task 4 checkpoint: both drafted issue comments published verbatim, #214 closed on the CI-01 reversal reasoning, and #209 also closed even though 15-SPEC.md R5 expected it to stay open
+- [Phase 15]: [Phase 15] 15-SPEC.md's locked amendment scope widened from one region to an allowlist of five, because the spec restates its commitments twice and four phase-global restatements contradicted the delivered mechanism

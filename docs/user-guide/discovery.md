@@ -133,6 +133,30 @@ device is currently reachable. The next action is to confirm it with a
 request, or to use `discover()`, whose mDNS candidates must answer a
 correlated device request before they are yielded.
 
+Because a border router keeps advertising a device whose power is gone,
+`discover_mdns()` may yield a device whose advertisement has outlived it,
+for as long as that advertisement lingers. On the fleet measured for this
+project, a Thread advertisement outlived its device's power by between 4140
+and 4200 seconds, an interval bounded by a sixty-second measurement cadence
+rather than a point value. On the same fleet, a WiFi advertisement, which
+has no border router sustaining it, was confirmed gone at most 80.8548
+seconds after power loss, the measured completion time of the first poll
+rather than a point observed inside that window.
+
+Both `discover()` and `find_by_serial()` instead verify an mDNS candidate
+with a correlated request before yielding it, so neither can hand back a
+device built from a stale advertisement; but that verification is a
+point-in-time observation and not a continuing reachability guarantee,
+because the device may go away immediately afterwards.
+
+A device can remain undiscoverable for tens of seconds after power returns,
+by any discovery method. On the fleet measured for this project, a Thread
+device took 69.4 seconds from the power-on edge to answering both discovery
+legs again, and a WiFi device took 14.6 seconds. These are single-trial
+observations of this fleet, one trial per link type, and are not a
+guarantee, a lease value, a universal limit, or a value to size a timeout
+from.
+
 Behaviour on a large or congested network is not characterised by this
 documentation. Any physical observations of Thread/mDNS behaviour, where
 referenced in this documentation set, describe the specific fleet measured

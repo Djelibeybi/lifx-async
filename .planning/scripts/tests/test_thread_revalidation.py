@@ -48,11 +48,14 @@ from measurement_support import (
     validate_session_id,
 )
 from thread_revalidation import (
+    _POLL_WORST_CASE_S,
+    _STALENESS_DISCOVERY_TIMEOUT_S,
     PowerScriptError,
     RosterDriftError,
     _load_target_alias_map,
     _posix_evidence_dir,
     _run_power_script,
+    _second_leg_poll_would_overrun_bound,
     _validate_request_event,
     append_animation_event,
     append_closure_event,
@@ -98,7 +101,7 @@ from thread_revalidation import (
 
 from lifx.animation.animator import AnimatorStats
 from lifx.color import HSBK
-from lifx.const import REQUEST_RETRANSMIT_GAPS
+from lifx.const import DISCOVERY_TIMEOUT, REQUEST_RETRANSMIT_GAPS
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixEffect, MatrixLight
@@ -240,6 +243,24 @@ def _staleness_kwargs(**overrides: Any) -> dict[str, Any]:
         "confounders": [],
     }
     kwargs.update(overrides)
+    # T-17-XX change 3: unless a caller explicitly overrides one of the two
+    # per-leg restoration fields, derive both from the FINAL
+    # restored_available_ns -- null/null when restoration was never
+    # confirmed, otherwise the discover leg mirrors restoration_duration_s
+    # (the "OR" first leg) and the mdns leg stays unobserved. Keeps every
+    # existing caller's intent (confirmed vs. never-restored) coherent with
+    # the new both-or-neither-and-at-least-one-populated schema invariant
+    # without every call site having to spell it out.
+    if (
+        "restoration_discover_s" not in overrides
+        and "restoration_mdns_s" not in overrides
+    ):
+        if kwargs["restored_available_ns"] is None:
+            kwargs["restoration_discover_s"] = None
+            kwargs["restoration_mdns_s"] = None
+        else:
+            kwargs["restoration_discover_s"] = kwargs["restoration_duration_s"]
+            kwargs["restoration_mdns_s"] = None
     return kwargs
 
 
@@ -855,14 +876,37 @@ class TestManifest:
                 )
             )
 
-    def test_rejects_gap_class_in_inventory(self) -> None:
+    def test_accepts_infrared_and_hev_in_inventory(self) -> None:
+        """T-17-XX change 4: InfraredLight/HevLight are OPTIONAL, not
+        permanently rejected -- an operator who owns that hardware must be
+        able to name it in the roster."""
+        manifest = build_manifest(
+            **_manifest_kwargs(
+                inventory=[
+                    {
+                        "alias": "infrared-1",
+                        "device_class": "InfraredLight",
+                        "available": True,
+                    },
+                    {
+                        "alias": "hev-1",
+                        "device_class": "HevLight",
+                        "available": True,
+                    },
+                ]
+            )
+        )
+        classes = {entry["device_class"] for entry in manifest["inventory"]}
+        assert classes == {"InfraredLight", "HevLight"}
+
+    def test_rejects_unrecognised_class_in_inventory(self) -> None:
         with pytest.raises(ValueError, match="available class"):
             build_manifest(
                 **_manifest_kwargs(
                     inventory=[
                         {
-                            "alias": "infrared-1",
-                            "device_class": "InfraredLight",
+                            "alias": "mystery-1",
+                            "device_class": "SwitchLight",
                             "available": True,
                         }
                     ]
@@ -1239,11 +1283,20 @@ class TestClosureEvent:
         with pytest.raises(ValueError, match="physical provenance"):
             build_closure_event(**_closure_kwargs(provenance="synthetic"))
 
-    def test_evidence_backed_requires_available_class(self) -> None:
-        with pytest.raises(ValueError, match="currently available"):
-            build_closure_event(
-                **_closure_kwargs(device_class="InfraredLight", aliases=["mini-1"])
-            )
+    @pytest.mark.parametrize("device_class", ["InfraredLight", "HevLight"])
+    def test_infrared_and_hev_can_now_close_evidence_backed(
+        self, device_class: str
+    ) -> None:
+        """T-17-XX change 4: InfraredLight/HevLight are OPTIONAL, not
+        permanently gap-only -- an operator who genuinely owns that
+        hardware must be able to close it with real evidence, not be
+        forced into a named_gap that misrepresents what they have."""
+        record = build_closure_event(
+            **_closure_kwargs(device_class=device_class, aliases=["ir-1"])
+        )
+        assert record["disposition"] == "evidence_backed"
+        assert record["device_class"] == device_class
+        assert record["aliases"] == ["ir-1"]
 
     def test_named_gap_only_for_infrared_and_hev(self) -> None:
         with pytest.raises(ValueError, match="named gap"):
@@ -1433,6 +1486,55 @@ class TestGenerateSummaryAndReport:
         report_second = generate_report(copy.deepcopy(summary))
         assert report_first == report_second
         assert "InfraredLight" in report_first
+
+    def test_staleness_summary_carries_the_per_leg_restoration_fields(self) -> None:
+        """WR-02: restoration_discover_s/restoration_mdns_s must survive the
+        staleness_summary projection, not just the raw journal row, so
+        generate_report()'s Markdown does not silently lose the measured
+        per-leg restoration data T-17-XX change 3 added."""
+        staleness_rows = [
+            build_staleness_event(
+                **_staleness_kwargs(
+                    restoration_discover_s=15.530575042008422,
+                    restoration_mdns_s=14.557117625008686,
+                )
+            )
+        ]
+        summary = generate_summary(
+            discovery_rows=[],
+            request_rows=[],
+            animation_rows=[],
+            staleness_rows=staleness_rows,
+            closure_rows=[],
+        )
+        entry = summary["staleness"]["candle-1"]
+        assert entry["restoration_discover_s"] == 15.530575042008422
+        assert entry["restoration_mdns_s"] == 14.557117625008686
+
+        report = generate_report(summary)
+        assert "15.530575042008422" in report
+        assert "14.557117625008686" in report
+
+    def test_staleness_summary_tolerates_a_legacy_row_missing_the_new_keys(
+        self,
+    ) -> None:
+        """WR-02 fix uses .get() so a v2.0-era row without the two new keys
+        still summarises instead of raising a KeyError."""
+        legacy_row = dict(build_staleness_event(**_staleness_kwargs()))
+        del legacy_row["restoration_discover_s"]
+        del legacy_row["restoration_mdns_s"]
+
+        summary = generate_summary(
+            discovery_rows=[],
+            request_rows=[],
+            animation_rows=[],
+            staleness_rows=[legacy_row],
+            closure_rows=[],
+        )
+
+        entry = summary["staleness"]["candle-1"]
+        assert entry["restoration_discover_s"] is None
+        assert entry["restoration_mdns_s"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -2079,11 +2181,33 @@ class TestStalenessValidationBranches:
         with pytest.raises(ValueError, match="contiguous"):
             _revalidate(build_staleness_event, record)
 
-    def test_rejects_elapsed_s_exceeding_cap(self) -> None:
+    def test_rejects_elapsed_s_exceeding_cap_on_a_non_final_poll(self) -> None:
+        """T-17-XX change 2: a non-terminal poll can never legitimately
+        exceed the cap -- the experiment loop always breaks the moment a
+        poll's measured elapsed_s reaches the cap, so only the FINAL poll
+        may ever carry a value past it (a measured overrun)."""
         record = build_staleness_event(**_staleness_kwargs())
-        record["polls"][-1]["elapsed_s"] = STALENESS_CAP_S + 1.0
-        with pytest.raises(ValueError, match="non-decreasing and within the cap"):
+        record["polls"][1]["elapsed_s"] = STALENESS_CAP_S + 1.0
+        with pytest.raises(ValueError, match="exceed the cap only on the final poll"):
             _revalidate(build_staleness_event, record)
+
+    def test_allows_elapsed_s_exceeding_cap_only_on_the_final_poll(self) -> None:
+        """T-17-XX change 2: elapsed_s is now the MEASURED wall-clock time,
+        so a poll that overran interval_s can legitimately push the
+        terminal poll's elapsed_s past STALENESS_CAP_S -- this must not
+        raise."""
+        record = build_staleness_event(
+            **_staleness_kwargs(
+                polls=[
+                    _absent_poll(1, STALENESS_CAP_S - 120.0),
+                    _absent_poll(2, STALENESS_CAP_S - 60.0),
+                    _absent_poll(3, STALENESS_CAP_S + 5.0),
+                ],
+                disposition="confirmed_expiry",
+            )
+        )
+        _revalidate(build_staleness_event, record)  # must not raise
+        assert record["polls"][-1]["elapsed_s"] == STALENESS_CAP_S + 5.0
 
     def test_rejects_non_boolean_presence_flag(self) -> None:
         record = build_staleness_event(**_staleness_kwargs())
@@ -2262,6 +2386,82 @@ class TestReloadEveryJournal:
         record = build_closure_event(**_closure_kwargs())
         append_closure_event(path, record)
         assert reload_closure_events(path) == [record]
+
+
+_V2_EVIDENCE_DIR = (
+    Path(__file__).resolve().parents[2]
+    / "milestones"
+    / "v2.0-phases"
+    / "14-thread-revalidation-and-docs"
+    / "14-EVIDENCE"
+)
+
+
+class TestV2CommittedEvidenceStillValidates:
+    """T-17-XX changes 3/4: the v2.0 THREAD-04/THREAD-05 evidence predates
+    the new per-leg restoration fields and the InfraredLight/HevLight
+    inventory widening -- it must still reload/validate byte-for-byte
+    unchanged, proving "nullable is load-bearing" (the row literally lacks
+    the two new keys, not merely carries them as null) rather than assumed.
+    """
+
+    def test_v2_staleness_jsonl_reloads_unchanged(self) -> None:
+        path = _V2_EVIDENCE_DIR / "14-STALENESS.jsonl"
+        rows = reload_staleness_events(path)
+        assert len(rows) == 1
+        row = rows[0]
+        # The committed row predates T-17-XX change 3: it carries NEITHER
+        # per-leg restoration key at all, not a null value for either.
+        assert "restoration_discover_s" not in row
+        assert "restoration_mdns_s" not in row
+        assert row["disposition"] == "confirmed_expiry"
+
+    def test_v2_manifest_json_still_validates(self) -> None:
+        manifest = json.loads(
+            (_V2_EVIDENCE_DIR / "14-MANIFEST.json").read_text(encoding="utf-8")
+        )
+        assert manifest["session_id"] == "seed-001"
+        # No InfraredLight/HevLight entries in this committed roster -- the
+        # T-17-XX change 4 widening must not require them.
+        classes = {entry["device_class"] for entry in manifest["inventory"]}
+        assert "InfraredLight" not in classes
+        assert "HevLight" not in classes
+        validate_expected_roster(manifest["inventory"])
+
+    def test_v2_closure_jsonl_still_validates(self) -> None:
+        path = _V2_EVIDENCE_DIR / "14-CLOSURE.jsonl"
+        rows = reload_closure_events(path)
+        gap_classes = {
+            row["device_class"] for row in rows if row["disposition"] == "named_gap"
+        }
+        assert gap_classes == {"InfraredLight", "HevLight"}
+
+    def test_v2_class_ledger_still_matches_the_derivation(self) -> None:
+        """T-17-XX change 4: derive_class_ledger_from_roster() must still
+        report InfraredLight/HevLight as named gaps for a roster that omits
+        them entirely -- the meaning of this historical evidence must not
+        silently change."""
+        manifest = json.loads(
+            (_V2_EVIDENCE_DIR / "14-MANIFEST.json").read_text(encoding="utf-8")
+        )
+        discovery_rows = reload_discovery_events(
+            _V2_EVIDENCE_DIR / "14-DISCOVERY.jsonl"
+        )
+        request_rows = reload_request_trial_events(
+            _V2_EVIDENCE_DIR / "14-REQUESTS.jsonl"
+        )
+        closure_rows = reload_closure_events(_V2_EVIDENCE_DIR / "14-CLOSURE.jsonl")
+        ledger = derive_class_ledger_from_roster(
+            inventory=manifest["inventory"],
+            discovery_rows=discovery_rows,
+            request_rows=request_rows,
+            closure_rows=closure_rows,
+        )
+        committed_ledger = json.loads(
+            (_V2_EVIDENCE_DIR / "14-CLASS-LEDGER.json").read_text(encoding="utf-8")
+        )
+        assert ledger["complete"] == committed_ledger["complete"]
+        assert ledger["classes"] == committed_ledger["classes"]
 
 
 class TestGenerateSummaryNonCompletedRequestRow:
@@ -3725,7 +3925,7 @@ class TestRunStalenessExperiment:
             alias="candle-1",
             disconnect_ns=0,
             poll=_poll,
-            restore_available=lambda: _async_return((999, 42.0)),
+            restore_available=lambda: _async_return((999, 42.0, 42.0, None)),
             now=clock.now,
             sleep=clock.sleep,
             interval_s=1.0,
@@ -3737,6 +3937,8 @@ class TestRunStalenessExperiment:
         assert row["confirmed_expiry_poll"] == 4
         assert row["restored_available_ns"] == 999
         assert row["restoration_duration_s"] == 42.0
+        assert row["restoration_discover_s"] == 42.0
+        assert row["restoration_mdns_s"] is None
 
     async def test_reaches_cap_without_confirmation_is_censored(
         self, tmp_path: Path
@@ -3759,7 +3961,7 @@ class TestRunStalenessExperiment:
             alias="candle-1",
             disconnect_ns=0,
             poll=_poll,
-            restore_available=lambda: _async_return((999, 42.0)),
+            restore_available=lambda: _async_return((999, 42.0, None, 42.0)),
             now=clock.now,
             sleep=clock.sleep,
         )
@@ -3786,7 +3988,7 @@ class TestRunStalenessExperiment:
             alias="candle-1",
             disconnect_ns=0,
             poll=_poll,
-            restore_available=lambda: _async_return((123, 7.0)),
+            restore_available=lambda: _async_return((123, 7.0, 7.0, 7.0)),
             should_stop_early=_should_stop_early,
             now=clock.now,
             sleep=clock.sleep,
@@ -3814,13 +4016,59 @@ class TestRunStalenessExperiment:
             alias="candle-1",
             disconnect_ns=0,
             poll=_poll,
-            restore_available=lambda: _async_return((999, 42.0)),
+            restore_available=lambda: _async_return((999, 42.0, 42.0, None)),
             now=clock.now,
             sleep=clock.sleep,
         )
 
         assert "unquiesced_environment" in row["confounders"]
         assert row["disposition"] == "censored"
+
+    async def test_records_measured_elapsed_time_not_nominal_schedule(
+        self, tmp_path: Path
+    ) -> None:
+        """T-17-XX change 2: the WiFi arm's 45s discovery timeout means a
+        fully-absent poll runs both legs sequentially (~90s) against the
+        60s cadence -- ``elapsed_s`` must record that MEASURED wall-clock
+        time, not the nominal ``poll_index * interval_s`` schedule, or the
+        recorded expiry bound understates the real one by ~1.5x. The
+        absolute-cadence scheduling target itself stays nominal (proven
+        indirectly here: the fake clock only ever advances via explicit
+        ``sleep()`` calls or the poll()'s own +90s, so a still-nominal
+        target is what keeps `wait` non-positive once the poll overruns)."""
+        manifest = _manifest_for_roster()
+        clock = _FakeMonotonicClock()
+
+        async def _poll() -> tuple[bool, bool]:
+            # Two sequential ~45s discovery legs -- 90s of wall time -- on
+            # a 60s nominal interval.
+            clock.value += 90.0
+            return False, False
+
+        row = await run_staleness_experiment(
+            session_dir=tmp_path,
+            manifest=manifest,
+            alias="candle-1",
+            disconnect_ns=0,
+            poll=_poll,
+            restore_available=lambda: _async_return((999, 42.0, 42.0, None)),
+            now=clock.now,
+            sleep=clock.sleep,
+            interval_s=60.0,
+            confirm_polls=3,
+            cap_s=1000.0,
+        )
+
+        assert row["disposition"] == "confirmed_expiry"
+        elapsed_values = [poll["elapsed_s"] for poll in row["polls"]]
+        # Measured: each poll adds 90s of real wall time, and the nominal
+        # 60s schedule never gets to "wait" once the first overrun pushes
+        # the clock past every later nominal target.
+        assert elapsed_values == [150.0, 240.0, 330.0]
+        # Explicitly NOT the nominal poll_index * interval_s schedule.
+        assert elapsed_values != [60.0, 120.0, 180.0]
+        assert row["confirmed_expiry_poll"] == 3
+        assert "unquiesced_environment" in row["confounders"]
 
     async def test_cancellation_records_interrupted_with_polls_so_far(
         self, tmp_path: Path
@@ -3857,6 +4105,8 @@ class TestRunStalenessExperiment:
         assert len(rows[0]["polls"]) == 1
         assert rows[0]["restored_available_ns"] is None
         assert rows[0]["restoration_duration_s"] is None
+        assert rows[0]["restoration_discover_s"] is None
+        assert rows[0]["restoration_mdns_s"] is None
 
     async def test_cancellation_during_restoration_wait_preserves_disposition(
         self, tmp_path: Path
@@ -3882,7 +4132,9 @@ class TestRunStalenessExperiment:
         async def _poll() -> tuple[bool, bool]:
             return next(polls_seen)
 
-        async def _restore_available() -> tuple[int, float] | None:
+        async def _restore_available() -> (
+            tuple[int, float, float | None, float | None] | None
+        ):
             raise asyncio.CancelledError()
 
         with pytest.raises(asyncio.CancelledError):
@@ -3911,6 +4163,8 @@ class TestRunStalenessExperiment:
         assert rows[0]["confirmed_expiry_poll"] == 4
         assert rows[0]["restored_available_ns"] is None
         assert rows[0]["restoration_duration_s"] is None
+        assert rows[0]["restoration_discover_s"] is None
+        assert rows[0]["restoration_mdns_s"] is None
 
     async def test_cancellation_during_restoration_wait_after_censoring(
         self, tmp_path: Path
@@ -3924,7 +4178,9 @@ class TestRunStalenessExperiment:
         async def _poll() -> tuple[bool, bool]:
             return True, True  # always present -- never confirms expiry
 
-        async def _restore_available() -> tuple[int, float] | None:
+        async def _restore_available() -> (
+            tuple[int, float, float | None, float | None] | None
+        ):
             raise asyncio.CancelledError()
 
         with pytest.raises(asyncio.CancelledError):
@@ -3944,6 +4200,8 @@ class TestRunStalenessExperiment:
         assert rows[0]["disposition"] == "censored"
         assert rows[0]["restored_available_ns"] is None
         assert rows[0]["restoration_duration_s"] is None
+        assert rows[0]["restoration_discover_s"] is None
+        assert rows[0]["restoration_mdns_s"] is None
 
     async def test_already_recorded_alias_is_a_no_op(self, tmp_path: Path) -> None:
         manifest = _manifest_for_roster()
@@ -4148,6 +4406,101 @@ class TestDeriveClassLedgerFromRoster:
             closure_rows=[],
         )
         assert ledger["complete"] is False
+
+    def test_infrared_and_hev_close_evidence_backed_when_the_roster_names_them(
+        self,
+    ) -> None:
+        """T-17-XX change 4: a roster that names real InfraredLight/HevLight
+        aliases must be able to close them with evidence, exactly like any
+        other class -- the fixed pre-T-17-XX gap-only routing is now
+        roster-derived, not permanent."""
+        roster = [
+            *_FULL_ROSTER,
+            {"alias": "infrared-1", "device_class": "InfraredLight", "available": True},
+            {"alias": "hev-1", "device_class": "HevLight", "available": True},
+        ]
+        manifest = build_manifest(**_manifest_kwargs(inventory=roster))
+        aliases = expected_alias_roster(roster)
+        discovery_rows = [_physical_discovery_row(alias, manifest) for alias in aliases]
+        request_rows = [
+            row for alias in aliases for row in _physical_request_rows(alias, manifest)
+        ]
+
+        ledger = derive_class_ledger_from_roster(
+            inventory=roster,
+            discovery_rows=discovery_rows,
+            request_rows=request_rows,
+            closure_rows=[],
+        )
+
+        assert ledger["complete"] is True
+        assert ledger["missing_classes"] == []
+        assert ledger["classes"]["InfraredLight"] == {
+            "disposition": "evidence_backed",
+            "aliases": ["infrared-1"],
+            "gap_reason": None,
+            "gap_recorded_date": None,
+        }
+        assert ledger["classes"]["HevLight"]["disposition"] == "evidence_backed"
+
+    def test_infrared_incomplete_evidence_is_missing_not_a_gap(self) -> None:
+        """A roster-named InfraredLight with incomplete evidence stays
+        ``missing`` -- it must never silently fall back to named_gap just
+        because that used to be its only closure path."""
+        roster = [
+            *_FULL_ROSTER,
+            {"alias": "infrared-1", "device_class": "InfraredLight", "available": True},
+        ]
+        manifest = build_manifest(**_manifest_kwargs(inventory=roster))
+        aliases = expected_alias_roster(_FULL_ROSTER)  # infrared-1 gets NO evidence
+        discovery_rows = [_physical_discovery_row(alias, manifest) for alias in aliases]
+        request_rows = [
+            row for alias in aliases for row in _physical_request_rows(alias, manifest)
+        ]
+
+        ledger = derive_class_ledger_from_roster(
+            inventory=roster,
+            discovery_rows=discovery_rows,
+            request_rows=request_rows,
+            closure_rows=[],
+        )
+
+        assert ledger["complete"] is False
+        assert "InfraredLight" in ledger["missing_classes"]
+        assert "InfraredLight" not in ledger["classes"]
+
+    def test_named_gap_alongside_roster_aliases_is_rejected(self) -> None:
+        """The laundering guard: a device_class with roster aliases must
+        never also carry a named_gap closure row (T-17-XX change 4) -- the
+        per-row schema alone can no longer prevent this since both
+        dispositions are now schema-legal for InfraredLight/HevLight."""
+        roster = [
+            *_FULL_ROSTER,
+            {"alias": "infrared-1", "device_class": "InfraredLight", "available": True},
+        ]
+        manifest = build_manifest(**_manifest_kwargs(inventory=roster))
+        closure_rows = [
+            build_closure_event(
+                **_closure_kwargs(
+                    session_id=manifest["session_id"],
+                    revision=manifest["revision"],
+                    device_class="InfraredLight",
+                    disposition="named_gap",
+                    aliases=[],
+                    gap_reason="no Thread-capable fleet hardware",
+                    gap_recorded_date="2026-08-31",
+                    provenance=None,
+                )
+            )
+        ]
+
+        with pytest.raises(ValueError, match="also a named_gap closure row"):
+            derive_class_ledger_from_roster(
+                inventory=roster,
+                discovery_rows=[],
+                request_rows=[],
+                closure_rows=closure_rows,
+            )
 
 
 class TestForbiddenVocabulary:
@@ -4632,16 +4985,20 @@ class _RestorationDiscoverStub:
     Reports the device present starting from its ``present_from_call``-th
     invocation -- used to hermetically prove the CLI's unbounded
     restoration-wait loop actually polls more than once before succeeding,
-    with no real socket or device involved.
+    with no real socket or device involved. ``timeouts`` records every
+    ``timeout=`` kwarg this stub was called with, so a test can assert
+    exactly what value reached the discovery call site (T-17-XX change 1).
     """
 
     def __init__(self, serial: str, *, present_from_call: int) -> None:
         self._serial = serial
         self._present_from_call = present_from_call
         self.calls = 0
+        self.timeouts: list[float] = []
 
     def __call__(self, timeout: float = 0.0) -> _RestorationDiscoverStub:
         self.calls += 1
+        self.timeouts.append(timeout)
         return self
 
     def __aiter__(self) -> Any:
@@ -4724,6 +5081,43 @@ class TestRunPowerScript:
         )
         _run_power_script(script, stage="off")
         assert capsys.readouterr().out == ""
+
+
+class TestSecondLegPollWouldOverrunBound:
+    """IN-03: the phase-2 restoration loop must never START a poll that could
+    itself finish past _RESTORATION_SECOND_LEG_BOUND_S. Exercised as a pure
+    predicate rather than through the CLI, since neither the real monotonic
+    clock nor asyncio's own loop timing is safe to fake wholesale for a
+    ~90s-wide window."""
+
+    def test_worst_case_is_twice_the_staleness_discovery_timeout(self) -> None:
+        assert _POLL_WORST_CASE_S == 2 * _STALENESS_DISCOVERY_TIMEOUT_S
+
+    def test_a_poll_with_exactly_enough_headroom_is_allowed(self) -> None:
+        """now + worst_case == deadline is still comfortably inside the
+        bound (the poll finishes AT the deadline, not past it), so this
+        must not be treated as an overrun."""
+        deadline = 900.0
+        now = deadline - _POLL_WORST_CASE_S
+        assert _second_leg_poll_would_overrun_bound(now, deadline) is False
+
+    def test_a_poll_started_too_close_to_the_deadline_is_refused(self) -> None:
+        """One second short of full headroom: starting a poll here could
+        finish one second past the documented bound, so it must be refused
+        -- this is the exact soft-overrun gap IN-03 reported."""
+        deadline = 900.0
+        now = deadline - _POLL_WORST_CASE_S + 1.0
+        assert _second_leg_poll_would_overrun_bound(now, deadline) is True
+
+    def test_a_poll_started_well_before_the_deadline_is_allowed(self) -> None:
+        deadline = 900.0
+        now = 0.0
+        assert _second_leg_poll_would_overrun_bound(now, deadline) is False
+
+    def test_a_poll_started_after_the_deadline_is_refused(self) -> None:
+        deadline = 900.0
+        now = 950.0
+        assert _second_leg_poll_would_overrun_bound(now, deadline) is True
 
 
 class TestCliStalenessPowerScripts:
@@ -4974,7 +5368,7 @@ class TestCliStalenessPowerScripts:
             captured_disconnect_ns.append(kwargs["disconnect_ns"])
             restore_result = await kwargs["restore_available"]()
             assert restore_result is not None
-            restored_ns, duration_s = restore_result
+            restored_ns, duration_s, discover_s, mdns_s = restore_result
             row = build_staleness_event(
                 **_staleness_kwargs(
                     session_id=manifest["session_id"],
@@ -4983,6 +5377,8 @@ class TestCliStalenessPowerScripts:
                     disconnect_ns=kwargs["disconnect_ns"],
                     restored_available_ns=restored_ns,
                     restoration_duration_s=duration_s,
+                    restoration_discover_s=discover_s,
+                    restoration_mdns_s=mdns_s,
                     provenance="physical",
                 )
             )
@@ -5022,6 +5418,10 @@ class TestCliStalenessPowerScripts:
         assert result["ok"] is True
         assert result["restoration_duration_s"] is not None
         assert result["restoration_duration_s"] >= 0
+        # Both stubs report present on the same (2nd) call, so the OR-based
+        # closure observes both legs at once -- neither is left unobserved.
+        assert result["restoration_discover_s"] is not None
+        assert result["restoration_mdns_s"] is not None
 
         assert f"power off: {power_off}" in captured.err
         assert "disconnect captured" in captured.err
@@ -5033,6 +5433,227 @@ class TestCliStalenessPowerScripts:
         # one "waiting" poll must have happened before the eventual success.
         assert discover_stub.calls >= 2
         assert mdns_stub.calls >= 2
+
+    def test_restoration_closes_on_the_first_leg_and_bounds_the_second(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+    ) -> None:
+        """T-17-XX change 3: restoration now closes the moment EITHER leg
+        reports present (OR) rather than requiring both simultaneously -- a
+        WiFi bulb with no Thread Border Router may never re-advertise over
+        mDNS this session. The still-missing leg is then given a BOUNDED
+        chance to appear (patched small here so the test completes fast)
+        before being recorded as ``None`` -- a real outcome, not a hang."""
+        import thread_revalidation as thread_revalidation_module
+
+        import lifx.api as lifx_api_module
+
+        session_dir, manifest, alias_map_path = self._session(tmp_path)
+        power_off = _write_executable_script(tmp_path / "off.sh", "exit 0")
+        power_on = _write_executable_script(tmp_path / "on.sh", "exit 0")
+
+        # discover restores on the very first restoration poll; mdns never
+        # restores at all within this test.
+        discover_stub = _RestorationDiscoverStub("d073d5000005", present_from_call=1)
+        mdns_stub = _RestorationDiscoverStub("d073d5000005", present_from_call=10**9)
+        monkeypatch.setattr(lifx_api_module, "discover", discover_stub)
+        monkeypatch.setattr(lifx_api_module, "discover_mdns", mdns_stub)
+        monkeypatch.setattr(
+            thread_revalidation_module, "_RESTORATION_SECOND_LEG_BOUND_S", 0.0
+        )
+
+        async def _fake_run_staleness_experiment(**kwargs: Any) -> dict[str, Any]:
+            restore_result = await kwargs["restore_available"]()
+            assert restore_result is not None
+            restored_ns, duration_s, discover_s, mdns_s = restore_result
+            row = build_staleness_event(
+                **_staleness_kwargs(
+                    session_id=manifest["session_id"],
+                    revision=manifest["revision"],
+                    alias="mini-1",
+                    disconnect_ns=kwargs["disconnect_ns"],
+                    restored_available_ns=restored_ns,
+                    restoration_duration_s=duration_s,
+                    restoration_discover_s=discover_s,
+                    restoration_mdns_s=mdns_s,
+                    provenance="physical",
+                )
+            )
+            append_staleness_event(kwargs["session_dir"] / "14-STALENESS.jsonl", row)
+            return row
+
+        monkeypatch.setattr(
+            thread_revalidation_module,
+            "run_staleness_experiment",
+            _fake_run_staleness_experiment,
+        )
+
+        exit_code = thread_revalidation_main(
+            [
+                "staleness",
+                "--session-dir",
+                str(session_dir),
+                "--alias-map",
+                str(alias_map_path),
+                "--alias",
+                "mini-1",
+                "--power-off",
+                str(power_off),
+                "--power-on",
+                str(power_on),
+            ]
+        )
+        assert exit_code == 0
+
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result["ok"] is True
+        assert result["restoration_duration_s"] is not None
+        assert result["restoration_discover_s"] is not None
+        assert result["restoration_mdns_s"] is None
+        assert "did not return within" in captured.err
+        assert "recording as not observed" in captured.err
+
+    def test_restoration_observes_the_second_leg_within_the_bound(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+    ) -> None:
+        """When the second leg DOES return before the bound expires, both
+        per-leg restoration times are recorded, distinguishing which
+        transport was faster."""
+        import thread_revalidation as thread_revalidation_module
+
+        import lifx.api as lifx_api_module
+
+        session_dir, manifest, alias_map_path = self._session(tmp_path)
+        power_off = _write_executable_script(tmp_path / "off.sh", "exit 0")
+        power_on = _write_executable_script(tmp_path / "on.sh", "exit 0")
+
+        # discover restores first; mdns restores a couple of polls later,
+        # well within the default _RESTORATION_SECOND_LEG_BOUND_S.
+        discover_stub = _RestorationDiscoverStub("d073d5000005", present_from_call=1)
+        mdns_stub = _RestorationDiscoverStub("d073d5000005", present_from_call=3)
+        monkeypatch.setattr(lifx_api_module, "discover", discover_stub)
+        monkeypatch.setattr(lifx_api_module, "discover_mdns", mdns_stub)
+
+        async def _fake_run_staleness_experiment(**kwargs: Any) -> dict[str, Any]:
+            restore_result = await kwargs["restore_available"]()
+            assert restore_result is not None
+            restored_ns, duration_s, discover_s, mdns_s = restore_result
+            row = build_staleness_event(
+                **_staleness_kwargs(
+                    session_id=manifest["session_id"],
+                    revision=manifest["revision"],
+                    alias="mini-1",
+                    disconnect_ns=kwargs["disconnect_ns"],
+                    restored_available_ns=restored_ns,
+                    restoration_duration_s=duration_s,
+                    restoration_discover_s=discover_s,
+                    restoration_mdns_s=mdns_s,
+                    provenance="physical",
+                )
+            )
+            append_staleness_event(kwargs["session_dir"] / "14-STALENESS.jsonl", row)
+            return row
+
+        monkeypatch.setattr(
+            thread_revalidation_module,
+            "run_staleness_experiment",
+            _fake_run_staleness_experiment,
+        )
+
+        exit_code = thread_revalidation_main(
+            [
+                "staleness",
+                "--session-dir",
+                str(session_dir),
+                "--alias-map",
+                str(alias_map_path),
+                "--alias",
+                "mini-1",
+                "--power-off",
+                str(power_off),
+                "--power-on",
+                str(power_on),
+            ]
+        )
+        assert exit_code == 0
+
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result["ok"] is True
+        assert result["restoration_discover_s"] is not None
+        assert result["restoration_mdns_s"] is not None
+        assert result["restoration_discover_s"] <= result["restoration_mdns_s"]
+        assert "mdns leg restored after" in captured.err
+        assert mdns_stub.calls >= 3
+
+    def test_poll_supplies_the_explicit_45s_timeout_not_the_library_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Phase 17 WiFi arm (T-17-XX change 1): a contested WiFi network can
+        miss the library's DISCOVERY_TIMEOUT default (15.0s), so the CLI
+        must pass its own, longer timeout explicitly at the discover()/
+        discover_mdns() call site -- never by reassigning or shadowing the
+        imported ``lifx.const.DISCOVERY_TIMEOUT``. ``run_staleness_experiment``
+        itself is faked out (as the other CLI-level tests in this class do)
+        so this test never waits on the real 60s poll cadence -- it only
+        needs to prove what timeout value reaches the shared ``_poll()``
+        closure, which both the confirmation loop and restoration wait use.
+        """
+        import thread_revalidation as thread_revalidation_module
+
+        import lifx.api as lifx_api_module
+
+        session_dir, manifest, alias_map_path = self._session(tmp_path)
+
+        discover_stub = _RestorationDiscoverStub("d073d5000005", present_from_call=1)
+        mdns_stub = _RestorationDiscoverStub("d073d5000005", present_from_call=1)
+        monkeypatch.setattr(lifx_api_module, "discover", discover_stub)
+        monkeypatch.setattr(lifx_api_module, "discover_mdns", mdns_stub)
+
+        async def _fake_run_staleness_experiment(**kwargs: Any) -> dict[str, Any]:
+            await kwargs["poll"]()
+            row = build_staleness_event(
+                **_staleness_kwargs(
+                    session_id=manifest["session_id"],
+                    revision=manifest["revision"],
+                    alias="mini-1",
+                    disconnect_ns=kwargs["disconnect_ns"],
+                    provenance="physical",
+                )
+            )
+            append_staleness_event(kwargs["session_dir"] / "14-STALENESS.jsonl", row)
+            return row
+
+        monkeypatch.setattr(
+            thread_revalidation_module,
+            "run_staleness_experiment",
+            _fake_run_staleness_experiment,
+        )
+
+        exit_code = thread_revalidation_main(
+            [
+                "staleness",
+                "--session-dir",
+                str(session_dir),
+                "--alias-map",
+                str(alias_map_path),
+                "--alias",
+                "mini-1",
+                "--disconnect-ns",
+                "0",
+            ]
+        )
+        assert exit_code == 0
+
+        assert discover_stub.timeouts
+        assert mdns_stub.timeouts
+        assert all(timeout == 45.0 for timeout in discover_stub.timeouts)
+        assert all(timeout == 45.0 for timeout in mdns_stub.timeouts)
+        assert _STALENESS_DISCOVERY_TIMEOUT_S == 45.0
+        # The imported library constant is untouched -- proves this module
+        # never reassigned or shadowed it to reach the 45s value.
+        assert DISCOVERY_TIMEOUT == 15.0
+        assert thread_revalidation_module.DISCOVERY_TIMEOUT == 15.0
 
     def test_already_recorded_alias_never_runs_power_off(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any

@@ -121,7 +121,7 @@ verified together, not by size.
 
 - [x] **Phase 15: Coverage Gate and Test-Suite Health** - Make the project's own verification machinery honest before it measures anything else: the `codecov/patch` gate cannot pass without scoring a pull request's changed range, the `scripts/` tree triage and measured-tree rule state which code coverage measures, and the v2.0 Phase 13 coordinator teardown item is settled either way (completed 2026-09-07)
 - [x] **Phase 16: mDNS Correctness, Docs and Test Hygiene** - Close the fail-closed address-check bypass in `selected_address_for()`, and make the mDNS surface describe itself to callers: `Device.connectivity` classified as a derived rather than cached property, caller-facing discovery docstrings, and module-scope test imports (completed 2026-09-07)
-- [ ] **Phase 17: Fleet Diagnostics and the Staleness Control** - Make the IPv6 Thread probe report what it actually observed, and give v2.0's 69s Thread disappearance-to-expiry figure a WiFi control measured with the same protocol
+- [x] **Phase 17: Fleet Diagnostics and the Staleness Control** - Make the IPv6 Thread probe report what it actually observed, and give v2.0's 4140-4200s Thread disappearance-to-expiry interval a WiFi control measured with the same protocol (completed 2026-09-08)
 - [ ] **Phase 18: Animator Connectivity Guard and Typed Move Effect** - The milestone's two public API changes: `Animator` stops silently accepting a Thread device, and a caller builds the firmware Move effect through typed arguments instead of an eight-slot `parameters` list
 - [ ] **Phase 19: Theme Library API and Data** - Primary themes distinguishable from rename aliases with canonical-slug resolution, a digit-leading display name representable as a slug, and the v1.2 palette substitutions named in the changelog
 - [ ] **Phase 20: Documentation Prose Sweep** - Roughly 200 em dashes across `docs/` recast sentence by sentence rather than substituted, run last so it cannot collide with any other change to `docs/`
@@ -239,7 +239,8 @@ Plans:
 ### Phase 17: Fleet Diagnostics and the Staleness Control
 
 **Goal**: The hardware-facing diagnostics report what they actually observed, and v2.0's
-69s Thread staleness figure gains a WiFi control instead of standing alone
+Thread disappearance-to-expiry interval of 4140 to 4200 s (not to be confused with its separate
+69.4 s restoration duration) gains a WiFi control instead of standing alone
 **Depends on**: Phase 15 (the probe lands at its relocated `.planning/scripts/` path, outside the measured tree) and Phase 16
 (the probe drives the library's address selection, so MDNS-09 settles first)
 **Requirements**: MDNS-10, DISC-04
@@ -247,11 +248,33 @@ Plans:
 
   1. The probe distinguishes an instance holding no address data at all from one holding a cached but unusable unscoped link-local AAAA record, and says which it saw instead of reporting "pending address records" for both
   2. The `linklocal_chosen` summary counter and its warning are reachable and truthful, or removed; a partially assembled instance no longer terminates diagnostics through the TXT assertion, and instead produces defensive diagnostic output
-  3. Advertisement staleness is measured against a WiFi bulb using the same disappearance-to-expiry protocol THREAD-04 used on Thread, producing a figure directly comparable with the recorded 69s
-  4. The recorded result states whether 69s is Thread-specific or a general mDNS TTL and goodbye artefact, so the library can answer that question rather than leaving one measurement uncontrolled
+  3. Advertisement staleness is measured against a WiFi bulb using the same disappearance-to-expiry protocol THREAD-04 used on Thread, producing a figure directly comparable with the recorded 4140 to 4200 s interval
+  4. The recorded result states whether the 4140 to 4200 s disappearance-to-expiry interval is Thread-specific or a general mDNS TTL and goodbye artefact, so the library can answer that question rather than leaving one measurement uncontrolled
   5. Every committed artefact from both runs carries format-preserving pseudonyms from the operator's private mapping, with no live serial, MAC address, IP address or hostname anywhere in the staged diff
 
-**Plans**: TBD
+**Plans**: 5/5 plans executed
+
+Plans:
+
+**Wave 1**
+
+- [x] 17-01-PLAN.md: MDNS-10 tracer, the typed instance view with five explicit selection states, the refused-versus-absent split, the single owner-normalisation site, the split summary counts, the dead link-local counter and predicate name removed, and defensive TXT handling (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion; same two files)*
+
+- [x] 17-02-PLAN.md: the opt-in `--alias-map` redaction, its external loader, prefix-reserved address substitution and stdout install seam, as its own commit with its own tooling tests (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion; hardware-gated, first half of the single operator sitting)*
+
+- [x] 17-03-PLAN.md: R4 one redacted Thread-fleet probe transcript under `17-EVIDENCE/`, with the observed and not-observed statement and a blocking staged-diff inspection (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion; hardware-gated, second half of the same sitting. Serialised after Wave 3 rather than sharing it: the two hardware plans are file-disjoint in what they write but share one git index and the `17-EVIDENCE/` directory, so concurrent runs could inspect or commit each other's staged artefacts)*
+
+- [x] 17-04-PLAN.md: DISC-04 the WiFi staleness trial through the unmodified tool, its session manifest and staleness JSONL under `17-EVIDENCE/`, the same-alias rerun guarantee and a blocking staged-diff inspection (wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion; gated on real WiFi numbers per D-22)*
+
+- [x] 17-05-PLAN.md: R6 the staleness control finding with all four figures and the 69.4 second correction across ROADMAP and REQUIREMENTS, and R7 the caller-facing liveness prose with its approved-phrase lock (wave 5)
 
 ### Phase 18: Animator Connectivity Guard and Typed Move Effect
 
@@ -321,7 +344,7 @@ sweep cannot collide with them)
 |-------|----------------|--------|-----------|
 | 15. Coverage Gate and Test-Suite Health | 5/5 | Not started |  |
 | 16. mDNS Correctness, Docs and Test Hygiene | 4/4 | Not started |  |
-| 17. Fleet Diagnostics and the Staleness Control | 0/? | Not started | - |
+| 17. Fleet Diagnostics and the Staleness Control | 5/5 | Not started |  |
 | 18. Animator Connectivity Guard and Typed Move Effect | 0/? | Not started | - |
 | 19. Theme Library API and Data | 0/? | Not started | - |
 | 20. Documentation Prose Sweep | 0/? | Not started | - |
