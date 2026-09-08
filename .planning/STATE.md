@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Spring Cleaning
-current_phase: 17
-current_phase_name: Fleet Diagnostics and the Staleness Control
-status: "Phase 16 shipped — PR #228"
-stopped_at: Phase 16 complete, ready to plan Phase 17
-last_updated: "2026-09-07T09:40:31.067Z"
-last_activity: 2026-09-07
-state_head: 7616656b0303506c58d6d624debb92a80d830034
+current_phase: 18
+current_phase_name: Animator Connectivity Guard and Typed Move Effect
+status: "Phase 17 shipped — PR #229"
+stopped_at: Phase 17 complete, ready to plan Phase 18
+last_updated: "2026-09-08T16:10:11.449Z"
+last_activity: 2026-09-09
+state_head: 40bca00052d11347d6b81c563015860fd4130125
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
-  percent: 33
+  completed_phases: 3
+  total_plans: 14
+  completed_plans: 14
+  percent: 50
 ---
 
 # Project State
@@ -24,15 +24,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after v2.0 milestone)
 
 **Core value:** Commands stick, devices are found — over WiFi or Thread, transparently — streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 16 — mDNS Correctness, Docs and Test Hygiene
+**Current focus:** Phase 17 — Fleet Diagnostics and the Staleness Control
 
 ## Current Position
 
-Phase: 17 — Fleet Diagnostics and the Staleness Control
+Phase: 18 — Animator Connectivity Guard and Typed Move Effect
 Plan: Not started
-Status: Phase 16 shipped — PR #228
-Total Plans in Phase: 4
-Last activity: 2026-09-07
+Status: Phase 17 shipped — PR #229
+Total Plans in Phase: 5
+Last activity: 2026-09-09
 
 **v2.1 phase order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20
 
@@ -96,6 +96,11 @@ Last activity: 2026-09-07
 | Phase 16 P02 | 18min | 2 tasks | 4 files |
 | Phase 16 P03 | 12 min | 2 tasks | 4 files |
 | Phase 16 P04 | 24min | 2 tasks | 28 files |
+| Phase 17 P01 | 15 min | 3 tasks | 2 files |
+| Phase 17 P02 | 20 min | 2 tasks | 2 files |
+| Phase 17 P03 | 12min | 3 tasks | 1 files |
+| Phase 17 P04 | 6min | 5 tasks | 2 files |
+| Phase 17 P05 | 24min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -111,21 +116,22 @@ this milestone (all 2026-08-27 unless noted):
 - The mDNS ephemeral-port bind is a requirement in its own right (MDNS-01): an IPv4 defect, not a Thread feature
 - `LifxServiceRecord` keeps the wire name `tm`; no expansion of the undocumented key may be asserted anywhere
 - No WiFi-measured constant is retuned before Phase 14 measures it over Thread (spike-first discipline, 2026-07-16 lineage)
-- [Phase 15]: D-09: deselection via opt-in flags through the existing collection hook, not a growing -m negation
-- [Phase 15]: Extended bandit's pre-commit exclude to also cover .planning/scripts/tests/, since those test files were only ever exempted by their old tests/ path
-- [Phase 15]: [Phase 15] Accepted a pre-commit-forced isort reorder in Task 1's pure-rename commit rather than fighting an unavoidable, mechanically-identical re-trigger caused by ruff no longer treating scripts.* as first-party from the new .planning/scripts/ location
-- [Phase 15]: [Phase 15] Suppressed a reportPrivateImportUsage diagnostic surfaced by adding the locked [tool.pyright] extraPaths entry with a targeted type: ignore rather than exporting the private symbol from library code
-- [Phase 15]: [Phase 15] Fixed a hardcoded parents[1] directory-depth bug in measure_merged_discovery.py's _load_alias_map(), one level too shallow after the script moved one directory deeper to .planning/scripts/
-- [Phase 15]: The vacuous-gate guard derives its authoritative changed-measured denominator from coverage.py's own source analysis (analysis2), never from the coverage.xml report under judgement. A report-derived denominator let a report classifying nothing score a false pass; the source-derived denominator closes that while still passing docstring/comment/configured-exclusion-only changes
-- [Phase 15]: TEST-02: coordinator teardown fix (39bad58) confirmed load-bearing by reproducing the pre-fix hang in a scratch worktree; deferred-items.md and STATE.md reconciled to the same outcome
-- [Phase 15]: [Phase 15] Operator selected publish-both-close-209 at the Task 4 checkpoint: both drafted issue comments published verbatim, #214 closed on the CI-01 reversal reasoning, and #209 also closed even though 15-SPEC.md R5 expected it to stay open
-- [Phase 15]: [Phase 15] 15-SPEC.md's locked amendment scope widened from one region to an allowlist of five, because the spec restates its commitments twice and four phase-global restatements contradicted the delivered mechanism
 - [Phase 16]: MDNS-09: extracted _owner_is_unusable() as a shared six-term fail-closed predicate (adds a leading 'not owner' term) used by both selected_address_for() and pending_targets(), closing the trailing-dot and empty/root-owner guard bypasses — Cross-AI plan review found the naive single-caller fix left the empty/DNS-root owner and duplicated pending_targets() guard unrepaired; the shared predicate makes the next guard added land in both places automatically
 - [Phase 16]: Accepted a permanent, documented residual: an owner with two or more trailing dots still diverges between guard key and lookup key (D-02 declines to make _normalise_dns_name() idempotent) — No SPEC acceptance criterion or edge-coverage row covers a multi-dot owner form; recorded in the helper's docstring and the plan rather than widened out of scope
 - [Phase 16]: [Phase 16]: DOCS-08: proxy-response verification attributed to discover()'s mDNS candidates (via _discover_verified_devices_mdns()), not its UDP leg, correcting D-14's original clause which was false against src/lifx/api.py:1112/:1125
 - [Phase 16]: [Phase 16] DOCS-07: split the connectivity caching contract by file per D-09, and scoped the new AGENTS.md derived-not-cached category to a correlated response rather than a broader request outcome, matching connection.py:1075's correlation-gated assignment — Timeouts, connection failures, and uncorrelated replies are request outcomes that leave the cached value unchanged, so the broader phrasing would have overstated what the implementation guarantees
 - [Phase 16]: TEST-01: swept 166 function-local imports to module scope across 27 files in one mechanical commit, then enabled ruff PLC0415 with seven per-file-ignore handoff entries in a separate later commit — D-08 sequencing keeps every commit green under ruff check; zero imports needed retention, so no noqa marks exist under tests/
 - [Phase 16]: tests/test_packaging.py's Python 3.10 skip replaced with a module-scope tomli/tomllib compatibility import over the existing tomli dev dependency, gaining coverage rather than needing a suppression — Neither hoisting a bare tomllib nor retaining it under D-06/D-07's permitted noqa reasons was available; the existing tomli>=2.0.1 dev dependency closes the gap with no new dependency
+- [Phase 17]: 17-01: Module-level string constants hold each new fixed message tail on one physical source line, so grep-checkable phrases stay contiguous under ruff's 88-character limit
+- [Phase 17]: 17-01: Kept dead-code removal (Task 3) separate from the typed-view migration (Task 1) and the normalisation/summary changes (Task 2), so each commit's tests exercise only what that commit changed
+- [Phase 17]: [Phase 17]: 17-02: --alias-map redaction uses a single combined regex alternation (IPv6 branch first, dotted-quad before hex tail) so an IPv4-mapped IPv6 literal is consumed as one token rather than corrupted across two sequential passes
+- [Phase 17]: [Phase 17]: 17-02: Address redaction reserves a distinct documentation sub-range per classify_address() class (192.0.2.x for IPv4, 2001:db8:{1,2,3,4}::x for GUA/IPv6-other/ULA/link-local) rather than a class round trip, since no documentation-safe IPv6 range classifies as GUA/ULA/link-local; no pseudonym is drawn from operational fd00:: or fe80:: space
+- [Phase 17]: [Phase 17]: 17-02: The redacting stream is installed via contextlib.redirect_stdout() inside an ExitStack rather than a direct sys.stdout assignment, so it is always restored, including when the run raises, and cannot contaminate a later in-process test invocation
+- [Phase 17]: 17-03: Operator adjudicated the identity backstop's full local-tokens-for-operator list (46 entries) as exactly two classes with no residue: 10 firmware-assigned bare-hex SRV labels accepted per SPEC amendment A7, and 36 operator-chosen LIFX-<Type>-<n> aliases accepted as deliberately chosen and non-sensitive
+- [Phase 17]: 17-03: The Task 3 adjudication is recorded in the plan SUMMARY rather than by editing the committed transcript, since Task 2 forbids any edit to the staged transcript after staging
+- [Phase 17]: [Phase 17]: 17-04: WiFi staleness trial (seed-002) closes DISC-04/R5 with disappearance-to-expiry bounded at 0-80.85s (confirmed_expiry, first_absence_poll 1) against the Thread arm's 4140-4200s, restoration 14.557s (mDNS)/15.530s (broadcast); operator mandated a prominent accuracy caveat (coarse cadence, coarse absence detection, four confounders, unmatched arms) that must carry into 17-05's published verdict
+- [Phase 17]: [Phase 17]: 17-04: a third, 1Hz targeted-unicast disappearance measurement is planned to supersede this arm's disappearance figure; it does not supersede the restoration figures
+- [Phase 17]: Fixed 17-05-PLAN.md's stale WiFi-disappearance-bound verify gates to use measured elapsed_s (Rule 1), matching 17-04's already-authorised fix under SPEC amendment A8 — The plan's own gates computed the WiFi bound from the nominal 60s cadence constant, giving 'at most 60 s' when the committed row's measured elapsed_s is 80.8548 s; 17-04-PLAN.md's commit 21fd669 already fixed the identical defect and named this figure as 17-05's headline
 
 ### v2.1 Working Notes
 
@@ -208,8 +214,8 @@ Items acknowledged and carried forward from previous milestone closes:
 
 ## Session Continuity
 
-Last session: 2026-09-07T08:01:02.872Z
-Stopped at: Phase 16 complete, ready to plan Phase 17
+Last session: 2026-09-08T10:27:07.939Z
+Stopped at: Phase 17 complete, ready to plan Phase 18
 Resume file: None
 
 ## Operator Next Steps

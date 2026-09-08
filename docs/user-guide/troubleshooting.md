@@ -16,6 +16,10 @@ See the [Discovery Guide troubleshooting section](discovery.md#troubleshooting)
 for mDNS-specific and IPv6 zone issues. The general UDP broadcast issues below
 apply to `discover()` and `discover_udp()` alike.
 
+A device found and then lost after a power interruption is not necessarily broken:
+the [Discovery Guide's Limitations section](discovery.md#limitations) measures how
+long a device can stay undiscoverable after power returns.
+
 ### No Devices Found
 
 **Symptom:** `discover()` returns an empty group

@@ -1,0 +1,467 @@
+{
+  "animation_schedule": [
+    [
+      1,
+      10.0
+    ],
+    [
+      2,
+      10.0
+    ],
+    [
+      5,
+      10.0
+    ]
+  ],
+  "confounders": [],
+  "discovery_round_gaps_s": [
+    9.597229324226896,
+    11.644546234044558,
+    14.106301509201675,
+    13.650656490178894,
+    11.71313310625395
+  ],
+  "inventory": [
+    {
+      "alias": "LIFX-DL-Intl-e52e14d973a8c6c",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Path-Intl-19185",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Ceiling-13x26-1bd858a3db1bf7b1",
+      "available": true,
+      "device_class": "CeilingLight"
+    },
+    {
+      "alias": "LIFX-Ceiling-1982",
+      "available": true,
+      "device_class": "CeilingLight"
+    },
+    {
+      "alias": "LIFX-Path-1998",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Path-19129",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Mini-c9c068baece23a25",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Path-1915",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Luna-c6aca7c620aa9770",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Candle-C-52d9fc9e66b39421",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Tube-61a2e37be5ed9c",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-DL-Intl-70cf94ff4ddb4258",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Beam-19183",
+      "available": true,
+      "device_class": "MultiZoneLight"
+    },
+    {
+      "alias": "LIFX-A21-183",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-18207",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-db083a1ceb4869fe",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Beam-19200",
+      "available": true,
+      "device_class": "MultiZoneLight"
+    },
+    {
+      "alias": "LIFX-DL-Intl-87e1c41621583033",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-A21-1867",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-BR30-18239",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Neon-1876",
+      "available": true,
+      "device_class": "MultiZoneLight"
+    },
+    {
+      "alias": "LIFX-A21-19224",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-DL-19103",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-1825",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-GU10-1894",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-DL-18130",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-1918",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-1837",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-DL-19177",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Filament-Clear-185",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Clean-A19-1200lm-1962",
+      "available": true,
+      "device_class": "HevLight"
+    },
+    {
+      "alias": "LIFX-DL-19235",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-DL-1965",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-NV-BR30-1100lm-1945",
+      "available": true,
+      "device_class": "InfraredLight"
+    },
+    {
+      "alias": "LIFX-DL-194",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18225",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Candle-C-1881",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Mini-C-19241",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-NV-A19-1200lm-18229",
+      "available": true,
+      "device_class": "InfraredLight"
+    },
+    {
+      "alias": "LIFX-Mini-C-1943",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Tile-19243",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Tile-1862",
+      "available": true,
+      "device_class": "MatrixLight"
+    },
+    {
+      "alias": "LIFX-Mini-C-1938",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18110",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-DD-18232",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-DD-19196",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-DD-19242",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18244",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Colour-1000lm-1823",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-1985",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18248",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18234",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-19194",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18253",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-DL-1953",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-GU10-19130",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-DL-1987",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-1878",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Clean-A19-1200lm-1979",
+      "available": true,
+      "device_class": "HevLight"
+    },
+    {
+      "alias": "LIFX-DL-1993",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-GU10-1812",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Clean-A19-1200lm-1893",
+      "available": true,
+      "device_class": "HevLight"
+    },
+    {
+      "alias": "LIFX-Mini-C-19131",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-18210",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-1838",
+      "available": true,
+      "device_class": "Light"
+    },
+    {
+      "alias": "LIFX-Mini-C-19201",
+      "available": true,
+      "device_class": "Light"
+    }
+  ],
+  "kind": "session_manifest",
+  "protocol_version": 1,
+  "request_retransmit_floor_s": 0.2,
+  "request_trial_gaps_s": [
+    0.8275213224851552,
+    0.9792747117696878,
+    0.5677768476383503,
+    0.5602820602486606,
+    1.4238638519220865,
+    1.3967682201451774,
+    1.4979999876956787,
+    0.5147616974435044,
+    1.4625934437233377,
+    1.3294601484077064,
+    0.9555304970878027,
+    0.7076591038092069,
+    1.3817064001342985,
+    1.4187154751330442,
+    0.7802000976625463,
+    1.2385629775029832,
+    1.3639793429595493,
+    0.7960144074156014,
+    1.2323021366466282,
+    1.2947984581261758,
+    0.5164886768144061,
+    1.4210723082822385,
+    0.7437239894896251,
+    0.571624411416795,
+    1.3472576401086138,
+    0.5050909579532983,
+    0.9422347499432021,
+    0.7364580406950755,
+    0.8884556917499881,
+    0.509339947560161,
+    1.4870713240042155,
+    0.9070468490723789,
+    1.2182267502145492,
+    1.1646292886542264,
+    1.2170133384001094,
+    1.4726166196339656,
+    0.6351116060303827,
+    0.5779434513637703,
+    0.6947282618259545,
+    1.3309282569444685,
+    1.338619836978192,
+    1.0866138182635314,
+    1.2176074620486674,
+    0.9168296903682082,
+    1.3992624510238332,
+    1.232889071275407,
+    0.791128123768009,
+    1.3627186607083839,
+    1.3129126774083395,
+    0.5157623433883207,
+    1.1409469925490916,
+    1.1888584427746962,
+    0.7996484033258098,
+    0.7913807551497474,
+    0.8240151899185852,
+    1.2746066482013887,
+    1.0466006599232023,
+    1.4794281977141046,
+    0.9772381974963215,
+    1.4072172004068277,
+    1.303817585364466,
+    0.9531942469407176,
+    1.098656313233147,
+    1.3203240370832208,
+    0.6532052440377475,
+    0.6493401261750029,
+    1.0292944356681621,
+    0.8322781313082509,
+    1.3836625606920765,
+    1.1539423748309026,
+    1.3112049568556778,
+    0.6308802784674191,
+    1.04003180793227,
+    1.3696458353885828,
+    0.5905650535209371,
+    0.8970056402156447,
+    0.6842306519762946,
+    0.9583633037228246,
+    1.0974276575430102,
+    0.8320893895889985,
+    0.7799826747711549,
+    1.0880104290144015,
+    0.5209171101027386,
+    0.6960537266603469,
+    0.8758025951344891,
+    1.1525687330122705,
+    1.495726997454567,
+    1.3177718795421596,
+    0.6537082659202341,
+    0.8047664546704572,
+    1.4765264517226213,
+    1.4873407641281222,
+    1.178532872242954,
+    0.8464343387886809,
+    1.2079971488492949,
+    1.3974863123212684,
+    0.9281572591701381,
+    1.1804285649990578,
+    1.4912322932467923
+  ],
+  "revision": "52e3fe8aa52404d86e6610aabd4d74527ac0554e",
+  "schema_version": 1,
+  "seed": 4823901756,
+  "session_id": "seed-002",
+  "staleness_cap_s": 10800.0,
+  "staleness_confirm_absent_polls": 3,
+  "staleness_poll_interval_s": 60.0
+}

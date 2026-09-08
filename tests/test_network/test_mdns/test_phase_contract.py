@@ -138,6 +138,9 @@ class TestPhase11SurfaceContract:
             "they are not scaled to the requested discovery timeout",
             "a due re-broadcast is sent only while discovery remains active",
             "does not extend the overall timeout",
+            "may yield a device whose advertisement has outlived it",
+            "not a continuing reachability guarantee",
+            "undiscoverable for tens of seconds after power returns",
         )
         folded_guidance = guidance.casefold()
 

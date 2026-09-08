@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import ipaddress
 import json
 import re
@@ -64,13 +65,17 @@ import struct
 import subprocess  # nosec B404
 import sys
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, TextIO, TypeVar
 
-from measurement_support import CapturedState, restore_and_verify_device_state
+from measurement_support import (
+    CapturedState,
+    restore_and_verify_device_state,
+    validate_alias,
+)
 from measurement_support import capture_device_state as _capture_device_state
 
 from lifx.animation.animator import Animator
@@ -91,6 +96,7 @@ from lifx.network.discovery.mdns.discovery import (
     _create_device_from_record,
     _discover_lifx_services,
     _LifxRecordCache,
+    _normalise_dns_name,
 )
 from lifx.network.discovery.mdns.dns import (
     DNS_TYPE_A,
@@ -108,8 +114,78 @@ from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.network.transport import _UdpProtocol
 from lifx.network.utils import IdleDeadline
 from lifx.products import get_product
+from lifx.protocol.models import Serial
 
 _ULA_NETWORK = ipaddress.ip_network("fc00::/7")
+
+# D-11/A5: a single left-to-right alternation, IPv6 branch first, so an
+# IPv4-mapped IPv6 literal such as ::ffff:198.51.100.4 is consumed as one
+# token by _TranscriptRedactor rather than split across two sequential
+# substitution passes (Codex HIGH, pass 1 of 17-REVIEWS.md). Both branches
+# are bounded by lookarounds so a longer non-address token is never
+# partially matched.
+_ADDRESS_LITERAL_PATTERN = re.compile(
+    r"(?:"
+    r"(?<![0-9a-fA-F:.])"
+    r"(?:[0-9a-fA-F]{0,4}:){2,7}"
+    r"(?:(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F]{0,4})?"
+    r"(?:%[0-9A-Za-z_.-]+)?"
+    r"(?![0-9a-fA-F:.])"
+    r"|"
+    r"(?<![0-9A-Za-z.])"
+    r"(?:\d{1,3}\.){3}\d{1,3}"
+    r"(?![0-9A-Za-z.])"
+    r")"
+)
+
+# IN-01: after both substitution passes in redact() run, anything still
+# matching this is a serial- or MAC-shaped token that --alias-map did not
+# cover -- boundary-anchored the same way WR-01 anchored _serial_pattern, so
+# it only fires on a whole token, never a substring of a longer hex run.
+# Restricted to hex runs carrying at least one a-f digit, the same D-23
+# distinguisher the staged-diff identity backstop uses elsewhere in this
+# phase (every LIFX serial begins d073d5), so a purely decimal 12-digit
+# token -- e.g. a nanosecond-derived value -- is never flagged.
+# The boundary class is hex digits and separators, NOT every alphanumeric.
+# A wider class blocks a match on a non-hex neighbour, so an identifier like
+# `xd073d5aa11bb` goes undetected. Detection and substitution must use the
+# same boundaries or the detector stops being a backstop for the substituter.
+_UNMAPPED_IDENTIFIER_PATTERN = re.compile(
+    r"(?<![0-9A-Fa-f:-])"
+    r"(?:[0-9A-Fa-f]{12}|(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})"
+    r"(?![0-9A-Fa-f:-])"
+)
+
+# D-11, amended twice (A4, A5): each classify_address() label a redacted
+# address can carry gets its own sub-range, no two classes sharing one.
+# Every IPv6 sub-range sits inside 2001:db8::/32 (RFC 3849, the one IPv6
+# documentation range) and IPv4 sits inside 192.0.2.0/24 (RFC 5737). Do not
+# substitute fd00:: or fe80:: here: both are operational ranges (RFC 4193,
+# RFC 4291), not documentation ones, and a pseudonym drawn from either is a
+# different real address rather than a pseudonym.
+_REDACTION_PREFIX_BY_CLASS: dict[str, str] = {
+    "IPv4": "192.0.2.",
+    "GUA": "2001:db8:1::",
+    "IPv6-other": "2001:db8:2::",
+    "ULA": "2001:db8:3::",
+    "link-local": "2001:db8:4::",
+}
+
+# IN-02, resolved by keeping the single range. The pool is the 254 usable
+# hosts of 192.0.2.0/24, and it stays that way deliberately. Widening it to
+# RFC 5737's other two /24s was tried and reverted: the staged-diff identity
+# backstop in `17-03-PLAN.md` and `17-04-PLAN.md` whitelists this one prefix
+# and nothing else, so an emitted 198.51.100.x would have been flagged by the
+# gate as a live-address leak. SPEC amendment A5 holds the whitelist to
+# exactly the forms this redactor can emit, and the two sides must move
+# together or not at all. They do not need to move: one run's distinct IPv4
+# literals are memoised per address, and the committed transcript emitted 17
+# against a ceiling of 254. A whole-fleet WiFi sweep would reach roughly 70.
+_IPV4_DOCUMENTATION_CAPACITY = 254
+# One hextet of suffix per IPv6 sub-range. Past this the emitted form leaves
+# what the staged-diff backstop whitelists, so the ceiling is the contract's
+# edge rather than an arbitrary limit.
+_IPV6_SUBRANGE_CAPACITY = 0xFFFF
 
 RULE = "=" * 72
 THIN = "-" * 72
@@ -186,12 +262,233 @@ def classify_address(addr: str) -> str:
     return "IPv6-other"
 
 
-def is_reachable_choice(addr: str) -> bool:
+def _has_routable_scope(addr: str) -> bool:
     """Whether an address can be connected to without a zone/scope ID."""
     classification = classify_address(addr)
     if classification != "link-local":
         return classification != "invalid"
     return "%" in addr
+
+
+def _load_probe_alias_map(path: Path) -> dict[str, str]:
+    """Load an external raw-serial-to-alias mapping only into memory (D-09).
+
+    Mirrors ``.planning/scripts/measure_merged_discovery.py``'s
+    ``_load_alias_map()`` exactly rather than re-deriving its contract: the
+    file lives outside the repository, is read once into memory, and its raw
+    identities never reach any tracked evidence.
+    """
+    repository = Path(__file__).resolve().parents[2]
+    resolved = path.expanduser().resolve()
+    if resolved == repository or repository in resolved.parents:
+        raise ValueError("--alias-map must be outside the repository")
+    value = json.loads(resolved.read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or not value:
+        raise ValueError("alias map must be a non-empty JSON object")
+    aliases: dict[str, str] = {}
+    for raw_serial, raw_alias in value.items():
+        serial = Serial.from_string(raw_serial).to_string()
+        alias = validate_alias(raw_alias)
+        if serial in aliases:
+            raise ValueError("alias map contains a duplicate normalised serial")
+        aliases[serial] = alias
+    return aliases
+
+
+class _TranscriptRedactor:
+    """Rewrites one run's transcript so no live identifier survives it.
+
+    Substitution is a whole-text replace rather than a per-field one: mDNS
+    instance names and SRV target hostnames both embed the serial, and a
+    per-field approach would leak through any field nobody thought to cover
+    (D-10, AC-23).
+
+    Every emitted IPv6 pseudonym sits inside ``2001:db8::/32``: a GUA source
+    goes to ``2001:db8:1::``, any other IPv6 class to ``2001:db8:2::``, ULA to
+    ``2001:db8:3::``, and link-local to ``2001:db8:4::``. Re-running
+    classify_address() over any of those four sub-ranges returns
+    ``IPv6-other`` for all of them, because ``2001:db8::/32`` is
+    documentation space rather than ``is_global``, ``is_link_local``, or
+    inside ``fc00::/7`` -- the reserved sub-range, not the classifier, carries
+    the class after redaction (SPEC amendment A4). The redactor emits no
+    ``fd00::`` or ``fe80::`` form: those are operational Unique Local
+    (RFC 4193) and operational link-local (RFC 4291) space, not documentation
+    ranges, so a pseudonym drawn from either would be a different real
+    address rather than a pseudonym (SPEC amendment A5).
+    """
+
+    def __init__(self, aliases: Mapping[str, str]) -> None:
+        self._aliases = aliases
+        variants: list[str] = []
+        for serial in aliases:
+            octets = [serial[index : index + 2] for index in range(0, 12, 2)]
+            variants.extend([serial, ":".join(octets), "-".join(octets)])
+        variants.sort(key=len, reverse=True)
+        alternation = "|".join(re.escape(variant) for variant in variants)
+        # WR-01: the same hex/separator-aware boundary treatment
+        # _ADDRESS_LITERAL_PATTERN already gets (module docstring at
+        # lines 50-55 explains why), so a mapped 12-character serial can
+        # never partially match as a substring of a longer all-hex token,
+        # e.g. a firmware-assigned 16-character .local label that happens
+        # to embed one (SPEC amendment A7 authorises exactly this shape as
+        # committable evidence). Without the anchors a match could span
+        # only the coincidentally-overlapping substring, leaving a
+        # corrupted hybrid that is neither the raw token nor a clean
+        # pseudonym.
+        # Hex digits and separators only, deliberately not every alphanumeric.
+        # A wider class blocks the match on a non-hex neighbour, so
+        # `xd073d5aa11bb` would survive as a raw serial. That is a miss, and a
+        # miss is a leak: the identifier stays intact. The narrower class
+        # substitutes instead, which can leave a hybrid in that same position,
+        # but a hybrid has the identifier removed. For a privacy control the
+        # miss is the worse of the two, so the boundary is drawn to prefer
+        # substituting. The hex neighbours that caused WR-01's corruption are
+        # still blocked, which is the case that actually occurs.
+        self._serial_pattern: re.Pattern[str] | None = (
+            re.compile(
+                rf"(?<![0-9A-Fa-f:-])(?:{alternation})(?![0-9A-Fa-f:-])",
+                re.IGNORECASE,
+            )
+            if variants
+            else None
+        )
+        self._address_pseudonyms: dict[tuple[str, str], str] = {}
+        self._class_counters: dict[str, int] = {}
+        self._unmapped_tokens: set[str] = set()
+
+    def redact(self, text: str) -> str:
+        """Rewrite every mapped serial, then every parsing address literal.
+
+        Three single-pass scans, in this order, none of which re-scans its
+        own replacement text -- the SPEC's ``ordering / R8`` backstop edge
+        for double substitution. The third scan (IN-01) never rewrites
+        anything; it only counts identifier-shaped tokens that survived the
+        first two passes unmapped, so ``main()`` can fail the run closed
+        after it finishes rather than silently letting an unmapped serial
+        print raw with no signal at redaction time.
+        """
+        if self._serial_pattern is not None:
+            text = self._serial_pattern.sub(self._redact_serial_match, text)
+        text = _ADDRESS_LITERAL_PATTERN.sub(self._redact_address_match, text)
+        self._record_unmapped_identifier_tokens(text)
+        return text
+
+    def _record_unmapped_identifier_tokens(self, text: str) -> None:
+        """Count distinct identifier-shaped tokens left unredacted (IN-01).
+
+        Runs on the fully-substituted text, after known serials and every
+        parseable address literal (including one that happens to embed a
+        serial's hex digits, e.g. a Thread device's EUI-64-derived link-local
+        address) are already gone, so a remaining match is a serial- or
+        MAC-shaped token this run's --alias-map does not cover. Only the
+        count is ever recorded, never the token itself.
+        """
+        for match in _UNMAPPED_IDENTIFIER_PATTERN.finditer(text):
+            normalised = match.group(0).replace(":", "").replace("-", "").lower()
+            if any(character in "abcdef" for character in normalised):
+                self._unmapped_tokens.add(normalised)
+
+    @property
+    def unmapped_token_count(self) -> int:
+        """Distinct identifier-shaped tokens seen but not covered by the map."""
+        return len(self._unmapped_tokens)
+
+    def _redact_serial_match(self, match: re.Match[str]) -> str:
+        normalised = match.group(0).replace(":", "").replace("-", "").lower()
+        return self._aliases.get(normalised, match.group(0))
+
+    def _redact_address_match(self, match: re.Match[str]) -> str:
+        text = match.group(0)
+        body, separator, zone_suffix = text.partition("%")
+        zone = f"%{zone_suffix}" if separator else ""
+        try:
+            parsed = ipaddress.ip_address(body)
+        except ValueError:
+            return text
+        if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped is not None:
+            # Emit ::ffff:192.0.2.N from the IPv4 counter rather than the
+            # IPv6-other prefix, so the mapped shape the cache deliberately
+            # retains stays legible as mapped (D-11).
+            pseudonym = self._pseudonym_for(str(parsed), "IPv4")
+            return f"::ffff:{pseudonym}{zone}"
+        classification = classify_address(body)
+        pseudonym = self._pseudonym_for(str(parsed), classification)
+        return f"{pseudonym}{zone}"
+
+    def _pseudonym_for(self, address_key: str, class_label: str) -> str:
+        memo_key = (class_label, address_key)
+        cached = self._address_pseudonyms.get(memo_key)
+        if cached is not None:
+            return cached
+        counter = self._class_counters.get(class_label, 0) + 1
+        self._class_counters[class_label] = counter
+        prefix = _REDACTION_PREFIX_BY_CLASS[class_label]
+        if class_label == "IPv4":
+            # IN-02: the defect was raising a bare ValueError partway through
+            # a write, leaving a half-redacted transcript and no clue what to
+            # do. The ceiling itself is fine, so it stays; the message now
+            # names the limit, what was exceeded and the only real remedy.
+            if counter > _IPV4_DOCUMENTATION_CAPACITY:
+                raise ValueError(
+                    "no documentation-range IPv4 pseudonym left to assign: "
+                    f"this run names more than {_IPV4_DOCUMENTATION_CAPACITY} "
+                    "distinct IPv4 literals, which is every usable host in "
+                    "192.0.2.0/24. The transcript written so far is partial "
+                    "and must be discarded. Narrow the sweep and re-run; do "
+                    "not widen the pool, because the staged-diff identity "
+                    "backstop whitelists this prefix alone (SPEC amendment A5)"
+                )
+            pseudonym = f"{prefix}{counter}"
+        else:
+            # The IPv6 branch needs its own ceiling for the same reason the
+            # IPv4 one has it, and for symmetry of failure. A suffix is one
+            # hextet, so past 0xffff this would emit a five-digit form that
+            # the staged-diff backstop's whitelist does not recognise and
+            # would report as a live address: the same emitter/backstop
+            # mismatch A5 and A9 exist to prevent, arrived at by
+            # under-specification rather than by widening. Failing here with a
+            # readable message beats a confusing leak report on an otherwise
+            # legitimate run. Unreachable at any plausible fleet size.
+            if counter > _IPV6_SUBRANGE_CAPACITY:
+                raise ValueError(
+                    f"no {class_label} pseudonym left to assign: this run "
+                    f"names more than {_IPV6_SUBRANGE_CAPACITY} distinct "
+                    f"{class_label} literals, which is the whole one-hextet "
+                    f"suffix space of {prefix}. The transcript written so far "
+                    "is partial and must be discarded. Narrow the sweep and "
+                    "re-run; do not widen the sub-range, because the "
+                    "staged-diff identity backstop whitelists these forms "
+                    "alone (SPEC amendment A5)"
+                )
+            pseudonym = f"{prefix}{counter:x}"
+        self._address_pseudonyms[memo_key] = pseudonym
+        return pseudonym
+
+
+class _RedactingStream:
+    """Wraps one text stream so every write through it comes out pseudonymised.
+
+    Every identifier-bearing call in this probe passes a single
+    pre-formatted string to ``print()``, so no serial or address literal
+    straddles two writes -- per-write redaction is therefore sufficient
+    without buffering across calls.
+    """
+
+    def __init__(self, stream: TextIO, redactor: _TranscriptRedactor) -> None:
+        self._stream = stream
+        self._redactor = redactor
+
+    def write(self, data: str) -> int:
+        """Redact one write and forward it to the wrapped stream."""
+        return self._stream.write(self._redactor.redact(data))
+
+    def flush(self) -> None:
+        """Delegate to the wrapped stream."""
+        self._stream.flush()
+
+    def isatty(self) -> bool:
+        """Report non-interactive so nothing downstream assumes a terminal."""
+        return False
 
 
 @dataclass
@@ -352,11 +649,51 @@ async def sweep(
     return result
 
 
-def _instance_view(cache: _LifxRecordCache) -> list[tuple[str, dict[str, object]]]:
+_Selection = Literal["selected", "fallback", "refused", "absent", "no-target"]
+
+# Split out so the refused-state CHOSEN line's fixed tail stays on one
+# physical source line regardless of the count prefixed onto it.
+_REFUSED_ADDRESS_TAIL = "cached address record(s) for the SRV target, none usable"
+
+# D-02: named once here so the refused and absent arms of
+# _non_resolving_lines() can append the same unused-fallback statement.
+_FALLBACK_MSG = "packet-source address present and not used while an SRV record exists"
+
+# D-06/D-07: the malformed-field marker for a TXT owner whose payload did not
+# parse into a TxtData. Named once so the fixed tail stays on one physical
+# source line regardless of the label prefixed onto it at the print site.
+_MALFORMED_TXT_MSG = "payload did not parse; serial, product and firmware unavailable"
+
+
+@dataclass(frozen=True)
+class _InstanceView:
+    """One mDNS service instance's assembled records and address selection.
+
+    Typed so the two type-narrowing asserts the untyped dict required
+    (`aaaa` as `list`, `chosen` as `str`) become unnecessary by construction
+    rather than runtime guards (D-05).
+    """
+
+    instance: str
+    txt: TxtData | None
+    txt_count: int
+    srv: SrvData | None
+    srv_count: int
+    target: str | None
+    a: str | None
+    aaaa: tuple[str, ...]
+    address_records: tuple[str, ...]
+    addresses: frozenset[str]
+    chosen: str | None
+    fallback: str | None
+    selection: _Selection
+
+
+def _instance_view(cache: _LifxRecordCache) -> list[_InstanceView]:
     """Pull the per-instance record set out of the cache for reporting."""
     fallback: dict[str, str] = cache._fallback_ip_by_instance  # noqa: SLF001
 
-    views: list[tuple[str, dict[str, object]]] = []
+    views: list[_InstanceView] = []
     for instance in sorted(cache.owners_for(DNS_TYPE_TXT)):
         txt_records = cache.records_for(instance, DNS_TYPE_TXT)
         txt_values = [
@@ -371,7 +708,7 @@ def _instance_view(cache: _LifxRecordCache) -> list[tuple[str, dict[str, object]
         ]
         txt = txt_values[0] if txt_values else None
         srv = srv_values[0] if srv_values else None
-        target = srv.target.lower() if srv is not None else None
+        target = _normalise_dns_name(srv.target) if srv is not None else None
         addresses = cache.addresses_for(target) if target else frozenset()
         a_values = [
             record.parsed_data
@@ -383,24 +720,81 @@ def _instance_view(cache: _LifxRecordCache) -> list[tuple[str, dict[str, object]
             for record in cache.records_for(target or "", DNS_TYPE_AAAA)
             if isinstance(record.parsed_data, str)
         ]
+        address_records = tuple(a_values) + tuple(aaaa_values)
+        instance_fallback = fallback.get(instance)
+
+        selection: _Selection
+        chosen: str | None
+        if target is None:
+            if instance_fallback is not None:
+                selection = "fallback"
+                chosen = instance_fallback
+            else:
+                selection = "no-target"
+                chosen = None
+        else:
+            selected = cache.selected_address_for(target)
+            if selected is not None:
+                selection = "selected"
+                chosen = selected
+            elif address_records:
+                selection = "refused"
+                chosen = None
+            else:
+                selection = "absent"
+                chosen = None
+
         views.append(
-            (
-                instance,
-                {
-                    "txt": txt,
-                    "txt_count": len(txt_values),
-                    "srv": srv,
-                    "srv_count": len(srv_values),
-                    "target": target,
-                    "a": a_values[0] if a_values else None,
-                    "aaaa": aaaa_values,
-                    "addresses": addresses,
-                    "chosen": cache.selected_address_for(target) if target else None,
-                    "fallback": fallback.get(instance),
-                },
+            _InstanceView(
+                instance=instance,
+                txt=txt,
+                txt_count=len(txt_values),
+                srv=srv,
+                srv_count=len(srv_values),
+                target=target,
+                a=a_values[0] if a_values else None,
+                aaaa=tuple(aaaa_values),
+                address_records=address_records,
+                addresses=addresses,
+                chosen=chosen,
+                fallback=instance_fallback,
+                selection=selection,
             )
         )
     return views
+
+
+def _non_resolving_lines(view: _InstanceView) -> list[str]:
+    """Render the CHOSEN block for a view whose selection has no address.
+
+    A separate, pure function so the refused, absent and no-target states
+    are provably distinguishable without capturing stdout (SPEC amendment
+    A1). The final arm renders a `selected` or `fallback` view whose
+    `chosen` is null: `_instance_view()` never constructs that combination,
+    but a frozen dataclass gives pyright no relationship between its two
+    independently typed fields, so `report_records()` narrows through a
+    local rather than an assertion, and this is the marker that narrowing
+    falls back to instead of raising (R3's second condition, SPEC amendment
+    A6).
+    """
+    if view.selection == "refused":
+        count = len(view.address_records)
+        lines = [f"  CHOSEN   : none - {count} {_REFUSED_ADDRESS_TAIL}"]
+        lines.extend(
+            f"             {record}  [{classify_address(record)}]"
+            for record in view.address_records
+        )
+        if view.fallback is not None:
+            lines.append(f"             {_FALLBACK_MSG}")
+        return lines
+    if view.selection == "absent":
+        lines = ["  CHOSEN   : none - no address record cached for the SRV target"]
+        if view.fallback is not None:
+            lines.append(f"             {_FALLBACK_MSG}")
+        return lines
+    if view.selection == "no-target":
+        return ["  CHOSEN   : none - no SRV record and no fallback source"]
+    return ["  CHOSEN   : none - chosen address missing for a resolved selection state"]
 
 
 def report_records(result: SweepResult) -> None:
@@ -425,30 +819,35 @@ def report_records(result: SweepResult) -> None:
 
     v4_count = 0
     aaaa_count = 0
-    linklocal_chosen = 0
+    refused_count = 0
+    absent_count = 0
 
-    for instance, view in views:
-        txt = view["txt"]
-        srv = view["srv"]
-        target = view["target"]
-        a_ip = view["a"]
-        aaaa_ips = view["aaaa"]
-        assert isinstance(txt, TxtData)
-        assert isinstance(aaaa_ips, list)
+    for view in views:
+        if view.selection == "refused":
+            refused_count += 1
+        elif view.selection == "absent":
+            absent_count += 1
 
-        serial = txt.pairs.get("id", "?")
-        product_id = txt.pairs.get("p", "?")
-        firmware = txt.pairs.get("fw", "?")
-        try:
-            product_name = get_product(int(product_id)).name
-        except (ValueError, KeyError):
-            product_name = "unknown product"
+        txt = view.txt
+        srv = view.srv
+        a_ip = view.a
+        aaaa_ips = view.aaaa
 
         print(f"\n{THIN}")
-        print(f"  instance : {instance}")
-        print(f"  serial   : {serial}")
-        print(f"  product  : {product_id} ({product_name})")
-        print(f"  firmware : {firmware}")
+        print(f"  instance : {view.instance}")
+        if isinstance(txt, TxtData):
+            serial = txt.pairs.get("id", "?")
+            product_id = txt.pairs.get("p", "?")
+            firmware = txt.pairs.get("fw", "?")
+            try:
+                product_name = get_product(int(product_id)).name
+            except (ValueError, KeyError):
+                product_name = "unknown product"
+            print(f"  serial   : {serial}")
+            print(f"  product  : {product_id} ({product_name})")
+            print(f"  firmware : {firmware}")
+        else:
+            print(f"  TXT      : {_MALFORMED_TXT_MSG}")
 
         if isinstance(srv, SrvData):
             print(f"  SRV      : {srv.target}:{srv.port}")
@@ -469,48 +868,30 @@ def report_records(result: SweepResult) -> None:
         else:
             print("  AAAA     : (none)")
 
-        if view["addresses"]:
-            chosen = view["chosen"]
-        elif isinstance(view["fallback"], str):
-            chosen = view["fallback"]
-        else:
-            chosen = None
-
+        chosen = view.chosen
         if chosen is None:
-            if target is not None:
-                print("  CHOSEN   : none - pending address records for SRV target")
-            else:
-                print("  CHOSEN   : none - no SRV record and no fallback source")
+            for line in _non_resolving_lines(view):
+                print(line)
             continue
-        assert isinstance(chosen, str)
 
         classification = classify_address(chosen)
         if isinstance(a_ip, str) and chosen == a_ip:
             reason = "A record present; IPv4 preferred over IPv6"
-        elif chosen == view["fallback"]:
+        elif chosen == view.fallback:
             reason = "no SRV record; fell back to the response packet's source"
-        elif classification == "link-local":
-            reason = "ONLY link-local AAAA records available"
-            linklocal_chosen += 1
         else:
             reason = f"routable {classification} preferred over link-local"
 
         print(f"  CHOSEN   : {chosen}  [{classification}]")
         print(f"  WHY      : {reason}")
-        if not is_reachable_choice(chosen):
-            print("  WARNING  : link-local without a zone ID is not connectable")
 
     print(f"\n{THIN}")
     print("Summary:")
     print(f"  instances with an A record    : {v4_count}")
     print(f"  instances with AAAA record(s) : {aaaa_count}")
     print(f"  resolved to a usable record   : {len(result.resolved)}")
-    print(f"  chose a bare link-local addr  : {linklocal_chosen}")
-    pending = result.cache.pending_targets()
-    if pending:
-        print(f"  still-unresolved SRV targets  : {len(pending)}")
-        for target in pending:
-            print(f"      {target}")
+    print(f"  cached but no usable address  : {refused_count}")
+    print(f"  awaiting address records      : {absent_count}")
 
 
 async def stage_records(timeout: float, verbose: bool) -> SweepResult:
@@ -595,7 +976,7 @@ async def stage_connect(records: list[_LifxServiceRecord]) -> None:
         classification = classify_address(record.ip)
         label = f"  {record.serial}  {record.ip}  [{classification}]"
 
-        if not is_reachable_choice(record.ip):
+        if not _has_routable_scope(record.ip):
             unreachable_choice += 1
             print(f"{label}\n      SKIP: address selection problem, not a device fault")
             print("      link-local address has no zone ID, so it cannot be routed")
@@ -692,7 +1073,7 @@ def _select_target(
         )
 
     record = matches[0]
-    if not is_reachable_choice(record.ip):
+    if not _has_routable_scope(record.ip):
         return TargetNotFound(
             serial=wanted,
             reason=f"chosen address {record.ip} has no zone ID and cannot be routed",
@@ -1283,6 +1664,34 @@ async def main_async(args: argparse.Namespace) -> int:
     return _exit_code(outcome)
 
 
+def _warn_if_tokens_went_unmapped(redactor: _TranscriptRedactor | None) -> bool:
+    """Report identifier-shaped tokens `--alias-map` could not substitute.
+
+    Returns whether the transcript is unsafe to commit, so `main()` can fail
+    the run closed. Pure apart from the write to stderr, and never raises, so
+    it is safe to call from a `finally` on a path already carrying an
+    exception: a crash while reporting a leak would hide the leak.
+
+    Only meaningful when `--alias-map` was supplied. Without one the probe
+    prints raw identifiers by design, because naming the physical device is
+    what makes it a diagnostic, so `redactor is None` reports nothing.
+
+    The count is deliberate: the tokens themselves are never printed. Echoing
+    an identifier to warn that an identifier leaked would put a second copy in
+    the operator's scrollback and, under `tee`, in the capture file too.
+    """
+    if redactor is None or not redactor.unmapped_token_count:
+        return False
+    print(
+        f"error: {redactor.unmapped_token_count} unmapped identifier-shaped "
+        "token(s) were printed raw despite --alias-map. Extend the alias map "
+        "to cover every device this run named, then re-run. The transcript "
+        "printed above is not safe to commit as-is.",
+        file=sys.stderr,
+    )
+    return True
+
+
 def main() -> int:
     """Parse arguments and run the probe."""
     parser = argparse.ArgumentParser(
@@ -1349,6 +1758,19 @@ def main() -> int:
             "written."
         ),
     )
+    parser.add_argument(
+        "--alias-map",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "External raw-serial-to-alias JSON mapping, which must live outside "
+            "the repository. Rewrites every mapped serial and every address "
+            "literal in this probe's own output to a stable pseudonym. Without "
+            "it the probe prints raw identifiers, so the operator can tell "
+            "which physical device is misbehaving."
+        ),
+    )
     args = parser.parse_args()
 
     if args.uat_output is not None and args.serial is None:
@@ -1363,11 +1785,53 @@ def main() -> int:
         except ValueError as error:
             parser.error(str(error))
 
+    redacted_stdout: _RedactingStream | None = None
+    redactor: _TranscriptRedactor | None = None
+    if args.alias_map is not None:
+        try:
+            aliases = _load_probe_alias_map(args.alias_map)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            parser.error(str(error))
+        else:
+            redactor = _TranscriptRedactor(aliases)
+            redacted_stdout = _RedactingStream(sys.stdout, redactor)
+
+    interrupted = False
+    exit_code = 0
     try:
-        return asyncio.run(main_async(args))
-    except KeyboardInterrupt:
-        print("\nInterrupted.", file=sys.stderr)
+        with contextlib.ExitStack() as stack:
+            if redacted_stdout is not None:
+                stack.enter_context(contextlib.redirect_stdout(redacted_stdout))
+            try:
+                exit_code = asyncio.run(main_async(args))
+            except KeyboardInterrupt:
+                print("\nInterrupted.", file=sys.stderr)
+                interrupted = True
+    finally:
+        # The warning sits in `finally` so it reaches the operator on EVERY
+        # exit path, not just the successful one. Its first form ran only
+        # after the `with` block completed normally, so a Ctrl-C returned 130
+        # and an uncaught exception propagated, both skipping it entirely and
+        # both leaving a captured transcript holding raw identifiers with no
+        # signal that it is unsafe. A multi-hour trial makes Ctrl-C a routine
+        # outcome rather than a hypothetical one, and 130 reads like a clean
+        # abort. It stays outside the redirect_stdout context so stderr is
+        # never itself redacted.
+        unsafe_transcript = _warn_if_tokens_went_unmapped(redactor)
+
+    # Interrupt outranks the unmapped-token failure, and the ordering is
+    # deliberate rather than incidental. Both are non-zero, and the capture
+    # gate treats any non-zero probe exit as re-run-do-not-capture, so the
+    # transcript is refused either way. 130 is the more accurate account of
+    # what happened: the operator stopped the run, and whatever the alias map
+    # did or did not cover, the transcript is truncated as well as unsafe.
+    # The warning itself has already been printed by the finally above, so
+    # nothing is lost by not also reporting it through the exit code.
+    if interrupted:
         return 130
+    if unsafe_transcript:
+        return 1
+    return exit_code
 
 
 if __name__ == "__main__":

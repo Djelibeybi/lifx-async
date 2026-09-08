@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import io
 import ipaddress
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -36,6 +38,7 @@ from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixEffect, MatrixLight
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
+from lifx.network.discovery.mdns.discovery import _normalise_dns_name
 from lifx.network.discovery.mdns.dns import DnsResourceRecord, SrvData, TxtData
 from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.products import get_product
@@ -1067,12 +1070,984 @@ class TestSyntheticCacheReporting:
             "192.0.2.10",
         )
 
-        [(reported_instance, view)] = probe._instance_view(cache)
+        [view] = probe._instance_view(cache)
 
-        assert reported_instance == instance
-        assert view["addresses"] == frozenset({"192.0.2.20", "fd00::20"})
-        assert view["chosen"] == "192.0.2.20"
-        assert view["fallback"] == "192.0.2.10"
+        assert view.instance == instance
+        assert view.addresses == frozenset({"192.0.2.20", "fd00::20"})
+        assert view.chosen == "192.0.2.20"
+        assert view.fallback == "192.0.2.10"
+
+    def test_instance_view_reports_refused_when_cached_addresses_yield_no_selection(
+        self,
+    ) -> None:
+        """A cached-but-unusable AAAA record is distinct from no record at all."""
+        instance = "synthetic._lifx._udp.local"
+        host = "synthetic-host.local"
+        txt = TxtData(
+            strings=["id=d073d5aa11bb", "p=57", "fw=4.10"],
+            pairs={"id": "d073d5aa11bb", "p": "57", "fw": "4.10"},
+        )
+        srv = SrvData(priority=0, weight=0, port=56700, target=host)
+        cache = probe._LifxRecordCache()
+        cache.add_packet(
+            [
+                DnsResourceRecord(instance, 16, 1, 120, b"txt", txt),
+                DnsResourceRecord(instance, 33, 1, 120, b"srv", srv),
+                DnsResourceRecord(
+                    host,
+                    28,
+                    1,
+                    120,
+                    b"\xfe\x80" + (b"\x00" * 13) + b"\x20",
+                    "fe80::20",
+                ),
+            ],
+            "192.0.2.10",
+        )
+
+        [view] = probe._instance_view(cache)
+
+        assert view.selection == "refused"
+        assert view.chosen is None
+        assert view.address_records == ("fe80::20",)
+        refused_first_line = probe._non_resolving_lines(view)[0]
+        absent_view = probe._InstanceView(
+            instance=view.instance,
+            txt=view.txt,
+            txt_count=view.txt_count,
+            srv=view.srv,
+            srv_count=view.srv_count,
+            target=view.target,
+            a=None,
+            aaaa=(),
+            address_records=(),
+            addresses=frozenset(),
+            chosen=None,
+            fallback=None,
+            selection="absent",
+        )
+        assert refused_first_line != probe._non_resolving_lines(absent_view)[0]
+
+    def test_instance_view_reports_absent_when_no_address_record_is_cached(
+        self,
+    ) -> None:
+        """No cached A or AAAA record for the target is the absent state."""
+        instance = "synthetic._lifx._udp.local"
+        host = "synthetic-host.local"
+        txt = TxtData(
+            strings=["id=d073d5aa11bb", "p=57", "fw=4.10"],
+            pairs={"id": "d073d5aa11bb", "p": "57", "fw": "4.10"},
+        )
+        srv = SrvData(priority=0, weight=0, port=56700, target=host)
+        cache = probe._LifxRecordCache()
+        cache.add_packet(
+            [
+                DnsResourceRecord(instance, 16, 1, 120, b"txt", txt),
+                DnsResourceRecord(instance, 33, 1, 120, b"srv", srv),
+            ],
+            "192.0.2.10",
+        )
+
+        [view] = probe._instance_view(cache)
+
+        assert view.selection == "absent"
+        assert view.chosen is None
+        assert view.address_records == ()
+        absent_first_line = probe._non_resolving_lines(view)[0]
+        refused_view = probe._InstanceView(
+            instance=view.instance,
+            txt=view.txt,
+            txt_count=view.txt_count,
+            srv=view.srv,
+            srv_count=view.srv_count,
+            target=view.target,
+            a=None,
+            aaaa=("fe80::20",),
+            address_records=("fe80::20",),
+            addresses=frozenset(),
+            chosen=None,
+            fallback=None,
+            selection="refused",
+        )
+        assert absent_first_line != probe._non_resolving_lines(refused_view)[0]
+
+    def test_instance_view_keys_addresses_and_selection_on_the_same_normalised_owner(
+        self,
+    ) -> None:
+        """A trailing-dot SRV target reaches the key the cache itself uses.
+
+        Only the `view.target` assertion fails against the pre-change
+        source. `records_for()` already normalises its own owner argument
+        (`_normalise_dns_name()`, `discovery.py:330`), and
+        `selected_address_for()` does the same at `discovery.py:388`, so
+        both probe lookups already key identically today, whatever
+        spelling the probe hands them. The `addresses`/`chosen` assertions
+        below pass either way; only `view.target` itself carries the
+        raw `.lower()`ed near-miss before this change.
+        """
+        instance = "synthetic._lifx._udp.local"
+        host = "synthetic-host.local."
+        txt = TxtData(
+            strings=["id=d073d5aa11bb", "p=57", "fw=4.10"],
+            pairs={"id": "d073d5aa11bb", "p": "57", "fw": "4.10"},
+        )
+        srv = SrvData(priority=0, weight=0, port=56700, target=host)
+        cache = probe._LifxRecordCache()
+        cache.add_packet(
+            [
+                DnsResourceRecord(instance, 16, 1, 120, b"txt", txt),
+                DnsResourceRecord(instance, 33, 1, 120, b"srv", srv),
+                DnsResourceRecord(
+                    "synthetic-host.local",
+                    1,
+                    1,
+                    120,
+                    b"\xc0\x00\x02\x14",
+                    "192.0.2.20",
+                ),
+            ],
+            "192.0.2.10",
+        )
+
+        [view] = probe._instance_view(cache)
+
+        assert view.target == _normalise_dns_name(host)
+        assert view.addresses
+        assert view.chosen == "192.0.2.20"
+
+    def test_instance_view_names_an_unused_fallback_when_cached_addresses_are_refused(
+        self,
+    ) -> None:
+        """A refused instance with a packet-source fallback names it unused."""
+        instance = "synthetic._lifx._udp.local"
+        host = "synthetic-host.local"
+        txt = TxtData(
+            strings=["id=d073d5aa11bb", "p=57", "fw=4.10"],
+            pairs={"id": "d073d5aa11bb", "p": "57", "fw": "4.10"},
+        )
+        srv = SrvData(priority=0, weight=0, port=56700, target=host)
+        cache = probe._LifxRecordCache()
+        cache.add_packet(
+            [
+                DnsResourceRecord(instance, 16, 1, 120, b"txt", txt),
+                DnsResourceRecord(instance, 33, 1, 120, b"srv", srv),
+                DnsResourceRecord(
+                    host,
+                    28,
+                    1,
+                    120,
+                    b"\xfe\x80" + (b"\x00" * 13) + b"\x20",
+                    "fe80::20",
+                ),
+            ],
+            "192.0.2.99",
+        )
+
+        [view] = probe._instance_view(cache)
+
+        assert view.selection == "refused"
+        assert view.chosen is None
+        assert view.fallback == "192.0.2.99"
+        lines = probe._non_resolving_lines(view)
+        assert any(
+            "packet-source address present and not used" in line for line in lines
+        )
+
+    def test_instance_view_marks_a_malformed_txt_and_keeps_the_remaining_instances(
+        self,
+    ) -> None:
+        """A malformed middle instance does not drop the well-formed ones."""
+        good_txt = TxtData(
+            strings=["id=d073d5aa11bb", "p=57", "fw=4.10"],
+            pairs={"id": "d073d5aa11bb", "p": "57", "fw": "4.10"},
+        )
+        records: list[DnsResourceRecord] = []
+        for label, host, address in (
+            ("aaa", "host-a.local", "192.0.2.30"),
+            ("zzz", "host-z.local", "192.0.2.31"),
+        ):
+            instance = f"{label}._lifx._udp.local"
+            srv = SrvData(priority=0, weight=0, port=56700, target=host)
+            records.extend(
+                [
+                    DnsResourceRecord(instance, 16, 1, 120, b"txt", good_txt),
+                    DnsResourceRecord(instance, 33, 1, 120, b"srv", srv),
+                    DnsResourceRecord(
+                        host,
+                        1,
+                        1,
+                        120,
+                        ipaddress.ip_address(address).packed,
+                        address,
+                    ),
+                ]
+            )
+        malformed_instance = "mmm._lifx._udp.local"
+        malformed_srv = SrvData(priority=0, weight=0, port=56700, target="host-m.local")
+        records.extend(
+            [
+                DnsResourceRecord(
+                    malformed_instance, 16, 1, 120, b"garbled", "not-a-txtdata"
+                ),
+                DnsResourceRecord(
+                    malformed_instance, 33, 1, 120, b"srv", malformed_srv
+                ),
+            ]
+        )
+        cache = probe._LifxRecordCache()
+        cache.add_packet(records, "192.0.2.10")
+
+        views = probe._instance_view(cache)
+
+        assert [view.instance for view in views] == [
+            "aaa._lifx._udp.local",
+            "mmm._lifx._udp.local",
+            "zzz._lifx._udp.local",
+        ]
+        assert views[1].txt is None
+        assert views[2].txt == good_txt
+        assert views[2].chosen == "192.0.2.31"
+
+    def test_non_resolving_lines_marks_a_missing_chosen_address(self) -> None:
+        """A resolved selection state with a null chosen renders, not raises."""
+        view = probe._InstanceView(
+            instance="synthetic",
+            txt=None,
+            txt_count=0,
+            srv=None,
+            srv_count=0,
+            target="synthetic-host.local",
+            a=None,
+            aaaa=(),
+            address_records=(),
+            addresses=frozenset(),
+            chosen=None,
+            fallback=None,
+            selection="selected",
+        )
+
+        lines = probe._non_resolving_lines(view)
+
+        assert lines
+        assert "chosen" in lines[0]
+
+    def test_report_records_completes_over_a_malformed_middle_instance(self) -> None:
+        """R3: one malformed instance does not end the whole diagnostic run."""
+        good_txt = TxtData(
+            strings=["id=d073d5aa11bb", "p=57", "fw=4.10"],
+            pairs={"id": "d073d5aa11bb", "p": "57", "fw": "4.10"},
+        )
+        records: list[DnsResourceRecord] = []
+        for label, host, address in (
+            ("aaa", "host-a.local", "192.0.2.30"),
+            ("zzz", "host-z.local", "192.0.2.31"),
+        ):
+            instance = f"{label}._lifx._udp.local"
+            srv = SrvData(priority=0, weight=0, port=56700, target=host)
+            records.extend(
+                [
+                    DnsResourceRecord(instance, 16, 1, 120, b"txt", good_txt),
+                    DnsResourceRecord(instance, 33, 1, 120, b"srv", srv),
+                    DnsResourceRecord(
+                        host,
+                        1,
+                        1,
+                        120,
+                        ipaddress.ip_address(address).packed,
+                        address,
+                    ),
+                ]
+            )
+        malformed_instance = "mmm._lifx._udp.local"
+        malformed_srv = SrvData(priority=0, weight=0, port=56700, target="host-m.local")
+        records.extend(
+            [
+                DnsResourceRecord(
+                    malformed_instance, 16, 1, 120, b"garbled", "not-a-txtdata"
+                ),
+                DnsResourceRecord(
+                    malformed_instance, 33, 1, 120, b"srv", malformed_srv
+                ),
+            ]
+        )
+        cache = probe._LifxRecordCache()
+        cache.add_packet(records, "192.0.2.10")
+        result = probe.SweepResult(cache=cache, local_port=12345)
+
+        probe.report_records(result)
+
+
+class TestAliasMapRedaction:
+    """The opt-in --alias-map redaction (D-09..D-12, SPEC amendments A4/A5)."""
+
+    def test_replaces_mapped_serial_everywhere_in_all_spellings(self) -> None:
+        """A mapped serial disappears from every field that embeds it (AC-23)."""
+        serial = "d073d5aa11bb"
+        alias = "probe-alpha"
+        redactor = probe._TranscriptRedactor({serial: alias})
+        text = "\n".join(
+            [
+                f"Instance  : {serial}._lifx._udp.local",
+                "SRV target: D0:73:D5:AA:11:BB.local",
+                "  id       : d0-73-d5-aa-11-bb",
+            ]
+        )
+
+        redacted = redactor.redact(text)
+
+        assert serial not in redacted
+        assert "d0:73:d5:aa:11:bb" not in redacted.lower()
+        assert "d0-73-d5-aa-11-bb" not in redacted
+        assert redacted.count(alias) == 3
+
+    def test_serial_embedded_in_a_longer_hex_token_is_left_alone(self) -> None:
+        """WR-01: a mapped serial that is a substring of a longer all-hex
+        token (e.g. a firmware-assigned 16-character .local label, SPEC
+        amendment A7) must not be partially substituted into a corrupted
+        hybrid -- the serial pattern needs the same boundary anchors
+        _ADDRESS_LITERAL_PATTERN already carries.
+        """
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "device-a"})
+
+        bare = redactor.redact("aad073d5aa11bbbb")
+        colon_separated = redactor.redact("1234d0:73:d5:aa:11:bbcd")
+
+        assert bare == "aad073d5aa11bbbb"
+        assert colon_separated == "1234d0:73:d5:aa:11:bbcd"
+
+    def test_serial_alone_still_redacts_when_not_embedded(self) -> None:
+        """The boundary fix must not regress whole-token matching (AC-23)."""
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "device-a"})
+
+        redacted = redactor.redact("id=d073d5aa11bb seen")
+
+        assert redacted == "id=device-a seen"
+
+    def test_each_source_class_lands_on_its_reserved_subrange(self) -> None:
+        """Reservation, not a classify_address() round trip, carries the class.
+
+        A5 (SPEC): every IPv6 pseudonym stays inside 2001:db8::/32 and none
+        starts fd00: or fe80:, because those are operational Unique Local
+        (RFC 4193) and operational link-local (RFC 4291) space, not
+        documentation ranges.
+        """
+        redactor = probe._TranscriptRedactor({})
+        samples = {
+            "IPv4": "192.0.2.9",
+            "GUA": "4001::9",
+            "IPv6-other": "::1",
+            "ULA": "fd00::9",
+            "link-local": "fe80::9",
+        }
+
+        replacements = {
+            label: redactor.redact(address) for label, address in samples.items()
+        }
+
+        for label, address in samples.items():
+            assert replacements[label] != address
+
+        ipv6_replacements = [
+            replacements[label] for label in ("GUA", "IPv6-other", "ULA", "link-local")
+        ]
+        assert len(set(ipv6_replacements)) == len(ipv6_replacements)
+
+        documentation_range = ipaddress.ip_network("2001:db8::/32")
+        for replacement in ipv6_replacements:
+            assert ipaddress.ip_address(replacement) in documentation_range
+            assert not replacement.startswith("fd00:")
+            assert not replacement.startswith("fe80:")
+
+    def test_ipv4_mapped_ipv6_rewritten_whole(self) -> None:
+        """The two-pass corruption a single combined pattern removes never recurs."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("packet source ::ffff:198.51.100.4 observed")
+
+        assert "198.51.100.4" not in redacted
+        match = re.search(r"::ffff:192(\S*)", redacted)
+        assert match is not None
+        assert re.fullmatch(r"\.0\.2\.[0-9a-f]+", match.group(1))
+
+    def test_loopback_lands_on_ipv6_other(self) -> None:
+        """A degenerate but parseable address does not raise."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("::1")
+
+        assert redacted.startswith("2001:db8:2::")
+
+    def test_unspecified_address_lands_on_ipv6_other(self) -> None:
+        """The all-zeros address is a parseable class, not a crash."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("::")
+
+        assert redacted.startswith("2001:db8:2::")
+
+    def test_repeated_address_yields_stable_pseudonym(self) -> None:
+        """One redactor instance names one device the same way twice."""
+        redactor = probe._TranscriptRedactor({})
+
+        first = redactor.redact("192.0.2.30 seen")
+        second = redactor.redact("192.0.2.30 seen again")
+
+        assert first.split()[0] == second.split()[0]
+
+    def test_distinct_addresses_of_one_class_yield_distinct_pseudonyms(self) -> None:
+        """Two different devices of one class stay distinguishable."""
+        redactor = probe._TranscriptRedactor({})
+
+        first = redactor.redact("192.0.2.30")
+        second = redactor.redact("192.0.2.31")
+
+        assert first != second
+
+    def test_zone_suffix_survives_substitution_verbatim(self) -> None:
+        """A zone ID is a local interface name, not a device identifier."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("fe80::1%eth0")
+
+        assert redacted.endswith("%eth0")
+        assert not redacted.startswith("fe80::1")
+
+    def test_clock_time_passes_through_unchanged(self) -> None:
+        """A colon-separated, hex-shaped clock time does not parse as an address."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("captured at 13:45:07 local")
+
+        assert "13:45:07" in redacted
+
+    def test_iso_timestamp_passes_through_unchanged(self) -> None:
+        """An ISO-8601 timestamp does not parse as an address either."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("run date 2026-09-08T13:45:07")
+
+        assert "2026-09-08T13:45:07" in redacted
+
+    def test_mac_shaped_token_without_mapping_passes_through_unchanged(self) -> None:
+        """The redactor does not guess at an unparseable token (D-10 hand-off).
+
+        A MAC-shaped token that is not derived from a mapped serial is caught
+        only after the run, at the staged-diff gate in 17-03-PLAN.md, and the
+        recovery is another Thread-fleet sitting rather than a re-redaction,
+        because redaction happens as the probe prints. For a --stage records
+        capture this is theoretical, since the probe prints no MAC there, but
+        the cost is real if it ever fires and a reader should not have to
+        rediscover it.
+        """
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("fallback source aa:bb:cc:dd:ee:ff")
+
+        assert "aa:bb:cc:dd:ee:ff" in redacted
+
+    def test_unmapped_serial_shaped_token_is_counted_but_still_passes_through(
+        self,
+    ) -> None:
+        """IN-01: redact() itself stays fail-open at the text level (D-10
+        hand-off, unchanged from test_mac_shaped_token_without_mapping_...
+        above) -- but now also counts the token so main() can fail the run
+        closed afterwards."""
+        redactor = probe._TranscriptRedactor({})
+
+        redacted = redactor.redact("fallback source aa:bb:cc:dd:ee:ff")
+
+        assert "aa:bb:cc:dd:ee:ff" in redacted
+        assert redactor.unmapped_token_count == 1
+
+    def test_two_spellings_of_the_same_unmapped_serial_count_once(self) -> None:
+        """Distinct means distinct after normalising separators and case."""
+        redactor = probe._TranscriptRedactor({})
+
+        redactor.redact("id=aabbccddeeff")
+        redactor.redact("id=AA:BB:CC:DD:EE:FF")
+
+        assert redactor.unmapped_token_count == 1
+
+    def test_all_decimal_twelve_digit_token_is_not_counted_as_unmapped(self) -> None:
+        """D-23's own distinguisher: no LIFX serial can be all-decimal (every
+        one begins d073d5), so an all-decimal 12-digit run -- e.g. a
+        nanosecond-derived value -- must never be flagged."""
+        redactor = probe._TranscriptRedactor({})
+
+        redactor.redact("seed=123456789012")
+
+        assert redactor.unmapped_token_count == 0
+
+    def test_mapped_serial_does_not_count_as_unmapped(self) -> None:
+        """A serial the map covers is gone before the unmapped scan runs."""
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "probe-alpha"})
+
+        redactor.redact("id=d073d5aa11bb")
+
+        assert redactor.unmapped_token_count == 0
+
+    def test_address_that_embeds_serial_hex_digits_is_not_counted_as_unmapped(
+        self,
+    ) -> None:
+        """The unmapped scan runs on the fully-substituted text, so a real
+        IPv6 address (already replaced with a pseudonym by the address pass)
+        is never mistaken for a leftover MAC-shaped token, even when its hex
+        digits happen to collide with a serial's."""
+        redactor = probe._TranscriptRedactor({})
+
+        redactor.redact("fe80::d073:d5ff:feaa:11bb")
+
+        assert redactor.unmapped_token_count == 0
+
+    def test_serial_adjacent_to_a_non_hex_character_still_redacts(self) -> None:
+        """A miss is a leak, so the boundary prefers substituting.
+
+        The boundary class is hex digits and separators, not every
+        alphanumeric. A wider class would block on a non-hex neighbour and
+        leave the serial intact, which is the worse of the two failures: a
+        hybrid at least has the identifier removed.
+        """
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "device-a"})
+
+        assert redactor.redact("xd073d5aa11bb") == "xdevice-a"
+        assert redactor.redact("d073d5aa11bby") == "device-ay"
+
+    def test_serial_inside_a_longer_hex_run_is_still_left_alone(self) -> None:
+        """WR-01's corruption case must not regress when the class narrows.
+
+        Hex neighbours are the adjacency that actually occurs, via the
+        sixteen-character firmware SRV labels amendment A7 admits.
+        """
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "device-a"})
+
+        assert redactor.redact("aad073d5aa11bbbb") == "aad073d5aa11bbbb"
+        assert redactor.redact("1234d0:73:d5:aa:11:bbcd") == "1234d0:73:d5:aa:11:bbcd"
+
+    def test_unmapped_detector_uses_the_same_boundaries_as_substitution(
+        self,
+    ) -> None:
+        """Detector and substituter must agree, or the backstop has a hole.
+
+        An unmapped serial adjacent to a non-hex character is detected, and
+        one embedded in a longer hex run is not, matching exactly what the
+        substitution pattern would and would not have replaced.
+        """
+        adjacent = probe._TranscriptRedactor({})
+        adjacent.redact("xd073d5ccddee")
+        assert adjacent.unmapped_token_count == 1
+
+        embedded = probe._TranscriptRedactor({})
+        embedded.redact("aad073d5ccddeebb")
+        assert embedded.unmapped_token_count == 0
+
+    def test_ipv6_pseudonym_exhaustion_matches_the_ipv4_failure_shape(self) -> None:
+        """Both branches fail the same readable way at their own ceiling.
+
+        Past one hextet the emitted form leaves what the staged-diff backstop
+        whitelists, so the ceiling is the contract's edge. Unreachable at any
+        plausible fleet size; asserted so the two branches cannot drift.
+        """
+        redactor = probe._TranscriptRedactor({})
+        redactor._class_counters["GUA"] = probe._IPV6_SUBRANGE_CAPACITY
+
+        with pytest.raises(ValueError) as excinfo:
+            redactor.redact("2400:a842:40c1:0:dead:beef:cafe:0001")
+
+        message = str(excinfo.value)
+        assert "no GUA pseudonym left to assign" in message
+        assert "partial" in message
+        assert "do not widen the sub-range" in message.lower()
+
+    def test_main_warns_about_unmapped_tokens_when_interrupted(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The interrupt path must still report an unsafe transcript.
+
+        This is the case the check originally missed, and the reason it now
+        lives in a `finally`: a Ctrl-C returned 130 straight out of the
+        `with` block, skipping the report entirely. A records sweep is
+        seconds but a full run is not, so an interrupt is a routine outcome,
+        and 130 reads like a clean abort while the captured file holds raw
+        identifiers.
+
+        Driven through `main()` rather than the extracted function, because
+        the defect was in how `main()` was wired, not in the reporting.
+        """
+        alias_map = tmp_path / "aliases.json"
+        alias_map.write_text(
+            json.dumps({"d073d5ffffff": "covered-device"}), encoding="utf-8"
+        )
+
+        async def _unmapped_then_interrupt(_args: object) -> int:
+            print("id=d073d5aa11bb")
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(probe, "main_async", _unmapped_then_interrupt)
+        monkeypatch.setattr(
+            sys, "argv", ["probe", "--stage", "records", "--alias-map", str(alias_map)]
+        )
+
+        assert probe.main() == 130
+
+        captured = capsys.readouterr()
+        assert "1 unmapped identifier-shaped" in captured.err
+        assert "not safe to commit" in captured.err
+        assert "d073d5aa11bb" not in captured.err
+
+    def test_unmapped_warning_reports_the_count_and_never_the_tokens(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The warning names how many leaked, never which.
+
+        Echoing an identifier to warn that an identifier leaked would put a
+        second copy in the operator's scrollback and, under `tee`, in the
+        capture file as well.
+        """
+        redactor = probe._TranscriptRedactor({})
+        redactor.redact("id=d073d5aa11bb and id=d073d5ccddee")
+
+        assert probe._warn_if_tokens_went_unmapped(redactor) is True
+
+        captured = capsys.readouterr()
+        assert "2 unmapped identifier-shaped" in captured.err
+        assert "not safe to commit" in captured.err
+        assert "d073d5aa11bb" not in captured.err
+        assert "d073d5ccddee" not in captured.err
+
+    def test_unmapped_warning_is_silent_without_an_alias_map(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """No `--alias-map` means raw output by design, so nothing is reported.
+
+        The probe's diagnostic value depends on naming the physical device.
+        Reporting a leak in that mode would be reporting intended behaviour.
+        """
+        assert probe._warn_if_tokens_went_unmapped(None) is False
+        assert capsys.readouterr().err == ""
+
+    def test_unmapped_warning_is_silent_when_every_token_mapped(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A fully covered map produces no warning and no failure."""
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "device-a"})
+        redactor.redact("id=d073d5aa11bb")
+
+        assert probe._warn_if_tokens_went_unmapped(redactor) is False
+        assert capsys.readouterr().err == ""
+
+    def test_unmapped_warning_survives_being_called_from_a_finally(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """It must not raise, or a crash while reporting would hide the leak.
+
+        `main()` calls this from a `finally` that can already be carrying an
+        exception. Regression for the iteration-2 finding: the check
+        originally sat after the `with` block, so a Ctrl-C returned 130 and an
+        uncaught exception propagated, both skipping it and both leaving a
+        captured transcript of raw identifiers with no signal.
+        """
+        redactor = probe._TranscriptRedactor({})
+        redactor.redact("id=d073d5aa11bb")
+
+        with pytest.raises(RuntimeError, match="run failed"):
+            try:
+                raise RuntimeError("run failed")
+            finally:
+                assert probe._warn_if_tokens_went_unmapped(redactor) is True
+
+        assert "1 unmapped identifier-shaped" in capsys.readouterr().err
+
+    @staticmethod
+    def _distinct_ipv4(index: int) -> str:
+        """A syntactically valid, distinct-per-index private IPv4 literal."""
+        return f"10.{(index >> 16) & 0xFF}.{(index >> 8) & 0xFF}.{index & 0xFF}"
+
+    def test_every_ipv4_pseudonym_stays_inside_the_whitelisted_prefix(self) -> None:
+        """IN-02: the pool is 192.0.2.0/24 and nothing else.
+
+        Widening it to RFC 5737's other two /24s was tried and reverted. The
+        staged-diff identity backstop whitelists this one prefix, so any other
+        documentation range would be flagged by the gate as a live-address
+        leak. This asserts the emitter never leaves the whitelisted range,
+        which is the invariant SPEC amendment A5 holds it to.
+        """
+        redactor = probe._TranscriptRedactor({})
+
+        pseudonyms = [
+            redactor.redact(self._distinct_ipv4(index))
+            for index in range(1, probe._IPV4_DOCUMENTATION_CAPACITY + 1)
+        ]
+
+        assert all(pseudonym.startswith("192.0.2.") for pseudonym in pseudonyms)
+        assert len(set(pseudonyms)) == probe._IPV4_DOCUMENTATION_CAPACITY
+
+    def test_ipv4_pseudonym_exhaustion_names_the_limit_and_the_remedy(self) -> None:
+        """IN-02: exhaustion raises with a diagnosable message.
+
+        The defect was a bare ValueError partway through a write, leaving a
+        half-redacted transcript and no indication of what to do about it. The
+        ceiling is not the defect and is unreachable on this fleet: one run's
+        literals are memoised per address, and the committed transcript emitted
+        17 of a possible 254.
+        """
+        redactor = probe._TranscriptRedactor({})
+        for index in range(1, probe._IPV4_DOCUMENTATION_CAPACITY + 1):
+            redactor.redact(self._distinct_ipv4(index))
+
+        with pytest.raises(ValueError) as excinfo:
+            redactor.redact(self._distinct_ipv4(probe._IPV4_DOCUMENTATION_CAPACITY + 1))
+
+        message = str(excinfo.value)
+        assert "no documentation-range IPv4" in message
+        assert "192.0.2.0/24" in message
+        assert "partial" in message
+        assert "do not widen the pool" in message.lower()
+
+    def test_alias_map_loader_rejects_path_inside_repository(self) -> None:
+        """The mapping must never be read from a tracked location."""
+        repository_root = Path(probe.__file__).resolve().parents[2]
+        inside = repository_root / ".planning" / "scratch-alias-map.json"
+
+        with pytest.raises(ValueError, match="outside the repository"):
+            probe._load_probe_alias_map(inside)
+
+    def test_alias_map_loader_rejects_empty_object(self, tmp_path: Path) -> None:
+        """An alias map with nothing in it is rejected, not treated as a no-op."""
+        path = tmp_path / "alias.json"
+        path.write_text("{}", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="non-empty"):
+            probe._load_probe_alias_map(path)
+
+    def test_alias_map_loader_rejects_duplicate_normalised_serial(
+        self, tmp_path: Path
+    ) -> None:
+        """Two spellings of one serial must not silently pick a winner."""
+        path = tmp_path / "alias.json"
+        path.write_text(
+            json.dumps(
+                {"d073d5aa11bb": "probe-alpha", "d0:73:d5:aa:11:bb": "probe-beta"}
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError, match="duplicate"):
+            probe._load_probe_alias_map(path)
+
+    def test_alias_map_loader_rejects_identifier_shaped_alias(
+        self, tmp_path: Path
+    ) -> None:
+        """An alias must be privacy-safe, not another identifier in disguise."""
+        path = tmp_path / "alias.json"
+        path.write_text(json.dumps({"d073d5aa11bb": "d073d5aa11bb"}), encoding="utf-8")
+
+        with pytest.raises(ValueError):
+            probe._load_probe_alias_map(path)
+
+    def test_redacting_stream_wraps_writes_through_a_redactor(self) -> None:
+        """print() through the wrapped stream redacts; the wrapped write proves it."""
+        buffer = io.StringIO()
+        redactor = probe._TranscriptRedactor({"d073d5aa11bb": "probe-alpha"})
+        stream = probe._RedactingStream(buffer, redactor)
+
+        stream.write("id=d073d5aa11bb SRV=d0:73:d5:aa:11:bb.local\n")
+
+        captured = buffer.getvalue()
+        assert "probe-alpha" in captured
+        assert "d073d5aa11bb" not in captured
+        assert "d0:73:d5:aa:11:bb" not in captured.lower()
+
+    def test_report_records_prints_raw_serial_without_a_redacting_stream(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Function-boundary check: report_records() itself adds no redaction."""
+        cache = probe._LifxRecordCache()
+        cache.add_packet(_cache_chain(), "192.0.2.10")
+        result = probe.SweepResult(cache=cache, local_port=12345)
+
+        probe.report_records(result)
+
+        assert "d073d5aa11bb" in capsys.readouterr().out
+
+    def test_main_leaves_stdout_unwrapped_with_no_alias_map(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A wrong parser default or truthy guard is caught here, not just above.
+
+        report_records() alone never reaches the parser, so a wrong
+        add_argument default or an install guard written as truthiness
+        would not be caught by the function-boundary test above; this one
+        drives the real argparse boundary through the named main_async seam.
+        """
+        seen: list[object] = []
+
+        async def fake_main_async(args: argparse.Namespace) -> int:
+            seen.append(sys.stdout)
+            return 0
+
+        monkeypatch.setattr(probe, "main_async", fake_main_async)
+        monkeypatch.setattr(sys, "argv", ["ipv6_thread_probe.py", "--stage", "records"])
+
+        exit_code = probe.main()
+
+        assert exit_code == 0
+        assert seen
+        assert not isinstance(seen[0], probe._RedactingStream)
+
+    def test_main_wraps_and_restores_stdout_with_a_valid_alias_map(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The install is exercised through the real argparse boundary too."""
+        alias_map = tmp_path / "alias.json"
+        alias_map.write_text(
+            json.dumps({"d073d5aa11bb": "probe-alpha"}), encoding="utf-8"
+        )
+        seen: list[object] = []
+
+        async def fake_main_async(args: argparse.Namespace) -> int:
+            seen.append(sys.stdout)
+            return 0
+
+        monkeypatch.setattr(probe, "main_async", fake_main_async)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "ipv6_thread_probe.py",
+                "--stage",
+                "records",
+                "--alias-map",
+                str(alias_map),
+            ],
+        )
+        original_stdout = sys.stdout
+
+        exit_code = probe.main()
+
+        assert exit_code == 0
+        assert seen
+        assert isinstance(seen[0], probe._RedactingStream)
+        assert sys.stdout is original_stdout
+
+    def test_main_fails_closed_when_an_unmapped_token_was_printed_raw(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
+    ) -> None:
+        """IN-01: --alias-map covers one serial; the run also prints an
+        unrelated MAC-shaped token the map does not cover. main() must
+        report that failure and exit non-zero rather than treat the run as
+        having succeeded, even though the underlying stage itself passed."""
+        alias_map = tmp_path / "alias.json"
+        alias_map.write_text(
+            json.dumps({"d073d5aa11bb": "probe-alpha"}), encoding="utf-8"
+        )
+
+        async def fake_main_async(args: argparse.Namespace) -> int:
+            print("fallback source aa:bb:cc:dd:ee:ff")
+            return 0
+
+        monkeypatch.setattr(probe, "main_async", fake_main_async)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "ipv6_thread_probe.py",
+                "--stage",
+                "records",
+                "--alias-map",
+                str(alias_map),
+            ],
+        )
+
+        exit_code = probe.main()
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "1 unmapped identifier-shaped" in captured.err
+        assert "aa:bb:cc:dd:ee:ff" not in captured.err
+
+    def test_main_restores_stdout_when_the_run_raises(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A raising run must not leave a redacting stream installed afterwards.
+
+        This is the case a bare `sys.stdout = ...` assignment gets wrong, and
+        the case that would contaminate a whole in-process test session,
+        because this module's own tooling tests call main() in-process.
+        """
+        alias_map = tmp_path / "alias.json"
+        alias_map.write_text(
+            json.dumps({"d073d5aa11bb": "probe-alpha"}), encoding="utf-8"
+        )
+
+        async def failing_main_async(args: argparse.Namespace) -> int:
+            raise RuntimeError("synthetic failure")
+
+        monkeypatch.setattr(probe, "main_async", failing_main_async)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "ipv6_thread_probe.py",
+                "--stage",
+                "records",
+                "--alias-map",
+                str(alias_map),
+            ],
+        )
+        original_stdout = sys.stdout
+
+        with pytest.raises(RuntimeError, match="synthetic failure"):
+            probe.main()
+
+        assert sys.stdout is original_stdout
+
+    def test_main_rejects_an_alias_map_inside_the_repository(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The loader's ValueError reaches argparse's error path, not a traceback."""
+        repository_root = Path(probe.__file__).resolve().parents[2]
+        inside = repository_root / ".planning" / "scratch-alias-map.json"
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["ipv6_thread_probe.py", "--stage", "records", "--alias-map", str(inside)],
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            probe.main()
+
+        assert exc_info.value.code != 0
+
+    def test_main_rejects_a_malformed_alias_map_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A JSONDecodeError is converted at the same site as OSError/ValueError.
+
+        Without this test that promise is unexercised, and a caught-exception
+        tuple missing one member ships as a traceback in front of an operator
+        mid-run.
+        """
+        alias_map = tmp_path / "alias.json"
+        alias_map.write_text("not valid json", encoding="utf-8")
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "ipv6_thread_probe.py",
+                "--stage",
+                "records",
+                "--alias-map",
+                str(alias_map),
+            ],
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            probe.main()
+
+        assert exc_info.value.code != 0
 
 
 class TestSelectTarget:
