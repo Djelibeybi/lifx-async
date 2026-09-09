@@ -68,6 +68,18 @@ class MultiZoneApplicationRequest(IntEnum):
     APPLY_ONLY = 2
 
 
+class ThreadRoutingRole(IntEnum):
+    """Auto-generated enum."""
+
+    UNSPECIFIED = 0
+    UNASSIGNED = 1
+    SLEEPY = 2
+    END = 3
+    REED = 4
+    ROUTER = 5
+    LEADER = 6
+
+
 class TileEffectSkyPalette(IntEnum):
     """Auto-generated enum."""
 
@@ -399,6 +411,77 @@ class MultiZoneEffectSettings:
                 speed=speed,
                 duration=duration,
                 parameter=parameter,
+            ),
+            current_offset,
+        )
+
+
+@dataclass
+class ThreadLinkHealth:
+    """Auto-generated field structure."""
+
+    rloc16: int
+    link_quality_in: int
+    link_quality_out: int
+    link_margin_db: int
+
+    def pack(self) -> bytes:
+        """Pack to bytes."""
+        from lifx.protocol import serializer
+
+        result = b""
+
+        # rloc16: uint16
+        result += serializer.pack_value(self.rloc16, "uint16")
+        # Bit-packed run (1 bytes, LSB first)
+        result += (
+            ((self.link_quality_in & 3) << 2) | ((self.link_quality_out & 3) << 4)
+        ).to_bytes(1, "little")
+        # Reserved 1 bytes
+        result += serializer.pack_reserved(1)
+        # Reserved 1 bytes
+        result += serializer.pack_reserved(1)
+        # Reserved 1 bytes
+        result += serializer.pack_reserved(1)
+        # link_margin_db: uint8
+        result += serializer.pack_value(self.link_margin_db, "uint8")
+        # Reserved 1 bytes
+        result += serializer.pack_reserved(1)
+
+        return result
+
+    @classmethod
+    def unpack(cls, data: bytes, offset: int = 0) -> tuple[ThreadLinkHealth, int]:
+        """Unpack from bytes."""
+        from lifx.protocol import serializer
+
+        current_offset = offset
+        # rloc16: uint16
+        rloc16, current_offset = serializer.unpack_value(data, "uint16", current_offset)
+        # Bit-packed run (1 bytes, LSB first)
+        bit_run = int.from_bytes(data[current_offset : current_offset + 1], "little")
+        current_offset += 1
+        link_quality_in = (bit_run >> 2) & 3
+        link_quality_out = (bit_run >> 4) & 3
+        # Skip reserved 1 bytes
+        current_offset += 1
+        # Skip reserved 1 bytes
+        current_offset += 1
+        # Skip reserved 1 bytes
+        current_offset += 1
+        # link_margin_db: uint8
+        link_margin_db, current_offset = serializer.unpack_value(
+            data, "uint8", current_offset
+        )
+        # Skip reserved 1 bytes
+        current_offset += 1
+
+        return (
+            cls(
+                rloc16=rloc16,
+                link_quality_in=link_quality_in,
+                link_quality_out=link_quality_out,
+                link_margin_db=link_margin_db,
             ),
             current_offset,
         )
@@ -819,6 +902,12 @@ FIELD_MAPPINGS: dict[str, dict[str, str]] = {
         "instanceid": "Instanceid",
         "parameter": "Parameter",
         "speed": "Speed",
+    },
+    "ThreadLinkHealth": {
+        "link_margin_db": "LinkMarginDb",
+        "link_quality_in": "LinkQualityIn",
+        "link_quality_out": "LinkQualityOut",
+        "rloc16": "Rloc16",
     },
     "TileAccelMeas": {"x": "X", "y": "Y", "z": "Z"},
     "TileBufferRect": {"fb_index": "FbIndex", "x": "X", "y": "Y", "width": "Width"},

@@ -1030,6 +1030,7 @@ class Light(Device[LightState]):
         pending: list[asyncio.Future[Any]] = []
         color_task = self._schedule_request(self.get_color(), pending)
         wifi_signal_task = self._schedule_request(self._fetch_wifi_signal(), pending)
+        thread_info_task = self._schedule_request(self._fetch_thread_reading(), pending)
         ambient_light_task = self._schedule_request(
             self._fetch_ambient_light_level(), pending
         )
@@ -1053,6 +1054,7 @@ class Light(Device[LightState]):
         self._state.wifi_info = WifiInfo(
             signal=wifi_signal_task.result(), host_firmware=self._state.host_firmware
         )
+        self._state.thread_info = thread_info_task.result()
         self._state.ambient_light = self._ambient_light_reading(
             ambient_light_task.result(), power
         )
@@ -1097,6 +1099,7 @@ class Light(Device[LightState]):
                 host_firmware=common.host_firmware,
                 wifi_firmware=common.wifi_firmware,
                 wifi_info=common.wifi_info,
+                thread_info=common.thread_info,
                 location=common.location,
                 group=common.group,
                 color=color,

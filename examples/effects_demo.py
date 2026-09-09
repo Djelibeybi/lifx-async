@@ -65,10 +65,10 @@ async def resolve_device(ip: str | None, serial: str | None) -> Light | None:
     """Find a device by IP or serial number."""
     if ip:
         print(f"Looking up device at {ip}...")
-        device = await find_by_ip(ip, timeout=5.0)
+        device = await find_by_ip(ip)
     elif serial:
         print(f"Looking up device {serial}...")
-        device = await find_by_serial(serial, timeout=5.0)
+        device = await find_by_serial(serial)
     else:
         return None
 

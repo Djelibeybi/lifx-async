@@ -23,17 +23,17 @@ discovery-specific troubleshooting.
 
 ### Opt-In State Fields on Discovered Devices
 
-Discovery functions take no `fetch_wifi_info` or `fetch_ambient_light`
-argument, so every discovered device starts with both flags off. Set the
-matching property **before** entering the context manager: `async with device`
-is what runs state initialisation, so a flag set inside the body arrives too
-late for the first fetch.
+Discovery functions take no `fetch_wifi_info`, `fetch_thread_info`,
+`fetch_radio_info` or `fetch_ambient_light` argument, so every discovered device
+starts with every flag off. Set the matching property **before** entering the
+context manager: `async with device` is what runs state initialisation, so a
+flag set inside the body arrives too late for the first fetch.
 
 ```python
 from lifx import discover
 
 async def discover_with_signal():
-    async for device in discover(timeout=5.0):
+    async for device in discover():
         device.fetch_wifi_info = True  # before `async with`
         async with device:
             print(f"{device.state.label}: {device.state.wifi_info.rssi}")
@@ -43,7 +43,7 @@ Setting it inside the body leaves `state.wifi_info` unpopulated until the next
 refresh, which re-fetches the volatile state rather than just the signal:
 
 ```python
-async for device in discover(timeout=5.0):
+async for device in discover():
     async with device:
         device.fetch_wifi_info = True
         print(device.state.wifi_info.rssi)  # None - initialisation already ran
@@ -56,6 +56,19 @@ async for device in discover(timeout=5.0):
 
         # For a single reading, skip the flag entirely:
         wifi_info = await device.get_wifi_info()
+```
+
+A Thread device cannot answer the WiFi queries, so read its signal strength
+through `get_thread_info()` or the `fetch_thread_info` flag instead. For a
+mixed fleet, `fetch_radio_info` picks the right query per device from the
+connectivity evidenced at each fetch:
+
+```python
+async for device in discover_mdns():
+    device.fetch_radio_info = True  # before `async with`
+    async with device:
+        radio = device.state.thread_info or device.state.wifi_info
+        print(f"{device.state.label}: {radio.rssi} {radio.rssi_unit}")
 ```
 
 The same ordering applies to `discover_mdns()`, `find_by_serial()`,
@@ -144,7 +157,9 @@ async def use_cached_or_fetch():
 ##### Non-State Properties
 
 - `Device.connectivity` - `Connectivity.THREAD` or `Connectivity.WIFI`; the
-  device's own frame address report wins once it has answered a request
+  device's own frame address report wins once it has answered a request. It
+  gates the radio-specific queries: `get_wifi_info()` and `get_wifi_firmware()`
+  are refused on a Thread device and `get_thread_info()` on a WiFi device
 - `Device.model` - Device product model
 
 #### Light properties

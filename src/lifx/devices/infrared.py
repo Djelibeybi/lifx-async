@@ -46,6 +46,7 @@ class InfraredLightState(LightState):
             host_firmware=light_state.host_firmware,
             wifi_firmware=light_state.wifi_firmware,
             wifi_info=light_state.wifi_info,
+            thread_info=light_state.thread_info,
             location=light_state.location,
             group=light_state.group,
             color=light_state.color,
@@ -94,6 +95,8 @@ class InfraredLight(Light):
         max_retries: int = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
         _emit_input_warnings: bool = True,
     ) -> None:
@@ -112,6 +115,8 @@ class InfraredLight(Light):
             timeout,
             max_retries,
             fetch_wifi_info=fetch_wifi_info,
+            fetch_thread_info=fetch_thread_info,
+            fetch_radio_info=fetch_radio_info,
             fetch_ambient_light=fetch_ambient_light,
             _emit_input_warnings=_emit_input_warnings,
         )

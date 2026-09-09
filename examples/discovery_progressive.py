@@ -43,7 +43,7 @@ async def merged_discovery() -> None:
     verified mDNS results under one caller deadline, so more devices can be
     found without any code change.
     """
-    async for device in lifx.discover(timeout=5.0):
+    async for device in lifx.discover():
         async with device:
             color, power, label = await device.get_color()
             print(f"{label}: {type(device).__name__} ({device.connectivity})")
@@ -58,7 +58,7 @@ async def explicit_udp_discovery() -> None:
 
     Use it when the caller wants only that source, with no mDNS leg at all.
     """
-    async for device in lifx.discover_udp(timeout=5.0):
+    async for device in lifx.discover_udp():
         async with device:
             color, power, label = await device.get_color()
             print(f"{label}: {type(device).__name__} ({device.connectivity})")
@@ -77,7 +77,7 @@ async def explicit_mdns_discovery() -> None:
     `discover()`.
     """
     found = False
-    async for device in lifx.discover_mdns(timeout=5.0):
+    async for device in lifx.discover_mdns():
         found = True
         async with device:
             color, power, label = await device.get_color()
@@ -85,7 +85,7 @@ async def explicit_mdns_discovery() -> None:
 
     if not found:
         print("No mDNS responders in this call; falling back to discover()")
-        async for device in lifx.discover(timeout=5.0):
+        async for device in lifx.discover():
             async with device:
                 await device.get_color()
 

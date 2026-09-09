@@ -306,7 +306,7 @@ sequenceDiagram
     participant Network
     participant Devices
 
-    User->>Discovery: discover_devices(timeout=3.0)
+    User->>Discovery: discover_devices()
     Discovery->>Transport: Open UDP socket
     Discovery->>Transport: Send broadcast (GetService)
     Transport->>Network: Broadcast on 255.255.255.255

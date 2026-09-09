@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 async def main():
     """Discover lights and log label, power and color for each light."""
     # Collect devices as they're discovered
-    async for device in discover(timeout=4.0):
+    async for device in discover():
         if isinstance(device, Light):
             color, power, label = await device.get_color()
             logger.info(

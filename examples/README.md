@@ -50,10 +50,24 @@ uv run python examples/discovery_find_device.py --ip 192.168.1.100
 ### discovery_mdns
 
 Discovers devices using mDNS/DNS-SD instead of UDP broadcast. Demonstrates the supported
-device-level API and reports each device's `"wifi"` or `"thread"` connectivity.
+device-level API and reports each device's `"wifi"` or `"thread"` connectivity, plus the
+reading for its own radio collected by `fetch_radio_info` during state initialisation.
 
 ```bash
 uv run python examples/discovery_mdns.py
+```
+
+No parameters.
+
+### discovery_thread
+
+Discovers Thread devices over mDNS (the only path that reaches a device behind a Thread
+border router), then calls `get_thread_info()` on each and prints its routing role, network
+name, routing locators, link quality to the next hop toward the leader, link margin and
+the derived RSSI.
+
+```bash
+uv run python examples/discovery_thread.py
 ```
 
 No parameters.

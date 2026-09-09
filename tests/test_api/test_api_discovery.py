@@ -1071,7 +1071,16 @@ class TestFindBySerialRace:
     async def test_udp_winner_construction_cannot_exceed_caller_deadline(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Awaited cancellation cleanup cannot extend the serial race budget."""
+        """Awaited cancellation cleanup cannot extend the serial race budget.
+
+        The budget must comfortably outlast source start-up: construction is
+        scheduled with whatever remains of it, and a task cancelled before its
+        first step never runs its body, so a budget that start-up alone can
+        exhaust on a loaded runner leaves nothing to clean up and misreports
+        the property under test.
+        """
+        budget = 0.5
+        construction_started = asyncio.Event()
         cleanup_started = asyncio.Event()
         cleanup_finished = asyncio.Event()
         force_close = asyncio.Event()
@@ -1089,6 +1098,7 @@ class TestFindBySerialRace:
                 task = asyncio.current_task()
                 assert task is not None
                 construction_tasks.append(task)
+                construction_started.set()
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
                 cleanup_started.set()
@@ -1117,13 +1127,16 @@ class TestFindBySerialRace:
         )
 
         started = asyncio.get_running_loop().time()
-        assert await find_by_serial("d073d5123456", timeout=0.03) is None
+        assert await find_by_serial("d073d5123456", timeout=budget) is None
         elapsed = asyncio.get_running_loop().time() - started
 
+        assert construction_started.is_set(), "construction never began"
         assert cleanup_started.is_set()
         assert cleanup_finished.is_set()
         assert construction_tasks and all(task.done() for task in construction_tasks)
-        assert elapsed <= 0.3
+        # Cleanup loops on 0.08 s sleeps until force-closed; without the force
+        # close it would run on past the budget indefinitely.
+        assert elapsed <= budget + 0.5
 
     @pytest.mark.parametrize("winner_source", ["udp", "mdns"])
     async def test_find_by_serial_either_source_wins_after_both_close(

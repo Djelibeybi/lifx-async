@@ -32,6 +32,8 @@ def mock_device_factory():
         ip: str = "192.168.1.100",
         port: int = 56700,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
     ) -> Device:
         device = device_class(
@@ -39,12 +41,17 @@ def mock_device_factory():
             ip=ip,
             port=port,
             fetch_wifi_info=fetch_wifi_info,
+            fetch_thread_info=fetch_thread_info,
+            fetch_radio_info=fetch_radio_info,
             fetch_ambient_light=fetch_ambient_light,
         )
         # Replace device's connection with mock
         mock_conn = MagicMock()
         mock_conn.request = AsyncMock()
         mock_conn.request_ack = AsyncMock()
+        # No correlated response has been observed yet, so the transport
+        # report is unknown rather than a truthy mock attribute
+        mock_conn.thread_connection = None
         device.connection = mock_conn
         return device
 

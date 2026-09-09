@@ -60,6 +60,29 @@ Common protocol type definitions and enums.
       heading_level: 4
       members_order: source
 
+### Thread Routing Role
+
+Routing role reported by `ThreadStateInfo` and surfaced as `ThreadInfo.role`:
+
+::: lifx.protocol.protocol_types.ThreadRoutingRole
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+
+### Thread Link Health
+
+Link health reported by `ThreadStateInfo` for the device's next hop toward the
+Thread leader, which may or may not be the border router. Its `rloc16` is that
+next hop's Routing Locator (RLOC16), the 16-bit address the mesh routes by. The two link quality indicators are 2-bit fields packed into one
+byte on the wire:
+
+::: lifx.protocol.protocol_types.ThreadLinkHealth
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+
 ### MultiZone Application Request
 
 ::: lifx.protocol.protocol_types.MultiZoneApplicationRequest

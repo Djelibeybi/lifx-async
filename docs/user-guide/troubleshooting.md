@@ -33,7 +33,7 @@ long a device can stay undiscoverable after power returns.
    from lifx.network.discovery import discover_devices
 
    devices = []
-   async for device in discover_devices(timeout=5.0):
+   async for device in discover_devices():
        devices.append(device)
    print(f"Found {len(devices)} devices")
    ```
@@ -76,12 +76,9 @@ from lifx.network.discovery import discover_devices
 async def diagnose_discovery():
     print("Attempting discovery...")
 
-    # Try with extended timeout
+    # Try with an extended discovery window (the default is 15.0 seconds)
     devices = []
-    async for device in discover_devices(
-        timeout=10.0,
-        broadcast_address="255.255.255.255"
-    ):
+    async for device in discover_devices(timeout=30.0):
         devices.append(device)
 
     if not devices:
@@ -215,11 +212,14 @@ async def resilient_operation(ip: str, max_retries: int = 3):
 
 **Solution:**
 
+The default request deadline already spans eight retries over 16 seconds, so
+a timeout usually means the device is unreachable rather than slow. Confirm it
+answers a single request at all before tuning anything:
+
 ```python
 from lifx import Device
 
-# Increase timeout for slow devices
-async with await Device.connect(ip, timeout=5.0) as light:
+async with await Device.connect(ip) as light:
     # get_color() returns (color, power, label)
     color, power, label = await light.get_color()
 ```
@@ -494,7 +494,7 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    async for device in discover(timeout=4.0):
+    async for device in discover():
         logger.info("Found %s at %s", device.serial, device.ip)
 
 

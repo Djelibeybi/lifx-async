@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import asdict, dataclass
+from enum import IntEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -44,6 +45,20 @@ _ARRAY_PATTERN = re.compile(r"\[(\d+)\](.+)")
 _PASCAL_TO_SNAKE = re.compile(r"(?<!^)(?=[A-Z])")
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _enum_class(type_name: str) -> type[IntEnum] | None:
+    """Return the generated IntEnum named ``type_name``, or None for a struct.
+
+    Every enum in ``protocol_types`` is derived from IntEnum and every field
+    structure is a plain dataclass, so the base class alone tells the two
+    apart. Looking the name up rather than keeping a hand-maintained list
+    means a newly generated enum is recognised without touching this module.
+    """
+    candidate = getattr(_get_protocol_types(), type_name, None)
+    if isinstance(candidate, type) and issubclass(candidate, IntEnum):
+        return candidate
+    return None
 
 
 def _coerce_enum(enum_class: type, raw: int) -> Any:
@@ -222,15 +237,8 @@ class Packet:
         # Parse field type
         base_type, array_count, is_nested = self._parse_field_type(field_type)
 
-        # Check if it's an enum (Button/Relay enums excluded)
-        enum_types = {
-            "DeviceService",
-            "LightLastHevCycleResult",
-            "LightWaveform",
-            "MultiZoneApplicationRequest",
-            "FirmwareEffect",
-        }
-        is_enum = is_nested and base_type in enum_types
+        # An enum field packs as its integer value
+        is_enum = is_nested and _enum_class(base_type) is not None
 
         # Handle different field types
         if array_count:
@@ -273,15 +281,9 @@ class Packet:
         # Parse field type
         base_type, array_count, is_nested = cls._parse_field_type(field_type)
 
-        # Check if it's an enum (Button/Relay enums excluded)
-        enum_types = {
-            "DeviceService": protocol_types.DeviceService,
-            "LightLastHevCycleResult": protocol_types.LightLastHevCycleResult,
-            "LightWaveform": protocol_types.LightWaveform,
-            "MultiZoneApplicationRequest": protocol_types.MultiZoneApplicationRequest,
-            "FirmwareEffect": protocol_types.FirmwareEffect,
-        }
-        is_enum = is_nested and base_type in enum_types
+        # An enum field unpacks from its integer value
+        enum_class = _enum_class(base_type) if is_nested else None
+        is_enum = enum_class is not None
 
         # Handle different field types
         if array_count:
@@ -289,7 +291,6 @@ class Packet:
                 # Array of enums
                 result = []
                 current_offset = offset
-                enum_class = enum_types[base_type]
                 for _ in range(array_count):
                     item_raw, current_offset = serializer.unpack_value(
                         data, "uint8", current_offset
@@ -320,7 +321,6 @@ class Packet:
                 return serializer.unpack_array(data, base_type, array_count, offset)
         elif is_enum:
             # Single enum
-            enum_class = enum_types[base_type]
             value_raw, new_offset = serializer.unpack_value(data, "uint8", offset)
             return _coerce_enum(enum_class, value_raw), new_offset
         elif is_nested:

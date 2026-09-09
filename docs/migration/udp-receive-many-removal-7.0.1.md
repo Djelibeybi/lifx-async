@@ -14,7 +14,7 @@ from lifx import discover
 
 
 async def discover_devices():
-    async for device in discover(timeout=5.0):
+    async for device in discover():
         print(device.serial, device.ip)
 ```
 
@@ -29,7 +29,7 @@ async def receive_until_quiet(transport):
     packets = []
     while True:
         try:
-            packets.append(await transport.receive(timeout=0.25))
+            packets.append(await transport.receive())
         except LifxTimeoutError:
             return packets
 ```

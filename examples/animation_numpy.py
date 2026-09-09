@@ -671,14 +671,14 @@ async def main(
         device = await Device.connect(ip=ip, serial=serial)
     elif ip:
         print(f"\nSearching for device at IP: {ip}")
-        device = await find_by_ip(ip, timeout=5.0)
+        device = await find_by_ip(ip)
         if device is None:
             print(f"No device found at IP '{ip}'")
             return
     else:
         assert serial is not None
         print(f"\nSearching for device with serial: {serial}")
-        device = await find_by_serial(serial, timeout=5.0)
+        device = await find_by_serial(serial)
         if device is None:
             print(f"No device found with serial '{serial}'")
             return

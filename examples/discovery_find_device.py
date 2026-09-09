@@ -41,7 +41,7 @@ async def find_by_serial_example(serial: str) -> None:
 
     start = time.monotonic()
 
-    device = await find_by_serial(serial, timeout=5.0)
+    device = await find_by_serial(serial)
 
     if device is None:
         print(f"❌ No device found with serial '{serial}'")
@@ -61,7 +61,7 @@ async def find_by_ip_example(ip: str) -> None:
     print()
 
     start = time.monotonic()
-    device = await find_by_ip(ip, timeout=5.0)
+    device = await find_by_ip(ip)
 
     if device is None:
         print(f"❌ No device found at IP '{ip}'")

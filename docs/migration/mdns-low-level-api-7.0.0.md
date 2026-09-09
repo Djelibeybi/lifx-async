@@ -26,7 +26,7 @@ from lifx import discover_mdns
 
 
 async def discover_devices():
-    async for device in discover_mdns(timeout=5.0):
+    async for device in discover_mdns():
         async with device:
             print(device.serial, device.ip, device.connectivity)
 ```

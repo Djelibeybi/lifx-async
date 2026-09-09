@@ -10,6 +10,7 @@ from lifx.devices.base import (
     DeviceInfo,
     DeviceVersion,
     FirmwareInfo,
+    ThreadInfo,
     WifiInfo,
 )
 from lifx.devices.ceiling import CeilingLight, CeilingLightState
@@ -29,6 +30,7 @@ __all__ = [
     "DeviceInfo",
     "DeviceVersion",
     "FirmwareInfo",
+    "ThreadInfo",
     "HevLight",
     "HevLightState",
     "InfraredLight",
