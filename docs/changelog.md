@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v7.3.0 (2026-09-09)
+
+### Documentation
+
+- **discovery**: Report observed address states and measure WiFi staleness
+  ([`a5e20ab`](https://github.com/Djelibeybi/lifx-async/commit/a5e20abd906ec5f2438dab987ce9abdd1c41b4a4))
+
+### Features
+
+- Add ThreadGetInfo support and connectivity-gated radio queries
+  ([`9d04cf0`](https://github.com/Djelibeybi/lifx-async/commit/9d04cf07a39c5d35ace4e7a30d5c3f51ef81705c))
+
+
 ## v7.2.1 (2026-09-07)
 
 ### Bug Fixes
