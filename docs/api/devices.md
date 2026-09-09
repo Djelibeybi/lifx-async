@@ -47,8 +47,9 @@ firmware-aware `rssi_unit` (`dB` through firmware 2.77, otherwise `dBm`).
 
 Also available as `device.state.wifi_info`. Neither state initialisation nor
 `refresh_state()` queries the device for WiFi signal strength unless the device
-was created with `fetch_wifi_info=True`, so `signal` and `rssi` are `None` by
-default while `rssi_unit` is always populated from the host firmware version:
+was created with `fetch_wifi_info=True` (or `fetch_radio_info=True` on a device
+evidenced as WiFi), so `signal` and `rssi` are `None` by default while
+`rssi_unit` is always populated from the host firmware version:
 
 ```python
 device = await Device.connect(ip="192.168.1.100", fetch_wifi_info=True)
@@ -86,7 +87,72 @@ async with await Device.connect(ip="192.168.1.100") as device:
     print(f"{wifi_info.rssi} {wifi_info.rssi_unit}")
 ```
 
+`get_wifi_info()` and `get_wifi_firmware()` raise `LifxUnsupportedCommandError`
+once a device is evidenced as Thread, because WiFi and Thread are mutually
+exclusive firmware installs and Thread firmware cannot answer either query.
+Use [`get_thread_info()`](#threadinfo) for a Thread device's signal reading.
+The opt-in `fetch_wifi_info` reading is unaffected: a Thread device that does
+not answer simply leaves `signal` and `rssi` as `None`.
+
 ::: lifx.devices.base.WifiInfo
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+
+### ThreadInfo
+
+Thread radio information returned by `Device.get_thread_info()`, flattened
+from the `ThreadStateInfo` reply: the device's own Routing Locator (RLOC16, the
+16-bit address the mesh routes to it by, see the
+[OpenThread primer](https://openthread.io/guides/thread-primer/ipv6-addressing#routing-locator-rloc)),
+the network name, its routing role, and the health of its link to the next hop
+toward the Thread leader (`next_hop`), which LIFX note may or may not be
+the border router.
+
+The reading is never cached, so every call is a single request to the device:
+
+```python
+async with await Device.connect(ip="192.168.1.100") as device:
+    thread_info = await device.get_thread_info()
+    print(f"{thread_info.role.name} on {thread_info.network_name}")
+    print(f"{thread_info.rssi} {thread_info.rssi_unit}")
+```
+
+Also available as `device.state.thread_info`, which is `None` unless the device
+was created with `fetch_thread_info=True`, in which case the query joins the
+same parallel batch as the other state requests on every initialisation and
+refresh. Like `fetch_wifi_info`, it is a settable property that takes effect
+from the next fetch, and a device that does not answer leaves the field `None`
+rather than failing the refresh. On a device evidenced as WiFi the query is
+refused before any packet is sent.
+
+A consumer that does not yet know a device's radio can set `fetch_radio_info`
+instead. At each fetch it sends the WiFi signal query on a device evidenced as
+WiFi and the Thread query on a device evidenced as Thread, and neither while
+connectivity is still unknown, so nothing is sent that the firmware cannot
+answer:
+
+```python
+async for device in discover_mdns():
+    device.fetch_radio_info = True  # before `async with`
+    async with device:
+        radio = device.state.thread_info or device.state.wifi_info
+        print(f"{device.state.label}: {radio.rssi} {radio.rssi_unit}")
+```
+
+`rssi` is derived as `link_margin_db - 100`. LIFX advise that this is a close
+enough approximation to compare with `WifiInfo.rssi`; the protocol
+specification itself does not define it. `rssi_unit` is always `dBm`.
+
+`get_thread_info()` raises `LifxUnsupportedCommandError` once a device is
+evidenced as WiFi, the mirror image of the WiFi queries above. A device that
+has not yet answered any request and carries no discovery metadata is queried and
+answers for itself, so `from_ip()` on a Thread device works without a prior
+discovery.
+
+::: lifx.devices.base.ThreadInfo
     options:
       show_root_heading: true
       heading_level: 4
@@ -96,6 +162,7 @@ async with await Device.connect(ip="192.168.1.100") as device:
 ### FirmwareInfo
 
 Firmware version information returned by `Device.get_host_firmware()` and `Device.get_wifi_firmware()`.
+`get_wifi_firmware()` is refused on a device evidenced as Thread; see [WifiInfo](#wifiinfo).
 
 ::: lifx.devices.base.FirmwareInfo
     options:
@@ -359,8 +426,14 @@ defaulting to `Connectivity.WIFI`. This means a Thread device found over UDP
 broadcast, `from_ip()`, or a won `find_by_serial()` race reports correctly
 once it has answered, even though it carries no mDNS TXT record.
 
-The value is descriptive metadata; it does not change the device's address,
-routing, retry, or tuning behaviour.
+The value does not change the device's address, routing, retry, or tuning
+behaviour. It does gate the radio-specific queries: `get_wifi_info()` and
+`get_wifi_firmware()` are refused once a device is evidenced as Thread, and
+`get_thread_info()` is refused once it is evidenced as WiFi, because each
+firmware install can only answer its own radio's packets. Evidence means an
+observed frame address report or an mDNS record naming either radio; the WiFi default a
+device carries before either exists is not evidence, so a never-contacted
+device is queried and answers for itself.
 
 ### MAC Address
 

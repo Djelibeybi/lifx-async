@@ -298,6 +298,7 @@ class CeilingLightState(MatrixLightState):
             host_firmware=matrix_state.host_firmware,
             wifi_firmware=matrix_state.wifi_firmware,
             wifi_info=matrix_state.wifi_info,
+            thread_info=matrix_state.thread_info,
             location=matrix_state.location,
             group=matrix_state.group,
             color=matrix_state.color,
@@ -363,6 +364,8 @@ class CeilingLight(MatrixLight):
         state_file: str | None = None,
         *,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
         _emit_input_warnings: bool = True,
     ):
@@ -380,6 +383,10 @@ class CeilingLight(MatrixLight):
             max_retries: Maximum number of retry attempts for network requests
             state_file: Optional path to JSON file for state persistence
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_thread_info: Query Thread mesh information during state
+                initialization
+            fetch_radio_info: Query whichever radio matches the device's
+                evidenced connectivity during state initialization
             fetch_ambient_light: Query the ambient light sensor during state
                 initialization
             _emit_input_warnings: Internal construction policy for caller-facing
@@ -395,6 +402,8 @@ class CeilingLight(MatrixLight):
             timeout,
             max_retries,
             fetch_wifi_info=fetch_wifi_info,
+            fetch_thread_info=fetch_thread_info,
+            fetch_radio_info=fetch_radio_info,
             fetch_ambient_light=fetch_ambient_light,
             _emit_input_warnings=_emit_input_warnings,
         )
@@ -525,6 +534,8 @@ class CeilingLight(MatrixLight):
         max_retries: int = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
         state_file: str | None = None,
     ) -> CeilingLight:
@@ -537,6 +548,10 @@ class CeilingLight(MatrixLight):
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retries for requests
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_thread_info: Query Thread mesh information during state
+                initialization
+            fetch_radio_info: Query whichever radio matches the device's
+                evidenced connectivity during state initialization
             fetch_ambient_light: Query the ambient light sensor during state
                 initialization
             state_file: Optional path to JSON file for state persistence
@@ -558,6 +573,8 @@ class CeilingLight(MatrixLight):
             timeout,
             max_retries,
             fetch_wifi_info=fetch_wifi_info,
+            fetch_thread_info=fetch_thread_info,
+            fetch_radio_info=fetch_radio_info,
             fetch_ambient_light=fetch_ambient_light,
         )
         device._state_file = state_file

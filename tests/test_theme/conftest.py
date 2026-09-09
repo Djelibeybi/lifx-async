@@ -72,6 +72,7 @@ def mock_device_factory():
         device = device_class(serial=serial, ip=ip, port=port)
         # Replace device's connection with mock
         mock_conn = MagicMock()
+        mock_conn.thread_connection = None
         mock_conn.request = AsyncMock()
         mock_conn.request_ack = AsyncMock()
         device.connection = mock_conn

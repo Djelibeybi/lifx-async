@@ -21,6 +21,8 @@ from lifx.protocol.protocol_types import (
     LightWaveform,
     MultiZoneApplicationRequest,
     MultiZoneEffectSettings,
+    ThreadLinkHealth,
+    ThreadRoutingRole,
     TileBufferRect,
     TileEffectSettings,
     TileStateDevice,
@@ -1103,6 +1105,51 @@ class Sensor(Packet):
         lux: float
 
 
+class Thread(Packet):
+    """Thread category packets."""
+
+    @dataclass
+    class GetInfo(Packet):
+        """Packet type 1200."""
+
+        PKT_TYPE: ClassVar[int] = 1200
+        STATE_TYPE: ClassVar[int] = 1201
+        _fields: ClassVar[list[dict[str, Any]]] = []
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "GET"
+        _requires_ack: ClassVar[bool] = False
+        _requires_response: ClassVar[bool] = False
+
+        pass
+
+    @dataclass
+    class StateInfo(Packet):
+        """Packet type 1201."""
+
+        PKT_TYPE: ClassVar[int] = 1201
+        _fields: ClassVar[list[dict[str, Any]]] = [
+            {"name": "Rloc16", "type": "uint16", "size_bytes": 2},
+            {"type": "reserved", "size_bytes": 2},
+            {"name": "NetworkName", "type": "[16]byte", "size_bytes": 16},
+            {"name": "Role", "type": "<ThreadRoutingRole>", "size_bytes": 1},
+            {"type": "reserved", "size_bytes": 1},
+            {"type": "reserved", "size_bytes": 1},
+            {"type": "reserved", "size_bytes": 1},
+            {"name": "LinkHealth", "type": "<ThreadLinkHealth>", "size_bytes": 8},
+        ]
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "STATE"
+        _requires_ack: ClassVar[bool] = False
+        _requires_response: ClassVar[bool] = False
+
+        rloc16: int
+        network_name: bytes
+        role: ThreadRoutingRole
+        link_health: ThreadLinkHealth
+
+
 class Tile(Packet):
     """Tile category packets."""
 
@@ -1391,6 +1438,8 @@ PACKET_REGISTRY: dict[int, type[Packet]] = {
     718: Tile.GetEffect,
     719: Tile.SetEffect,
     720: Tile.StateEffect,
+    1200: Thread.GetInfo,
+    1201: Thread.StateInfo,
 }
 
 

@@ -1,11 +1,13 @@
 """Tests for generated protocol types and packets."""
 
-from lifx.protocol.packets import Device, Light, Sensor
+from lifx.protocol.packets import PACKET_REGISTRY, Device, Light, Sensor, Thread
 from lifx.protocol.protocol_types import (
     DeviceService,
     FirmwareEffect,
     LightHsbk,
     LightWaveform,
+    ThreadLinkHealth,
+    ThreadRoutingRole,
 )
 
 
@@ -182,3 +184,41 @@ class TestGeneratedPackets:
         # Unpack and verify
         unpacked = Sensor.StateAmbientLight.unpack(packed)
         assert abs(unpacked.lux - 250.75) < 0.01  # Float comparison with tolerance
+
+
+class TestThreadPackets:
+    """Thread category packets added in protocol 0.12."""
+
+    # Rloc16 0x2C00, 2 reserved, "OpenThread-c9d1" padded, role LEADER, 3 reserved,
+    # link health: next hop 0x2800, LQI in 3 / out 2 in bits 2-5, margin 55 dB.
+    STATE_INFO_BYTES = (
+        bytes([0x00, 0x2C, 0, 0])
+        + b"OpenThread-c9d1\x00"
+        + bytes([6, 0, 0, 0])
+        + bytes([0x00, 0x28, 0b0010_1100, 0, 0, 0, 55, 0])
+    )
+
+    def test_get_info_registers_packet_and_state_types(self) -> None:
+        """ThreadGetInfo is packet 1200 and expects ThreadStateInfo 1201."""
+        assert Thread.GetInfo.PKT_TYPE == 1200
+        assert Thread.GetInfo.STATE_TYPE == 1201
+        assert PACKET_REGISTRY[1201] is Thread.StateInfo
+        assert Thread.GetInfo().pack() == b""
+
+    def test_state_info_unpacks_golden_bytes(self) -> None:
+        """A 32-byte ThreadStateInfo payload decodes field by field."""
+        state = Thread.StateInfo.unpack(self.STATE_INFO_BYTES)
+
+        assert state.rloc16 == 0x2C00
+        assert state.network_name == b"OpenThread-c9d1\x00"
+        assert state.role is ThreadRoutingRole.LEADER
+        assert state.link_health == ThreadLinkHealth(
+            rloc16=0x2800, link_quality_in=3, link_quality_out=2, link_margin_db=55
+        )
+
+    def test_state_info_round_trips(self) -> None:
+        """Packing the decoded state reproduces the golden bytes exactly."""
+        state = Thread.StateInfo.unpack(self.STATE_INFO_BYTES)
+
+        assert state.pack() == self.STATE_INFO_BYTES
+        assert len(self.STATE_INFO_BYTES) == 32

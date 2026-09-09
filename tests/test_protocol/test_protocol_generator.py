@@ -1,12 +1,14 @@
 """Tests for protocol code generator."""
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 from lifx.protocol import packets
 from lifx.protocol.generator import (
     TypeRegistry,
+    apply_thread_packets_quirk,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
@@ -606,6 +608,41 @@ class TestGenerateEnumCode:
         assert "RESERVED" not in code
         assert "VALUE1 = 1" in code
 
+    def test_generate_enum_strips_shared_prefix_that_differs_from_name(self):
+        """A shared prefix is stripped even when it is not the enum name."""
+        enums = {
+            "ThreadRoutingRole": {
+                "type": "uint8",
+                "values": [
+                    {"name": "DEVICE_THREAD_ROLE_UNSPECIFIED", "value": 0},
+                    {"name": "DEVICE_THREAD_ROLE_LEADER", "value": 6},
+                ],
+            }
+        }
+
+        code = generate_enum_code(enums)
+
+        assert "    UNSPECIFIED = 0" in code
+        assert "    LEADER = 6" in code
+        assert "DEVICE_THREAD_ROLE" not in code
+
+    def test_generate_enum_keeps_prefix_that_would_empty_a_member(self):
+        """A shared prefix is not stripped when one member is only the prefix."""
+        enums = {
+            "Mode": {
+                "type": "uint8",
+                "values": [
+                    {"name": "FAST", "value": 0},
+                    {"name": "FAST_ER", "value": 1},
+                ],
+            }
+        }
+
+        code = generate_enum_code(enums)
+
+        assert "    FAST = 0" in code
+        assert "    FAST_ER = 1" in code
+
 
 class TestGenerateFieldCode:
     """Test field code generation."""
@@ -1058,3 +1095,208 @@ class TestFormatGeneratedFiles:
 
         with pytest.raises(RuntimeError, match=r"ruff format failed"):
             format_generated_files(target)
+
+
+THREAD_LINK_HEALTH_FIELDS = [
+    {"name": "Rloc16", "type": "uint16", "size_bytes": 2},
+    {"type": "reserved", "size_bits": 2},
+    {"name": "LinkQualityIn", "type": "uint8", "size_bits": 2},
+    {"name": "LinkQualityOut", "type": "uint8", "size_bits": 2},
+    {"type": "reserved", "size_bits": 2},
+    {"type": "reserved", "size_bytes": 1},
+    {"type": "reserved", "size_bytes": 1},
+    {"type": "reserved", "size_bytes": 1},
+    {"name": "LinkMarginDb", "type": "uint8", "size_bytes": 1},
+    {"type": "reserved", "size_bytes": 1},
+]
+
+
+def _exec_field_class(fields: dict[str, object], class_name: str) -> type:
+    """Execute generated field code and return the named class."""
+    code, _ = generate_field_code(fields)
+    namespace: dict[str, object] = {}
+    # The generated module starts with the same future import, so the return
+    # annotations that name the class itself are not evaluated at definition
+    exec(
+        "from __future__ import annotations\nfrom dataclasses import dataclass\n"
+        + code,
+        namespace,
+    )
+    return cast(type, namespace[class_name])
+
+
+class TestBitFields:
+    """Sub-byte fields declared with ``size_bits`` pack LSB-first into bytes."""
+
+    def test_bit_fields_pack_lsb_first(self):
+        """The first declared bit field occupies the least significant bits."""
+        link_health = _exec_field_class(
+            {"ThreadLinkHealth": {"fields": THREAD_LINK_HEALTH_FIELDS}},
+            "ThreadLinkHealth",
+        )
+
+        packed = link_health(
+            rloc16=0x1234, link_quality_in=3, link_quality_out=1, link_margin_db=45
+        ).pack()
+
+        # bits 0-1 reserved, bits 2-3 in=0b11, bits 4-5 out=0b01, bits 6-7 reserved
+        assert packed == bytes([0x34, 0x12, 0b0001_1100, 0, 0, 0, 45, 0])
+
+    def test_bit_fields_unpack_lsb_first(self):
+        """Unpacking recovers each bit field from its own bit range."""
+        link_health = _exec_field_class(
+            {"ThreadLinkHealth": {"fields": THREAD_LINK_HEALTH_FIELDS}},
+            "ThreadLinkHealth",
+        )
+
+        value, offset = link_health.unpack(
+            bytes([0x34, 0x12, 0b1110_0110, 0xFF, 0xFF, 0xFF, 45, 0xFF])
+        )
+
+        assert offset == 8
+        assert (value.rloc16, value.link_quality_in, value.link_quality_out) == (
+            0x1234,
+            1,
+            2,
+        )
+        assert value.link_margin_db == 45
+
+    def test_bit_field_value_is_masked_to_its_width(self):
+        """A value wider than the field cannot spill into a neighbour's bits."""
+        link_health = _exec_field_class(
+            {"ThreadLinkHealth": {"fields": THREAD_LINK_HEALTH_FIELDS}},
+            "ThreadLinkHealth",
+        )
+
+        packed = link_health(
+            rloc16=0, link_quality_in=0b111, link_quality_out=0, link_margin_db=0
+        ).pack()
+
+        assert packed[2] == 0b0000_1100
+
+    def test_bit_fields_are_plain_ints_in_the_dataclass(self):
+        """A bit field is annotated like any other unsigned integer."""
+        code, mappings = generate_field_code(
+            {"ThreadLinkHealth": {"fields": THREAD_LINK_HEALTH_FIELDS}}
+        )
+
+        assert "    link_quality_in: int" in code
+        assert mappings["ThreadLinkHealth"]["link_quality_out"] == "LinkQualityOut"
+
+    def test_bit_run_that_is_not_whole_bytes_is_rejected(self):
+        """The validator reports a bit run that does not fill whole bytes."""
+        protocol = {
+            "enums": {},
+            "fields": {
+                "Broken": {
+                    "size_bytes": 1,
+                    "fields": [
+                        {"name": "A", "type": "uint8", "size_bits": 3},
+                        {"name": "B", "type": "uint8", "size_bits": 3},
+                    ],
+                }
+            },
+            "compound_fields": {},
+            "unions": {},
+            "packets": {},
+        }
+
+        errors = validate_protocol_spec(protocol)
+
+        assert len(errors) == 1
+        assert "fields.Broken" in errors[0]
+        assert "6 bits" in errors[0]
+
+    def test_bit_run_ending_at_structure_end_is_rejected(self):
+        """A trailing bit run short of a byte is reported too."""
+        protocol = {
+            "enums": {},
+            "fields": {
+                "Broken": {
+                    "size_bytes": 2,
+                    "fields": [
+                        {"name": "A", "type": "uint8", "size_bytes": 1},
+                        {"name": "B", "type": "uint8", "size_bits": 4},
+                    ],
+                }
+            },
+            "compound_fields": {},
+            "unions": {},
+            "packets": {},
+        }
+
+        errors = validate_protocol_spec(protocol)
+
+        assert len(errors) == 1
+        assert "4 bits" in errors[0]
+
+    def test_whole_byte_bit_run_is_valid(self):
+        """A bit run that fills its bytes exactly produces no error."""
+        protocol = {
+            "enums": {},
+            "fields": {"ThreadLinkHealth": {"fields": THREAD_LINK_HEALTH_FIELDS}},
+            "compound_fields": {},
+            "unions": {},
+            "packets": {},
+        }
+
+        assert validate_protocol_spec(protocol) == []
+
+
+class TestThreadPacketsQuirk:
+    """The Thread packets are injected locally until LIFX publish them upstream."""
+
+    def test_adds_thread_definitions_when_absent(self):
+        """A spec without the thread category gains the enum, field and packets."""
+        enums, fields, packets_by_category = apply_thread_packets_quirk({}, {}, {})
+
+        assert enums["ThreadRoutingRole"]["values"][-1] == {
+            "name": "DEVICE_THREAD_ROLE_LEADER",
+            "value": 6,
+        }
+        assert fields["ThreadLinkHealth"]["size_bytes"] == 8
+        assert packets_by_category["thread"]["ThreadGetInfo"]["pkt_type"] == 1200
+        assert packets_by_category["thread"]["ThreadStateInfo"]["pkt_type"] == 1201
+        assert packets_by_category["thread"]["ThreadStateInfo"]["size_bytes"] == 32
+
+    def test_injected_definitions_validate(self):
+        """The injected spec passes the same validation as a downloaded one."""
+        enums, fields, packets_by_category = apply_thread_packets_quirk({}, {}, {})
+
+        errors = validate_protocol_spec(
+            {
+                "enums": enums,
+                "fields": fields,
+                "compound_fields": {},
+                "unions": {},
+                "packets": packets_by_category,
+            }
+        )
+
+        assert errors == []
+
+    def test_leaves_upstream_definitions_untouched_when_present(self):
+        """Once LIFX ship the packets, the upstream definitions win unchanged."""
+        upstream_enum = {"type": "uint8", "values": [{"name": "X", "value": 0}]}
+        upstream_field = {"size_bytes": 8, "fields": []}
+        upstream_packets = {"thread": {"ThreadGetInfo": {"pkt_type": 1200}}}
+
+        enums, fields, packets_by_category = apply_thread_packets_quirk(
+            {"ThreadRoutingRole": upstream_enum},
+            {"ThreadLinkHealth": upstream_field},
+            upstream_packets,
+        )
+
+        assert enums["ThreadRoutingRole"] is upstream_enum
+        assert fields["ThreadLinkHealth"] is upstream_field
+        assert packets_by_category["thread"] is upstream_packets["thread"]
+
+    def test_does_not_mutate_its_inputs(self):
+        """The quirk returns new mappings rather than editing the parsed spec."""
+        enums: dict[str, object] = {}
+        fields: dict[str, object] = {}
+        packets_by_category: dict[str, object] = {}
+
+        apply_thread_packets_quirk(enums, fields, packets_by_category)
+
+        assert enums == {} and fields == {} and packets_by_category == {}

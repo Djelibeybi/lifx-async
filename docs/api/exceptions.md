@@ -77,7 +77,7 @@ from lifx import discover, Colors, LifxError, LifxTimeoutError
 
 async def main():
     try:
-        async for device in discover(timeout=5.0):
+        async for device in discover():
             await device.set_color(Colors.BLUE)
     except LifxTimeoutError:
         print("Discovery timed out - no devices found")
@@ -127,7 +127,7 @@ from lifx.protocol import packets
 
 async def main():
     try:
-        conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100", timeout=2.0)
+        conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
         response = await conn.request(packets.Light.Get())
     except LifxTimeoutError:
         print("Device did not respond in time")
@@ -174,7 +174,7 @@ from lifx import find_by_serial, LifxDeviceNotFoundError
 
 async def main():
     try:
-        device = await find_by_serial("d073d5123456", timeout=3.0)
+        device = await find_by_serial("d073d5123456")
         if device:
             async with device:
                 await device.set_power(True)
@@ -267,7 +267,7 @@ async def main():
 
 ```python
 # Usually raises: LifxTimeoutError
-async with await Device.connect("192.168.1.100", timeout=5.0) as light:
+async with await Device.connect("192.168.1.100") as light:
     await light.set_color(Colors.BLUE)
 ```
 
@@ -283,7 +283,7 @@ Causes:
 ```python
 # May raise: LifxTimeoutError or LifxDeviceNotFoundError
 devices = []
-async for device in discover(timeout=3.0):
+async for device in discover():
     devices.append(device)
 if not devices:
     print("No devices found")

@@ -36,6 +36,7 @@ from lifx.protocol.models import (
     Serial,
     mac_candidates_for_serial,
 )
+from lifx.protocol.protocol_types import ThreadRoutingRole
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -183,6 +184,68 @@ class WifiInfo:
 
 
 @dataclass
+class ThreadInfo:
+    """Device Thread radio information.
+
+    Flattens the ``ThreadStateInfo`` reply so a consumer reads the numbers
+    directly rather than walking the nested link-health structure. The link
+    health describes the device's link to its next hop toward the Thread
+    leader, not necessarily to its parent or to the border router.
+
+    Attributes:
+        rloc: The device's own 16-bit Routing Locator (RLOC16), the
+            address the Thread mesh routes to it by. See
+            https://openthread.io/guides/thread-primer/ipv6-addressing#routing-locator-rloc
+        network_name: Thread network name, decoded from the 16-byte field
+        role: The device's routing role in the Thread mesh
+        next_hop: RLOC16 of the neighbour the link health
+            describes: the device's next hop toward the Thread leader, which
+            LIFX note may or may not be the border router
+        link_quality_in: Inbound link quality indicator, 0 (unknown) to 3 (best)
+        link_quality_out: Outbound link quality indicator, 0 (unknown) to 3
+            (best)
+        link_margin_db: Link margin above the receiver noise floor, in dB
+        rssi: Approximate received signal strength in dBm, derived as
+            ``link_margin_db - 100``. LIFX advise that this approximation is
+            close enough to compare with :attr:`WifiInfo.rssi`; the protocol
+            specification itself does not define it
+        rssi_unit: Always ``dBm``
+    """
+
+    rloc: int
+    network_name: str
+    role: ThreadRoutingRole
+    next_hop: int
+    link_quality_in: int
+    link_quality_out: int
+    link_margin_db: int
+    rssi: int = field(init=False)
+    rssi_unit: Literal["dBm"] = field(init=False, default="dBm")
+
+    #: Offset LIFX quote between Thread link margin and an RSSI-like reading.
+    _RSSI_OFFSET_DB: ClassVar[int] = 100
+
+    def __post_init__(self) -> None:
+        """Derive the approximate RSSI from the link margin."""
+        self.rssi = self.link_margin_db - self._RSSI_OFFSET_DB
+
+    @property
+    def as_dict(self) -> dict[str, Any]:
+        """Return as dictionary for serialisation."""
+        return {
+            "rloc": self.rloc,
+            "network_name": self.network_name,
+            "role": self.role.name,
+            "next_hop": self.next_hop,
+            "link_quality_in": self.link_quality_in,
+            "link_quality_out": self.link_quality_out,
+            "link_margin_db": self.link_margin_db,
+            "rssi": self.rssi,
+            "rssi_unit": self.rssi_unit,
+        }
+
+
+@dataclass
 class FirmwareInfo:
     """Device firmware version information.
 
@@ -297,6 +360,10 @@ class DeviceState:
             device was created with ``fetch_wifi_info=True``; ``rssi_unit`` is
             always populated from the host firmware version. Keyword-only with a
             default so adding it stays additive for existing constructors.
+        thread_info: Thread mesh information, or None unless the device was
+            created with ``fetch_thread_info=True`` (or ``fetch_radio_info=True``
+            on a device evidenced as Thread) and answered the query. Keyword-only
+            with a default for the same reason.
     """
 
     model: str
@@ -314,6 +381,7 @@ class DeviceState:
         kw_only=True,
         default_factory=lambda: WifiInfo(signal=None, host_firmware=None),
     )
+    thread_info: ThreadInfo | None = field(kw_only=True, default=None)
 
     @property
     def as_dict(
@@ -325,7 +393,9 @@ class DeviceState:
         | float
         | dict[str, bool | int]
         | dict[str, str | int]
-        | dict[str, float | int | str | None],
+        | dict[str, float | int | str | None]
+        | dict[str, Any]
+        | None,
     ]:
         """Return DeviceState as a dictionary."""
         return {
@@ -338,6 +408,7 @@ class DeviceState:
             "host_firmware": self.host_firmware.as_dict,
             "wifi_firmware": self.wifi_firmware.as_dict,
             "wifi_info": self.wifi_info.as_dict,
+            "thread_info": self.thread_info.as_dict if self.thread_info else None,
             "location": self.location.as_dict,
             "group": self.group.as_dict,
             "last_updated": self.last_updated,
@@ -385,6 +456,7 @@ class _CommonStateRequests:
         location: Location request
         group: Group request
         wifi_signal: Opt-in WiFi signal request, resolving to None when disabled
+        thread_info: Opt-in Thread info request, resolving to None when disabled
         version: Version request, or None when capabilities are already loaded
     """
 
@@ -393,6 +465,7 @@ class _CommonStateRequests:
     location: asyncio.Task[CollectionInfo]
     group: asyncio.Task[CollectionInfo]
     wifi_signal: asyncio.Task[float | None]
+    thread_info: asyncio.Task[ThreadInfo | None]
     version: asyncio.Task[DeviceVersion] | None
 
 
@@ -407,6 +480,7 @@ class _CommonState:
         host_firmware: Host firmware version
         wifi_firmware: WiFi firmware version
         wifi_info: WiFi signal and RSSI
+        thread_info: Thread mesh information, or None when not fetched
         location: Device location
         group: Device group
     """
@@ -417,12 +491,16 @@ class _CommonState:
     host_firmware: FirmwareInfo
     wifi_firmware: FirmwareInfo
     wifi_info: WifiInfo
+    thread_info: ThreadInfo | None
     location: CollectionInfo
     group: CollectionInfo
 
 
 # TypeVar for generic state type, bound to DeviceState
 StateT = TypeVar("StateT", bound=DeviceState)
+
+#: Result type of an opt-in telemetry query.
+OptionalT = TypeVar("OptionalT")
 
 #: Result type of a single scheduled state request.
 _T = TypeVar("_T")
@@ -487,6 +565,8 @@ class Device(Generic[StateT]):
         max_retries: int = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
         _emit_input_warnings: bool = True,
     ) -> None:
@@ -502,6 +582,15 @@ class Device(Generic[StateT]):
                 state is initialized or refreshed. When False (the default),
                 ``state.wifi_info`` has None for signal and rssi, but rssi_unit
                 is still populated from the host firmware version.
+            fetch_thread_info: Query the device for Thread mesh information
+                whenever state is initialized or refreshed. Off by default so
+                no unrequested packet is sent; ``state.thread_info`` is None
+                until enabled. Refused without a packet on a device evidenced
+                as WiFi.
+            fetch_radio_info: Send whichever radio query matches the device's
+                evidenced connectivity at each fetch: the WiFi signal on a WiFi
+                device, Thread information on a Thread device, and neither
+                while connectivity is still unknown. Off by default.
             fetch_ambient_light: Query the ambient light sensor whenever state is
                 initialized or refreshed, leaving ``state.ambient_light`` None
                 when False (the default). Only lights expose the sensor, so this
@@ -552,8 +641,13 @@ class Device(Generic[StateT]):
         self._timeout = timeout
         self._max_retries = max_retries
         self._fetch_wifi_info = fetch_wifi_info
+        self._fetch_thread_info = fetch_thread_info
+        self._fetch_radio_info = fetch_radio_info
         self._fetch_ambient_light = fetch_ambient_light
         self._connectivity: Connectivity = Connectivity.WIFI
+        # Set only when discovery metadata (the mDNS TXT record) reported a
+        # radio, so an explicit WiFi record can be told apart from the default
+        self._connectivity_metadata: Connectivity | None = None
 
         # Create lightweight connection handle - connection pooling is internal
         self.connection = DeviceConnection(
@@ -598,6 +692,7 @@ class Device(Generic[StateT]):
             self._connectivity = Connectivity(value)
         except ValueError:
             raise ValueError(f"Invalid connectivity value: {value!r}") from None
+        self._connectivity_metadata = self._connectivity
 
     def adopt_cached_metadata(self, source: Device) -> None:
         """Adopt metadata already fetched by a temporary device instance.
@@ -613,6 +708,7 @@ class Device(Generic[StateT]):
         self._mac_address = source._mac_address
         self._mac_address_firmware = source._mac_address_firmware
         self._connectivity = source._connectivity
+        self._connectivity_metadata = source._connectivity_metadata
 
         # Discovery observes the transport on the temporary device, whose
         # connection is closed before this instance is built. Without this the
@@ -631,6 +727,8 @@ class Device(Generic[StateT]):
         max_retries: int = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
     ) -> Self:
         """Create and return an instance for the given IP address.
@@ -645,6 +743,10 @@ class Device(Generic[StateT]):
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retry attempts
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_thread_info: Query Thread mesh information during state
+                initialization
+            fetch_radio_info: Query whichever radio matches the device's
+                evidenced connectivity during state initialization
             fetch_ambient_light: Query the ambient light sensor during state
                 initialization (lights only)
 
@@ -686,6 +788,8 @@ class Device(Generic[StateT]):
                             timeout=timeout,
                             max_retries=max_retries,
                             fetch_wifi_info=fetch_wifi_info,
+                            fetch_thread_info=fetch_thread_info,
+                            fetch_radio_info=fetch_radio_info,
                             fetch_ambient_light=fetch_ambient_light,
                             _emit_input_warnings=False,
                         )
@@ -700,6 +804,8 @@ class Device(Generic[StateT]):
                 timeout=timeout,
                 max_retries=max_retries,
                 fetch_wifi_info=fetch_wifi_info,
+                fetch_thread_info=fetch_thread_info,
+                fetch_radio_info=fetch_radio_info,
                 fetch_ambient_light=fetch_ambient_light,
                 _emit_input_warnings=False,
             )
@@ -716,6 +822,8 @@ class Device(Generic[StateT]):
         max_retries: int = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
+        fetch_thread_info: bool = False,
+        fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
     ) -> Light | HevLight | InfraredLight | MultiZoneLight | MatrixLight | CeilingLight:
         """Create a device instance with the correct type for the given IP.
@@ -735,6 +843,10 @@ class Device(Generic[StateT]):
             timeout: Request timeout for this device instance
             max_retries: Maximum number of retry attempts
             fetch_wifi_info: Query WiFi signal strength during state initialization
+            fetch_thread_info: Query Thread mesh information during state
+                initialization
+            fetch_radio_info: Query whichever radio matches the device's
+                evidenced connectivity during state initialization
             fetch_ambient_light: Query the ambient light sensor during state
                 initialization (lights only)
 
@@ -836,6 +948,8 @@ class Device(Generic[StateT]):
                 timeout=timeout,
                 max_retries=max_retries,
                 fetch_wifi_info=fetch_wifi_info,
+                fetch_thread_info=fetch_thread_info,
+                fetch_radio_info=fetch_radio_info,
                 fetch_ambient_light=fetch_ambient_light,
                 _emit_input_warnings=False,
             )
@@ -1291,6 +1405,8 @@ class Device(Generic[StateT]):
             print(f"WiFi RSSI: {wifi_info.rssi}")
             ```
         """
+        self._refuse_on_connectivity(Connectivity.THREAD, "get_wifi_info")
+
         # Fetch firmware alongside WiFi info when it has not already been cached.
         # Firmware determines whether the RSSI unit is dB or dBm.
         wifi_request = self.connection.request(packets.Device.GetWifiInfo())
@@ -1391,6 +1507,20 @@ class Device(Generic[StateT]):
             print(f"WiFi Firmware: v{wifi_fw.version_major}.{wifi_fw.version_minor}")
             ```
         """
+        self._refuse_on_connectivity(Connectivity.THREAD, "get_wifi_firmware")
+        return await self._request_wifi_firmware()
+
+    async def _request_wifi_firmware(self) -> FirmwareInfo:
+        """Request and cache the WiFi firmware without the connectivity guard.
+
+        The shared state batch predates the Thread guard on
+        :meth:`get_wifi_firmware` and sends this query to every device, so it
+        calls here directly: a refresh on an observed Thread device must not
+        start failing because the public method now refuses it.
+
+        Returns:
+            FirmwareInfo with build timestamp and version
+        """
         # Request automatically unpacks response
         state = await self.connection.request(packets.Device.GetWifiFirmware())  # type: ignore
         self._raise_if_unhandled(state)
@@ -1416,6 +1546,94 @@ class Device(Generic[StateT]):
             }
         )
         return firmware
+
+    async def get_thread_info(self) -> ThreadInfo:
+        """Get device Thread radio information.
+
+        Always fetches from the device: link health is volatile, so nothing
+        here is cached. The query is refused once the device is evidenced as
+        WiFi, because WiFi and Thread are mutually exclusive firmware
+        installs and WiFi firmware cannot answer ``ThreadGetInfo``. A device
+        that has not yet answered anything and carries no discovery metadata is
+        queried and answers for itself.
+
+        Returns:
+            ThreadInfo with routing role, network name and link health
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxTimeoutError: If device does not respond
+            LifxProtocolError: If response is invalid
+            LifxUnsupportedCommandError: If the device is on WiFi firmware or
+                does not support this command
+
+        Example:
+            ```python
+            thread_info = await device.get_thread_info()
+            print(f"Thread role: {thread_info.role.name}")
+            print(f"Thread RSSI: {thread_info.rssi} {thread_info.rssi_unit}")
+            ```
+        """
+        self._refuse_on_connectivity(Connectivity.WIFI, "get_thread_info")
+
+        state = await self.connection.request(packets.Thread.GetInfo())
+        self._raise_if_unhandled(state)
+
+        link_health = state.link_health
+        thread_info = ThreadInfo(
+            rloc=state.rloc16,
+            network_name=state.network_name.rstrip(b"\x00").decode(
+                "utf-8", errors="replace"
+            ),
+            role=state.role,
+            next_hop=link_health.rloc16,
+            link_quality_in=link_health.link_quality_in,
+            link_quality_out=link_health.link_quality_out,
+            link_margin_db=link_health.link_margin_db,
+        )
+
+        _LOGGER.debug(
+            {
+                "class": "Device",
+                "method": "get_thread_info",
+                "action": "query",
+                "reply": thread_info.as_dict,
+            }
+        )
+        return thread_info
+
+    def _evidenced_connectivity(self) -> Connectivity | None:
+        """Return the connectivity the device has actually given evidence for.
+
+        An observed frame-address report is evidence in both directions, and
+        so is an mDNS TXT record, whichever radio it names. The WiFi default a
+        device carries before either exists is not evidence of anything.
+        """
+        observed = self.connection.thread_connection
+        if observed is not None:
+            return Connectivity.THREAD if observed else Connectivity.WIFI
+        return self._connectivity_metadata
+
+    def _refuse_on_connectivity(self, refused: Connectivity, method: str) -> None:
+        """Refuse a radio-specific query the device's firmware cannot answer.
+
+        WiFi and Thread are mutually exclusive firmware installs, so there is
+        no opt-in: the packet has no meaning on the other radio.
+
+        Args:
+            refused: The connectivity on which ``method`` cannot work
+            method: Name of the calling method, for the error message
+
+        Raises:
+            LifxUnsupportedCommandError: If the device is evidenced as
+                ``refused``
+        """
+        if self._evidenced_connectivity() is refused:
+            radio = "Thread" if refused is Connectivity.THREAD else "WiFi"
+            raise LifxUnsupportedCommandError(
+                f"{method}() is not supported on a {radio} device: "
+                f"{radio} firmware cannot answer this query"
+            )
 
     async def get_location(self) -> CollectionInfo:
         """Get device location information.
@@ -1928,6 +2146,50 @@ class Device(Generic[StateT]):
         self._fetch_wifi_info = enabled
 
     @property
+    def fetch_thread_info(self) -> bool:
+        """Whether state fetches include Thread mesh information.
+
+        Toggle this to start or stop collecting ``state.thread_info``. It takes
+        effect from the next state initialization or refresh, which stores None
+        while disabled rather than leaving a stale reading behind a freshly
+        stamped ``last_updated``. On a device evidenced as WiFi the query is
+        refused before any packet is sent and the field stays None.
+
+        Example:
+            ```python
+            if device.connectivity is Connectivity.THREAD:
+                device.fetch_thread_info = True
+            await device.refresh_state()
+            print(device.state.thread_info)
+            ```
+        """
+        return self._fetch_thread_info
+
+    @fetch_thread_info.setter
+    def fetch_thread_info(self, enabled: bool) -> None:
+        """Enable or disable the Thread information query."""
+        self._fetch_thread_info = enabled
+
+    @property
+    def fetch_radio_info(self) -> bool:
+        """Whether state fetches include the reading for the device's own radio.
+
+        With this set, each state initialization or refresh sends the WiFi
+        signal query on a device evidenced as WiFi and the Thread information
+        query on a device evidenced as Thread. While connectivity is unknown,
+        before any response and without an mDNS record, neither is
+        sent, so the first reading arrives with the first refresh after the
+        device has answered. :attr:`fetch_wifi_info` and
+        :attr:`fetch_thread_info` remain independent explicit switches.
+        """
+        return self._fetch_radio_info
+
+    @fetch_radio_info.setter
+    def fetch_radio_info(self, enabled: bool) -> None:
+        """Enable or disable the connectivity-matched radio query."""
+        self._fetch_radio_info = enabled
+
+    @property
     def fetch_ambient_light(self) -> bool:
         """Whether state fetches include the ambient light sensor.
 
@@ -2005,8 +2267,8 @@ class Device(Generic[StateT]):
                 await task
 
     async def _fetch_optional(
-        self, name: str, coro: Coroutine[Any, Any, float | None]
-    ) -> float | None:
+        self, name: str, coro: Coroutine[Any, Any, OptionalT]
+    ) -> OptionalT | None:
         """Run an opt-in telemetry query, returning None if the device refuses.
 
         Opt-in readings are additive: a device that does not answer one must
@@ -2046,10 +2308,36 @@ class Device(Generic[StateT]):
             WiFi signal strength, or None when WiFi info is not fetched or the
             device did not answer the query
         """
-        if not self._fetch_wifi_info:
+        if not self._wants_wifi_info():
             return None
 
         return await self._fetch_optional("wifi_info", self._request_wifi_signal())
+
+    async def _fetch_thread_reading(self) -> ThreadInfo | None:
+        """Query Thread mesh information when enabled, else return None.
+
+        Returns:
+            ThreadInfo, or None when Thread info is not fetched or the device
+            did not answer the query
+        """
+        if not self._wants_thread_info():
+            return None
+
+        return await self._fetch_optional("thread_info", self.get_thread_info())
+
+    def _wants_wifi_info(self) -> bool:
+        """Whether this fetch should send the WiFi signal query."""
+        return self._fetch_wifi_info or (
+            self._fetch_radio_info
+            and self._evidenced_connectivity() is Connectivity.WIFI
+        )
+
+    def _wants_thread_info(self) -> bool:
+        """Whether this fetch should send the Thread information query."""
+        return self._fetch_thread_info or (
+            self._fetch_radio_info
+            and self._evidenced_connectivity() is Connectivity.THREAD
+        )
 
     async def _request_wifi_signal(self) -> float | None:
         """Request the WiFi signal strength from the device.
@@ -2082,10 +2370,13 @@ class Device(Generic[StateT]):
         """
         return _CommonStateRequests(
             host_firmware=self._schedule_request(self.get_host_firmware(), pending),
-            wifi_firmware=self._schedule_request(self.get_wifi_firmware(), pending),
+            wifi_firmware=self._schedule_request(
+                self._request_wifi_firmware(), pending
+            ),
             location=self._schedule_request(self.get_location(), pending),
             group=self._schedule_request(self.get_group(), pending),
             wifi_signal=self._schedule_request(self._fetch_wifi_signal(), pending),
+            thread_info=self._schedule_request(self._fetch_thread_reading(), pending),
             version=(
                 None
                 if self._capabilities is not None
@@ -2145,6 +2436,7 @@ class Device(Generic[StateT]):
             wifi_info=WifiInfo(
                 signal=requests.wifi_signal.result(), host_firmware=host_firmware
             ),
+            thread_info=requests.thread_info.result(),
             location=requests.location.result(),
             group=requests.group.result(),
         )
@@ -2183,6 +2475,7 @@ class Device(Generic[StateT]):
                 host_firmware=common.host_firmware,
                 wifi_firmware=common.wifi_firmware,
                 wifi_info=common.wifi_info,
+                thread_info=common.thread_info,
                 location=common.location,
                 group=common.group,
                 last_updated=time.time(),
@@ -2223,6 +2516,7 @@ class Device(Generic[StateT]):
         label_task = self._schedule_request(self.get_label(), pending)
         power_task = self._schedule_request(self.get_power(), pending)
         wifi_signal_task = self._schedule_request(self._fetch_wifi_signal(), pending)
+        thread_info_task = self._schedule_request(self._fetch_thread_reading(), pending)
 
         try:
             await self._await_batch(pending)
@@ -2239,6 +2533,7 @@ class Device(Generic[StateT]):
             signal=wifi_signal_task.result(),
             host_firmware=self._state.host_firmware,
         )
+        self._state.thread_info = thread_info_task.result()
 
         self._state.last_updated = time.time()
 
@@ -2314,8 +2609,12 @@ class Device(Generic[StateT]):
         :meth:`from_ip`, or a won ``find_by_serial()`` race, none of which
         carry an mDNS TXT record.
 
-        This is descriptive metadata. It does not authenticate the device or
-        change its routing, retry, or tuning behaviour.
+        The value does not authenticate the device or change its routing,
+        retry, or tuning behaviour. It does gate the radio-specific queries:
+        :meth:`get_wifi_info` and :meth:`get_wifi_firmware` are refused once
+        the device is evidenced as Thread, and :meth:`get_thread_info` once it
+        is evidenced as WiFi, because each firmware install can only answer
+        its own radio's packets.
         """
         observed = self.connection.thread_connection
         if observed is not None:

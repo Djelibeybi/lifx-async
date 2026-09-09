@@ -7,6 +7,8 @@ only parsed and converted into protocol classes.
 
 from __future__ import annotations
 
+import copy
+import os
 import re
 import subprocess  # nosec B404
 import sys
@@ -301,6 +303,84 @@ def apply_tile_state_device_quirk(
     return fields
 
 
+#: Definitions from LIFX/public-protocol#14, injected until they reach main.
+_THREAD_ROUTING_ROLE_ENUM: dict[str, Any] = {
+    "type": "uint8",
+    "values": [
+        {"name": "DEVICE_THREAD_ROLE_UNSPECIFIED", "value": 0},
+        {"name": "DEVICE_THREAD_ROLE_UNASSIGNED", "value": 1},
+        {"name": "DEVICE_THREAD_ROLE_SLEEPY", "value": 2},
+        {"name": "DEVICE_THREAD_ROLE_END", "value": 3},
+        {"name": "DEVICE_THREAD_ROLE_REED", "value": 4},
+        {"name": "DEVICE_THREAD_ROLE_ROUTER", "value": 5},
+        {"name": "DEVICE_THREAD_ROLE_LEADER", "value": 6},
+    ],
+}
+
+_THREAD_LINK_HEALTH_FIELD: dict[str, Any] = {
+    "size_bytes": 8,
+    "fields": [
+        {"name": "Rloc16", "type": "uint16", "size_bytes": 2},
+        {"type": "reserved", "size_bits": 2},
+        {"name": "LinkQualityIn", "type": "uint8", "size_bits": 2},
+        {"name": "LinkQualityOut", "type": "uint8", "size_bits": 2},
+        {"type": "reserved", "size_bits": 2},
+        {"type": "reserved", "size_bytes": 1},
+        {"type": "reserved", "size_bytes": 1},
+        {"type": "reserved", "size_bytes": 1},
+        {"name": "LinkMarginDb", "type": "uint8", "size_bytes": 1},
+        {"type": "reserved", "size_bytes": 1},
+    ],
+}
+
+_THREAD_PACKETS: dict[str, Any] = {
+    "ThreadGetInfo": {"pkt_type": 1200, "size_bytes": 0, "fields": []},
+    "ThreadStateInfo": {
+        "pkt_type": 1201,
+        "size_bytes": 32,
+        "fields": [
+            {"name": "Rloc16", "type": "uint16", "size_bytes": 2},
+            {"type": "reserved", "size_bytes": 2},
+            {"name": "NetworkName", "type": "[16]byte", "size_bytes": 16},
+            {"name": "Role", "type": "<ThreadRoutingRole>", "size_bytes": 1},
+            {"type": "reserved", "size_bytes": 1},
+            {"type": "reserved", "size_bytes": 1},
+            {"type": "reserved", "size_bytes": 1},
+            {"name": "LinkHealth", "type": "<ThreadLinkHealth>", "size_bytes": 8},
+        ],
+    },
+}
+
+
+def apply_thread_packets_quirk(
+    enums: dict[str, Any], fields: dict[str, Any], packets: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Apply local quirk to add the Thread packets until LIFX publish them.
+
+    LIFX/public-protocol#14 adds ``ThreadGetInfo`` (1200), ``ThreadStateInfo``
+    (1201), the ``ThreadRoutingRole`` enum and the ``ThreadLinkHealth``
+    structure. Until that pull request reaches ``main`` the downloaded spec
+    lacks them, so this quirk injects the same definitions. Each one is added
+    only when absent, so the upstream definition wins once it exists and this
+    quirk can then be removed.
+
+    Args:
+        enums: Dictionary of enum definitions
+        fields: Dictionary of field definitions
+        packets: Dictionary of packet definitions grouped by category
+
+    Returns:
+        New (enums, fields, packets) dictionaries with the Thread definitions
+    """
+    enums = {**enums}
+    fields = {**fields}
+    packets = {**packets}
+    enums.setdefault("ThreadRoutingRole", copy.deepcopy(_THREAD_ROUTING_ROLE_ENUM))
+    fields.setdefault("ThreadLinkHealth", copy.deepcopy(_THREAD_LINK_HEALTH_FIELD))
+    packets.setdefault("thread", copy.deepcopy(_THREAD_PACKETS))
+    return enums, fields, packets
+
+
 def apply_firmware_effect_enum_quirk(
     enums: dict[str, Any], fields: dict[str, Any], compound_fields: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -510,6 +590,35 @@ def camel_to_snake_upper(name: str) -> str:
     return snake.upper()
 
 
+def shared_enum_prefix(enum_name: str, member_names: list[str]) -> str:
+    """Return the redundant prefix to strip from every member of an enum.
+
+    The enum's own name in upper snake case is preferred. When the members
+    share some other underscore-delimited prefix instead, that prefix is
+    returned, provided at least two members exist and none of them would be
+    left empty. Otherwise an empty string means nothing is stripped.
+
+    Args:
+        enum_name: Enum class name in PascalCase
+        member_names: Non-reserved member names in protocol form
+
+    Returns:
+        Prefix ending in an underscore, or an empty string
+    """
+    if not member_names:
+        return ""
+    expected_prefix = camel_to_snake_upper(enum_name) + "_"
+    if all(name.startswith(expected_prefix) for name in member_names):
+        return expected_prefix
+    if len(member_names) < 2:
+        return ""
+    common = os.path.commonprefix(member_names)
+    common = common[: common.rfind("_") + 1]
+    if common and all(len(name) > len(common) for name in member_names):
+        return common
+    return ""
+
+
 def generate_enum_code(enums: dict[str, Any]) -> str:
     """Generate Python Enum definitions with shortened names.
 
@@ -531,14 +640,14 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
             # New format: {type: "uint16", values: [{name: "X", value: 1}, ...]}
             values = enum_def["values"]
 
-            # Check if all values share a common prefix (enum name)
-            expected_prefix = camel_to_snake_upper(enum_name) + "_"
+            # Strip the prefix every member shares: the enum's own name when
+            # LIFX follow that convention, otherwise whatever underscore-delimited
+            # prefix the members have in common
             non_reserved = [
                 item["name"] for item in values if item["name"].lower() != "reserved"
             ]
-            has_common_prefix = non_reserved and all(
-                name.startswith(expected_prefix) for name in non_reserved
-            )
+            expected_prefix = shared_enum_prefix(enum_name, non_reserved)
+            has_common_prefix = bool(expected_prefix)
 
             for item in sorted(values, key=lambda x: x["value"]):
                 protocol_name = item["name"]
@@ -610,6 +719,56 @@ def convert_type_to_python(
         return "Any"
 
 
+def group_bit_runs(
+    fields_data: list[dict[str, Any]],
+) -> list[dict[str, Any] | list[dict[str, Any]]]:
+    """Group consecutive ``size_bits`` entries into bit runs.
+
+    A field declared with ``size_bits`` occupies part of a byte. Consecutive
+    bit-sized entries, reserved or named, form one run that is packed into
+    whole bytes with the first declared field in the least significant bits,
+    the same convention the frame header uses.
+
+    Args:
+        fields_data: Field definitions in protocol order
+
+    Returns:
+        The same fields in order, with each bit run replaced by a list of its
+        entries and every byte-sized field left as-is
+    """
+    grouped: list[dict[str, Any] | list[dict[str, Any]]] = []
+    run: list[dict[str, Any]] = []
+    for field_item in fields_data:
+        if "size_bits" in field_item:
+            run.append(field_item)
+            continue
+        if run:
+            grouped.append(run)
+            run = []
+        grouped.append(field_item)
+    if run:
+        grouped.append(run)
+    return grouped
+
+
+def bit_run_width(run: list[dict[str, Any]]) -> int:
+    """Return the total width of a bit run in bits."""
+    return sum(int(item["size_bits"]) for item in run)
+
+
+def _bit_run_layout(run: list[dict[str, Any]]) -> list[tuple[str, int, int]]:
+    """Return ``(python_name, shift, width)`` for each named field in a run."""
+    layout: list[tuple[str, int, int]] = []
+    shift = 0
+    for item in run:
+        width = int(item["size_bits"])
+        if "name" in item:
+            python_name = apply_field_name_quirks(to_snake_case(item["name"]))
+            layout.append((python_name, shift, width))
+        shift += width
+    return layout
+
+
 def generate_pack_method(
     fields_data: list[dict[str, Any]],
     class_type: str = "field",
@@ -635,7 +794,21 @@ def generate_pack_method(
     code.append('        result = b""')
     code.append("")
 
-    for field_item in fields_data:
+    for field_item in group_bit_runs(fields_data):
+        if isinstance(field_item, list):
+            # Bit run: pack every sub-byte field into one little-endian integer
+            size_bytes = bit_run_width(field_item) // 8
+            code.append(f"        # Bit-packed run ({size_bytes} bytes, LSB first)")
+            terms = [
+                f"((self.{name} & {(1 << width) - 1}) << {shift})"
+                for name, shift, width in _bit_run_layout(field_item)
+            ]
+            expression = " | ".join(terms) if terms else "0"
+            code.append(
+                f'        result += ({expression}).to_bytes({size_bytes}, "little")'
+            )
+            continue
+
         # Handle reserved fields (no name)
         if "name" not in field_item:
             size_bytes = field_item.get("size_bytes", 0)
@@ -738,7 +911,24 @@ def generate_unpack_method(
     # Store field values
     field_vars = []
 
-    for field_item in fields_data:
+    for field_item in group_bit_runs(fields_data):
+        if isinstance(field_item, list):
+            # Bit run: read the bytes as one little-endian integer, then slice it
+            size_bytes = bit_run_width(field_item) // 8
+            code.append(f"        # Bit-packed run ({size_bytes} bytes, LSB first)")
+            code.append(
+                "        bit_run = int.from_bytes("
+                f'data[current_offset : current_offset + {size_bytes}], "little"'
+                ")"
+            )
+            code.append(f"        current_offset += {size_bytes}")
+            for name, shift, width in _bit_run_layout(field_item):
+                code.append(
+                    f"        {name} = (bit_run >> {shift}) & {(1 << width) - 1}"
+                )
+                field_vars.append(name)
+            continue
+
         # Handle reserved fields (no name)
         if "name" not in field_item:
             size_bytes = field_item.get("size_bytes", 0)
@@ -1477,8 +1667,14 @@ def validate_protocol_spec(protocol: dict[str, Any]) -> list[str]:
 
     # Validate field type references
     def validate_field_types(struct_name: str, struct_def: dict[str, Any]) -> None:
-        """Validate all field types in a structure."""
+        """Validate all field types and bit runs in a structure."""
         if isinstance(struct_def, dict) and "fields" in struct_def:
+            for run in group_bit_runs(struct_def["fields"]):
+                if isinstance(run, list) and bit_run_width(run) % 8:
+                    errors.append(
+                        f"{struct_name}: bit run of {bit_run_width(run)} bits "
+                        "does not fill whole bytes"
+                    )
             for field_item in struct_def["fields"]:
                 if "type" in field_item:
                     field_type = field_item["type"]
@@ -1630,6 +1826,7 @@ def main() -> None:
     enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
     fields = apply_tile_state_device_quirk(fields)
+    enums, fields, packets = apply_thread_packets_quirk(enums, fields, packets)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {

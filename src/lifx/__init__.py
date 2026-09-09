@@ -42,6 +42,7 @@ from lifx.devices import (
     MultiZoneEffect,
     MultiZoneLight,
     MultiZoneLightState,
+    ThreadInfo,
     TileInfo,
     WifiInfo,
 )
@@ -83,6 +84,7 @@ from lifx.protocol.protocol_types import (
     FirmwareEffect,
     LightLastHevCycleResult,
     LightWaveform,
+    ThreadRoutingRole,
     TileEffectSkyType,
 )
 from lifx.theme import Theme, ThemeLibrary, get_theme
@@ -119,6 +121,7 @@ __all__ = [
     "DeviceInfo",
     "DeviceVersion",
     "FirmwareInfo",
+    "ThreadInfo",
     "WifiInfo",
     "mac_candidates_for_serial",
     # HEV
@@ -174,6 +177,7 @@ __all__ = [
     "ProductCapability",
     # Protocol types
     "LightWaveform",
+    "ThreadRoutingRole",
     "FirmwareEffect",
     "Direction",
     # State management

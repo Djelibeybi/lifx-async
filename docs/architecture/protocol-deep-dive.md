@@ -278,10 +278,7 @@ async def low_level_control():
     )
 
     # Send and receive response
-    response = await conn.request(
-        packet,
-        timeout=2.0
-    )
+    response = await conn.request(packet)
 
     print(f"Response: {response}")
 

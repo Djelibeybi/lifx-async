@@ -19,13 +19,19 @@ from lifx.devices.base import (
     DeviceInfo,
     DeviceVersion,
     FirmwareInfo,
+    ThreadInfo,
     WifiInfo,
 )
 from lifx.devices.matrix import MatrixLight
+from lifx.exceptions import LifxUnsupportedCommandError
 from lifx.network.connection import DeviceConnection
 from lifx.network.discovery import DiscoveredDevice
 from lifx.protocol import packets
-from lifx.protocol.protocol_types import DeviceService
+from lifx.protocol.protocol_types import (
+    DeviceService,
+    ThreadLinkHealth,
+    ThreadRoutingRole,
+)
 
 
 class TestDevice:
@@ -1373,3 +1379,204 @@ class TestAdoptedThreadObservation:
         recipient.adopt_cached_metadata(donor)
 
         assert recipient.connection.thread_connection is True
+
+
+def _thread_state_info() -> packets.Thread.StateInfo:
+    """A ThreadStateInfo reply from a leader with a healthy next-hop link."""
+    return packets.Thread.StateInfo(
+        rloc16=0x2C00,
+        network_name=b"OpenThread-c9d1\x00",
+        role=ThreadRoutingRole.LEADER,
+        link_health=ThreadLinkHealth(
+            rloc16=0x2800, link_quality_in=3, link_quality_out=2, link_margin_db=55
+        ),
+    )
+
+
+class TestThreadInfo:
+    """The ThreadInfo value object flattens ThreadStateInfo for consumers."""
+
+    def test_rssi_is_link_margin_less_one_hundred(self) -> None:
+        """LIFX advise that link margin minus 100 approximates RSSI in dBm."""
+        info = ThreadInfo(
+            rloc=0x2C00,
+            network_name="OpenThread-c9d1",
+            role=ThreadRoutingRole.LEADER,
+            next_hop=0x2800,
+            link_quality_in=3,
+            link_quality_out=2,
+            link_margin_db=55,
+        )
+
+        assert info.rssi == -45
+        assert info.rssi_unit == "dBm"
+
+    def test_rssi_is_not_a_constructor_argument(self) -> None:
+        """The derived reading cannot be set independently of the margin."""
+        with pytest.raises(TypeError):
+            ThreadInfo(  # type: ignore[call-arg]
+                rloc=0,
+                network_name="",
+                role=ThreadRoutingRole.UNSPECIFIED,
+                next_hop=0,
+                link_quality_in=0,
+                link_quality_out=0,
+                link_margin_db=0,
+                rssi=-100,
+            )
+
+
+class TestGetThreadInfo:
+    """Device.get_thread_info() queries ThreadGetInfo and decodes the reply."""
+
+    async def test_returns_flattened_thread_info(self, device: Device) -> None:
+        """A never-contacted device is asked and its reply is decoded."""
+        device.connection.request.return_value = _thread_state_info()
+
+        info = await device.get_thread_info()
+
+        assert info == ThreadInfo(
+            rloc=0x2C00,
+            network_name="OpenThread-c9d1",
+            role=ThreadRoutingRole.LEADER,
+            next_hop=0x2800,
+            link_quality_in=3,
+            link_quality_out=2,
+            link_margin_db=55,
+        )
+        sent = device.connection.request.await_args.args[0]
+        assert isinstance(sent, packets.Thread.GetInfo)
+
+    async def test_network_name_is_a_string_without_padding(
+        self, device: Device
+    ) -> None:
+        """The 16-byte network name reaches the caller as text."""
+        device.connection.request.return_value = _thread_state_info()
+
+        info = await device.get_thread_info()
+
+        assert info.network_name == "OpenThread-c9d1"
+        assert isinstance(info.network_name, str)
+
+    async def test_observed_thread_device_is_queried(self, device: Device) -> None:
+        """A device whose frame address reported Thread is queried."""
+        device.connection.thread_connection = True
+        device.connection.request.return_value = _thread_state_info()
+
+        info = await device.get_thread_info()
+
+        assert info.role is ThreadRoutingRole.LEADER
+
+    async def test_metadata_thread_device_is_queried(self, device: Device) -> None:
+        """mDNS metadata alone is enough evidence to send the query."""
+        device._set_connectivity("thread")
+        device.connection.request.return_value = _thread_state_info()
+
+        info = await device.get_thread_info()
+
+        assert info.role is ThreadRoutingRole.LEADER
+
+    async def test_observed_wifi_device_is_refused_without_a_request(
+        self, device: Device
+    ) -> None:
+        """A device that answered as WiFi runs firmware without Thread support."""
+        device.connection.thread_connection = False
+
+        with pytest.raises(LifxUnsupportedCommandError, match="WiFi"):
+            await device.get_thread_info()
+
+        device.connection.request.assert_not_awaited()
+
+    async def test_metadata_wifi_device_is_refused_without_a_request(
+        self, device: Device
+    ) -> None:
+        """An mDNS record saying WiFi is evidence, unlike the constructor default."""
+        device._set_connectivity("wifi")
+
+        with pytest.raises(LifxUnsupportedCommandError, match="WiFi"):
+            await device.get_thread_info()
+
+        device.connection.request.assert_not_awaited()
+
+    async def test_adopted_metadata_carries_the_evidence(self, device: Device) -> None:
+        """A device built from a discovery probe inherits the probe's record."""
+        source = Device(serial=device.serial, ip=device.ip)
+        source._set_connectivity("wifi")
+
+        device.adopt_cached_metadata(source)
+
+        with pytest.raises(LifxUnsupportedCommandError, match="WiFi"):
+            await device.get_thread_info()
+
+    async def test_unhandled_reply_raises_unsupported(self, device: Device) -> None:
+        """A StateUnhandled reply from a never-contacted device is surfaced."""
+        device.connection.request.return_value = packets.Device.StateUnhandled(
+            unhandled_type=packets.Thread.GetInfo.PKT_TYPE
+        )
+
+        with pytest.raises(LifxUnsupportedCommandError):
+            await device.get_thread_info()
+
+    async def test_result_is_not_cached(self, device: Device) -> None:
+        """Link health is volatile, so every call goes to the device."""
+        device.connection.request.return_value = _thread_state_info()
+
+        await device.get_thread_info()
+        await device.get_thread_info()
+
+        assert device.connection.request.await_count == 2
+
+
+class TestWifiQueriesOnThreadDevices:
+    """WiFi queries are refused once a device is evidenced as Thread."""
+
+    async def test_observed_thread_refuses_wifi_info(self, device: Device) -> None:
+        """GetWifiInfo is not sent to a device that answered as Thread."""
+        device.connection.thread_connection = True
+        device._host_firmware = FirmwareInfo(
+            build=1234567890, version_major=3, version_minor=90
+        )
+
+        with pytest.raises(LifxUnsupportedCommandError, match="Thread"):
+            await device.get_wifi_info()
+
+        device.connection.request.assert_not_awaited()
+
+    async def test_metadata_thread_refuses_wifi_info(self, device: Device) -> None:
+        """mDNS metadata alone is enough evidence to refuse."""
+        device._set_connectivity("thread")
+
+        with pytest.raises(LifxUnsupportedCommandError, match="Thread"):
+            await device.get_wifi_info()
+
+        device.connection.request.assert_not_awaited()
+
+    async def test_observed_thread_refuses_wifi_firmware(self, device: Device) -> None:
+        """GetWifiFirmware is not sent to a device that answered as Thread."""
+        device.connection.thread_connection = True
+
+        with pytest.raises(LifxUnsupportedCommandError, match="Thread"):
+            await device.get_wifi_firmware()
+
+        device.connection.request.assert_not_awaited()
+
+    async def test_observed_wifi_device_is_queried(self, device: Device) -> None:
+        """A device that answered as WiFi is queried as before."""
+        device.connection.thread_connection = False
+        device.connection.request.return_value = packets.Device.StateWifiFirmware(
+            build=1234567890, version_minor=90, version_major=3
+        )
+
+        firmware = await device.get_wifi_firmware()
+
+        assert firmware.version_minor == 90
+
+    async def test_never_contacted_device_is_queried(self, device: Device) -> None:
+        """Without evidence the request is sent and the device answers for itself."""
+        device.connection.request.return_value = packets.Device.StateWifiFirmware(
+            build=1234567890, version_minor=90, version_major=3
+        )
+
+        firmware = await device.get_wifi_firmware()
+
+        assert firmware.version_major == 3

@@ -47,10 +47,10 @@ async def resolve_devices(targets: list[str]) -> list[Light]:
     for target in targets:
         if "." in target:
             print(f"  Looking up IP {target}...")
-            device = await find_by_ip(target, timeout=5.0)
+            device = await find_by_ip(target)
         else:
             print(f"  Looking up serial {target}...")
-            device = await find_by_serial(target, timeout=5.0)
+            device = await find_by_serial(target)
 
         if device is None:
             print(f"  Warning: No device found for '{target}', skipping")

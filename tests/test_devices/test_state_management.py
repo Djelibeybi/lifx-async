@@ -8,15 +8,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import lifx
 from lifx.color import HSBK
 from lifx.const import INVALID_AMBIENT_LIGHT_RESPONSE
 from lifx.devices.base import (
     CollectionInfo,
+    Connectivity,
     Device,
     DeviceCapabilities,
     DeviceState,
     DeviceVersion,
     FirmwareInfo,
+    ThreadInfo,
     WifiInfo,
 )
 from lifx.devices.light import Light, LightState
@@ -31,8 +34,24 @@ from lifx.products.registry import (
     TemperatureRange,
 )
 from lifx.protocol import packets
-from lifx.protocol.protocol_types import LightHsbk
+from lifx.protocol.protocol_types import (
+    LightHsbk,
+    ThreadLinkHealth,
+    ThreadRoutingRole,
+)
 from tests.conftest import PROGRESS_TIMEOUT
+
+
+def _thread_state_info() -> packets.Thread.StateInfo:
+    """A ThreadStateInfo reply from a router with a healthy next-hop link."""
+    return packets.Thread.StateInfo(
+        rloc16=0x2C00,
+        network_name=b"OpenThread-c9d1\x00",
+        role=ThreadRoutingRole.ROUTER,
+        link_health=ThreadLinkHealth(
+            rloc16=0x2800, link_quality_in=3, link_quality_out=2, link_margin_db=55
+        ),
+    )
 
 
 def _state_request_handler(
@@ -45,6 +64,8 @@ def _state_request_handler(
     """
 
     async def mock_request(packet):
+        if isinstance(packet, packets.Thread.GetInfo):
+            return _thread_state_info()
         if isinstance(packet, packets.Sensor.GetAmbientLight):
             return packets.Sensor.StateAmbientLight(lux=lux)
         if isinstance(packet, packets.Light.GetColor):
@@ -101,6 +122,7 @@ class TestDeviceConnectFactory:
                     # Create Light device and mock all required state fetching
                     device = Light(serial="d073d5010203", ip="192.168.1.100")
                     mock_conn = MagicMock()
+                    mock_conn.thread_connection = None
                     mock_conn.request = AsyncMock()
                     device.connection = mock_conn
 
@@ -176,6 +198,7 @@ class TestDeviceConnectFactory:
 
                     device = Device(serial="d073d5010203", ip="192.168.1.100")
                     mock_conn = MagicMock()
+                    mock_conn.thread_connection = None
                     mock_conn.request = AsyncMock()
                     device.connection = mock_conn
 
@@ -1840,6 +1863,71 @@ class TestProcessCapabilities:
         assert not device._capabilities.has_extended_multizone
 
 
+class TestStateBatchOnThreadDevice:
+    """The shared state batch keeps working once a device is evidenced as Thread."""
+
+    async def test_initialize_state_does_not_apply_the_wifi_firmware_guard(
+        self, mock_product_info, mock_firmware_info
+    ):
+        """The batch sends GetWifiFirmware to a Thread device as it always has.
+
+        The public ``get_wifi_firmware()`` refuses a Thread device, but state
+        initialisation and refresh predate that guard and a refresh on an
+        observed Thread device must not start failing because of it.
+        """
+        product_info = mock_product_info(has_color=True)
+        firmware = mock_firmware_info()
+
+        device = Device(serial="d073d5010203", ip="192.168.1.100")
+        mock_conn = MagicMock()
+        mock_conn.thread_connection = True
+        device.connection = mock_conn
+        device._capabilities = product_info
+
+        requested_packets: list[type] = []
+
+        async def mock_request(packet):
+            requested_packets.append(type(packet))
+            if isinstance(packet, packets.Device.GetLabel):
+                return packets.Device.StateLabel(label=b"Test")
+            elif isinstance(packet, packets.Device.GetPower):
+                return packets.Device.StatePower(level=0)
+            elif isinstance(
+                packet,
+                (packets.Device.GetHostFirmware, packets.Device.GetWifiFirmware),
+            ):
+                state_class = (
+                    packets.Device.StateHostFirmware
+                    if isinstance(packet, packets.Device.GetHostFirmware)
+                    else packets.Device.StateWifiFirmware
+                )
+                return state_class(
+                    build=firmware.build,
+                    version_major=firmware.version_major,
+                    version_minor=firmware.version_minor,
+                )
+            elif isinstance(packet, packets.Device.GetLocation):
+                return packets.Device.StateLocation(
+                    location=b"\x00" * 16,
+                    label=b"Location",
+                    updated_at=int(time.time() * 1e9),
+                )
+            elif isinstance(packet, packets.Device.GetGroup):
+                return packets.Device.StateGroup(
+                    group=b"\x00" * 16,
+                    label=b"Group",
+                    updated_at=int(time.time() * 1e9),
+                )
+            raise AssertionError(f"unexpected packet {packet!r}")
+
+        mock_conn.request = AsyncMock(side_effect=mock_request)
+
+        state = await device._initialize_state()
+
+        assert packets.Device.GetWifiFirmware in requested_packets
+        assert state.wifi_firmware.version_major == firmware.version_major
+
+
 class TestDeviceInitializeStateParallel:
     """Tests for _initialize_state() parallel get_version() optimization."""
 
@@ -1854,6 +1942,7 @@ class TestDeviceInitializeStateParallel:
 
         device = Device(serial="d073d5010203", ip="192.168.1.100")
         mock_conn = MagicMock()
+        mock_conn.thread_connection = None
         mock_conn.request = AsyncMock()
         device.connection = mock_conn
 
@@ -1922,6 +2011,7 @@ class TestDeviceInitializeStateParallel:
 
         device = Device(serial="d073d5010203", ip="192.168.1.100")
         mock_conn = MagicMock()
+        mock_conn.thread_connection = None
         mock_conn.request = AsyncMock()
         device.connection = mock_conn
 
@@ -1981,6 +2071,7 @@ class TestDeviceInitializeStateParallel:
         raises."""
         device = Device(serial="d073d5010203", ip="192.168.1.100")
         mock_conn = MagicMock()
+        mock_conn.thread_connection = None
         mock_conn.request = AsyncMock()
         device.connection = mock_conn
 
@@ -2034,3 +2125,294 @@ class TestDeviceInitializeStateParallel:
 
         assert cancelled.is_set()
         assert device._state is None
+
+
+class TestThreadInfoInState:
+    """state.thread_info follows fetch_thread_info as wifi_info follows its flag."""
+
+    def test_device_state_thread_info_defaults_to_none(self) -> None:
+        """thread_info is keyword-only with a None default, so it stays additive."""
+        state = DeviceState(
+            model="Test",
+            label="Test",
+            serial="d073d5010203",
+            mac_address="d0:73:d5:01:02:03",
+            capabilities=DeviceCapabilities(
+                has_color=True,
+                has_multizone=False,
+                has_chain=False,
+                has_matrix=False,
+                has_infrared=False,
+                has_hev=False,
+                has_extended_multizone=False,
+                kelvin_min=None,
+                kelvin_max=None,
+            ),
+            power=0,
+            host_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            wifi_firmware=FirmwareInfo(build=0, version_major=2, version_minor=80),
+            location=CollectionInfo(uuid="", label="", updated_at=0),
+            group=CollectionInfo(uuid="", label="", updated_at=0),
+            last_updated=0.0,
+        )
+
+        assert state.thread_info is None
+        assert state.as_dict["thread_info"] is None
+
+    async def test_initialize_state_skips_thread_info_by_default(
+        self, light, mock_product_info
+    ):
+        """No ThreadGetInfo is sent unless a consumer asks for it."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.thread_info is None
+        assert not any(
+            isinstance(call.args[0], packets.Thread.GetInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_initialize_state_fetches_thread_info_when_enabled(
+        self, mock_device_factory, mock_product_info
+    ):
+        """fetch_thread_info=True populates state.thread_info from the device."""
+        light = mock_device_factory(Light, fetch_thread_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.thread_info == ThreadInfo(
+            rloc=0x2C00,
+            network_name="OpenThread-c9d1",
+            role=ThreadRoutingRole.ROUTER,
+            next_hop=0x2800,
+            link_quality_in=3,
+            link_quality_out=2,
+            link_margin_db=55,
+        )
+        assert light._state.as_dict["thread_info"]["rssi"] == -45
+
+    async def test_refresh_state_fetches_thread_info_once_property_is_set(
+        self, light, mock_product_info
+    ):
+        """Setting fetch_thread_info makes the next refresh collect a reading."""
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        assert light._state.thread_info is None
+
+        light.fetch_thread_info = True
+        await light.refresh_state()
+
+        assert light._state.thread_info is not None
+        assert light._state.thread_info.role is ThreadRoutingRole.ROUTER
+
+    async def test_clearing_fetch_thread_info_clears_the_reading(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A refresh with the flag cleared stores None, not a stale reading."""
+        light = mock_device_factory(Light, fetch_thread_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        light.connection.request.reset_mock()
+
+        light.fetch_thread_info = False
+        await light.refresh_state()
+
+        assert light._state.thread_info is None
+        assert not any(
+            isinstance(call.args[0], packets.Thread.GetInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_base_device_refresh_also_collects_thread_info(
+        self, mock_device_factory, mock_product_info
+    ):
+        """The base Device refresh path stores the reading, not only Light's."""
+        device = mock_device_factory(Device, fetch_thread_info=True)
+        device._capabilities = mock_product_info(has_color=False)
+        device.connection.request.side_effect = _state_request_handler()
+        await device._initialize_state()
+        device._state.thread_info = None
+
+        await device.refresh_state()
+
+        assert device._state.thread_info is not None
+
+    async def test_thread_query_failure_leaves_none_and_keeps_the_batch(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A device that does not answer ThreadGetInfo still initialises."""
+        light = mock_device_factory(Light, fetch_thread_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        handler = _state_request_handler()
+
+        async def failing(packet):
+            if isinstance(packet, packets.Thread.GetInfo):
+                raise LifxTimeoutError("no reply")
+            return await handler(packet)
+
+        light.connection.request.side_effect = failing
+
+        await light._initialize_state()
+
+        assert light._state is not None
+        assert light._state.thread_info is None
+
+    async def test_thread_query_is_not_sent_to_an_evidenced_wifi_device(
+        self, mock_device_factory, mock_product_info
+    ):
+        """The flag on a WiFi device costs no packet: the guard refuses first."""
+        light = mock_device_factory(Light, fetch_thread_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.thread_connection = False
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.thread_info is None
+        assert not any(
+            isinstance(call.args[0], packets.Thread.GetInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_fetch_thread_info_property_reflects_constructor_argument(
+        self, mock_device_factory
+    ):
+        """The constructor argument is readable through the property."""
+        light = mock_device_factory(Light, fetch_thread_info=True)
+
+        assert light.fetch_thread_info is True
+
+    @pytest.mark.parametrize(
+        "device_class",
+        ["HevLight", "InfraredLight", "MultiZoneLight", "MatrixLight", "CeilingLight"],
+    )
+    def test_subclasses_accept_the_new_flags(self, device_class: str) -> None:
+        """Every device class spells out fetch_thread_info and fetch_radio_info."""
+        cls = getattr(lifx, device_class)
+        device = cls(
+            serial="d073d5010203",
+            ip="192.0.2.10",
+            fetch_thread_info=True,
+            fetch_radio_info=True,
+        )
+
+        assert device.fetch_thread_info is True
+        assert device.fetch_radio_info is True
+
+
+class TestFetchRadioInfo:
+    """fetch_radio_info sends the query matching the evidenced connectivity."""
+
+    async def test_evidenced_thread_device_gets_thread_info_only(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A Thread device fetches thread_info and leaves the WiFi signal alone."""
+        light = mock_device_factory(Light, fetch_radio_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light._set_connectivity(Connectivity.THREAD)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.thread_info is not None
+        assert light._state.wifi_info.signal is None
+        assert not any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_evidenced_wifi_device_gets_wifi_info_only(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A WiFi device fetches the WiFi signal and sends no ThreadGetInfo."""
+        light = mock_device_factory(Light, fetch_radio_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.thread_connection = False
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.wifi_info.rssi == -51
+        assert light._state.thread_info is None
+        assert not any(
+            isinstance(call.args[0], packets.Thread.GetInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_mdns_wifi_record_is_evidence_for_the_wifi_query(
+        self, mock_device_factory, mock_product_info
+    ):
+        """A TXT record saying WiFi is as much evidence as one saying Thread."""
+        light = mock_device_factory(Light, fetch_radio_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light._set_connectivity("wifi")
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.wifi_info.rssi == -51
+        assert light._state.thread_info is None
+        assert not any(
+            isinstance(call.args[0], packets.Thread.GetInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_unknown_connectivity_sends_neither_radio_query(
+        self, mock_device_factory, mock_product_info
+    ):
+        """Without evidence no radio packet is sent, so nothing is wasted."""
+        light = mock_device_factory(Light, fetch_radio_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.wifi_info.signal is None
+        assert light._state.thread_info is None
+        assert not any(
+            isinstance(call.args[0], packets.Device.GetWifiInfo)
+            for call in light.connection.request.await_args_list
+        )
+        assert not any(
+            isinstance(call.args[0], packets.Thread.GetInfo)
+            for call in light.connection.request.await_args_list
+        )
+
+    async def test_radio_info_is_reevaluated_on_each_refresh(
+        self, mock_device_factory, mock_product_info
+    ):
+        """Evidence arriving after initialisation is honoured by the next refresh."""
+        light = mock_device_factory(Light, fetch_radio_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+        await light._initialize_state()
+        assert light._state.thread_info is None
+
+        light.connection.thread_connection = True
+        await light.refresh_state()
+
+        assert light._state.thread_info is not None
+
+    async def test_explicit_flag_still_wins_over_radio_choice(
+        self, mock_device_factory, mock_product_info
+    ):
+        """fetch_wifi_info=True keeps querying WiFi regardless of the radio flag."""
+        light = mock_device_factory(Light, fetch_wifi_info=True, fetch_radio_info=True)
+        light._capabilities = mock_product_info(has_color=True)
+        light.connection.request.side_effect = _state_request_handler()
+
+        await light._initialize_state()
+
+        assert light._state.wifi_info.rssi == -51
+
+    def test_fetch_radio_info_property_is_settable(self, light) -> None:
+        """The property toggles like the other opt-in readings."""
+        assert light.fetch_radio_info is False
+        light.fetch_radio_info = True
+        assert light.fetch_radio_info is True
