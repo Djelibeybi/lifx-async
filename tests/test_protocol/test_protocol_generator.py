@@ -8,7 +8,6 @@ import pytest
 from lifx.protocol import packets
 from lifx.protocol.generator import (
     TypeRegistry,
-    apply_thread_packets_quirk,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
@@ -1241,62 +1240,3 @@ class TestBitFields:
         }
 
         assert validate_protocol_spec(protocol) == []
-
-
-class TestThreadPacketsQuirk:
-    """The Thread packets are injected locally until LIFX publish them upstream."""
-
-    def test_adds_thread_definitions_when_absent(self):
-        """A spec without the thread category gains the enum, field and packets."""
-        enums, fields, packets_by_category = apply_thread_packets_quirk({}, {}, {})
-
-        assert enums["ThreadRoutingRole"]["values"][-1] == {
-            "name": "DEVICE_THREAD_ROLE_LEADER",
-            "value": 6,
-        }
-        assert fields["ThreadLinkHealth"]["size_bytes"] == 8
-        assert packets_by_category["thread"]["ThreadGetInfo"]["pkt_type"] == 1200
-        assert packets_by_category["thread"]["ThreadStateInfo"]["pkt_type"] == 1201
-        assert packets_by_category["thread"]["ThreadStateInfo"]["size_bytes"] == 32
-
-    def test_injected_definitions_validate(self):
-        """The injected spec passes the same validation as a downloaded one."""
-        enums, fields, packets_by_category = apply_thread_packets_quirk({}, {}, {})
-
-        errors = validate_protocol_spec(
-            {
-                "enums": enums,
-                "fields": fields,
-                "compound_fields": {},
-                "unions": {},
-                "packets": packets_by_category,
-            }
-        )
-
-        assert errors == []
-
-    def test_leaves_upstream_definitions_untouched_when_present(self):
-        """Once LIFX ship the packets, the upstream definitions win unchanged."""
-        upstream_enum = {"type": "uint8", "values": [{"name": "X", "value": 0}]}
-        upstream_field = {"size_bytes": 8, "fields": []}
-        upstream_packets = {"thread": {"ThreadGetInfo": {"pkt_type": 1200}}}
-
-        enums, fields, packets_by_category = apply_thread_packets_quirk(
-            {"ThreadRoutingRole": upstream_enum},
-            {"ThreadLinkHealth": upstream_field},
-            upstream_packets,
-        )
-
-        assert enums["ThreadRoutingRole"] is upstream_enum
-        assert fields["ThreadLinkHealth"] is upstream_field
-        assert packets_by_category["thread"] is upstream_packets["thread"]
-
-    def test_does_not_mutate_its_inputs(self):
-        """The quirk returns new mappings rather than editing the parsed spec."""
-        enums: dict[str, object] = {}
-        fields: dict[str, object] = {}
-        packets_by_category: dict[str, object] = {}
-
-        apply_thread_packets_quirk(enums, fields, packets_by_category)
-
-        assert enums == {} and fields == {} and packets_by_category == {}

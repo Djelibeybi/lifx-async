@@ -7,7 +7,6 @@ only parsed and converted into protocol classes.
 
 from __future__ import annotations
 
-import copy
 import os
 import re
 import subprocess  # nosec B404
@@ -301,84 +300,6 @@ def apply_tile_state_device_quirk(
                         break
 
     return fields
-
-
-#: Definitions from LIFX/public-protocol#14, injected until they reach main.
-_THREAD_ROUTING_ROLE_ENUM: dict[str, Any] = {
-    "type": "uint8",
-    "values": [
-        {"name": "DEVICE_THREAD_ROLE_UNSPECIFIED", "value": 0},
-        {"name": "DEVICE_THREAD_ROLE_UNASSIGNED", "value": 1},
-        {"name": "DEVICE_THREAD_ROLE_SLEEPY", "value": 2},
-        {"name": "DEVICE_THREAD_ROLE_END", "value": 3},
-        {"name": "DEVICE_THREAD_ROLE_REED", "value": 4},
-        {"name": "DEVICE_THREAD_ROLE_ROUTER", "value": 5},
-        {"name": "DEVICE_THREAD_ROLE_LEADER", "value": 6},
-    ],
-}
-
-_THREAD_LINK_HEALTH_FIELD: dict[str, Any] = {
-    "size_bytes": 8,
-    "fields": [
-        {"name": "Rloc16", "type": "uint16", "size_bytes": 2},
-        {"type": "reserved", "size_bits": 2},
-        {"name": "LinkQualityIn", "type": "uint8", "size_bits": 2},
-        {"name": "LinkQualityOut", "type": "uint8", "size_bits": 2},
-        {"type": "reserved", "size_bits": 2},
-        {"type": "reserved", "size_bytes": 1},
-        {"type": "reserved", "size_bytes": 1},
-        {"type": "reserved", "size_bytes": 1},
-        {"name": "LinkMarginDb", "type": "uint8", "size_bytes": 1},
-        {"type": "reserved", "size_bytes": 1},
-    ],
-}
-
-_THREAD_PACKETS: dict[str, Any] = {
-    "ThreadGetInfo": {"pkt_type": 1200, "size_bytes": 0, "fields": []},
-    "ThreadStateInfo": {
-        "pkt_type": 1201,
-        "size_bytes": 32,
-        "fields": [
-            {"name": "Rloc16", "type": "uint16", "size_bytes": 2},
-            {"type": "reserved", "size_bytes": 2},
-            {"name": "NetworkName", "type": "[16]byte", "size_bytes": 16},
-            {"name": "Role", "type": "<ThreadRoutingRole>", "size_bytes": 1},
-            {"type": "reserved", "size_bytes": 1},
-            {"type": "reserved", "size_bytes": 1},
-            {"type": "reserved", "size_bytes": 1},
-            {"name": "LinkHealth", "type": "<ThreadLinkHealth>", "size_bytes": 8},
-        ],
-    },
-}
-
-
-def apply_thread_packets_quirk(
-    enums: dict[str, Any], fields: dict[str, Any], packets: dict[str, Any]
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Apply local quirk to add the Thread packets until LIFX publish them.
-
-    LIFX/public-protocol#14 adds ``ThreadGetInfo`` (1200), ``ThreadStateInfo``
-    (1201), the ``ThreadRoutingRole`` enum and the ``ThreadLinkHealth``
-    structure. Until that pull request reaches ``main`` the downloaded spec
-    lacks them, so this quirk injects the same definitions. Each one is added
-    only when absent, so the upstream definition wins once it exists and this
-    quirk can then be removed.
-
-    Args:
-        enums: Dictionary of enum definitions
-        fields: Dictionary of field definitions
-        packets: Dictionary of packet definitions grouped by category
-
-    Returns:
-        New (enums, fields, packets) dictionaries with the Thread definitions
-    """
-    enums = {**enums}
-    fields = {**fields}
-    packets = {**packets}
-    enums.setdefault("ThreadRoutingRole", copy.deepcopy(_THREAD_ROUTING_ROLE_ENUM))
-    fields.setdefault("ThreadLinkHealth", copy.deepcopy(_THREAD_LINK_HEALTH_FIELD))
-    packets.setdefault("thread", copy.deepcopy(_THREAD_PACKETS))
-    return enums, fields, packets
 
 
 def apply_firmware_effect_enum_quirk(
@@ -1826,7 +1747,6 @@ def main() -> None:
     enums, packets = apply_multizone_application_request_quirk(enums, packets)
     fields = apply_tile_effect_parameter_quirk(fields)
     fields = apply_tile_state_device_quirk(fields)
-    enums, fields, packets = apply_thread_packets_quirk(enums, fields, packets)
 
     # Rebuild protocol dict with filtered items for validation
     filtered_protocol = {

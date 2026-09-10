@@ -481,10 +481,6 @@ Local generator quirks:
   `LightWaveform.SAW`). When LIFX use a different shared prefix, that prefix is stripped instead
   (`DEVICE_THREAD_ROLE_LEADER` becomes `ThreadRoutingRole.LEADER`), provided the enum has at
   least two members and none would be left empty
-- **thread packets**: `ThreadGetInfo` (1200), `ThreadStateInfo` (1201), `ThreadRoutingRole` and
-  `ThreadLinkHealth` come from LIFX/public-protocol#14 and are injected by
-  `apply_thread_packets_quirk()` only while the downloaded spec lacks them. Once that pull
-  request reaches `main` the upstream definitions win unchanged and the quirk can be removed
 - **bit runs**: Consecutive `size_bits` entries (reserved or named) are packed into whole bytes
   with the first declared field in the least significant bits, the frame header's convention.
   `ThreadLinkHealth` is the only structure that uses them. The validator rejects a run that does
