@@ -2873,7 +2873,7 @@ class TestFindByIpAddressGate:
                 "lifx.network.discovery.udp.UdpTransport",
                 _ObservedNoResponseDiscoveryTransport,
             ),
-            caplog.at_level(logging.WARNING, logger="lifx.network.address"),
+            caplog.at_level(logging.DEBUG, logger="lifx.network.address"),
         ):
             result = await find_by_ip(
                 "::1",

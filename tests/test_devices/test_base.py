@@ -78,11 +78,11 @@ class TestDevice:
         assert device.port == 56700
         assert device.connection is not None
 
-    def test_direct_loopback_construction_retains_caller_warning(
+    def test_direct_loopback_construction_retains_caller_advisories(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Wire suppression cannot disable advisories for public construction."""
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG, logger="lifx"):
             Device(serial="d073d5010203", ip="127.0.0.1", port=12345)
 
         actions = {
@@ -1097,7 +1097,7 @@ class TestAddressEntryPointGate:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Factory validation cannot duplicate constructor advisories."""
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG, logger="lifx"):
             await Device.from_ip(ip="127.0.0.1", port=12345, serial=self.SERIAL)
 
         actions = [
@@ -1151,7 +1151,7 @@ class TestAddressEntryPointGate:
         connection.close = AsyncMock()
 
         with (
-            caplog.at_level(logging.WARNING),
+            caplog.at_level(logging.DEBUG, logger="lifx"),
             patch("lifx.devices.base.DeviceConnection", return_value=connection),
         ):
             device = await Device.from_ip(ip="127.0.0.1", port=12345)
@@ -1196,7 +1196,7 @@ class TestAddressEntryPointGate:
     ) -> None:
         """Temporary and concrete devices do not repeat factory advisories."""
         with (
-            caplog.at_level(logging.WARNING),
+            caplog.at_level(logging.DEBUG, logger="lifx"),
             patch.object(
                 Device,
                 "get_version",

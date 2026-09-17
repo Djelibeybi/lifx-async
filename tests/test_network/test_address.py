@@ -112,38 +112,34 @@ class TestValidateAddressRejects:
             validate_address(value)
 
 
-class TestValidateAddressRaisesBeforeWarning:
+class TestValidateAddressRaisesBeforeAdvisory:
     """Review finding 11: a doomed address must not log on its way out."""
 
     @pytest.mark.parametrize("value", ["::ffff:8.8.8.8", "0.0.0.0", "::"])
     def test_rejected_address_logs_nothing(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Each of these would trip a warning arm under the old ordering.
-
-        ``::ffff:8.8.8.8`` is non-private and would have warned before the
-        IPv4-mapped rejection; ``0.0.0.0`` and ``::`` are reached only after
-        the loopback test under the branch's ordering.
-        """
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        """``0.0.0.0`` and ``::`` are reached only after the loopback test."""
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             with pytest.raises(ValueError):
                 validate_address(value)
 
         assert caplog.records == []
 
 
-class TestValidateAddressWarns:
-    """The two arms that log and return rather than raising."""
+class TestValidateAddressNotes:
+    """The one arm that logs and returns rather than raising."""
 
     @pytest.mark.parametrize("value", ["127.0.0.1", "::1"])
-    def test_loopback_warns_in_the_helper_shape(
+    def test_loopback_notes_in_the_helper_shape(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
         """The dict names the helper, not the calling class (D-06)."""
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             validate_address(value)
 
         assert len(caplog.records) == 1
+        assert caplog.records[0].levelno == logging.DEBUG
         assert caplog.records[0].msg == {
             "module": "lifx.network.address",
             "function": "validate_address",
@@ -151,26 +147,21 @@ class TestValidateAddressWarns:
             "ip": value,
         }
 
-    def test_non_private_warns_in_the_helper_shape(
-        self, caplog: pytest.LogCaptureFixture
+    @pytest.mark.parametrize("value", ["8.8.8.8", "2001:db8::1"])
+    def test_globally_routable_address_is_not_flagged(
+        self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A routable public address is legal but worth flagging."""
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-            validate_address("8.8.8.8")
+        """A LAN with a delegated prefix gives every device a global address."""
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
+            assert validate_address(value) is None
 
-        assert len(caplog.records) == 1
-        assert caplog.records[0].msg == {
-            "module": "lifx.network.address",
-            "function": "validate_address",
-            "action": "non_private_ip",
-            "ip": "8.8.8.8",
-        }
+        assert caplog.records == []
 
-    def test_warning_dicts_drop_the_class_and_method_keys(
+    def test_note_dicts_drop_the_class_and_method_keys(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """D-06 explicitly retires the Device-shaped context keys."""
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             validate_address("127.0.0.1")
 
         payload = caplog.records[0].msg
@@ -178,12 +169,12 @@ class TestValidateAddressWarns:
         assert "class" not in payload
         assert "method" not in payload
 
-    @pytest.mark.parametrize("value", ["127.0.0.1", "8.8.8.8"])
-    def test_wire_validation_can_suppress_advisory_warnings(
+    @pytest.mark.parametrize("value", ["127.0.0.1", "::1"])
+    def test_wire_validation_can_suppress_the_advisory(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Responder-controlled datagrams cannot produce a warning flood."""
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        """Responder datagrams cannot drown a debug-level discovery trace."""
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             validate_address(value, emit_warnings=False)
 
         assert caplog.records == []
@@ -200,7 +191,7 @@ class TestValidateAddressAccepts:
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
         """A zoned link-local is exactly what IPV6-02 wants accepted."""
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             assert validate_address(value) is None
 
         assert caplog.records == []
