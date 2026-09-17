@@ -52,7 +52,7 @@ use zero to request an ephemeral port. :func:`sockaddr_for` applies that rule
 before a destination reaches operating-system socket handling.
 
 **The rules, in the order :func:`validate_address` applies them.** Every
-rejection is evaluated before either warning, so an address on its way to a
+rejection is evaluated before the advisory, so an address on its way to a
 ``ValueError`` never logs on the way out:
 
 1. An empty or missing address is rejected, because there is nothing to
@@ -72,18 +72,24 @@ rejection is evaluated before either warning, so an address on its way to a
    addresses are ambiguous without an interface, so the send silently goes
    nowhere and the caller waits out the full request timeout. Rejecting it
    turns a permanent configuration error into an immediate, named failure.
-7. A loopback address is accepted with a warning: a real LIFX device is never
-   on loopback, but the test suite legitimately puts an emulator there.
-8. A non-private address is accepted with a warning: LIFX devices live on the
-   local network, so a routable public address is usually a mistake.
+7. A loopback address is accepted and noted at DEBUG: a real LIFX device is
+   never on loopback, but the test suite legitimately puts an emulator there,
+   so the note is diagnostic context rather than something the caller must
+   act on.
 
-Rules 7 and 8 are caller-input advisories and may be suppressed with
+There is deliberately no advisory for a globally routable address. A device
+address outside the IPv4 private ranges is ordinary rather than suspect: any
+LAN with a delegated IPv6 prefix gives every device a global unicast address,
+including a Thread device reached over a global OMR prefix. Warning on those
+fired on correct configurations far more often than on mistakes.
+
+Rule 7 is a caller-input advisory and may be suppressed with
 ``emit_warnings=False``. Inbound wire validation does this because a responder
-controls its source address, so one warning per datagram would itself be a
-flooding vector. Device constructors also accept a private, explicit warning
-policy: public factories validate once and suppress duplicate constructor
-advisories, while discovery factories suppress advisories for already-validated
-wire data. The rejections in rules 1-6 are never suppressed.
+controls its source address, so one line per datagram would drown a debug-level
+discovery trace. Device constructors also accept a private, explicit advisory
+policy: public factories validate once and suppress the duplicate constructor
+note, while discovery factories suppress it for already-validated wire data.
+The rejections in rules 1-6 are never suppressed.
 
 This is a near-leaf module by design. Its one import from ``lifx`` is
 :data:`lifx.const.DEFAULT_IP_ADDRESS`, which :func:`wildcard_for` returns.
@@ -257,10 +263,10 @@ def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
 
     Args:
         ip: The device address to check.
-        emit_warnings: Emit caller-facing advisories for loopback and public
-            addresses. Inbound wire validation disables these warnings to
-            avoid one warning per responder datagram; device factories also
-            disable them during construction after validation has already run.
+        emit_warnings: Emit the caller-facing loopback advisory. Inbound wire
+            validation disables it to avoid one line per responder datagram;
+            device factories also disable it during construction after
+            validation has already run.
 
     Raises:
         ValueError: If the address is empty, unparsable, IPv4-mapped,
@@ -296,21 +302,11 @@ def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
             )
 
     if emit_warnings and addr.is_loopback:
-        _LOGGER.warning(
+        _LOGGER.debug(
             {
                 "module": "lifx.network.address",
                 "function": "validate_address",
                 "action": "is_loopback",
-                "ip": ip,
-            }
-        )
-
-    if emit_warnings and not addr.is_private:
-        _LOGGER.warning(
-            {
-                "module": "lifx.network.address",
-                "function": "validate_address",
-                "action": "non_private_ip",
                 "ip": ip,
             }
         )
