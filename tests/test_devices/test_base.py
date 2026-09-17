@@ -1093,34 +1093,34 @@ class TestAddressEntryPointGate:
         assert isinstance(device, Device)
         assert device.ip == self.ZONED
 
-    async def test_from_ip_emits_each_caller_advisory_once(
+    async def test_from_ip_notes_the_port_once_per_construction(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Factory validation cannot duplicate constructor advisories."""
+        """The note belongs to construction, and this leg constructs once.
+
+        The factory's own gate rejects rather than advises, so the single
+        ``Device`` built below is the only thing that speaks. The record
+        names its class and nothing else: the entry point is no longer part
+        of the payload, because construction is now the only emitter.
+        """
         with caplog.at_level(logging.DEBUG, logger="lifx"):
             await Device.from_ip(ip="127.0.0.1", port=12345, serial=self.SERIAL)
 
-        actions = [
-            record.msg.get("action")
-            for record in caplog.records
-            if isinstance(record.msg, dict)
-        ]
-        assert actions.count("is_loopback") == 1
-        assert actions.count("non_standard_port") == 1
-        port_record = next(
+        port_records = [
             record.msg
             for record in caplog.records
             if isinstance(record.msg, dict)
             and record.msg.get("action") == "non_standard_port"
-        )
-        assert port_record["class"] == "Device"
-        assert port_record["method"] == "from_ip"
+        ]
+        assert len(port_records) == 1
+        assert port_records[0]["class"] == "Device"
+        assert "method" not in port_records[0]
 
-    async def test_subclass_factory_advisory_names_the_subclass(
+    async def test_subclass_construction_notes_the_subclass(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Inherited factories attribute endpoint warnings to their real class."""
-        with caplog.at_level(logging.WARNING):
+        """Inherited factories attribute the note to the real class."""
+        with caplog.at_level(logging.DEBUG, logger="lifx"):
             await MatrixLight.from_ip(
                 ip="127.0.0.1",
                 port=12345,
@@ -1134,12 +1134,11 @@ class TestAddressEntryPointGate:
             and record.msg.get("action") == "non_standard_port"
         )
         assert port_record["class"] == "MatrixLight"
-        assert port_record["method"] == "from_ip"
 
-    async def test_from_ip_without_serial_suppresses_constructor_advisories(
+    async def test_from_ip_without_serial_notes_the_port_once(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Serial discovery does not repeat the public factory warnings."""
+        """Serial discovery builds one Device, so the port is noted once."""
         connection = MagicMock()
         connection.serial = self.SERIAL
         connection.request = AsyncMock(
@@ -1162,7 +1161,6 @@ class TestAddressEntryPointGate:
             if isinstance(record.msg, dict)
         ]
         assert isinstance(device, Device)
-        assert actions.count("is_loopback") == 1
         assert actions.count("non_standard_port") == 1
 
     async def test_connect_rejects_zone_less_link_local(self) -> None:
@@ -1191,10 +1189,19 @@ class TestAddressEntryPointGate:
 
         assert device.ip == self.ZONED
 
-    async def test_connect_emits_each_caller_advisory_once(
+    async def test_connect_notes_the_port_once_per_construction(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Temporary and concrete devices do not repeat factory advisories."""
+        """``connect()`` constructs twice, so the note lands twice.
+
+        Reading the version needs a device before the product is known, so
+        a temporary ``Device`` precedes the typed instance. Both note the
+        port, and the pair of class names is what makes the two
+        constructions visible in a trace. This is the accepted cost of the
+        note being unconditional: at DEBUG a second line is cheaper than a
+        suppression flag on every device constructor, and a third entry
+        here would mean a construction nobody intended.
+        """
         with (
             caplog.at_level(logging.DEBUG, logger="lifx"),
             patch.object(
@@ -1205,20 +1212,13 @@ class TestAddressEntryPointGate:
         ):
             await Device.connect(ip="127.0.0.1", port=12345, serial=self.SERIAL)
 
-        actions = [
-            record.msg.get("action")
-            for record in caplog.records
-            if isinstance(record.msg, dict)
-        ]
-        assert actions.count("is_loopback") == 1
-        assert actions.count("non_standard_port") == 1
-        port_record = next(
-            record.msg
+        classes = [
+            record.msg["class"]
             for record in caplog.records
             if isinstance(record.msg, dict)
             and record.msg.get("action") == "non_standard_port"
-        )
-        assert port_record["method"] == "connect"
+        ]
+        assert classes == ["Device", "Light"]
 
     @pytest.mark.parametrize(
         ("ip", "message"),

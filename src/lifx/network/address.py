@@ -12,8 +12,8 @@ The call sites, all of which import from here:
 
 * :mod:`lifx.devices.base`: ``Device.__init__``, ``Device.from_ip()`` and
   ``Device.connect()`` gate on :func:`validate_address` and
-  :func:`validate_port`; the public factories validate caller input once and
-  explicitly suppress duplicate constructor advisories
+  :func:`validate_port`; the public factories reject an unusable endpoint
+  before building a connection that never reaches ``__init__``
 * :mod:`lifx.api`: ``find_by_ip()`` gates on :func:`validate_address`
 * :mod:`lifx.network.transport`: ``UdpTransport.open()`` derives its socket
   family with :func:`family_for` and canonicalises its local bind with
@@ -83,13 +83,10 @@ LAN with a delegated IPv6 prefix gives every device a global unicast address,
 including a Thread device reached over a global OMR prefix. Warning on those
 fired on correct configurations far more often than on mistakes.
 
-Rule 7 is a caller-input advisory and may be suppressed with
-``emit_warnings=False``. Inbound wire validation does this because a responder
-controls its source address, so one line per datagram would drown a debug-level
-discovery trace. Device constructors also accept a private, explicit advisory
-policy: public factories validate once and suppress the duplicate constructor
-note, while discovery factories suppress it for already-validated wire data.
-The rejections in rules 1-6 are never suppressed.
+Rule 7 is the only arm that logs, and it logs unconditionally. Nothing here
+takes a caller-supplied policy for whether to speak: at DEBUG a repeated note
+costs a duplicate line in a trace that is already opt-in, which is not worth a
+suppression flag threaded through every construction site to avoid.
 
 This is a near-leaf module by design. Its one import from ``lifx`` is
 :data:`lifx.const.DEFAULT_IP_ADDRESS`, which :func:`wildcard_for` returns.
@@ -254,7 +251,7 @@ def host_from_sockaddr(
     return unscoped_host
 
 
-def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
+def validate_address(ip: str | None) -> None:
     """Validate a device address, raising on anything unusable.
 
     This is the entry-point gate. It is called before any socket exists, so
@@ -263,10 +260,6 @@ def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
 
     Args:
         ip: The device address to check.
-        emit_warnings: Emit the caller-facing loopback advisory. Inbound wire
-            validation disables it to avoid one line per responder datagram;
-            device factories also disable it during construction after
-            validation has already run.
 
     Raises:
         ValueError: If the address is empty, unparsable, IPv4-mapped,
@@ -301,7 +294,7 @@ def validate_address(ip: str | None, *, emit_warnings: bool = True) -> None:
                 f"Append the interface, for example {ip}%en0"
             )
 
-    if emit_warnings and addr.is_loopback:
+    if addr.is_loopback:
         _LOGGER.debug(
             {
                 "module": "lifx.network.address",

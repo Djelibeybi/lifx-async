@@ -162,7 +162,6 @@ class DiscoveredDevice:
                 port=self.port,
                 timeout=self.timeout,
                 max_retries=self.max_retries,
-                _emit_input_warnings=False,
             )
             construction_task = asyncio.current_task()
             if construction_task is not None:
@@ -224,7 +223,6 @@ class DiscoveredDevice:
             port=self.port,
             timeout=self.timeout,
             max_retries=self.max_retries,
-            _emit_input_warnings=False,
         )
 
         # Capability detection already fetched and derived this metadata.
@@ -281,7 +279,6 @@ async def _discover_with_packet(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     *,
-    _address_is_prevalidated: bool = False,
     _observer: _DiscoveryObserver | None = None,
 ) -> AsyncGenerator[DiscoveryResponse]:
     """Generic discovery using any Get* packet.
@@ -306,8 +303,6 @@ async def _discover_with_packet(
         port: UDP port
         max_response_time: Max response time
         idle_timeout_multiplier: Idle timeout multiplier
-        _address_is_prevalidated: Suppress caller advisories when a public
-            entry point already validated the same destination
         _observer: Explicit caller-owned measurement observer. The
             repository harness selector is captured by ``discover_devices`` and is
             never consulted inside this wire producer.
@@ -357,7 +352,7 @@ async def _discover_with_packet(
     seen_serials: set[str] = set()
     start_time = time.monotonic()
 
-    validate_address(broadcast_address, emit_warnings=not _address_is_prevalidated)
+    validate_address(broadcast_address)
     local_bind = wildcard_for(broadcast_address)
     try:
         send_address = sockaddr_for((broadcast_address, port))
@@ -580,7 +575,7 @@ async def _discover_with_packet(
                     responder_ip = host_from_sockaddr(
                         addr, fallback_ip=broadcast_address
                     )
-                    validate_address(responder_ip, emit_warnings=False)
+                    validate_address(responder_ip)
                 except ValueError as error:
                     _LOGGER.debug(
                         {
@@ -699,8 +694,6 @@ async def discover_devices(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    *,
-    _address_is_prevalidated: bool = False,
 ) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
@@ -737,8 +730,6 @@ async def discover_devices(
         idle_timeout_multiplier: Idle timeout multiplier
         device_timeout: Request timeout set on discovered devices
         max_retries: Max retries per request set on discovered devices
-        _address_is_prevalidated: Internal signal that caller advisories were
-            already emitted for ``broadcast_address``
 
     Yields:
         DiscoveredDevice instances as they are discovered
@@ -764,7 +755,6 @@ async def discover_devices(
         port=port,
         max_response_time=max_response_time,
         idle_timeout_multiplier=idle_timeout_multiplier,
-        _address_is_prevalidated=_address_is_prevalidated,
         _observer=observer,
     )
     async with aclosing(responses):
@@ -792,7 +782,6 @@ async def discover_devices_shared(
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
     *,
-    _address_is_prevalidated: bool = False,
     _caller_deadline: float | None = None,
     _observer: _DiscoveryObserver | None = None,
 ) -> AsyncGenerator[DiscoveredDevice, None]:
@@ -809,7 +798,7 @@ async def discover_devices_shared(
     applied only after raw fan-out and therefore do not split a compatible wire
     sweep or leak one subscriber's settings into another.
     """
-    validate_address(broadcast_address, emit_warnings=not _address_is_prevalidated)
+    validate_address(broadcast_address)
     validate_port(port)
     caller_deadline = (
         time.monotonic() + max(0.0, timeout)
@@ -833,7 +822,6 @@ async def discover_devices_shared(
             port=port,
             max_response_time=max_response_time,
             idle_timeout_multiplier=idle_timeout_multiplier,
-            _address_is_prevalidated=True,
             _observer=None,
         )
 

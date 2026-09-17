@@ -53,23 +53,23 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def _validate_device_endpoint(
-    ip: str,
-    port: int,
-    *,
-    emit_warnings: bool,
-    class_name: str,
-    method: str,
-) -> None:
-    """Validate a device endpoint and optionally emit caller advisories."""
-    validate_address(ip, emit_warnings=emit_warnings)
+def _validate_device_endpoint(ip: str, port: int, *, class_name: str) -> None:
+    """Validate a device endpoint, noting a non-standard port at DEBUG.
+
+    The port note is diagnostic context, not a defect report: the caller
+    chose the port, and the only routine reason to use one other than
+    :data:`~lifx.const.LIFX_UDP_PORT` is an emulator. Logging it at DEBUG is
+    what lets every construction site call this unconditionally, because a
+    duplicate line in an opt-in trace is cheaper than a suppression flag
+    threaded through every device constructor.
+    """
+    validate_address(ip)
     validate_port(port)
 
-    if port != LIFX_UDP_PORT and emit_warnings:
-        _LOGGER.warning(
+    if port != LIFX_UDP_PORT:
+        _LOGGER.debug(
             {
                 "class": class_name,
-                "method": method,
                 "action": "non_standard_port",
                 "port": port,
                 "default_port": LIFX_UDP_PORT,
@@ -568,7 +568,6 @@ class Device(Generic[StateT]):
         fetch_thread_info: bool = False,
         fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
-        _emit_input_warnings: bool = True,
     ) -> None:
         """Initialize device.
 
@@ -595,11 +594,6 @@ class Device(Generic[StateT]):
                 initialized or refreshed, leaving ``state.ambient_light`` None
                 when False (the default). Only lights expose the sensor, so this
                 is ignored by the base ``Device`` class.
-            _emit_input_warnings: Emit caller-facing address and port advisories.
-                Internal factories disable these after validating caller input
-                once, or when constructing from already-validated wire data.
-                This is an internal construction policy; callers should leave
-                it at its default.
 
         Raises:
             ValueError: If any parameter is invalid
@@ -623,16 +617,8 @@ class Device(Generic[StateT]):
                 "Broadcast serial number not allowed for device connection"
             )
 
-        # Address rules stay centralised in lifx.network.address. Endpoint
-        # advisories are explicit constructor input, rather than ambient state,
-        # so every internal construction site shows whether it is suppressed.
-        _validate_device_endpoint(
-            ip,
-            port,
-            emit_warnings=_emit_input_warnings,
-            class_name=type(self).__name__,
-            method="__init__",
-        )
+        # Address and port rules stay centralised in lifx.network.address.
+        _validate_device_endpoint(ip, port, class_name=type(self).__name__)
 
         # Store normalized serial as 12-digit hex string
         self.serial = serial_obj.to_string()
@@ -759,13 +745,10 @@ class Device(Generic[StateT]):
                 label = await device.get_label()
             ```
         """
-        _validate_device_endpoint(
-            ip,
-            port,
-            emit_warnings=True,
-            class_name=cls.__name__,
-            method="from_ip",
-        )
+        # Reject an unusable endpoint before the serial-less leg below builds
+        # a DeviceConnection directly; the advisory belongs to construction.
+        validate_address(ip)
+        validate_port(port)
 
         if serial is None:
             temp_conn = DeviceConnection(
@@ -791,7 +774,6 @@ class Device(Generic[StateT]):
                             fetch_thread_info=fetch_thread_info,
                             fetch_radio_info=fetch_radio_info,
                             fetch_ambient_light=fetch_ambient_light,
-                            _emit_input_warnings=False,
                         )
             finally:
                 # Always close the temporary connection to prevent resource leaks
@@ -807,7 +789,6 @@ class Device(Generic[StateT]):
                 fetch_thread_info=fetch_thread_info,
                 fetch_radio_info=fetch_radio_info,
                 fetch_ambient_light=fetch_ambient_light,
-                _emit_input_warnings=False,
             )
 
         raise LifxDeviceNotFoundError()
@@ -879,13 +860,8 @@ class Device(Generic[StateT]):
         # DeviceConnection directly and never reaches Device.__init__, so
         # without this call an unusable address would cost a full silent
         # request timeout here.
-        _validate_device_endpoint(
-            ip,
-            port,
-            emit_warnings=True,
-            class_name=cls.__name__,
-            method="connect",
-        )
+        validate_address(ip)
+        validate_port(port)
 
         # Step 1: Get serial if not provided
         if serial is None:
@@ -922,7 +898,6 @@ class Device(Generic[StateT]):
             port=port,
             timeout=timeout,
             max_retries=max_retries,
-            _emit_input_warnings=False,
         )
 
         try:
@@ -951,7 +926,6 @@ class Device(Generic[StateT]):
                 fetch_thread_info=fetch_thread_info,
                 fetch_radio_info=fetch_radio_info,
                 fetch_ambient_light=fetch_ambient_light,
-                _emit_input_warnings=False,
             )
 
             # Type system note: device._state is guaranteed non-None after

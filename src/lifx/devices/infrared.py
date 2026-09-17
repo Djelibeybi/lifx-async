@@ -98,15 +98,12 @@ class InfraredLight(Light):
         fetch_thread_info: bool = False,
         fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
-        _emit_input_warnings: bool = True,
     ) -> None:
         """Initialize InfraredLight with additional state attributes.
 
         See :class:`~lifx.devices.base.Device` for parameter documentation. The
         signature is spelled out rather than forwarded as ``*args, **kwargs`` so
         callers get the same type checking the base class offers.
-        ``_emit_input_warnings`` is an internal construction policy; callers
-        should leave it at its default.
         """
         super().__init__(
             serial,
@@ -118,7 +115,6 @@ class InfraredLight(Light):
             fetch_thread_info=fetch_thread_info,
             fetch_radio_info=fetch_radio_info,
             fetch_ambient_light=fetch_ambient_light,
-            _emit_input_warnings=_emit_input_warnings,
         )
         # Infrared-specific state storage
         self._infrared: float | None = None
