@@ -353,7 +353,6 @@ class TestDiscoveredDeviceValidationBoundary:
                 max_retries=4,
                 fetch_wifi_info=True,
                 fetch_ambient_light=True,
-                _emit_input_warnings=False,
             )
 
         assert type(device) is device_class

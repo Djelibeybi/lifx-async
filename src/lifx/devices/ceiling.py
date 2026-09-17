@@ -367,7 +367,6 @@ class CeilingLight(MatrixLight):
         fetch_thread_info: bool = False,
         fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
-        _emit_input_warnings: bool = True,
     ):
         """Initialize CeilingLight.
 
@@ -389,8 +388,6 @@ class CeilingLight(MatrixLight):
                 evidenced connectivity during state initialization
             fetch_ambient_light: Query the ambient light sensor during state
                 initialization
-            _emit_input_warnings: Internal construction policy for caller-facing
-                endpoint advisories; callers should leave it at its default
 
         Raises:
             LifxError: If device is not a supported Ceiling product
@@ -405,7 +402,6 @@ class CeilingLight(MatrixLight):
             fetch_thread_info=fetch_thread_info,
             fetch_radio_info=fetch_radio_info,
             fetch_ambient_light=fetch_ambient_light,
-            _emit_input_warnings=_emit_input_warnings,
         )
         self._state_file = state_file
 

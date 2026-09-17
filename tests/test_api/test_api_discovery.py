@@ -2864,10 +2864,10 @@ class TestFindByIpAddressGate:
             with pytest.raises(LifxNetworkError, match="Port must be between"):
                 await find_by_ip("192.0.2.1", port=70000)
 
-    async def test_loopback_advisory_is_emitted_once(
+    async def test_loopback_is_noted_at_debug_only(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Public validation owns the one advisory for a targeted lookup."""
+        """A loopback lookup is legitimate, so it never rises above DEBUG."""
         with (
             patch(
                 "lifx.network.discovery.udp.UdpTransport",
@@ -2883,13 +2883,14 @@ class TestFindByIpAddressGate:
             )
 
         assert result is None
-        advisories = [
+        notes = [
             record
             for record in caplog.records
             if isinstance(record.msg, dict)
             and record.msg.get("action") == "is_loopback"
         ]
-        assert len(advisories) == 1
+        assert notes
+        assert {record.levelno for record in notes} == {logging.DEBUG}
 
 
 @pytest.mark.emulator

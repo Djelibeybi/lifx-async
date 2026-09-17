@@ -1117,7 +1117,6 @@ async def discover(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-        _address_is_prevalidated=True,
         _caller_deadline=deadline,
         _observer=observer,
     )
@@ -1251,7 +1250,6 @@ async def discover_udp(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-        _address_is_prevalidated=True,
         _caller_deadline=deadline,
     )
     async with aclosing(devices):
@@ -1363,7 +1361,6 @@ async def _race_serial_sources(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-        _address_is_prevalidated=True,
         _caller_deadline=deadline,
         _observer=observer,
     )
@@ -1583,7 +1580,6 @@ async def find_by_ip(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
-        _address_is_prevalidated=True,
     )
     async with aclosing(devices):
         async for discovered in devices:

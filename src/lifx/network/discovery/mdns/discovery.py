@@ -761,7 +761,7 @@ class _LifxRecordCache:
             instance = next(iter(packet_instances))
             if self.records_for(instance, DNS_TYPE_TXT):
                 try:
-                    validate_address(source_ip, emit_warnings=False)
+                    validate_address(source_ip)
                 except ValueError:
                     self.count_rejection("invalid_address", "A")
                 else:
@@ -921,12 +921,9 @@ def _create_device_from_record(
         "port": record.port,
         "timeout": timeout,
         "max_retries": max_retries,
-        "_emit_input_warnings": False,
     }
 
-    # Priority-based selection matching DiscoveredDevice.create_device(). The
-    # record address and port came from the wire and were validated above, so
-    # caller-input advisories must not be emitted again by construction.
+    # Priority-based selection matching DiscoveredDevice.create_device().
     device: Light | None
     if is_ceiling_product(record.product_id):
         device = CeilingLight(**kwargs)
@@ -1368,7 +1365,7 @@ async def _verify_mdns_candidate(
         return None
 
     try:
-        validate_address(record.ip, emit_warnings=False)
+        validate_address(record.ip)
         validate_port(record.port)
     except ValueError:
         error = _MdnsCandidateResponseError()
@@ -1437,7 +1434,6 @@ async def _verify_mdns_candidate(
             port=record.port,
             timeout=device_timeout,
             max_retries=max_retries,
-            _emit_input_warnings=False,
         )
         device._set_connectivity(record.connectivity)
         # The liveness probe already elicited a correlated response, so the
@@ -1643,7 +1639,7 @@ async def discover_devices_mdns(
             if not _is_lifx_service_instance(record.service_instance):
                 continue
             try:
-                validate_address(record.ip, emit_warnings=False)
+                validate_address(record.ip)
             except ValueError:
                 continue
 

@@ -170,14 +170,18 @@ class TestValidateAddressNotes:
         assert "method" not in payload
 
     @pytest.mark.parametrize("value", ["127.0.0.1", "::1"])
-    def test_wire_validation_can_suppress_the_advisory(
+    def test_the_note_takes_no_caller_policy(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Responder datagrams cannot drown a debug-level discovery trace."""
+        """Wire validation gets the same note; there is no suppression flag."""
         with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
-            validate_address(value, emit_warnings=False)
+            validate_address(value)
+            validate_address(value)
 
-        assert caplog.records == []
+        assert [record.levelno for record in caplog.records] == [
+            logging.DEBUG,
+            logging.DEBUG,
+        ]
 
 
 class TestValidateAddressAccepts:
