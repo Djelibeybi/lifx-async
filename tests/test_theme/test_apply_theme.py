@@ -283,6 +283,33 @@ class TestMatrixLightApplyTheme:
         # Duration should be converted to milliseconds
         assert kwargs.get("duration", 0) == 3000
 
+    async def test_apply_theme_without_power_on_skips_get_power(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test that GetPower is only sent when the light may be turned on."""
+        theme = Theme([Colors.RED, Colors.BLUE])
+        matrix_light.get_device_chain = AsyncMock(return_value=[make_tile(0)])
+        matrix_light.get_power = AsyncMock(return_value=65535)
+
+        await matrix_light.apply_theme(theme, duration=1.0)
+
+        matrix_light.get_power.assert_not_awaited()
+        matrix_light.set_power.assert_not_called()
+
+    async def test_apply_theme_with_power_on_asks_for_power(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test that power_on=True checks the power and leaves an on light on."""
+        theme = Theme([Colors.RED])
+        matrix_light.get_device_chain = AsyncMock(return_value=[make_tile(0)])
+        matrix_light.get_power = AsyncMock(return_value=65535)
+
+        await matrix_light.apply_theme(theme, power_on=True, duration=2.0)
+
+        matrix_light.get_power.assert_awaited_once()
+        matrix_light.set_power.assert_not_called()
+        assert matrix_light.set_matrix_colors.call_args.kwargs["duration"] == 2000
+
     async def test_apply_theme_with_power_on(self, matrix_light: MatrixLight) -> None:
         """Test apply_theme with power_on=True."""
         theme = Theme([Colors.RED])
