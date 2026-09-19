@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v7.4.0 (2026-09-19)
+
+### Bug Fixes
+
+- **animation**: Reset component tracking when an Animator starts
+  ([`03e476f`](https://github.com/Djelibeybi/lifx-async/commit/03e476fa9f8d7c59970082be9ef7b595a4bf6fe5))
+
+- **devices**: Address component-light review findings
+  ([`a1dcd55`](https://github.com/Djelibeybi/lifx-async/commit/a1dcd55d096532e58dd0e0ac9278a313b16f7504))
+
+- **devices**: Bring CeilingLight in line with the MirrorLight fixes
+  ([`349cc7e`](https://github.com/Djelibeybi/lifx-async/commit/349cc7e27e8655aee1f9e4593e731636dc18b056))
+
+- **devices**: Name the unexpected GetService reply in from_ip()
+  ([`79802eb`](https://github.com/Djelibeybi/lifx-async/commit/79802eb66bc9a98da9882a16fc93fa4eb9ba4861))
+
+- **devices**: Only blame the port when a serial lookup gets no reply
+  ([`74cce7c`](https://github.com/Djelibeybi/lifx-async/commit/74cce7cd7e5eaca779a6d3ec257ced3a38463d70))
+
+- **network**: Address endpoint and discovery review findings
+  ([`88c4917`](https://github.com/Djelibeybi/lifx-async/commit/88c49173d69e9aa4d985c8eb2c55c8cc4572908d))
+
+- **network**: Drop the public-address advisory, demote loopback to DEBUG
+  ([`6aa276f`](https://github.com/Djelibeybi/lifx-async/commit/6aa276f7b81b8feb455414b5baba947201f26cdc))
+
+- **scripts**: Keep the Matrix scan going when a device stalls
+  ([`1580d7a`](https://github.com/Djelibeybi/lifx-async/commit/1580d7a2dd65a1d97522239bb07421c9a95db715))
+
+### Documentation
+
+- **mirror**: Fix typo in the Mirror light entity list
+  ([`aff1c17`](https://github.com/Djelibeybi/lifx-async/commit/aff1c173d2af48c975578a666221987c54d620d4))
+
+### Features
+
+- **devices**: Add support for LIFX Mirror
+  ([`da224d1`](https://github.com/Djelibeybi/lifx-async/commit/da224d16024d009b750f719624c7463598e36c6b))
+
+### Performance Improvements
+
+- **devices**: Skip GetPower in MatrixLight.apply_theme without power_on
+  ([`8d358d0`](https://github.com/Djelibeybi/lifx-async/commit/8d358d025dc7e9777f01c6f3916804dbb5a3c41f))
+
+
 ## v7.3.0 (2026-09-09)
 
 ### Documentation
