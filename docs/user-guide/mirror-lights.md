@@ -5,7 +5,7 @@ entities:
 
 - **Front LEDs**: Zones facing the room, for task lighting
 - **Back LEDs**: Zones facing the wall, for indirect backwash lighting
-- **Mirror LEDs**: All zones, facing the front and rear of thew room
+- **Mirror LEDs**: All zones, facing the front and rear of the room
 
 Unlike [Ceiling lights](ceiling-lights.md), whose uplight is a single zone,
 **both Mirror components span multiple zones**, so each one can carry its own
