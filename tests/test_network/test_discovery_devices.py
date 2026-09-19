@@ -22,6 +22,7 @@ from lifx.devices.hev import HevLight
 from lifx.devices.infrared import InfraredLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
+from lifx.devices.mirror import MirrorLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxTimeoutError
 from lifx.network.discovery import (
@@ -299,10 +300,10 @@ class TestDiscoveredDeviceValidationBoundary:
 
         close.assert_awaited_once_with()
 
-    async def test_wire_address_warning_stays_suppressed_during_construction(
+    async def test_wire_address_is_noted_at_debug_during_construction(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A responder-controlled loopback address cannot flood warnings."""
+        """A responder-controlled endpoint is noted at DEBUG, never WARNING."""
         discovered = DiscoveredDevice(
             serial="d073d5010203",
             ip="127.0.0.1",
@@ -322,7 +323,7 @@ class TestDiscoveredDeviceValidationBoundary:
             self._version = DeviceVersion(vendor=1, product=27)
 
         with (
-            caplog.at_level(logging.WARNING),
+            caplog.at_level(logging.DEBUG, logger="lifx"),
             patch.object(Device, "ensure_capabilities", fake_ensure),
             patch(
                 "lifx.network.connection.DeviceConnection.close",
@@ -332,19 +333,36 @@ class TestDiscoveredDeviceValidationBoundary:
             device = await discovered.create_device()
 
         assert isinstance(device, Light)
-        assert caplog.records == []
+        actions = {
+            record.msg.get("action")
+            for record in caplog.records
+            if isinstance(record.msg, dict) and record.levelno == logging.DEBUG
+        }
+        assert {"is_loopback", "non_standard_port"} <= actions
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
     @pytest.mark.parametrize(
         "device_class",
-        [Light, HevLight, InfraredLight, MultiZoneLight, MatrixLight, CeilingLight],
+        [
+            Light,
+            HevLight,
+            InfraredLight,
+            MultiZoneLight,
+            MatrixLight,
+            CeilingLight,
+            MirrorLight,
+        ],
     )
-    def test_all_concrete_types_accept_explicit_warning_policy(
+    def test_all_concrete_types_accept_the_factory_contract(
         self,
         device_class: type[Light],
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Every type accepts and forwards the complete factory contract."""
-        with caplog.at_level(logging.WARNING):
+        """Every type accepts and forwards the complete factory contract.
+
+        Its endpoint notes stay at DEBUG, whichever class is built.
+        """
+        with caplog.at_level(logging.DEBUG, logger="lifx"):
             device = device_class(
                 serial="d073d5010203",
                 ip="127.0.0.1",
@@ -360,7 +378,13 @@ class TestDiscoveredDeviceValidationBoundary:
         assert device.connection.max_retries == 4
         assert device.fetch_wifi_info is True
         assert device.fetch_ambient_light is True
-        assert caplog.records == []
+        assert any(
+            isinstance(record.msg, dict)
+            and record.msg.get("action") == "non_standard_port"
+            and record.msg.get("class") == device_class.__name__
+            for record in caplog.records
+        )
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
 @pytest.mark.emulator

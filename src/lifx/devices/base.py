@@ -24,6 +24,7 @@ from lifx.const import (
 from lifx.exceptions import (
     LifxDeviceNotFoundError,
     LifxError,
+    LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
 from lifx.network.address import validate_address, validate_port
@@ -71,6 +72,25 @@ def _validate_device_endpoint(ip: str, port: int, *, class_name: str) -> None:
             {
                 "class": class_name,
                 "action": "non_standard_port",
+                "port": port,
+                "default_port": LIFX_UDP_PORT,
+            }
+        )
+
+
+def _warn_unanswered_port(ip: str, port: int) -> None:
+    """Point at a non-standard port when a serial lookup gets no answer.
+
+    The construction-time port note is DEBUG because the caller chose the
+    port. A serial-less from_ip() or connect() that hears nothing never
+    constructs a device, though, and a wrong port is then the likeliest cause,
+    so this case is worth a WARNING.
+    """
+    if port != LIFX_UDP_PORT:
+        _LOGGER.warning(
+            {
+                "action": "no_response_on_non_standard_port",
+                "ip": ip,
                 "port": port,
                 "default_port": LIFX_UDP_PORT,
             }
@@ -775,6 +795,9 @@ class Device(Generic[StateT]):
                             fetch_radio_info=fetch_radio_info,
                             fetch_ambient_light=fetch_ambient_light,
                         )
+            except LifxTimeoutError:
+                _warn_unanswered_port(ip, port)
+                raise
             finally:
                 # Always close the temporary connection to prevent resource leaks
                 await temp_conn.close()
@@ -791,6 +814,7 @@ class Device(Generic[StateT]):
                 fetch_ambient_light=fetch_ambient_light,
             )
 
+        _warn_unanswered_port(ip, port)
         raise LifxDeviceNotFoundError()
 
     @classmethod
@@ -884,7 +908,11 @@ class Device(Generic[StateT]):
                             "Could not determine device serial"
                         )
                 else:
+                    _warn_unanswered_port(ip, port)
                     raise LifxDeviceNotFoundError("No response from device")
+            except LifxTimeoutError:
+                _warn_unanswered_port(ip, port)
+                raise
             finally:
                 await temp_conn.close()
 

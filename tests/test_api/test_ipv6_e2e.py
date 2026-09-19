@@ -11,9 +11,10 @@ socket the call actually used. Without that, a regression that quietly sent
 these tests back over IPv4 would leave them green, and the suite would go on
 reporting IPv6 coverage it no longer had.
 
-The loopback warning fires on every ``::1`` request, exactly as it already
-does for the ``127.0.0.1`` emulator suite. That is left alone: it is genuinely
-useful in production, where a LIFX device is never on loopback.
+The loopback note is logged at DEBUG on every ``::1`` request, exactly as it
+is for the ``127.0.0.1`` emulator suite. It is trace context rather than a
+defect: a LIFX device is never on loopback, so seeing it says the emulator
+answered.
 """
 
 from __future__ import annotations

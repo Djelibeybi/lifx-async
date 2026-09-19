@@ -23,7 +23,11 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.devices.matrix import MatrixLight
-from lifx.exceptions import LifxUnsupportedCommandError
+from lifx.exceptions import (
+    LifxDeviceNotFoundError,
+    LifxTimeoutError,
+    LifxUnsupportedCommandError,
+)
 from lifx.network.connection import DeviceConnection
 from lifx.network.discovery import DiscoveredDevice
 from lifx.protocol import packets
@@ -1162,6 +1166,78 @@ class TestAddressEntryPointGate:
         ]
         assert isinstance(device, Device)
         assert actions.count("non_standard_port") == 1
+
+    @staticmethod
+    def _unanswered_port_warnings(
+        caplog: pytest.LogCaptureFixture,
+    ) -> list[dict[str, object]]:
+        """Collect the WARNING records naming an unanswered non-standard port."""
+        return [
+            record.msg
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+            and isinstance(record.msg, dict)
+            and record.msg.get("action") == "no_response_on_non_standard_port"
+        ]
+
+    @pytest.mark.parametrize("entry_point", ["from_ip", "connect"])
+    async def test_timeout_on_non_standard_port_warns(
+        self, entry_point: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A serial lookup that times out names the port as the likely cause.
+
+        Nothing is constructed when nothing answers, so the DEBUG
+        construction note never fires: this WARNING is the only hint.
+        """
+        connection = MagicMock()
+        connection.request = AsyncMock(side_effect=LifxTimeoutError("no reply"))
+        connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx"),
+            patch("lifx.devices.base.DeviceConnection", return_value=connection),
+            pytest.raises(LifxTimeoutError),
+        ):
+            await getattr(Device, entry_point)(ip="127.0.0.1", port=12345)
+
+        warnings = self._unanswered_port_warnings(caplog)
+        assert len(warnings) == 1
+        assert warnings[0]["port"] == 12345
+
+    @pytest.mark.parametrize("entry_point", ["from_ip", "connect"])
+    async def test_no_response_on_non_standard_port_warns(
+        self, entry_point: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An empty reply is treated like a timeout."""
+        connection = MagicMock()
+        connection.request = AsyncMock(return_value=None)
+        connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx"),
+            patch("lifx.devices.base.DeviceConnection", return_value=connection),
+            pytest.raises(LifxDeviceNotFoundError),
+        ):
+            await getattr(Device, entry_point)(ip="127.0.0.1", port=12345)
+
+        assert len(self._unanswered_port_warnings(caplog)) == 1
+
+    async def test_timeout_on_default_port_does_not_warn(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The default port is never blamed for a silent device."""
+        connection = MagicMock()
+        connection.request = AsyncMock(side_effect=LifxTimeoutError("no reply"))
+        connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx"),
+            patch("lifx.devices.base.DeviceConnection", return_value=connection),
+            pytest.raises(LifxTimeoutError),
+        ):
+            await Device.from_ip(ip="127.0.0.1")
+
+        assert self._unanswered_port_warnings(caplog) == []
 
     async def test_connect_rejects_zone_less_link_local(self) -> None:
         """`connect()` raises with no DeviceConnection constructed.
