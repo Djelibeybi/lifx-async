@@ -244,6 +244,12 @@ class Animator:
             duration_ms=duration_ms,
         )
 
+        # Frames go straight out over UDP rather than through set64(), so the
+        # device never hears about them. Tell it now: a component light
+        # (Ceiling, Mirror) forgets the tile it last wrote, so its next
+        # component call reads the device instead of undoing the animation.
+        device._zones_changed()
+
         return cls(ip, serial, framebuffer, packet_generator, port=device.port)
 
     @classmethod

@@ -774,6 +774,30 @@ class TestAnimatorForMatrixFactory:
 
         assert animator.pixel_count == 64
 
+    @pytest.mark.asyncio
+    async def test_for_matrix_tells_the_device_its_zones_change(self) -> None:
+        """Test that a component light forgets its remembered tile.
+
+        Frames bypass set64(), so without this a Ceiling or Mirror component
+        call made just after starting an animation would undo its frames.
+        """
+        from lifx.devices.mirror import MirrorLight
+
+        device = MirrorLight(serial="d073d5000001", ip="192.0.2.10")
+        tile = MagicMock(width=4, height=13, user_x=0.0, user_y=0.0)
+        tile.nearest_orientation = "Upright"
+        device._device_chain = [tile]
+        device._capabilities = MagicMock(has_chain=False)
+        device._pending_tile.record([MagicMock()] * 52, 5.0)
+
+        with patch(
+            "lifx.animation.animator.FrameBuffer.for_matrix",
+            new=AsyncMock(return_value=MagicMock(pixel_count=52)),
+        ):
+            await Animator.for_matrix(device)
+
+        assert device._pending_tile.get() is None
+
 
 class TestAnimatorForMultizoneFactory:
     """Tests for Animator.for_multizone factory method."""

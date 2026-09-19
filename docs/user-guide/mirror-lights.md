@@ -171,7 +171,11 @@ light back up. Once the fade has finished, the device is read again, so changes
 made in the LIFX app are picked up. A colour change made through an inherited
 `MatrixLight` method (`set_matrix_colors()`, `apply_theme()`, a firmware effect
 or a waveform) resets this tracking, so the next component call starts from
-what the device reports rather than undoing that change.
+what the device reports rather than undoing that change. Starting an
+`Animator` (which the effects `Conductor` does for every frame effect) resets it
+too. Frames sent while an animation runs bypass the component methods
+entirely, so a component call made during an animation writes over the
+current frame: stop the animation before switching components.
 
 This is best effort. The second write restarts both components' transitions
 with its own duration, and running component calls concurrently on one device
