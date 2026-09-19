@@ -34,8 +34,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component_light import ComponentMatrixLight
 from lifx.devices.component_state import (
-    Pending,
     colors_as_dict,
     decode_color,
     encode_color,
@@ -43,7 +43,7 @@ from lifx.devices.component_state import (
     read_state_file,
     write_state_file,
 )
-from lifx.devices.matrix import MatrixLight, MatrixLightState
+from lifx.devices.matrix import MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import (
     MirrorComponentLayout,
@@ -151,9 +151,12 @@ class MirrorLightState(MatrixLightState):
             capabilities=matrix_state.capabilities,
             host_firmware=matrix_state.host_firmware,
             wifi_firmware=matrix_state.wifi_firmware,
+            wifi_info=matrix_state.wifi_info,
+            thread_info=matrix_state.thread_info,
             location=matrix_state.location,
             group=matrix_state.group,
             color=matrix_state.color,
+            ambient_light=matrix_state.ambient_light,
             chain=matrix_state.chain,
             tile_orientations=matrix_state.tile_orientations,
             tile_colors=matrix_state.tile_colors,
@@ -175,7 +178,7 @@ class MirrorLightState(MatrixLightState):
         )
 
 
-class MirrorLight(MatrixLight):
+class MirrorLight(ComponentMatrixLight):
     """LIFX Mirror Light with independent front and back control.
 
     MirrorLight extends MatrixLight to provide semantic control over the front
@@ -256,8 +259,6 @@ class MirrorLight(MatrixLight):
             fetch_ambient_light=fetch_ambient_light,
         )
         self._state_file = state_file
-        self._pending_tile: Pending[list[HSBK]] = Pending()
-        self._pending_power: Pending[int] = Pending()
 
     async def __aenter__(self) -> MirrorLight:
         """Async context manager entry.
@@ -582,62 +583,6 @@ class MirrorLight(MatrixLight):
 
         return any(c.brightness > 0 for c in last_colors)
 
-    async def _tile_colors_for_update(self) -> list[HSBK]:
-        """Get the tile as the base for a component write.
-
-        While the last write is still transitioning this is that write's
-        target rather than the device's in-flight colours, so the untouched
-        component keeps heading where it was going. See
-        :class:`~lifx.devices.component_state.Pending`.
-
-        Returns:
-            Colors for every buffer position on the tile
-        """
-        pending = self._pending_tile.get()
-        if pending is not None:
-            return pending
-
-        all_colors = await self.get_all_tile_colors()
-        return all_colors[0]
-
-    async def _power_for_update(self) -> int:
-        """Get the power level, trusting this device's own recent change.
-
-        GetPower keeps reporting the old level for a moment after a SetPower,
-        even an acknowledged one, so a component method that has just powered
-        the light off must not ask the device whether it is on.
-
-        Returns:
-            Power level, 0 or 65535
-        """
-        pending = self._pending_power.get()
-        if pending is not None:
-            return pending
-        return await self.get_power()
-
-    async def _write_power(self, on: bool, duration: float) -> None:
-        """Set the power level and remember it until it settles.
-
-        Calls Light.set_power() directly, bypassing this class's override,
-        which captures component colours on the way down.
-
-        Args:
-            on: True to power on, False to power off
-            duration: Transition duration in seconds
-        """
-        await super().set_power(on, duration)
-        self._pending_power.record(65535 if on else 0, duration)
-
-    async def _write_tile(self, tile_colors: list[HSBK], duration: float) -> None:
-        """Write the whole tile and remember it until the transition settles.
-
-        Args:
-            tile_colors: Colors for every buffer position on the tile
-            duration: Transition duration in seconds
-        """
-        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
-        self._pending_tile.record(tile_colors, duration)
-
     async def get_front_colors(self) -> list[HSBK]:
         """Get current front component colors from device.
 
@@ -792,12 +737,13 @@ class MirrorLight(MatrixLight):
             self.front_zone_count if component == "front" else self.back_zone_count
         )
 
+        # Compared on the wire: a brightness that rounds to 0 is written as 0
         if isinstance(colors, HSBK):
-            if colors.brightness == 0:
+            if _is_dark([colors]):
                 raise ValueError(zero_message)
             return [colors] * zone_count
 
-        if all(c.brightness == 0 for c in colors):
+        if _is_dark(colors):
             raise ValueError(zero_message)
 
         if len(colors) != zone_count:
@@ -894,10 +840,13 @@ class MirrorLight(MatrixLight):
                 )
 
             # Store the other component's colors BEFORE zeroing them out so
-            # its own turn_on() can restore them later
+            # its own turn_on() can restore them later. A component that is
+            # already dark keeps the colours stored when it was turned off:
+            # storing its zeros would lose them.
             other_positions = self._component_positions(other)
             other_colors = _gather(tile_colors, other_positions)
-            self._set_stored_colors(other, other_colors)
+            if not _is_dark(other_colors):
+                self._set_stored_colors(other, other_colors)
 
             # Apply target colors, and zero the other component so it stays
             # off when power comes back on
@@ -1027,19 +976,20 @@ class MirrorLight(MatrixLight):
         positions = self._component_positions(component)
         other_positions = self._component_positions(other)
 
-        # If not provided, extract from fetched data
-        # (kept local until I/O succeeds)
-        if stored_colors is None:
-            stored_colors = _gather(tile_colors, positions)
-
         current_colors = _gather(tile_colors, positions)
 
-        # Is the other component already dark (or fading there)? Compared at
-        # uint16 granularity, matching what the wire can express.
-        other_already_off = all(
-            c.to_protocol().brightness == 0
-            for c in _gather(tile_colors, other_positions)
-        )
+        # If not provided, store what the component is showing (kept local
+        # until I/O succeeds). A component that is already dark keeps the
+        # colours stored when it went dark: storing its zeros would lose them.
+        if stored_colors is None:
+            previous = self._stored_colors(component)
+            if _is_dark(current_colors) and previous is not None:
+                stored_colors = previous
+            else:
+                stored_colors = current_colors
+
+        # Is the other component already dark (or fading there)?
+        other_already_off = _is_dark(_gather(tile_colors, other_positions))
 
         if other_already_off:
             # Nothing else is lit, so power the whole device down instead of
@@ -1048,19 +998,24 @@ class MirrorLight(MatrixLight):
             # a plain set_power(True) turning on a light that shows nothing.
             await self._write_power(False, duration)
 
-            # Brightness is kept, but caller-supplied H/S/K still has to reach
-            # the device or a later power-on would restore the old colours.
-            # Sent after the power-off so the change is not seen.
-            device_colors = [
-                HSBK(
-                    hue=stored.hue,
-                    saturation=stored.saturation,
-                    brightness=current.brightness,
-                    kelvin=stored.kelvin,
-                )
-                for stored, current in zip(stored_colors, current_colors, strict=True)
-            ]
-            if colors is not None:
+            # Brightness is kept, but caller-supplied H/S/K has to reach the
+            # device or a later plain set_power(True) would restore the old
+            # colours. Only an instant power-off hides the change: during a
+            # fade the light is still visibly lit, so the new colours are only
+            # stored, which is what turn_front_on()/turn_back_on() restore.
+            device_colors = list(current_colors)
+            if colors is not None and duration == 0:
+                device_colors = [
+                    HSBK(
+                        hue=stored.hue,
+                        saturation=stored.saturation,
+                        brightness=current.brightness,
+                        kelvin=stored.kelvin,
+                    )
+                    for stored, current in zip(
+                        stored_colors, current_colors, strict=True
+                    )
+                ]
                 _scatter(tile_colors, positions, device_colors)
                 await self._write_tile(tile_colors, 0.0)
         else:
@@ -1160,13 +1115,12 @@ class MirrorLight(MatrixLight):
 
         colors = _gather(rendered, self._component_positions(component))
 
-        is_on = await self._power_for_update()
-
-        # If the light is off and we are turning it on, set colors instantly
-        # and then fade the power up, so it fades to the theme
-        if power_on and not is_on:
-            await self._set_component_colors(component, colors, 0.0)
-            await self.set_power(True, duration)
+        # Turning on goes through the same path as turn_front_on() and
+        # turn_back_on(): from off, the theme is loaded while the light is
+        # dark, the other component is zeroed so it stays off, and the power
+        # fades up
+        if power_on:
+            await self._turn_component_on(component, colors, duration)
         else:
             await self._set_component_colors(component, colors, duration)
 
@@ -1230,7 +1184,7 @@ class MirrorLight(MatrixLight):
             self._set_component_state("back", back_colors)
 
         await super().set_power(level, duration)
-        self._pending_power.record(0 if turning_off else 65535, duration)
+        self._record_power(not turning_off, duration)
 
         state = self.state
         if turning_off:
@@ -1279,8 +1233,11 @@ class MirrorLight(MatrixLight):
             ```
         """
         await super().set_color(color, duration)
-        # Every zone was just rewritten, so a remembered tile is now wrong
-        self._pending_tile.clear()
+
+        # Nothing to keep in sync before the device has been entered, and
+        # DeviceGroup.set_color() reaches devices straight from discover()
+        if self._state is None:
+            return
 
         state = self.state
         is_on = bool(state.power > 0 and color.brightness > 0)
@@ -1315,6 +1272,26 @@ class MirrorLight(MatrixLight):
 
         if stored:
             self._set_stored_colors(component, colors)
+
+    def _stored_colors(self, component: str) -> list[HSBK] | None:
+        """Get a component's stored restoration colors, if they fit the layout.
+
+        Args:
+            component: Either "front" or "back"
+
+        Returns:
+            The stored colors, or None if unset or the wrong length
+        """
+        state = self.state
+        stored = (
+            state.stored_front_colors
+            if component == "front"
+            else state.stored_back_colors
+        )
+        zone_count = len(self._component_positions(component))
+        if stored is None or len(stored) != zone_count:
+            return None
+        return list(stored)
 
     def _set_stored_colors(self, component: str, colors: list[HSBK]) -> None:
         """Update the stored restoration colors of one component.
@@ -1574,6 +1551,21 @@ def _scatter(
 
     for position, color in zip(positions, colors):
         buffer[position] = color
+
+
+def _is_dark(colors: list[HSBK]) -> bool:
+    """Return whether every color is unlit once encoded for the wire.
+
+    Compared at uint16 granularity, matching what the device can express: a
+    float brightness small enough to round to 0 is written as 0.
+
+    Args:
+        colors: Colours to check
+
+    Returns:
+        True if every colour has wire brightness 0
+    """
+    return all(c.to_protocol().brightness == 0 for c in colors)
 
 
 def _unlit(color: HSBK) -> HSBK:

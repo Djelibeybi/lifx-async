@@ -235,6 +235,7 @@ class TestCeilingLightSetMethods:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_set_uplight_color(self, ceiling_176: CeilingLight) -> None:
@@ -369,6 +370,7 @@ class TestCeilingLightTurnOnOff:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_turn_uplight_on_with_color(self, ceiling_176: CeilingLight) -> None:
@@ -1663,6 +1665,7 @@ class TestCeilingLightTurnDownlightOffWithList:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_turn_downlight_off_with_list_stores_provided(
@@ -1725,6 +1728,7 @@ class TestCeilingLightBrightnessInference:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_determine_uplight_brightness_zero_downlight_fallback(
@@ -1914,6 +1918,7 @@ class TestCeilingLightSetDownlightSingleZeroBrightness:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_set_downlight_single_color_zero_brightness_raises(
@@ -1944,6 +1949,7 @@ class TestCeilingLightSetPowerOverride:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_set_power_off_captures_uplight_color(
@@ -2292,6 +2298,7 @@ class TestCeilingLightTurnOnPowerBehavior:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     async def test_turn_uplight_on_sets_color_instantly_then_powers_on(
@@ -2642,6 +2649,7 @@ class TestCeilingLightTurnOffPowerBehavior:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     @staticmethod
@@ -2843,6 +2851,7 @@ class TestCeilingLightStateCoverage:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
     # as_dict serialisation is covered in test_state_serialisation.py, against
@@ -3316,3 +3325,24 @@ class TestWriteStateFileFailure:
             assert json.loads(state_file.read_text()) == {
                 "d073d5000001": {"uplight": {}}
             }
+
+
+class TestCeilingLightBeforeEntering:
+    """Tests for a Ceiling used straight from discover(), before async with."""
+
+    async def test_set_color_before_entering_does_not_raise(self) -> None:
+        """Test that DeviceGroup.set_color() can reach an unentered Ceiling."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+
+        with patch("lifx.devices.light.Light.set_color", new_callable=AsyncMock):
+            await ceiling.set_color(
+                HSBK(hue=0, saturation=0, brightness=1, kelvin=3500)
+            )
+
+    async def test_power_check_before_entering_leaves_state_alone(self) -> None:
+        """Test that the power check works with no state to update."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.get_power = AsyncMock(return_value=65535)
+
+        assert await ceiling._power_for_update() == 65535
+        assert ceiling._state is None

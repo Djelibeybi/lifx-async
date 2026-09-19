@@ -245,6 +245,7 @@ class Light(Device[LightState]):
             ),
         )
         self._raise_if_unhandled(result)
+        self._zones_changed()
 
         _LOGGER.debug(
             {
@@ -435,6 +436,14 @@ class Light(Device[LightState]):
             set_brightness=False,
             set_kelvin=False,
         )
+
+    def _zones_changed(self) -> None:
+        """Hook called after a write that changes zone colours.
+
+        A no-op here. Component devices override it to forget colours they
+        were tracking for an in-flight transition, so a later component write
+        does not undo a colour change made through an inherited method.
+        """
 
     async def get_power(self) -> int:
         """Get light power state (specific to light, not device).
@@ -658,6 +667,7 @@ class Light(Device[LightState]):
             ),
         )
         self._raise_if_unhandled(result)
+        self._zones_changed()
         _LOGGER.debug(
             {
                 "class": "Device",
@@ -779,6 +789,7 @@ class Light(Device[LightState]):
             ),
         )
         self._raise_if_unhandled(result)
+        self._zones_changed()
         _LOGGER.debug(
             {
                 "class": "Light",
