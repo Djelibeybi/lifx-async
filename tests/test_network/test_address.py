@@ -115,11 +115,18 @@ class TestValidateAddressRejects:
 class TestValidateAddressRaisesBeforeAdvisory:
     """Review finding 11: a doomed address must not log on its way out."""
 
-    @pytest.mark.parametrize("value", ["::ffff:8.8.8.8", "0.0.0.0", "::"])
+    @pytest.mark.parametrize(
+        "value", ["::ffff:8.8.8.8", "0.0.0.0", "::", "::1%0", "::1%99999999999"]
+    )
     def test_rejected_address_logs_nothing(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """``0.0.0.0`` and ``::`` are reached only after the loopback test."""
+        """A rejected address is never noted first.
+
+        ``::1%0`` and ``::1%99999999999`` are loopback addresses rejected for
+        their zone, so moving the loopback note ahead of the rejections would
+        log them on the way out.
+        """
         with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             with pytest.raises(ValueError):
                 validate_address(value)

@@ -906,45 +906,25 @@ def _create_device_from_record(
         (e.g., relay/button-only devices)
 
     """
-    from lifx.devices.ceiling import CeilingLight
-    from lifx.devices.hev import HevLight
-    from lifx.devices.infrared import InfraredLight
-    from lifx.devices.light import Light
-    from lifx.devices.matrix import MatrixLight
-    from lifx.devices.mirror import MirrorLight
-    from lifx.devices.multizone import MultiZoneLight
-    from lifx.products import get_product, is_ceiling_product, is_mirror_product
+    from lifx.products import get_product
 
-    product = get_product(record.product_id)
-    kwargs = {
-        "serial": record.serial,
-        "ip": record.ip,
-        "port": record.port,
-        "timeout": timeout,
-        "max_retries": max_retries,
-    }
+    # The same detection chain as discover() and Device.connect(), so both
+    # discovery paths always build the same class for a product
+    try:
+        device_class = get_device_class_for_product(
+            record.product_id, get_product(record.product_id)
+        )
+    except LifxUnsupportedDeviceError:
+        return None
 
-    # Priority-based selection matching DiscoveredDevice.create_device().
-    device: Light | None
-    if is_ceiling_product(record.product_id):
-        device = CeilingLight(**kwargs)
-    elif is_mirror_product(record.product_id):
-        device = MirrorLight(**kwargs)
-    elif product.has_matrix:
-        device = MatrixLight(**kwargs)
-    elif product.has_multizone:
-        device = MultiZoneLight(**kwargs)
-    elif product.has_infrared:
-        device = InfraredLight(**kwargs)
-    elif product.has_hev:
-        device = HevLight(**kwargs)
-    elif product.has_relays or (product.has_buttons and not product.has_color):
-        device = None
-    else:
-        device = Light(**kwargs)
-
-    if device is not None:
-        device._set_connectivity(record.connectivity)
+    device = device_class(
+        serial=record.serial,
+        ip=record.ip,
+        port=record.port,
+        timeout=timeout,
+        max_retries=max_retries,
+    )
+    device._set_connectivity(record.connectivity)
     return device
 
 

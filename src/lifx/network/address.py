@@ -25,12 +25,12 @@ The call sites, all of which import from here:
   with :func:`sockaddr_for`
 * :mod:`lifx.network.discovery`: discovery derives bind literals with
   :func:`wildcard_for`, reconstructs responder scope with
-  :func:`host_from_sockaddr`, and validates wire addresses without emitting
-  caller-input warnings; device construction retains that explicit policy
+  :func:`host_from_sockaddr`, and validates wire addresses with
+  :func:`validate_address`. Its only advisory, the loopback note, is logged at
+  DEBUG, so responder-controlled addresses cannot flood a log at WARNING
 * :mod:`lifx.network.discovery.mdns.discovery`: mDNS validates packet-source and
-  advertised device addresses with :func:`validate_address`, suppressing
-  caller-input warnings for both wire-controlled paths and for construction
-  from those validated records
+  advertised device addresses with :func:`validate_address`, under the same
+  DEBUG-only loopback note
 * :mod:`lifx.animation.animator`: ``Animator`` validates its caller-supplied
   address, resolves its frame destination with :func:`sockaddr_for`, and
   derives the socket family with :func:`family_for_sockaddr`

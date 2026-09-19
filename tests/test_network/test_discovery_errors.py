@@ -483,10 +483,14 @@ class TestDiscoveryResponderAddressValidation:
             record for record in caplog.records if record.levelno >= logging.ERROR
         ]
 
-    async def test_inbound_loopback_does_not_emit_address_warning(
+    async def test_inbound_loopback_is_noted_at_debug_only(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Caller advisories are disabled for responder-controlled addresses."""
+        """A responder-controlled loopback address is noted, never warned about.
+
+        One line per datagram would flood the log at WARNING; at DEBUG it is
+        opt-in trace context.
+        """
         known_source = 42
         packet = _build_state_service_packet(
             source=known_source,
@@ -501,7 +505,7 @@ class TestDiscoveryResponderAddressValidation:
                 raise LifxTimeoutError("timeout") from None
 
         with (
-            caplog.at_level(logging.WARNING, logger="lifx.network.address"),
+            caplog.at_level(logging.DEBUG, logger="lifx.network.address"),
             patch("lifx.network.discovery.udp.UdpTransport") as mock_transport_cls,
             patch(
                 "lifx.network.discovery.udp.allocate_source", return_value=known_source
@@ -522,7 +526,15 @@ class TestDiscoveryResponderAddressValidation:
             ]
 
         assert len(discovered) == 1
-        assert caplog.records == []
+        notes = [
+            record
+            for record in caplog.records
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "is_loopback"
+        ]
+        assert notes
+        assert all(record.levelno == logging.DEBUG for record in notes)
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
 class TestDiscoverySourceValidation:

@@ -185,19 +185,20 @@ class TestMdnsPublicSurface:
 class TestLifxRecordCache:
     """Tests for the _LifxRecordCache mDNS record accumulator."""
 
-    def test_packet_source_validation_suppresses_caller_warnings(
+    def test_packet_source_is_noted_at_debug_only(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A responder-controlled source cannot emit caller-input warnings."""
+        """A responder-controlled loopback source is noted, never warned about."""
         cache = _LifxRecordCache()
 
-        with caplog.at_level("WARNING", logger="lifx.network.address"):
+        with caplog.at_level("DEBUG", logger="lifx.network.address"):
             cache.add_packet(
                 [_txt_record("device._lifx._udp.local")],
                 "127.0.0.1",
             )
 
-        assert caplog.records == []
+        assert caplog.records
+        assert all(record.levelname == "DEBUG" for record in caplog.records)
 
     def test_complete_unrelated_service_chain_is_rejected_at_every_boundary(
         self,
@@ -2417,10 +2418,10 @@ class TestDiscoverDevicesMdns:
             assert devices[0].serial == "d073d5123456"
 
     @pytest.mark.asyncio
-    async def test_record_validation_suppresses_caller_warnings(
+    async def test_advertised_address_is_noted_at_debug_only(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Construction cannot re-emit warnings for an advertised address."""
+        """Construction notes an advertised loopback endpoint at DEBUG only."""
         record = _LifxServiceRecord(
             serial="d073d5123456",
             ip="127.0.0.1",
@@ -2434,7 +2435,7 @@ class TestDiscoverDevicesMdns:
             yield record
 
         with (
-            caplog.at_level("WARNING"),
+            caplog.at_level("DEBUG", logger="lifx"),
             patch(
                 "lifx.network.discovery.mdns.discovery._discover_lifx_services",
                 return_value=mock_generator(),
@@ -2444,7 +2445,13 @@ class TestDiscoverDevicesMdns:
 
         assert len(devices) == 1
         assert isinstance(devices[0], Light)
-        assert caplog.records == []
+        actions = {
+            record.msg.get("action")
+            for record in caplog.records
+            if isinstance(record.msg, dict) and record.levelname == "DEBUG"
+        }
+        assert {"is_loopback", "non_standard_port"} <= actions
+        assert not [r for r in caplog.records if r.levelname in ("WARNING", "ERROR")]
 
     @pytest.mark.asyncio
     async def test_mixed_unusable_ipv4_and_valid_ula_yields_thread_device(
