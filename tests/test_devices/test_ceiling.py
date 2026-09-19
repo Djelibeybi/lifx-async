@@ -10,17 +10,16 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.ceiling import (
-    CeilingLight,
-    CeilingLightState,
+from lifx.devices.ceiling import CeilingLight, CeilingLightState
+from lifx.devices.component_state import (
     _resolve_state_path,
     _state_file_lock,
-    _write_state_file,
+    write_state_file,
 )
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
@@ -931,11 +930,11 @@ class TestCeilingLightStatePersistence:
             real_replace(src, dst)  # type: ignore[arg-type]
             order.append("done")
 
-        monkeypatch.setattr("lifx.devices.ceiling.os.replace", _slow_replace)
+        monkeypatch.setattr("lifx.devices.component_state.os.replace", _slow_replace)
 
         threads = [
             threading.Thread(
-                target=_write_state_file,
+                target=write_state_file,
                 args=(state_file, serial, {"uplight": {"brightness": 0.5}}),
             )
             for serial in ("d073d5010203", "d073d5040506")
@@ -3225,3 +3224,71 @@ class TestCeilingLightStateCoverage:
 
             # Downlight should be rejected due to zone count mismatch
             assert ceiling.state.stored_downlight_colors is None
+
+
+class TestCeilingLightTransitions:
+    """Tests for writes that land while an earlier transition is running."""
+
+    LIT = HSBK(hue=120, saturation=1.0, brightness=0.9, kelvin=3500)
+    DARK = HSBK(hue=30, saturation=0.4, brightness=0.0, kelvin=2700)
+    AMBER = HSBK(hue=30, saturation=0.4, brightness=0.3, kelvin=2700)
+
+    @pytest.fixture
+    def ceiling(self) -> CeilingLight:
+        """Create a Ceiling product 176 (8x8) with both components lit."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state()
+        ceiling.set_matrix_colors = AsyncMock()
+        ceiling._save_state_to_file = AsyncMock()
+        ceiling.get_all_tile_colors = AsyncMock(return_value=[[self.LIT] * 64])
+        ceiling.get_power = AsyncMock(return_value=65535)
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        return ceiling
+
+    async def test_switch_mid_fade_carries_the_other_target(
+        self, ceiling: CeilingLight
+    ) -> None:
+        """Test that the second write keeps the downlight heading to 0.
+
+        The device reports the downlight still lit while it fades out.
+        Rebuilding the tile from that would pin it on; the write must carry
+        the downlight's target instead.
+        """
+        await ceiling.turn_downlight_off(duration=1.0)
+        await ceiling.turn_uplight_on(self.AMBER, duration=1.0)
+
+        written = ceiling.set_matrix_colors.call_args.args[1]
+        assert all(c.brightness == 0 for c in written[:63])
+        assert written[63] == self.AMBER
+        ceiling.get_all_tile_colors.assert_awaited_once()
+
+    async def test_turn_on_right_after_power_off_powers_back_on(
+        self, ceiling: CeilingLight
+    ) -> None:
+        """Test that a stale GetPower does not skip powering the light back on.
+
+        With the downlight already dark, turning the uplight off powers the
+        device down. GetPower still reports the old level just afterwards, so
+        the downlight turn-on must trust the power-off it has just sent.
+        """
+        ceiling.get_all_tile_colors = AsyncMock(
+            return_value=[[self.DARK] * 63 + [self.LIT]]
+        )
+
+        with patch(
+            "lifx.devices.light.Light.set_power", new_callable=AsyncMock
+        ) as light_power:
+            await ceiling.turn_uplight_off(duration=1.0)
+            await ceiling.turn_downlight_on(self.AMBER, duration=1.0)
+
+        assert light_power.await_args_list == [
+            call(False, 1.0),
+            call(True, 1.0),
+        ]
+        written = ceiling.set_matrix_colors.call_args.args[1]
+        assert written[:63] == [self.AMBER] * 63
+        assert written[63].brightness == 0
+        # The power-off is still fading out, so the zones fade rather than snap
+        assert ceiling.set_matrix_colors.call_args.kwargs["duration"] == 1000

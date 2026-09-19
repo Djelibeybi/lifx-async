@@ -19,178 +19,29 @@ Product IDs:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-import tempfile
-import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component_state import (
+    Pending,
+    color_as_dict,
+    colors_as_dict,
+    decode_color,
+    encode_color,
+    hsk_matches,
+    read_state_file,
+    write_state_file,
+    zones_as_dict,
+)
 from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
 
 _LOGGER = logging.getLogger(__name__)
-
-# Locks serialising read-modify-write cycles per state file, keyed on the
-# resolved path so every spelling of one file shares a lock. Bounded by the
-# number of distinct state files an application opens.
-#
-# These are ``threading.Lock`` rather than ``asyncio.Lock`` because the file
-# I/O runs in worker threads: an asyncio.Lock binds to whichever event loop
-# first contends for it, so two loops sharing a file would deadlock, and it
-# would be released the instant a pending ``asyncio.to_thread`` is cancelled —
-# while the worker thread carried on writing. Taking the lock inside the
-# thread avoids both. ``_STATE_FILE_LOCKS_GUARD`` makes the get-or-create
-# atomic; without it two threads can install two locks for one file.
-_STATE_FILE_LOCKS_GUARD = threading.Lock()
-_STATE_FILE_LOCKS: dict[str, threading.Lock] = {}
-
-
-def _resolve_state_path(path: Path) -> Path:
-    """Normalise a state file path so every spelling maps to one lock.
-
-    Expands ``~`` and resolves relative segments and symlinks. Case-only
-    differences on case-insensitive filesystems are left alone: folding them
-    would be wrong on a case-sensitive one.
-
-    Args:
-        path: State file path as supplied by the caller
-
-    Returns:
-        The resolved path
-    """
-    return path.expanduser().resolve()
-
-
-def _state_file_lock(path: Path) -> threading.Lock:
-    """Get the lock guarding a state file.
-
-    Several devices can share one state file, and saving is a read-merge-write
-    cycle. That I/O runs in worker threads, so without this lock two saves
-    could interleave and drop one device's entry — running on the event loop
-    used to serialise them for free.
-
-    Args:
-        path: Resolved path to the state file
-
-    Returns:
-        The lock guarding that path
-    """
-    key = str(path)
-    with _STATE_FILE_LOCKS_GUARD:
-        lock = _STATE_FILE_LOCKS.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _STATE_FILE_LOCKS[key] = lock
-        return lock
-
-
-def _read_state_file(path: Path) -> tuple[bool, Any]:
-    """Read and parse the state file. Blocking — call via asyncio.to_thread.
-
-    Takes the file's lock so a read cannot observe a half-finished merge.
-
-    Args:
-        path: Path to the state file; resolved here
-
-    Returns:
-        ``(exists, contents)``. The flag distinguishes an absent file from one
-        that parses to JSON ``null``, which is corruption rather than absence.
-    """
-    resolved = _resolve_state_path(path)
-    with _state_file_lock(resolved):
-        if not resolved.exists():
-            return False, None
-
-        with resolved.open("r") as f:
-            return True, json.load(f)
-
-
-def _write_state_file(path: Path, serial: str, device_state: dict[str, Any]) -> None:
-    """Merge one device's state into the state file and write it back.
-
-    Blocking — call via asyncio.to_thread. Takes the file's lock for the whole
-    read-merge-write cycle, so devices sharing a file cannot drop each other's
-    entries. The lock is process-local: it does not coordinate with a separate
-    process pointed at the same file.
-
-    The on-disk entry is merged rather than replaced so absent in-memory values
-    (e.g. state that failed to load in ``__aenter__``) are not clobbered.
-
-    Args:
-        path: Path to the state file; resolved here
-        serial: Serial number of the device whose entry is being updated
-        device_state: Serialisable state to merge into that device's entry
-
-    Raises:
-        ValueError: If the existing file does not contain a JSON object, which
-            would otherwise be silently overwritten along with every device's
-            stored state
-    """
-    resolved = _resolve_state_path(path)
-    with _state_file_lock(resolved):
-        if resolved.exists():
-            with resolved.open("r") as f:
-                data = json.load(f)
-            if not isinstance(data, dict):
-                raise ValueError(
-                    f"State file {resolved} does not contain a JSON object "
-                    f"(found {type(data).__name__}); refusing to overwrite it"
-                )
-        else:
-            data = {}
-
-        entry = data.get(serial, {})
-        entry.update(device_state)
-        data[serial] = entry
-
-        # Ensure directory exists
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write atomically: dump to a temp file in the same directory, then
-        # replace, so a crash mid-write cannot leave a truncated file that
-        # loses every device's stored state
-        fd, tmp = tempfile.mkstemp(dir=resolved.parent, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(data, f, indent=2)
-            os.replace(tmp, resolved)
-        except BaseException:
-            os.unlink(tmp)
-            raise
-
-
-def _hsk_matches(stored: HSBK, current: HSBK) -> bool:
-    """Compare hue/saturation/kelvin at uint16 (wire) granularity.
-
-    Brightness is intentionally ignored. Comparing the decoded uint16 values
-    rather than the raw floats keeps stored-state validity stable across a
-    protocol round-trip, which exposes slightly different raw H/S/B floats for
-    the same wire representation.
-    """
-    sp = stored.to_protocol()
-    cp = current.to_protocol()
-    return (
-        sp.hue == cp.hue and sp.saturation == cp.saturation and sp.kelvin == cp.kelvin
-    )
-
-
-def _color_as_dict(color: HSBK | None) -> dict[str, float | int] | None:
-    """Expand an optional HSBK for serialisation, preserving None."""
-    return None if color is None else color.as_dict
-
-
-def _colors_as_dict(
-    colors: list[HSBK] | None,
-) -> list[dict[str, float | int]] | None:
-    """Expand an optional list of HSBK for serialisation, preserving None."""
-    return None if colors is None else [color.as_dict for color in colors]
 
 
 @dataclass
@@ -242,22 +93,17 @@ class CeilingLightState(MatrixLightState):
         The uplight/downlight colors are expanded via :attr:`HSBK.as_dict`;
         the stored and last-known fields stay None when unset.
         """
-        zones = self.downlight_zones
         state = super().as_dict
-        state["downlight_zones"] = {
-            "start": zones.start,
-            "stop": zones.stop,
-            "step": 1 if zones.step is None else zones.step,
-        }
+        state["downlight_zones"] = zones_as_dict(self.downlight_zones)
         state["uplight_is_on"] = self.uplight_is_on
         state["downlight_is_on"] = self.downlight_is_on
         state["uplight_zone"] = self.uplight_zone
         state["uplight_color"] = self.uplight_color.as_dict
-        state["downlight_colors"] = _colors_as_dict(self.downlight_colors)
-        state["stored_uplight_color"] = _color_as_dict(self.stored_uplight_color)
-        state["stored_downlight_colors"] = _colors_as_dict(self.stored_downlight_colors)
-        state["last_uplight_color"] = _color_as_dict(self.last_uplight_color)
-        state["last_downlight_colors"] = _colors_as_dict(self.last_downlight_colors)
+        state["downlight_colors"] = colors_as_dict(self.downlight_colors)
+        state["stored_uplight_color"] = color_as_dict(self.stored_uplight_color)
+        state["stored_downlight_colors"] = colors_as_dict(self.stored_downlight_colors)
+        state["last_uplight_color"] = color_as_dict(self.last_uplight_color)
+        state["last_downlight_colors"] = colors_as_dict(self.last_downlight_colors)
         return state
 
     @classmethod
@@ -404,6 +250,8 @@ class CeilingLight(MatrixLight):
             fetch_ambient_light=fetch_ambient_light,
         )
         self._state_file = state_file
+        self._pending_tile: Pending[list[HSBK]] = Pending()
+        self._pending_power: Pending[int] = Pending()
 
     async def __aenter__(self) -> CeilingLight:
         """Async context manager entry."""
@@ -689,6 +537,62 @@ class CeilingLight(MatrixLight):
 
         return any(c.brightness > 0 for c in state.last_downlight_colors)
 
+    async def _tile_colors_for_update(self) -> list[HSBK]:
+        """Get the tile as the base for a component write.
+
+        While the last write is still transitioning this is that write's
+        target rather than the device's in-flight colours, so the untouched
+        component keeps heading where it was going. See
+        :class:`~lifx.devices.component_state.Pending`.
+
+        Returns:
+            Colors for every zone on the tile
+        """
+        pending = self._pending_tile.get()
+        if pending is not None:
+            return pending
+
+        all_colors = await self.get_all_tile_colors()
+        return all_colors[0]
+
+    async def _write_tile(self, tile_colors: list[HSBK], duration: float) -> None:
+        """Write the whole tile and remember it until the transition settles.
+
+        Args:
+            tile_colors: Colors for every zone on the tile
+            duration: Transition duration in seconds
+        """
+        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+        self._pending_tile.record(tile_colors, duration)
+
+    async def _power_for_update(self) -> int:
+        """Get the power level, trusting this device's own recent change.
+
+        GetPower keeps reporting the old level for a moment after a SetPower,
+        even an acknowledged one, so a component method that has just powered
+        the light off must not ask the device whether it is on.
+
+        Returns:
+            Power level, 0 or 65535
+        """
+        pending = self._pending_power.get()
+        if pending is not None:
+            return pending
+        return await self.get_power()
+
+    async def _write_power(self, on: bool, duration: float) -> None:
+        """Set the power level and remember it until it settles.
+
+        Calls Light.set_power() directly, bypassing this class's override,
+        which captures component colours on the way down.
+
+        Args:
+            on: True to power on, False to power off
+            duration: Transition duration in seconds
+        """
+        await super().set_power(on, duration)
+        self._pending_power.record(65535 if on else 0, duration)
+
     async def get_uplight_color(self) -> HSBK:
         """Get current uplight component color from device.
 
@@ -746,14 +650,13 @@ class CeilingLight(MatrixLight):
             )
 
         # Get current colors for all zones
-        all_colors = await self.get_all_tile_colors()
-        tile_colors = all_colors[0]
+        tile_colors = await self._tile_colors_for_update()
 
         # Update uplight zone
         tile_colors[self.uplight_zone] = color
 
         # Set all colors back (duration in milliseconds for set_matrix_colors)
-        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+        await self._write_tile(tile_colors, duration)
 
         # Update state — public fields, stored state, and last-known
         self.state.uplight_color = color
@@ -809,14 +712,13 @@ class CeilingLight(MatrixLight):
             downlight_colors = colors
 
         # Get current colors for all zones
-        all_colors = await self.get_all_tile_colors()
-        tile_colors = all_colors[0]
+        tile_colors = await self._tile_colors_for_update()
 
         # Update downlight zones
         tile_colors[self.downlight_zones] = downlight_colors
 
         # Set all colors back
-        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+        await self._write_tile(tile_colors, duration)
 
         # Update state — public fields, stored state, and last-known
         self.state.downlight_colors = list(downlight_colors)
@@ -856,10 +758,9 @@ class CeilingLight(MatrixLight):
             raise ValueError("Cannot turn on uplight with brightness=0")
 
         # Check if light is off first to determine which path to take
-        if await self.get_power() == 0:
+        if await self._power_for_update() == 0:
             # Light is off - single fetch for both determining color and modification
-            all_colors = await self.get_all_tile_colors()
-            tile_colors = all_colors[0]
+            tile_colors = await self._tile_colors_for_update()
 
             # Determine target color (pass pre-fetched colors to avoid extra fetch)
             if color is not None:
@@ -884,8 +785,12 @@ class CeilingLight(MatrixLight):
                     kelvin=tile_colors[i].kelvin,
                 )
 
-            # Set all colors instantly (duration=0) while light is off
-            await self.set_matrix_colors(0, tile_colors, duration=0)
+            # Set all colors instantly while the light is dark. If a power-off
+            # is still fading out, the light is visibly lit, so an instant
+            # write would snap both components: fade the zones instead, while
+            # the power comes back up.
+            preload = duration if self._pending_power.transitioning() else 0.0
+            await self._write_tile(tile_colors, preload)
 
             # Update state — public fields, stored state, and last-known
             # (is_on flags deferred until after power-on succeeds)
@@ -896,7 +801,7 @@ class CeilingLight(MatrixLight):
             self.state.last_downlight_colors = list(tile_colors[self.downlight_zones])
 
             # Turn on with the requested duration - light fades on to target color
-            await super().set_power(True, duration)
+            await self._write_power(True, duration)
 
             # Mark is_on flags only after power-on succeeds
             self.state.uplight_is_on = True
@@ -944,8 +849,7 @@ class CeilingLight(MatrixLight):
             )
 
         # Fetch current state once and reuse to calculate brightness
-        all_colors = await self.get_all_tile_colors()
-        tile_colors = all_colors[0]
+        tile_colors = await self._tile_colors_for_update()
 
         # Determine which color to store (kept local until I/O succeeds)
         if color is not None:
@@ -972,7 +876,7 @@ class CeilingLight(MatrixLight):
             # leaving it on with every zone at zero brightness. The zone keeps
             # its brightness on the device: zeroing it as well would leave a
             # plain set_power(True) turning on a light that shows nothing.
-            await super().set_power(False, duration)
+            await self._write_power(False, duration)
 
             # Brightness is kept, but a caller-supplied H/S/K still has to
             # reach the device or a later power-on would restore the old
@@ -985,11 +889,11 @@ class CeilingLight(MatrixLight):
             )
             if color is not None:
                 tile_colors[self.uplight_zone] = device_color
-                await self.set_matrix_colors(0, tile_colors, duration=0)
+                await self._write_tile(tile_colors, 0.0)
         else:
             # Update uplight zone and send
             tile_colors[self.uplight_zone] = off_color
-            await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+            await self._write_tile(tile_colors, duration)
             device_color = off_color
 
         # Update state only after I/O succeeds. The colour fields track what
@@ -1051,10 +955,9 @@ class CeilingLight(MatrixLight):
                     )
 
         # Check if light is off first to determine which path to take
-        if await self.get_power() == 0:
+        if await self._power_for_update() == 0:
             # Light is off - single fetch for both determining colors and modification
-            all_colors = await self.get_all_tile_colors()
-            tile_colors = all_colors[0]
+            tile_colors = await self._tile_colors_for_update()
 
             # Determine target colors (pass pre-fetched colors to avoid extra fetch)
             if colors is not None:
@@ -1081,8 +984,12 @@ class CeilingLight(MatrixLight):
                 kelvin=uplight_color.kelvin,
             )
 
-            # Set all colors instantly (duration=0) while light is off
-            await self.set_matrix_colors(0, tile_colors, duration=0)
+            # Set all colors instantly while the light is dark. If a power-off
+            # is still fading out, the light is visibly lit, so an instant
+            # write would snap both components: fade the zones instead, while
+            # the power comes back up.
+            preload = duration if self._pending_power.transitioning() else 0.0
+            await self._write_tile(tile_colors, preload)
 
             # Update state — public fields, stored state, and last-known
             # (is_on flags deferred until after power-on succeeds)
@@ -1093,7 +1000,7 @@ class CeilingLight(MatrixLight):
             self.state.last_uplight_color = tile_colors[self.uplight_zone]
 
             # Turn on with the requested duration - light fades on to target colors
-            await super().set_power(True, duration)
+            await self._write_power(True, duration)
 
             # Mark is_on flags only after power-on succeeds
             self.state.downlight_is_on = True
@@ -1166,8 +1073,7 @@ class CeilingLight(MatrixLight):
         # If turning off, capture current colors for both components with single fetch
         if turning_off:
             # Single fetch to capture both uplight and downlight colors
-            all_colors = await self.get_all_tile_colors()
-            tile_colors = all_colors[0]
+            tile_colors = await self._tile_colors_for_update()
 
             # Extract and store both component colors
             state = self.state
@@ -1182,6 +1088,7 @@ class CeilingLight(MatrixLight):
 
         # Call parent to perform actual power change
         await super().set_power(level, duration)
+        self._pending_power.record(0 if turning_off else 65535, duration)
 
         # Mark components as off only after power-off succeeds
         if turning_off:
@@ -1238,6 +1145,8 @@ class CeilingLight(MatrixLight):
         """
         # Call parent to perform actual color change
         await super().set_color(color, duration)
+        # Every zone was just rewritten, so a remembered tile is now wrong
+        self._pending_tile.clear()
 
         # Update all state fields — all zones now have the same color
         state = self.state
@@ -1307,8 +1216,7 @@ class CeilingLight(MatrixLight):
                 stored_colors = list(colors)
 
         # Fetch current state once and reuse to calculate brightness
-        all_colors = await self.get_all_tile_colors()
-        tile_colors = all_colors[0]
+        tile_colors = await self._tile_colors_for_update()
 
         # If not provided, extract from fetched data
         # (kept local until I/O succeeds)
@@ -1337,7 +1245,7 @@ class CeilingLight(MatrixLight):
             # leaving it on with every zone at zero brightness. The zones keep
             # their brightness on the device: zeroing them as well would leave
             # a plain set_power(True) turning on a light that shows nothing.
-            await super().set_power(False, duration)
+            await self._write_power(False, duration)
 
             # Brightness is kept, but caller-supplied H/S/K still has to reach
             # the device or a later power-on would restore the old colours.
@@ -1355,11 +1263,11 @@ class CeilingLight(MatrixLight):
             ]
             if colors is not None:
                 tile_colors[self.downlight_zones] = device_colors
-                await self.set_matrix_colors(0, tile_colors, duration=0)
+                await self._write_tile(tile_colors, 0.0)
         else:
             # Update downlight zones and send
             tile_colors[self.downlight_zones] = off_colors
-            await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
+            await self._write_tile(tile_colors, duration)
             device_colors = list(off_colors)
 
         # Update state only after I/O succeeds. The colour fields track what
@@ -1409,8 +1317,7 @@ class CeilingLight(MatrixLight):
 
         # Get current colors (use pre-fetched if available)
         if tile_colors is None:
-            all_colors = await self.get_all_tile_colors()
-            tile_colors = all_colors[0]
+            tile_colors = await self._tile_colors_for_update()
 
         current_uplight = tile_colors[self.uplight_zone]
         downlight_colors = tile_colors[self.downlight_zones]
@@ -1473,8 +1380,7 @@ class CeilingLight(MatrixLight):
 
         # Get current colors (use pre-fetched if available)
         if tile_colors is None:
-            all_colors = await self.get_all_tile_colors()
-            tile_colors = all_colors[0]
+            tile_colors = await self._tile_colors_for_update()
 
         current_downlight = list(tile_colors[self.downlight_zones])
         uplight_color = tile_colors[self.uplight_zone]
@@ -1534,7 +1440,7 @@ class CeilingLight(MatrixLight):
                 return False
 
             stored = state.stored_uplight_color
-            return _hsk_matches(stored, current)
+            return hsk_matches(stored, current)
 
         if component == "downlight":
             if state.stored_downlight_colors is None or not isinstance(current, list):
@@ -1545,7 +1451,7 @@ class CeilingLight(MatrixLight):
 
             # Check if all zones match (H, S, K at wire granularity)
             return all(
-                _hsk_matches(s, c)
+                hsk_matches(s, c)
                 for s, c in zip(state.stored_downlight_colors, current)
             )
 
@@ -1563,11 +1469,10 @@ class CeilingLight(MatrixLight):
             return
 
         try:
-            state_path = Path(self._state_file).expanduser()
-            exists, data = await asyncio.to_thread(_read_state_file, state_path)
+            exists, data = await asyncio.to_thread(read_state_file, self._state_file)
 
             if not exists:
-                _LOGGER.debug("State file does not exist: %s", state_path)
+                _LOGGER.debug("State file does not exist: %s", self._state_file)
                 return
 
             if not isinstance(data, dict):
@@ -1575,7 +1480,7 @@ class CeilingLight(MatrixLight):
                 # truncated write, a bare list) is corruption, not absence
                 _LOGGER.warning(
                     "State file %s does not contain a JSON object (found %s)",
-                    state_path,
+                    self._state_file,
                     type(data).__name__,
                 )
                 return
@@ -1589,26 +1494,11 @@ class CeilingLight(MatrixLight):
             # Load uplight state
             state = self.state
             if "uplight" in device_state:
-                uplight_data = device_state["uplight"]
-                state.stored_uplight_color = HSBK(
-                    hue=uplight_data["hue"],
-                    saturation=uplight_data["saturation"],
-                    brightness=uplight_data["brightness"],
-                    kelvin=uplight_data["kelvin"],
-                )
+                state.stored_uplight_color = decode_color(device_state["uplight"])
 
             # Load downlight state (validate zone count if version is available)
             if "downlight" in device_state:
-                downlight_data = device_state["downlight"]
-                loaded_colors = [
-                    HSBK(
-                        hue=c["hue"],
-                        saturation=c["saturation"],
-                        brightness=c["brightness"],
-                        kelvin=c["kelvin"],
-                    )
-                    for c in downlight_data
-                ]
+                loaded_colors = [decode_color(c) for c in device_state["downlight"]]
                 try:
                     expected = self.downlight_zone_count
                 except LifxError:
@@ -1625,7 +1515,9 @@ class CeilingLight(MatrixLight):
                             len(loaded_colors),
                         )
 
-            _LOGGER.debug("Loaded state from %s for device %s", state_path, self.serial)
+            _LOGGER.debug(
+                "Loaded state from %s for device %s", self._state_file, self.serial
+            )
 
         except Exception as e:
             _LOGGER.warning("Failed to load state from %s: %s", self._state_file, e)
@@ -1644,37 +1536,26 @@ class CeilingLight(MatrixLight):
             return
 
         try:
-            state_path = Path(self._state_file).expanduser()
-
-            # Build this device's entry; _write_state_file merges it into any
+            # Build this device's entry; write_state_file merges it into any
             # existing on-disk entry
             device_state: dict[str, Any] = {}
             state = self.state
 
             if state.stored_uplight_color:
-                device_state["uplight"] = {
-                    "hue": state.stored_uplight_color.hue,
-                    "saturation": state.stored_uplight_color.saturation,
-                    "brightness": state.stored_uplight_color.brightness,
-                    "kelvin": state.stored_uplight_color.kelvin,
-                }
+                device_state["uplight"] = encode_color(state.stored_uplight_color)
 
             if state.stored_downlight_colors:
                 device_state["downlight"] = [
-                    {
-                        "hue": c.hue,
-                        "saturation": c.saturation,
-                        "brightness": c.brightness,
-                        "kelvin": c.kelvin,
-                    }
-                    for c in state.stored_downlight_colors
+                    encode_color(c) for c in state.stored_downlight_colors
                 ]
 
             await asyncio.to_thread(
-                _write_state_file, state_path, self.serial, device_state
+                write_state_file, self._state_file, self.serial, device_state
             )
 
-            _LOGGER.debug("Saved state to %s for device %s", state_path, self.serial)
+            _LOGGER.debug(
+                "Saved state to %s for device %s", self._state_file, self.serial
+            )
 
         except Exception as e:
             _LOGGER.warning("Failed to save state to %s: %s", self._state_file, e)

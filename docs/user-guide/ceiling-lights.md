@@ -293,6 +293,32 @@ await ceiling.set_downlight_colors(
 )
 ```
 
+### Switching Between Components
+
+The uplight and downlight live on one matrix, and the firmware runs one
+transition per matrix: any new write stops a fade that is still running, even
+in zones it does not touch. `CeilingLight` works around this so that calls made
+back to back behave:
+
+```python
+# The downlight fades out while the uplight fades in, both over one second
+await ceiling.turn_downlight_off(duration=1.0)
+await ceiling.turn_uplight_on(duration=1.0)
+```
+
+While a fade is still running, each component write carries the other
+component's *target* colors rather than the half-faded ones the device
+reports, so both finish where they were headed. The same applies to power: the
+device keeps reporting its old power level for a moment after a change, so a
+turn-on straight after the last component was turned off still powers the
+light back up. Once the fade has finished, the device is read again, so changes
+made in the LIFX app are picked up.
+
+This is best effort. The second write restarts both components' transitions
+with its own duration, and running component calls concurrently on one device
+(for example with `asyncio.gather()`) is not supported: await each call in
+turn.
+
 ## MatrixLight Compatibility
 
 CeilingLight extends `MatrixLight`, so all matrix operations are available:

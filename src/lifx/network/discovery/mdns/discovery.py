@@ -911,8 +911,9 @@ def _create_device_from_record(
     from lifx.devices.infrared import InfraredLight
     from lifx.devices.light import Light
     from lifx.devices.matrix import MatrixLight
+    from lifx.devices.mirror import MirrorLight
     from lifx.devices.multizone import MultiZoneLight
-    from lifx.products import get_product, is_ceiling_product
+    from lifx.products import get_product, is_ceiling_product, is_mirror_product
 
     product = get_product(record.product_id)
     kwargs = {
@@ -927,6 +928,8 @@ def _create_device_from_record(
     device: Light | None
     if is_ceiling_product(record.product_id):
         device = CeilingLight(**kwargs)
+    elif is_mirror_product(record.product_id):
+        device = MirrorLight(**kwargs)
     elif product.has_matrix:
         device = MatrixLight(**kwargs)
     elif product.has_multizone:

@@ -18,6 +18,7 @@ from lifx.devices.hev import HevLight, HevLightState
 from lifx.devices.infrared import InfraredLight, InfraredLightState
 from lifx.devices.light import Light, LightState
 from lifx.devices.matrix import MatrixEffect, MatrixLight, MatrixLightState, TileInfo
+from lifx.devices.mirror import MirrorLight, MirrorLightState
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
 
 __all__ = [
@@ -40,6 +41,8 @@ __all__ = [
     "MatrixEffect",
     "MatrixLight",
     "MatrixLightState",
+    "MirrorLight",
+    "MirrorLightState",
     "MultiZoneEffect",
     "MultiZoneLight",
     "MultiZoneLightState",
