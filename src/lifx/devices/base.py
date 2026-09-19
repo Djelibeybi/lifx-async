@@ -782,7 +782,12 @@ class Device(Generic[StateT]):
                 response = await temp_conn.request(
                     packets.Device.GetService(), timeout=timeout
                 )
-                if response and isinstance(response, packets.Device.StateService):
+                if not response:
+                    # Nothing answered, so the port is worth naming. A device
+                    # that answered without a usable serial is not a port
+                    # problem and raises below without the hint.
+                    _warn_unanswered_port(ip, port)
+                elif isinstance(response, packets.Device.StateService):
                     if temp_conn.serial and temp_conn.serial != "000000000000":
                         return cls(
                             serial=temp_conn.serial,
@@ -814,7 +819,6 @@ class Device(Generic[StateT]):
                 fetch_ambient_light=fetch_ambient_light,
             )
 
-        _warn_unanswered_port(ip, port)
         raise LifxDeviceNotFoundError()
 
     @classmethod
@@ -907,9 +911,16 @@ class Device(Generic[StateT]):
                         raise LifxDeviceNotFoundError(
                             "Could not determine device serial"
                         )
-                else:
+                elif not response:
+                    # Nothing answered, so the port is worth naming
                     _warn_unanswered_port(ip, port)
                     raise LifxDeviceNotFoundError("No response from device")
+                else:
+                    # The device answered, just not with StateService, so the
+                    # port is not the problem
+                    raise LifxDeviceNotFoundError(
+                        f"Unexpected response to GetService: {type(response).__name__}"
+                    )
             except LifxTimeoutError:
                 _warn_unanswered_port(ip, port)
                 raise

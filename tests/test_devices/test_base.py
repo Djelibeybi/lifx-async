@@ -1222,6 +1222,51 @@ class TestAddressEntryPointGate:
 
         assert len(self._unanswered_port_warnings(caplog)) == 1
 
+    @pytest.mark.parametrize("entry_point", ["from_ip", "connect"])
+    async def test_reply_without_a_usable_serial_does_not_warn(
+        self, entry_point: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A device that answered is not a port problem, even without a serial."""
+        connection = MagicMock()
+        connection.serial = "000000000000"
+        connection.request = AsyncMock(
+            return_value=packets.Device.StateService(
+                service=DeviceService.UDP,
+                port=12345,
+            )
+        )
+        connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx"),
+            patch("lifx.devices.base.DeviceConnection", return_value=connection),
+            pytest.raises(LifxDeviceNotFoundError),
+        ):
+            await getattr(Device, entry_point)(ip="127.0.0.1", port=12345)
+
+        assert self._unanswered_port_warnings(caplog) == []
+
+    @pytest.mark.parametrize("entry_point", ["from_ip", "connect"])
+    async def test_unexpected_reply_does_not_warn(
+        self, entry_point: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A reply that is not StateService still proves the port answers."""
+        connection = MagicMock()
+        connection.serial = self.SERIAL
+        connection.request = AsyncMock(
+            return_value=packets.Device.StateLabel(label="x")
+        )
+        connection.close = AsyncMock()
+
+        with (
+            caplog.at_level(logging.DEBUG, logger="lifx"),
+            patch("lifx.devices.base.DeviceConnection", return_value=connection),
+            pytest.raises(LifxDeviceNotFoundError),
+        ):
+            await getattr(Device, entry_point)(ip="127.0.0.1", port=12345)
+
+        assert self._unanswered_port_warnings(caplog) == []
+
     async def test_timeout_on_default_port_does_not_warn(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
