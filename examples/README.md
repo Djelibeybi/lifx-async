@@ -342,7 +342,7 @@ uv run python examples/mirror_components.py --ip 192.168.1.100 --hold 5
 |-----------|----------|---------|-------------|
 | `--ip` | yes | | IP address of the Mirror |
 | `--serial` | no | | Serial number; supplying it skips the serial lookup |
-| `--hold` | no | `3.0` | Seconds to hold each step before moving on |
+| `--hold` | no | `10.0` | Seconds to hold each step before moving on |
 
 ## Animation
 
