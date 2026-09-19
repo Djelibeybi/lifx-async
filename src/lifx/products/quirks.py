@@ -102,6 +102,181 @@ def supports_sky_effect(has_matrix: bool, firmware_major: int) -> bool:
     return has_matrix and firmware_major >= SKY_EFFECT_MIN_FIRMWARE_MAJOR
 
 
+@dataclass(frozen=True)
+class MirrorComponentLayout:
+    """Component layout for LIFX Mirror lights.
+
+    Mirror lights have two logical components, both of which span multiple
+    zones, so each one can carry its own gradient, theme or effect:
+
+    - Front: Zones facing the room, for task lighting
+    - Back: Zones facing the wall, for indirect backwash lighting
+
+    Each component is a closed ring that traces the capsule-shaped perimeter,
+    so its first and last zones are physically adjacent. The two rings run in
+    opposite directions: viewed in the default portrait orientation, the front
+    ring starts at the lower left and runs clockwise, while the back ring
+    starts at the lower left and runs anticlockwise.
+
+    Zone numbering does not match the Set64 buffer order. ``zone_map`` gives
+    the zone at each buffer position, and the position tuples give the buffer
+    positions in zone order, so callers can gather and scatter component
+    colours without re-deriving the mapping.
+
+    Attributes:
+        width: Matrix width in zones
+        height: Matrix height in zones
+        zone_map: Zone index at each buffer position, -1 where unused
+        front_positions: Buffer positions of the front zones, in zone order
+        back_positions: Buffer positions of the back zones, in zone order
+    """
+
+    width: int
+    height: int
+    zone_map: tuple[int, ...]
+    front_positions: tuple[int, ...]
+    back_positions: tuple[int, ...]
+
+    @property
+    def zone_count(self) -> int:
+        """Total number of addressable zones across both components."""
+        return len(self.front_positions) + len(self.back_positions)
+
+    @property
+    def buffer_size(self) -> int:
+        """Number of Set64 buffer positions, including unused ones."""
+        return self.width * self.height
+
+
+# Zone at each Set64 buffer position for the LIFX Mirror, in row-major order
+# across a 4x13 matrix. The buffer holds 52 positions but only 50 zones: the
+# two -1 entries are unused. Columns 0-1 carry the front ring (zones 0-24) and
+# columns 2-3 carry the back ring (zones 25-49).
+MIRROR_ZONE_MAP: tuple[int, ...] = (
+    9,
+    -1,
+    40,
+    -1,
+    8,
+    10,
+    41,
+    39,
+    7,
+    11,
+    42,
+    38,
+    6,
+    12,
+    43,
+    37,
+    5,
+    13,
+    44,
+    36,
+    4,
+    14,
+    45,
+    35,
+    3,
+    15,
+    46,
+    34,
+    2,
+    16,
+    47,
+    33,
+    1,
+    17,
+    48,
+    32,
+    0,
+    18,
+    49,
+    31,
+    24,
+    19,
+    25,
+    30,
+    23,
+    20,
+    26,
+    29,
+    22,
+    21,
+    27,
+    28,
+)
+
+#: Zones belonging to each Mirror component.
+MIRROR_FRONT_ZONES = range(0, 25)
+MIRROR_BACK_ZONES = range(25, 50)
+
+
+def _buffer_positions(zone_map: tuple[int, ...], zones: range) -> tuple[int, ...]:
+    """Map zone indices to their Set64 buffer positions.
+
+    Args:
+        zone_map: Zone index at each buffer position, -1 where unused
+        zones: Zone indices to look up, in the order they should be returned
+
+    Returns:
+        Buffer positions in the same order as ``zones``
+
+    Raises:
+        ValueError: If a zone is missing from the map
+    """
+    position_of = {zone: position for position, zone in enumerate(zone_map)}
+
+    try:
+        return tuple(position_of[zone] for zone in zones)
+    except KeyError as e:
+        raise ValueError(f"Zone {e.args[0]} is missing from the zone map") from e
+
+
+# Mirror product component layouts
+# Zone map supplied by the LIFX firmware team: a 36x22 capsule, portrait by
+# default, driven as a 4x13 matrix. The Matter buttons sit just above the
+# bottom half-circle endpoint, between front zones 21 and 22. Not yet verified
+# against hardware.
+# TODO: Remove once LIFX adds component layout metadata to products.json
+_MIRROR_LAYOUT = MirrorComponentLayout(
+    width=4,
+    height=13,
+    zone_map=MIRROR_ZONE_MAP,
+    front_positions=_buffer_positions(MIRROR_ZONE_MAP, MIRROR_FRONT_ZONES),
+    back_positions=_buffer_positions(MIRROR_ZONE_MAP, MIRROR_BACK_ZONES),
+)
+
+MIRROR_LAYOUTS: dict[int, MirrorComponentLayout] = {
+    267: _MIRROR_LAYOUT,  # Mirror (US)
+    268: _MIRROR_LAYOUT,  # Mirror (Intl)
+}
+
+
+def get_mirror_layout(pid: int) -> MirrorComponentLayout | None:
+    """Get component layout for a Mirror product.
+
+    Args:
+        pid: Product ID
+
+    Returns:
+        MirrorComponentLayout if product is a Mirror light, None otherwise
+    """
+    return MIRROR_LAYOUTS.get(pid)
+
+
+def is_mirror_product(pid: int) -> bool:
+    """Check if product ID is a Mirror light.
+
+    Args:
+        pid: Product ID
+
+    Returns:
+        True if product is a Mirror light
+    """
+    return pid in MIRROR_LAYOUTS
+
+
 def get_ceiling_layout(pid: int) -> CeilingComponentLayout | None:
     """Get component layout for a Ceiling product.
 
