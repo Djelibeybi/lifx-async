@@ -1250,7 +1250,10 @@ class TestAddressEntryPointGate:
     async def test_unexpected_reply_does_not_warn(
         self, entry_point: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A reply that is not StateService still proves the port answers."""
+        """A reply that is not StateService still proves the port answers.
+
+        Both entry points name the packet they got back.
+        """
         connection = MagicMock()
         connection.serial = self.SERIAL
         connection.request = AsyncMock(
@@ -1261,7 +1264,7 @@ class TestAddressEntryPointGate:
         with (
             caplog.at_level(logging.DEBUG, logger="lifx"),
             patch("lifx.devices.base.DeviceConnection", return_value=connection),
-            pytest.raises(LifxDeviceNotFoundError),
+            pytest.raises(LifxDeviceNotFoundError, match="GetService: StateLabel"),
         ):
             await getattr(Device, entry_point)(ip="127.0.0.1", port=12345)
 
