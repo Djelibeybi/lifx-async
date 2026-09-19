@@ -3346,3 +3346,155 @@ class TestCeilingLightBeforeEntering:
 
         assert await ceiling._power_for_update() == 65535
         assert ceiling._state is None
+
+
+class TestCeilingLightMirrorParity:
+    """Behaviour ported from MirrorLight so both component lights agree."""
+
+    UPLIGHT = HSBK(hue=30, saturation=0.4, brightness=0.9, kelvin=2700)
+    DOWNLIGHT = HSBK(hue=200, saturation=0.5, brightness=0.2, kelvin=4000)
+    DARK = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
+    NEW = HSBK(hue=120, saturation=1.0, brightness=0.6, kelvin=3500)
+    TINY = HSBK(hue=30, saturation=0.5, brightness=5e-6, kelvin=2700)
+
+    @staticmethod
+    def _ceiling(tile: list[HSBK], power: int = 65535) -> tuple[CeilingLight, dict]:
+        """Create an 8x8 Ceiling backed by a fake device that keeps its writes."""
+        device: dict = {"tile": list(tile), "power": power}
+        ceiling = CeilingLight(serial="d073d5000001", ip="192.0.2.10")
+        ceiling.connection = AsyncMock()
+        ceiling._state = _make_mock_state(power)
+        ceiling._save_state_to_file = AsyncMock()
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+
+        async def get_all_tile_colors() -> list[list[HSBK]]:
+            return [list(device["tile"])]
+
+        async def set_matrix_colors(
+            tile_index: int, colors: list[HSBK], duration: int = 0
+        ) -> None:
+            device["tile"] = list(colors)
+
+        async def get_power() -> int:
+            return device["power"]
+
+        ceiling.get_all_tile_colors = AsyncMock(side_effect=get_all_tile_colors)
+        ceiling.set_matrix_colors = AsyncMock(side_effect=set_matrix_colors)
+        ceiling.get_power = AsyncMock(side_effect=get_power)
+        return ceiling, device
+
+    @staticmethod
+    def _light_power(device: dict) -> AsyncMock:
+        """Patchable Light.set_power that records the level on the fake device."""
+
+        async def set_power(level: bool | int, duration: float = 0.0) -> None:
+            device["power"] = 65535 if level else 0
+
+        return AsyncMock(side_effect=set_power)
+
+    async def test_dark_downlight_keeps_its_stored_colors_across_power_off(
+        self,
+    ) -> None:
+        """Test the downlight comes back at its own brightness, not the uplight's.
+
+        downlight off, uplight off (powers down), uplight on, downlight on: the
+        uplight turn-on must not store the dark downlight's zeros over the
+        colours saved when it was turned off.
+        """
+        ceiling, device = self._ceiling([self.DOWNLIGHT] * 63 + [self.UPLIGHT])
+
+        with patch("lifx.devices.light.Light.set_power", self._light_power(device)):
+            await ceiling.turn_downlight_off()
+            await ceiling.turn_uplight_off()
+            assert device["power"] == 0
+            await ceiling.turn_uplight_on()
+            await ceiling.turn_downlight_on()
+
+        assert device["tile"][:63] == [self.DOWNLIGHT] * 63
+        assert device["tile"][63] == self.UPLIGHT
+
+    async def test_dark_uplight_keeps_its_stored_color_across_power_off(
+        self,
+    ) -> None:
+        """Test the mirror-image sequence for the uplight."""
+        ceiling, device = self._ceiling([self.DOWNLIGHT] * 63 + [self.UPLIGHT])
+
+        with patch("lifx.devices.light.Light.set_power", self._light_power(device)):
+            await ceiling.turn_uplight_off()
+            await ceiling.turn_downlight_off()
+            await ceiling.turn_downlight_on()
+            await ceiling.turn_uplight_on()
+
+        assert device["tile"][63] == self.UPLIGHT
+
+    async def test_turning_off_a_dark_uplight_keeps_its_stored_color(self) -> None:
+        """Test that no colours given and already dark stores nothing new."""
+        ceiling, _ = self._ceiling([self.DOWNLIGHT] * 63 + [self.DARK])
+        ceiling.state.stored_uplight_color = self.UPLIGHT
+
+        await ceiling.turn_uplight_off()
+
+        assert ceiling.state.stored_uplight_color == self.UPLIGHT
+
+    async def test_turning_off_a_dark_downlight_keeps_its_stored_colors(
+        self,
+    ) -> None:
+        """Test the downlight equivalent."""
+        ceiling, _ = self._ceiling([self.DARK] * 63 + [self.UPLIGHT])
+        ceiling.state.stored_downlight_colors = [self.DOWNLIGHT] * 63
+
+        await ceiling.turn_downlight_off()
+
+        assert ceiling.state.stored_downlight_colors == [self.DOWNLIGHT] * 63
+
+    async def test_last_uplight_off_during_fade_only_stores_color(self) -> None:
+        """Test that new H/S/K is not written while the power-off is visible."""
+        ceiling, device = self._ceiling([self.DARK] * 63 + [self.UPLIGHT])
+
+        with patch("lifx.devices.light.Light.set_power", self._light_power(device)):
+            await ceiling.turn_uplight_off(self.NEW, duration=3.0)
+
+        ceiling.set_matrix_colors.assert_not_awaited()
+        assert ceiling.state.stored_uplight_color == self.NEW
+        assert ceiling.state.uplight_color == self.UPLIGHT
+
+    async def test_last_downlight_off_during_fade_only_stores_colors(self) -> None:
+        """Test the downlight equivalent."""
+        ceiling, device = self._ceiling([self.DOWNLIGHT] * 63 + [self.DARK])
+
+        with patch("lifx.devices.light.Light.set_power", self._light_power(device)):
+            await ceiling.turn_downlight_off(self.NEW, duration=3.0)
+
+        ceiling.set_matrix_colors.assert_not_awaited()
+        assert ceiling.state.stored_downlight_colors == [self.NEW] * 63
+
+    async def test_last_component_off_instantly_still_writes_hsk(self) -> None:
+        """Test that an instant power-off still sends the new H/S/K."""
+        ceiling, device = self._ceiling([self.DARK] * 63 + [self.UPLIGHT])
+
+        with patch("lifx.devices.light.Light.set_power", self._light_power(device)):
+            await ceiling.turn_uplight_off(self.NEW)
+
+        written = device["tile"][63]
+        assert written.hue == self.NEW.hue
+        assert written.brightness == self.UPLIGHT.brightness
+
+    @pytest.mark.parametrize(
+        "call",
+        [
+            lambda c, x: c.set_uplight_color(x),
+            lambda c, x: c.set_downlight_colors(x),
+            lambda c, x: c.set_downlight_colors([x] * 63),
+            lambda c, x: c.turn_uplight_on(x),
+            lambda c, x: c.turn_downlight_on(x),
+            lambda c, x: c.turn_uplight_off(x),
+            lambda c, x: c.turn_downlight_off(x),
+        ],
+    )
+    async def test_brightness_that_rounds_to_zero_is_rejected(self, call) -> None:
+        """Test that a brightness written as 0 on the wire counts as dark."""
+        ceiling, _ = self._ceiling([self.DOWNLIGHT] * 63 + [self.UPLIGHT])
+
+        with pytest.raises(ValueError, match="brightness=0"):
+            await call(ceiling, self.TINY)

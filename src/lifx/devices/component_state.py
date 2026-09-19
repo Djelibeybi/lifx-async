@@ -107,6 +107,21 @@ class Pending(Generic[T]):
         return cast(T, list(value)) if isinstance(value, list) else value
 
 
+def is_dark(colors: list[HSBK]) -> bool:
+    """Return whether every color is unlit once encoded for the wire.
+
+    Compared at uint16 granularity, matching what the device can express: a
+    float brightness small enough to round to 0 is written as 0.
+
+    Args:
+        colors: Colours to check
+
+    Returns:
+        True if every colour has wire brightness 0
+    """
+    return all(c.to_protocol().brightness == 0 for c in colors)
+
+
 def hsk_matches(stored: HSBK, current: HSBK) -> bool:
     """Compare hue/saturation/kelvin at uint16 (wire) granularity.
 
