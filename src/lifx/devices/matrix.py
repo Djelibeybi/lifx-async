@@ -866,6 +866,7 @@ class MatrixLight(Light):
                 colors=proto_colors,
             )
         )
+        self._zones_changed()
 
     async def copy_frame_buffer(
         self,
@@ -955,6 +956,7 @@ class MatrixLight(Light):
                 duration=duration_ms,
             )
         )
+        self._zones_changed()
 
     async def set_matrix_colors(
         self, tile_index: int, colors: list[HSBK], duration: int = 0
@@ -1282,6 +1284,7 @@ class MatrixLight(Light):
 
         await self.connection.send_packet(packets.Tile.SetEffect(settings=settings))
         self._tile_effect = effect
+        self._zones_changed()
 
     async def apply_theme(
         self,

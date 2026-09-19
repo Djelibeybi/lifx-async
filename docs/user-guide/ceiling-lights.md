@@ -132,8 +132,9 @@ assert await ceiling.get_power() == 0
 ```
 
 Pass a `duration` and it is applied to the power transition, so the light still
-fades out. `get_power()` reads the device directly and reports the level part
-way through a fade, so only expect `0` once the fade has finished.
+fades out. `get_power()` reads the device directly, and the device keeps
+reporting the light as on until the fade has finished, so only expect `0` once
+it has.
 
 The component's zones keep their brightness on the device rather than being
 zeroed, so a plain power-on brings that component back:
@@ -312,7 +313,10 @@ reports, so both finish where they were headed. The same applies to power: the
 device keeps reporting its old power level for a moment after a change, so a
 turn-on straight after the last component was turned off still powers the
 light back up. Once the fade has finished, the device is read again, so changes
-made in the LIFX app are picked up.
+made in the LIFX app are picked up. A colour change made through an inherited
+`MatrixLight` method (`set_matrix_colors()`, `apply_theme()`, a firmware effect
+or a waveform) resets this tracking, so the next component call starts from
+what the device reports rather than undoing that change.
 
 This is best effort. The second write restarts both components' transitions
 with its own duration, and running component calls concurrently on one device

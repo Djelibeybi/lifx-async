@@ -69,25 +69,34 @@ class Pending(Generic[T]):
         self._ends_at = 0.0
         self._settles_at = 0.0
 
-    def record(self, value: T, duration: float) -> None:
+    def record(
+        self, value: T, duration: float, *, trust_for_duration: bool = True
+    ) -> None:
         """Remember a value just written.
 
         Args:
             value: What was written. Lists are copied.
             duration: Transition duration of the write, in seconds
+            trust_for_duration: Keep the value for the whole transition plus the
+                settle margin (the default). When False it is kept for the
+                settle margin only, for writes the device reports correctly as
+                soon as it has caught up, however long the transition runs.
         """
         self._value = cast(T, list(value)) if isinstance(value, list) else value
         now = time.monotonic()
         self._ends_at = now + duration
-        self._settles_at = now + duration + WRITE_SETTLE_MARGIN
+        self._settles_at = (
+            now + (duration if trust_for_duration else 0.0) + WRITE_SETTLE_MARGIN
+        )
 
     def transitioning(self) -> bool:
         """Return whether the last write's transition is still visibly running."""
-        return self._value is not None and time.monotonic() < self._ends_at
+        return time.monotonic() < self._ends_at
 
     def clear(self) -> None:
         """Forget the pending value after something else changed the device."""
         self._value = None
+        self._ends_at = 0.0
 
     def get(self) -> T | None:
         """Return the pending value (lists copied), or None once settled."""

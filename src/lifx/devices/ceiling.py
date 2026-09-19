@@ -26,8 +26,8 @@ from typing import Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component_light import ComponentMatrixLight
 from lifx.devices.component_state import (
-    Pending,
     color_as_dict,
     colors_as_dict,
     decode_color,
@@ -37,7 +37,7 @@ from lifx.devices.component_state import (
     write_state_file,
     zones_as_dict,
 )
-from lifx.devices.matrix import MatrixLight, MatrixLightState
+from lifx.devices.matrix import MatrixLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_ceiling_layout, is_ceiling_product
 
@@ -169,7 +169,7 @@ class CeilingLightState(MatrixLightState):
         )
 
 
-class CeilingLight(MatrixLight):
+class CeilingLight(ComponentMatrixLight):
     """LIFX Ceiling Light with independent uplight and downlight control.
 
     CeilingLight extends MatrixLight to provide semantic control over uplight and
@@ -250,8 +250,6 @@ class CeilingLight(MatrixLight):
             fetch_ambient_light=fetch_ambient_light,
         )
         self._state_file = state_file
-        self._pending_tile: Pending[list[HSBK]] = Pending()
-        self._pending_power: Pending[int] = Pending()
 
     async def __aenter__(self) -> CeilingLight:
         """Async context manager entry."""
@@ -536,62 +534,6 @@ class CeilingLight(MatrixLight):
             return False
 
         return any(c.brightness > 0 for c in state.last_downlight_colors)
-
-    async def _tile_colors_for_update(self) -> list[HSBK]:
-        """Get the tile as the base for a component write.
-
-        While the last write is still transitioning this is that write's
-        target rather than the device's in-flight colours, so the untouched
-        component keeps heading where it was going. See
-        :class:`~lifx.devices.component_state.Pending`.
-
-        Returns:
-            Colors for every zone on the tile
-        """
-        pending = self._pending_tile.get()
-        if pending is not None:
-            return pending
-
-        all_colors = await self.get_all_tile_colors()
-        return all_colors[0]
-
-    async def _write_tile(self, tile_colors: list[HSBK], duration: float) -> None:
-        """Write the whole tile and remember it until the transition settles.
-
-        Args:
-            tile_colors: Colors for every zone on the tile
-            duration: Transition duration in seconds
-        """
-        await self.set_matrix_colors(0, tile_colors, duration=int(duration * 1000))
-        self._pending_tile.record(tile_colors, duration)
-
-    async def _power_for_update(self) -> int:
-        """Get the power level, trusting this device's own recent change.
-
-        GetPower keeps reporting the old level for a moment after a SetPower,
-        even an acknowledged one, so a component method that has just powered
-        the light off must not ask the device whether it is on.
-
-        Returns:
-            Power level, 0 or 65535
-        """
-        pending = self._pending_power.get()
-        if pending is not None:
-            return pending
-        return await self.get_power()
-
-    async def _write_power(self, on: bool, duration: float) -> None:
-        """Set the power level and remember it until it settles.
-
-        Calls Light.set_power() directly, bypassing this class's override,
-        which captures component colours on the way down.
-
-        Args:
-            on: True to power on, False to power off
-            duration: Transition duration in seconds
-        """
-        await super().set_power(on, duration)
-        self._pending_power.record(65535 if on else 0, duration)
 
     async def get_uplight_color(self) -> HSBK:
         """Get current uplight component color from device.
@@ -1088,7 +1030,7 @@ class CeilingLight(MatrixLight):
 
         # Call parent to perform actual power change
         await super().set_power(level, duration)
-        self._pending_power.record(0 if turning_off else 65535, duration)
+        self._record_power(not turning_off, duration)
 
         # Mark components as off only after power-off succeeds
         if turning_off:
@@ -1145,8 +1087,11 @@ class CeilingLight(MatrixLight):
         """
         # Call parent to perform actual color change
         await super().set_color(color, duration)
-        # Every zone was just rewritten, so a remembered tile is now wrong
-        self._pending_tile.clear()
+
+        # Nothing to keep in sync before the device has been entered, and
+        # DeviceGroup.set_color() reaches devices straight from discover()
+        if self._state is None:
+            return
 
         # Update all state fields — all zones now have the same color
         state = self.state

@@ -12,7 +12,8 @@ import pytest
 from lifx.color import HSBK
 from lifx.devices.component_state import WRITE_SETTLE_MARGIN
 from lifx.devices.detection import get_device_class_for_product
-from lifx.devices.mirror import MirrorLight
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.mirror import MirrorLight, MirrorLightState
 from lifx.exceptions import LifxError
 from lifx.products import get_mirror_layout, get_product, is_mirror_product
 from lifx.products.quirks import MIRROR_ZONE_MAP, _buffer_positions
@@ -397,18 +398,96 @@ class TestMirrorTransitions:
 
         assert mirror.get_all_tile_colors.await_count == 2
 
-    async def test_set_color_forgets_the_remembered_tile(self) -> None:
-        """Test that a whole-light colour change is not undone by a later write."""
+    async def test_set_color_fade_is_carried_into_a_component_write(self) -> None:
+        """Test that a component call during set_color's fade keeps its target.
+
+        Rebuilding from the in-flight colours would freeze the front part way
+        through the set_color fade.
+        """
+        mirror = _mirror()
+        mirror._device_chain = [MagicMock(total_zones=BUFFER_SIZE)]
+        lit = _buffer([self.LIT] * 25, [self.LIT] * 25)
+        mirror.get_all_tile_colors = AsyncMock(return_value=[lit])
+
+        with patch("lifx.devices.light.Light.set_color", new_callable=AsyncMock):
+            await mirror.set_color(WHITE, duration=4.0)
+        await mirror.set_back_colors(self.AMBER)
+
+        written = mirror.set_matrix_colors.call_args.args[1]
+        assert _front_of(written) == [WHITE] * 25
+        assert _back_of(written) == [self.AMBER] * 25
+        mirror.get_all_tile_colors.assert_not_awaited()
+
+    async def test_inherited_tile_write_forgets_the_remembered_tile(self) -> None:
+        """Test that a raw Set64 is not undone by the next component write."""
         mirror = _mirror()
         lit = _buffer([self.LIT] * 25, [self.LIT] * 25)
         mirror.get_all_tile_colors = AsyncMock(return_value=[lit])
 
-        await mirror.turn_front_off(duration=1.0)
-        with patch("lifx.devices.light.Light.set_color", new_callable=AsyncMock):
-            await mirror.set_color(WHITE)
+        await mirror.set_front_colors(self.AMBER, duration=2.0)
+        # An inherited MatrixLight write, sent for real through the connection
+        await MatrixLight.set64(
+            mirror,
+            tile_index=0,
+            length=1,
+            x=0,
+            y=0,
+            width=4,
+            duration=0,
+            colors=[WHITE] * BUFFER_SIZE,
+        )
         await mirror.set_back_colors(self.AMBER)
 
         assert mirror.get_all_tile_colors.await_count == 2
+
+    async def test_pending_power_on_is_trusted_for_the_margin_only(self) -> None:
+        """Test that a long power-on fade does not hide a later power-off.
+
+        GetPower reports a power-on straight away, so after the settle margin
+        the device is asked again even though the fade is still running.
+        """
+        mirror = _mirror(power=0)
+
+        with patch(
+            "lifx.devices.component_state.time.monotonic", return_value=100.0
+        ) as clock:
+            mirror._record_power(True, 30.0)
+            assert await mirror._power_for_update() == 65535
+            mirror.get_power.assert_not_awaited()
+
+            clock.return_value = 100.0 + WRITE_SETTLE_MARGIN
+            assert await mirror._power_for_update() == 0
+            mirror.get_power.assert_awaited_once()
+
+    async def test_power_for_update_refreshes_cached_power(self) -> None:
+        """Test that the power just fetched feeds the component on flags."""
+        mirror = _mirror(power=65535)
+        mirror.state.power = 0  # connected while off, turned on in the app
+
+        await mirror.turn_front_on(self.AMBER)
+
+        assert mirror.state.power == 65535
+        assert mirror.state.front_is_on is True
+
+    async def test_apply_theme_power_on_trusts_a_fading_power_off(self) -> None:
+        """Test that apply_theme(power_on=True) powers on after a power-off.
+
+        GetPower still reports on while the power-off fades, which would make
+        MatrixLight.apply_theme() skip the power-on.
+        """
+        mirror = _mirror(power=65535)
+        mirror.set_power = AsyncMock()
+        mirror._record_power(False, 1.0)
+
+        with patch(
+            "lifx.devices.matrix.MatrixLight.apply_theme", new_callable=AsyncMock
+        ) as matrix_theme:
+            await mirror.apply_theme(Theme([self.AMBER]), power_on=True, duration=1.0)
+
+        assert matrix_theme.await_args.kwargs["power_on"] is False
+        # The power-off is still fading, so the theme fades in too
+        assert matrix_theme.await_args.kwargs["duration"] == 1.0
+        mirror.set_power.assert_awaited_once_with(True, 1.0)
 
     async def test_last_component_off_powers_the_device_off(self) -> None:
         """Test that turning off the only lit component powers the light down.
@@ -470,6 +549,41 @@ class TestMirrorTransitions:
             for c in _front_of(written)
         )
         assert mirror.state.stored_front_colors == [stored] * 25
+
+    async def test_last_component_off_during_fade_only_stores_colors(
+        self,
+    ) -> None:
+        """Test that new H/S/K is not written while the power-off is visible."""
+        mirror = _mirror()
+        dark = HSBK(hue=30, saturation=0.4, brightness=0.0, kelvin=2700)
+        buffer = _buffer([self.LIT] * 25, [dark] * 25)
+        mirror.get_all_tile_colors = AsyncMock(return_value=[buffer])
+        stored = HSBK(hue=200, saturation=0.5, brightness=0.6, kelvin=4000)
+
+        with patch("lifx.devices.light.Light.set_power", new_callable=AsyncMock):
+            await mirror.turn_front_off(stored, duration=3.0)
+
+        mirror.set_matrix_colors.assert_not_awaited()
+        assert mirror.state.stored_front_colors == [stored] * 25
+
+    async def test_dark_component_keeps_its_stored_colors(self) -> None:
+        """Test that a dark component's stored colours are not replaced by zeros.
+
+        Neither turning the other component on from power-off nor turning the
+        dark component off again may overwrite them.
+        """
+        mirror = _mirror(power=0)
+        dark = HSBK(hue=30, saturation=0.4, brightness=0.0, kelvin=2700)
+        stored_back = [HSBK(hue=200, saturation=0.5, brightness=0.2, kelvin=4000)] * 25
+        mirror.state.stored_back_colors = list(stored_back)
+        buffer = _buffer([self.LIT] * 25, [dark] * 25)
+        mirror.get_all_tile_colors = AsyncMock(return_value=[buffer])
+
+        with patch("lifx.devices.light.Light.set_power", new_callable=AsyncMock):
+            await mirror.turn_front_on(self.AMBER)
+            await mirror.turn_back_off()
+
+        assert mirror.state.stored_back_colors == stored_back
 
     async def test_turn_on_right_after_power_off_powers_back_on(self) -> None:
         """Test that a stale GetPower does not skip powering the light back on.
@@ -561,15 +675,53 @@ class TestMirrorComponentThemes:
         generator_class.assert_called_once_with([((0, 0), (4, 13))])
 
     async def test_apply_back_theme_powers_on_after_writing(self) -> None:
-        """Test that power_on writes colours first, then fades the light up."""
+        """Test that power_on writes colours first, then fades the light up.
+
+        The front keeps its brightness after a last-component power-off, so it
+        must be zeroed or it would come back on with the back.
+        """
         mirror = _mirror(power=0)
-        mirror.set_power = AsyncMock()
         theme = Theme([HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)])
 
-        await mirror.apply_back_theme(theme, power_on=True, duration=3.0)
+        with patch(
+            "lifx.devices.light.Light.set_power", new_callable=AsyncMock
+        ) as light_power:
+            await mirror.apply_back_theme(theme, power_on=True, duration=3.0)
 
         assert mirror.set_matrix_colors.call_args.kwargs["duration"] == 0
-        mirror.set_power.assert_awaited_once_with(True, 3.0)
+        written = mirror.set_matrix_colors.call_args.args[1]
+        assert all(c.brightness == 0 for c in _front_of(written))
+        assert all(c.brightness > 0 for c in _back_of(written))
+        light_power.assert_awaited_once_with(True, 3.0)
+
+    async def test_set_color_before_entering_does_not_raise(self) -> None:
+        """Test that set_color works on a Mirror straight from discover()."""
+        mirror = _mirror()
+        mirror._state = None
+
+        with patch("lifx.devices.light.Light.set_color", new_callable=AsyncMock):
+            await mirror.set_color(WHITE)
+
+    async def test_brightness_that_rounds_to_zero_is_rejected(self) -> None:
+        """Test that a brightness written as 0 on the wire counts as dark."""
+        mirror = _mirror()
+
+        with pytest.raises(ValueError, match="brightness=0"):
+            await mirror.set_front_colors(
+                HSBK(hue=30, saturation=0.5, brightness=5e-6, kelvin=2700)
+            )
+
+    def test_state_keeps_the_optional_light_fields(self) -> None:
+        """Test that wifi, thread and ambient readings survive into the state."""
+        matrix_state = MagicMock(power=65535)
+
+        state = MirrorLightState.from_matrix_state(
+            matrix_state, [WHITE] * 25, [WHITE] * 25, FRONT_POSITIONS, BACK_POSITIONS
+        )
+
+        assert state.wifi_info is matrix_state.wifi_info
+        assert state.thread_info is matrix_state.thread_info
+        assert state.ambient_light is matrix_state.ambient_light
 
 
 class TestMirrorStatePersistence:
