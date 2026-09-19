@@ -800,6 +800,12 @@ class Device(Generic[StateT]):
                             fetch_radio_info=fetch_radio_info,
                             fetch_ambient_light=fetch_ambient_light,
                         )
+                else:
+                    # The device answered, just not with StateService, so the
+                    # port is not the problem. Named the same way as connect().
+                    raise LifxDeviceNotFoundError(
+                        f"Unexpected response to GetService: {type(response).__name__}"
+                    )
             except LifxTimeoutError:
                 _warn_unanswered_port(ip, port)
                 raise
