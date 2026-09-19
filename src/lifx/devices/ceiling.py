@@ -803,7 +803,7 @@ class CeilingLight(ComponentMatrixLight):
         current_uplight = tile_colors[self.uplight_zone]
         if color is not None:
             stored_color = color
-        elif is_dark([current_uplight]) and self.state.stored_uplight_color:
+        elif is_dark([current_uplight]) and self.state.stored_uplight_color is not None:
             stored_color = self.state.stored_uplight_color
         else:
             stored_color = current_uplight
