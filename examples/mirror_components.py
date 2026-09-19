@@ -63,6 +63,9 @@ async def main(ip: str, serial: str | None = None, hold: float = 10.0) -> None:
         original_power = power
         original_front = await mirror.get_front_colors()
         original_back = await mirror.get_back_colors()
+        # The whole buffer too, for a Mirror that started off: its colours are
+        # written back while it is dark, so the restore is never seen
+        original_tile = (await mirror.get_all_tile_colors())[0]
         front_was_on = mirror.front_is_on
         back_was_on = mirror.back_is_on
 
@@ -106,21 +109,27 @@ async def main(ip: str, serial: str | None = None, hold: float = 10.0) -> None:
         await asyncio.sleep(hold)
 
         print("\nRestoring original state...")
-        if front_was_on:
-            await mirror.turn_front_on(original_front, duration=1.0)
-        else:
-            # A component that was off has brightness 0 in every zone, which
-            # turn_front_off() rejects as an explicit colour list. Passing no
-            # colours stores the current ones instead.
-            await mirror.turn_front_off(duration=1.0)
-
-        if back_was_on:
-            await mirror.turn_back_on(original_back, duration=1.0)
-        else:
-            await mirror.turn_back_off(duration=1.0)
-
         if original_power == 0:
+            # Fade out first, then put every zone back exactly as it was while
+            # the light is dark. A component that was already dark has
+            # brightness 0 in every zone, which the component setters reject,
+            # so the whole buffer is restored in one write instead.
             await mirror.set_power(False, duration=1.0)
+            await asyncio.sleep(1.0)
+            await mirror.set_matrix_colors(0, original_tile)
+        else:
+            if front_was_on:
+                await mirror.turn_front_on(original_front, duration=1.0)
+            else:
+                # A component that was off has brightness 0 in every zone,
+                # which turn_front_off() rejects as an explicit colour list.
+                # Passing no colours stores the current ones instead.
+                await mirror.turn_front_off(duration=1.0)
+
+            if back_was_on:
+                await mirror.turn_back_on(original_back, duration=1.0)
+            else:
+                await mirror.turn_back_off(duration=1.0)
 
     print("Done!")
 

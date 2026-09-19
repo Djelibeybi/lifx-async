@@ -53,7 +53,7 @@ from lifx import (
     discover,
 )
 from lifx.const import INVALID_AMBIENT_LIGHT_RESPONSE
-from lifx.devices.matrix import MatrixEffect, TileInfo
+from lifx.devices.matrix import MatrixEffect, MatrixLightState, TileInfo
 
 #: Discovery window in seconds. Long enough for a large fleet to answer.
 DEFAULT_TIMEOUT = 15.0
@@ -84,6 +84,19 @@ class Report:
     def kind(self) -> str:
         """Name of the device class the product registry resolved to."""
         return type(self.device).__name__
+
+    @property
+    def ready(self) -> bool:
+        """Whether the device answered enough to have a full matrix state.
+
+        discover() yields devices before their state is initialized, so a
+        device that timed out has no state at all, or only the light-level
+        part of it. Either way nothing matrix-specific can be rendered.
+        """
+        try:
+            return isinstance(self.device.state, MatrixLightState)
+        except RuntimeError:
+            return False
 
     @property
     def product_id(self) -> int | None:
@@ -341,6 +354,18 @@ def _component_table(report: Report) -> Table | None:
 def _device_panel(report: Report, effect: MatrixEffect | None) -> Panel:
     """Assemble the full detail panel for one device."""
     device = report.device
+
+    if not report.ready:
+        return Panel(
+            Text(f"No state: {report.error or 'device did not answer'}", "yellow"),
+            title=f"[bold]{report.label}[/bold] · {report.kind}",
+            title_align="left",
+            subtitle=f"{device.serial} · {device.ip}",
+            subtitle_align="right",
+            border_style="yellow",
+            padding=(1, 2),
+        )
+
     state = device.state
 
     left = Group(_identity_table(report), Text(), _state_table(report))
@@ -395,6 +420,21 @@ def _summary_table(
         table.add_column(column, no_wrap=True, min_width=len(column))
 
     for report in reports:
+        if not report.ready:
+            # One silent device must not cost everyone else's rows
+            table.add_row(
+                report.label,
+                report.kind,
+                str(report.product_id) if report.product_id is not None else "—",
+                "—",
+                report.device.ip,
+                "—",
+                "—",
+                "—",
+                Text("no reply", style="yellow"),
+            )
+            continue
+
         state = report.device.state
         chain = state.chain
         size = (
@@ -477,16 +517,25 @@ async def scan(timeout: float, verbose: bool, console: Console) -> None:
     with Live(
         _live_table(reports, done=False), console=console, transient=True
     ) as live:
-        async for device in discover(timeout=timeout):
-            if not isinstance(device, MatrixLight):
-                await device.close()
-                continue
 
+        async def inspect_and_record(device: MatrixLight) -> None:
             report, effect = await _inspect(device)
             reports.append(report)
             effects[device.serial] = effect
             live.update(_live_table(reports, done=False))
 
+        # Each device is inspected as it is found rather than inside the loop:
+        # one stalled device (a 16 s request timeout against a 15 s window)
+        # would otherwise use up the discovery deadline and silently drop
+        # every device still queued behind it.
+        inspections: list[asyncio.Task[None]] = []
+        async for device in discover(timeout=timeout):
+            if not isinstance(device, MatrixLight):
+                await device.close()
+                continue
+            inspections.append(asyncio.create_task(inspect_and_record(device)))
+
+        await asyncio.gather(*inspections)
         live.update(_live_table(reports, done=True))
 
     try:
