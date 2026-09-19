@@ -40,6 +40,7 @@ from lifx.devices.component_state import (
     decode_color,
     encode_color,
     hsk_matches,
+    is_dark,
     read_state_file,
     write_state_file,
 )
@@ -739,11 +740,11 @@ class MirrorLight(ComponentMatrixLight):
 
         # Compared on the wire: a brightness that rounds to 0 is written as 0
         if isinstance(colors, HSBK):
-            if _is_dark([colors]):
+            if is_dark([colors]):
                 raise ValueError(zero_message)
             return [colors] * zone_count
 
-        if _is_dark(colors):
+        if is_dark(colors):
             raise ValueError(zero_message)
 
         if len(colors) != zone_count:
@@ -845,7 +846,7 @@ class MirrorLight(ComponentMatrixLight):
             # storing its zeros would lose them.
             other_positions = self._component_positions(other)
             other_colors = _gather(tile_colors, other_positions)
-            if not _is_dark(other_colors):
+            if not is_dark(other_colors):
                 self._set_stored_colors(other, other_colors)
 
             # Apply target colors, and zero the other component so it stays
@@ -983,13 +984,13 @@ class MirrorLight(ComponentMatrixLight):
         # colours stored when it went dark: storing its zeros would lose them.
         if stored_colors is None:
             previous = self._stored_colors(component)
-            if _is_dark(current_colors) and previous is not None:
+            if is_dark(current_colors) and previous is not None:
                 stored_colors = previous
             else:
                 stored_colors = current_colors
 
         # Is the other component already dark (or fading there)?
-        other_already_off = _is_dark(_gather(tile_colors, other_positions))
+        other_already_off = is_dark(_gather(tile_colors, other_positions))
 
         if other_already_off:
             # Nothing else is lit, so power the whole device down instead of
@@ -1551,21 +1552,6 @@ def _scatter(
 
     for position, color in zip(positions, colors):
         buffer[position] = color
-
-
-def _is_dark(colors: list[HSBK]) -> bool:
-    """Return whether every color is unlit once encoded for the wire.
-
-    Compared at uint16 granularity, matching what the device can express: a
-    float brightness small enough to round to 0 is written as 0.
-
-    Args:
-        colors: Colours to check
-
-    Returns:
-        True if every colour has wire brightness 0
-    """
-    return all(c.to_protocol().brightness == 0 for c in colors)
 
 
 def _unlit(color: HSBK) -> HSBK:
