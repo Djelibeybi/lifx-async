@@ -432,6 +432,24 @@ class TestMirrorTransitions:
         assert mirror.state.back_is_on is False
         assert mirror.state.stored_front_colors == [self.LIT] * 25
 
+    async def test_back_off_with_front_dark_powers_the_device_off(self) -> None:
+        """Test the power-off path when the back is the last lit component."""
+        mirror = _mirror()
+        dark = HSBK(hue=30, saturation=0.4, brightness=0.0, kelvin=2700)
+        buffer = _buffer([dark] * 25, [self.LIT] * 25)
+        mirror.get_all_tile_colors = AsyncMock(return_value=[buffer])
+
+        with patch(
+            "lifx.devices.light.Light.set_power", new_callable=AsyncMock
+        ) as light_power:
+            await mirror.turn_back_off(duration=2.0)
+
+        light_power.assert_awaited_once_with(False, 2.0)
+        mirror.set_matrix_colors.assert_not_awaited()
+        assert mirror.state.front_is_on is False
+        assert mirror.state.back_is_on is False
+        assert mirror.state.stored_back_colors == [self.LIT] * 25
+
     async def test_last_component_off_writes_supplied_hsk_after_power_off(
         self,
     ) -> None:
