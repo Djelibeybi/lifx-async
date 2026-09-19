@@ -3292,3 +3292,27 @@ class TestCeilingLightTransitions:
         assert written[63].brightness == 0
         # The power-off is still fading out, so the zones fade rather than snap
         assert ceiling.set_matrix_colors.call_args.kwargs["duration"] == 1000
+
+
+class TestWriteStateFileFailure:
+    """Tests for the atomic state-file write when the dump fails."""
+
+    def test_failed_write_removes_temp_file_and_keeps_original(self) -> None:
+        """Test that a failed dump leaves no temp file and the old file intact."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "state.json"
+            state_file.write_text(json.dumps({"d073d5000001": {"uplight": {}}}))
+
+            with (
+                patch(
+                    "lifx.devices.component_state.json.dump",
+                    side_effect=OSError("disk full"),
+                ),
+                pytest.raises(OSError, match="disk full"),
+            ):
+                write_state_file(state_file, "d073d5000002", {"uplight": {}})
+
+            assert [p.name for p in Path(tmpdir).iterdir()] == ["state.json"]
+            assert json.loads(state_file.read_text()) == {
+                "d073d5000001": {"uplight": {}}
+            }
