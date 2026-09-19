@@ -1345,8 +1345,9 @@ class MatrixLight(Light):
             generator = MatrixGenerator([((0, 0), (t.width, t.height)) for t in tiles])
         tile_colors = generator.get_theme_colors(theme)
 
-        # Check if light is on
-        is_on = await self.get_power()
+        # Power only matters when asked to turn the light on, so GetPower is
+        # sent only then
+        needs_power_on = power_on and not await self.get_power()
 
         # Apply colors to each tile
         for tile, colors in zip(tiles, tile_colors, strict=True):
@@ -1356,7 +1357,7 @@ class MatrixLight(Light):
             oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
 
             # Apply with appropriate timing
-            if power_on and not is_on:
+            if needs_power_on:
                 await self.set_matrix_colors(tile.tile_index, oriented, duration=0)
             else:
                 await self.set_matrix_colors(
@@ -1364,7 +1365,7 @@ class MatrixLight(Light):
                 )
 
         # Turn on light if requested and currently off
-        if power_on and not is_on:
+        if needs_power_on:
             await self.set_power(True, duration=duration)
 
     @staticmethod
