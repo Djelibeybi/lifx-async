@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.5.0 (2026-09-24)
+
+### Features
+
+- **devices**: Add typed Move effect and LIFX-app default palettes
+  ([`2b1ea90`](https://github.com/Djelibeybi/lifx-async/commit/2b1ea909d8e27991cd90bc11c1c0978862d5c78b))
+
+
 ## v7.4.0 (2026-09-19)
 
 ### Bug Fixes
