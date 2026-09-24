@@ -33,7 +33,7 @@ covered_files:
   - tests/test_devices/test_matrix.py
   - tests/test_devices/test_multizone.py
   - tests/test_devices/test_multizone_move.py
-covered_digest: "v1:sha256:2fa53bf7bf4b7ea3670c3f8ee21b219ae00db02048f8061ed5bd631a21db2718"
+covered_digest: "v1:sha256:9849244c8de2ed84e9aec9e29996b71f3fa1df5867f1d34f75df7dd3b6d49830"
 behavior_unverified: 0
 overrides_applied: 0
 re_verification:
@@ -217,3 +217,4 @@ _Verifier: Claude (gsd-verifier)_
 - UAT test 2 (real-hardware re-test of G-18-1) passed: palette-less MORPH starts on a multi-colour Luna and Move is unchanged. `status` moved from `human_needed` to `passed`.
 - `tests/test_devices/test_multizone_move.py` gained `test_duration_uint64_boundary` (d01a862), the at-limit case the security audit found missing for T-18-08. Test-only; no library code changed.
 - `covered_digest` recomputed over the same `covered_files` after confirming `18-UAT.md` (test 2 result, and test 1 recorded as passed on retest) and that test file were the only covered inputs changed since this report was written.
+- `test_raw_set_effect_sends_only_set_effect_and_zones_unchanged` now reads the zones back before its capture window, closing a CI race where the unacknowledged setup paint (packet 510) landed inside the window. Test-only; digest recomputed.
