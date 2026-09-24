@@ -1,49 +1,50 @@
 ---
-gsd_state_version: 1.0
+gsd_state_version: "1.0"
 milestone: v2.1
 milestone_name: Spring Cleaning
-current_phase: 18
-current_phase_name: Animator Connectivity Guard and Typed Move Effect
-status: "Phase 17 shipped — PR #229"
-stopped_at: Phase 17 complete, ready to plan Phase 18
-last_updated: "2026-09-08T16:10:11.449Z"
-last_activity: 2026-09-09
-state_head: 40bca00052d11347d6b81c563015860fd4130125
+current_phase: 19
+current_phase_name: Theme Library API and Data
+status: "Phase 18 shipped — PR #236"
+stopped_at: Phase 18 complete, ready to plan Phase 19
+last_updated: "2026-09-24T00:45:27.915Z"
+last_activity: 2026-09-24
+state_head: cad679c7497c55d2d99feec6e1b38a9cb4de7893
 progress:
-  total_phases: 6
-  completed_phases: 3
-  total_plans: 14
-  completed_plans: 14
-  percent: 50
+  total_phases: 7
+  completed_phases: 4
+  total_plans: 20
+  completed_plans: 20
+  percent: 57
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-05 after v2.0 milestone)
+See: .planning/PROJECT.md (updated 2026-09-24 after Phase 18)
 
 **Core value:** Commands stick, devices are found — over WiFi or Thread, transparently — streaming never starves control traffic, and a theme by name looks like the theme of that name in the LIFX app.
-**Current focus:** Phase 17 — Fleet Diagnostics and the Staleness Control
+**Current focus:** Phase 19 — Theme Library API and Data
 
 ## Current Position
 
-Phase: 18 — Animator Connectivity Guard and Typed Move Effect
+Phase: 19 — Theme Library API and Data
 Plan: Not started
-Status: Phase 17 shipped — PR #229
-Total Plans in Phase: 5
-Last activity: 2026-09-09
+Status: Phase 18 shipped — PR #236
+Total Plans in Phase: 0 (not yet planned)
+Last activity: 2026-09-24 — Phase 18 shipped as PR #236; Phase 19 ready to plan
 
-**v2.1 phase order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20
+**v2.1 phase order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20 → 21
 
 | Phase | Name | Requirements |
 |-------|------|--------------|
 | 15 | Coverage Gate and Test-Suite Health | CI-01, CI-02, TEST-02 |
 | 16 | mDNS Correctness, Docs and Test Hygiene | MDNS-09, DOCS-07, DOCS-08, TEST-01 |
 | 17 | Fleet Diagnostics and the Staleness Control | MDNS-10, DISC-04 |
-| 18 | Animator Connectivity Guard and Typed Move Effect | ANIM-05, EFFECT-01 |
+| 18 | Typed Move and Morph Palette Effects | EFFECT-01, EFFECT-02 |
 | 19 | Theme Library API and Data | THEME-05, THEME-06, THEME-07 |
-| 20 | Documentation Prose Sweep | DOCS-09 |
+| 20 | Animator Thread Guard | ANIM-05 |
+| 21 | Documentation Prose Sweep | DOCS-09 |
 
 ## Performance Metrics
 
@@ -101,6 +102,12 @@ Last activity: 2026-09-09
 | Phase 17 P03 | 12min | 3 tasks | 1 files |
 | Phase 17 P04 | 6min | 5 tasks | 2 files |
 | Phase 17 P05 | 24min | 2 tasks | 7 files |
+| Phase 18 P03 | 16 min | 2 tasks | 2 files |
+| Phase 18 P04 | 25min | 2 tasks | 4 files |
+| Phase 18 P06 | 26min | 3 tasks | 2 files |
+| Phase 18 P07 | 25min | 3 tasks | 6 files |
+| Phase 18 P08 | 20min | 2 tasks | 3 files |
+| Phase 18 P09 | 35min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -116,12 +123,6 @@ this milestone (all 2026-08-27 unless noted):
 - The mDNS ephemeral-port bind is a requirement in its own right (MDNS-01): an IPv4 defect, not a Thread feature
 - `LifxServiceRecord` keeps the wire name `tm`; no expansion of the undocumented key may be asserted anywhere
 - No WiFi-measured constant is retuned before Phase 14 measures it over Thread (spike-first discipline, 2026-07-16 lineage)
-- [Phase 16]: MDNS-09: extracted _owner_is_unusable() as a shared six-term fail-closed predicate (adds a leading 'not owner' term) used by both selected_address_for() and pending_targets(), closing the trailing-dot and empty/root-owner guard bypasses — Cross-AI plan review found the naive single-caller fix left the empty/DNS-root owner and duplicated pending_targets() guard unrepaired; the shared predicate makes the next guard added land in both places automatically
-- [Phase 16]: Accepted a permanent, documented residual: an owner with two or more trailing dots still diverges between guard key and lookup key (D-02 declines to make _normalise_dns_name() idempotent) — No SPEC acceptance criterion or edge-coverage row covers a multi-dot owner form; recorded in the helper's docstring and the plan rather than widened out of scope
-- [Phase 16]: [Phase 16]: DOCS-08: proxy-response verification attributed to discover()'s mDNS candidates (via _discover_verified_devices_mdns()), not its UDP leg, correcting D-14's original clause which was false against src/lifx/api.py:1112/:1125
-- [Phase 16]: [Phase 16] DOCS-07: split the connectivity caching contract by file per D-09, and scoped the new AGENTS.md derived-not-cached category to a correlated response rather than a broader request outcome, matching connection.py:1075's correlation-gated assignment — Timeouts, connection failures, and uncorrelated replies are request outcomes that leave the cached value unchanged, so the broader phrasing would have overstated what the implementation guarantees
-- [Phase 16]: TEST-01: swept 166 function-local imports to module scope across 27 files in one mechanical commit, then enabled ruff PLC0415 with seven per-file-ignore handoff entries in a separate later commit — D-08 sequencing keeps every commit green under ruff check; zero imports needed retention, so no noqa marks exist under tests/
-- [Phase 16]: tests/test_packaging.py's Python 3.10 skip replaced with a module-scope tomli/tomllib compatibility import over the existing tomli dev dependency, gaining coverage rather than needing a suppression — Neither hoisting a bare tomllib nor retaining it under D-06/D-07's permitted noqa reasons was available; the existing tomli>=2.0.1 dev dependency closes the gap with no new dependency
 - [Phase 17]: 17-01: Module-level string constants hold each new fixed message tail on one physical source line, so grep-checkable phrases stay contiguous under ruff's 88-character limit
 - [Phase 17]: 17-01: Kept dead-code removal (Task 3) separate from the typed-view migration (Task 1) and the normalisation/summary changes (Task 2), so each commit's tests exercise only what that commit changed
 - [Phase 17]: [Phase 17]: 17-02: --alias-map redaction uses a single combined regex alternation (IPv6 branch first, dotted-quad before hex tail) so an IPv4-mapped IPv6 literal is consumed as one token rather than corrupted across two sequential passes
@@ -132,6 +133,15 @@ this milestone (all 2026-08-27 unless noted):
 - [Phase 17]: [Phase 17]: 17-04: WiFi staleness trial (seed-002) closes DISC-04/R5 with disappearance-to-expiry bounded at 0-80.85s (confirmed_expiry, first_absence_poll 1) against the Thread arm's 4140-4200s, restoration 14.557s (mDNS)/15.530s (broadcast); operator mandated a prominent accuracy caveat (coarse cadence, coarse absence detection, four confounders, unmatched arms) that must carry into 17-05's published verdict
 - [Phase 17]: [Phase 17]: 17-04: a third, 1Hz targeted-unicast disappearance measurement is planned to supersede this arm's disappearance figure; it does not supersede the restoration figures
 - [Phase 17]: Fixed 17-05-PLAN.md's stale WiFi-disappearance-bound verify gates to use measured elapsed_s (Rule 1), matching 17-04's already-authorised fix under SPEC amendment A8 — The plan's own gates computed the WiFi bound from the nominal 60s cadence constant, giving 'at most 60 s' when the committed row's measured elapsed_s is 80.8548 s; 17-04-PLAN.md's commit 21fd669 already fixed the identical defect and named this figure as 17-05's headline
+- [Phase 18]: D-09 implemented: _coerce_direction() is the single parsing rule for the direction field, shared by move() and the widened setter; a bare int now deliberately raises ValueError
+- [Phase 18]: 18-04: derive_effect_palette()/validate_effect_palette() shared helper in component_state.py implements the full R10 Morph default-palette rule; MatrixEffect._validate_palette delegates to it, ready for plan 06's Move palette rule
+- [Phase 18]: set_move_effect() implements the full D-10 palette flow in Task 1 (tracer), leaving Task 2's tdd="true" gate with zero RED failures — 56 edge-case tests passed on first run, documented as regression coverage per the 18-04 precedent — Task 1's own plan action mandated the complete production method (not a throwaway slice), so no implementation gap remained for Task 2's GREEN commit
+- [Phase 18]: 18-07: every keyword-first pre-4.3.0 set_move_effect() call in the migration guide became prose rather than a code sample, since the method name is reused today with a different signature and a literal call would misleadingly read as valid current code
+- [Phase 18]: 18-07: the phase-wide added-lines prose gate scans the whole phase diff from merge-base, not just the current plan's additions, so an earlier plan's stray em dash (component_state.py, plan 04) blocked this plan's own Task 3 verify and was fixed here
+- [Phase 18]: [Phase 18]: 18-08: closed the Phase 16 D-05 PLC0415 handoff for both owned test paths by merging every function-local test import into each file's existing module-scope import block, proven import-only by an ast/difflib diff gate and exact before/after node-ID set equality
+- [Phase 18]: [Phase 18] 18-09: sample_effect_palette() samples on the ORIGINAL pixel count (n = len(colors)), not the pre-deduplicated distinct count, matching D-25's literal i * n // 16 formula -- confirmed against the maintainer's 40-pixel worked example
+- [Phase 18]: D-26 (2026-09-24): palette-less Morph raises when the colour read fails, reversing the WR-01 fallback for Morph only; Move keeps its fallback
+- [Phase 18]: [Phase 18] 18-09: GREEN commit for the read-failure raise uses a fix(devices) scope, not feat(devices) -- removing the over-wide except from commit 5a9d254 is a bug fix per D-26
 
 ### v2.1 Working Notes
 
@@ -143,9 +153,13 @@ this milestone (all 2026-08-27 unless noted):
   so MDNS-09's owner-name normalisation settles before MDNS-10 changes what the probe reports.
 - **Phases 16, 18 and 19 are file-disjoint** and can run in parallel:
   `src/lifx/network/discovery/mdns/` plus `tests/test_network/`;
-  `src/lifx/animation/` plus `src/lifx/devices/multizone.py`; `src/lifx/theme/` plus
+  `src/lifx/devices/multizone.py`, `matrix.py` and `component_state.py`; `src/lifx/theme/` plus
   `data/themes.jsonl`.
-- **Phase 20 is last on purpose.** A ~200-occurrence prose pass across `docs/` conflicts
+- **Phase 20 is verified without the emulator.** CI uses synthetic Thread connectivity;
+  integration evidence comes from an operator-run check on real Thread devices,
+  pseudonymised. The superseded 18-01, 18-02 and 18-05 plans assumed per-device emulator
+  replies and are reference only.
+- **Phase 21 is last on purpose.** A ~200-occurrence prose pass across `docs/` conflicts
   textually with every other phase that touches documentation.
 - **DISC-04 (Phase 17) is hardware-gated**, needing a real WiFi bulb and a physical unplug.
   The emulator cannot verify it. It must not block CI or any other phase.
@@ -194,6 +208,12 @@ Thread hardware endpoint values remain operator-controlled evidence outside the 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 
+### Roadmap Evolution
+
+- Phase 17.1 inserted after Phase 17: Modify the Move and Morph effect handling when no palette is provided (URGENT)
+- Phase 17.1 removed: Folded into Phase 18 as SPEC R9/R10 and CONTEXT D-13 to D-23
+- Phase 18 split (2026-09-23): ANIM-05 moved to new Phase 20 Animator Thread Guard, verified with synthetic CI tests plus a real Thread hardware check (emulator integration deferred); Phase 18 keeps EFFECT-01/02 and needs replanning without the `thread_emulator` fixture; Documentation Prose Sweep renumbered 20 to 21
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone closes:
@@ -206,19 +226,20 @@ Items acknowledged and carried forward from previous milestone closes:
 | Docs | 02-01-SUMMARY.md carries no `requirements-completed` frontmatter; DISC-01/02 evidenced only in 02-VERIFICATION.md (cross-checked manually at the v1.1 audit) | Acknowledged, deferred | 2026-07-26 |
 | Decision | D5-09 "publish behaviour, not tuning constants" is disputed by the operator and remains OPEN; spike candidate 006 would measure the cap impact | Open decision | 2026-07-26 |
 | Verification | v1.1 `override_closeout` overrides (3): Phase 2 and Phase 4 resolver-stale false negatives (open-gsd/gsd-core#2348) and Phase 3's `human_needed` manual UAT | Recorded at close | 2026-07-26 |
-| Style | No-em-dash house style: roughly 200 em dashes across `docs/`, deferred by the user during v1.2 Phase 7 UAT. Recast each sentence rather than swapping the character | Scheduled as v2.1 DOCS-09 (Phase 20) | 2026-08-27 |
+| Style | No-em-dash house style: roughly 200 em dashes across `docs/`, deferred by the user during v1.2 Phase 7 UAT. Recast each sentence rather than swapping the character | Scheduled as v2.1 DOCS-09 (Phase 21) | 2026-08-27 |
 | Verification | v1.2 `override_closeout` overrides (1): SEED-001 acknowledged at close. Phase 8 retains its operator-approved exception (Tile restoration unverified, `08-UAT-RESULTS.json` deliberately absent, synthetic merge prohibited) | Recorded at close | 2026-08-27 |
 | Seed | SEED-002-wifi-advertisement-staleness-control: run the staleness experiment against WiFi bulbs as a control | Fired 2026-09-05; live as v2.1 DISC-04 (Phase 17) | 2026-09-05 |
-| Seed | SEED-003-lock-animation-to-wifi: lock `Animator` to WiFi devices | Fired 2026-09-05; live as v2.1 ANIM-05 (Phase 18) | 2026-09-05 |
+| Testing | ANIM-05 emulator integration tests: add once lifx-emulator ships standards-based Thread replies (packed into as few packets as possible, not per-device). Phase 20 ships on synthetic CI tests plus a real-hardware check | Deferred | 2026-09-23 |
+| Seed | SEED-003-lock-animation-to-wifi: lock `Animator` to WiFi devices | Fired 2026-09-05; live as v2.1 ANIM-05 (Phase 20) | 2026-09-05 |
 | Verification | Phase 13 deferred item: coordinator teardown test left a blocked executor worker in `test_discovery_coordinator.py` (`test_non_last_detach_preserves_producer_and_last_detach_reaps_it`); confirmed load-bearing under v2.1 TEST-02 (Phase 15). The real fix is `39bad58`, not the `fc61b98` the v2.0 close assumed. Reintroducing the pre-fix form in a scratch worktree reproduces the hang; the fixed form exits cleanly. See `15-TEST-02-EVIDENCE.md` and `deferred-items.md`, which now state the same outcome | Resolved and confirmed load-bearing (Phase 15) | 2026-09-05 |
 
 ## Session Continuity
 
-Last session: 2026-09-08T10:27:07.939Z
-Stopped at: Phase 17 complete, ready to plan Phase 18
+Last session: 2026-09-24T00:13:01.086Z
+Stopped at: Phase 18 complete, ready to plan Phase 19
 Resume file: None
 
 ## Operator Next Steps
 
-- Review `.planning/ROADMAP.md` v2.1 section (Phases 15 to 20)
-- Then discuss and plan the first phase with `/gsd-discuss-phase 15`
+- Phase 18 shipped as PR #236 from `gsd/phase-18-typed-move-and-morph-palette-effects` (renamed from the pre-split branch name), squashed to one commit
+- Next: `/gsd-discuss-phase 19` (Theme Library API and Data)

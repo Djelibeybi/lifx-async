@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import InitVar, asdict, dataclass
+from dataclasses import InitVar, asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from lifx.animation.orientation import Orientation, build_orientation_lut
@@ -25,10 +25,18 @@ from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
-    MAX_PALETTE_COLORS,
+)
+from lifx.devices.component_state import (
+    derive_effect_palette,
+    sample_effect_palette,
+    validate_effect_palette,
 )
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
+from lifx.exceptions import (
+    LifxProtocolError,
+    LifxTimeoutError,
+    LifxUnsupportedCommandError,
+)
 from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
 from lifx.products import supports_sky_effect as firmware_supports_sky_effect
 from lifx.protocol import packets
@@ -261,19 +269,17 @@ class MatrixEffect:
     def _validate_palette(value: list[HSBK]) -> None:
         """Validate color palette.
 
+        Delegates to the shared size rule in ``component_state``, so a
+        matrix effect's palette and a multizone effect's palette are
+        validated by exactly the same check.
+
         Args:
             value: List of HSBK colors (max 16)
 
         Raises:
             ValueError: If palette is invalid
         """
-        if not value:
-            raise ValueError("Effect palette must contain at least one color")
-        if len(value) > MAX_PALETTE_COLORS:
-            raise ValueError(
-                f"Effect palette can contain at most {MAX_PALETTE_COLORS} colors, "
-                f"got {len(value)}"
-            )
+        validate_effect_palette(value)
 
     @staticmethod
     def _validate_saturation(value: int, name: str) -> None:
@@ -1173,6 +1179,42 @@ class MatrixLight(Light):
         supported, _ = await self._resolve_sky_support()
         return supported
 
+    async def _derive_morph_palette(self) -> list[HSBK]:
+        """Derive the default MORPH palette from the device's own colours.
+
+        Reads every tile's colours with ``get_all_tile_colors()``. A device
+        showing one colour gets the generated three-colour palette from
+        ``derive_effect_palette()``; a device showing several gets those
+        colours back, sampled by ``sample_effect_palette()``, because real
+        firmware does not start MORPH with an empty palette.
+
+        MORPH never starts with an empty palette, so a failed read is not
+        papered over: the error reaches the caller and no effect is sent.
+
+        Returns:
+            A derived or sampled palette.
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxUnsupportedCommandError: If device doesn't support this command
+            LifxTimeoutError: If the colour read times out
+            LifxProtocolError: If the colour read gets a malformed reply, or
+                the device reports no tile colours to build a palette from
+        """
+        all_colors = await self.get_all_tile_colors()
+
+        flattened = [color for tile_colors in all_colors for color in tile_colors]
+        if not flattened:
+            raise LifxProtocolError(
+                f"{self.label or self.serial} reported no tile colours to "
+                f"build a MORPH palette from; pass palette= to choose the "
+                f"colours yourself"
+            )
+        palette = derive_effect_palette(flattened, self.min_kelvin, self.max_kelvin)
+        if palette is None:
+            return sample_effect_palette(flattened)
+        return palette
+
     async def set_effect(
         self,
         effect_type: FirmwareEffect,
@@ -1189,7 +1231,21 @@ class MatrixLight(Light):
             effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
             speed: Effect speed in seconds (default: 3)
             duration: Total effect duration in nanoseconds (0 for infinite)
-            palette: Color palette for the effect (max 16 colors, None for no palette)
+            palette: Color palette for the effect (max 16 colors). An explicit
+                palette is always sent exactly as given, with no extra read.
+                ``None`` behaves differently for MORPH: it triggers one
+                ``get_all_tile_colors()`` read of the device's own colours
+                before the effect is sent, a small start-up latency. A
+                device showing one colour gets a generated three-colour
+                palette from ``derive_effect_palette()`` (whites at the
+                device's kelvin range for a white colour, or hue +-45
+                degrees for a hued one); a device showing several gets its
+                own colours from ``sample_effect_palette()`` (every distinct
+                colour in the order first seen when there are 16 or fewer,
+                otherwise 16 pixels spaced evenly across all tiles,
+                de-duplicated). If the read fails, or reports no colours,
+                the error is raised and no effect is sent. FLAME and SKY
+                with ``None`` send no palette and perform no read at all
             sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
@@ -1198,6 +1254,11 @@ class MatrixLight(Light):
             LifxUnsupportedCommandError: If SKY is requested on a device that
                 is known not to support it, either because it lacks the matrix
                 capability or because its host firmware is too old
+            LifxTimeoutError: If MORPH is requested with no palette and the
+                colour read times out
+            LifxProtocolError: If MORPH is requested with no palette and the
+                colour read gets a malformed reply, or the device reports no
+                colours
 
         Example:
             >>> # Set MORPH effect with rainbow palette
@@ -1255,6 +1316,12 @@ class MatrixLight(Light):
             cloud_saturation_min=cloud_saturation_min,
             cloud_saturation_max=cloud_saturation_max,
         )
+
+        if effect_type == FirmwareEffect.MORPH and palette is None:
+            # Rebuild rather than assign effect.palette directly: replace()
+            # reruns __post_init__, so a derived palette passes the same
+            # size validation as a caller-supplied one.
+            effect = replace(effect, palette=await self._derive_morph_palette())
 
         # Convert to protocol format
         proto_palette = []

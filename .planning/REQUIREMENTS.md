@@ -51,10 +51,13 @@ categories.
 
 ### Effects API
 
-- [ ] **EFFECT-01**: A caller constructs the firmware Move effect through a typed API
+- [x] **EFFECT-01**: A caller constructs the firmware Move effect through a typed API
       instead of hand-encoding the eight-slot `parameters` list and needing to know the
       protocol layout.
       ([#191](https://github.com/Djelibeybi/lifx-async/issues/191))
+- [x] **EFFECT-02**: Starting the firmware Move effect through the typed API, or Morph,
+      without a palette animates the colours already on the device, and a device showing a
+      single colour gets a generated three-colour palette, matching the LIFX app.
 
 ### Theme Library
 
@@ -174,14 +177,15 @@ v2.0, which ended at Phase 14.
 | MDNS-09 | Phase 16 | Complete |
 | MDNS-10 | Phase 17 | Complete |
 | DISC-04 | Phase 17 | Complete |
-| ANIM-05 | Phase 18 | Pending |
-| EFFECT-01 | Phase 18 | Pending |
+| ANIM-05 | Phase 20 | Pending |
+| EFFECT-01 | Phase 18 | Complete |
+| EFFECT-02 | Phase 18 | Complete |
 | THEME-05 | Phase 19 | Pending |
 | THEME-06 | Phase 19 | Pending |
 | THEME-07 | Phase 19 | Pending |
 | DOCS-07 | Phase 16 | Complete |
 | DOCS-08 | Phase 16 | Complete |
-| DOCS-09 | Phase 20 | Pending |
+| DOCS-09 | Phase 21 | Pending |
 | TEST-01 | Phase 16 | Complete |
 | TEST-02 | Phase 15 | Complete |
 | CI-01 | Phase 15 | Reversed |
@@ -189,14 +193,14 @@ v2.0, which ended at Phase 14.
 
 **Coverage:**
 
-- v2.1 requirements: 15 total
-- Mapped to phases: 15
+- v2.1 requirements: 16 total
+- Mapped to phases: 16
 - Unmapped: 0
 - Orphaned (no phase): 0
 - Duplicated (more than one phase): 0
 
 Per-phase distribution: Phase 15 (3), Phase 16 (4), Phase 17 (2), Phase 18 (2),
-Phase 19 (3), Phase 20 (1).
+Phase 19 (3), Phase 20 (1), Phase 21 (1).
 
 ---
 *Requirements defined: 2026-09-05*

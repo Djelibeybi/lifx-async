@@ -4,6 +4,13 @@ Ceiling and Mirror lights both split their matrix into logical components
 whose colours are tracked in memory and optionally persisted to a JSON file
 keyed by device serial. This module holds the pieces both device classes need
 so the persistence format and comparison rules stay identical between them.
+
+It also owns the firmware-effect palette rule shared by matrix and multizone
+devices: ``derive_effect_palette()`` generates a default palette from a
+single colour shown on the device, ``sample_effect_palette()`` builds
+Morph's palette from a device showing several colours, and
+``validate_effect_palette()`` is the one size check both device types'
+effect validation delegates to.
 """
 
 from __future__ import annotations
@@ -14,12 +21,18 @@ import os
 import tempfile
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Generic, TypeVar, cast
 
 from lifx.color import HSBK
+from lifx.const import MAX_KELVIN, MAX_PALETTE_COLORS, MIN_KELVIN
 
 _LOGGER = logging.getLogger(__name__)
+
+#: Degrees either side of the current hue for a generated two-colour spread,
+#: per the shared firmware-effect palette rule (D-15/D-18).
+_EFFECT_PALETTE_HUE_STEP = 45.0
 
 # Locks serialising read-modify-write cycles per state file, keyed on the
 # resolved path so every spelling of one file shares a lock. Bounded by the
@@ -142,6 +155,137 @@ def hsk_matches(stored: HSBK, current: HSBK) -> bool:
     return (
         sp.hue == cp.hue and sp.saturation == cp.saturation and sp.kelvin == cp.kelvin
     )
+
+
+def derive_effect_palette(
+    colors: Sequence[HSBK], min_kelvin: int | None, max_kelvin: int | None
+) -> list[HSBK] | None:
+    """Derive a default firmware-effect palette from a single shown colour.
+
+    A firmware effect (Morph on a matrix, Move on a multizone strip) started
+    without a palette works from the colours already on the device. A
+    palette is generated here only when every colour is identical, so the
+    effect has something visible to work with. When the colours are not all
+    identical there is nothing to derive: Move leaves the strip's zones as
+    they are, and Morph instead builds its own palette from those colours
+    with ``sample_effect_palette()``.
+
+    "Identical" is decided under ``HSBK.__eq__`` (uint16 wire equality, no
+    perceptual tolerance): two colours one wire step apart count as multiple
+    colours, and two colours that encode identically count as one, even if
+    their raw floats differ.
+
+    For a white colour (wire saturation 0), the generated palette is the
+    current colour plus whites at ``min_kelvin`` and ``max_kelvin``, keeping
+    the current brightness and saturation 0. A range endpoint that is None
+    (temperature range unknown) falls back to ``MIN_KELVIN`` /
+    ``MAX_KELVIN``. For a hued colour, the palette is the current colour plus
+    hue +``_EFFECT_PALETTE_HUE_STEP`` and hue -``_EFFECT_PALETTE_HUE_STEP``,
+    each wrapped modulo 360, keeping the current saturation, brightness and
+    kelvin.
+
+    Args:
+        colors: Colours currently shown by the device. An empty sequence, or
+            a sequence containing more than one distinct colour, derives no
+            palette.
+        min_kelvin: The device's minimum white-mode kelvin, or None when the
+            temperature range is unknown.
+        max_kelvin: The device's maximum white-mode kelvin, or None when the
+            temperature range is unknown.
+
+    Returns:
+        A three-colour palette when every colour is identical, otherwise
+        None, meaning the colours are not all identical (or there are
+        none).
+    """
+    if not colors:
+        return None
+
+    current = colors[0]
+    if any(color != current for color in colors):
+        return None
+
+    if current.to_protocol().saturation == 0:
+        lo = MIN_KELVIN if min_kelvin is None else min_kelvin
+        hi = MAX_KELVIN if max_kelvin is None else max_kelvin
+        return [
+            current,
+            HSBK(current.hue, 0.0, current.brightness, lo),
+            HSBK(current.hue, 0.0, current.brightness, hi),
+        ]
+
+    return [
+        current,
+        HSBK(
+            (current.hue + _EFFECT_PALETTE_HUE_STEP) % 360,
+            current.saturation,
+            current.brightness,
+            current.kelvin,
+        ),
+        HSBK(
+            (current.hue - _EFFECT_PALETTE_HUE_STEP) % 360,
+            current.saturation,
+            current.brightness,
+            current.kelvin,
+        ),
+    ]
+
+
+def sample_effect_palette(colors: Sequence[HSBK]) -> list[HSBK]:
+    """Build a Morph palette from a device showing several colours.
+
+    Real firmware does not start Morph when ``Tile.SetEffect`` carries an
+    empty palette, so when ``derive_effect_palette()`` returns None (the
+    colours are not all identical) this is Morph's fallback: the device's
+    own colours become the palette instead. "Distinct" means uint16 wire
+    equality, the same rule ``derive_effect_palette()`` uses.
+
+    Up to ``MAX_PALETTE_COLORS`` distinct colours are returned in the order
+    they are first seen. With more than that, ``MAX_PALETTE_COLORS`` colours
+    are sampled at pixel index ``i * len(colors) // MAX_PALETTE_COLORS`` for
+    ``i`` in ``range(MAX_PALETTE_COLORS)``, spacing the sample evenly across
+    the whole input, and the sampled colours are then de-duplicated in
+    sample order. A non-empty input therefore yields between 1 and
+    ``MAX_PALETTE_COLORS`` colours; sampled pixels can repeat a colour.
+
+    Args:
+        colors: Colours currently shown by the device, flattened across
+            every tile in tile order.
+
+    Returns:
+        Between 1 and ``MAX_PALETTE_COLORS`` colours, de-duplicated in
+        first-seen (or sample) order. An empty input returns an empty list;
+        callers must not rely on that, since Morph's caller raises before
+        an empty result ever reaches this function.
+    """
+    distinct = list(dict.fromkeys(colors))
+    if len(distinct) <= MAX_PALETTE_COLORS:
+        return distinct
+
+    total = len(colors)
+    sampled = [
+        colors[i * total // MAX_PALETTE_COLORS] for i in range(MAX_PALETTE_COLORS)
+    ]
+    return list(dict.fromkeys(sampled))
+
+
+def validate_effect_palette(palette: Sequence[HSBK]) -> None:
+    """Validate a firmware-effect palette's size, shared by matrix and multizone.
+
+    Args:
+        palette: Colours to validate
+
+    Raises:
+        ValueError: If the palette is empty or longer than
+            ``MAX_PALETTE_COLORS``
+    """
+    if not palette:
+        raise ValueError("Effect palette must contain at least one color")
+    if len(palette) > MAX_PALETTE_COLORS:
+        raise ValueError(
+            f"Effect palette can contain at most {MAX_PALETTE_COLORS} colors, "
+            f"got {len(palette)}"
+        )
 
 
 def color_as_dict(color: HSBK | None) -> dict[str, float | int] | None:

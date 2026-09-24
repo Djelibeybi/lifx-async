@@ -318,7 +318,7 @@ MultiZone light device state dataclass returned by `MultiZoneLight.state`.
 
 ### MultiZoneEffect
 
-Configuration dataclass for multizone effects (MOVE). Used with `MultiZoneLight.set_effect()` and returned by `MultiZoneLight.get_effect()`.
+Configuration dataclass for multizone effects (MOVE). Used with `MultiZoneLight.set_effect()` and returned by `MultiZoneLight.get_effect()`. `MultiZoneEffect.move()` builds a Move effect from typed arguments, and `MultiZoneLight.set_move_effect()` builds and sends one in a single call.
 
 ::: lifx.devices.multizone.MultiZoneEffect
     options:
@@ -371,6 +371,8 @@ Information dataclass for a single tile in the device chain. Returned as part of
 Configuration dataclass for matrix effects (MORPH, FLAME, SKY). Used with `MatrixLight.set_effect()` and returned by `MatrixLight.get_effect()`.
 
 SKY requires the matrix capability plus host firmware 4.x or later — confirmed on Ceiling, Luna, Tube, Path and the E26 Candle. Check with `await matrix.supports_sky_effect()`; `set_effect()` raises `LifxUnsupportedCommandError` when either requirement is unmet.
+
+MORPH started with no palette builds one from the device's own colours, because the firmware does not start MORPH with an empty palette. `set_effect()` first reads the tiles with `get_all_tile_colors()`. A device showing one colour gets a generated three-colour palette, and a device showing several gets those colours (all of them in the order first seen when there are 16 or fewer, otherwise 16 pixels sampled evenly across the device). If that read times out, `set_effect()` raises `LifxTimeoutError`; if the reply is malformed, or the device reports no tile colours at all, it raises `LifxProtocolError` naming the device. Either way it sends nothing. Pass `palette=` to choose the colours yourself. FLAME and SKY with no palette send none and read nothing.
 
 ::: lifx.devices.matrix.MatrixEffect
     options:
@@ -644,11 +646,7 @@ async def main():
         await light.set_all_color_zones(colors, start=10, end=19)
 
         # Set a MOVE effect
-        await light.set_effect(
-            effect_type=FirmwareEffect.MOVE,
-            speed=5.0,  # seconds per cycle
-            direction=Direction.FORWARD,
-        )
+        await light.set_move_effect(Direction.FORWARD, 5.0)  # seconds per cycle
 
         # Get current effect
         effect = await light.get_effect()
@@ -657,7 +655,7 @@ async def main():
             print(f"Direction: {effect.direction.name}")
 
         # Stop the effect
-        await light.set_effect(effect_type=FirmwareEffect.OFF)
+        await light.stop_effect()
 ```
 
 ### Tile Control

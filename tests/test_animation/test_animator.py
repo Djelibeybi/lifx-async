@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import socket
+import struct
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import lifx.animation
 from lifx.animation.animator import Animator, AnimatorStats
 from lifx.animation.framebuffer import FrameBuffer
-from lifx.animation.packets import MatrixPacketGenerator
+from lifx.animation.packets import HEADER_SIZE, MatrixPacketGenerator
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.mirror import MirrorLight
+from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError
 from lifx.protocol.models import Serial
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
@@ -156,8 +162,6 @@ class TestAnimatorSendFrame:
 
     def test_send_frame_is_synchronous(self, animator: Animator) -> None:
         """Test that send_frame is synchronous (not a coroutine)."""
-        import inspect
-
         assert not inspect.iscoroutinefunction(animator.send_frame)
 
     def test_send_frame_reuses_socket(
@@ -733,10 +737,6 @@ class TestAnimatorGating:
         AckGate facility is never exported from `lifx.animation.__init__`.
         Passes today and must stay green -- the no-toggle invariant.
         """
-        import inspect
-
-        import lifx.animation
-
         sig = inspect.signature(animator.send_frame)
         assert list(sig.parameters) == ["hsbk"]
         assert "AckGate" not in lifx.animation.__all__
@@ -781,8 +781,6 @@ class TestAnimatorForMatrixFactory:
         Frames bypass set64(), so without this a Ceiling or Mirror component
         call made just after starting an animation would undo its frames.
         """
-        from lifx.devices.mirror import MirrorLight
-
         device = MirrorLight(serial="d073d5000001", ip="192.0.2.10")
         tile = MagicMock(width=4, height=13, user_x=0.0, user_y=0.0)
         tile.nearest_orientation = "Upright"
@@ -871,8 +869,6 @@ class TestAnimatorForLightFactory:
 
     def test_for_light_is_synchronous(self) -> None:
         """Test for_light factory is synchronous (not async)."""
-        import inspect
-
         assert not inspect.iscoroutinefunction(Animator.for_light)
 
     def test_for_light_with_duration(self) -> None:
@@ -885,10 +881,6 @@ class TestAnimatorForLightFactory:
         animator = Animator.for_light(device, duration_ms=500)
 
         # Verify by checking the packet template's duration
-        import struct
-
-        from lifx.animation.packets import HEADER_SIZE
-
         template = animator._templates[0]
         payload = bytes(template.data[HEADER_SIZE:])
         (duration,) = struct.unpack_from("<I", payload, 9)
@@ -901,8 +893,6 @@ class TestAnimatorForMatrixIntegration:
 
     async def test_for_matrix_creates_animator(self, emulator_devices) -> None:
         """Test factory method works with real device."""
-        from lifx.devices.matrix import MatrixLight
-
         # Find the matrix device
         matrix = None
         for device in emulator_devices:
@@ -919,8 +909,6 @@ class TestAnimatorForMatrixIntegration:
 
     async def test_send_frame_sends_packets(self, emulator_devices) -> None:
         """Test send_frame sends packets."""
-        from lifx.devices.matrix import MatrixLight
-
         matrix = None
         for device in emulator_devices:
             if isinstance(device, MatrixLight):
@@ -946,8 +934,6 @@ class TestAnimatorForMatrixIntegration:
 
     async def test_animation_loop_simulation(self, emulator_devices) -> None:
         """Test multiple frames in sequence."""
-        from lifx.devices.matrix import MatrixLight
-
         matrix = None
         for device in emulator_devices:
             if isinstance(device, MatrixLight):
@@ -989,8 +975,6 @@ class TestAnimatorForMultizoneIntegration:
 
     async def test_for_multizone_creates_animator(self, emulator_devices) -> None:
         """Test factory method works with real device."""
-        from lifx.devices.multizone import MultiZoneLight
-
         multizone = None
         for device in emulator_devices:
             if isinstance(device, MultiZoneLight):
@@ -1008,8 +992,6 @@ class TestAnimatorForMultizoneIntegration:
 
     async def test_send_frame_extended_protocol(self, emulator_devices) -> None:
         """Test extended multizone sends packets."""
-        from lifx.devices.multizone import MultiZoneLight
-
         multizone = None
         for device in emulator_devices:
             if isinstance(device, MultiZoneLight):
@@ -1032,8 +1014,6 @@ class TestAnimatorForMultizoneIntegration:
 
     async def test_animation_loop_simulation(self, emulator_devices) -> None:
         """Test multiple frames in sequence."""
-        from lifx.devices.multizone import MultiZoneLight
-
         multizone = None
         for device in emulator_devices:
             if isinstance(device, MultiZoneLight):
@@ -1101,8 +1081,6 @@ class TestAnimatorFlowControlIntegration:
         the gate. The first frame runs before the wrap purely to create the
         lazily-opened socket instance being wrapped.
         """
-        from lifx.devices.matrix import MatrixLight
-
         server_info, device_info = await emulator_server_with_scenarios(
             device_type="tile",
             serial="d073d5000007",
@@ -1161,8 +1139,6 @@ class TestAnimatorFlowControlIntegration:
         emulator connection's deadline logic. The first frame runs before the
         wrap purely to create the lazily-opened socket instance being wrapped.
         """
-        from lifx.devices.matrix import MatrixLight
-
         server_info, device_info = await emulator_server_with_scenarios(
             device_type="tile",
             serial="d073d5000007",
@@ -1212,8 +1188,6 @@ class TestAnimatorFlowControlIntegration:
         probe was swept, only this frame's own probe remains tracked) --
         proves ack collection through the animator's own socket.
         """
-        from lifx.devices.matrix import MatrixLight
-
         matrix = None
         for device in emulator_devices:
             if isinstance(device, MatrixLight):
@@ -1273,8 +1247,6 @@ class TestAnimatorErrorHandling:
 
     async def test_send_frame_wrong_length_raises(self, emulator_devices) -> None:
         """Test wrong Color array length raises error."""
-        from lifx.devices.matrix import MatrixLight
-
         matrix = None
         for device in emulator_devices:
             if isinstance(device, MatrixLight):
@@ -1298,8 +1270,6 @@ class TestAnimatorErrorHandling:
 
     async def test_for_matrix_no_tiles_raises(self, emulator_devices) -> None:
         """Test for_matrix raises when device has no tiles."""
-        from lifx.devices.matrix import MatrixLight
-
         matrix = None
         for device in emulator_devices:
             if isinstance(device, MatrixLight):

@@ -889,6 +889,39 @@ await conductor.start(effect, [matrix_light])
 
 All ported effects run indefinitely until stopped via `conductor.stop()`.
 
+## Firmware Move effect
+
+Move runs on the strip's own firmware: the library sends one packet and the strip animates
+itself, so there is no Conductor and no Animator involved. Move rotates whichever colours are
+already on the strip rather than carrying a palette of its own.
+
+`set_move_effect()` gives a single-colour strip something to move. When every zone shows one
+colour, it generates a three-colour palette and passes it to `apply_theme()` before Move starts.
+A strip that already shows more than one colour is left as it is. A `palette=` argument you
+supply is passed to `apply_theme()` unchanged, without first reading the strip's own colours
+through `get_all_color_zones()`. `apply_theme()` shuffles the palette and blends between its
+colours across the zones, so the strip shows a blend of the palette rather than each colour in
+the order given.
+
+Both examples below assume a connected `MultiZoneLight` bound to `light`. The one-call typed
+method builds the effect, applies the palette rule, and sends it in one step:
+
+```python
+from lifx import Direction
+
+await light.set_move_effect(Direction.FORWARD, 5.0)
+```
+
+The builder form constructs the effect on its own and sends it through `set_effect()`. Unlike
+`set_move_effect()`, this path never paints a palette:
+
+```python
+from lifx import Direction, MultiZoneEffect
+
+effect = MultiZoneEffect.move(Direction.FORWARD, 5.0)
+await light.set_effect(effect)
+```
+
 ## Next Steps
 
 - See [Effects Gallery](effects-gallery.md) for animated previews of all effects

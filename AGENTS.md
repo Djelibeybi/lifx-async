@@ -263,7 +263,7 @@ gh workflow run docs.yml
    - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
    - `mirror.py`: `MirrorLight` class (extends `MatrixLight` with independent front/back component control for LIFX Mirror products; both components are multi-zone rings)
    - `component_light.py`: `ComponentMatrixLight`, the shared base of `CeilingLight` and `MirrorLight`. Both components share one tile, and the firmware runs one transition per tile, reports in-flight colours from Get64 and reports the old power level until a power-off fade finishes, so it remembers the tile and power it last wrote until the device catches up (`Pending`)
-   - `component_state.py`: Shared helpers for component-based devices (colour comparison, serialisation, atomic state-file I/O, `Pending`)
+   - `component_state.py`: Shared helpers for component-based devices (colour comparison, serialisation, atomic state-file I/O, `Pending`) and the firmware-effect palette rule shared by Morph and Move: `derive_effect_palette()` for a single colour, `sample_effect_palette()` for Morph's palette from a device showing several colours, and `validate_effect_palette()` for the shared size check
    - State caching with configurable TTL to reduce network traffic
 
 4. **High-Level API** (`src/lifx/api.py`)
