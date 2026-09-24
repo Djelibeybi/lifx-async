@@ -287,15 +287,19 @@ LIFX app.
 - ✓ Every v1.1 wire-reliability finding revalidated against a real 8-device Thread fleet;
   every device class evidence-backed or a named gap; consumer guidance and doc
   corrections shipped (THREAD-01..05, DOCS-04..06) — v2.0 Phase 14
+- ✓ Typed Move-effect API ([#191](https://github.com/Djelibeybi/lifx-async/issues/191)): callers build Move from a direction and
+  seconds instead of the eight-slot `parameters` list, and Move or Morph started without a
+  palette uses the device's own colours, confirmed on a real strip and a Thread Luna
+  (EFFECT-01, EFFECT-02) — v2.1 Phase 18
 
 ### Active
 
 <!-- v2.1 Spring Cleaning scope. Full REQ-IDs in .planning/REQUIREMENTS.md; the
      "Current Milestone" section above carries the per-item detail and issue links. -->
 
-- [ ] Eleven open GitHub issues resolved: #213, #212 (mDNS correctness); #217, #216, #215
-      (mDNS docs and tests); #214, #209 (CI and coverage); #201, #199, #198 (theme API and
-      data); #191 (typed Move-effect API)
+- [ ] Remaining open GitHub issues resolved: #213, #212 (mDNS correctness); #217, #216,
+      #215 (mDNS docs and tests); #214, #209 (CI and coverage); #201, #199, #198 (theme API
+      and data). #191 shipped in Phase 18
 - [ ] SEED-002: the staleness experiment run against WiFi bulbs as a control for v2.0's
       69s Thread figure
 - [ ] SEED-003: `Animator` locked to WiFi devices, since Thread lacks the bandwidth for
@@ -477,6 +481,7 @@ LIFX app.
 | Measure Thread discovery and retry timing before changing any constant, never assume | The project's spike-first discipline (2026-07-16 lineage): a WiFi-tuned constant only changes on Thread-measured evidence, not on suspicion that Thread is slower | ✓ Applied — Phase 14. Discovery coverage held across repeated rounds; ack RTT medians (37-57ms across 8 aliases) did not warrant retuning any constant |
 | Record Thread animation as an explicit scope boundary, not a throughput measurement | Thread doesn't have the bandwidth to sustain animation at usable frame rates, and pushing that volume onto a mesh is bad practice regardless of what a measurement would show | Decided in Phase 14 (THREAD-03). One alias completing 1/2/5 FPS without failing is preserved as evidence Thread carries frames, explicitly not evidence of usable animation. `Animator` is intended to be locked to WiFi devices in a future milestone (SEED-003) |
 | Close v2.0 with 3 acknowledged items rather than blocking on them | SEED-002 and SEED-003 are genuinely future-milestone work, not v2.0 scope; the Phase 13 deferred item's underlying test-hang bug appears already fixed by a later commit but `deferred-items.md` was never confirmed against it | Accepted 2026-09-05 at milestone close (override_closeout). Recorded in `.planning/STATE.md` Deferred Items; worth a `/gsd-audit-uat` recheck next session |
+| Palette-less Morph sends the device's own colours, and raises when it cannot read them | Real Luna firmware does not start MORPH with `palette_count=0`, so the planned "animate what is showing" empty palette silently did nothing (UAT gap G-18-1). Two to 16 distinct colours go as-is; more are sampled at 16 evenly spaced pixels. A failed read raises, because the only fallback would be the empty palette the firmware ignores | ✓ Shipped — Phase 18 (D-24 to D-26, 2026-09-24). Move keeps its empty-palette path and read fallback, which real strips honour |
 
 ## Evolution
 
@@ -496,4 +501,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after v2.1 milestone start*
+*Last updated: 2026-09-24 after Phase 18*

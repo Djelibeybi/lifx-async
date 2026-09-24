@@ -39,28 +39,25 @@ effect = FirmwareEffect.SKY    # Matrix/Tile
 
 ### 2. Direction Control for MOVE Effects
 
-**Before:**
-```python
-# Direction was embedded in specialized methods
-await light.set_move_effect(speed=5.0, direction=1)  # 0=reversed, 1=forward
-```
+**Before:** direction was embedded in a specialised method, taking `speed` and an integer
+`direction` (`0` for reversed, `1` for forward) as keywords.
 
 **After:**
 ```python
-from lifx import FirmwareEffect, Direction
+from lifx import Direction, FirmwareEffect
 
 # Direction is a proper enum with named values
-await light.set_effect(
-    effect_type=FirmwareEffect.MOVE,
-    speed=5.0,
-    direction=Direction.FORWARD,  # or Direction.REVERSED
-)
+await light.set_move_effect(Direction.FORWARD, 5.0)  # or Direction.REVERSED
 
 # Direction can also be accessed as a property on MultiZoneEffect
 effect = await light.get_effect()
 if effect.effect_type == FirmwareEffect.MOVE:
     print(f"Direction: {effect.direction.name}")  # FORWARD or REVERSED
 ```
+
+The `MultiZoneEffect.direction` setter now accepts a `Direction` member or its case-insensitive
+name (`"forward"`, `"reversed"`). A bare integer, which it used to store unchecked, now raises
+`ValueError`; wrap such a value as `Direction(value)` before assigning it.
 
 ### 3. Method Naming Simplified
 
@@ -74,20 +71,19 @@ effect = await multizone_light.get_multizone_effect()
 await matrix_light.set_tile_effect(...)
 effect = await matrix_light.get_tile_effect()
 
-# Specialized MOVE method
-await multizone_light.set_move_effect(speed=5.0, direction=1)
+# Specialised MOVE method took speed and an integer direction as keywords
 ```
 
 **After:**
 ```python
 # Unified naming across all device types
-await multizone_light.set_effect(effect_type=FirmwareEffect.MOVE, ...)
+await multizone_light.set_move_effect(Direction.FORWARD, 5.0)
 effect = await multizone_light.get_effect()
 
 await matrix_light.set_effect(effect_type=FirmwareEffect.FLAME, ...)
 effect = await matrix_light.get_effect()
 
-# No more specialized methods - use set_effect with Direction enum
+# No more specialised get/set method names per device type
 ```
 
 ### 4. Application Request Enum Unified
@@ -126,8 +122,7 @@ async with await Device.connect("192.168.1.100") as light:
         speed=5.0,
     )
 
-    # Or using specialized method
-    await light.set_move_effect(speed=5.0, direction=1)
+    # A specialised method also existed, taking speed and direction as keywords
 
     effect = await light.get_multizone_effect()
 ```
@@ -138,12 +133,8 @@ from lifx import Device, Direction, FirmwareEffect, MultiZoneLight
 
 async with await Device.connect("192.168.1.100") as light:
     assert isinstance(light, MultiZoneLight)
-    # New unified API
-    await light.set_effect(
-        effect_type=FirmwareEffect.MOVE,
-        speed=5.0,
-        direction=Direction.FORWARD,
-    )
+    # The typed method builds the effect and sends it in one call
+    await light.set_move_effect(Direction.FORWARD, 5.0)
 
     effect = await light.get_effect()
     if effect.effect_type == FirmwareEffect.MOVE:
@@ -233,7 +224,7 @@ The following have been **removed** in v4.3.0:
 - `lifx.protocol.protocol_types.MultiZoneExtendedApplicationRequest` → use `MultiZoneApplicationRequest`
 - `MultiZoneLight.set_multizone_effect()` → use `set_effect()`
 - `MultiZoneLight.get_multizone_effect()` → use `get_effect()`
-- `MultiZoneLight.set_move_effect()` → use `set_effect(effect_type=FirmwareEffect.MOVE, direction=Direction.FORWARD)`
+- `MultiZoneLight.set_move_effect()`'s pre-4.3.0 keyword form (`speed` and an integer `direction`) → removed in 4.3.0 in favour of `set_effect()`; releases after 7.4.0 add the typed `set_move_effect(direction, speed, duration=0, palette=None)`, which replaces it
 - `MultiZoneLight.get_move_effect()` → use `get_effect()` and access `effect.direction`
 - `MatrixLight.set_tile_effect()` → use `set_effect()`
 - `MatrixLight.get_tile_effect()` → use `get_effect()`

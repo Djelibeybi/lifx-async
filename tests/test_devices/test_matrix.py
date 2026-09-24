@@ -489,10 +489,23 @@ class TestMatrixLight:
             assert copied_colors[0].brightness == 1.0
 
     async def test_set_effect_without_palette(self, emulator_devices) -> None:
-        """Test setting effect without a palette (palette_count=0)."""
+        """Test setting effect without a palette on a multi-colour device.
+
+        A device showing more than one distinct colour now gets those
+        colours back as the MORPH palette (D-24, D-25): real firmware does
+        not start MORPH when Tile.SetEffect carries palette_count=0.
+        """
         matrix = emulator_devices[6]
         async with matrix:
-            # Set effect without palette - should send palette_count=0
+            # Paint the tile with two distinct colours so the read-back shows
+            # more than one colour.
+            colors = [Colors.RED] * 32 + [Colors.BLUE] * 32
+            await matrix.set_matrix_colors(0, colors)
+            tile_colors = await matrix.get_all_tile_colors()
+            assert len({color for tile in tile_colors for color in tile}) > 1
+
+            # Set effect without palette - the device's own colours become
+            # the palette.
             await matrix.set_effect(
                 effect_type=FirmwareEffect.MORPH,
                 speed=3000,
@@ -501,7 +514,7 @@ class TestMatrixLight:
             # Verify effect was set
             effect = await matrix.get_effect()
             assert effect.effect_type == FirmwareEffect.MORPH
-            assert effect.palette is None
+            assert effect.palette == [Colors.RED, Colors.BLUE]
 
     async def test_get64_large_tile(self, ceiling_device) -> None:
         """Test getting colors from 16x8 tile (128 zones) with default parameters.
@@ -918,6 +931,10 @@ class TestSkyEffectFirmwareGate:
         matrix = self._matrix_light(
             mock_device_factory, self.MATRIX_PRODUCT, major=3, minor=90
         )
+        # MORPH with no palette now reads the device's colours first; the
+        # stubbed red and blue are now sent as the palette instead of
+        # palette_count=0.
+        matrix.get_all_tile_colors = AsyncMock(return_value=[[Colors.RED, Colors.BLUE]])
 
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=2.0)
 

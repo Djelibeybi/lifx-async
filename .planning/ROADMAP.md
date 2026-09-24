@@ -7,7 +7,7 @@
 - ✅ **v1.1 Wire Reliability**: Phases 2–5, shipped 2026-07-26 ([archive](milestones/v1.1-ROADMAP.md))
 - ✅ **v1.2 Theme Library Update**: Phases 6–9, shipped 2026-08-27 ([archive](milestones/v1.2-ROADMAP.md))
 - ✅ **v2.0 Thread/IPv6 Support**: Phases 10–14, shipped 2026-09-05 ([archive](milestones/v2.0-ROADMAP.md))
-- 🚧 **v2.1 Spring Cleaning**: Phases 15–20, in progress
+- 🚧 **v2.1 Spring Cleaning**: Phases 15–21, in progress
 
 ## Phases
 
@@ -109,7 +109,7 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
 </details>
 
-### 🚧 v2.1 Spring Cleaning (Phases 15–20, In Progress)
+### 🚧 v2.1 Spring Cleaning (Phases 15–21, In Progress)
 
 **Milestone Goal:** Clear every accumulated small item so nothing carried forward is left
 unaddressed: all 11 open GitHub issues, both dormant seeds, the repo-wide em dash style
@@ -122,9 +122,10 @@ verified together, not by size.
 - [x] **Phase 15: Coverage Gate and Test-Suite Health** - Make the project's own verification machinery honest before it measures anything else: the `codecov/patch` gate cannot pass without scoring a pull request's changed range, the `scripts/` tree triage and measured-tree rule state which code coverage measures, and the v2.0 Phase 13 coordinator teardown item is settled either way (completed 2026-09-07)
 - [x] **Phase 16: mDNS Correctness, Docs and Test Hygiene** - Close the fail-closed address-check bypass in `selected_address_for()`, and make the mDNS surface describe itself to callers: `Device.connectivity` classified as a derived rather than cached property, caller-facing discovery docstrings, and module-scope test imports (completed 2026-09-07)
 - [x] **Phase 17: Fleet Diagnostics and the Staleness Control** - Make the IPv6 Thread probe report what it actually observed, and give v2.0's 4140-4200s Thread disappearance-to-expiry interval a WiFi control measured with the same protocol (completed 2026-09-08)
-- [ ] **Phase 18: Animator Connectivity Guard and Typed Move Effect** - The milestone's two public API changes: `Animator` stops silently accepting a Thread device, and a caller builds the firmware Move effect through typed arguments instead of an eight-slot `parameters` list
+- [x] **Phase 18: Typed Move and Morph Palette Effects** - A caller builds the firmware Move effect through typed arguments instead of an eight-slot `parameters` list, and Move or Morph started without a palette animates the colours already on the device (completed 2026-09-24)
 - [ ] **Phase 19: Theme Library API and Data** - Primary themes distinguishable from rename aliases with canonical-slug resolution, a digit-leading display name representable as a slug, and the v1.2 palette substitutions named in the changelog
-- [ ] **Phase 20: Documentation Prose Sweep** - Roughly 200 em dashes across `docs/` recast sentence by sentence rather than substituted, run last so it cannot collide with any other change to `docs/`
+- [ ] **Phase 20: Animator Thread Guard** - `Animator` and the effects Conductor stop silently accepting a Thread device, covered in CI with synthetic Thread connectivity and verified by hand on real Thread devices
+- [ ] **Phase 21: Documentation Prose Sweep** - Roughly 200 em dashes across `docs/` recast sentence by sentence rather than substituted, run last so it cannot collide with any other change to `docs/`
 
 **Constraints that bind every phase:**
 
@@ -155,11 +156,20 @@ verified together, not by size.
 
 - **Phases 16, 18 and 19 are file-disjoint and can run in parallel.** Phase 16 lives in
   `src/lifx/network/discovery/mdns/`, `src/lifx/devices/base.py` docstrings and
-  `tests/test_network/`; Phase 18 lives in `src/lifx/animation/` and
-  `src/lifx/devices/multizone.py`; Phase 19 lives in `src/lifx/theme/` and
-  `data/themes.jsonl`.
+  `tests/test_network/`; Phase 18 lives in `src/lifx/devices/multizone.py`,
+  `src/lifx/devices/matrix.py` and `src/lifx/devices/component_state.py`; Phase 19 lives in
+  `src/lifx/theme/` and `data/themes.jsonl`.
 
-- **Phase 20 is last on purpose.** A ~200-occurrence prose pass across `docs/` conflicts
+- **Phase 20 does not wait on the emulator.** ANIM-05 was split out of Phase 18 on
+  2026-09-23 because the lifx-emulator-core release that models Thread devices is not ready.
+  CI covers every guard branch with synthetic Thread connectivity, the way the existing
+  `_refuse_on_connectivity()` tests do, and an operator-run check on real Thread devices
+  provides the integration evidence, pseudonymised like Phase 17's. Emulator integration
+  tests are a deferred follow-up: the emulator will answer Thread requests the way the
+  standard does, packing replies into as few packets as possible rather than one reply per
+  device, so the superseded per-device plans are replanned rather than reused.
+
+- **Phase 21 is last on purpose.** A ~200-occurrence prose pass across `docs/` conflicts
   textually with every other phase that adds or edits documentation, so it sweeps what the
   earlier phases have already landed rather than racing them.
 
@@ -276,22 +286,42 @@ Plans:
 
 - [x] 17-05-PLAN.md: R6 the staleness control finding with all four figures and the 69.4 second correction across ROADMAP and REQUIREMENTS, and R7 the caller-facing liveness prose with its approved-phrase lock (wave 5)
 
-### Phase 18: Animator Connectivity Guard and Typed Move Effect
+### Phase 18: Typed Move and Morph Palette Effects
 
-**Goal**: The milestone's two public API changes land: a caller cannot silently push
-animation frames onto a Thread mesh, and a caller builds the firmware Move effect without
-knowing the protocol layout
+**Goal**: A caller builds the firmware Move effect without knowing the protocol layout, and
+Move or Morph started without a palette behaves the way the LIFX app does
 **Depends on**: Phase 15; file-disjoint from Phases 16 and 19 and can run in parallel with
 them
-**Requirements**: ANIM-05, EFFECT-01
+**Requirements**: EFFECT-01, EFFECT-02
 **Success Criteria** (what must be TRUE):
 
-  1. `Animator.for_light()`, `for_multizone()` and `for_matrix()` refuse or clearly degrade when handed a Thread device, naming connectivity as the reason at construction time rather than failing opaquely later during frame delivery
-  2. A WiFi device constructs and drives an `Animator` exactly as before, so existing callers including LedFx see no signature or behaviour change
-  3. A caller starts the firmware Move effect by naming direction, speed and duration through typed arguments, without constructing the eight-slot `parameters` list or knowing which slot carries direction
-  4. The typed Move API appears in the published API documentation with an example that runs, and the existing `MultiZoneEffect` construction path keeps working for callers already using it
+  1. A caller starts the firmware Move effect by naming direction, speed and duration through typed arguments, without constructing the eight-slot `parameters` list or knowing which slot carries direction
+  2. The typed Move API appears in the published API documentation with an example that runs, and the existing `MultiZoneEffect` construction path keeps working for callers already using it
+  3. Starting Move through the typed API or Morph without a palette animates the colours already on the device, and a device showing a single colour gets a generated three-colour palette, the way the LIFX app behaves
 
-**Plans**: TBD
+**Plans**: 6/6 plans executed (revised 2026-09-23 after the ANIM-05 split; numbering kept for review traceability; 18-09 added 2026-09-24 to close UAT gap G-18-1)
+
+**Wave 1**
+
+- [x] 18-03-PLAN.md: typed `MultiZoneEffect.move()` builder, edges and golden-packet backstop
+- [x] 18-04-PLAN.md: Morph default palette and the shared `derive_effect_palette()` helper
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 18-06-PLAN.md: `MultiZoneLight.set_move_effect()` and the Move default palette
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 18-07-PLAN.md: Firmware Move documentation, executed examples and phase-wide gates
+- [x] 18-08-PLAN.md: PLC0415 import hoist in `tests/test_animation/` and `tests/test_devices/test_multizone.py`
+
+**Wave 4** *(gap closure for UAT gap G-18-1, 2026-09-24)*
+
+- [x] 18-09-PLAN.md: Morph with no palette always sends a non-empty palette built from the device's own colours (all of them up to 16, otherwise 16 evenly sampled pixels), and a failed colour read raises; Move unchanged
+
+All emulator tests run against the locked lifx-emulator-core 3.7.0 and its existing
+fixtures. The Thread content that left with ANIM-05 is listed in
+`phases/20-animator-thread-guard/prior-plans/README.md`.
 
 ### Phase 19: Theme Library API and Data
 
@@ -310,11 +340,35 @@ them
 
 **Plans**: TBD
 
-### Phase 20: Documentation Prose Sweep
+### Phase 20: Animator Thread Guard
+
+**Goal**: A caller cannot silently push animation frames onto a Thread mesh
+**Depends on**: Phase 18 (both edit effect and animation documentation). Needs access to real
+Thread devices for the operator-run hardware check; does not depend on a lifx-emulator
+release
+**Requirements**: ANIM-05
+**Success Criteria** (what must be TRUE):
+
+  1. `Animator.for_light()`, `for_multizone()` and `for_matrix()` refuse or clearly degrade when handed a Thread device, naming connectivity as the reason at construction time rather than failing opaquely later during frame delivery
+  2. A WiFi device constructs and drives an `Animator` exactly as before, so existing callers including LedFx see no signature or behaviour change
+  3. The effects Conductor drops Thread participants from frame effects before it captures their state
+  4. Every guard branch is covered in CI without hardware, using synthetic Thread connectivity
+  5. An operator-run check on real Thread devices shows each factory refusing a Thread device with the connectivity reason, `enable_thread=True` driving it, a WiFi device unaffected, and no frame sent to a refused device as counted by the request-observation seam; the committed evidence is pseudonymised
+
+**Plans**: TBD
+
+Emulator integration tests for Thread devices are deferred until lifx-emulator ships
+standards-based Thread replies.
+
+The superseded plans 18-01, 18-02 and 18-05 are kept under this phase's `prior-plans/`
+directory as reference only. They assumed per-device Thread replies and must not be executed
+as written.
+
+### Phase 21: Documentation Prose Sweep
 
 **Goal**: The published documentation reads in the project's house style, with every em
 dash recast rather than substituted
-**Depends on**: Phases 15 to 19 (every other change touching `docs/` lands first, so this
+**Depends on**: Phases 15 to 20 (every other change touching `docs/` lands first, so this
 sweep cannot collide with them)
 **Requirements**: DOCS-09
 **Success Criteria** (what must be TRUE):
@@ -327,7 +381,7 @@ sweep cannot collide with them)
 
 ## Progress
 
-**Execution Order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20
+**Execution Order:** 15 → (16 → 17) ∥ 18 ∥ 19 → 20 → 21
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
@@ -336,7 +390,7 @@ sweep cannot collide with them)
 | v1.1 Wire Reliability | 2–5 | Complete | 2026-07-26 |
 | v1.2 Theme Library Update | 6–9 | Complete | 2026-08-27 |
 | v2.0 Thread/IPv6 Support | 10–14 | Complete | 2026-09-05 |
-| v2.1 Spring Cleaning | 15–20 | In progress | - |
+| v2.1 Spring Cleaning | 15–21 | In progress | - |
 
 ### v2.1 Phases
 
@@ -345,6 +399,7 @@ sweep cannot collide with them)
 | 15. Coverage Gate and Test-Suite Health | 5/5 | Not started |  |
 | 16. mDNS Correctness, Docs and Test Hygiene | 4/4 | Not started |  |
 | 17. Fleet Diagnostics and the Staleness Control | 5/5 | Not started |  |
-| 18. Animator Connectivity Guard and Typed Move Effect | 0/? | Not started | - |
+| 18. Typed Move and Morph Palette Effects | 6/6 | Not started |  |
 | 19. Theme Library API and Data | 0/? | Not started | - |
-| 20. Documentation Prose Sweep | 0/? | Not started | - |
+| 20. Animator Thread Guard | 0/? | Not started | - |
+| 21. Documentation Prose Sweep | 0/? | Not started | - |

@@ -19,6 +19,8 @@ from lifx.protocol.protocol_types import (
     FirmwareEffect,
     LightHsbk,
     MultiZoneApplicationRequest,
+    MultiZoneEffectParameter,
+    MultiZoneEffectSettings,
 )
 from lifx.protocol.protocol_types import (
     MultiZoneApplicationRequest as ExtendedAppReq,
@@ -832,11 +834,6 @@ class TestMultiZoneEffect:
     async def test_get_effect(self, multizone_light: MultiZoneLight) -> None:
         """Test getting multizone effect with direction."""
         # Mock StateEffect response
-        from lifx.protocol.protocol_types import (
-            MultiZoneEffectParameter,
-            MultiZoneEffectSettings,
-        )
-
         mock_state = packets.MultiZone.StateEffect(
             settings=MultiZoneEffectSettings(
                 instanceid=12345,
@@ -870,11 +867,6 @@ class TestMultiZoneEffect:
     async def test_get_effect_when_off(self, multizone_light: MultiZoneLight) -> None:
         """Test getting effect returns None when effect type is OFF."""
         # Mock StateEffect response with OFF effect type
-        from lifx.protocol.protocol_types import (
-            MultiZoneEffectParameter,
-            MultiZoneEffectSettings,
-        )
-
         mock_state = packets.MultiZone.StateEffect(
             settings=MultiZoneEffectSettings(
                 instanceid=0,

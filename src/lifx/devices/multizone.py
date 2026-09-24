@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component_state import derive_effect_palette, validate_effect_palette
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxTimeoutError
+from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     Direction,
@@ -29,6 +31,39 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Wire bounds for the typed Move builder's converted speed (uint32
+# milliseconds) and duration (uint64 nanoseconds).
+_UINT32_MAX = 2**32 - 1
+_UINT64_MAX = 2**64 - 1
+
+
+def _coerce_direction(value: Direction | str) -> Direction:
+    """Coerce a Direction member or its case-insensitive name to a Direction.
+
+    Args:
+        value: A ``Direction`` member, or a string naming one
+            case-insensitively (``"forward"``, ``"reversed"``).
+
+    Returns:
+        The matching ``Direction`` member.
+
+    Raises:
+        ValueError: If value is not a ``Direction`` member and not a string
+            naming one. A bare integer, ``None`` and a ``bool`` are all
+            rejected; the message names the accepted names.
+    """
+    if isinstance(value, Direction):
+        return value
+    if isinstance(value, str):
+        try:
+            return Direction[value.upper()]
+        except KeyError:
+            pass
+    raise ValueError(
+        "direction must be a Direction member or one of 'forward'/'reversed' "
+        f"(case-insensitive), got {value!r}"
+    )
+
 
 @dataclass
 class MultiZoneEffect:
@@ -39,6 +74,11 @@ class MultiZoneEffect:
         speed: Effect speed in milliseconds
         duration: Total effect duration (0 for infinite)
         parameters: Effect-specific parameters (8 uint32 values)
+
+    Use :meth:`move` to build a Move effect from a direction and float
+    seconds. The raw constructor and its ``parameters`` list are unchanged
+    for callers who already encode them directly (for example, Home
+    Assistant).
     """
 
     effect_type: FirmwareEffect
@@ -103,6 +143,111 @@ class MultiZoneEffect:
                     f"Parameter {i} must be a uint32 (0-{2**32 - 1}), got {param}"
                 )
 
+    @staticmethod
+    def _seconds_to_units(
+        value: float, per_second: int, maximum: int, name: str
+    ) -> int:
+        """Convert a float number of seconds to a bounded integer wire unit.
+
+        Args:
+            value: Number of seconds, as an ``int`` or ``float``.
+            per_second: Wire units per second (1000 for milliseconds,
+                1_000_000_000 for nanoseconds).
+            maximum: Maximum permitted wire value, inclusive.
+            name: Field name ("speed" or "duration") used in error messages.
+
+        Returns:
+            ``round(value * per_second)``, guaranteed to be within
+            ``0..maximum``.
+
+        Raises:
+            TypeError: If value is a ``bool`` or is not an ``int`` or
+                ``float`` instance.
+            ValueError: If value is negative, not finite, or the scaled
+                value is not finite or exceeds ``maximum``. An ``int`` too
+                large for a float, and a finite float whose scaled value
+                overflows to infinity, both raise this same overflow
+                ``ValueError`` rather than escaping as ``OverflowError``.
+        """
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(
+                f"{name} must be a number of seconds (int or float), "
+                f"got {type(value).__name__}"
+            )
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError(f"{name} must be finite, got {value}")
+        if value < 0:
+            raise ValueError(f"{name} must be non-negative, got {value}")
+
+        overflow_message = (
+            f"{name} of {value} seconds converts to more than the wire "
+            f"maximum of {maximum}"
+        )
+        # An int scales exactly with no float conversion, so it is never
+        # non-finite here; math.isfinite() is only ever called on a float
+        # (an int too large for a float would otherwise raise OverflowError
+        # from math.isfinite() itself, escaping the promised ValueError).
+        scaled = value * per_second
+        if isinstance(scaled, float) and not math.isfinite(scaled):
+            raise ValueError(overflow_message)
+
+        result = round(scaled)
+        if result > maximum:
+            raise ValueError(overflow_message)
+        return result
+
+    @classmethod
+    def move(
+        cls,
+        direction: Direction | str,
+        speed: float,
+        duration: float = 0,
+    ) -> MultiZoneEffect:
+        """Build a Move effect from a direction and float seconds.
+
+        Args:
+            direction: A ``Direction`` member, or its case-insensitive name
+                (``"forward"``, ``"reversed"``).
+            speed: Number of seconds per full cycle, rounded to the nearest
+                whole millisecond.
+            duration: Number of seconds the effect runs for; ``0`` (the
+                default) means indefinitely. Rounded to the nearest whole
+                nanosecond.
+
+        Returns:
+            A ``MultiZoneEffect`` with ``effect_type`` set to
+            ``FirmwareEffect.MOVE`` and the eight-slot ``parameters`` list
+            encoded internally.
+
+        Raises:
+            ValueError: If direction is not a ``Direction`` member and not
+                one of its names (a bare ``bool`` included, since it is
+                neither); or if speed or duration is negative, not finite,
+                or converts to a value larger than the wire can hold
+                (``uint32`` for speed, ``uint64`` for duration).
+            TypeError: If speed or duration is a ``bool`` or is not an
+                ``int`` or ``float``.
+
+        Example:
+            ```python
+            from lifx import Direction, MultiZoneEffect
+
+            effect = MultiZoneEffect.move(Direction.FORWARD, 5.0)
+            await light.set_effect(effect)
+            ```
+        """
+        resolved_direction = _coerce_direction(direction)
+        speed_ms = cls._seconds_to_units(speed, 1000, _UINT32_MAX, "speed")
+        duration_ns = cls._seconds_to_units(
+            duration, 1_000_000_000, _UINT64_MAX, "duration"
+        )
+        return cls(
+            effect_type=FirmwareEffect.MOVE,
+            speed=speed_ms,
+            duration=duration_ns,
+            parameters=[0, int(resolved_direction), 0, 0, 0, 0, 0, 0],
+        )
+
     @property
     def direction(self) -> Direction | None:
         """Get direction for MOVE effect.
@@ -115,21 +260,24 @@ class MultiZoneEffect:
         return Direction(self.parameters[1]) if self.parameters else Direction.FORWARD
 
     @direction.setter
-    def direction(self, value: Direction) -> None:
+    def direction(self, value: Direction | str) -> None:
         """Set direction for MOVE effect.
 
         Args:
-            value: Direction enum value
+            value: A ``Direction`` member, or its case-insensitive name
+                (``"forward"``, ``"reversed"``).
 
         Raises:
-            ValueError: If effect type is not MOVE
+            ValueError: If effect type is not MOVE, or if value is not a
+                ``Direction`` member and not one of its names. A bare
+                integer is rejected; wrap it as ``Direction(value)`` first.
         """
         if self.effect_type != FirmwareEffect.MOVE:
             raise ValueError(
                 f"Direction can only be set for MOVE effects, "
                 f"current type is {self.effect_type.name}"
             )
-        self.parameters = [0, int(value), 0, 0, 0, 0, 0, 0]
+        self.parameters = [0, int(_coerce_direction(value)), 0, 0, 0, 0, 0, 0]
 
 
 @dataclass
@@ -196,6 +344,8 @@ class MultiZoneLight(Light):
 
     Example:
         ```python
+        from lifx import Direction
+
         light = MultiZoneLight(serial="d073d5123456", ip="192.168.1.100")
 
         async with light:
@@ -212,14 +362,16 @@ class MultiZoneLight(Light):
             colors = await light.get_color_zones(0, 4)
 
             # Apply a moving effect
-            await light.set_move_effect(speed=5.0, direction="forward")
+            await light.set_move_effect(Direction.FORWARD, 5.0)
         ```
 
         Using the simplified connect method:
         ```python
+        from lifx import Direction
+
         async with await Device.connect(ip="192.168.1.100") as light:
             assert isinstance(light, MultiZoneLight)
-            await light.set_move_effect(speed=5.0, direction="forward")
+            await light.set_move_effect(Direction.FORWARD, 5.0)
         ```
     """
 
@@ -937,6 +1089,103 @@ class MultiZoneLight(Light):
                 "values": {},
             }
         )
+
+    async def _derive_move_palette(self) -> list[HSBK] | None:
+        """Derive the default Move palette from the strip's own zone colours.
+
+        Reads every zone's colour with ``get_all_color_zones()`` and derives
+        a palette with ``derive_effect_palette()``: None when the zones show
+        more than one distinct colour (Move then animates what is already
+        shown), or a generated three-colour palette when every zone shows one
+        colour.
+
+        A timeout or a malformed reply reading the zones is logged at DEBUG
+        and Move is still sent, with no palette, rather than turning a
+        fire-and-forget effect into a hard failure.
+
+        Returns:
+            A derived palette, or None to send no palette.
+
+        Raises:
+            LifxDeviceNotFoundError: If device is not connected
+            LifxUnsupportedCommandError: If device doesn't support this command
+        """
+        try:
+            zones = await self.get_all_color_zones()
+        except (LifxTimeoutError, LifxProtocolError) as err:
+            _LOGGER.debug(
+                {
+                    "class": "MultiZoneLight",
+                    "method": "set_move_effect",
+                    "action": "palette read failed, sending the effect "
+                    "without a palette",
+                    "error": type(err).__name__,
+                    "values": {"serial": self.serial},
+                }
+            )
+            return None
+
+        return derive_effect_palette(zones, self.min_kelvin, self.max_kelvin)
+
+    async def set_move_effect(
+        self,
+        direction: Direction | str,
+        speed: float,
+        duration: float = 0,
+        palette: list[HSBK] | None = None,
+    ) -> None:
+        """Start the firmware Move effect in one call.
+
+        Move rotates the colours already on the strip; it carries no palette
+        of its own on the wire. With no palette, the strip's colours are read
+        first and left as they are when they differ. When every zone shows
+        one colour a three-colour palette is generated (following the LIFX
+        app) and passed to :meth:`apply_theme`, which shuffles the palette
+        and blends between its colours across the zones, so the strip shows
+        a blend of the palette rather than each colour in order. An explicit
+        palette is passed to :meth:`apply_theme` unchanged, without first
+        reading the strip's colours through :meth:`get_all_color_zones`. The
+        raw ``set_effect(MultiZoneEffect)`` path never paints.
+
+        Args:
+            direction: A ``Direction`` member, or its case-insensitive name
+                (``"forward"``, ``"reversed"``).
+            speed: Number of seconds per full cycle.
+            duration: Number of seconds the effect runs for; ``0`` (the
+                default) means indefinitely.
+            palette: Up to 16 colours to paint before Move starts. ``None``
+                (the default) derives a palette from the strip's own zones
+                as described above.
+
+        Raises:
+            ValueError: If direction, speed, duration or an explicit
+                palette is invalid.
+            TypeError: If speed or duration is a non-numeric value.
+            LifxUnsupportedCommandError: If device doesn't support this command
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device is not connected
+
+        Example:
+            ```python
+            from lifx import Direction
+
+            await light.set_move_effect(Direction.FORWARD, 5.0)
+            ```
+        """
+        effect = MultiZoneEffect.move(direction, speed, duration)
+
+        if palette is not None:
+            validate_effect_palette(palette)
+            paint = palette
+        else:
+            paint = await self._derive_move_palette()
+
+        if paint is not None:
+            from lifx.theme.theme import Theme
+
+            await self.apply_theme(Theme(list(paint)), duration=0)
+
+        await self.set_effect(effect)
 
     # Cached value properties
     @property

@@ -20,7 +20,7 @@
     },
     {
       "number": "18",
-      "name": "Animator Connectivity Guard and Typed Move Effect",
+      "name": "Typed Move and Morph Palette Effects",
       "status": "pending"
     },
     {
@@ -30,14 +30,19 @@
     },
     {
       "number": "20",
+      "name": "Animator Thread Guard",
+      "status": "pending"
+    },
+    {
+      "number": "21",
       "name": "Documentation Prose Sweep",
       "status": "pending"
     }
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 18)",
-    "reason": "Phase 18 of 6 — needs a plan"
+    "label": "Advance to the next step (plan phase 19)",
+    "reason": "Phase 19 of 7 — needs a plan"
   },
-  "updated_at": "2026-09-08T10:54:20.623Z"
+  "updated_at": "2026-09-24T00:41:31.968Z"
 }
