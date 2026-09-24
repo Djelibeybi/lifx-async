@@ -731,8 +731,9 @@ class TestRawPathPaintsNothing:
             n = await strip.get_zone_count()
             c = HSBK(200, 1.0, 1.0, 3500)
             await strip.set_all_color_zones([c] * n)
-            # The paint is unacknowledged; a round trip ensures the emulator has
-            # processed it before the capture window opens.
+            # The emulator acks the paint before process_packet() runs (see
+            # _received_packets), so a round trip proves it was processed
+            # before the capture window opens.
             before = await strip.get_all_color_zones()
 
             with _received_packets(server, strip.serial) as captured:
