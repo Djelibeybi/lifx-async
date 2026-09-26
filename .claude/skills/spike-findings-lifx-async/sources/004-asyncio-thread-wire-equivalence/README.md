@@ -30,11 +30,11 @@ Assistant event loop" hypothesis with the same application logic expressed both 
 
 ```bash
 # Idle conditions
-uv run python .planning/spikes/004-asyncio-thread-wire-equivalence/wire.py run \
+uv run python wire.py run \
     --host <bulb-ip>
 
 # Busy-loop conditions (50 concurrent workers)
-uv run python .planning/spikes/004-asyncio-thread-wire-equivalence/wire.py run \
+uv run python wire.py run \
     --host <bulb-ip> --load 50
 ```
 

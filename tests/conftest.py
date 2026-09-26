@@ -7,10 +7,12 @@ import os
 import socket
 import sys
 import threading
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
-from pathlib import Path
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from types import SimpleNamespace
+from typing import Literal, cast
 
 import pytest
 from lifx_emulator import EmulatedLifxServer
@@ -37,20 +39,6 @@ from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxConnectionError, LifxNetworkError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
 from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
-
-# tests/test_discovery_observation.py and
-# tests/test_network/test_connection_retry.py import the shared operator
-# measurement helper flatly (`import measurement_support`). That helper lives
-# outside the measured tree at .planning/scripts/measurement_support.py, so
-# it is on no import path by default. Adding its directory here, rather than
-# to pyproject.toml's pythonpath, keeps the entry inside test infrastructure
-# (D-02/D-05): pytest loads this conftest for any collection under tests/,
-# including a targeted single-file run that never loads the tooling conftest
-# beside .planning/scripts/tests/, which is the case those two tests need to
-# keep working.
-_MEASUREMENT_SCRIPTS_DIR = Path(__file__).resolve().parents[1] / ".planning" / "scripts"
-if str(_MEASUREMENT_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_MEASUREMENT_SCRIPTS_DIR))
 
 NETWORK_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LifxTimeoutError,
@@ -130,7 +118,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--tooling",
         action="store_true",
         default=False,
-        help="run relocated tooling tests under .planning/scripts/tests",
+        help="run the CI tooling tests under tests/test_ci",
     )
     parser.addoption(
         "--benchmark",
@@ -1058,3 +1046,265 @@ async def emulator_server_with_scenarios(
 
     # Invalidate caches after cleanup
     server.invalidate_all_scenario_caches()
+
+
+# ---------------------------------------------------------------------------
+# Test-only observers for the private request and discovery observation hooks.
+#
+# lifx.network.connection and lifx.network.discovery.udp each read an optional
+# callback from an attribute on the current asyncio task. The retry-timing and
+# discovery tests attach the sinks below to that attribute so they can assert
+# on what the request engine and discovery sweep did, without the library
+# exposing any public hook. Observations are value-only; discovery
+# observations carry a raw identity but omit it from repr so a failing
+# assertion cannot print it.
+# ---------------------------------------------------------------------------
+
+# Must match lifx.network.connection._REQUEST_OBSERVER_TASK_ATTRIBUTE exactly
+# -- this is the task attribute name the production request engine reads.
+_OBSERVER_TASK_ATTRIBUTE = "_lifx_request_observer"
+
+_RequestCategory = Literal[
+    "logical_start",
+    "sent",
+    "accepted",
+    "timeout",
+    "send_error",
+    "cancelled",
+    "cleanup",
+]
+_REQUEST_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "logical_start",
+        "sent",
+        "accepted",
+        "timeout",
+        "send_error",
+        "cancelled",
+        "cleanup",
+    }
+)
+
+
+@dataclass(frozen=True, repr=False)
+class _RequestObservation:
+    """One in-memory request-engine event, identity- and packet-free.
+
+    ``sequence`` is ``None`` for request-scoped events (``logical_start``,
+    ``timeout``, ``cancelled``, ``cleanup``) and set for the
+    transmission-scoped events (``sent``, ``accepted``). ``thread_connection``
+    is only ever non-``None`` on an ``accepted`` event.
+    """
+
+    category: _RequestCategory
+    sequence: int | None
+    timestamp_ns: int
+    thread_connection: bool | None = None
+
+    def __repr__(self) -> str:
+        """Render every field -- none of them is identity-bearing content."""
+        return (
+            f"{type(self).__name__}(category={self.category!r}, "
+            f"sequence={self.sequence!r}, timestamp_ns={self.timestamp_ns!r}, "
+            f"thread_connection={self.thread_connection!r})"
+        )
+
+
+@dataclass(repr=False)
+class _RequestObservationSink:
+    """Caller-owned append-only sink for one measured production request."""
+
+    _observations: list[_RequestObservation] = field(
+        default_factory=list,
+        init=False,
+        repr=False,
+    )
+
+    @property
+    def observations(self) -> tuple[_RequestObservation, ...]:
+        """Return an immutable snapshot of observations in arrival order."""
+        return tuple(self._observations)
+
+    def emit(self, observation: _RequestObservation) -> None:
+        """Append one already validated in-memory observation."""
+        self._observations.append(observation)
+
+    def observe(
+        self,
+        category: str,
+        sequence: int | None,
+        timestamp_ns: int,
+        thread_connection: bool | None,
+    ) -> None:
+        """Receive the production callable's value-only event payload."""
+        if category not in _REQUEST_CATEGORIES:
+            raise ValueError(f"unknown request observation category: {category!r}")
+        self.emit(
+            _RequestObservation(
+                category=cast(_RequestCategory, category),
+                sequence=sequence,
+                timestamp_ns=timestamp_ns,
+                thread_connection=thread_connection,
+            )
+        )
+
+    def __repr__(self) -> str:
+        """Suppress all observation values while retaining a useful count."""
+        return f"{type(self).__name__}(count={len(self._observations)})"
+
+
+@contextmanager
+def _capture_request_observations() -> Iterator[_RequestObservationSink]:
+    """Attach one caller-local repository observer for the exact async call.
+
+    Must be entered from inside the task that will issue the observed
+    request -- ``lifx.network.connection._current_request_observer()``
+    resolves ``asyncio.current_task()`` at the moment each thin request
+    wrapper runs, so a sink attached from a different task is never seen.
+    """
+    task = asyncio.current_task()
+    if task is None:
+        raise RuntimeError("request observation capture requires an asyncio task")
+    sink = _RequestObservationSink()
+    had_previous = hasattr(task, _OBSERVER_TASK_ATTRIBUTE)
+    previous = getattr(task, _OBSERVER_TASK_ATTRIBUTE, None)
+
+    setattr(task, _OBSERVER_TASK_ATTRIBUTE, sink.observe)
+    try:
+        yield sink
+    finally:
+        if had_previous:
+            setattr(task, _OBSERVER_TASK_ATTRIBUTE, previous)
+        else:
+            delattr(task, _OBSERVER_TASK_ATTRIBUTE)
+
+
+# Must match lifx.network.discovery.udp._DISCOVERY_OBSERVER_TASK_ATTRIBUTE
+# exactly -- this is the task attribute name the production sweep reads.
+_DISCOVERY_OBSERVER_TASK_ATTRIBUTE = "_lifx_discovery_observer"
+
+_DiscoverySource = Literal["udp", "mdns"]
+_DiscoveryStage = Literal["accepted", "winner", "duplicate"]
+
+
+@dataclass(frozen=True, repr=False)
+class _DiscoveryObservation:
+    """One in-memory discovery event whose identity is omitted from repr."""
+
+    source: _DiscoverySource
+    stage: _DiscoveryStage
+    raw_identity: str = field(repr=False)
+    firmware_major: int | None = None
+    firmware_minor: int | None = None
+    connectivity: str | None = field(default=None, repr=False)
+
+    def __repr__(self) -> str:
+        """Render categories only so logs cannot expose a hardware identity."""
+        return f"{type(self).__name__}(source={self.source!r}, stage={self.stage!r})"
+
+
+@dataclass(repr=False)
+class _DiscoveryObservationSink:
+    """Caller-owned append-only sink for one measured discovery call."""
+
+    _observations: list[_DiscoveryObservation] = field(
+        default_factory=list,
+        init=False,
+        repr=False,
+    )
+
+    @property
+    def observations(self) -> tuple[_DiscoveryObservation, ...]:
+        """Return an immutable snapshot of observations in arrival order."""
+        return tuple(self._observations)
+
+    def emit(self, observation: _DiscoveryObservation) -> None:
+        """Append one already validated in-memory observation."""
+        self._observations.append(observation)
+
+    def observe(
+        self,
+        source: str,
+        stage: str,
+        raw_identity: str,
+        firmware_major: int | None,
+        firmware_minor: int | None,
+        connectivity: str | None,
+    ) -> None:
+        """Receive the production callable's value-only event payload."""
+        _emit_discovery_observation(
+            self,
+            source=cast(_DiscoverySource, source),
+            stage=cast(_DiscoveryStage, stage),
+            raw_identity=raw_identity,
+            firmware_major=firmware_major,
+            firmware_minor=firmware_minor,
+            connectivity=connectivity,
+        )
+
+    def __repr__(self) -> str:
+        """Suppress all observation values while retaining a useful count."""
+        return f"{type(self).__name__}(count={len(self._observations)})"
+
+
+_DISCOVERY_OBSERVATION_SINK: ContextVar[_DiscoveryObservationSink | None] = ContextVar(
+    "lifx_discovery_observation_sink", default=None
+)
+
+
+@contextmanager
+def _capture_discovery_observations() -> Iterator[_DiscoveryObservationSink]:
+    """Attach one caller-local repository observer for the exact async call.
+
+    Must be entered from inside the task that will issue the observed
+    discovery sweep -- ``lifx.network.discovery.udp``'s observer selector
+    resolves ``asyncio.current_task()`` at the moment the sweep runs, so a
+    sink attached from a different task is never seen.
+    """
+    task = asyncio.current_task()
+    if task is None:
+        raise RuntimeError("discovery observation capture requires an asyncio task")
+    sink = _DiscoveryObservationSink()
+    token = _DISCOVERY_OBSERVATION_SINK.set(sink)
+    previous = getattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE, None)
+    had_previous = hasattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE)
+
+    setattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE, sink.observe)
+    try:
+        yield sink
+    finally:
+        if had_previous:
+            setattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE, previous)
+        else:
+            delattr(task, _DISCOVERY_OBSERVER_TASK_ATTRIBUTE)
+        _DISCOVERY_OBSERVATION_SINK.reset(token)
+
+
+def _current_discovery_observation_sink() -> _DiscoveryObservationSink | None:
+    """Return the sink selected by the current caller context, if any."""
+    return _DISCOVERY_OBSERVATION_SINK.get()
+
+
+def _emit_discovery_observation(
+    sink: _DiscoveryObservationSink | None,
+    *,
+    source: _DiscoverySource,
+    stage: _DiscoveryStage,
+    raw_identity: str,
+    firmware_major: int | None = None,
+    firmware_minor: int | None = None,
+    connectivity: str | None = None,
+) -> None:
+    """Emit one observation only when an explicit sink was supplied."""
+    if sink is None:
+        return
+    sink.emit(
+        _DiscoveryObservation(
+            source=cast(_DiscoverySource, source),
+            stage=cast(_DiscoveryStage, stage),
+            raw_identity=raw_identity,
+            firmware_major=firmware_major,
+            firmware_minor=firmware_minor,
+            connectivity=connectivity,
+        )
+    )

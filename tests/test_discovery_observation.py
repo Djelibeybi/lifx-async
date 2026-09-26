@@ -1,24 +1,14 @@
-"""Discovery observation tests importing the canonical scripts-layer helper.
-
-The event/sink/capture-context primitives themselves moved to
-``.planning/scripts/measurement_support.py`` (Plan 14-03, D-17/D-19): no
-script may import a helper from ``tests/``, and
-``.planning/scripts/measure_merged_discovery.py`` previously loaded this
-module by anchored ``importlib`` path specifically to work around that rule.
-This file now only re-exports the canonical private names (so existing test
-imports keep working unchanged) and proves the properties the measurement
-scripts depend on: caller isolation, repr suppression, arrival order, and
-deterministic cleanup.
-"""
+"""Discovery observation sink: caller isolation, repr suppression, order and cleanup."""
 
 from __future__ import annotations
 
 import asyncio
 from unittest.mock import patch
 
-import measurement_support
 import pytest
-from measurement_support import (
+
+from tests import conftest
+from tests.conftest import (
     _DISCOVERY_OBSERVER_TASK_ATTRIBUTE,
     _capture_discovery_observations,
     _current_discovery_observation_sink,
@@ -26,14 +16,6 @@ from measurement_support import (
     _DiscoveryObservationSink,
     _emit_discovery_observation,
 )
-
-__all__ = [
-    "_DiscoveryObservation",
-    "_DiscoveryObservationSink",
-    "_capture_discovery_observations",
-    "_current_discovery_observation_sink",
-    "_emit_discovery_observation",
-]
 
 
 class TestDiscoveryObservation:
@@ -144,9 +126,7 @@ class TestCaptureDiscoveryObservations:
         """`asyncio.current_task()` can return `None` from inside a running
         loop when the calling code is not itself a Task (rather than raising
         `RuntimeError` outright, which only happens with no loop at all)."""
-        with patch.object(
-            measurement_support.asyncio, "current_task", return_value=None
-        ):
+        with patch.object(conftest.asyncio, "current_task", return_value=None):
             with pytest.raises(
                 RuntimeError, match="discovery observation capture requires an asyncio"
             ):

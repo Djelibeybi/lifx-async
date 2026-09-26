@@ -188,10 +188,10 @@ def test_every_tooling_test_module_declares_the_marker_at_module_scope() -> None
     a module-level marker, so no assertion here relies on one.
     """
     repo_root = Path(__file__).resolve().parent.parent
-    tooling_dir = repo_root / ".planning" / "scripts" / "tests"
+    tooling_dir = repo_root / "tests" / "test_ci"
     tooling_test_files = sorted(tooling_dir.glob("test_*.py"))
     assert tooling_test_files, (
-        f"expected at least one relocated tooling test module under {tooling_dir}"
+        f"expected at least one tooling test module under {tooling_dir}"
     )
 
     for path in tooling_test_files:

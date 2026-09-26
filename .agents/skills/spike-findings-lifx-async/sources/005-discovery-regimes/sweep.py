@@ -19,7 +19,7 @@ for every regime; native early-exit rules are applied post-hoc from the
 timestamps (e.g. lifx-async's 4 s idle deadline after its single broadcast).
 
 Usage:
-  uv run python .planning/spikes/005-discovery-regimes/sweep.py run \
+  uv run python sweep.py run \
       [--rounds 6] [--window 10] [--quick]
 
 Results: JSONL event log + JSON summary in this directory.

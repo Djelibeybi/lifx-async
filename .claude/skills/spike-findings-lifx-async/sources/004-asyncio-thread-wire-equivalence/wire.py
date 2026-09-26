@@ -18,7 +18,7 @@ the same application logic expressed in each concurrency model. This models
 the "busy Home Assistant event loop" hypothesis fairly.
 
 Usage:
-  uv run python .planning/spikes/004-asyncio-thread-wire-equivalence/wire.py run \
+  uv run python wire.py run \
       --host <bulb-ip> [--probes 300] [--rate 20] [--seconds 30] [--load 0]
 
 Results: JSONL event log + JSON summary in this directory.

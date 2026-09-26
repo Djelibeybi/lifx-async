@@ -1,8 +1,8 @@
 """Render Spike 001 results JSONL into a self-contained HTML report.
 
 Usage:
-  uv run python .planning/spikes/001-modem-sleep-keepalive/report.py \
-      .planning/spikes/001-modem-sleep-keepalive/results-<runid>.jsonl
+  uv run python report.py \
+      results-<runid>.jsonl
 """
 
 from __future__ import annotations

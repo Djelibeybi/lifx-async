@@ -70,7 +70,8 @@ _GENERATED_DOCS = (Path("docs/changelog.md"),)
 
 # Each entry is (directory, glob). The repository root is walked
 # non-recursively so the canonical guidance files are covered without
-# reaching into `.planning/`, which records the retired phrases deliberately.
+# reaching into the agent skill directories, which quote spike evidence
+# verbatim.
 _WALKED_TREES = (
     ("src", "**/*.py"),
     ("docs", "**/*.md"),

@@ -45,7 +45,7 @@ Spike sessions wrapped: 2026-07-16
 ## Source Files
 
 Original spike harnesses (probe/race/stream/wire/sweep scripts + READMEs with full data)
-are preserved in `sources/`. Raw results JSONL remains in `.planning/spikes/*/`.
+are preserved in `sources/`. The raw results JSONL was not retained.
 </findings_index>
 
 <metadata>

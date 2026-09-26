@@ -23,7 +23,7 @@ from lifx.network.discovery.coordinator import (
     subscribe_udp_sweep,
 )
 from lifx.network.discovery.udp import discover_devices_shared
-from tests.test_discovery_observation import _DiscoveryObservationSink
+from tests.conftest import _DiscoveryObservationSink
 
 
 def _response(serial: str, ordinal: int) -> DiscoveryResponse:
