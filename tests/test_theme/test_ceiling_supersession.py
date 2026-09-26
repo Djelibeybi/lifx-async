@@ -13,13 +13,13 @@ They now ship at their real lengths, well above the ceiling.
 That supersession is what this module pins. A future resync that regressed any of
 these back to a clipped 16-colour palette would silently reintroduce the truncation
 Phase 9 removed, and nothing else in the suite would notice: the Phase 8 harness
-that first found them is archived planning material, pinned to a capture directory
-and hardware setup that no longer exist, and `testpaths` deliberately excludes it.
+that first found them was planning material pinned to a capture directory and
+hardware setup that no longer exist, and it has since left the repository.
 
 The slug list is therefore an explicit literal rather than a re-derivation. Its
-source of truth is the historical record in the Phase 8 archive
-(`08-CEILING-DETERMINATIONS.json`), which this file deliberately does not read,
-because phase directories move into `.planning/milestones/` at milestone close.
+source of truth was the historical record in the Phase 8 archive
+(`08-CEILING-DETERMINATIONS.json`), which left the repository with the rest of
+the planning material.
 """
 
 from __future__ import annotations

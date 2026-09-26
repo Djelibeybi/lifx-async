@@ -16,7 +16,7 @@ The animation is watchable — judge visual smoothness live while the numbers
 are collected.
 
 Usage:
-  uv run python .planning/spikes/003-ack-paced-frames/stream.py run \
+  uv run python stream.py run \
       --host <tiles-ip> [--seconds 30] [--fps 20]
 
 Results: JSONL event log + JSON summary in this directory.

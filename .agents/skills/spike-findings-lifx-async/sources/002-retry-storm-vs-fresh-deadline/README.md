@@ -41,11 +41,11 @@ behaviour; the injector provides controlled loss on top.
 
 ```bash
 # Shakedown (~2 min)
-uv run python .planning/spikes/002-retry-storm-vs-fresh-deadline/race.py run \
+uv run python race.py run \
     --hosts <gen2-ip>,<gen3-ip>,<gen4-ip> --quick
 
 # Full run (~10-20 min depending on loss draw)
-uv run python .planning/spikes/002-retry-storm-vs-fresh-deadline/race.py run \
+uv run python race.py run \
     --hosts <gen2-ip>,<gen3-ip>,<gen4-ip>
 ```
 

@@ -33,8 +33,7 @@ from lifx.network.discovery.mdns.transport import MdnsTransport
 from lifx.network.discovery.mdns.types import _LifxServiceRecord
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
-from tests.conftest import PROGRESS_TIMEOUT
-from tests.test_discovery_observation import _capture_discovery_observations
+from tests.conftest import PROGRESS_TIMEOUT, _capture_discovery_observations
 
 _FIRST_SERIAL = "d073d5123456"
 _SECOND_SERIAL = "d073d5123458"

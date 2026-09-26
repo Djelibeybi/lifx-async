@@ -19,7 +19,7 @@ configured per-direction probability. Offered sends are counted as wire
 pressure whether or not the injector drops them (models loss in transit).
 
 Usage:
-  uv run python .planning/spikes/002-retry-storm-vs-fresh-deadline/race.py run \
+  uv run python race.py run \
       --hosts <gen2-ip>,<gen3-ip>,<gen4-ip> [--loss-rates 0,0.25,0.5] [--trials 20]
 
 Results: JSONL event log + JSON summary in this directory.

@@ -40,7 +40,7 @@ each strategy, against a no-streaming baseline.
 ## How to Run
 
 ```bash
-uv run python .planning/spikes/003-ack-paced-frames/stream.py run \
+uv run python stream.py run \
     --host 203.0.113.15   # System Test Tiles I (gen 3)
 ```
 
