@@ -605,3 +605,45 @@ async def test_later_read_preserves_returned_snapshot(rig: Rig):
     rig.wire.colours[:] = [BLUE] * len(rig.wire.colours)
     await rig.light.get64()
     assert snapshot == expected
+
+
+def test_unknown_component_has_clear_error(rig: Rig):
+    with pytest.raises(ValueError, match="Unknown light component: unknown"):
+        rig.light._fields("unknown")
+
+
+async def test_writes_can_complete_before_component_state_initialisation(rig: Rig):
+    rig.light._state = None
+    await rig.light._write_tile([BLUE] * len(rig.wire.colours), 0)
+    await rig.light._write_power(True, 0)
+    rig.light._update_component_flags()
+    assert rig.light._state is None
+    assert rig.wire.colours == [BLUE] * len(rig.wire.colours)
+    assert rig.wire.power == 65535
+
+
+@pytest.mark.parametrize("rect", [(0, 0, 0), (-1, 0, 8), (0, -1, 8)])
+def test_invalid_observation_rectangle_does_not_change_state(rig: Rig, rect):
+    original = list(rig.light.state.tile_colors)
+    rig.light._adopt_tile_observation(0, *rect, [BLUE] * 64)
+    assert rig.light.state.tile_colors == original
+    assert rig.colours(1) == [RED] * len(rig.positions[1])
+
+
+async def test_read_fills_missing_last_colours_and_tile_snapshot(rig: Rig):
+    fields = rig.light._fields(rig.names[1])
+    setattr(rig.light.state, "last_" + fields.colours, None)
+    rig.light.state.tile_colors = []
+    rig.external(1, BLUE)
+    await rig.light.get_all_tile_colors()
+    assert rig.colours(1, "last_") == [BLUE] * len(rig.positions[1])
+    assert rig.light.state.tile_colors == rig.wire.colours
+
+
+async def test_read_during_incomplete_component_initialisation(rig: Rig):
+    fields = rig.light._fields(rig.names[1])
+    setattr(rig.light.state, fields.colours, [])
+    rig.external(0, BLUE)
+    await rig.light.get_all_tile_colors()
+    assert rig.colours(0, "last_") == [BLUE] * len(rig.positions[0])
+    assert rig.colours(1) == []
