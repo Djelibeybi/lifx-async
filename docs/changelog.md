@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v7.5.1 (2026-09-27)
+
+### Bug Fixes
+
+- **devices**: Reconcile component observations and organise shared package
+  ([`2b7f7ba`](https://github.com/Djelibeybi/lifx-async/commit/2b7f7ba6e5654cea9dd489c9f47a6dfc532ee04b))
+
+- **devices**: Unify Ceiling and Mirror transition state
+  ([`9db61f0`](https://github.com/Djelibeybi/lifx-async/commit/9db61f0737e1254c3257b41f65397b9a56c718e8))
+
+### Documentation
+
+- Use the public Ceiling 13x26 product name
+  ([`cb403eb`](https://github.com/Djelibeybi/lifx-async/commit/cb403eb5df01bf25cf4256749f0767819d28df26))
+
+
 ## v7.5.0 (2026-09-24)
 
 ### Features
