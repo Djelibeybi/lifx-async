@@ -453,7 +453,7 @@ class CeilingLight(ComponentMatrixLight):
         """Zone index of the uplight component.
 
         Returns:
-            Zone index (63 for standard Ceiling, 127 for Capsule)
+            Zone index (63 for standard Ceiling, 127 for Ceiling 13x26)
 
         Raises:
             LifxError: If device version is not available or not a Ceiling product
@@ -472,7 +472,7 @@ class CeilingLight(ComponentMatrixLight):
         """Slice representing the downlight component zones.
 
         Returns:
-            Slice object (slice(0, 63) for standard, slice(0, 127) for Capsule)
+            Slice object (slice(0, 63) for standard, slice(0, 127) for Ceiling 13x26)
 
         Raises:
             LifxError: If device version is not available or not a Ceiling product
@@ -491,7 +491,7 @@ class CeilingLight(ComponentMatrixLight):
         """Number of downlight zones.
 
         Returns:
-            Zone count (63 for standard 8x8, 127 for Capsule 16x8)
+            Zone count (63 for standard 8x8, 127 for Ceiling 13x26 16x8)
 
         Raises:
             LifxError: If device version is not available or not a Ceiling product

@@ -12,7 +12,7 @@ The `CeilingLight` class provides high-level control over these components while
 | Product | Zones | Layout |
 |---------|-------|--------|
 | LIFX Ceiling (US/Intl) | 64 | 8x8 grid, zone 63 = uplight |
-| LIFX Ceiling Capsule (US/Intl) | 128 | 16x8 grid, zone 127 = uplight |
+| LIFX Ceiling 13x26 (US/Intl) | 128 | 16x8 grid, zone 127 = uplight |
 | LIFX Ceiling 13" (US/Intl) | 64 | 8x8 grid, zone 63 = uplight |
 
 All LIFX Ceiling devices are gen4, so the first command after a period of idle may
@@ -279,7 +279,7 @@ This ensures a reasonable brightness level even when no state is available.
 Received tile colours update the component colour fields and `last_*` tracking
 without requiring a full `refresh_state()`. Partial responses update only the
 zones they report. Restoration colours are reconciled once all zones of that
-component have been observed; a Capsule downlight requires two responses.
+component have been observed; a Ceiling 13x26 downlight requires two responses.
 Outside this instance's pending transition, changed lit colours become the new
 restoration colours. If the whole component is dark, its remembered brightness
 is retained while externally changed hue, saturation and kelvin are adopted.
@@ -476,7 +476,7 @@ The `origin` parameter accepts two values:
 - `"center"`: Middle of the canvas — designed for round/oval Ceiling lights
 
 !!! tip "Choosing the right origin"
-    For **LIFX Ceiling** and **LIFX Ceiling Capsule** devices, always use `origin="center"` for the most natural-looking sunrise and sunset transitions.
+    For **LIFX Ceiling** and **LIFX Ceiling 13x26** devices, always use `origin="center"` for the most natural-looking sunrise and sunset transitions.
 
 ## API Reference
 

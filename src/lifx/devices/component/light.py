@@ -93,7 +93,7 @@ class ComponentMatrixLight(MatrixLight):
         # Baseline for detecting changes, not a substitute for a hardware read.
         # During our own fade this holds the target, not intermediate reports.
         self._known_tile: dict[int, HSBK] = {}
-        # A Capsule downlight spans two responses. Only decide whether an
+        # A Ceiling 13x26 downlight spans two responses. Only decide whether an
         # entire component is dark after observing all of its zones.
         self._observed_positions: set[int] = set()
         self._changed_positions: set[int] = set()
