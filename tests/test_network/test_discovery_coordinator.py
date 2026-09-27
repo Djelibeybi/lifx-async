@@ -1297,7 +1297,13 @@ def test_registration_rejects_two_stale_worker_snapshots(
 async def test_deadline_expiry_before_registration_ack_detaches_later(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Expiry before acknowledgement arranges eventual detachment."""
+    """Expiry before acknowledgement arranges eventual detachment.
+
+    The coordinator's ``detach`` is replaced rather than
+    ``_detach_abandoned_subscription``, so the real done-callback helper runs
+    and its delegation is covered deterministically instead of relying on a
+    garbage-collected subscription elsewhere in the suite.
+    """
     registration = discovery_coordinator._completed_future()
     detach_calls: list[tuple[_UdpSweepKey, object]] = []
 
@@ -1306,10 +1312,15 @@ async def test_deadline_expiry_before_registration_ack_detaches_later(
         "register",
         lambda *_args, **_kwargs: registration,
     )
+
+    def detach_subscription(key: _UdpSweepKey, token: object):
+        detach_calls.append((key, token))
+        return discovery_coordinator._completed_future()
+
     monkeypatch.setattr(
-        discovery_coordinator,
-        "_detach_abandoned_subscription",
-        lambda key, token: detach_calls.append((key, token)),
+        discovery_coordinator._UDP_SWEEP_COORDINATOR,
+        "detach",
+        detach_subscription,
     )
     monkeypatch.setattr(
         discovery_coordinator,
@@ -1325,7 +1336,7 @@ async def test_deadline_expiry_before_registration_ack_detaches_later(
         )
         == []
     )
-    assert len(detach_calls) == 1
+    assert [key for key, _token in detach_calls] == [_key()]
 
 
 async def test_deadline_expiry_after_registration_skips_queue_wait(
