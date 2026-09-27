@@ -18,9 +18,6 @@ repos:
   - id: check-json
   - id: check-added-large-files
     args: [--maxkb=1000]
-    # Per-event hardware evidence logs (measurement artefacts, committed
-    # verbatim) legitimately exceed the source-file cap.
-    exclude: ^\.planning/phases/.*-EVENTS\.jsonl$
   - id: check-case-conflict
   - id: check-merge-conflict
   - id: detect-private-key
@@ -72,7 +69,7 @@ repos:
   - id: bandit
     args: [-c, pyproject.toml]
     additional_dependencies: ['bandit[toml]']
-    exclude: ^(tests/|\.planning/scripts/tests/)
+    exclude: ^tests/
 
   # Spell checking
 - repo: https://github.com/codespell-project/codespell

@@ -15,8 +15,8 @@ Every trial records the host's ARP-table state for the bulb immediately
 before probing, to separate client-side ARP expiry from bulb-side effects.
 
 Usage:
-  uv run python .planning/spikes/001-modem-sleep-keepalive/probe.py discover
-  uv run python .planning/spikes/001-modem-sleep-keepalive/probe.py run \
+  uv run python probe.py discover
+  uv run python probe.py run \
       --hosts 192.168.1.10,192.168.1.11 [--quick]
 
 Results: JSONL event log + JSON summary in this directory.

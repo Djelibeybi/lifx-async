@@ -6,9 +6,6 @@ for plan 04-04 Task 1: the exact `AckGate` API (constants, `track`, `sweep`,
 `reset`, `gated`, `outstanding_count`) that the animator's gate-before-frame
 contract depends on.
 
-See `.planning/phases/04-animation-flow-control/04-RESEARCH.md` -- "AckGate
-facility" code example and "Branch matrix for 100% branch patch coverage".
-
 All timing uses explicit `now` float arguments -- no sleeps anywhere.
 """
 

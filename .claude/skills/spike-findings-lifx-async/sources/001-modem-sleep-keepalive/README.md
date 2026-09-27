@@ -40,14 +40,14 @@ trials show materially lower latency/loss.
 
 ```bash
 # List candidate bulbs
-uv run python .planning/spikes/001-modem-sleep-keepalive/probe.py discover
+uv run python probe.py discover
 
 # Shakedown (~3 min)
-uv run python .planning/spikes/001-modem-sleep-keepalive/probe.py run \
+uv run python probe.py run \
     --hosts <ip1>,<ip2> --quick
 
 # Full run (~35 min, bulbs run concurrently)
-uv run python .planning/spikes/001-modem-sleep-keepalive/probe.py run \
+uv run python probe.py run \
     --hosts <ip1>,<ip2>,<ip3>
 ```
 

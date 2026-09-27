@@ -49,9 +49,10 @@ from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device as DevicePackets
 from lifx.protocol.packets import Light as LightPackets
 from lifx.protocol.protocol_types import DeviceService, LightHsbk
-from tests.conftest import PROGRESS_TIMEOUT, get_free_port
-from tests.test_discovery_observation import (
+from tests.conftest import (
+    PROGRESS_TIMEOUT,
     _capture_discovery_observations,
+    get_free_port,
 )
 
 

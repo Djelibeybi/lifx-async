@@ -24,12 +24,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 from unittest.mock import patch
 
-import measurement_support
 import pytest
-from measurement_support import (
-    _capture_request_observations,
-    _RequestObservationSink,
-)
 
 from lifx.const import REQUEST_RETRANSMIT_GAPS
 from lifx.exceptions import LifxConnectionError, LifxProtocolError, LifxTimeoutError
@@ -40,6 +35,11 @@ from lifx.network.connection import (
 )
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
+from tests import conftest
+from tests.conftest import (
+    _capture_request_observations,
+    _RequestObservationSink,
+)
 
 _STATE_POWER_PKT_TYPE = 22
 _ACKNOWLEDGEMENT_PKT_TYPE = 45
@@ -1224,9 +1224,7 @@ class TestRequestObservation:
         """`asyncio.current_task()` can return `None` from inside a running
         loop when the calling code is not itself a Task (rather than raising
         `RuntimeError` outright, which only happens with no loop at all)."""
-        with patch.object(
-            measurement_support.asyncio, "current_task", return_value=None
-        ):
+        with patch.object(conftest.asyncio, "current_task", return_value=None):
             with pytest.raises(
                 RuntimeError, match="request observation capture requires an asyncio"
             ):

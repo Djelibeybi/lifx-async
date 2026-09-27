@@ -88,14 +88,12 @@ ignore = []
 "benchmarks/*.py" = ["E501"]
 "tests/benchmarks/*.py" = ["E501"]
 # PLC0415 (import-outside-top-level) is enabled repository-wide, but these
-# five paths are not yet swept. Each entry is a visible, deletable line
-# rather than a silent exclusion, so the owning phase removes its own line
-# when it sweeps its files: Phase 19 deletes
-# "tests/test_theme/**". "src/**" and ".planning/**" remain for a future
-# phase. ".agents/skills/**" and ".claude/skills/**" cover two archived
-# spike harnesses preserved verbatim as evidence sources.
+# four paths are not yet swept. Each entry is a visible, deletable line
+# rather than a silent exclusion, so whoever sweeps a path removes its own
+# line: "tests/test_theme/**" and "src/**" remain to be swept.
+# ".agents/skills/**" and ".claude/skills/**" cover two archived spike
+# harnesses preserved verbatim as evidence sources.
 "src/**" = ["PLC0415"]
-".planning/**" = ["PLC0415"]
 "tests/test_theme/**" = ["PLC0415"]
 ".agents/skills/**" = ["PLC0415"]
 ".claude/skills/**" = ["PLC0415"]
@@ -104,25 +102,16 @@ ignore = []
 typeCheckingMode = "standard"
 pythonVersion = "3.10"
 # scripts/generate_theme_data.py is hand-written validation and path handling,
-# so it stays type-checked even though it lives outside the package. The
-# operator measurement scripts (.planning/scripts/measurement_support.py,
-# .planning/scripts/thread_revalidation.py,
-# .planning/scripts/measure_merged_discovery.py,
-# .planning/scripts/ipv6_thread_probe.py) are likewise hand-written, not
-# generated, so they stay type-checked too, even though .planning/ is a
-# dot-directory pyright would otherwise skip by default -- the explicit
-# exclude list below means that default dot-directory exclusion never
-# applies here. The two maintainer CI tools in .github/
-# (patch_coverage_guard.py and check_patch_coverage.py) are hand-written path
-# handling and subprocess plumbing of exactly the same kind, so both are
-# included too rather than checking one and silently skipping its sibling.
+# so it stays type-checked even though it lives outside the package. The two
+# maintainer CI tools in .github/ (patch_coverage_guard.py and
+# check_patch_coverage.py) are hand-written path handling and subprocess
+# plumbing of exactly the same kind, so both are included too rather than
+# checking one and silently skipping its sibling. .github/ is a dot-directory
+# pyright would otherwise skip by default; the explicit exclude list below
+# means that default dot-directory exclusion never applies here.
 include = [
     "src",
     "scripts/generate_theme_data.py",
-    ".planning/scripts/measurement_support.py",
-    ".planning/scripts/thread_revalidation.py",
-    ".planning/scripts/measure_merged_discovery.py",
-    ".planning/scripts/ipv6_thread_probe.py",
     ".github/patch_coverage_guard.py",
     ".github/check_patch_coverage.py",
 ]
@@ -133,13 +122,13 @@ exclude = [
     "src/lifx/products/generator.py",
     "**/registry.py",   # Auto-generated from products.json
 ]
-extraPaths = [".planning/scripts", ".github"]
+extraPaths = [".github"]
 
 [tool.bandit]
 skips = ["B101", "B311"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", ".planning/scripts/tests"]
+testpaths = ["tests"]
 pythonpath = ["src", "scripts"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -165,7 +154,7 @@ markers = [
     "emulator: tests that require the lifx-emulator-core embedded emulator",
     "targeted_ipv6_windows: focused targeted-IPv6 test enabled on Windows CI",
     "benchmark: performance benchmark tests, run with --benchmark to measure baselines",
-    "tooling: relocated hardware and CI tooling tests under .planning/scripts/tests, run with --tooling",
+    "tooling: CI tooling tests under tests/test_ci, run with --tooling",
 ]
 
 [tool.coverage.run]

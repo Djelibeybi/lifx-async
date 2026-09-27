@@ -91,16 +91,11 @@ Thumbs.db
 
 # Local storage
 .notes/
-/.planning/local/phase-08-theme-fidelity/
-/.planning/local/phase-13-merged-discovery/
 .claude/settings.local.json
 .mcp.json
 .serena/
 .full-review/
 .gsd/
 
-# GSD local files
-.planning/milestone.lock
-.planning/config.claude.json
-.planning/config.codex.json
-.planning/phases/*/.review-diagnostics/
+# GSD local planning state
+/.planning/

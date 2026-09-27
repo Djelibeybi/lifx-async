@@ -50,26 +50,24 @@ _RECEIVER_SHUTDOWN_TIMEOUT: float = (
 )
 _RECEIVER_POLL_TIMEOUT: float = 0.1  # How often the background receiver will sleep
 
-# Private request-observation seam (Phase 14 THREAD-02). No public export: a
-# repository measurement script selects itself onto the current task before
-# issuing a request (see .planning/scripts/measurement_support.py), and each thin
-# request wrapper below reads that selection ONCE and passes it explicitly
-# into _transmit_and_listen() rather than the retry loop reading ambient
-# state itself. The callback receives (category, sequence, timestamp_ns,
-# thread_connection) -- bounded categories, integer monotonic-clock
-# timestamps and a value-only transport flag, never identity, packet
-# content or exception text.
+# Private request-observation seam. No public export: a test attaches a
+# callback to the current task before issuing a request (see
+# tests/conftest.py), and each thin request wrapper below reads
+# that selection ONCE and passes it explicitly into _transmit_and_listen()
+# rather than the retry loop reading ambient state itself. The callback
+# receives (category, sequence, timestamp_ns, thread_connection) -- bounded
+# categories, integer monotonic-clock timestamps and a value-only transport
+# flag, never identity, packet content or exception text.
 _RequestObserver = Callable[[str, int | None, int, bool | None], None]
 _REQUEST_OBSERVER_TASK_ATTRIBUTE = "_lifx_request_observer"
 
 
 def _current_request_observer() -> _RequestObserver | None:
-    """Return the repository measurement callback attached to the current task.
+    """Return the test observation callback attached to the current task.
 
-    ``None`` on every ordinary call -- only a repository measurement script
-    that has explicitly attached itself via
-    ``measurement_support._capture_request_observations()`` ever
-    sees a non-``None`` return here.
+    ``None`` on every ordinary call -- only a test that has explicitly
+    attached itself via ``_capture_request_observations()`` in
+    ``tests/conftest.py`` ever sees a non-``None`` return here.
     """
     try:
         task = asyncio.current_task()

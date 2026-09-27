@@ -31,8 +31,8 @@ validation, same fixed listen window; native early-exit rules applied post-hoc):
 ## How to Run
 
 ```bash
-uv run python .planning/spikes/005-discovery-regimes/sweep.py run   # 6 rounds, ~7 min
-uv run python .planning/spikes/005-discovery-regimes/sweep.py run --quick
+uv run python sweep.py run   # 6 rounds, ~7 min
+uv run python sweep.py run --quick
 ```
 
 Do not run concurrently with the other spikes.
