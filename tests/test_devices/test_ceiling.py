@@ -764,7 +764,9 @@ class TestCeilingLightStatePersistence:
             ceiling.connection = AsyncMock()
             ceiling._state = _make_mock_state()
             ceiling.set_matrix_colors = AsyncMock()
-            ceiling.get_all_tile_colors = AsyncMock()
+            ceiling.get_all_tile_colors = AsyncMock(
+                return_value=[[HSBK(0, 0, 1, 3500)] * 64]
+            )
 
             # Mock version for product detection
             ceiling._version = MagicMock()
@@ -1318,154 +1320,6 @@ class TestCeilingLightErrorHandling:
         ceiling._state = None
 
         assert ceiling.downlight_is_on is False
-
-
-class TestCeilingLightIsStoredStateValid:
-    """Tests for _is_stored_state_valid method."""
-
-    @pytest.fixture
-    def ceiling_176(self) -> CeilingLight:
-        """Create a Ceiling product 176 instance."""
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
-        ceiling._state = _make_mock_state()
-        ceiling._version = MagicMock()
-        ceiling._version.product = 176
-        return ceiling
-
-    def test_uplight_valid_match(self, ceiling_176: CeilingLight) -> None:
-        """Test uplight stored state matches current (ignoring brightness)."""
-        ceiling_176.state.stored_uplight_color = HSBK(
-            hue=30, saturation=0.2, brightness=0.8, kelvin=2700
-        )
-        current = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
-
-        assert ceiling_176._is_stored_state_valid("uplight", current) is True
-
-    def test_uplight_no_stored_state(self, ceiling_176: CeilingLight) -> None:
-        """Test uplight returns False when no stored state."""
-        ceiling_176.state.stored_uplight_color = None
-        current = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
-
-        assert ceiling_176._is_stored_state_valid("uplight", current) is False
-
-    def test_uplight_wrong_type(self, ceiling_176: CeilingLight) -> None:
-        """Test uplight returns False when current is not HSBK."""
-        ceiling_176.state.stored_uplight_color = HSBK(
-            hue=30, saturation=0.2, brightness=0.8, kelvin=2700
-        )
-        # Pass a list instead of HSBK
-        current = [HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)]
-
-        assert ceiling_176._is_stored_state_valid("uplight", current) is False
-
-    def test_uplight_hue_mismatch(self, ceiling_176: CeilingLight) -> None:
-        """Test uplight returns False when hue doesn't match."""
-        ceiling_176.state.stored_uplight_color = HSBK(
-            hue=30, saturation=0.2, brightness=0.8, kelvin=2700
-        )
-        current = HSBK(hue=60, saturation=0.2, brightness=0.5, kelvin=2700)
-
-        assert ceiling_176._is_stored_state_valid("uplight", current) is False
-
-    def test_downlight_valid_match(self, ceiling_176: CeilingLight) -> None:
-        """Test downlight stored state matches current (ignoring brightness)."""
-        ceiling_176.state.stored_downlight_colors = [
-            HSBK(hue=i * 5, saturation=0.8, brightness=0.9, kelvin=3500)
-            for i in range(63)
-        ]
-        current = [
-            HSBK(hue=i * 5, saturation=0.8, brightness=0.3, kelvin=3500)
-            for i in range(63)
-        ]
-
-        assert ceiling_176._is_stored_state_valid("downlight", current) is True
-
-    def test_downlight_no_stored_state(self, ceiling_176: CeilingLight) -> None:
-        """Test downlight returns False when no stored state."""
-        ceiling_176.state.stored_downlight_colors = None
-        current = [
-            HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500) for _ in range(63)
-        ]
-
-        assert ceiling_176._is_stored_state_valid("downlight", current) is False
-
-    def test_downlight_wrong_type(self, ceiling_176: CeilingLight) -> None:
-        """Test downlight returns False when current is not list."""
-        ceiling_176.state.stored_downlight_colors = [
-            HSBK(hue=0, saturation=0, brightness=0.9, kelvin=3500) for _ in range(63)
-        ]
-        # Pass HSBK instead of list
-        current = HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
-
-        assert ceiling_176._is_stored_state_valid("downlight", current) is False
-
-    def test_downlight_length_mismatch(self, ceiling_176: CeilingLight) -> None:
-        """Test downlight returns False when lengths don't match."""
-        ceiling_176.state.stored_downlight_colors = [
-            HSBK(hue=0, saturation=0, brightness=0.9, kelvin=3500) for _ in range(63)
-        ]
-        current = [
-            HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
-            for _ in range(10)  # Wrong length
-        ]
-
-        assert ceiling_176._is_stored_state_valid("downlight", current) is False
-
-    def test_downlight_saturation_mismatch(self, ceiling_176: CeilingLight) -> None:
-        """Test downlight returns False when saturation doesn't match."""
-        ceiling_176.state.stored_downlight_colors = [
-            HSBK(hue=0, saturation=0.8, brightness=0.9, kelvin=3500) for _ in range(63)
-        ]
-        current = [
-            HSBK(
-                hue=0, saturation=0.5, brightness=0.5, kelvin=3500
-            )  # Different saturation
-            for _ in range(63)
-        ]
-
-        assert ceiling_176._is_stored_state_valid("downlight", current) is False
-
-    def test_unknown_component_returns_false(self, ceiling_176: CeilingLight) -> None:
-        """Test unknown component name returns False."""
-        current = HSBK(hue=0, saturation=0, brightness=0.5, kelvin=3500)
-
-        assert ceiling_176._is_stored_state_valid("unknown", current) is False
-
-    def test_uplight_valid_match_after_roundtrip(
-        self, ceiling_176: CeilingLight
-    ) -> None:
-        """Uplight stays valid when current came back via a protocol round-trip.
-
-        The same wire tuple decodes to slightly different raw H/S floats, so a
-        raw-float comparison would wrongly fail. Wire-granularity comparison
-        keeps it valid (brightness still ignored).
-        """
-        stored = HSBK(hue=34, saturation=0.75, brightness=0.902, kelvin=3500)
-        ceiling_176.state.stored_uplight_color = stored
-        # Same H/S/K read back from the device, with a different brightness.
-        current = HSBK.from_protocol(
-            HSBK(hue=34, saturation=0.75, brightness=0.3, kelvin=3500).to_protocol()
-        )
-
-        # Raw floats genuinely differ after the round-trip.
-        assert current.hue != stored.hue
-        assert ceiling_176._is_stored_state_valid("uplight", current) is True
-
-    def test_downlight_valid_match_after_roundtrip(
-        self, ceiling_176: CeilingLight
-    ) -> None:
-        """Downlight zones stay valid after a protocol round-trip."""
-        stored = HSBK(hue=34, saturation=0.75, brightness=0.902, kelvin=3500)
-        ceiling_176.state.stored_downlight_colors = [stored for _ in range(63)]
-        current = [
-            HSBK.from_protocol(
-                HSBK(hue=34, saturation=0.75, brightness=0.3, kelvin=3500).to_protocol()
-            )
-            for _ in range(63)
-        ]
-
-        assert current[0].saturation != stored.saturation
-        assert ceiling_176._is_stored_state_valid("downlight", current) is True
 
 
 class TestCeilingLightStateFileEdgeCases:

@@ -34,13 +34,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
-from lifx.devices.component_light import ComponentMatrixLight
+from lifx.devices.component_light import ComponentMatrixLight, _ComponentFields
 from lifx.devices.component_state import (
     colors_as_dict,
     decode_color,
     encode_color,
-    hsk_matches,
-    is_dark,
     read_state_file,
     write_state_file,
 )
@@ -58,7 +56,6 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 #: Brightness used when neither stored nor inferred brightness is available.
-DEFAULT_COMPONENT_BRIGHTNESS = 0.8
 
 
 @dataclass
@@ -212,6 +209,11 @@ class MirrorLight(ComponentMatrixLight):
             await mirror.turn_back_off()
         ```
     """
+
+    _component_fields = (
+        _ComponentFields("front", "front_colors"),
+        _ComponentFields("back", "back_colors"),
+    )
 
     def __init__(
         self,
@@ -666,94 +668,6 @@ class MirrorLight(ComponentMatrixLight):
         """
         await self._set_component_colors("back", colors, duration)
 
-    async def _set_component_colors(
-        self, component: str, colors: HSBK | list[HSBK], duration: float
-    ) -> None:
-        """Write one component's colors, leaving the other component alone.
-
-        Args:
-            component: Either "front" or "back"
-            colors: Single color for every zone, or one color per zone
-            duration: Transition duration in seconds
-
-        Raises:
-            ValueError: If every color has brightness == 0, or if a supplied
-                list does not match the component's zone count
-        """
-        target_colors = self._normalise_colors(
-            component,
-            colors,
-            zero_message=(
-                f"Cannot set {component} colors with brightness=0. "
-                f"Use turn_{component}_off() instead."
-            ),
-        )
-
-        tile_colors = await self._tile_colors_for_update()
-
-        # Update this component's zones only
-        _scatter(tile_colors, self._component_positions(component), target_colors)
-
-        await self._write_tile(tile_colors, duration)
-
-        # Update state — public fields, stored state, and last-known
-        state = self.state
-        is_on = bool(state.power > 0)
-        if component == "front":
-            state.front_colors = list(target_colors)
-            state.front_is_on = is_on
-            state.stored_front_colors = list(target_colors)
-            state.last_front_colors = list(target_colors)
-        else:
-            state.back_colors = list(target_colors)
-            state.back_is_on = is_on
-            state.stored_back_colors = list(target_colors)
-            state.last_back_colors = list(target_colors)
-
-        if self._state_file:
-            await self._save_state_to_file()
-
-    def _normalise_colors(
-        self,
-        component: str,
-        colors: HSBK | list[HSBK],
-        *,
-        zero_message: str,
-    ) -> list[HSBK]:
-        """Expand and validate colors for one component.
-
-        Args:
-            component: Either "front" or "back"
-            colors: Single color for every zone, or one color per zone
-            zero_message: Error text used when every color is unlit
-
-        Returns:
-            One color per zone in the component
-
-        Raises:
-            ValueError: If every color has brightness == 0, or if a supplied
-                list does not match the component's zone count
-        """
-        zone_count = (
-            self.front_zone_count if component == "front" else self.back_zone_count
-        )
-
-        # Compared on the wire: a brightness that rounds to 0 is written as 0
-        if isinstance(colors, HSBK):
-            if is_dark([colors]):
-                raise ValueError(zero_message)
-            return [colors] * zone_count
-
-        if is_dark(colors):
-            raise ValueError(zero_message)
-
-        if len(colors) != zone_count:
-            raise ValueError(
-                f"Expected {zone_count} colors for {component}, got {len(colors)}"
-            )
-
-        return list(colors)
-
     async def turn_front_on(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
     ) -> None:
@@ -801,91 +715,6 @@ class MirrorLight(ComponentMatrixLight):
             LifxTimeoutError: Device did not respond
         """
         await self._turn_component_on("back", colors, duration)
-
-    async def _turn_component_on(
-        self,
-        component: str,
-        colors: HSBK | list[HSBK] | None,
-        duration: float,
-    ) -> None:
-        """Turn one component on, leaving the other component off if unlit.
-
-        Args:
-            component: Either "front" or "back"
-            colors: Optional colors, or None to infer brightness
-            duration: Transition duration in seconds
-
-        Raises:
-            ValueError: If every color has brightness == 0, or if a supplied
-                list does not match the component's zone count
-        """
-        other = "back" if component == "front" else "front"
-
-        # Validate provided colors early
-        if colors is not None:
-            colors = self._normalise_colors(
-                component,
-                colors,
-                zero_message=f"Cannot turn on {component} with brightness=0",
-            )
-
-        if await self._power_for_update() == 0:
-            # Light is off — single fetch for both determining and modifying
-            tile_colors = await self._tile_colors_for_update()
-
-            if colors is not None:
-                target_colors = list(colors)
-            else:
-                target_colors = await self._determine_component_brightness(
-                    component, tile_colors
-                )
-
-            # Store the other component's colors BEFORE zeroing them out so
-            # its own turn_on() can restore them later. A component that is
-            # already dark keeps the colours stored when it was turned off:
-            # storing its zeros would lose them.
-            other_positions = self._component_positions(other)
-            other_colors = _gather(tile_colors, other_positions)
-            if not is_dark(other_colors):
-                self._set_stored_colors(other, other_colors)
-
-            # Apply target colors, and zero the other component so it stays
-            # off when power comes back on
-            _scatter(tile_colors, self._component_positions(component), target_colors)
-            _scatter(tile_colors, other_positions, [_unlit(c) for c in other_colors])
-
-            # Set all colors instantly while the light is dark. If a power-off
-            # is still fading out, the light is visibly lit, so an instant
-            # write would snap both components: fade the zones instead, while
-            # the power comes back up.
-            preload = duration if self._pending_power.transitioning() else 0.0
-            await self._write_tile(tile_colors, preload)
-
-            # Update state — is_on flags deferred until power-on succeeds
-            self._set_component_state(component, target_colors, stored=True)
-            self._set_component_state(other, _gather(tile_colors, other_positions))
-
-            # Turn on with the requested duration — fades to target colors
-            await self._write_power(True, duration)
-
-            state = self.state
-            if component == "front":
-                state.front_is_on = True
-                state.back_is_on = False  # back zones were zeroed
-            else:
-                state.back_is_on = True
-                state.front_is_on = False  # front zones were zeroed
-
-            if self._state_file:
-                await self._save_state_to_file()
-        else:
-            # Light is already on — determine target colors first, then set
-            if colors is not None:
-                target_colors = list(colors)
-            else:
-                target_colors = await self._determine_component_brightness(component)
-
-            await self._set_component_colors(component, target_colors, duration)
 
     async def turn_front_off(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
@@ -940,112 +769,6 @@ class MirrorLight(ComponentMatrixLight):
             on a light with every zone at zero brightness.
         """
         await self._turn_component_off("back", colors, duration)
-
-    async def _turn_component_off(
-        self,
-        component: str,
-        colors: HSBK | list[HSBK] | None,
-        duration: float,
-    ) -> None:
-        """Zero one component's brightness, preserving its hue and kelvin.
-
-        Args:
-            component: Either "front" or "back"
-            colors: Optional colors to store for a later turn-on
-            duration: Transition duration in seconds
-
-        Raises:
-            ValueError: If every color has brightness == 0, or if a supplied
-                list does not match the component's zone count
-        """
-        # Validate provided colors early (before fetching)
-        stored_colors: list[HSBK] | None = None
-        if colors is not None:
-            stored_colors = self._normalise_colors(
-                component,
-                colors,
-                zero_message=(
-                    "Provided colors cannot have brightness=0. "
-                    "Omit the parameter to use current colors."
-                ),
-            )
-
-        other = "back" if component == "front" else "front"
-
-        # Fetch current state once and reuse
-        tile_colors = await self._tile_colors_for_update()
-        positions = self._component_positions(component)
-        other_positions = self._component_positions(other)
-
-        current_colors = _gather(tile_colors, positions)
-
-        # If not provided, store what the component is showing (kept local
-        # until I/O succeeds). A component that is already dark keeps the
-        # colours stored when it went dark: storing its zeros would lose them.
-        if stored_colors is None:
-            previous = self._stored_colors(component)
-            if is_dark(current_colors) and previous is not None:
-                stored_colors = previous
-            else:
-                stored_colors = current_colors
-
-        # Is the other component already dark (or fading there)?
-        other_already_off = is_dark(_gather(tile_colors, other_positions))
-
-        if other_already_off:
-            # Nothing else is lit, so power the whole device down instead of
-            # leaving it on with every zone at zero brightness. The zones keep
-            # their brightness on the device: zeroing them as well would leave
-            # a plain set_power(True) turning on a light that shows nothing.
-            await self._write_power(False, duration)
-
-            # Brightness is kept, but caller-supplied H/S/K has to reach the
-            # device or a later plain set_power(True) would restore the old
-            # colours. Only an instant power-off hides the change: during a
-            # fade the light is still visibly lit, so the new colours are only
-            # stored, which is what turn_front_on()/turn_back_on() restore.
-            device_colors = list(current_colors)
-            if colors is not None and duration == 0:
-                device_colors = [
-                    HSBK(
-                        hue=stored.hue,
-                        saturation=stored.saturation,
-                        brightness=current.brightness,
-                        kelvin=stored.kelvin,
-                    )
-                    for stored, current in zip(
-                        stored_colors, current_colors, strict=True
-                    )
-                ]
-                _scatter(tile_colors, positions, device_colors)
-                await self._write_tile(tile_colors, 0.0)
-        else:
-            device_colors = [_unlit(c) for c in stored_colors]
-            _scatter(tile_colors, positions, device_colors)
-            await self._write_tile(tile_colors, duration)
-
-        # Update state only after I/O succeeds. The colour fields track what
-        # the device actually holds; the component is off either way because
-        # it is dark — powered off or zeroed.
-        self._set_stored_colors(component, stored_colors)
-        self._set_component_state(component, device_colors)
-        state = self.state
-        if component == "front":
-            state.front_is_on = False
-        else:
-            state.back_is_on = False
-        if other_already_off:
-            # The whole device went off, so refresh the other component's
-            # cache from the same fetch. Leaving it stale makes set_power(True)
-            # recompute its on flag from colours that predate this call.
-            self._set_component_state(other, _gather(tile_colors, other_positions))
-            if other == "front":
-                state.front_is_on = False
-            else:
-                state.back_is_on = False
-
-        if self._state_file:
-            await self._save_state_to_file()
 
     async def apply_front_theme(
         self, theme: Theme, power_on: bool = False, duration: float = 0.0
@@ -1158,52 +881,7 @@ class MirrorLight(ComponentMatrixLight):
             await mirror.turn_back_on()
             ```
         """
-        # Determine if we're turning off
-        if isinstance(level, bool):
-            turning_off = not level
-        elif isinstance(level, int):
-            if level not in (0, 65535):
-                raise ValueError(f"Power level must be 0 or 65535, got {level}")
-            turning_off = level == 0
-        else:
-            raise TypeError(f"Expected bool or int, got {type(level).__name__}")
-
-        # Ensure state is initialised so component colours can be captured
-        if self._state is None:
-            await self._initialize_state()
-
-        # If turning off, capture current colors for both components
-        if turning_off:
-            tile_colors = await self._tile_colors_for_update()
-
-            front_colors = _gather(tile_colors, self.front_positions)
-            back_colors = _gather(tile_colors, self.back_positions)
-
-            self._set_stored_colors("front", front_colors)
-            self._set_stored_colors("back", back_colors)
-            self._set_component_state("front", front_colors)
-            self._set_component_state("back", back_colors)
-
         await super().set_power(level, duration)
-        self._record_power(not turning_off, duration)
-
-        state = self.state
-        if turning_off:
-            # Mark components as off only after power-off succeeds
-            state.front_is_on = False
-            state.back_is_on = False
-        else:
-            # When turning on, recompute booleans from last-known colours
-            if state.last_front_colors is not None:
-                state.front_is_on = any(
-                    c.brightness > 0 for c in state.last_front_colors
-                )
-            if state.last_back_colors is not None:
-                state.back_is_on = any(c.brightness > 0 for c in state.last_back_colors)
-
-        # Persist AFTER device operation completes
-        if turning_off and self._state_file:
-            await self._save_state_to_file()
 
     async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
         """Set light color, updating component state tracking.
@@ -1234,168 +912,6 @@ class MirrorLight(ComponentMatrixLight):
             ```
         """
         await super().set_color(color, duration)
-
-        # Nothing to keep in sync before the device has been entered, and
-        # DeviceGroup.set_color() reaches devices straight from discover()
-        if self._state is None:
-            return
-
-        state = self.state
-        is_on = bool(state.power > 0 and color.brightness > 0)
-        front_colors = [color] * self.front_zone_count
-        back_colors = [color] * self.back_zone_count
-
-        self._set_component_state("front", front_colors, stored=True)
-        self._set_component_state("back", back_colors, stored=True)
-        state.front_is_on = is_on
-        state.back_is_on = is_on
-
-        if self._state_file:
-            await self._save_state_to_file()
-
-    def _set_component_state(
-        self, component: str, colors: list[HSBK], *, stored: bool = False
-    ) -> None:
-        """Update the current and last-known colors of one component.
-
-        Args:
-            component: Either "front" or "back"
-            colors: Colors now shown by the component
-            stored: Also update the stored colors used for restoration
-        """
-        state = self.state
-        if component == "front":
-            state.front_colors = list(colors)
-            state.last_front_colors = list(colors)
-        else:
-            state.back_colors = list(colors)
-            state.last_back_colors = list(colors)
-
-        if stored:
-            self._set_stored_colors(component, colors)
-
-    def _stored_colors(self, component: str) -> list[HSBK] | None:
-        """Get a component's stored restoration colors, if they fit the layout.
-
-        Args:
-            component: Either "front" or "back"
-
-        Returns:
-            The stored colors, or None if unset or the wrong length
-        """
-        state = self.state
-        stored = (
-            state.stored_front_colors
-            if component == "front"
-            else state.stored_back_colors
-        )
-        zone_count = len(self._component_positions(component))
-        if stored is None or len(stored) != zone_count:
-            return None
-        return list(stored)
-
-    def _set_stored_colors(self, component: str, colors: list[HSBK]) -> None:
-        """Update the stored restoration colors of one component.
-
-        Args:
-            component: Either "front" or "back"
-            colors: Colors to restore on a later turn-on
-        """
-        state = self.state
-        if component == "front":
-            state.stored_front_colors = list(colors)
-        else:
-            state.stored_back_colors = list(colors)
-
-    async def _determine_component_brightness(
-        self, component: str, tile_colors: list[HSBK] | None = None
-    ) -> list[HSBK]:
-        """Determine a component's turn-on colors using priority logic.
-
-        Priority order:
-        1. Stored state (if available AND any brightness > 0)
-        2. Infer from the other component's average brightness
-        3. Hardcoded default (0.8)
-
-        Args:
-            component: Either "front" or "back"
-            tile_colors: Optional pre-fetched tile colors to avoid a redundant
-                fetch. If None, will fetch from device.
-
-        Returns:
-            List of HSBK colors for the component's zones
-        """
-        other = "back" if component == "front" else "front"
-        state = self.state
-        zone_count = (
-            self.front_zone_count if component == "front" else self.back_zone_count
-        )
-        stored = (
-            state.stored_front_colors
-            if component == "front"
-            else state.stored_back_colors
-        )
-
-        # 1. Stored state (only if correct length and any brightness > 0)
-        if (
-            stored is not None
-            and len(stored) == zone_count
-            and any(c.brightness > 0 for c in stored)
-        ):
-            return list(stored)
-
-        # Get current colors (use pre-fetched if available)
-        if tile_colors is None:
-            tile_colors = await self._tile_colors_for_update()
-
-        current = _gather(tile_colors, self._component_positions(component))
-        other_colors = _gather(tile_colors, self._component_positions(other))
-
-        # Update state cache
-        self._set_component_state(component, current)
-        self._set_component_state(other, other_colors)
-
-        # Prefer stored H, S, K if available and correct length
-        source_colors = (
-            stored if stored is not None and len(stored) == zone_count else current
-        )
-
-        # 2. Infer from the other component's average brightness, skipping to
-        # the default when it is off
-        average = sum(c.brightness for c in other_colors) / len(other_colors)
-        brightness = average if average > 0 else DEFAULT_COMPONENT_BRIGHTNESS
-
-        return [
-            HSBK(
-                hue=c.hue,
-                saturation=c.saturation,
-                brightness=brightness,
-                kelvin=c.kelvin,
-            )
-            for c in source_colors
-        ]
-
-    def _is_stored_state_valid(self, component: str, current: list[HSBK]) -> bool:
-        """Check if stored state matches current (ignoring brightness).
-
-        Args:
-            component: Either "front" or "back"
-            current: Current colors from device
-
-        Returns:
-            True if stored state matches current (H, S, K), False otherwise
-        """
-        state = self.state
-        stored = (
-            state.stored_front_colors
-            if component == "front"
-            else state.stored_back_colors
-        )
-
-        if stored is None or len(stored) != len(current):
-            return False
-
-        return all(hsk_matches(s, c) for s, c in zip(stored, current))
 
     async def _load_state_from_file(self) -> None:
         """Load state from JSON file.
@@ -1527,45 +1043,3 @@ def _gather(buffer: list[HSBK], positions: tuple[int, ...]) -> list[HSBK]:
         )
 
     return [buffer[position] for position in positions]
-
-
-def _scatter(
-    buffer: list[HSBK], positions: tuple[int, ...], colors: list[HSBK]
-) -> None:
-    """Write a component's colors into a Set64 buffer in place.
-
-    Positions outside the component are left untouched, which is what keeps
-    the other component — and the two unused buffer positions — intact.
-
-    Args:
-        buffer: Colors for every buffer position on the tile
-        positions: Buffer positions to write, in zone order
-        colors: One color per position, in the same order
-
-    Raises:
-        LifxError: If the buffer is shorter than the layout requires
-    """
-    if positions and max(positions) >= len(buffer):
-        raise LifxError(
-            f"Device returned {len(buffer)} zones, too few for the component layout"
-        )
-
-    for position, color in zip(positions, colors):
-        buffer[position] = color
-
-
-def _unlit(color: HSBK) -> HSBK:
-    """Return a copy of a color with brightness zeroed.
-
-    Args:
-        color: Colour to darken
-
-    Returns:
-        Same hue, saturation and kelvin at brightness 0
-    """
-    return HSBK(
-        hue=color.hue,
-        saturation=color.saturation,
-        brightness=0.0,
-        kelvin=color.kelvin,
-    )

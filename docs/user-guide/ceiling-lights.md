@@ -276,6 +276,16 @@ When calling `turn_uplight_on()` or `turn_downlight_on()` without a color parame
 
 This ensures a reasonable brightness level even when no state is available.
 
+Received tile colours update the component colour fields and `last_*` tracking
+without requiring a full `refresh_state()`. Partial responses update only the
+zones they report. Restoration colours are reconciled once all zones of that
+component have been observed; a Capsule downlight requires two responses.
+Outside this instance's pending transition, changed lit colours become the new
+restoration colours. If the whole component is dark, its remembered brightness
+is retained while externally changed hue, saturation and kelvin are adopted.
+Intermediate reports during our own fade update observed colours without
+discarding the fade target or restoration colours. This adds no polling.
+
 ## Transition Duration
 
 All color-setting methods support smooth transitions:
@@ -322,10 +332,16 @@ too. Frames sent while an animation runs bypass the component methods
 entirely, so a component call made during an animation writes over the
 current frame: stop the animation before switching components.
 
-This is best effort. The second write restarts both components' transitions
-with its own duration, and running component calls concurrently on one device
-(for example with `asyncio.gather()`) is not supported: await each call in
-turn.
+The second write restarts both components' transitions with its own duration.
+Concurrent component operations on the same `CeilingLight` instance serialise
+their shared state handling, including whole-light `set_color()` and `set_power()`.
+They do not wait for fades to finish. This does not schedule raw matrix writes,
+Animator frames or commands from other controllers.
+
+If a later write fails, completed stages remain reflected in local state and the
+exception propagates. A timeout can mean a command was applied but its reply was
+lost; it is not a rollback. The caller decides whether to continue, retry or read
+the device. Tile sends retain their existing unacknowledged packet behaviour.
 
 ## MatrixLight Compatibility
 

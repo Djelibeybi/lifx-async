@@ -11,11 +11,11 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
+from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLightState
-from lifx.devices.mirror import MirrorLight, MirrorLightState, _gather, _scatter
+from lifx.devices.mirror import MirrorLight, MirrorLightState, _gather
 from lifx.exceptions import LifxError
 from lifx.products import get_mirror_layout
-from lifx.products.quirks import MIRROR_ZONE_MAP
 
 FRONT = [HSBK(hue=120, saturation=1.0, brightness=0.9, kelvin=3500)] * 25
 BACK = [HSBK(hue=200, saturation=0.8, brightness=0.4, kelvin=2700)] * 25
@@ -357,7 +357,7 @@ class TestMirrorWholeDeviceOperations:
         mirror = _connected_mirror()
         parent_power = AsyncMock()
 
-        with patch.object(MirrorLight.__mro__[1], "set_power", parent_power):
+        with patch.object(Light, "set_power", parent_power):
             await mirror.set_power(False)
 
         assert mirror.state.stored_front_colors == FRONT
@@ -372,7 +372,7 @@ class TestMirrorWholeDeviceOperations:
         mirror.state.last_front_colors = list(FRONT)
         mirror.state.last_back_colors = [DARK] * 25
 
-        with patch.object(MirrorLight.__mro__[1], "set_power", AsyncMock()):
+        with patch.object(Light, "set_power", AsyncMock()):
             await mirror.set_power(True)
 
         assert mirror.state.front_is_on is True
@@ -382,7 +382,7 @@ class TestMirrorWholeDeviceOperations:
         """Test that the raw 0/65535 levels are accepted."""
         mirror = _connected_mirror()
 
-        with patch.object(MirrorLight.__mro__[1], "set_power", AsyncMock()):
+        with patch.object(Light, "set_power", AsyncMock()):
             await mirror.set_power(65535)
 
         assert mirror.state.front_is_on is True
@@ -410,7 +410,7 @@ class TestMirrorWholeDeviceOperations:
             side_effect=lambda: setattr(mirror, "_state", state)
         )
 
-        with patch.object(MirrorLight.__mro__[1], "set_power", AsyncMock()):
+        with patch.object(Light, "set_power", AsyncMock()):
             await mirror.set_power(False)
 
         mirror._initialize_state.assert_awaited_once()
@@ -421,7 +421,7 @@ class TestMirrorWholeDeviceOperations:
         mirror._state_file = str(tmp_path / "mirror.json")
         mirror._save_state_to_file = AsyncMock()
 
-        with patch.object(MirrorLight.__mro__[1], "set_power", AsyncMock()):
+        with patch.object(Light, "set_power", AsyncMock()):
             await mirror.set_power(False)
 
         mirror._save_state_to_file.assert_called_once()
@@ -431,7 +431,7 @@ class TestMirrorWholeDeviceOperations:
         mirror = _connected_mirror()
         color = HSBK(hue=45, saturation=0.5, brightness=0.6, kelvin=3000)
 
-        with patch.object(MirrorLight.__mro__[1], "set_color", AsyncMock()):
+        with patch.object(Light, "set_color", AsyncMock()):
             await mirror.set_color(color)
 
         assert mirror.state.front_colors == [color] * 25
@@ -447,43 +447,12 @@ class TestMirrorWholeDeviceOperations:
         mirror._state_file = str(tmp_path / "mirror.json")
         mirror._save_state_to_file = AsyncMock()
 
-        with patch.object(MirrorLight.__mro__[1], "set_color", AsyncMock()):
+        with patch.object(Light, "set_color", AsyncMock()):
             await mirror.set_color(
                 HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
             )
 
         mirror._save_state_to_file.assert_called_once()
-
-
-class TestMirrorStoredStateValidity:
-    """Tests for stored-state comparison."""
-
-    def test_matching_stored_state_is_valid(self) -> None:
-        """Test that matching H, S, K counts as valid regardless of brightness."""
-        mirror = _connected_mirror()
-        dimmed = [
-            HSBK(hue=c.hue, saturation=c.saturation, brightness=0.1, kelvin=c.kelvin)
-            for c in FRONT
-        ]
-        mirror.state.stored_front_colors = dimmed
-
-        assert mirror._is_stored_state_valid("front", list(FRONT)) is True
-
-    def test_mismatched_hue_is_invalid(self) -> None:
-        """Test that a different hue invalidates the stored state."""
-        mirror = _connected_mirror()
-        mirror.state.stored_back_colors = list(FRONT)
-
-        assert mirror._is_stored_state_valid("back", list(BACK)) is False
-
-    def test_missing_or_wrong_length_is_invalid(self) -> None:
-        """Test that absent or wrongly sized stored state is invalid."""
-        mirror = _connected_mirror()
-        mirror.state.stored_front_colors = None
-        assert mirror._is_stored_state_valid("front", list(FRONT)) is False
-
-        mirror.state.stored_front_colors = list(FRONT[:5])
-        assert mirror._is_stored_state_valid("front", list(FRONT)) is False
 
 
 class TestMirrorStateFileEdgeCases:
@@ -605,26 +574,12 @@ class TestMirrorStateFileEdgeCases:
 
 
 class TestMirrorBufferValidation:
-    """Tests for Set64 buffer gather and scatter."""
+    """Tests for reading a short Set64 buffer."""
 
     def test_short_buffer_is_rejected_on_read(self) -> None:
         """Test that a device returning too few zones is reported clearly."""
         with pytest.raises(LifxError, match="too few for the component layout"):
             _gather([DARK] * 10, FRONT_POSITIONS)
-
-    def test_short_buffer_is_rejected_on_write(self) -> None:
-        """Test that scattering into a short buffer is reported clearly."""
-        with pytest.raises(LifxError, match="too few for the component layout"):
-            _scatter([DARK] * 10, BACK_POSITIONS, list(BACK))
-
-    def test_scatter_leaves_unused_positions_untouched(self) -> None:
-        """Test that scattering never writes the two unused buffer slots."""
-        buffer = [DARK] * BUFFER_SIZE
-        _scatter(buffer, FRONT_POSITIONS, list(FRONT))
-        _scatter(buffer, BACK_POSITIONS, list(BACK))
-
-        unused = [position for position, zone in enumerate(MIRROR_ZONE_MAP) if zone < 0]
-        assert all(buffer[position] is DARK for position in unused)
 
 
 class TestMirrorComponentCoverage:
@@ -707,7 +662,7 @@ class TestMirrorComponentCoverage:
         mirror.state.front_is_on = False
         mirror.state.back_is_on = False
 
-        with patch.object(MirrorLight.__mro__[1], "set_power", AsyncMock()):
+        with patch.object(Light, "set_power", AsyncMock()):
             await mirror.set_power(True)
 
         assert mirror.state.front_is_on is False
