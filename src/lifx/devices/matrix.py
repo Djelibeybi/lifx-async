@@ -610,13 +610,32 @@ class MatrixLight(Light):
             for proto_color in response.colors[:max_colors]
         ]
 
+        self._adopt_tile_observation(
+            response.tile_index,
+            response.rect.x,
+            response.rect.y,
+            response.rect.width,
+            result,
+        )
+
         # Update state if it exists and we fetched all colors from tile 0
         if self._state is not None and hasattr(self._state, "tile_colors"):
-            if tile_index == 0 and x == 0 and y == 0 and len(result) == max_colors:
+            if (
+                tile_index == 0
+                and x == 0
+                and y == 0
+                and width == device_chain[0].width
+                and len(result) == max_colors
+            ):
                 self._state.tile_colors = result
                 self._state.last_updated = time.time()
 
         return result
+
+    def _adopt_tile_observation(
+        self, tile_index: int, x: int, y: int, width: int, colors: list[HSBK]
+    ) -> None:
+        """Allow specialised lights to adopt the reported rectangle's colours."""
 
     async def get_all_tile_colors(self) -> list[list[HSBK]]:
         """Get colors for all tiles in the chain.

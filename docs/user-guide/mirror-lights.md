@@ -177,10 +177,24 @@ too. Frames sent while an animation runs bypass the component methods
 entirely, so a component call made during an animation writes over the
 current frame: stop the animation before switching components.
 
-This is best effort. The second write restarts both components' transitions
-with its own duration, and running component calls concurrently on one device
-(for example with `asyncio.gather()`) is not supported: await each call in
-turn.
+The second write restarts both components' transitions with its own duration.
+Concurrent component operations on the same `MirrorLight` instance serialise
+their shared state handling, including whole-light `set_color()` and `set_power()`.
+They do not wait for fades to finish. Raw matrix writes, Animator frames and
+commands from other controllers keep their existing behaviour.
+
+Received tile colours update component colour fields and `last_*` tracking for
+the reported zones. Once every zone of a component has been observed, changed
+colours outside our pending transition also update restoration colours. A fully
+dark component keeps its remembered brightness while adopting changed hue,
+saturation and kelvin. In-flight reports during our own fades update observed
+colours without replacing the fade target or restoration colours. No polling is
+added.
+
+Completed write stages remain reflected in local state if a later stage fails;
+errors and cancellation propagate so the caller can decide how to recover.
+Timeouts do not prove that the device rejected a write, and tile sends retain
+their existing unacknowledged packet behaviour.
 
 ## Per-Component Themes
 
