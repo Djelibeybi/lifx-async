@@ -375,7 +375,7 @@ finally:
 ### Choosing an FPS per Device Class
 
 ~20 FPS is the platform ceiling over WiFi/Set64. Larger multi-packet matrix devices
-saturate sooner: the LIFX Ceiling Capsule (16×8 zones — 128 zones — at 3 packets per
+saturate sooner: the LIFX Ceiling 13x26 (16×8 zones — 128 zones — at 3 packets per
 frame) sustains ~10 FPS.
 
 Oversending is safe but visible: when the frame rate exceeds what the device sustains,
