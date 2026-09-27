@@ -26,7 +26,7 @@ from lifx.const import (
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
 )
-from lifx.devices.component_state import (
+from lifx.devices.component.state import (
     derive_effect_palette,
     sample_effect_palette,
     validate_effect_palette,
@@ -269,7 +269,7 @@ class MatrixEffect:
     def _validate_palette(value: list[HSBK]) -> None:
         """Validate color palette.
 
-        Delegates to the shared size rule in ``component_state``, so a
+        Delegates to the shared size rule in ``component.state``, so a
         matrix effect's palette and a multizone effect's palette are
         validated by exactly the same check.
 

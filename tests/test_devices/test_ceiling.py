@@ -16,7 +16,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.ceiling import CeilingLight, CeilingLightState
-from lifx.devices.component_state import (
+from lifx.devices.component.state import (
     _resolve_state_path,
     _state_file_lock,
     write_state_file,
@@ -934,7 +934,7 @@ class TestCeilingLightStatePersistence:
             real_replace(src, dst)  # type: ignore[arg-type]
             order.append("done")
 
-        monkeypatch.setattr("lifx.devices.component_state.os.replace", _slow_replace)
+        monkeypatch.setattr("lifx.devices.component.state.os.replace", _slow_replace)
 
         threads = [
             threading.Thread(
@@ -3168,7 +3168,7 @@ class TestWriteStateFileFailure:
 
             with (
                 patch(
-                    "lifx.devices.component_state.json.dump",
+                    "lifx.devices.component.state.json.dump",
                     side_effect=OSError("disk full"),
                 ),
                 pytest.raises(OSError, match="disk full"),

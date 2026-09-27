@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
-from lifx.devices.component_state import derive_effect_palette, validate_effect_palette
+from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.protocol import packets

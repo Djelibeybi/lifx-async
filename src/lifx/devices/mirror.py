@@ -34,8 +34,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
-from lifx.devices.component_light import ComponentMatrixLight, _ComponentFields
-from lifx.devices.component_state import (
+from lifx.devices.component.light import ComponentMatrixLight, _ComponentFields
+from lifx.devices.component.state import (
     colors_as_dict,
     decode_color,
     encode_color,
