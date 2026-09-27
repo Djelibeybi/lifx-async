@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
-from lifx.devices.component_state import Pending, hsk_matches, is_dark
+from lifx.devices.component.state import Pending, hsk_matches, is_dark
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 
@@ -255,12 +255,11 @@ class ComponentMatrixLight(MatrixLight):
 
     async def _write_power(self, on: bool | int, duration: float) -> None:
         """Send power without re-entering whole-light colour capture."""
+        # Retain the last completed power write on failure: firmware may
+        # still report the old power level during a pending power-off fade.
         self._writing_power = True
         try:
             await super().set_power(on, duration)
-        except BaseException:
-            self._pending_power.clear()
-            raise
         finally:
             self._writing_power = False
         self._record_power(bool(on), duration)
@@ -484,6 +483,8 @@ class ComponentMatrixLight(MatrixLight):
             if self._writing_tile:
                 await super().set_color(color, duration)
                 return
+            self._observed_positions.clear()
+            self._changed_positions.clear()
             try:
                 await super().set_color(color, duration)
             except BaseException:
@@ -522,8 +523,15 @@ class ComponentMatrixLight(MatrixLight):
             if row < tile.height and column < tile.width:
                 observed[row * tile.width + column] = colour
         if len(self._state.tile_colors) == tile.total_zones:
+            updated = list(self._state.tile_colors)
             for position, colour in observed.items():
-                self._state.tile_colors[position] = colour
+                updated[position] = colour
+            self._state.tile_colors = updated
+        # Start a new pass at the origin or when rectangles repeat. A previous
+        # read's tail must not complete this read's first half.
+        if (x == 0 and y == 0) or self._observed_positions.intersection(observed):
+            self._observed_positions.clear()
+            self._changed_positions.clear()
         protected = (
             self._writing_tile
             or self._writing_power
@@ -587,10 +595,9 @@ class ComponentMatrixLight(MatrixLight):
                     )
                 if changed:
                     self._set_stored_colors(fields.name, restored)
+                self._known_tile.update(zip(positions, current))
                 self._observed_positions.difference_update(positions)
                 self._changed_positions.difference_update(positions)
-        if not protected:
-            self._known_tile.update(observed)
         self._update_component_flags()
 
     async def apply_theme(

@@ -10,10 +10,12 @@ Terminology:
   - Downlight Component: Multiple zones for main illumination (zones 0-62 or 0-126)
 
 Product IDs:
-- 176: Ceiling (US) - 8x8 matrix
-- 177: Ceiling (Intl) - 8x8 matrix
-- 201: Ceiling Capsule (US) - 16x8 matrix
-- 202: Ceiling Capsule (Intl) - 16x8 matrix
+- 176: Ceiling              - 8x8 matrix
+- 177: Ceiling Intl         - 8x8 matrix
+- 201: Ceiling 13x26        - 16x8 matrix
+- 202: Ceiling 13x26 Intl   - 16x8 matrix
+- 265: Ceiling 13".         - 8x8 matrix
+- 266: Ceiling 13" Intl     - 8x8 matrix
 """
 
 from __future__ import annotations
@@ -26,8 +28,8 @@ from typing import Any, cast
 
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
-from lifx.devices.component_light import ComponentMatrixLight, _ComponentFields
-from lifx.devices.component_state import (
+from lifx.devices.component.light import ComponentMatrixLight, _ComponentFields
+from lifx.devices.component.state import (
     color_as_dict,
     colors_as_dict,
     decode_color,

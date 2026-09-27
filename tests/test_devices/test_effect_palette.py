@@ -1,7 +1,7 @@
 """Tests for the shared firmware-effect palette rule.
 
 Covers ``derive_effect_palette()`` and ``validate_effect_palette()`` in
-``lifx.devices.component_state``, and the MORPH-only default-palette
+``lifx.devices.component.state``, and the MORPH-only default-palette
 derivation wired into ``MatrixLight.set_effect()``.
 """
 
@@ -14,7 +14,7 @@ import pytest
 
 from lifx.color import HSBK, Colors
 from lifx.devices.base import FirmwareInfo
-from lifx.devices.component_state import (
+from lifx.devices.component.state import (
     derive_effect_palette,
     sample_effect_palette,
     validate_effect_palette,

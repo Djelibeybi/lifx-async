@@ -17,7 +17,7 @@ from lifx.devices.base import (
     FirmwareInfo,
 )
 from lifx.devices.ceiling import CeilingLight, CeilingLightState
-from lifx.devices.component_state import WRITE_SETTLE_MARGIN
+from lifx.devices.component.state import WRITE_SETTLE_MARGIN
 from lifx.devices.matrix import MatrixLightState, TileInfo
 from lifx.devices.mirror import MirrorLight, MirrorLightState
 from lifx.exceptions import LifxError, LifxTimeoutError
@@ -130,7 +130,7 @@ class Rig:
 def rig(request, monkeypatch) -> Rig:
     product = request.param
     clock = [100.0]
-    monkeypatch.setattr("lifx.devices.component_state.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("lifx.devices.component.state.time.monotonic", lambda: clock[0])
     width, height = (4, 13) if product == 267 else (16, 8) if product == 201 else (8, 8)
     colours = [RED] * (width * height)
     tile = TileInfo(0, 0, 0, 0, 0, 0, width, height, 2, 1, product, 0, 1, 0, 4)
@@ -547,3 +547,61 @@ async def test_component_write_preserves_other_and_unused_buffer_positions(rig: 
     await rig.on(0, BLUE)
     untouched = set(range(len(before))) - set(rig.positions[0])
     assert [rig.wire.colours[p] for p in untouched] == [before[p] for p in untouched]
+
+
+@pytest.mark.parametrize("delivered", [False, True])
+async def test_retry_power_on_during_pending_power_off(rig: Rig, delivered: bool):
+    await rig.off(1)
+    await rig.off(0, duration=10)
+    rig.wire.power = 65535  # Firmware reports old power during the fade.
+
+    async def lose_power_reply(packet):
+        if isinstance(packet, packets.Light.SetPower):
+            if delivered:
+                rig.wire.power = packet.level
+            raise LifxTimeoutError("power reply lost")
+
+    rig.wire.before = lose_power_reply
+    with pytest.raises(LifxTimeoutError):
+        await rig.on(1)
+    rig.wire.before = None
+    rig.wire.packets.clear()
+    await rig.on(1)
+    assert any(
+        isinstance(p, packets.Light.SetPower) and p.level == 65535
+        for p in rig.wire.packets
+    )
+
+
+@pytest.mark.parametrize("partial", ["standalone", "expiry"])
+async def test_full_read_reconciles_after_incomplete_observation(
+    rig: Rig, partial: str
+):
+    if rig.wire.width != 16:
+        return
+    await rig.off(1)
+    if partial == "standalone":
+        rig.settle()
+        await rig.light.get64(y=4)
+    else:
+
+        async def expire_between_chunks(packet):
+            if isinstance(packet, packets.Tile.Get64) and packet.rect.y == 4:
+                rig.settle()
+
+        rig.wire.before = expire_between_chunks
+        await rig.light.get_all_tile_colors()
+        rig.wire.before = None
+    rig.external(1, BLUE)
+    await rig.on(1)
+    assert [rig.wire.colours[p] for p in rig.positions[1]] == [BLUE] * len(
+        rig.positions[1]
+    )
+
+
+async def test_later_read_preserves_returned_snapshot(rig: Rig):
+    snapshot = await rig.light.get64()
+    expected = list(snapshot)
+    rig.wire.colours[:] = [BLUE] * len(rig.wire.colours)
+    await rig.light.get64()
+    assert snapshot == expected

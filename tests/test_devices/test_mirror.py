@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.component_state import WRITE_SETTLE_MARGIN
+from lifx.devices.component.state import WRITE_SETTLE_MARGIN
 from lifx.devices.detection import get_device_class_for_product
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.mirror import MirrorLight, MirrorLightState
@@ -390,7 +390,7 @@ class TestMirrorTransitions:
         mirror.get_all_tile_colors = AsyncMock(return_value=[lit])
 
         with patch(
-            "lifx.devices.component_state.time.monotonic", return_value=100.0
+            "lifx.devices.component.state.time.monotonic", return_value=100.0
         ) as clock:
             await mirror.turn_front_off(duration=1.0)
             clock.return_value = 100.0 + 1.0 + WRITE_SETTLE_MARGIN
@@ -449,7 +449,7 @@ class TestMirrorTransitions:
         mirror = _mirror(power=0)
 
         with patch(
-            "lifx.devices.component_state.time.monotonic", return_value=100.0
+            "lifx.devices.component.state.time.monotonic", return_value=100.0
         ) as clock:
             mirror._record_power(True, 30.0)
             assert await mirror._power_for_update() == 65535
@@ -622,7 +622,7 @@ class TestMirrorTransitions:
         with (
             patch("lifx.devices.light.Light.set_power", new_callable=AsyncMock),
             patch(
-                "lifx.devices.component_state.time.monotonic", return_value=100.0
+                "lifx.devices.component.state.time.monotonic", return_value=100.0
             ) as clock,
         ):
             await mirror.turn_front_off(duration=1.0)
