@@ -314,14 +314,38 @@ class TestLight:
         assert packet.period == 0
 
     async def test_set_waveform_invalid_cycles(self, light: Light) -> None:
-        """Test setting waveform with invalid cycles."""
-        with pytest.raises(ValueError, match="Cycles must be 1 or higher"):
+        """Test setting waveform with negative cycles."""
+        with pytest.raises(ValueError, match="Cycles must be greater than 0"):
             await light.set_waveform(
                 color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
                 period=1.0,
                 cycles=-1,
                 waveform=LightWaveform.SINE,
             )
+
+    async def test_set_waveform_zero_cycles(self, light: Light) -> None:
+        """Test that zero cycles is rejected."""
+        with pytest.raises(ValueError, match="Cycles must be greater than 0"):
+            await light.set_waveform(
+                color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+                period=1.0,
+                cycles=0,
+                waveform=LightWaveform.SINE,
+            )
+
+    async def test_set_waveform_half_cycle(self, light: Light) -> None:
+        """Test that a fractional 0.5 cycle count is accepted."""
+        light.connection.request.return_value = True
+
+        await light.set_waveform(
+            color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+            period=1.0,
+            cycles=0.5,
+            waveform=LightWaveform.SINE,
+        )
+
+        packet = light.connection.request.call_args.args[0]
+        assert packet.cycles == 0.5
 
     async def test_set_waveform_optional(self, light: Light) -> None:
         """Test setting waveform with optional component control."""
@@ -393,7 +417,7 @@ class TestLight:
         await light.set_waveform_optional(
             color=color,
             period=5.0,
-            cycles=0,  # Infinite
+            cycles=1000,  # Long-running hue cycle
             waveform=LightWaveform.SAW,
             set_hue=True,
             set_saturation=False,
@@ -411,7 +435,7 @@ class TestLight:
         assert packet.set_brightness is False
         assert packet.set_kelvin is False
         assert packet.waveform == LightWaveform.SAW
-        assert packet.cycles == 0
+        assert packet.cycles == 1000
 
     async def test_set_waveform_optional_invalid_period(self, light: Light) -> None:
         """Test setting waveform_optional with invalid period."""
@@ -438,14 +462,38 @@ class TestLight:
         assert packet.period == 0
 
     async def test_set_waveform_optional_invalid_cycles(self, light: Light) -> None:
-        """Test setting waveform_optional with invalid cycles."""
-        with pytest.raises(ValueError, match="Cycles must be non-negative"):
+        """Test setting waveform_optional with negative cycles."""
+        with pytest.raises(ValueError, match="Cycles must be greater than 0"):
             await light.set_waveform_optional(
                 color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
                 period=1.0,
                 cycles=-1,
                 waveform=LightWaveform.SINE,
             )
+
+    async def test_set_waveform_optional_zero_cycles(self, light: Light) -> None:
+        """Test that zero cycles is rejected."""
+        with pytest.raises(ValueError, match="Cycles must be greater than 0"):
+            await light.set_waveform_optional(
+                color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+                period=1.0,
+                cycles=0,
+                waveform=LightWaveform.SINE,
+            )
+
+    async def test_set_waveform_optional_half_cycle(self, light: Light) -> None:
+        """Test that a fractional 0.5 cycle count is accepted."""
+        light.connection.request.return_value = True
+
+        await light.set_waveform_optional(
+            color=HSBK(hue=0, saturation=1, brightness=1, kelvin=3500),
+            period=1.0,
+            cycles=0.5,
+            waveform=LightWaveform.SINE,
+        )
+
+        packet = light.connection.request.call_args.args[0]
+        assert packet.cycles == 0.5
 
     async def test_set_waveform_optional_invalid_skew_ratio(self, light: Light) -> None:
         """Test setting waveform_optional with invalid skew ratio."""

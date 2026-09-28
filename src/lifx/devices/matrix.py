@@ -182,7 +182,7 @@ class MatrixEffect:
     """Matrix effect configuration.
 
     Attributes:
-        effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
+        effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP)
         speed: Effect speed in milliseconds
         duration: Total effect duration in nanoseconds (0 for infinite)
         palette: Color palette for the effect (max 16 colors)
@@ -1247,7 +1247,7 @@ class MatrixLight(Light):
         """Set matrix effect with configuration.
 
         Args:
-            effect_type: Type of effect (OFF, MORPH, FLAME, SKY)
+            effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP)
             speed: Effect speed in seconds (default: 3)
             duration: Total effect duration in nanoseconds (0 for infinite)
             palette: Color palette for the effect (max 16 colors). An explicit
@@ -1263,8 +1263,11 @@ class MatrixLight(Light):
                 colour in the order first seen when there are 16 or fewer,
                 otherwise 16 pixels spaced evenly across all tiles,
                 de-duplicated). If the read fails, or reports no colours,
-                the error is raised and no effect is sent. FLAME and SKY
-                with ``None`` send no palette and perform no read at all
+                the error is raised and no effect is sent. FLAME, SKY and
+                COLOR_SWEEP with ``None`` send no palette and perform no
+                read at all. COLOR_SWEEP runs on the Mirror only: with no
+                palette it sweeps through colour temperatures, and with a
+                palette it sweeps through the palette colours instead
             sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)

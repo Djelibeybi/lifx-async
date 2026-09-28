@@ -28,7 +28,7 @@ Subclass `FrameEffect` and implement `generate_frame()`. This is the recommended
 
 ### Imperative Effects
 
-Subclass `LIFXEffect` and implement `async_play()`. Use this when you need direct device control (e.g., firmware waveforms like EffectPulse).
+Subclass `LIFXEffect` and implement `async_play()`. Use this when you need direct device control (e.g., sending waveforms directly, like EffectPulse).
 
 1. Subclass `LIFXEffect`
 2. Implement `async_play()` with your effect logic
@@ -196,7 +196,7 @@ class FlashFrameEffect(FrameEffect):
 
 ## Imperative Effects (LIFXEffect)
 
-For effects that need direct device control (firmware waveforms, custom protocols), subclass `LIFXEffect` and implement `async_play()`.
+For effects that need direct device control (sending waveforms directly, custom protocols), subclass `LIFXEffect` and implement `async_play()`.
 
 ### Basic Structure
 
@@ -986,7 +986,7 @@ class Effect1(LIFXEffect):
 
 ## See Also
 
-- [Getting Started](../getting-started/effects.md) - Basic usage of built-in effects
+- [Getting Started](../getting-started/effects.md) - Basic usage of software effects
 - [Effects Reference](../api/effects.md) - Detailed API documentation
 - [Architecture](../architecture/effects-architecture.md) - How the system works internally
 - [Troubleshooting](effects-troubleshooting.md) - Common issues and solutions

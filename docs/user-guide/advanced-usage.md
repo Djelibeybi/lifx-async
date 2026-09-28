@@ -187,7 +187,7 @@ async def use_cached_or_fetch():
 
 - `MatrixLight.tile_count` - Number of tiles on the chain
 - `MatrixLight.device_chain` - Details of each tile on the chain
-- `MatrixLight.tile_effect` - Either MORPH, FLAME, SKY or OFF
+- `MatrixLight.tile_effect` - Either MORPH, FLAME, SKY, COLOR_SWEEP or OFF
 
 #### CeilingLight properties:
 

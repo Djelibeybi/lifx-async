@@ -333,7 +333,7 @@ If restoring many zones times out, state may be incomplete.
 
 **Works Well:**
 
-- EffectPulse: All zones pulse together (firmware waveform)
+- EffectPulse: sends one waveform to all zones, which the light runs itself
 - EffectColorloop: Entire device cycles color (via `MultiZonePacketGenerator`)
 - Custom `FrameEffect`: Per-zone control via `generate_frame()` with `pixel_count = zone_count`
 
@@ -353,7 +353,7 @@ If restoring many zones times out, state may be incomplete.
 
 **Works Well:**
 
-- EffectPulse: All tiles pulse together (firmware waveform)
+- EffectPulse: sends one waveform to all tiles, which the light runs itself
 - EffectColorloop: All pixels cycle color together (via `MatrixPacketGenerator`)
 - Custom `FrameEffect`: Per-pixel control via `generate_frame()` with `pixel_count = W * H`
 
@@ -743,7 +743,7 @@ class PixelRainbow(FrameEffect):
         return colors
 ```
 
-**Note:** `EffectPulse` still treats all device types as single units (applies firmware waveforms uniformly). For per-pixel pulse effects, use a `FrameEffect` instead.
+**Note:** `EffectPulse` still treats all device types as single units (sends one waveform per participant). For per-pixel pulse effects, use a `FrameEffect` instead.
 
 ---
 

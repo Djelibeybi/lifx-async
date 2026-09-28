@@ -174,7 +174,7 @@ await light.set_color(Colors.BLUE, duration=2.0)
 await light.set_brightness(0.5, duration=3.0)
 ```
 
-### Can I create pulsing effects?
+### Can I create pulsing waveforms?
 
 Yes! Use the `pulse()` or `breathe()` methods:
 

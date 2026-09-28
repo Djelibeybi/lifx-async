@@ -17,7 +17,7 @@ graph TB
     end
 
     subgraph "Layer 6: Effects Layer"
-        Effects[30+ Effects<br/>aurora, flame, plasma, etc.]
+        Effects[30+ Software Effects<br/>aurora, flicker, plasma, etc.]
         Registry[Registry<br/>Effect discovery]
     end
 
@@ -216,9 +216,9 @@ async with Light(serial, ip) as light:
 
 ### Layer 6: Effects Layer
 
-**Purpose**: 30+ built-in visual effects
+**Purpose**: 30+ software visual effects
 
-- **Effect Library**: aurora, flame, plasma, rainbow, twinkle, etc.
+- **Effect Library**: aurora, flicker, plasma, rainbow, twinkle, etc.
 - **Registry**: Discover effects by name
 - **State Management**: Run effects on devices
 - **Frame Generation**: Effects produce HSBK frames consumed by the Animation Layer

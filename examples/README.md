@@ -122,8 +122,8 @@ Without `--demo`, the script is read-only and only displays device information.
 
 ### effects_pulse
 
-Demonstrates pulse effect variations: blink, strobe, breathe, and ping. Each mode uses the LIFX
-protocol's built-in waveform engine for smooth transitions.
+Demonstrates `EffectPulse` variations: blink, strobe, breathe, and ping. Each mode sends one
+waveform to each light, which the light then runs itself.
 
 ```bash
 uv run python examples/effects_pulse.py
@@ -187,15 +187,15 @@ uv run python examples/effects_rainbow.py 192.168.1.100
 |-----------|----------|-------------|
 | positional args | no | IP addresses and/or serial numbers of target devices |
 
-### effects_flame
+### effects_flicker
 
 Simulates fire and candle flicker using layered sine waves. On single bulbs it flickers like a
 candle; on strips it looks like fire along a wall; on matrix lights a 2D fire with vertical
 gradient appears. Demonstrates default, intense, and ember glow modes.
 
 ```bash
-uv run python examples/effects_flame.py
-uv run python examples/effects_flame.py 192.168.1.100
+uv run python examples/effects_flicker.py
+uv run python examples/effects_flicker.py 192.168.1.100
 ```
 
 | Parameter | Required | Description |
@@ -294,8 +294,10 @@ uv run python examples/matrix_basic.py --ip 192.168.1.100 --serial d073d5123456
 
 ### matrix_effects
 
-Demonstrates the built-in firmware tile effects: MORPH, FLAME, SKY (sunrise and clouds), and
-custom palette MORPH. These effects run on the device firmware itself.
+Demonstrates the firmware tile effects: MORPH, FLAME, SKY (sunrise and clouds), COLOR_SWEEP, and
+custom palette MORPH. These effects run on the device firmware itself. Move runs on multizone
+strips rather than matrix lights; Morph and Flame run on matrix lights; Sky needs a matrix light
+with recent firmware; Color Sweep runs on the Mirror only.
 
 ```bash
 uv run python examples/matrix_effects.py --ip 192.168.1.100 --serial d073d5123456

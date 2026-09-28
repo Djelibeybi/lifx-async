@@ -1,6 +1,6 @@
 """MatrixLight tile effects example.
 
-Demonstrates using built-in tile effects: MORPH, FLAME, SKY and COLOR_SWEEP
+Demonstrates using firmware effects: MORPH, FLAME, SKY and COLOR_SWEEP
 with various parameters.
 """
 
@@ -94,10 +94,15 @@ async def main(ip: str, serial: str | None = None):
         #
         # COLOR_SWEEP was added in protocol.yml 0.10 (6 August 2026). The
         # protocol defines the effect type but no parameters of its own, so it
-        # is driven like MORPH and FLAME: speed plus an optional palette. Which
-        # products and firmware versions actually run it is not published, and
-        # there is no capability flag to gate on, so a device that does not
-        # support it will simply ignore the request rather than report an error.
+        # is driven like MORPH and FLAME: speed plus an optional palette. It
+        # only runs on the Mirror. With no palette it sweeps through colour
+        # temperatures (kelvin), which is intended for checking makeup; with a
+        # palette it sweeps through the palette colours instead. There is no
+        # capability flag to gate on, so a device that does not support it will
+        # simply ignore the request rather than report an error. While it
+        # runs, get_effect() reports COLOR_SWEEP with the speed and palette
+        # sent, but the Mirror keeps reporting its underlying tile colours
+        # from Get64, not the colours it is actually displaying.
         print("\nStarting COLOR_SWEEP effect...")
         print("  (sweeps the palette across the matrix)")
         await matrix.set_effect(

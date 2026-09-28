@@ -1,5 +1,6 @@
 """Tests for EffectRegistry."""
 
+import warnings
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,7 +11,7 @@ from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.aurora import EffectAurora
 from lifx.effects.colorloop import EffectColorloop
-from lifx.effects.flame import EffectFlame
+from lifx.effects.flicker import EffectFlicker
 from lifx.effects.progress import EffectProgress
 from lifx.effects.pulse import EffectPulse
 from lifx.effects.rainbow import EffectRainbow
@@ -69,6 +70,53 @@ class TestEffectRegistry:
         """Test looking up an unknown effect returns None."""
         registry = EffectRegistry()
         assert registry.get_effect("nonexistent") is None
+
+    def test_get_effect_unknown_does_not_warn(self) -> None:
+        """Test looking up an unknown effect emits no warning."""
+        registry = EffectRegistry()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert registry.get_effect("nonexistent") is None
+
+    def test_deprecated_name_resolves_to_replacement(self) -> None:
+        """Test a deprecated name warns and resolves to the replacement info."""
+        registry = EffectRegistry()
+        info = EffectInfo(
+            name="new_name",
+            effect_class=EffectPulse,
+            description="Replacement effect",
+            device_support={DeviceType.LIGHT: DeviceSupport.RECOMMENDED},
+        )
+        registry.register(info)
+        registry.register_deprecated_name("old_name", "new_name")
+
+        with pytest.warns(DeprecationWarning, match="new_name"):
+            result = registry.get_effect("old_name")
+
+        assert result is info
+
+    def test_deprecated_name_absent_from_effects_listing(self) -> None:
+        """Test a deprecated name never appears in .effects or device listings."""
+        registry = EffectRegistry()
+        registry.register(
+            EffectInfo(
+                name="new_name",
+                effect_class=EffectPulse,
+                description="Replacement effect",
+                device_support={DeviceType.LIGHT: DeviceSupport.RECOMMENDED},
+            )
+        )
+        registry.register_deprecated_name("old_name", "new_name")
+
+        names = {info.name for info in registry.effects}
+        assert "old_name" not in names
+        assert "new_name" in names
+
+        device_type_names = {
+            info.name
+            for info, _ in registry.get_effects_for_device_type(DeviceType.LIGHT)
+        }
+        assert "old_name" not in device_type_names
 
     def test_get_effects_for_device_type_light(self) -> None:
         """Test filtering effects for LIGHT device type."""
@@ -189,13 +237,31 @@ class TestDefaultRegistry:
             "pulse",
             "colorloop",
             "rainbow",
-            "flame",
+            "flicker",
             "aurora",
             "progress",
             "sunrise",
             "sunset",
         }
         assert original_effects.issubset(names)
+
+    def test_flame_deprecated_name_resolves_to_flicker(self) -> None:
+        """Test the deprecated "flame" name warns and resolves to flicker."""
+        registry = get_effect_registry()
+
+        with pytest.warns(DeprecationWarning, match="flicker"):
+            info = registry.get_effect("flame")
+
+        assert info is not None
+        assert info.name == "flicker"
+        assert info.effect_class is EffectFlicker
+
+    def test_flame_absent_from_effects_listing(self) -> None:
+        """Test "flame" never appears in .effects (only "flicker" does)."""
+        registry = get_effect_registry()
+        names = {info.name for info in registry.effects}
+        assert "flame" not in names
+        assert "flicker" in names
 
     def test_builtin_effect_names(self) -> None:
         """Test all expected effect names are present."""
@@ -205,7 +271,7 @@ class TestDefaultRegistry:
             "pulse",
             "colorloop",
             "rainbow",
-            "flame",
+            "flicker",
             "aurora",
             "progress",
             "sunrise",
@@ -219,7 +285,7 @@ class TestDefaultRegistry:
         assert registry.get_effect("pulse").effect_class is EffectPulse
         assert registry.get_effect("colorloop").effect_class is EffectColorloop
         assert registry.get_effect("rainbow").effect_class is EffectRainbow
-        assert registry.get_effect("flame").effect_class is EffectFlame
+        assert registry.get_effect("flicker").effect_class is EffectFlicker
         assert registry.get_effect("aurora").effect_class is EffectAurora
         assert registry.get_effect("progress").effect_class is EffectProgress
         assert registry.get_effect("sunrise").effect_class is EffectSunrise
@@ -255,10 +321,10 @@ class TestDefaultRegistry:
         info = registry.get_effect("aurora")
         assert info.device_support[DeviceType.MULTIZONE] is DeviceSupport.RECOMMENDED
 
-    def test_flame_recommended_on_all(self) -> None:
-        """Test flame is RECOMMENDED for all device types."""
+    def test_flicker_recommended_on_all(self) -> None:
+        """Test flicker is RECOMMENDED for all device types."""
         registry = get_effect_registry()
-        info = registry.get_effect("flame")
+        info = registry.get_effect("flicker")
         assert info.device_support[DeviceType.LIGHT] is DeviceSupport.RECOMMENDED
         assert info.device_support[DeviceType.MULTIZONE] is DeviceSupport.RECOMMENDED
         assert info.device_support[DeviceType.MATRIX] is DeviceSupport.RECOMMENDED
