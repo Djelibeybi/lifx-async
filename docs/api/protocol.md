@@ -349,9 +349,9 @@ from lifx.protocol.protocol_types import FirmwareEffect, Direction
 # Available firmware effects (for multizone and matrix devices)
 FirmwareEffect.OFF
 FirmwareEffect.MOVE         # MultiZone only
-FirmwareEffect.MORPH        # Tile/Matrix only
-FirmwareEffect.FLAME        # Tile/Matrix only
-FirmwareEffect.SKY          # Tile/Matrix with host firmware 4.x or later
+FirmwareEffect.MORPH        # Matrix only
+FirmwareEffect.FLAME        # Matrix only
+FirmwareEffect.SKY          # Matrix with host firmware 4.x or later
 FirmwareEffect.COLOR_SWEEP  # Mirror only
 
 # Direction for MOVE effects
