@@ -670,7 +670,7 @@ class TestDiscoverySourceValidation:
 
 
 class TestMalformedPayloadHandling:
-    """Test that malformed StateService payloads are handled gracefully (D-10).
+    """Test that malformed StateService payloads are handled gracefully.
 
     Re-proves the behaviour previously covered by the retired direct parser tests,
     now via the shared _discover_with_packet path that replaced the deleted parser.
@@ -733,7 +733,7 @@ class TestMalformedPayloadHandling:
 
 
 class TestMalformedSizeDatagramHandling:
-    """Test that size-invalid datagrams never abort discovery (CR-01).
+    """Test that size-invalid datagrams never abort discovery.
 
     UdpTransport.receive() raises LifxProtocolError for datagrams outside the
     [MIN_PACKET_SIZE, MAX_PACKET_SIZE] range. The shared discovery loop must
@@ -836,7 +836,7 @@ class TestMalformedSizeDatagramHandling:
 
 
 class TestDiscoverWithPacketSerialValidation:
-    """Direct generator-level tests for hoisted serial validation (D-11).
+    """Direct generator-level tests for hoisted serial validation.
 
     These tests drive _discover_with_packet directly to prove the broadcast/multicast
     and all-0xff serial guards are enforced at the shared generator, not only
@@ -847,7 +847,7 @@ class TestDiscoverWithPacketSerialValidation:
     async def test_broadcast_bit_serial_rejected_at_generator(self) -> None:
         """Packet with broadcast/multicast serial (LSB of byte 0 set) yields nothing.
 
-        Proves the D-01 guard in _discover_with_packet rejects multicast addresses
+        Proves the guard in _discover_with_packet rejects multicast addresses
         before any DiscoveryResponse is produced.
         """
         known_source = 42
@@ -889,7 +889,7 @@ class TestDiscoverWithPacketSerialValidation:
 
     @pytest.mark.asyncio
     async def test_all_ff_serial_rejected_at_generator(self) -> None:
-        """Packet with all-0xFF serial yields no DiscoveryResponse (D-01).
+        """Packet with all-0xFF serial yields no DiscoveryResponse.
 
         Proves the all-0xff broadcast serial guard in _discover_with_packet.
         """
@@ -931,7 +931,7 @@ class TestDiscoverWithPacketSerialValidation:
 
     @pytest.mark.asyncio
     async def test_all_zeros_serial_rejected_at_generator(self) -> None:
-        """Packet with all-zeros serial yields no DiscoveryResponse (WR-01).
+        """Packet with all-zeros serial yields no DiscoveryResponse.
 
         The all-zeros target is the LIFX broadcast address used by the
         discovery request itself — a spoofed response echoing it must not
@@ -977,7 +977,7 @@ class TestDiscoverWithPacketSerialValidation:
     async def test_first_wins_dedup_at_generator(self) -> None:
         """Two packets with the same valid serial yield exactly one DiscoveryResponse.
 
-        Proves the first-wins dedup guard (D-04) is enforced inside
+        Proves the first-wins dedup guard is enforced inside
         _discover_with_packet rather than only in its callers.
         """
         known_source = 42

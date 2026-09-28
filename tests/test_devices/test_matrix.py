@@ -492,8 +492,8 @@ class TestMatrixLight:
         """Test setting effect without a palette on a multi-colour device.
 
         A device showing more than one distinct colour now gets those
-        colours back as the MORPH palette (D-24, D-25): real firmware does
-        not start MORPH when Tile.SetEffect carries palette_count=0.
+        colours back as the MORPH palette: real firmware does not start
+        MORPH when Tile.SetEffect carries palette_count=0.
         """
         matrix = emulator_devices[6]
         async with matrix:

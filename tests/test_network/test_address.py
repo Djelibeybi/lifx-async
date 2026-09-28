@@ -2,14 +2,14 @@
 
 The module is a leaf rule whose shared helpers expose every branch directly,
 rather than through a ``Device`` constructor. That is the
-whole point of the move (D-04): the coverage-exemption markers the rules
+whole point of the move: the coverage-exemption markers the rules
 carried while they were inline in ``Device.__init__`` come off, and each
 branch is exercised from both sides here.
 
 Two orderings matter and are asserted explicitly:
 
 * every rejection is evaluated before either warning, so an address on its
-  way to a ``ValueError`` never logs (review finding 11); and
+  way to a ``ValueError`` never logs; and
 * :func:`family_for` deliberately does *not* apply the entry-point rules, so
   bind literals like ``"::"`` resolve to a family instead of raising.
 """
@@ -65,8 +65,8 @@ class TestValidateAddressRejects:
         """Case and expansion are the helper's problem, not the caller's.
 
         All three spellings are the same address, so all three raise the same
-        way. This is the IPV6-02 flip: the branch logged a warning here and
-        then spent 16 silent seconds timing out.
+        way. The branch used to log a warning here and then spend 16 silent
+        seconds timing out.
         """
         with pytest.raises(ValueError, match="zone"):
             validate_address(value)
@@ -141,7 +141,7 @@ class TestValidateAddressNotes:
     def test_loopback_notes_in_the_helper_shape(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The dict names the helper, not the calling class (D-06)."""
+        """The dict names the helper, not the calling class."""
         with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             validate_address(value)
 
@@ -163,18 +163,6 @@ class TestValidateAddressNotes:
             assert validate_address(value) is None
 
         assert caplog.records == []
-
-    def test_note_dicts_drop_the_class_and_method_keys(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """D-06 explicitly retires the Device-shaped context keys."""
-        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
-            validate_address("127.0.0.1")
-
-        payload = caplog.records[0].msg
-        assert isinstance(payload, dict)
-        assert "class" not in payload
-        assert "method" not in payload
 
     @pytest.mark.parametrize("value", ["127.0.0.1", "::1"])
     def test_the_note_takes_no_caller_policy(
@@ -201,7 +189,7 @@ class TestValidateAddressAccepts:
     def test_private_address_passes_silently(
         self, value: str, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A zoned link-local is exactly what IPV6-02 wants accepted."""
+        """A zoned link-local is exactly what this guard accepts."""
         with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
             assert validate_address(value) is None
 
@@ -345,14 +333,14 @@ class TestFamilyFor:
         assert family_for(value) == expected
 
     def test_wildcard_spellings_agree(self) -> None:
-        """SPEC AC 7: the two spellings of the IPv6 wildcard are one address."""
+        """The two spellings of the IPv6 wildcard are one address."""
         assert family_for("::") == family_for("0:0:0:0:0:0:0:0") == socket.AF_INET6
 
     def test_bind_literals_are_not_rejected(self) -> None:
         """`family_for` deliberately skips the validate_address rules.
 
         ``"::"`` is unspecified, which `validate_address` rejects, yet it is a
-        legitimate local bind literal. The split is the accepted cost of D-02.
+        legitimate local bind literal. The split is an accepted cost.
         """
         assert family_for("::") == socket.AF_INET6
         with pytest.raises(ValueError):

@@ -304,9 +304,9 @@ def large_tile_matrix_device(
 
     Mirrors the `ceiling_device` fixture pattern (`tests/conftest.py`), but
     with a non-64-divisible tile width (13) to exercise the row-aligned
-    large-tile chunking path (ANIM-04) end-to-end against a real emulated
-    device: 7 Set64 packets (6x52 + 1x26 colours) + 1 CopyFrameBuffer per
-    frame. See `_force_tile_dimensions` for why the dims are patched after
+    large-tile chunking path end-to-end against a real emulated device:
+    7 Set64 packets (6x52 + 1x26 colours) + 1 CopyFrameBuffer per frame.
+    See `_force_tile_dimensions` for why the dims are patched after
     construction rather than passed to `create_device`.
 
     Yields:

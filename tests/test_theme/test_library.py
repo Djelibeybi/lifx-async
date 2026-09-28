@@ -13,7 +13,7 @@ from lifx.theme.slug import derive_slug
 
 # Every key the pre-6.3.0 hand-written library resolved, captured as a
 # LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
-# of the new library cannot vacuously pass (COMPAT-01 empty edge).
+# of the new library cannot vacuously pass.
 PRE_V12_KEYS = (
     "arctic",
     "aurora_borealis",
@@ -74,7 +74,7 @@ PRE_V12_KEYS = (
     "zombie",
 )
 
-# The app's 8 categories (D-10) plus Library for the pre-6.3.0 orphans.
+# The app's 8 categories plus Library for the pre-6.3.0 orphans.
 LIBRARY_CATEGORIES = frozenset(
     {
         "Moods",
@@ -170,7 +170,7 @@ class TestThemeLibraryList:
             assert theme_name in themes
 
     def test_list_count(self) -> None:
-        """Test that the listing is non-empty (no count pin, D-23)."""
+        """Test that the listing is non-empty (no count pin)."""
         themes = ThemeLibrary.get_available_themes()
         assert len(themes) > 0
 
@@ -186,14 +186,14 @@ class EmptyLibrary(ThemeLibrary):
 
 
 class TestGetCategories:
-    """Tests for ThemeLibrary.get_categories() (SPEC R1)."""
+    """Tests for ThemeLibrary.get_categories()."""
 
     def test_exact_sorted_list(self) -> None:
         """Exactly the 9 category names, plain codepoint-sorted."""
         assert ThemeLibrary.get_categories() == sorted(LIBRARY_CATEGORIES)
 
     def test_empty_library_returns_empty_list(self) -> None:
-        """A library with no records has no categories (SPEC R1 empty edge)."""
+        """A library with no records has no categories."""
         assert EmptyLibrary.get_categories() == []
 
     def test_empty_library_lookup_raises_unknown(self) -> None:
@@ -213,13 +213,13 @@ class TestGetCategories:
 
 
 class TestThemeLibraryGetByCategory:
-    """Tests for ThemeLibrary.get_by_category() over the app taxonomy (SPEC R2)."""
+    """Tests for ThemeLibrary.get_by_category() over the app taxonomy."""
 
     def test_every_record_reachable_by_its_own_category(self) -> None:
         """record.slug is a key of get_by_category(record.category) for all names.
 
         Membership is asserted by slug key, never by Theme object equality,
-        because Theme ``==`` is identity (WR-02 closure sweep). The lookup
+        because Theme ``==`` is identity. The lookup
         is hoisted per category rather than per record: there are 9
         categories and 168 names, so calling once per record repeats the
         same 9 answers 168 times.
@@ -248,7 +248,7 @@ class TestThemeLibraryGetByCategory:
         assert all(theme.slug == slug for slug, theme in holidays.items())
 
     def test_normalised_forms_agree(self) -> None:
-        """Both sides pass through the D-09 slug rule (SPEC R2 encoding edge)."""
+        """Both sides pass through the same slug normalisation rule."""
         canonical = ThemeLibrary.get_by_category("Art Series").keys()
 
         assert ThemeLibrary.get_by_category("art_series").keys() == canonical
@@ -271,7 +271,7 @@ class TestThemeLibraryGetByCategory:
         assert "Archives" in message
 
     def test_empty_string_gets_generic_error(self) -> None:
-        """'' falls through to the unknown-category error (SPEC R3 empty edge)."""
+        """'' falls through to the unknown-category error."""
         with pytest.raises(ValueError) as exc_info:
             ThemeLibrary.get_by_category("")
 
@@ -299,7 +299,7 @@ class TestThemeLibraryGetByCategory:
 
 
 class TestRetiredCategoryNames:
-    """The 6 pre-6.4.0 category names are gone, with no shim (SPEC R3).
+    """The 6 pre-6.4.0 category names are gone, with no shim.
 
     The old hand-made taxonomy (``seasonal``, ``holiday``, ``mood``,
     ``ambient``, ``functional``, ``atmosphere``) never matched the data:
@@ -436,7 +436,7 @@ class TestThemeLibraryColorValues:
         regeneration that inverts the palette or drops a primary. Without
         it nothing in CI asserts a real colour value — `data.py` is in the
         coverage omit list and the generator suite runs only against
-        fixtures (D-23).
+        fixtures.
         """
         hues = [color.hue for color in ThemeLibrary.get("christmas")]
 
@@ -531,7 +531,7 @@ class TestThemeLibraryIntegration:
 
 
 class TestPreV12Compatibility:
-    """COMPAT-01: every pre-6.3.0 theme name still resolves."""
+    """Every pre-6.3.0 theme name still resolves."""
 
     @pytest.mark.parametrize("key", PRE_V12_KEYS)
     def test_pre_v12_key_resolves(self, key: str) -> None:
@@ -541,15 +541,17 @@ class TestPreV12Compatibility:
         assert len(theme) >= 1
 
     def test_no_legacy_suffixed_key(self) -> None:
-        """No key ends with the retired legacy suffix (COMPAT-02 retired)."""
+        """No key ends with the retired legacy suffix."""
         for name in ThemeLibrary.get_available_themes():
             assert not name.endswith("_legacy")
 
 
 class TestRenamePairs:
-    """COMPAT-03: renamed themes answer to both names, with the old key
-    carrying the target's palette, display name and category but its own
-    slug — the one piece of identity that actually changed (D-14)."""
+    """Renamed themes answer to both names, with the old key carrying the
+
+    target's palette, display name and category but its own slug, the one
+    piece of identity that actually changed.
+    """
 
     def test_aurora_borealis_resolves_to_aurora(self) -> None:
         """aurora_borealis returns aurora's palette under the old key."""
@@ -573,7 +575,7 @@ class TestRenamePairs:
 
 
 class TestResyncedPalettes:
-    """THEME-03: the resynced shared slugs carry app values."""
+    """The resynced shared slugs carry app values."""
 
     def test_soothing_contains_kelvin_8000(self) -> None:
         """soothing carries kelvin 8000 (pre-6.3.0 was uniformly 3500)."""
@@ -595,7 +597,7 @@ class TestMutationIsolation:
 
 
 class TestKeyErrorMessage:
-    """The shortened KeyError (THEME-01 empty edge)."""
+    """The shortened KeyError."""
 
     def test_unknown_name_and_pointer_present(self) -> None:
         """The error carries the requested name and the listing pointer."""
@@ -617,7 +619,7 @@ class TestKeyErrorMessage:
 
 
 class TestLibrarySweeps:
-    """Invariant sweeps over the runtime listing (D-15, META-01, META-02)."""
+    """Invariant sweeps over the runtime listing."""
 
     def test_every_key_is_identifier(self) -> None:
         """Every key in get_available_themes() passes str.isidentifier()."""
@@ -625,7 +627,7 @@ class TestLibrarySweeps:
             assert name.isidentifier()
 
     def test_every_listed_key_resolves(self) -> None:
-        """The listing names exactly what get() accepts (D-15)."""
+        """The listing names exactly what get() accepts."""
         for name in ThemeLibrary.get_available_themes():
             assert isinstance(ThemeLibrary.get(name), Theme)
 
@@ -646,18 +648,20 @@ class TestLibrarySweeps:
             assert ThemeLibrary.get(key).category in LIBRARY_CATEGORIES
 
     def test_canonical_palette_order(self) -> None:
-        """Every served palette is sorted by its uint16 tuple (D-24)."""
+        """Every served palette is sorted by its uint16 tuple."""
         for key in ThemeLibrary.get_available_themes():
             palette = [color.as_tuple() for color in ThemeLibrary.get(key)]
             assert palette == sorted(palette)
 
 
 class TestDispositionSurfacing:
-    """COMPAT-04: dispositions surface on get() and the shipped data holds
-    its shape invariants (shape sweeps, never count pins — D-08/D-23)."""
+    """Dispositions surface on get() and the shipped data holds its shape
+
+    invariants (shape sweeps, never count pins).
+    """
 
     def test_fire_is_deprecated_with_replacement(self) -> None:
-        """get('fire') carries the SPEC R5 pinned deprecation triple."""
+        """get('fire') carries the pinned deprecation triple."""
         fire = ThemeLibrary.get("fire")
 
         assert fire.disposition == "deprecated"
@@ -705,7 +709,7 @@ class TestDispositionSurfacing:
                 assert record.replaced_by in THEMES, record.slug
 
     def test_alias_is_its_own_record_sharing_the_palette(self) -> None:
-        """Each alias is a distinct record over the target's palette (R7).
+        """Each alias is a distinct record over the target's palette.
 
         A shared record would make the alias report the target's fate, so
         the two keys whose name actually changed would be the only ones

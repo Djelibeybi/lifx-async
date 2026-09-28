@@ -1871,7 +1871,7 @@ class TestDiscoverPrivateLifxServices:
 
     @pytest.mark.asyncio
     async def test_duplicate_responses_reset_idle_deadline(self) -> None:
-        """Duplicate announcements must reset the idle timer before dedup (D-04).
+        """Duplicate announcements must reset the idle timer before dedup.
 
         mark_response() must be called for every valid LIFX response —
         including duplicates of an already-seen serial — so a re-announcement
@@ -1928,7 +1928,7 @@ class TestDiscoverPrivateLifxServices:
 
     @pytest.mark.asyncio
     async def test_discover_network_error_does_not_propagate(self) -> None:
-        """Test that LifxNetworkError breaks the loop without propagating (D-08)."""
+        """Test that LifxNetworkError breaks the loop without propagating."""
         with patch(
             "lifx.network.discovery.mdns.discovery.MdnsTransport"
         ) as mock_transport_cls:
@@ -1946,7 +1946,7 @@ class TestDiscoverPrivateLifxServices:
 
     @pytest.mark.asyncio
     async def test_discover_unexpected_error_propagates(self) -> None:
-        """Test that unexpected receive exceptions are logged and re-raised (D-08)."""
+        """Test that unexpected receive exceptions are logged and re-raised."""
         with patch(
             "lifx.network.discovery.mdns.discovery.MdnsTransport"
         ) as mock_transport_cls:
@@ -3420,7 +3420,7 @@ class TestLifxRecordCacheByteBounds:
         assert cache.records_for(instance, 33)
 
     def test_byte_limits_do_not_change_address_identity_limits(self) -> None:
-        """D-15 count ceilings remain independent of retained-byte pressure."""
+        """Count ceilings remain independent of retained-byte pressure."""
         owner_cache = _LifxRecordCache()
         owner_cache.add_packet(
             [
@@ -3924,7 +3924,7 @@ class TestLifxRecordCachePendingTargets:
     def test_pending_targets_refuses_a_target_the_address_guards_reject(
         self,
     ) -> None:
-        """Closes D-04's residual for the two guard terms this class misses.
+        """Covers the two guard terms this class otherwise misses.
 
         The per-owner-overflow term is already covered at
         `test_address_owner_overflow_fails_closed_without_selecting_a_subset`.

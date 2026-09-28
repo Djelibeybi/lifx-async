@@ -24,8 +24,8 @@ def test_aurora_generate_frame_128px(benchmark) -> None:  # type: ignore[no-unty
 
     LIFX Ceiling Capsule configuration. Measures HSBK object construction
     cost: 128 HSBK objects created per call. At 30 FPS: ~3,840 objects/sec
-    per device. Phase 3 will add generate_protocol_frame() to bypass this
-    (PERF-C1).
+    per device. Compare against test_aurora_protocol_frame_128px, which
+    bypasses this cost via generate_protocol_frame().
     """
     effect = EffectAurora()
     ctx = FrameContext(
@@ -43,7 +43,7 @@ def test_aurora_generate_frame_320px(benchmark) -> None:  # type: ignore[no-unty
     """Benchmark EffectAurora.generate_frame() for a 5-tile canvas (5×8×8=320px).
 
     Multi-tile LIFX Tile setup. 320 HSBK objects created per call.
-    At 30 FPS: ~9,600 objects/sec per device (PERF-C1).
+    At 30 FPS: ~9,600 objects/sec per device.
     """
     effect = EffectAurora()
     ctx = FrameContext(

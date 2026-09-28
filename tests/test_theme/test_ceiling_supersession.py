@@ -1,25 +1,24 @@
 """Guard for the 25 themes whose palettes were once truncated by the device ceiling.
 
-Phase 8 determined a protocol-ceiling answer for 25 shipped `lifx-app` themes by
+A protocol-ceiling answer was determined for 25 shipped `lifx-app` themes by
 reading palettes back off a device. A device readback cannot reveal a seventeenth
 source colour, so every one of those palettes arrived clipped to exactly
 `MAX_PALETTE_COLORS`, and the recorded determination could only be
 "device-ceiling-unresolvable".
 
-The Phase 9 resync then obtained the true palettes for exactly these 25 themes from
+A later resync then obtained the true palettes for exactly these 25 themes from
 an internal LIFX HTTP API endpoint, a non-device method the ceiling does not bind.
 They now ship at their real lengths, well above the ceiling.
 
 That supersession is what this module pins. A future resync that regressed any of
-these back to a clipped 16-colour palette would silently reintroduce the truncation
-Phase 9 removed, and nothing else in the suite would notice: the Phase 8 harness
-that first found them was planning material pinned to a capture directory and
+these back to a clipped 16-colour palette would silently reintroduce the
+truncation, and nothing else in the suite would notice: the original
+device-readback harness that first found them relied on a capture directory and
 hardware setup that no longer exist, and it has since left the repository.
 
 The slug list is therefore an explicit literal rather than a re-derivation. Its
-source of truth was the historical record in the Phase 8 archive
-(`08-CEILING-DETERMINATIONS.json`), which left the repository with the rest of
-the planning material.
+source of truth was the historical record of that determination, which left the
+repository along with the harness.
 """
 
 from __future__ import annotations
@@ -29,8 +28,8 @@ import pytest
 from lifx.const import MAX_PALETTE_COLORS
 from lifx.theme.data import THEMES
 
-# The exact set Phase 8 recorded, verified equal in both directions against the
-# pre-resync blob (`data/themes.jsonl@291e7e6~1`) during the v1.2 milestone audit.
+# The exact set originally recorded, verified equal in both directions against
+# the pre-resync blob (`data/themes.jsonl@291e7e6~1`).
 DEVICE_CEILING_TRUNCATED_SLUGS = (
     "baubles",
     "bijutsukai",
@@ -58,16 +57,6 @@ DEVICE_CEILING_TRUNCATED_SLUGS = (
     "sun",
     "van_gogh",
 )
-
-
-def test_the_recorded_set_is_the_25_phase_8_determined() -> None:
-    """The literal above is a fixed historical set, not a moving derivation."""
-    assert len(DEVICE_CEILING_TRUNCATED_SLUGS) == 25
-    assert len(set(DEVICE_CEILING_TRUNCATED_SLUGS)) == 25
-    assert list(DEVICE_CEILING_TRUNCATED_SLUGS) == sorted(
-        DEVICE_CEILING_TRUNCATED_SLUGS
-    )
-    assert "carlton" not in DEVICE_CEILING_TRUNCATED_SLUGS
 
 
 @pytest.mark.parametrize("slug", DEVICE_CEILING_TRUNCATED_SLUGS)

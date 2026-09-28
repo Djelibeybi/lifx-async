@@ -1055,8 +1055,8 @@ class TestAddressEntryPointGate:
     All three delegate to :func:`lifx.network.address.validate_address`, so
     what is asserted here is that each one calls it, and calls it *before*
     building anything. A zone-less IPv6 link-local address is the case that
-    motivated the gate (IPV6-02): the branch logged a warning and carried
-    on, so the caller paid a full silent request timeout for a permanent
+    motivated the gate: the branch used to log a warning and carry on, so
+    the caller paid a full silent request timeout for a permanent
     configuration error.
 
     The elapsed-time assertions are deliberately loose. They are not
@@ -1365,7 +1365,7 @@ class TestAddressEntryPointGate:
             Device(serial=self.SERIAL, ip=ip)
 
     def test_serial_and_port_checks_are_untouched(self) -> None:
-        """The non-address checks stay exactly where they were (D-05)."""
+        """The non-address checks stay exactly where they were."""
         with pytest.raises(ValueError, match="all zeros"):
             Device(serial="000000000000", ip="192.168.1.10")
 

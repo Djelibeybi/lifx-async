@@ -437,19 +437,16 @@ class TestAnimatorSendFrame:
 
 
 class TestAnimatorStatsFlowFields:
-    """RED: additive AnimatorStats fields for ANIM-02 flow-control observability.
+    """Tests for the additive AnimatorStats flow-control observability fields.
 
-    `lifx.animation.flow` (from plan 04-02 Task 2) does not exist yet and
-    AnimatorStats doesn't carry these fields yet -- `getattr(..., default)`
-    keeps attribute access pyright-clean while pinning the RED assertion
-    (mirrors the 04-01 `getattr`-sentinel deviation pattern).
+    `getattr(..., default)` keeps attribute access pyright-clean while the
+    fields are exercised.
     """
 
     def test_gated_and_acks_outstanding_default(self) -> None:
-        """AnimatorStats(packets_sent=1, total_time_ms=0.5) constructs today
-        (additive fields have defaults); stats.gated is False and
-        stats.acks_outstanding == 0 (research Open Question 2 -- public,
-        defaulted, cheap observability).
+        """AnimatorStats(packets_sent=1, total_time_ms=0.5) constructs with
+        the additive fields defaulted: stats.gated is False and
+        stats.acks_outstanding == 0.
         """
         stats = AnimatorStats(packets_sent=1, total_time_ms=0.5)
 
@@ -458,14 +455,13 @@ class TestAnimatorStatsFlowFields:
 
 
 class TestAnimatorProbeBaking:
-    """RED: the ack-required probe flag is baked ONCE into the correct
+    """Tests that the ack-required probe flag is baked ONCE into the correct
 
-    template at Animator construction time (D4-01/D4-03), selected by
+    template at Animator construction time, selected by
     `PacketGenerator.probe_template_index` (default 0 = first packet;
-    large-tile mode = final CopyFrameBuffer, D4-04). FLAGS_OFFSET=22,
-    ACK_REQUIRED_FLAG=0x02 are hardcoded here (not imported) because
-    `packets.py` doesn't define those constants yet either -- importing
-    them would break this file's collection.
+    large-tile mode = final CopyFrameBuffer). FLAGS_OFFSET=22,
+    ACK_REQUIRED_FLAG=0x02 are hardcoded here (not imported from
+    `packets.py`) to keep this file's assertions self-contained.
     """
 
     def test_standard_matrix_bakes_flag_on_first_template(self) -> None:
@@ -490,9 +486,8 @@ class TestAnimatorProbeBaking:
     def test_large_tile_bakes_flag_only_on_final_copyfb_template(self) -> None:
         """13x26 large-tile: only the FINAL template (the CopyFrameBuffer,
         `probe_template_index`) carries the flag; every other template's
-        flags byte stays 0. Depends on the 04-03 row-aligned chunking fix
-        for the exact template count/index (7 Set64 + 1 CopyFB = index 7);
-        RED either way today since nothing bakes the flag yet.
+        flags byte stays 0. The row-aligned chunking produces 7 Set64
+        packets plus 1 CopyFB, so the flagged template is index 7.
         """
         framebuffer = FrameBuffer(pixel_count=338)
         packet_generator = MatrixPacketGenerator(
@@ -526,12 +521,11 @@ class TestAnimatorProbeBaking:
 
 
 class TestAnimatorGating:
-    """RED: gate-before-framebuffer, latest-frame-wins drop, probe tracking
+    """Tests for `send_frame`'s gate-before-framebuffer, latest-frame-wins
 
-    and expiry contract for `send_frame` (ANIM-01, D4-01, D4-02, Pitfall 7).
-    Uses `mock_udp_socket` with no acks queued unless a test explicitly
-    queues one; the 8x8 fixture animator sends 1 packet/frame, so frame N
-    tracks probe sequence N-1.
+    drop, probe tracking and expiry contract. Uses `mock_udp_socket` with no
+    acks queued unless a test explicitly queues one; the 8x8 fixture
+    animator sends 1 packet/frame, so frame N tracks probe sequence N-1.
     """
 
     @pytest.fixture
@@ -555,7 +549,8 @@ class TestAnimatorGating:
     ) -> None:
         """Frames 1 and 2 send (gated False, outstanding 1 then 2); frame 3
         is dropped before any packet is queued -- gated True, packets_sent
-        0, sendto call_count unchanged (D4-01 gate-at-2, latest-frame-wins).
+        0, sendto call_count unchanged (the gate saturates at 2 outstanding
+        probes and drops with latest-frame-wins semantics).
         """
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
 
@@ -599,10 +594,8 @@ class TestAnimatorGating:
         self, animator: Animator, mock_udp_socket: MockUdpSocket
     ) -> None:
         """The length-mismatch ValueError takes precedence over the gate
-        check (Pitfall 7): a saturated gate must not suppress input
-        validation. Passes today (framebuffer.apply already raises first);
-        must keep passing once 04-04 moves the explicit length check ahead
-        of the gate.
+        check: a saturated gate must not suppress input validation, so the
+        explicit length check runs ahead of the gate.
         """
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
         animator.send_frame(hsbk)
@@ -664,8 +657,7 @@ class TestAnimatorGating:
         self, animator: Animator, mock_udp_socket: MockUdpSocket
     ) -> None:
         """An ack matching the tracked sequence but from a different uint32
-        source must never unlatch the gate (T-04-03 -- worst case equals
-        today's blind-fire baseline).
+        source must never unlatch the gate.
         """
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
 
@@ -684,7 +676,7 @@ class TestAnimatorGating:
         self, animator: Animator, mock_udp_socket: MockUdpSocket
     ) -> None:
         """After ACK_EXPIRY_SECONDS with zero acks received, the oldest probe
-        expires and the gate reopens on its own (zero retransmits, D4-01).
+        expires and the gate reopens on its own with zero retransmits.
         Patches `time.monotonic` on the animator module (the project's
         runtime-read idiom) to control elapsed time deterministically.
         """
@@ -721,7 +713,7 @@ class TestAnimatorGating:
         self, animator: Animator, mock_udp_socket: MockUdpSocket
     ) -> None:
         """Sent frames report `acks_outstanding` including their own probe:
-        1 after the first frame, 2 after the second (ANIM-02 observability).
+        1 after the first frame, 2 after the second.
         """
         hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * 64
 
@@ -732,10 +724,9 @@ class TestAnimatorGating:
         assert getattr(stats2, "acks_outstanding", None) == 2
 
     def test_send_frame_has_no_flow_control_toggle(self, animator: Animator) -> None:
-        """D4-02 no-toggle guard: send_frame accepts exactly one positional
-        argument (hsbk) with no flow-control parameter, and the internal
-        AckGate facility is never exported from `lifx.animation.__init__`.
-        Passes today and must stay green -- the no-toggle invariant.
+        """send_frame accepts exactly one positional argument (hsbk) with no
+        flow-control parameter, and the internal AckGate facility is never
+        exported from `lifx.animation.__init__`.
         """
         sig = inspect.signature(animator.send_frame)
         assert list(sig.parameters) == ["hsbk"]
@@ -955,7 +946,7 @@ class TestAnimatorForMatrixIntegration:
 
                 stats = animator.send_frame(hsbk)
                 total_packets += stats.packets_sent
-                # Observe gating rather than mask it (Pitfall 3): the
+                # Observe gating rather than mask it: the
                 # localhost emulator acks fast enough that a lengthened
                 # inter-frame sleep should never actually gate a frame.
                 assert getattr(stats, "gated", None) is False
@@ -1035,7 +1026,7 @@ class TestAnimatorForMultizoneIntegration:
 
                 stats = animator.send_frame(hsbk)
                 total_packets += stats.packets_sent
-                # Observe gating rather than mask it (Pitfall 3): the
+                # Observe gating rather than mask it: the
                 # localhost emulator acks fast enough that a lengthened
                 # inter-frame sleep should never actually gate a frame.
                 assert getattr(stats, "gated", None) is False
@@ -1053,9 +1044,9 @@ class TestAnimatorForMultizoneIntegration:
 class TestAnimatorFlowControlIntegration:
     """Deterministic end-to-end gating via ack-drop scenarios and explicit
 
-    expiry sleeps -- zero reliance on ack RTT races (research Pitfall 4).
-    Gating is forced only via `drop_packets` scenarios; the only sleeps
-    below are the 1.05s expiry sleep and fixed localhost drain sleeps.
+    expiry sleeps, with zero reliance on ack RTT races. Gating is forced
+    only via `drop_packets` scenarios; the only sleeps below are the 1.05s
+    expiry sleep and fixed localhost drain sleeps.
     """
 
     async def test_gating_deterministic_when_acks_dropped(

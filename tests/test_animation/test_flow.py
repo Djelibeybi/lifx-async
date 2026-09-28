@@ -1,9 +1,7 @@
-"""RED branch-matrix suite pinning the AckGate flow-control contract.
+"""Branch-matrix suite pinning the AckGate flow-control contract.
 
-`src/lifx/animation/flow.py` does not exist yet -- importing it below fails
-at collection, which is this file's intended RED. This suite defines GREEN
-for plan 04-04 Task 1: the exact `AckGate` API (constants, `track`, `sweep`,
-`reset`, `gated`, `outstanding_count`) that the animator's gate-before-frame
+Covers the exact `AckGate` API (constants, `track`, `sweep`, `reset`,
+`gated`, `outstanding_count`) that the animator's gate-before-frame
 contract depends on.
 
 All timing uses explicit `now` float arguments -- no sleeps anywhere.
@@ -24,7 +22,7 @@ SOURCE = 0x12AB34CD
 
 
 class TestAckGateConstants:
-    """Pins the spike-003-measured tuning constants (D4-01)."""
+    """Pins the spike-003-measured tuning constants."""
 
     def test_constants_have_spike_measured_values(self) -> None:
         """ACK_PKT_TYPE=45, ACK_INFLIGHT_LIMIT=2, ACK_EXPIRY_SECONDS=1.0."""
@@ -57,9 +55,9 @@ class TestAckGateState:
         assert gate.gated is True
 
     def test_track_wrap_collision_overwrites(self) -> None:
-        """A sequence-number collision overwrites the stale entry (D4-01:
+        """A sequence-number collision overwrites the stale entry: the gate
 
-        errs towards sending, never towards stalling -- self-healing).
+        errs towards sending, never towards stalling -- self-healing.
         """
         gate = AckGate()
 

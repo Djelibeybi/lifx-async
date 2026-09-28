@@ -673,7 +673,7 @@ class TestMdnsTransportIsOpen:
 
 
 class TestMdnsTransportOpenFailureIsClean:
-    """A partway-failed open() must leave nothing behind (IPV6-04, SPEC R4).
+    """A partway-failed open() must leave nothing behind.
 
     Two distinct leaks live here. The obvious one is the descriptor: the
     socket is created, bound and configured before ``create_datagram_endpoint``
@@ -852,7 +852,7 @@ class TestMdnsTransportOpenFailureIsClean:
 
 
 class TestMdnsTransportOpenConcurrency:
-    """Concurrent lifecycle operations preserve one coherent state (SPEC R4)."""
+    """Concurrent lifecycle operations preserve one coherent state."""
 
     @pytest.mark.asyncio
     async def test_concurrent_opens_build_exactly_one_endpoint(self) -> None:

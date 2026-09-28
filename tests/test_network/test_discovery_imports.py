@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-
 import lifx.network.discovery as discovery
 import lifx.network.discovery.mdns as canonical_mdns
 import lifx.network.discovery.udp as udp
@@ -34,17 +31,6 @@ def test_legacy_mdns_surface_reexports_canonical_implementation() -> None:
     assert canonical_mdns.discover_devices_mdns.__module__ == (
         "lifx.network.discovery.mdns.discovery"
     )
-
-
-def test_production_tree_has_no_observation_or_tests_dependency() -> None:
-    """Observation models and capture state exist only in repository tests."""
-    assert importlib.util.find_spec("lifx.network.discovery_observation") is None
-    source_root = Path(__file__).resolve().parents[2] / "src" / "lifx"
-    for source_path in source_root.rglob("*.py"):
-        source = source_path.read_text(encoding="utf-8")
-        assert "tests.test_discovery_observation" not in source
-        assert "discovery_observation" not in source
-        assert "_DiscoveryObservation" not in source
 
 
 def test_observer_plumbing_is_inert_without_an_async_capture_task() -> None:

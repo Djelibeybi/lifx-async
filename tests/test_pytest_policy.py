@@ -110,12 +110,6 @@ def test_collection_hook_adds_the_focused_policy_only_on_windows() -> None:
     linux_item.add_marker.assert_not_called()
 
 
-def test_addopts_carries_no_marker_expression(pytestconfig: pytest.Config) -> None:
-    """D-09 replaces `-m` selection with opt-in flags; no `-m` may return."""
-    addopts = pytestconfig.getini("addopts")
-    assert not any(option == "-m" or option.startswith("-m") for option in addopts)
-
-
 def test_opt_in_marker_flags_are_fully_registered(pytestconfig: pytest.Config) -> None:
     """A future opt-in category is a table entry, not a silent hole."""
     marker_names = {

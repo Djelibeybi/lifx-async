@@ -213,7 +213,7 @@ class TestMoveBuilderRoundTrip:
 
 
 class TestMoveBuilderValidation:
-    """Every R4 direction, boundary, precision and type rule on move()."""
+    """Every direction, boundary, precision and type rule on move()."""
 
     @pytest.mark.parametrize(
         ("direction", "expected"),
@@ -342,7 +342,7 @@ class TestMoveBuilderValidation:
 
 
 class TestDirectionSetterWidening:
-    """The direction setter shares move()'s parsing rule (D-09)."""
+    """The direction setter shares move()'s parsing rule."""
 
     def test_setter_accepts_case_insensitive_name(self) -> None:
         effect = MultiZoneEffect(FirmwareEffect.MOVE, 5000)
@@ -360,7 +360,7 @@ class TestDirectionSetterWidening:
             effect.direction = "sideways"  # type: ignore[assignment]
 
     def test_setter_rejects_bare_int(self) -> None:
-        """D-09's deliberate narrowing: the old setter stored any int unchecked."""
+        """Deliberate narrowing: the old setter stored any int unchecked."""
         effect = MultiZoneEffect(FirmwareEffect.MOVE, 5000)
         with pytest.raises(ValueError, match="forward"):
             effect.direction = 1  # type: ignore[assignment]
@@ -486,7 +486,7 @@ class TestDocumentedMoveExamples:
 
 @pytest.mark.emulator
 class TestSetMoveEffectEmulator:
-    """set_move_effect() paints a single-colour strip before Move starts (R9)."""
+    """set_move_effect() paints a single-colour strip before Move starts."""
 
     async def test_single_colour_strip_is_painted_then_moved(
         self,
@@ -555,7 +555,7 @@ class TestSetMoveEffectEmulator:
 
 @pytest.mark.emulator
 class TestSetMoveEffectPalette:
-    """Explicit palettes, multi-colour strips and the timeout fallback (R9)."""
+    """Explicit palettes, multi-colour strips and the timeout fallback."""
 
     @pytest.mark.parametrize("bad_palette", [[], [Colors.RED] * 17])
     async def test_explicit_bad_palette_raises_with_no_packet(
@@ -717,7 +717,7 @@ class TestSetMoveEffectPalette:
 
 @pytest.mark.emulator
 class TestRawPathPaintsNothing:
-    """The raw set_effect(MultiZoneEffect) path reads and paints nothing (R6/R9)."""
+    """The raw set_effect(MultiZoneEffect) path reads and paints nothing."""
 
     async def test_raw_set_effect_sends_only_set_effect_and_zones_unchanged(
         self,
@@ -749,7 +749,7 @@ class TestRawPathPaintsNothing:
 
 
 class TestSetMoveEffectErrors:
-    """Error propagation from set_move_effect(), mock and emulator (R5)."""
+    """Error propagation from set_move_effect(), mock and emulator."""
 
     @pytest.mark.emulator
     async def test_state_unhandled_comes_from_set_effect(

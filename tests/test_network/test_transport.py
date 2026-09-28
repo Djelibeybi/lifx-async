@@ -720,7 +720,7 @@ class TestEndpointLoss:
 
 
 class TestSocketFamilySelection:
-    """The socket family follows the local bind address (IPV6-03, B9).
+    """The socket family follows the local bind address.
 
     ``open()`` no longer decides this for itself: it asks
     :func:`lifx.network.address.family_for`, the one shared rule. Both arms
@@ -882,7 +882,7 @@ class TestSocketFamilySelection:
 
 
 class TestSendFamilyAssertion:
-    """A destination of the wrong family must fail loudly, not silently (B1).
+    """A destination of the wrong family must fail loudly, not silently.
 
     Sending an IPv6 literal down an ``AF_INET`` socket raises
     :class:`socket.gaierror`, an ``OSError`` subclass, which asyncio hands to
@@ -910,7 +910,7 @@ class TestSendFamilyAssertion:
         datagram_transport.sendto.assert_not_called()
 
     async def test_ipv6_destination_on_an_ipv4_socket_raises_immediately(self) -> None:
-        """The B1 case: an IPv6 target reached through the IPv4 seam."""
+        """An IPv6 target reached through the IPv4 seam."""
         transport, datagram_transport, _ = await _open_mock_transport("0.0.0.0")
 
         started = time.perf_counter()

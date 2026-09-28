@@ -119,7 +119,7 @@ class TestMdnsParserAdversarial:
             parse_name(data, 0)
 
     def test_malformed_utf8_in_label(self) -> None:
-        """Malformed UTF-8 bytes in DNS label must not crash (T-H2).
+        """Malformed UTF-8 bytes in DNS label must not crash.
 
         Parser should use errors='replace' and return a string with
         replacement characters instead of raising UnicodeDecodeError.

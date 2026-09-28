@@ -1,9 +1,9 @@
-"""Tests for the escalating GetService re-broadcast schedule (DISC-01, DISC-02).
+"""Tests for the escalating GetService re-broadcast schedule.
 
-Covers the behavioural branch matrix from 02-RESEARCH.md Validation Architecture:
-schedule timing, window capping, schedule exhaustion, quiet-slice continue with
-both idle and overall exits, no-mark_response-on-send, multi-send loop passes,
-message/source reuse across re-sends, and dedup across broadcasts.
+Covers schedule timing, window capping, schedule exhaustion, quiet-slice
+continue with both idle and overall exits, no-mark_response-on-send,
+multi-send loop passes, message/source reuse across re-sends, and dedup
+across broadcasts.
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ from tests.test_network.test_discovery_errors import _build_state_service_packet
 def _make_quiet_receive() -> AsyncMock:
     """Build a receive mock that honours the requested slice before timing out.
 
-    Must sleep for the requested timeout before raising — with the new
-    continue-on-timeout loop, an instantly-raising receive would hot-spin
-    the loop until a deadline fires (02-RESEARCH.md Pitfall 6).
+    Must sleep for the requested timeout before raising. With the
+    continue-on-timeout loop, an instantly-raising receive would otherwise
+    hot-spin the loop until a deadline fires.
     """
 
     async def _quiet_receive(timeout: float = 2.0):
@@ -69,7 +69,7 @@ class TestRebroadcastSchedule:
     @pytest.mark.asyncio
     async def test_two_sends_at_first_gap_within_window(self) -> None:
         """Real (unpatched) gaps: a 1.0 s window yields exactly 2 sends,
-        the second at ~0.6 s after the first (DISC-01 schedule timing)."""
+        the second at ~0.6 s after the first."""
         send_times: list[float] = []
 
         with (
@@ -279,7 +279,7 @@ class TestRebroadcastSchedule:
 
 
 class TestRebroadcastDedup:
-    """DISC-02: duplicate StateService responses across re-broadcasts dedup."""
+    """Duplicate StateService responses across re-broadcasts dedup."""
 
     @pytest.mark.asyncio
     async def test_same_serial_across_broadcasts_yields_once(self) -> None:
@@ -500,7 +500,7 @@ class TestConsumerIdleWindow:
 
 @pytest.mark.emulator
 class TestRebroadcastEmulator:
-    """DISC-02 integration: dedup holds across a real re-broadcast window."""
+    """Integration test: dedup holds across a real re-broadcast window."""
 
     @pytest.mark.asyncio
     async def test_emulator_dedup_across_rebroadcast_window(

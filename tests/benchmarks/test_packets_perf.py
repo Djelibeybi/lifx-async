@@ -30,7 +30,7 @@ def test_matrix_update_colors_64px(benchmark) -> None:  # type: ignore[no-untype
     """Benchmark MatrixPacketGenerator.update_colors for a 64px tile (8×8).
 
     Per-frame color flattening cost: 64 iterations building a 256-element
-    flat list, then a single struct.pack_into call (PERF-H2).
+    flat list, then a single struct.pack_into call.
     """
     gen = MatrixPacketGenerator(tile_count=1, tile_width=8, tile_height=8)
     templates = gen.create_templates(SOURCE, TARGET)
@@ -45,7 +45,7 @@ def test_matrix_update_colors_128px(benchmark) -> None:  # type: ignore[no-untyp
     LIFX Ceiling Capsule configuration. Large tile mode generates 3 templates:
     2× Set64 packets into the temp frame buffer + 1× CopyFrameBuffer to display.
     update_colors skips the CopyFrameBuffer packet (color_count == 0) and
-    iterates over the 2 color-bearing templates × 64px each (PERF-H2).
+    iterates over the 2 color-bearing templates × 64px each.
     """
     gen = MatrixPacketGenerator(tile_count=1, tile_width=16, tile_height=8)
     templates = gen.create_templates(SOURCE, TARGET)
@@ -58,7 +58,7 @@ def test_multizone_update_colors_82(benchmark) -> None:  # type: ignore[no-untyp
     """Benchmark MultiZonePacketGenerator.update_colors for an 82-zone strip.
 
     Single SetExtendedColorZones packet: 82 iterations building a 328-element
-    flat list before packing (PERF-H2).
+    flat list before packing.
     """
     gen = MultiZonePacketGenerator(zone_count=82)
     templates = gen.create_templates(SOURCE, TARGET)
@@ -72,7 +72,7 @@ def test_multizone_update_colors_120(benchmark) -> None:  # type: ignore[no-unty
 
     LIFX Neon configuration. Requires 2 SetExtendedColorZones packets
     (82 zones + 38 zones). Each packet flattens its zone slice independently
-    before packing (PERF-H2).
+    before packing.
     """
     gen = MultiZonePacketGenerator(zone_count=120)
     templates = gen.create_templates(SOURCE, TARGET)
@@ -84,8 +84,8 @@ def test_multizone_update_colors_120(benchmark) -> None:  # type: ignore[no-unty
 def test_matrix_create_templates_5_tile(benchmark) -> None:  # type: ignore[no-untyped-def]
     """Benchmark MatrixPacketGenerator.create_templates for a 5-tile device.
 
-    One-time init-time cost. Establishing a baseline ensures Phase 2
-    optimizations do not regress template creation.
+    One-time init-time cost. Establishing a baseline guards against future
+    optimisations regressing template creation.
     """
     gen = MatrixPacketGenerator(tile_count=5, tile_width=8, tile_height=8)
     benchmark(gen.create_templates, SOURCE, TARGET)
