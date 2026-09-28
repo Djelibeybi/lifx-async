@@ -228,6 +228,17 @@ async with await MirrorLight.from_ip(
 The file is keyed by device serial and written atomically, so several devices
 can share one file.
 
+## Firmware Effects
+
+The Mirror is the only product that runs the COLOR_SWEEP firmware effect,
+alongside MORPH and FLAME. With no palette, COLOR_SWEEP sweeps through
+colour temperatures, which is intended for checking makeup; with a palette
+it sweeps through the palette colours instead. While it runs, `get_effect()`
+reports COLOR_SWEEP with the speed and palette sent, but the device keeps
+reporting its underlying tile colours from `get_all_tile_colors()`, not the
+colours it is actually displaying. See [`MatrixLight.set_effect()`](../api/devices.md#matrix-light)
+for details.
+
 ## Whole-Device Operations
 
 `set_power()` and `set_color()` still act on the entire fixture. Both keep the

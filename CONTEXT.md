@@ -30,10 +30,18 @@ An effect built into the library. The library computes each frame and streams it
 to the light for as long as the effect runs. It draws on a whole light.
 
 **Firmware effect**:
-An effect built into the light, such as Morph, Flame, Sky or Move. The light runs
-it without any software, and some lights, such as the Mirror and Luna, can start
-and cycle through them from a button. It always covers the whole light. _Avoid_:
-built-in effect (both kinds are built in, to different things).
+An effect built into the light: Move on strips, Morph and Flame on matrix lights,
+Sky on matrix lights with recent firmware, and Color Sweep on the Mirror. The light runs it without any software,
+and some lights, such as the Mirror and Luna, can start and cycle through them
+from a button. It always covers the whole light. Flame always means the firmware
+effect; the software effect with a similar look is Flicker. _Avoid_: built-in
+effect (both kinds are built in, to different things).
+
+**Waveform**:
+A transition the light performs from one waveform command: it swings between its
+current colour and a target colour in a set shape (saw, sine, half-sine, triangle
+or pulse) for a set period and number of cycles. Breathe and pulse are waveforms.
+_Avoid_: effect (a waveform is neither a software nor a firmware effect).
 
 **Effect participant**:
 A light that a software effect draws on. One effect can draw on several

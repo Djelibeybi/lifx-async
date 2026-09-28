@@ -10,7 +10,7 @@ This reference guide provides comprehensive documentation for all effect classes
 - [LIFXEffect (Base Class)](#lifxeffect-base-class)
 - [FrameEffect (Base Class)](#frameeffect-base-class)
 - [EffectRegistry](#effectregistry)
-- [Effects](#effects) — all built-in effects listed alphabetically
+- [Effects](#effects): all software effects listed alphabetically
 
 ## Conductor
 
@@ -376,7 +376,7 @@ registry = get_effect_registry()
 
 ### `get_effect_registry() -> EffectRegistry`
 
-Returns the default registry pre-populated with all built-in effects. Lazily initialized on first call.
+Returns the default registry pre-populated with all software effects. Lazily initialized on first call.
 
 ### EffectRegistry Methods
 
@@ -417,8 +417,8 @@ Get effects compatible with a device type category.
 ```python
 @dataclass(frozen=True)
 class EffectInfo:
-    name: str                                        # e.g. "flame"
-    effect_class: type[LIFXEffect]                   # e.g. EffectFlame
+    name: str                                        # e.g. "flicker"
+    effect_class: type[LIFXEffect]                   # e.g. EffectFlicker
     description: str                                 # Human-readable one-liner
     device_support: dict[DeviceType, DeviceSupport]  # Per-type support
 ```
@@ -433,7 +433,7 @@ class EffectInfo:
 | double_slit | — | RECOMMENDED | — |
 | embers | COMPATIBLE | RECOMMENDED | — |
 | fireworks | — | RECOMMENDED | — |
-| flame | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| flicker | RECOMMENDED | RECOMMENDED | RECOMMENDED |
 | jacobs_ladder | — | RECOMMENDED | — |
 | newtons_cradle | — | RECOMMENDED | — |
 | pendulum_wave | — | RECOMMENDED | — |
@@ -478,7 +478,7 @@ for info, support in registry.get_effects_for_device(my_light):
 
 ## Effects
 
-All built-in effect classes, listed alphabetically. Effects adapted from [pkivolowitz/lifx](https://github.com/pkivolowitz/lifx) by Perry Kivolowitz are noted in their docstrings.
+All software effect classes, listed alphabetically. Effects adapted from [pkivolowitz/lifx](https://github.com/pkivolowitz/lifx) by Perry Kivolowitz are noted in their docstrings.
 
 ### EffectAurora
 
@@ -534,9 +534,13 @@ All built-in effect classes, listed alphabetically. Effects adapted from [pkivol
 
 ---
 
-### EffectFlame
+### EffectFlicker
 
-::: lifx.effects.EffectFlame
+Renamed from `EffectFlame`, which clashed with the firmware Flame effect run by matrix lights.
+`EffectFlame` remains importable as a deprecated alias, emitting a `DeprecationWarning`, until
+the next major version.
+
+::: lifx.effects.EffectFlicker
     options:
       show_source: false
       heading_level: 4

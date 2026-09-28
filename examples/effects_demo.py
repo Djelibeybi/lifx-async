@@ -13,7 +13,7 @@ Usage:
     uv run examples/effects_demo.py --ip 192.168.1.100 --effect plasma
 
     # Run a specific effect on a device by serial
-    uv run examples/effects_demo.py --serial d073d5123456 --effect flame
+    uv run examples/effects_demo.py --serial d073d5123456 --effect flicker
 
     # Cycle through all compatible effects
     uv run examples/effects_demo.py --ip 192.168.1.100 --cycle

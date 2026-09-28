@@ -368,11 +368,11 @@ Information dataclass for a single tile in the device chain. Returned as part of
 
 ### MatrixEffect
 
-Configuration dataclass for matrix effects (MORPH, FLAME, SKY). Used with `MatrixLight.set_effect()` and returned by `MatrixLight.get_effect()`.
+Configuration dataclass for firmware effects (MORPH, FLAME, SKY, COLOR_SWEEP). Used with `MatrixLight.set_effect()` and returned by `MatrixLight.get_effect()`.
 
 SKY requires the matrix capability plus host firmware 4.x or later — confirmed on Ceiling, Luna, Tube, Path and the E26 Candle. Check with `await matrix.supports_sky_effect()`; `set_effect()` raises `LifxUnsupportedCommandError` when either requirement is unmet.
 
-MORPH started with no palette builds one from the device's own colours, because the firmware does not start MORPH with an empty palette. `set_effect()` first reads the tiles with `get_all_tile_colors()`. A device showing one colour gets a generated three-colour palette, and a device showing several gets those colours (all of them in the order first seen when there are 16 or fewer, otherwise 16 pixels sampled evenly across the device). If that read times out, `set_effect()` raises `LifxTimeoutError`; if the reply is malformed, or the device reports no tile colours at all, it raises `LifxProtocolError` naming the device. Either way it sends nothing. Pass `palette=` to choose the colours yourself. FLAME and SKY with no palette send none and read nothing.
+MORPH started with no palette builds one from the device's own colours, because the firmware does not start MORPH with an empty palette. `set_effect()` first reads the tiles with `get_all_tile_colors()`. A device showing one colour gets a generated three-colour palette, and a device showing several gets those colours (all of them in the order first seen when there are 16 or fewer, otherwise 16 pixels sampled evenly across the device). If that read times out, `set_effect()` raises `LifxTimeoutError`; if the reply is malformed, or the device reports no tile colours at all, it raises `LifxProtocolError` naming the device. Either way it sends nothing. Pass `palette=` to choose the colours yourself. FLAME and SKY with no palette send none and read nothing. COLOR_SWEEP runs on the Mirror only: with no palette it sweeps through colour temperatures, and with a palette it sweeps through the palette colours instead.
 
 ::: lifx.devices.matrix.MatrixEffect
     options:
@@ -517,7 +517,7 @@ async def main():
         print(f"Controlling: {label}")
 ```
 
-### Light Effects
+### Light Waveforms
 
 ```python
 from lifx import Colors, Device
@@ -525,10 +525,10 @@ from lifx import Colors, Device
 
 async def main():
     async with await Device.connect("192.168.1.100") as light:
-        # Pulse effect
+        # Pulse waveform
         await light.pulse(Colors.RED, period=1.0, cycles=5)
 
-        # Breathe effect
+        # Breathe waveform
         await light.breathe(Colors.BLUE, period=2.0, cycles=3)
 ```
 
@@ -674,7 +674,7 @@ async def main():
         ]
         await light.set_tile_colors(colors)
 
-        # Set a tile effect (MORPH, FLAME, or SKY)
+        # Set a tile effect (MORPH, FLAME, SKY, or COLOR_SWEEP)
         await light.set_effect(
             effect_type=FirmwareEffect.FLAME,
             speed=5.0,  # seconds per cycle

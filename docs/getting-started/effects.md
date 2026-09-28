@@ -1,6 +1,6 @@
 # Light Effects
 
-lifx-async includes 25+ built-in light effects — from simple pulse and color loops to complex animations like aurora, flame, fireworks, and cellular automata. The effects framework handles state management automatically: it captures your lights' current state, runs the effect, and restores everything when done.
+lifx-async includes 25+ software effects: from simple pulse and color loops to complex animations like aurora, flicker, fireworks, and cellular automata. The effects framework handles state management automatically: it captures your lights' current state, runs the effect, and restores everything when done.
 
 ## Quick Example
 
@@ -44,14 +44,14 @@ Effects complete in different ways:
 
 - **Cycle-based** (Pulse) — completes after configured cycles
 - **Duration-based** (Sunrise, Sunset) — completes after a set duration
-- **Continuous** (ColorLoop, Rainbow, Flame, Aurora) — runs until `conductor.stop()` is called
+- **Continuous** (ColorLoop, Rainbow, Flicker, Aurora): runs until `conductor.stop()` is called
 
-## Built-in Effects
+## Software Effects
 
 | Category | Effects |
 |----------|---------|
 | **Basic** | Pulse (blink/breathe/strobe), ColorLoop, Rainbow |
-| **Ambient** | Flame, Aurora, Twinkle, Embers, Sunrise, Sunset |
+| **Ambient** | Flicker, Aurora, Twinkle, Embers, Sunrise, Sunset |
 | **Physics** | Wave, Sine, Pendulum Wave, Double Slit, Ripple, Newton's Cradle |
 | **Generative** | Rule 30, Rule Trio, Plasma, Plasma 2D, Spectrum Sweep |
 | **Visual** | Cylon, Spin, Fireworks, Jacob's Ladder, Sonar, Progress |

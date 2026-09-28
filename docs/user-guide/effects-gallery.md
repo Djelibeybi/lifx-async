@@ -56,13 +56,14 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     **Class:** `EffectFireworks` · **Best on:** Multizone
 
--   ### Flame
+-   ### Flicker
 
-    ![Flame](../assets/effects/flame.gif)
+    ![Flicker](../assets/effects/flame.gif)
 
-    Fire/candle flicker with layered sine waves and warm colors.
+    Fire/candle flicker with layered sine waves and warm colors. Renamed from `EffectFlame`,
+    which remains as a deprecated alias.
 
-    **Class:** `EffectFlame` · **Best on:** Light, Multizone, Matrix
+    **Class:** `EffectFlicker` · **Best on:** Light, Multizone, Matrix
 
 -   ### Jacob's Ladder
 

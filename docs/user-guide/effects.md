@@ -1,13 +1,13 @@
 # Light Effects Guide
 
-The Light Effects Framework provides a comprehensive system for creating and managing visual effects on LIFX devices. This guide covers all built-in effects and common patterns for using the effects system.
+The Light Effects Framework provides a comprehensive system for creating and managing visual effects on LIFX devices. This guide covers all software effects and common patterns for using the effects system.
 
 ## Overview
 
 The effects framework consists of three main components:
 
 - **Conductor**: Central orchestrator that manages effect lifecycle and state
-- **Effects**: Pre-built effect classes (Pulse, ColorLoop, Rainbow, Flame, Aurora, Progress, Sunrise/Sunset) and base class for custom effects
+- **Effects**: Pre-built effect classes (Pulse, ColorLoop, Rainbow, Flicker, Aurora, Progress, Sunrise/Sunset) and base class for custom effects
 - **Effect Registry**: Central discovery mechanism for querying available effects by device type
 - **State Management**: Automatic capture and restoration of device state before and after effects
 
@@ -124,19 +124,24 @@ async def main():
 asyncio.run(main())
 ```
 
-### Flame Effect
+### Flicker Effect
 
-The `EffectFlame` creates a warm fire/candle flicker using layered sine waves. On matrix devices, bottom rows glow hotter:
+The `EffectFlicker` creates a warm fire/candle flicker using layered sine waves. On matrix devices, bottom rows glow hotter:
+
+!!! note "Renamed from EffectFlame"
+    This software effect was renamed from `EffectFlame` to `EffectFlicker` because "Flame" is
+    the name of the firmware effect that matrix lights run themselves. `EffectFlame` remains
+    as a deprecated alias, emitting a `DeprecationWarning`, until the next major version.
 
 ```python
-from lifx.effects import EffectFlame
+from lifx.effects import EffectFlicker
 
 # Default candle flicker
-effect = EffectFlame()
+effect = EffectFlicker()
 await conductor.start(effect, lights)
 
 # Intense fast fire with wide temperature range
-effect = EffectFlame(intensity=1.0, speed=2.0, brightness=1.0)
+effect = EffectFlicker(intensity=1.0, speed=2.0, brightness=1.0)
 await conductor.start(effect, lights)
 
 await asyncio.sleep(30)
@@ -232,7 +237,7 @@ Effects complete in different ways:
 
 1. **Cycle-based** — Pulse effects complete after their configured cycles finish
 2. **Duration-based** — Sunrise and sunset effects complete after their duration expires
-3. **Manual** — Continuous effects (ColorLoop, Rainbow, Flame, Aurora, Progress) run until `conductor.stop()` is called
+3. **Manual**: continuous effects (ColorLoop, Rainbow, Flicker, Aurora, Progress) run until `conductor.stop()` is called
 
 ## Common Patterns
 
@@ -351,7 +356,7 @@ from lifx import get_effect_registry, DeviceType
 
 registry = get_effect_registry()
 
-# List all built-in effects
+# List all software effects
 for info in registry.effects:
     print(f"{info.name}: {info.description}")
 

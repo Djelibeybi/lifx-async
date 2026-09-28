@@ -500,7 +500,7 @@ class DeviceGroup:
     async def pulse(
         self, color: HSBK, period: float = 1.0, cycles: float = 1.0
     ) -> None:
-        """Pulse effect for all Light devices.
+        """Pulse waveform for all Light devices.
 
         Args:
             color: Color to pulse to

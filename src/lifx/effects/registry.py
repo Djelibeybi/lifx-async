@@ -7,6 +7,7 @@ effects based on device type.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -37,8 +38,8 @@ class EffectInfo:
     """Metadata about a registered effect.
 
     Attributes:
-        name: Effect name (e.g. "flame")
-        effect_class: The effect class (e.g. EffectFlame)
+        name: Effect name (e.g. "flicker")
+        effect_class: The effect class (e.g. EffectFlicker)
         description: Human-readable one-liner
         device_support: Per-device-type support level
     """
@@ -88,6 +89,7 @@ class EffectRegistry:
     def __init__(self) -> None:
         """Initialize an empty registry."""
         self._effects: dict[str, EffectInfo] = {}
+        self._deprecated_names: dict[str, str] = {}
 
     def register(self, info: EffectInfo) -> None:
         """Register an effect.
@@ -96,6 +98,21 @@ class EffectRegistry:
             info: Effect metadata to register
         """
         self._effects[info.name] = info
+
+    def register_deprecated_name(self, old_name: str, new_name: str) -> None:
+        """Register a deprecated alias for a currently registered effect name.
+
+        A deprecated name is resolved by :meth:`get_effect` (with a
+        ``DeprecationWarning``) but never appears in :attr:`effects` or the
+        results of :meth:`get_effects_for_device` /
+        :meth:`get_effects_for_device_type`, so UIs such as Home Assistant
+        never list it alongside its replacement.
+
+        Args:
+            old_name: The deprecated effect name
+            new_name: The current effect name it now resolves to
+        """
+        self._deprecated_names[old_name] = new_name
 
     @property
     def effects(self) -> list[EffectInfo]:
@@ -109,12 +126,25 @@ class EffectRegistry:
     def get_effect(self, name: str) -> EffectInfo | None:
         """Look up an effect by name.
 
+        A deprecated name registered via :meth:`register_deprecated_name`
+        resolves to its replacement's :class:`EffectInfo` and emits a
+        ``DeprecationWarning`` naming that replacement. An unknown name
+        returns None without warning.
+
         Args:
             name: Effect name to look up
 
         Returns:
             EffectInfo if found, None otherwise
         """
+        new_name = self._deprecated_names.get(name)
+        if new_name is not None:
+            warnings.warn(
+                f'Effect name "{name}" is deprecated; use "{new_name}" instead',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return self._effects.get(new_name)
         return self._effects.get(name)
 
     def get_effects_for_device(
@@ -163,7 +193,7 @@ _default_registry: EffectRegistry | None = None
 
 
 def get_effect_registry() -> EffectRegistry:
-    """Return the default registry pre-populated with all built-in effects.
+    """Return the default registry pre-populated with all software effects.
 
     The registry is lazily initialized on first call.
 
@@ -177,14 +207,14 @@ def get_effect_registry() -> EffectRegistry:
 
 
 def _build_default_registry() -> EffectRegistry:
-    """Build and populate the default registry with built-in effects."""
+    """Build and populate the default registry with software effects."""
     from lifx.effects.aurora import EffectAurora
     from lifx.effects.colorloop import EffectColorloop
     from lifx.effects.cylon import EffectCylon
     from lifx.effects.double_slit import EffectDoubleSlit
     from lifx.effects.embers import EffectEmbers
     from lifx.effects.fireworks import EffectFireworks
-    from lifx.effects.flame import EffectFlame
+    from lifx.effects.flicker import EffectFlicker
     from lifx.effects.jacobs_ladder import EffectJacobsLadder
     from lifx.effects.newtons_cradle import EffectNewtonsCradle
     from lifx.effects.pendulum_wave import EffectPendulumWave
@@ -210,7 +240,7 @@ def _build_default_registry() -> EffectRegistry:
         EffectInfo(
             name="pulse",
             effect_class=EffectPulse,
-            description="Pulse, blink, or breathe effect using firmware waveforms",
+            description="Pulse, blink, or breathe; sends one waveform to each light",
             device_support={
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
@@ -247,8 +277,8 @@ def _build_default_registry() -> EffectRegistry:
 
     registry.register(
         EffectInfo(
-            name="flame",
-            effect_class=EffectFlame,
+            name="flicker",
+            effect_class=EffectFlicker,
             description="Fire/candle flicker with warm organic brightness variation",
             device_support={
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
@@ -257,6 +287,7 @@ def _build_default_registry() -> EffectRegistry:
             },
         )
     )
+    registry.register_deprecated_name("flame", "flicker")
 
     registry.register(
         EffectInfo(

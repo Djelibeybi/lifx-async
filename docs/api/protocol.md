@@ -129,7 +129,7 @@ The protocol layer includes packet definitions for all LIFX message types. Major
 
 - `LightGet` / `LightState` - Get/set light state
 - `LightSetColor` - Set color with transition
-- `LightSetWaveform` - Waveform effects (pulse, breathe)
+- `LightSetWaveform` - Waveforms (pulse, breathe)
 - `LightGetPower` / `LightSetPower` / `LightStatePower` - Light power control
 - `LightGetInfrared` / `LightSetInfrared` / `LightStateInfrared` - Infrared control
 
@@ -348,10 +348,11 @@ from lifx.protocol.protocol_types import FirmwareEffect, Direction
 
 # Available firmware effects (for multizone and matrix devices)
 FirmwareEffect.OFF
-FirmwareEffect.MOVE       # MultiZone only
-FirmwareEffect.MORPH      # Tile/Matrix only
-FirmwareEffect.FLAME      # Tile/Matrix only
-FirmwareEffect.SKY        # Tile/Matrix with host firmware 4.x or later
+FirmwareEffect.MOVE         # MultiZone only
+FirmwareEffect.MORPH        # Tile/Matrix only
+FirmwareEffect.FLAME        # Tile/Matrix only
+FirmwareEffect.SKY          # Tile/Matrix with host firmware 4.x or later
+FirmwareEffect.COLOR_SWEEP  # Mirror only
 
 # Direction for MOVE effects
 Direction.FORWARD   # Move forward through zones

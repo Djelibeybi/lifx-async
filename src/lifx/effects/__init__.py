@@ -45,6 +45,7 @@ from lifx.effects.double_slit import EffectDoubleSlit
 from lifx.effects.embers import EffectEmbers
 from lifx.effects.fireworks import EffectFireworks
 from lifx.effects.flame import EffectFlame
+from lifx.effects.flicker import EffectFlicker
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.jacobs_ladder import EffectJacobsLadder
 from lifx.effects.models import PreState, RunningEffect
@@ -86,6 +87,7 @@ __all__ = [
     "EffectEmbers",
     "EffectFireworks",
     "EffectFlame",
+    "EffectFlicker",
     "EffectInfo",
     "EffectJacobsLadder",
     "EffectNewtonsCradle",

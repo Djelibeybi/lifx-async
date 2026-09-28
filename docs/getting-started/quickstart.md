@@ -208,9 +208,9 @@ purple = HSBK.from_rgb(0.5, 0.0, 0.5)
 await light.set_color(purple)
 ```
 
-### Effects
+### Waveforms
 
-Create visual effects:
+Create visual waveforms:
 
 ```python
 import asyncio
@@ -219,10 +219,10 @@ from lifx import Colors, Device
 
 async def main():
     async with await Device.connect("192.168.1.100") as light:
-        # Pulse effect
+        # Pulse waveform
         await light.pulse(Colors.RED, period=1.0, cycles=5)
 
-        # Breathe effect (10 cycles)
+        # Breathe waveform (10 cycles)
         await light.breathe(Colors.BLUE, period=2.0, cycles=10)
 
 

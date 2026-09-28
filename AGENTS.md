@@ -224,7 +224,7 @@ gh workflow run docs.yml
 3. **Device Layer** (`src/lifx/devices/`)
 
    - `base.py`: Base `Device` class with common operations: `from_ip()`, label, power, version, info
-   - `light.py`: `Light` class (color control, effects: pulse, breathe, waveforms)
+   - `light.py`: `Light` class (color control, waveforms: pulse, breathe)
    - `hev.py`: `HevLight` class (Light with HEV anti-bacterial cleaning cycle control)
    - `infrared.py`: `InfraredLight` class (Light with infrared LED control for night vision)
    - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
@@ -262,7 +262,7 @@ gh workflow run docs.yml
 
 6. **Effects Layer** (`src/lifx/effects/`)
 
-   - 26 built-in effects (aurora, flame, plasma, rainbow, twinkle, etc.)
+   - 26 software effects (aurora, flicker, plasma, rainbow, twinkle, etc.)
    - `base.py`: Base effect class with frame generation interface
    - `registry.py`: Effect registry for discovering available effects by name
    - `state_manager.py`: Effect state management for running effects on devices

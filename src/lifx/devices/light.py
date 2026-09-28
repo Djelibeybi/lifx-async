@@ -89,7 +89,7 @@ class Light(Device[LightState]):
     - Color control (HSBK)
     - Brightness control
     - Color temperature control
-    - Waveform effects
+    - Waveform control
 
     Example:
         ```python
@@ -599,18 +599,24 @@ class Light(Device[LightState]):
         transient: bool = True,
         skew_ratio: float = 0.5,
     ) -> None:
-        """Apply a waveform effect to the light.
+        """Apply a waveform to the light.
 
-        Waveforms create repeating color transitions. Useful for effects like
-        pulsing, breathing, or blinking.
+        Waveforms create repeating color transitions. Useful for pulsing,
+        breathing, or blinking.
+
+        Cycles may be fractional; 0.5 is a half cycle. On a colour bulb, a
+        half cycle moves towards the target for half a period, then a
+        transient waveform jumps straight back to the original colour
+        (no fade back), while a non-transient one stays at the target.
 
         Args:
             color: Target color for the waveform
             period: Period of one cycle in seconds. Zero requests an immediate
                 transition.
-            cycles: Number of cycles
+            cycles: Number of cycles, must be greater than 0 (may be fractional)
             waveform: Waveform type (SAW, SINE, HALF_SINE, TRIANGLE, PULSE)
-            transient: If True, return to original color after effect (default True)
+            transient: If True, return to the original color once the
+                waveform completes (default True)
             skew_ratio: Waveform skew (0.0-1.0, default 0.5 for symmetric)
 
         Raises:
@@ -628,7 +634,7 @@ class Light(Device[LightState]):
                 color=HSBK.from_rgb(1.0, 0.0, 0.0),
                 period=1.0,
                 cycles=5,
-                waveform=LightWaveform.SINE,
+                waveform=LightWaveform.PULSE,
             )
 
             # Breathe white once
@@ -643,8 +649,8 @@ class Light(Device[LightState]):
         """
         if period < 0:
             raise ValueError(f"Period must be non-negative, got {period}")
-        if cycles < 1:
-            raise ValueError(f"Cycles must be 1 or higher, got {cycles}")
+        if cycles <= 0:
+            raise ValueError(f"Cycles must be greater than 0, got {cycles}")
         if not (0.0 <= skew_ratio <= 1.0):
             raise ValueError(
                 f"Skew ratio must be between 0.0 and 1.0, got {skew_ratio}"
@@ -704,20 +710,26 @@ class Light(Device[LightState]):
         set_brightness: bool = True,
         set_kelvin: bool = True,
     ) -> None:
-        """Apply a waveform effect with selective color component control.
+        """Apply a waveform with selective color component control.
 
         Similar to set_waveform() but allows fine-grained control over which
         color components (hue, saturation, brightness, kelvin) are affected
-        by the waveform. This enables effects like pulsing brightness while
-        keeping hue constant, or cycling hue while maintaining brightness.
+        by the waveform. This enables pulsing brightness while keeping hue
+        constant, or cycling hue while maintaining brightness.
+
+        Cycles may be fractional; 0.5 is a half cycle. On a colour bulb, a
+        half cycle moves towards the target for half a period, then a
+        transient waveform jumps straight back to the original colour
+        (no fade back), while a non-transient one stays at the target.
 
         Args:
             color: Target color for the waveform
             period: Period of one cycle in seconds. Zero requests an immediate
                 transition.
-            cycles: Number of cycles
+            cycles: Number of cycles, must be greater than 0 (may be fractional)
             waveform: Waveform type (SAW, SINE, HALF_SINE, TRIANGLE, PULSE)
-            transient: If True, return to original color after effect (default True)
+            transient: If True, return to the original color once the
+                waveform completes (default True)
             skew_ratio: Waveform skew (0.0-1.0, default 0.5 for symmetric)
             set_hue: Apply waveform to hue component (default True)
             set_saturation: Apply waveform to saturation component (default True)
@@ -750,7 +762,7 @@ class Light(Device[LightState]):
             await light.set_waveform_optional(
                 color=HSBK(180, 1.0, 1.0, 3500),
                 period=5.0,
-                cycles=0,  # Infinite
+                cycles=1000,
                 waveform=LightWaveform.SAW,
                 set_hue=True,
                 set_saturation=False,
@@ -761,8 +773,8 @@ class Light(Device[LightState]):
         """
         if period < 0:
             raise ValueError(f"Period must be non-negative, got {period}")
-        if cycles < 0:
-            raise ValueError(f"Cycles must be non-negative, got {cycles}")
+        if cycles <= 0:
+            raise ValueError(f"Cycles must be greater than 0, got {cycles}")
         if not (0.0 <= skew_ratio <= 1.0):
             raise ValueError(
                 f"Skew ratio must be between 0.0 and 1.0, got {skew_ratio}"
@@ -838,13 +850,14 @@ class Light(Device[LightState]):
     ) -> None:
         """Pulse the light to a specific color.
 
-        Convenience method for creating a pulse effect using SINE waveform.
+        Convenience method using the PULSE waveform.
 
         Args:
             color: Target color to pulse to
             period: Period of one pulse in seconds (default 1.0)
             cycles: Number of pulses (default 1)
-            transient: If True, return to original color after effect (default True)
+            transient: If True, return to the original color once the
+                waveform completes (default True)
 
         Example:
             ```python
@@ -871,7 +884,7 @@ class Light(Device[LightState]):
     ) -> None:
         """Make the light breathe to a specific color.
 
-        Convenience method for creating a breathing effect using SINE waveform.
+        Convenience method using the SINE waveform.
 
         Args:
             color: Target color to breathe to
