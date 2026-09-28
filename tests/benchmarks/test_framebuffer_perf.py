@@ -56,10 +56,10 @@ def test_apply_canvas_1_tile(benchmark) -> None:  # type: ignore[no-untyped-def]
 def test_apply_canvas_5_tile(benchmark) -> None:  # type: ignore[no-untyped-def]
     """Benchmark _apply_canvas for a 5-tile (320px) configuration.
 
-    Per spec PERF-H1: must complete in <5ms per call. Phase 1 baseline uses
-    nested loops with per-frame index arithmetic (tiles × rows × cols = 320
-    iterations). Phase 2 LUT optimization replaces this with a single
-    list comprehension.
+    Must complete in under 5ms per call. Extraction uses a precomputed
+    canvas-to-device lookup table so each frame only needs a single list
+    comprehension over 320 indices (tiles × rows × cols), rather than
+    per-frame index arithmetic.
     """
     fb = _make_framebuffer(5)
     canvas = _make_canvas(5)
@@ -71,7 +71,7 @@ def test_apply_canvas_10_tile(benchmark) -> None:  # type: ignore[no-untyped-def
     """Benchmark _apply_canvas for a 10-tile (640px) configuration.
 
     Per-frame cost for large multi-tile setups (10 tiles × 8 rows × 8 cols
-    = 640 iterations per call in the pre-LUT implementation).
+    = 640 lookup-table indices per call).
     """
     fb = _make_framebuffer(10)
     canvas = _make_canvas(10)

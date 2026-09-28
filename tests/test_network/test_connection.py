@@ -678,7 +678,7 @@ class TestDeviceConnection:
         # All requests should complete
         assert len(execution_order) == 6
 
-        # Phase 2: Concurrent requests can overlap (no serialization lock)
+        # Concurrent requests can overlap (no serialization lock).
         # We should see interleaved execution like:
         # [start_1, start_2, start_3, end_1, end_2, end_3]
         # This demonstrates true concurrency
@@ -1711,7 +1711,7 @@ class TestTransportDeathRecovery:
 
 
 class TestWildcardBindSelection:
-    """The local bind literal follows the device address (IPV6-03, B9).
+    """The local bind literal follows the device address.
 
     ``_open()`` performs no family test of its own: it asks
     :func:`lifx.network.address.wildcard_for`. Only the IPv4 arm runs in the

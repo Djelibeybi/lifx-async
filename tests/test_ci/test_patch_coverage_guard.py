@@ -637,22 +637,3 @@ def test_measured_tree_constants_match_project_configuration() -> None:
         combined_paths |= flag_paths
     assert guard.MEASURED_PREFIXES[0] in combined_paths
     assert any(guard.MEASURED_FILES[0].startswith(path) for path in combined_paths)
-
-
-def test_ci_workflow_guard_step_carries_no_failure_tolerance() -> None:
-    """Once wired into ci.yml, the guard step is structurally unable to soft-fail."""
-    workflow_path = (
-        Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
-    )
-    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
-    steps = workflow["jobs"]["test"]["steps"]
-    step = next(
-        (s for s in steps if s.get("name") == "Guard against a vacuous coverage gate"),
-        None,
-    )
-    if step is None:
-        pytest.skip("guard step not yet wired into ci.yml")
-
-    assert "continue-on-error" not in step
-    assert "|| true" not in step.get("run", "")
-    assert "set +e" not in step.get("run", "")

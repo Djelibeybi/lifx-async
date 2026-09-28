@@ -471,15 +471,14 @@ class TestCeilingLightSaveOnExit:
     """Tests for CeilingLight save-on-exit behaviour via __aexit__.
 
     All tests use the ``ceiling_device`` fixture to exercise a real
-    ``async with`` block against the embedded emulator; per-test docstrings
-    carry the CEIL-01/02/03 requirement mapping.
+    ``async with`` block against the embedded emulator.
     """
 
     @pytest.mark.asyncio
     async def test_save_on_exit_writes_state_file(
         self, ceiling_device, tmp_path
     ) -> None:
-        """CEIL-01 / TEST-01: state is written to state_file on __aexit__.
+        """State is written to state_file on __aexit__.
 
         Mutates component state in the body (populating
         ``stored_uplight_color``), then deletes the state file inside the
@@ -519,7 +518,7 @@ class TestCeilingLightSaveOnExit:
     async def test_save_on_exit_no_op_without_state_file(
         self, ceiling_device, monkeypatch
     ) -> None:
-        """CEIL-02 / TEST-02: no save is attempted when state_file is None."""
+        """No save is attempted when state_file is None."""
         save_calls: list[str] = []
 
         async def _record_save(self) -> None:
@@ -542,7 +541,7 @@ class TestCeilingLightSaveOnExit:
     async def test_save_on_exit_body_exception_propagates(
         self, ceiling_device, tmp_path, caplog, monkeypatch
     ) -> None:
-        """CEIL-03 / TEST-03: body exception propagates; save error is logged.
+        """Body exception propagates; save error is logged.
 
         Monkeypatches ``_save_state_to_file`` to raise ``OSError`` so the
         belt-and-braces guard in ``__aexit__`` is exercised directly.  The

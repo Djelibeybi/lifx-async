@@ -3,23 +3,23 @@
 Tests cover:
 - JSONL loading and malformed-line aborts with line numbers
 - Canonical-key validation for primary slugs AND aliases
-- D-09 slug derivation from stored display names
+- Slug derivation from stored display names
 - Record schema validation aborts (missing/extra fields, wrong containers,
   string numerics, booleans) naming the record and its JSONL line number
 - Name/category metadata validation (non-string, empty, non-ASCII)
 - Key collision aborts naming both display names
 - Colour range validation (kelvin 0 is inbound-only and rejected here);
   palettes longer than a 16-slot MORPH wire palette are valid themes
-- Canonical palette ordering (D-24) with duplicates preserved
-- Alias expansion binding the target's own record (D-13, D-14)
+- Canonical palette ordering with duplicates preserved
+- Alias expansion binding the target's own record
 - Transcription exactness of emitted HSBK literals (stored values are
   already HSBK's user-facing units; no protocol round-trip involved) and
   the HSBK-construction guard that still fires for an invalid component
 - Deterministic emission
-- Atomic write via a uniquely named temp file (D-05)
+- Atomic write via a uniquely named temp file
 
 All tests run against fixture data in tmp_path — never against the committed
-data/themes.jsonl (D-23: the data file is the record of what should exist; no
+data/themes.jsonl (the data file is the record of what should exist; no
 drift check, no count assertions against real data).
 """
 
@@ -170,7 +170,7 @@ class TestValidateKey:
 
 
 class TestDeriveSlug:
-    """Tests for the D-09 slug derivation over stored ASCII names."""
+    """Tests for slug derivation over stored ASCII names."""
 
     @pytest.mark.parametrize(
         ("name", "expected"),
@@ -189,9 +189,9 @@ class TestDeriveSlug:
         assert derive_slug(name) == expected
 
     def test_generator_shares_the_package_rule(self) -> None:
-        """The schema module's derive_slug IS the package's (identity, D-04).
+        """The schema module's derive_slug IS the package's (identity).
 
-        A second copy anywhere would reintroduce the drift D-04 forbids;
+        A second copy anywhere would reintroduce drift between the two;
         identity — not equality — proves there is exactly one implementation.
         """
         assert lifx.theme.schema.derive_slug is lifx.theme.slug.derive_slug
@@ -203,7 +203,7 @@ class TestDeriveSlug:
 
 
 class TestCanonicalPalette:
-    """Tests for D-24 canonical palette ordering."""
+    """Tests for canonical palette ordering."""
 
     def test_sorts_by_stored_tuple(self) -> None:
         """Palettes sort by (hue, saturation, brightness, kelvin)."""
@@ -430,7 +430,7 @@ class TestValidateRecordsSchema:
 
 
 class TestValidateRecordsMetadata:
-    """Name/category metadata aborts (META-01, META-02, D-06)."""
+    """Name/category metadata aborts."""
 
     @pytest.mark.parametrize("field", ["name", "category"])
     @pytest.mark.parametrize(
@@ -480,7 +480,7 @@ class TestValidateRecordsCollisions:
 
 
 class TestValidateRecordsDispositions:
-    """The three D-08 disposition validations (COMPAT-04) and their branches."""
+    """The three disposition validations and their branches."""
 
     def test_unknown_disposition_aborts(self) -> None:
         """An unknown disposition aborts naming record, line and value."""
@@ -492,7 +492,7 @@ class TestValidateRecordsDispositions:
 
     def test_deprecated_without_replacement_aborts(self) -> None:
         """A deprecated record with no replaced_by aborts with the
-        controlled deprecated-requires-replaced_by error (SPEC R4)."""
+        controlled deprecated-requires-replaced_by error."""
         with pytest.raises(
             RuntimeError,
             match=r"line 1.*Test Theme.*deprecated record requires a "
@@ -624,7 +624,7 @@ class TestValidateRecordsDispositions:
 
     def test_replaced_by_resolving_via_alias_validates(self) -> None:
         """A replaced_by naming an alias of another record validates —
-        aliases count as resolution targets (SPEC R4: resolves in THEMES)."""
+        aliases count as resolution targets that resolve in THEMES."""
         target = _record(slug="new_theme", name="New Theme", aliases=["old_alias"])
         deprecated = _record(
             slug="old_theme",
@@ -711,7 +711,7 @@ class TestEmitDataModule:
         assert "scripts/generate_theme_data.py" in docstring
 
     def test_alias_emitted_as_its_own_renamed_record(self) -> None:
-        """The alias key gets its own record reporting the rename (D-13, D-14).
+        """The alias key gets its own record reporting the rename.
 
         It keeps its own slug so the dead key is what the caller sees, and
         names the target in replaced_by so one hop reaches the live theme.
@@ -748,8 +748,7 @@ class TestEmitDataModule:
 
     def test_palette_emitted_canonically_sorted(self) -> None:
         """A record whose colours arrive unsorted is emitted sorted by its
-        stored tuple, with a duplicated colour surviving in both positions
-        (D-24)."""
+        stored tuple, with a duplicated colour surviving in both positions."""
         c1 = _color(hue=100)
         c2 = _color(hue=200)
         c3 = _color(hue=300)
@@ -953,7 +952,7 @@ class TestFormatGeneratedFiles:
 
 
 # ============================================================================
-# Tests for main() — atomic write (D-05)
+# Tests for main(): atomic write
 # ============================================================================
 
 

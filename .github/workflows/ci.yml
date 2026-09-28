@@ -20,11 +20,9 @@ on:
     # .github/*.py must still run the suite, ruff, pyright and bandit.
     - .github/**
     - codecov.yml
-    # tests/test_docs_language.py and tests/test_repository_guidance.py are
-    # prose contracts over published documentation and the root guidance
-    # files. Without these two entries a pull request that touches only
-    # docs/ or AGENTS.md never triggers this workflow, and the contracts
-    # are green by absence for exactly the change class they guard.
+    # Documentation-only pull requests still trigger this workflow so the
+    # required checks report. The changes job finds no source changes, and
+    # every job that needs source is skipped, which counts as passing.
     - docs/**
     - '*.md'
   workflow_dispatch:
@@ -64,8 +62,8 @@ jobs:
           echo "source=true" >> "$GITHUB_OUTPUT"
           exit 0
         fi
-        # Check if any source/test files changed in this PR
-        CHANGED=$(gh pr diff "${{ github.event.number }}" --name-only | grep -cE '^(src/|tests/|data/|scripts/|\.github/workflows/ci\.yml|pyproject\.toml|uv\.lock)' || true)
+        # Every trigger path except docs/** and root Markdown counts as source
+        CHANGED=$(gh pr diff "${{ github.event.number }}" --name-only | grep -cE '^(src/|tests/|data/|scripts/|\.github/|pyproject\.toml|uv\.lock|\.pre-commit-config\.yaml|codecov\.yml)' || true)
         if [ "$CHANGED" -gt 0 ]; then
           echo "source=true" >> "$GITHUB_OUTPUT"
         else
@@ -77,6 +75,8 @@ jobs:
   # Code quality checks
   quality:
     name: Code Quality
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -158,12 +158,13 @@ jobs:
         echo "All generated files are up-to-date."
 
   # Testing matrix scope:
-  # - PRs with source/test/CI workflow changes: full 3-OS matrix
-  # - PRs touching only codecov.yml or .pre-commit-config.yaml: Ubuntu-only
-  #   (smoke test)
+  # - PRs with any source change (every trigger path except docs/** and root
+  #   Markdown): full 3-OS matrix
+  # - PRs touching only docs/** or root Markdown: skipped
   # - Push to main: Ubuntu-only (PR already validated all OSes)
   test:
     needs: changes
+    if: needs.changes.outputs.source == 'true'
     name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     # contents: read is the workflow default; statuses: read is added so the

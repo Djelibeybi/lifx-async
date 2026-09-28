@@ -208,7 +208,7 @@ class TestAsyncGeneratorRequests:
 
 @pytest.mark.emulator
 class TestRetryTimeoutBudget:
-    """Test that the caller's timeout is honoured as wall time (RETRY-03).
+    """Test that the caller's timeout is honoured as wall time.
 
     All waiting -- transmissions, retransmit gaps, and the final listen
     window -- counts against the caller's timeout budget. A request can
@@ -226,7 +226,7 @@ class TestRetryTimeoutBudget:
         five fit inside the 2.0s budget; the sixth (due at 2.1s) does not.
         max_retries=5 (not 3) is deliberate: the old code's message reads
         "after 6 attempts" (max_retries + 1) regardless of jitter, so the
-        message assertion is deterministic RED independent of randomness.
+        message assertion is deterministic, independent of randomness.
         """
         # Create a scenario that drops all packets to force full timeout
         server, _device = await emulator_server_with_scenarios(
@@ -257,8 +257,8 @@ class TestRetryTimeoutBudget:
 
         elapsed = time.monotonic() - start_time
 
-        # RETRY-03: the wall deadline is honoured -- never overshoots by
-        # more than a small CI-tolerant margin.
+        # The wall deadline is honoured -- never overshoots by more than a
+        # small CI-tolerant margin.
         assert 2.0 <= elapsed < 2.3, (
             f"Elapsed {elapsed}s should stay within the wall-time budget"
         )

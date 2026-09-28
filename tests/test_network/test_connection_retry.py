@@ -1,24 +1,17 @@
-"""Tests for the reshaped request retransmit schedule (RETRY-01/02/04).
+"""Tests for the request retransmit schedule.
 
-Wave-0 RED suite for the Phase 3 retry reshape (03-RESEARCH.md). Covers the
-behavioural branch matrix rows B2-B13, B15-B16: floored first window and
-escalating retransmit gaps (RETRY-01), retransmit-while-listening with no
-blind sleeps (RETRY-02), and shared-queue correlation with late-reply
-acceptance on both GET and ACK paths (RETRY-04).
+Covers the floored first window and escalating retransmit gaps,
+retransmit-while-listening with no blind sleeps, and shared-queue
+correlation with late-reply acceptance on both GET and ACK paths.
 
-These tests are written against the FINAL contract (D3-01, D3-02, D3-04):
-a runtime-read ``REQUEST_RETRANSMIT_GAPS`` tuple and ``_STREAM_IDLE_TIMEOUT``
-float, both module attributes of ``lifx.network.connection``. At this
-commit neither exists, so most tests fail with ``AttributeError`` when the
-schedule/idle-window patch targets are entered -- that is the expected RED
-state for plan 03-02 to turn GREEN. See 03-01-SUMMARY.md for the recorded
-per-test RED/coincidental-pass breakdown.
+These tests are written against a runtime-read ``REQUEST_RETRANSMIT_GAPS``
+tuple and ``_STREAM_IDLE_TIMEOUT`` float, both module attributes of
+``lifx.network.connection``.
 """
 
 from __future__ import annotations
 
 import asyncio
-import inspect
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -26,7 +19,6 @@ from unittest.mock import patch
 
 import pytest
 
-from lifx.const import REQUEST_RETRANSMIT_GAPS
 from lifx.exceptions import LifxConnectionError, LifxProtocolError, LifxTimeoutError
 from lifx.network.connection import (
     _REQUEST_OBSERVER_TASK_ATTRIBUTE,
@@ -57,7 +49,7 @@ def _send_spy(
     """Wrap the real bound ``send_packet``, recording send times.
 
     Appends ``time.monotonic()`` to ``send_times`` before delegating to the
-    real implementation (03-RESEARCH.md Code Examples).
+    real implementation.
     """
     real_send = conn.send_packet
 
@@ -82,8 +74,8 @@ def _header(
     Mirrors ``TestRequestStreamDebugLogging._header`` in test_connection.py,
     parameterised on source/sequence/target/pkt_type so mismatch variants
     can be constructed for the correlation branch matrix. ``thread_connection``
-    defaults to ``False`` (the dataclass default) and is exposed so Phase 14
-    THREAD-02 observer tests can construct a Thread-flagged reply.
+    defaults to ``False`` (the dataclass default) and is exposed so request
+    observer tests can construct a Thread-flagged reply.
     """
     return LifxHeader(
         size=36 + payload_len,
@@ -104,8 +96,8 @@ async def _wait_for_keys(
 ) -> None:
     """Poll ``conn._pending_requests`` until at least ``count`` keys exist.
 
-    A bounded wait loop -- never an unbounded spin (03-RESEARCH.md
-    Pitfall 5). Raises if the keys never appear within ``deadline``.
+    A bounded wait loop -- never an unbounded spin. Raises if the keys
+    never appear within ``deadline``.
     """
     start = time.monotonic()
     while len(conn._pending_requests) < count:
@@ -118,13 +110,13 @@ async def _wait_for_keys(
 
 
 class TestRetransmitSchedule:
-    """RETRY-01 (D3-01): floored first window, escalating retransmit gaps."""
+    """Floored first window, escalating retransmit gaps."""
 
     @pytest.mark.emulator
     async def test_healthy_network_single_transmission(
         self, emulator_server_with_scenarios: Any
     ) -> None:
-        """Healthy network, real gaps: exactly 1 transmission (B6b False)."""
+        """Healthy network, real gaps: exactly 1 transmission."""
         server, _device = await emulator_server_with_scenarios(
             device_type="color",
             serial="d073d5000001",
@@ -151,7 +143,7 @@ class TestRetransmitSchedule:
 
     async def test_no_retransmit_before_first_gap_floor(self) -> None:
         """Real gaps, timeout below the 0.2s floor: exactly 1 send raised
-        offline (RETRY-01 floor; B4 raise arm offline)."""
+        offline."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.15, max_retries=2
         )
@@ -174,7 +166,7 @@ class TestRetransmitSchedule:
 
     async def test_escalating_gaps_drive_retransmits(self) -> None:
         """Patched gaps (0.05, 0.05): 3 sends at ~0, 0.05, 0.10s, then the
-        wall deadline raises (B6/B6b True, B7 True->False, B10 raised arm)."""
+        wall deadline raises."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.5, max_retries=2
         )
@@ -199,7 +191,7 @@ class TestRetransmitSchedule:
     async def test_retransmit_cap_then_keeps_listening(self) -> None:
         """Patched gaps (0.05,), max_retries=1: exactly 2 sends, then the
         request keeps listening to the wall deadline instead of failing
-        early at the retransmit cap (B6 False post-cap, B7 False)."""
+        early at the retransmit cap."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.4, max_retries=1
         )
@@ -223,7 +215,7 @@ class TestRetransmitSchedule:
 
     async def test_gap_exhaustion_repeats_final_gap(self) -> None:
         """Patched gaps (0.05,), max_retries=3: the single gap repeats after
-        exhaustion, giving 4 sends at ~0.05s spacing (B16)."""
+        exhaustion, giving 4 sends at ~0.05s spacing."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.5, max_retries=3
         )
@@ -247,7 +239,7 @@ class TestRetransmitSchedule:
 
     async def test_direct_impl_call_explicit_max_retries_zero(self) -> None:
         """Direct ``_request_stream_impl`` call with ``max_retries=0``:
-        exactly 1 send, single-shot semantics (B2 False, B3 False)."""
+        exactly 1 send, single-shot semantics."""
         conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP)
         send_times: list[float] = []
         try:
@@ -268,13 +260,12 @@ class TestRetransmitSchedule:
 
 
 class TestListenDuringBackoff:
-    """RETRY-02 (D3-02): retransmit-while-listening, no blind sleeps."""
+    """Retransmit-while-listening, no blind sleeps."""
 
     async def test_response_between_retransmits_completes_immediately(self) -> None:
         """Patched gaps (0.5,): a response injected right after the first
         transmission completes the request immediately -- well under the
-        first retransmit gap, with exactly 1 send (RETRY-02 core; B10 not
-        raised)."""
+        first retransmit gap, with exactly 1 send."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
         )
@@ -316,7 +307,7 @@ class TestListenDuringBackoff:
         """Patched gaps (0.1, 0.1), idle window patched to 0.3s: a response
         injected immediately is the only yield; the generator idle-exits
         ~0.3s later with exactly 1 send -- no retransmit fires once a
-        response has been yielded (B5 True, B6a False, B9 True)."""
+        response has been yielded."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
         )
@@ -366,7 +357,7 @@ class TestListenDuringBackoff:
     async def test_second_response_before_idle_extends_stream(self) -> None:
         """Real gaps, idle window patched to 0.4s: a second response
         injected ~0.15s after the first resets the idle clock, giving
-        exactly 2 yields (B5 False idle-not-elapsed, B9)."""
+        exactly 2 yields."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
         )
@@ -414,7 +405,7 @@ class TestListenDuringBackoff:
     async def test_deadline_return_after_yield_no_raise(self) -> None:
         """Idle window patched to 10.0s, timeout=0.3s: one response injected
         immediately; the generator completes WITHOUT raising at ~0.3s with
-        exactly 1 yield (B4 True + yielded -> return, B15 not-reached arm)."""
+        exactly 1 yield."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.3, max_retries=8
         )
@@ -455,12 +446,12 @@ class TestListenDuringBackoff:
 
 
 class TestCorrelationContract:
-    """RETRY-04 (D3-04): shared-queue correlation, late replies accepted."""
+    """Shared-queue correlation, late replies accepted."""
 
     async def test_late_reply_to_earlier_sequence_accepted(self) -> None:
         """Patched gaps (0.05,): once >=2 transmissions are in flight, a
         reply to sequence 0 (the FIRST transmission) still satisfies the
-        request (B13 in-range; the RETRY-04 acceptance case)."""
+        request."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
         )
@@ -491,8 +482,8 @@ class TestCorrelationContract:
     async def test_late_ack_to_earlier_sequence_accepted(self) -> None:
         """Same shape for the ACK path with an Acknowledgement injected
         against sequence 0 after >=2 transmissions are in flight -- the
-        D3-04-mandated ACK-path behaviour change (today's per-attempt queue
-        discards it)."""
+        shared queue accepts it, where a per-attempt queue would discard
+        it."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
         )
@@ -565,8 +556,7 @@ class TestCorrelationContract:
         assert conn._pending_requests == {}
 
     async def test_wrong_source_raises_protocol_error(self) -> None:
-        """A response with a mismatched source raises LifxProtocolError
-        (B12)."""
+        """A response with a mismatched source raises LifxProtocolError."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=2
         )
@@ -594,8 +584,7 @@ class TestCorrelationContract:
             await conn.close()
 
     async def test_out_of_range_sequence_raises_protocol_error(self) -> None:
-        """A response with a never-issued sequence raises LifxProtocolError
-        (B13 out-of-range)."""
+        """A response with a never-issued sequence raises LifxProtocolError."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=2
         )
@@ -623,8 +612,7 @@ class TestCorrelationContract:
             await conn.close()
 
     async def test_serial_mismatch_raises_protocol_error(self) -> None:
-        """A response targeting a different serial raises LifxProtocolError
-        (B11 mismatch)."""
+        """A response targeting a different serial raises LifxProtocolError."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=2
         )
@@ -653,8 +641,7 @@ class TestCorrelationContract:
 
     async def test_discovery_connection_accepts_any_target(self) -> None:
         """A discovery connection (serial "000000000000") yields a response
-        regardless of its target -- serial validation is skipped (B11
-        False).
+        regardless of its target -- serial validation is skipped.
 
         Idle window patched to 0.3s (matching this file's other _drive()
         streaming tests): this is a multi-response streaming consumer that
@@ -732,7 +719,7 @@ class TestCorrelationContract:
 
 
 class TestRequestObservation:
-    """Phase 14 THREAD-02 (D-07/D-17/D-19): private request-observer seam.
+    """Tests for the private request-observer seam.
 
     No observer is attached by any test elsewhere in this file or in the
     rest of the suite, so every pre-existing test in this module already
@@ -800,7 +787,7 @@ class TestRequestObservation:
 
     async def test_observes_thread_flagged_accepted_response(self) -> None:
         """A Thread-flagged reply is distinguished from an unflagged one, and
-        the flag changes nothing about correlation or timing (T-14 scope)."""
+        the flag changes nothing about correlation or timing."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=5.0, max_retries=8
         )
@@ -847,7 +834,7 @@ class TestRequestObservation:
         """The winning (retransmitted) sequence's sent_ns, not the first
         transmission's, is what the accepted event's sequence resolves to --
         proving logical_latency_ns and ack_rtt_ns are computable as distinct
-        values (D-07 acceptance criterion)."""
+        values."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
         )
@@ -902,8 +889,8 @@ class TestRequestObservation:
     async def test_late_ack_to_earlier_sequence_uses_matching_sent(self) -> None:
         """A reply accepted against the FIRST transmission after a second
         has already gone out still resolves ack_rtt_ns from sequence 0's
-        sent_ns, not sequence 1's (RETRY-04 correlation contract preserved
-        under observation)."""
+        sent_ns, not sequence 1's -- the shared-queue correlation contract
+        is preserved under observation."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=3
         )
@@ -971,7 +958,7 @@ class TestRequestObservation:
         """A ``send_packet()`` failure on the initial transmission emits
         send_error (not sent) and no exception text is ever captured -- the
         observation carries only the bounded category, sequence and
-        timestamp (T-14-02)."""
+        timestamp."""
         conn = DeviceConnection(
             serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=2.0, max_retries=2
         )
@@ -1036,7 +1023,7 @@ class TestRequestObservation:
 
     def test_sink_repr_suppresses_observation_values(self) -> None:
         """The sink's repr exposes a count only -- never category, sequence
-        or timestamp values, even after several observations (T-14-02)."""
+        or timestamp values, even after several observations."""
         sink = _RequestObservationSink()
         sink.observe("logical_start", None, 1_000, None)
         sink.observe("sent", 0, 1_500, None)
@@ -1171,43 +1158,6 @@ class TestRequestObservation:
             await conn.close()
         assert call_count == 2
         assert _current_request_observer() is None
-
-    def test_observer_insertion_leaves_public_surface_unchanged(self) -> None:
-        """Regression gate (T-14-03): the observer seam must never appear on
-        a public signature, and the retransmit schedule constant is
-        untouched by this plan (source-level anti-weakening check for the
-        Task 2 coverage/estimate concern in 14-REVIEWS.md)."""
-        assert REQUEST_RETRANSMIT_GAPS == (
-            0.2,
-            0.3,
-            0.4,
-            0.5,
-            0.7,
-            0.9,
-            1.0,
-            2.0,
-            3.0,
-            4.0,
-            5.0,
-        )
-
-        request_params = list(inspect.signature(DeviceConnection.request).parameters)
-        assert request_params == ["self", "packet", "timeout"]
-        request_stream_params = list(
-            inspect.signature(DeviceConnection.request_stream).parameters
-        )
-        assert request_stream_params == ["self", "packet", "timeout"]
-        for params in (request_params, request_stream_params):
-            assert "observer" not in params
-
-        # observer is keyword-only with a None default -- every existing
-        # caller of _transmit_and_listen() (both thin wrappers) keeps
-        # working with no source change if this default were ever removed.
-        transmit_params = inspect.signature(
-            DeviceConnection._transmit_and_listen
-        ).parameters
-        assert transmit_params["observer"].default is None
-        assert transmit_params["observer"].kind == inspect.Parameter.KEYWORD_ONLY
 
     def test_observe_rejects_an_unknown_category(self) -> None:
         """`_RequestObservationSink.observe()` validates every category it

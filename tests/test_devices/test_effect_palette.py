@@ -151,8 +151,8 @@ class TestTileSetEffectGoldens:
     async def test_morph_no_palette_never_sends_the_empty_palette(self) -> None:
         """MORPH with no palette on a multi-colour device never sends palette_count 0.
 
-        The constant now pins the bytes MORPH must never send again (D-24):
-        real firmware does not start MORPH when Tile.SetEffect carries
+        The constant pins the bytes MORPH must never send again: real
+        firmware does not start MORPH when Tile.SetEffect carries
         palette_count=0, so the derivation sends the device's own colours
         instead.
         """
@@ -225,7 +225,7 @@ class TestMorphDefaultPaletteEmulator:
     ) -> None:
         """A multi-tile chain showing several colours gets those colours as the palette.
 
-        Real firmware does not start MORPH with an empty palette (D-24), so
+        Real firmware does not start MORPH with an empty palette, so
         a device already showing several distinct colours now gets its own
         colours back as the MORPH palette instead of palette_count=0.
         """
@@ -413,7 +413,7 @@ class TestValidateEffectPalette:
 
 
 class TestSampleEffectPalette:
-    """Unit tests for sample_effect_palette(), Morph's multi-colour rule (D-25).
+    """Unit tests for sample_effect_palette(), Morph's multi-colour rule.
 
     Every expected list below is written out by hand from pixel indices,
     never recomputed with the ``i * n // 16`` formula, so these tests pin
