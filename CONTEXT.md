@@ -25,6 +25,20 @@ what the light reports while the fade is in progress.
 Colours reported by the light for the zones covered by a response. During a fade,
 they can be intermediate colours rather than the transition target.
 
+**Software effect**:
+An effect built into the library. The library computes each frame and streams it
+to the light for as long as the effect runs. It draws on a whole light.
+
+**Firmware effect**:
+An effect built into the light, such as Morph, Flame, Sky or Move. The light runs
+it without any software, and some lights, such as the Mirror and Luna, can start
+and cycle through them from a button. It always covers the whole light. _Avoid_:
+built-in effect (both kinds are built in, to different things).
+
+**Effect participant**:
+A light that a software effect draws on. One effect can draw on several
+participants in step.
+
 **Brightness inference**:
 Choosing turn-on brightness when no colour is supplied: use suitable stored
 brightness first, otherwise the other light component's brightness, then the

@@ -493,6 +493,23 @@ Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 - Never update docs/changelog.md manually as it is auto-generated during the release process by the CI/CD workflow.
 - If a field is user-visible, it must never be bytes. This means things like serial, label, location and group must always be converted to a string prior to storing it anywhere a user would be able to access it. Conversion to and from bytes should happen either as close to sending or receiving the packet as possible.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues on this repo, managed with the `gh` CLI. See
+`.claude/agent-skills/issue-tracker.md`.
+
+### Triage labels
+
+Uses the five default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`). See `.claude/agent-skills/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the repo root and ADRs in `.claude/adr/`. Neither lives under
+`docs/`, which is published. See `.claude/agent-skills/domain.md`.
+
 ## Spike Findings
 
 - **Spike findings for lifx-async** (implementation patterns, constraints, gotchas) → `Skill("spike-findings-lifx-async")`
