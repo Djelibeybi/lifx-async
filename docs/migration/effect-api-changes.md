@@ -67,7 +67,7 @@ name (`"forward"`, `"reversed"`). A bare integer, which it used to store uncheck
 await multizone_light.set_multizone_effect(...)
 effect = await multizone_light.get_multizone_effect()
 
-# Tile/Matrix devices
+# Matrix devices
 await matrix_light.set_tile_effect(...)
 effect = await matrix_light.get_tile_effect()
 
