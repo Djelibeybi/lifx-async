@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v7.6.0 (2026-09-29)
+
+### Documentation
+
+- Add effect glossary terms, device-owned Animator ADR and agent skills setup
+  ([`d6c6a13`](https://github.com/Djelibeybi/lifx-async/commit/d6c6a13937afbd293b87608bc53d0b87bc9d1ebe))
+
+- Label matrix firmware effects as matrix only
+  ([`4e1b1b2`](https://github.com/Djelibeybi/lifx-async/commit/4e1b1b27464d3a54b1a10aa008fafd6c66a6e352))
+
+### Features
+
+- **effects**: Rename software Flame to Flicker and separate waveforms from effects
+  ([`438d36f`](https://github.com/Djelibeybi/lifx-async/commit/438d36fafc9a64778d13f636000567836eac483b))
+
+
 ## v7.5.1 (2026-09-27)
 
 ### Bug Fixes
