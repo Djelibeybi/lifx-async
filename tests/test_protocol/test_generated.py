@@ -1,5 +1,7 @@
 """Tests for generated protocol types and packets."""
 
+import pytest
+
 from lifx.protocol.packets import PACKET_REGISTRY, Device, Light, Sensor, Thread
 from lifx.protocol.protocol_types import (
     DeviceService,
@@ -8,6 +10,8 @@ from lifx.protocol.protocol_types import (
     LightWaveform,
     ThreadLinkHealth,
     ThreadRoutingRole,
+    TileEffectParameter,
+    TileEffectSkyType,
 )
 
 
@@ -45,6 +49,38 @@ class TestGeneratedEnums:
 
         # Reserved protocol values (4, and MultiZone 2/3) stay unmapped
         assert {effect.value for effect in FirmwareEffect} == {0, 1, 2, 3, 5, 6}
+
+    def test_sky_type_accepts_undocumented_value(self) -> None:
+        """An undocumented sky type becomes a pseudo-member instead of raising.
+
+        A Mirror running the Colour Sweep started from its button reports
+        sky_type 13. The pseudo-member keeps the enum type and its value.
+        """
+        sky = TileEffectSkyType(13)
+
+        assert isinstance(sky, TileEffectSkyType)
+        assert sky == 13
+        assert sky.name == "UNKNOWN_13"
+        # Documented members still resolve to themselves, and the pseudo-member
+        # is not added to the enum's membership
+        assert TileEffectSkyType(2) is TileEffectSkyType.CLOUDS
+        assert [member.value for member in TileEffectSkyType] == [0, 1, 2]
+
+    @pytest.mark.parametrize("value", [-1, 256, "13"])
+    def test_sky_type_rejects_values_outside_uint8(self, value: object) -> None:
+        """Only a value that fits the uint8 wire field becomes a pseudo-member."""
+        with pytest.raises(ValueError):
+            TileEffectSkyType(value)
+
+    def test_effect_parameter_round_trips_undocumented_sky_type(self) -> None:
+        """The undocumented sky type packs back to the byte the device sent."""
+        data = bytes([0x0D]) + bytes(31)
+
+        parameter, offset = TileEffectParameter.unpack(data)
+
+        assert offset == 32
+        assert parameter.sky_type == 13
+        assert parameter.pack()[:1] == b"\x0d"
 
 
 class TestGeneratedFields:

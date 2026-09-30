@@ -17,6 +17,7 @@ from lifx.protocol.generator import (
     generate_enum_code,
     generate_field_code,
     generate_nested_packet_code,
+    generate_open_enum_missing,
     generate_pack_method,
     generate_packets_file,
     generate_types_file,
@@ -572,6 +573,37 @@ class TestGenerateEnumCode:
         assert "class MyEnum(IntEnum):" in code
         assert "VALUE1 = 1" in code
         assert "VALUE2 = 2" in code
+
+    def test_generate_closed_enum_has_no_missing_hook(self):
+        """An enum outside OPEN_ENUMS still raises on an unknown value."""
+        enums = {
+            "MyEnum": {
+                "type": "uint8",
+                "values": [{"name": "MY_ENUM_VALUE1", "value": 1}],
+            }
+        }
+
+        assert "_missing_" not in generate_enum_code(enums)
+
+    def test_generate_open_enum_bounds_missing_hook_by_wire_type(self):
+        """An enum in OPEN_ENUMS gets a _missing_ hook bounded by its type."""
+        enums = {
+            "TileEffectSkyType": {
+                "type": "uint8",
+                "values": [{"name": "TILE_EFFECT_SKY_TYPE_SUNRISE", "value": 0}],
+            }
+        }
+
+        code = generate_enum_code(enums)
+
+        assert "def _missing_(cls, value: object) -> TileEffectSkyType | None:" in code
+        assert "0 <= value <= 0xff" in code
+
+    def test_open_enum_missing_hook_defaults_to_uint32_bound(self):
+        """A definition without a wire type falls back to the uint32 range."""
+        assert "0 <= value <= 0xffffffff" in "\n".join(
+            generate_open_enum_missing("MyEnum", None)
+        )
 
     def test_generate_enum_without_prefix(self):
         """Test enum generation when values don't have common prefix."""

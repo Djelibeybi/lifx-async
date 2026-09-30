@@ -262,6 +262,55 @@ def apply_tile_effect_parameter_quirk(
     return fields
 
 
+#: Enums that accept values the protocol does not document. Firmware reports
+#: these values on the wire, and unpacking must not raise on a reply the device
+#: legitimately sent.
+OPEN_ENUMS: frozenset[str] = frozenset(
+    {
+        # A Mirror running the Colour Sweep started from its physical button
+        # reports sky_type 13, which LIFX have not documented.
+        "TileEffectSkyType",
+    }
+)
+
+#: Largest value each wire type can carry, bounding an open enum's pseudo-members.
+_ENUM_TYPE_MAX: dict[str, int] = {
+    "uint8": 0xFF,
+    "uint16": 0xFFFF,
+    "uint32": 0xFFFFFFFF,
+}
+
+
+def generate_open_enum_missing(enum_name: str, enum_type: str | None) -> list[str]:
+    """Generate a ``_missing_`` hook that turns an unknown value into a member.
+
+    The pseudo-member is still an instance of the enum, so annotations and
+    ``isinstance`` checks hold, and it packs back to the byte the device sent.
+    Values outside the enum's wire type still raise.
+
+    Args:
+        enum_name: Name of the enum class the hook belongs to
+        enum_type: The enum's protocol wire type, such as ``uint8``, or None
+            when the definition does not give one
+
+    Returns:
+        Code lines for the method, indented for a class body
+    """
+    maximum = _ENUM_TYPE_MAX.get(enum_type or "uint32", _ENUM_TYPE_MAX["uint32"])
+    return [
+        "",
+        "    @classmethod",
+        f"    def _missing_(cls, value: object) -> {enum_name} | None:",
+        '        """Represent a value the protocol does not document."""',
+        f"        if not isinstance(value, int) or not 0 <= value <= {maximum:#x}:",
+        "            return None",
+        "        member = int.__new__(cls, value)",
+        '        member._name_ = f"UNKNOWN_{value}"',
+        "        member._value_ = value",
+        "        return member",
+    ]
+
+
 def apply_tile_state_device_quirk(
     fields: dict[str, Any],
 ) -> dict[str, Any]:
@@ -591,6 +640,10 @@ def generate_enum_code(enums: dict[str, Any]) -> str:
                 enum_def.items(), key=lambda x: x[1]
             ):
                 code.append(f"    {member_name} = {member_value}")
+
+        if enum_name in OPEN_ENUMS:
+            enum_type = enum_def.get("type") if "values" in enum_def else None
+            code.extend(generate_open_enum_missing(enum_name, enum_type))
 
         code.append("")
         code.append("")

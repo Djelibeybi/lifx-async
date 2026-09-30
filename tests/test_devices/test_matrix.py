@@ -148,6 +148,41 @@ class TestMatrixLight:
         assert effect.cloud_saturation_min == 0
         assert effect.cloud_saturation_max == 0
 
+    async def test_get_effect_accepts_undocumented_sky_type(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """A StateEffect carrying an undocumented sky type decodes.
+
+        The payload is a Mirror's reply while running the Colour Sweep started
+        from its button: sky_type 13, which unpacking used to reject with a
+        ValueError before get_effect() could return.
+        """
+        settings = (
+            bytes(4)  # instanceid
+            + bytes([FirmwareEffect.COLOR_SWEEP])
+            + (0).to_bytes(4, "little")  # speed
+            + (30_000_000_000).to_bytes(8, "little")  # duration
+            + bytes(8)  # reserved
+            + bytes([0x0D, 0x02])
+            + bytes(30)  # parameter
+            + bytes([2])  # palette_count
+            + LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=1500).pack()
+            + LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=6500).pack()
+            + bytes(14 * 8)
+        )
+        matrix_light.connection.request.return_value = packets.Tile.StateEffect.unpack(
+            bytes(1) + settings
+        )
+
+        effect = await matrix_light.get_effect()
+
+        assert effect.effect_type == FirmwareEffect.COLOR_SWEEP
+        assert effect.sky_type == 13
+        assert isinstance(effect.sky_type, TileEffectSkyType)
+        assert effect.duration == 30_000_000_000
+        assert effect.palette is not None
+        assert [color.kelvin for color in effect.palette] == [1500, 6500]
+
     def test_effect_still_validates_user_input(self) -> None:
         """Outbound construction keeps the send-time guards."""
         with pytest.raises(ValueError, match="Effect speed must be positive"):
