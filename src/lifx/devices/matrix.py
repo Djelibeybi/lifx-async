@@ -182,7 +182,9 @@ class MatrixEffect:
     """Matrix effect configuration.
 
     Attributes:
-        effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP)
+        effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP). A
+            device can report a value outside these, which reads back as an
+            ``UNKNOWN_<n>`` member rather than raising
         speed: Effect speed in milliseconds
         duration: Effect duration in nanoseconds (0 for infinite). A value
             read back from a device is the time remaining, not the total

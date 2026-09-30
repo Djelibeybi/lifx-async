@@ -8,6 +8,7 @@ import pytest
 from lifx.protocol import packets
 from lifx.protocol.generator import (
     TypeRegistry,
+    apply_firmware_effect_enum_quirk,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
@@ -598,6 +599,15 @@ class TestGenerateEnumCode:
 
         assert "def _missing_(cls, value: object) -> TileEffectSkyType | None:" in code
         assert "0 <= value <= 0xff" in code
+
+    def test_firmware_effect_quirk_types_enum_as_uint8(self):
+        """The merged FirmwareEffect enum carries the uint8 wire type."""
+        enums, _, _ = apply_firmware_effect_enum_quirk({}, {}, {})
+
+        firmware_effect = enums["FirmwareEffect"]
+        assert firmware_effect["type"] == "uint8"
+        assert {"name": "COLOR_SWEEP", "value": 6} in firmware_effect["values"]
+        assert "0 <= value <= 0xff" in generate_enum_code(enums)
 
     def test_open_enum_missing_hook_defaults_to_uint32_bound(self):
         """A definition without a wire type falls back to the uint32 range."""

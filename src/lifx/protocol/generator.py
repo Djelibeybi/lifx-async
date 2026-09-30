@@ -267,6 +267,10 @@ def apply_tile_effect_parameter_quirk(
 #: legitimately sent.
 OPEN_ENUMS: frozenset[str] = frozenset(
     {
+        # LIFX say effect replies are polymorphic by effect type and should not
+        # be relied on until they rebuild the effect messages, so an effect
+        # reply must never raise on a value the protocol does not list.
+        "FirmwareEffect",
         # A Mirror running the Colour Sweep started from its physical button
         # reports sky_type 13, which LIFX have not documented.
         "TileEffectSkyType",
@@ -392,8 +396,15 @@ def apply_firmware_effect_enum_quirk(
         "COLOR_SWEEP": 6,
     }
 
-    # Create FirmwareEffect enum
-    enums["FirmwareEffect"] = firmware_effect_values
+    # Create FirmwareEffect enum. Both effect settings carry the type as a
+    # uint8, which bounds the open enum's pseudo-members.
+    enums["FirmwareEffect"] = {
+        "type": "uint8",
+        "values": [
+            {"name": name, "value": value}
+            for name, value in firmware_effect_values.items()
+        ],
+    }
 
     # Remove the old separate enums
     enums.pop("MultiZoneEffectType", None)

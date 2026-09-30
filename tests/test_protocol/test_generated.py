@@ -66,11 +66,27 @@ class TestGeneratedEnums:
         assert TileEffectSkyType(2) is TileEffectSkyType.CLOUDS
         assert [member.value for member in TileEffectSkyType] == [0, 1, 2]
 
+    def test_firmware_effect_accepts_undocumented_value(self) -> None:
+        """An undocumented effect type becomes a pseudo-member instead of raising.
+
+        LIFX say effect replies are polymorphic by effect type, so a reply can
+        carry an effect type the protocol does not list.
+        """
+        effect = FirmwareEffect(99)
+
+        assert isinstance(effect, FirmwareEffect)
+        assert effect == 99
+        assert effect.name == "UNKNOWN_99"
+        assert FirmwareEffect(6) is FirmwareEffect.COLOR_SWEEP
+
+    @pytest.mark.parametrize("enum", [FirmwareEffect, TileEffectSkyType])
     @pytest.mark.parametrize("value", [-1, 256, "13"])
-    def test_sky_type_rejects_values_outside_uint8(self, value: object) -> None:
+    def test_open_enum_rejects_values_outside_uint8(
+        self, enum: type[FirmwareEffect | TileEffectSkyType], value: object
+    ) -> None:
         """Only a value that fits the uint8 wire field becomes a pseudo-member."""
         with pytest.raises(ValueError):
-            TileEffectSkyType(value)
+            enum(value)
 
     def test_effect_parameter_round_trips_undocumented_sky_type(self) -> None:
         """The undocumented sky type packs back to the byte the device sent."""
