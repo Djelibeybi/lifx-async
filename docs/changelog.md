@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v7.6.2 (2026-09-30)
+
+### Bug Fixes
+
+- **devices**: Reject negative effect speed before rounding
+  ([`dacc1ac`](https://github.com/Djelibeybi/lifx-async/commit/dacc1acd62e126f40052df330e0caa4c7a3c7f0c))
+
+- **matrix**: Allow speed 0 for the COLOR_SWEEP effect
+  ([`7e1baa8`](https://github.com/Djelibeybi/lifx-async/commit/7e1baa8eef4ae2928ddd1dd3b395e8a2091f9fdb))
+
+
 ## v7.6.1 (2026-09-30)
 
 ### Bug Fixes
