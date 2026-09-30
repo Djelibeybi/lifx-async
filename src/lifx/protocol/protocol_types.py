@@ -99,6 +99,16 @@ class TileEffectSkyType(IntEnum):
     SUNSET = 1
     CLOUDS = 2
 
+    @classmethod
+    def _missing_(cls, value: object) -> TileEffectSkyType | None:
+        """Represent a value the protocol does not document."""
+        if not isinstance(value, int) or not 0 <= value <= 0xFF:
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"UNKNOWN_{value}"
+        member._value_ = value
+        return member
+
 
 @dataclass
 class DeviceStateHostFirmware:

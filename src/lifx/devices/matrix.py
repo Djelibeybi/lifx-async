@@ -184,9 +184,12 @@ class MatrixEffect:
     Attributes:
         effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP)
         speed: Effect speed in milliseconds
-        duration: Total effect duration in nanoseconds (0 for infinite)
+        duration: Effect duration in nanoseconds (0 for infinite). A value
+            read back from a device is the time remaining, not the total
         palette: Color palette for the effect (max 16 colors)
-        sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
+        sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS). A device can
+            report a value outside these, which reads back as an
+            ``UNKNOWN_<n>`` member rather than raising
         cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS sky type)
         cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS sky type)
         from_device: Set when building this object from a device response. The
@@ -1090,6 +1093,9 @@ class MatrixLight(Light):
 
     async def get_effect(self) -> MatrixEffect:
         """Get current running matrix effect.
+
+        The reported duration counts down while the effect runs, so it is the
+        time remaining rather than the duration the effect was started with.
 
         Returns:
             MatrixEffect describing the current effect state
