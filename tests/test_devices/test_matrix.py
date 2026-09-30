@@ -1088,6 +1088,30 @@ class TestSkyEffectFirmwareGate:
         packet = matrix.connection.send_packet.await_args.args[0]
         assert packet.settings.speed == 1235
 
+    @pytest.mark.parametrize(
+        "effect_type", [FirmwareEffect.COLOR_SWEEP, FirmwareEffect.FLAME]
+    )
+    async def test_set_effect_rejects_negative_speed_that_rounds_to_zero(
+        self, mock_device_factory, effect_type: FirmwareEffect
+    ) -> None:
+        """Test that a tiny negative speed is rejected before rounding.
+
+        -0.0001 s rounds to 0 ms, which COLOR_SWEEP accepts, so the sign
+        must be checked on the caller's value.
+        """
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        with pytest.raises(ValueError, match="speed must be non-negative"):
+            await matrix.set_effect(
+                effect_type=effect_type,
+                speed=-0.0001,
+                duration=30_000_000_000,
+            )
+
+        matrix.connection.send_packet.assert_not_called()
+
     async def test_set_effect_zero_speed_keeps_default_for_other_effects(
         self, mock_device_factory
     ) -> None:

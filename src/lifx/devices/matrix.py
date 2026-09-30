@@ -1295,9 +1295,10 @@ class MatrixLight(Light):
             LifxProtocolError: If MORPH is requested with no palette and the
                 colour read gets a malformed reply, or the device reports no
                 colours
-            ValueError: If speed is negative, or a non-zero speed rounds to
-                0 ms for an active effect other than COLOR_SWEEP, or another
-                field fails ``MatrixEffect`` validation
+            ValueError: If speed is negative (checked before rounding), or a
+                non-zero speed rounds to 0 ms for an active effect other than
+                COLOR_SWEEP, or another field fails ``MatrixEffect``
+                validation
 
         Example:
             >>> # Set MORPH effect with rainbow palette
@@ -1343,6 +1344,11 @@ class MatrixLight(Light):
             speed,
             self.label or self.serial,
         )
+        # Check the sign before rounding: a tiny negative value rounds to 0 ms,
+        # which COLOR_SWEEP would otherwise accept.
+        if speed < 0:
+            raise ValueError(f"Effect speed must be non-negative, got {speed}")
+
         # A falsy speed has always meant the 3 second default. COLOR_SWEEP is
         # the exception: speed 0 is a real setting that sweeps once across
         # the duration, matching the button-started Colour Sweep.
