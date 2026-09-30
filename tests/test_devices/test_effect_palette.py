@@ -573,7 +573,7 @@ class TestMorphDerivationMock:
         matrix = _matrix_light()
         matrix.get_all_tile_colors = AsyncMock(return_value=[[Colors.RED]])
 
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match="must be non-negative"):
             await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=-1.0)
 
         matrix.get_all_tile_colors.assert_not_awaited()
