@@ -180,11 +180,12 @@ class TileInfo:
 def _plays_once_at_zero_speed(effect_type: FirmwareEffect, duration: int) -> bool:
     """Whether speed 0 is a real setting for this effect rather than an error.
 
-    With speed 0, COLOR_SWEEP and SKY play once across the effect's duration:
-    the button-started Colour Sweep reports speed 0 and sweeps once across its
-    30 second duration, and a Path runs a sunrise or sunset across the duration
-    it is given. SKY qualifies only with a finite duration, because speed 0
-    with an infinite duration is untested on hardware.
+    With speed 0 and a finite duration, COLOR_SWEEP and SKY play once across
+    that duration: the button-started Colour Sweep reports speed 0 and sweeps
+    once across its 30 second duration, and a Path runs a sunrise or sunset
+    across the duration it is given. With an infinite duration, speed 0 is not
+    a setting: a Mirror given COLOR_SWEEP at speed 0 with no duration repeats
+    the sweep every second or two, forever.
 
     Args:
         effect_type: The effect being configured
@@ -193,9 +194,9 @@ def _plays_once_at_zero_speed(effect_type: FirmwareEffect, duration: int) -> boo
     Returns:
         True if speed 0 plays the effect once across ``duration``
     """
-    if effect_type == FirmwareEffect.COLOR_SWEEP:
-        return True
-    return effect_type == FirmwareEffect.SKY and duration > 0
+    return (
+        effect_type in (FirmwareEffect.COLOR_SWEEP, FirmwareEffect.SKY) and duration > 0
+    )
 
 
 @dataclass
@@ -207,7 +208,7 @@ class MatrixEffect:
             device can report a value outside these, which reads back as an
             ``UNKNOWN_<n>`` member rather than raising
         speed: Effect speed in milliseconds. Must be positive for an active
-            effect, except COLOR_SWEEP, and SKY with a non-zero ``duration``,
+            effect, except COLOR_SWEEP and SKY with a non-zero ``duration``,
             where 0 plays the effect once across ``duration``
         duration: Effect duration in nanoseconds (0 for infinite). A value
             read back from a device is the time remaining, not the total
@@ -1285,7 +1286,7 @@ class MatrixLight(Light):
             speed: Effect speed in seconds (default: 3), rounded to the
                 nearest millisecond. For SKY sunrise and sunset, it sets how
                 long the transition takes. 0 means the 3 second default,
-                except for COLOR_SWEEP, and SKY with a non-zero ``duration``,
+                except for COLOR_SWEEP and SKY with a non-zero ``duration``,
                 where 0 plays the effect once across ``duration``
             duration: Total effect duration in nanoseconds (0 for infinite)
             palette: Color palette for the effect (max 16 colors). An explicit

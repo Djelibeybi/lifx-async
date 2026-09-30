@@ -240,7 +240,9 @@ colours it is actually displaying. See [`MatrixLight.set_effect()`](../api/devic
 for details.
 
 To sweep once, as the Mirror's button does, pass `speed=0` with a duration.
-The button-started sweep runs once over 30 seconds:
+The button-started sweep runs once over 30 seconds. Without a duration,
+`speed=0` means the 3 second default, because the Mirror would otherwise repeat
+the sweep every second or two:
 
 ```python
 from lifx import FirmwareEffect
