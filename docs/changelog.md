@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v7.6.1 (2026-09-30)
+
+### Bug Fixes
+
+- **protocol**: Accept undocumented effect types in effect replies
+  ([`0ce2233`](https://github.com/Djelibeybi/lifx-async/commit/0ce2233a474fa6ed5172a176972efda6509f4226))
+
+- **protocol**: Accept undocumented sky types in effect replies
+  ([`6a5f27f`](https://github.com/Djelibeybi/lifx-async/commit/6a5f27ffb58f55c64ff22cb4065ec705dec55bdd))
+
+
 ## v7.6.0 (2026-09-29)
 
 ### Documentation
