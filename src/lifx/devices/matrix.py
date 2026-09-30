@@ -177,6 +177,27 @@ class TileInfo:
                 return "Upright"
 
 
+def _plays_once_at_zero_speed(effect_type: FirmwareEffect, duration: int) -> bool:
+    """Whether speed 0 is a real setting for this effect rather than an error.
+
+    With speed 0, COLOR_SWEEP and SKY play once across the effect's duration:
+    the button-started Colour Sweep reports speed 0 and sweeps once across its
+    30 second duration, and a Path runs a sunrise or sunset across the duration
+    it is given. SKY qualifies only with a finite duration, because speed 0
+    with an infinite duration is untested on hardware.
+
+    Args:
+        effect_type: The effect being configured
+        duration: Effect duration in nanoseconds, 0 for infinite
+
+    Returns:
+        True if speed 0 plays the effect once across ``duration``
+    """
+    if effect_type == FirmwareEffect.COLOR_SWEEP:
+        return True
+    return effect_type == FirmwareEffect.SKY and duration > 0
+
+
 @dataclass
 class MatrixEffect:
     """Matrix effect configuration.
@@ -186,8 +207,8 @@ class MatrixEffect:
             device can report a value outside these, which reads back as an
             ``UNKNOWN_<n>`` member rather than raising
         speed: Effect speed in milliseconds. Must be positive for an active
-            effect, except COLOR_SWEEP, where 0 sweeps once across
-            ``duration``
+            effect, except COLOR_SWEEP, and SKY with a non-zero ``duration``,
+            where 0 plays the effect once across ``duration``
         duration: Effect duration in nanoseconds (0 for infinite). A value
             read back from a device is the time remaining, not the total
         palette: Color palette for the effect (max 16 colors)
@@ -218,10 +239,11 @@ class MatrixEffect:
             return
 
         # Validate all fields
-        # Speed can be 0 only when effect is OFF, or COLOR_SWEEP: the
-        # button-started Colour Sweep reports speed 0 and sweeps once across
-        # its duration.
-        if self.effect_type not in (FirmwareEffect.OFF, FirmwareEffect.COLOR_SWEEP):
+        # Speed can be 0 only when the effect is OFF, or plays once across its
+        # duration at speed 0.
+        if self.effect_type != FirmwareEffect.OFF and not _plays_once_at_zero_speed(
+            self.effect_type, self.duration
+        ):
             self._validate_speed_active(self.speed)
         elif self.speed < 0:
             raise ValueError(f"Effect speed must be non-negative, got {self.speed}")
@@ -1261,8 +1283,10 @@ class MatrixLight(Light):
         Args:
             effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP)
             speed: Effect speed in seconds (default: 3), rounded to the
-                nearest millisecond. 0 means the 3 second default, except
-                for COLOR_SWEEP, where 0 sweeps once across ``duration``
+                nearest millisecond. For SKY sunrise and sunset, it sets how
+                long the transition takes. 0 means the 3 second default,
+                except for COLOR_SWEEP, and SKY with a non-zero ``duration``,
+                where 0 plays the effect once across ``duration``
             duration: Total effect duration in nanoseconds (0 for infinite)
             palette: Color palette for the effect (max 16 colors). An explicit
                 palette is always sent exactly as given, with no extra read.
@@ -1296,9 +1320,9 @@ class MatrixLight(Light):
                 colour read gets a malformed reply, or the device reports no
                 colours
             ValueError: If speed is negative (checked before rounding), or a
-                non-zero speed rounds to 0 ms for an active effect other than
-                COLOR_SWEEP, or another field fails ``MatrixEffect``
-                validation
+                non-zero speed rounds to 0 ms for an active effect that does
+                not play once at speed 0, or another field fails
+                ``MatrixEffect`` validation
 
         Example:
             >>> # Set MORPH effect with rainbow palette
@@ -1345,14 +1369,14 @@ class MatrixLight(Light):
             self.label or self.serial,
         )
         # Check the sign before rounding: a tiny negative value rounds to 0 ms,
-        # which COLOR_SWEEP would otherwise accept.
+        # which COLOR_SWEEP and SKY with a duration would otherwise accept.
         if speed < 0:
             raise ValueError(f"Effect speed must be non-negative, got {speed}")
 
-        # A falsy speed has always meant the 3 second default. COLOR_SWEEP is
-        # the exception: speed 0 is a real setting that sweeps once across
-        # the duration, matching the button-started Colour Sweep.
-        if speed or effect_type == FirmwareEffect.COLOR_SWEEP:
+        # A falsy speed has always meant the 3 second default. The exception is
+        # an effect that plays once across its duration at speed 0, where 0 is
+        # a real setting.
+        if speed or _plays_once_at_zero_speed(effect_type, duration):
             speed_ms = round(speed * 1000)
         else:
             speed_ms = 3000

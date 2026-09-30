@@ -852,6 +852,25 @@ class TestMatrixEffect:
         )
         assert effect.speed == 0
 
+    def test_effect_validation_zero_speed_for_sky_with_duration(self) -> None:
+        """Test that zero speed is valid for SKY with a finite duration.
+
+        A Path runs a sunrise or sunset once across the duration it is given.
+        """
+        effect = MatrixEffect(
+            effect_type=FirmwareEffect.SKY,
+            speed=0,
+            duration=10_000_000_000,
+        )
+        assert effect.speed == 0
+
+    def test_effect_validation_zero_speed_for_sky_without_duration(self) -> None:
+        """Test that zero speed is rejected for SKY with an infinite duration."""
+        with pytest.raises(
+            ValueError, match="speed must be positive for active effects"
+        ):
+            MatrixEffect(effect_type=FirmwareEffect.SKY, speed=0)
+
     def test_effect_validation_negative_speed_for_color_sweep(self) -> None:
         """Test that negative speed is still rejected for COLOR_SWEEP."""
         with pytest.raises(ValueError, match="speed must be non-negative"):
@@ -1075,6 +1094,38 @@ class TestSkyEffectFirmwareGate:
         assert packet.settings.speed == 0
         assert packet.settings.duration == 30_000_000_000
 
+    async def test_set_effect_sky_with_duration_sends_zero_speed(
+        self, mock_device_factory
+    ) -> None:
+        """Test that SKY with speed 0 and a duration goes on the wire as 0 ms."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.SKY,
+            speed=0,
+            duration=10_000_000_000,
+            sky_type=TileEffectSkyType.SUNSET,
+        )
+
+        packet = matrix.connection.send_packet.await_args.args[0]
+        assert packet.settings.speed == 0
+        assert packet.settings.duration == 10_000_000_000
+
+    async def test_set_effect_sky_without_duration_keeps_default_speed(
+        self, mock_device_factory
+    ) -> None:
+        """Test that SKY speed 0 with an infinite duration keeps the default."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=0)
+
+        packet = matrix.connection.send_packet.await_args.args[0]
+        assert packet.settings.speed == 3000
+
     async def test_set_effect_converts_speed_to_milliseconds(
         self, mock_device_factory
     ) -> None:
@@ -1089,15 +1140,16 @@ class TestSkyEffectFirmwareGate:
         assert packet.settings.speed == 1235
 
     @pytest.mark.parametrize(
-        "effect_type", [FirmwareEffect.COLOR_SWEEP, FirmwareEffect.FLAME]
+        "effect_type",
+        [FirmwareEffect.COLOR_SWEEP, FirmwareEffect.SKY, FirmwareEffect.FLAME],
     )
     async def test_set_effect_rejects_negative_speed_that_rounds_to_zero(
         self, mock_device_factory, effect_type: FirmwareEffect
     ) -> None:
         """Test that a tiny negative speed is rejected before rounding.
 
-        -0.0001 s rounds to 0 ms, which COLOR_SWEEP accepts, so the sign
-        must be checked on the caller's value.
+        -0.0001 s rounds to 0 ms, which COLOR_SWEEP and SKY with a duration
+        accept, so the sign must be checked on the caller's value.
         """
         matrix = self._matrix_light(
             mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
