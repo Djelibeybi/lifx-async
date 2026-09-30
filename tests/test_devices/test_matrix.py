@@ -357,7 +357,7 @@ class TestMatrixLight:
 
             await matrix.set_effect(
                 effect_type=FirmwareEffect.MORPH,
-                speed=5000,
+                speed=5.0,
                 palette=rainbow,
             )
 
@@ -380,7 +380,7 @@ class TestMatrixLight:
 
             await matrix.set_effect(
                 effect_type=FirmwareEffect.FLAME,
-                speed=3000,
+                speed=3.0,
                 palette=fire_palette,
             )
 
@@ -398,7 +398,7 @@ class TestMatrixLight:
         async with matrix:
             await matrix.set_effect(
                 effect_type=FirmwareEffect.SKY,
-                speed=2000,
+                speed=2.0,
                 sky_type=TileEffectSkyType.SUNRISE,
             )
 
@@ -417,7 +417,7 @@ class TestMatrixLight:
         async with matrix:
             await matrix.set_effect(
                 effect_type=FirmwareEffect.SKY,
-                speed=2000,
+                speed=2.0,
                 sky_type=TileEffectSkyType.SUNSET,
             )
 
@@ -436,7 +436,7 @@ class TestMatrixLight:
         async with matrix:
             await matrix.set_effect(
                 effect_type=FirmwareEffect.SKY,
-                speed=4000,
+                speed=4.0,
                 sky_type=TileEffectSkyType.CLOUDS,
                 cloud_saturation_min=50,
                 cloud_saturation_max=200,
@@ -456,7 +456,7 @@ class TestMatrixLight:
             # First set an effect
             await matrix.set_effect(
                 effect_type=FirmwareEffect.MORPH,
-                speed=3000,
+                speed=3.0,
             )
 
             # Then turn it off
@@ -571,7 +571,7 @@ class TestMatrixLight:
             # the palette.
             await matrix.set_effect(
                 effect_type=FirmwareEffect.MORPH,
-                speed=3000,
+                speed=3.0,
             )
 
             # Verify effect was set
@@ -839,6 +839,24 @@ class TestMatrixEffect:
                 speed=0,
             )
 
+    def test_effect_validation_zero_speed_for_color_sweep(self) -> None:
+        """Test that zero speed is valid for COLOR_SWEEP.
+
+        The button-started Colour Sweep reports speed 0 and sweeps once
+        across its duration.
+        """
+        effect = MatrixEffect(
+            effect_type=FirmwareEffect.COLOR_SWEEP,
+            speed=0,
+            duration=30_000_000_000,
+        )
+        assert effect.speed == 0
+
+    def test_effect_validation_negative_speed_for_color_sweep(self) -> None:
+        """Test that negative speed is still rejected for COLOR_SWEEP."""
+        with pytest.raises(ValueError, match="speed must be non-negative"):
+            MatrixEffect(effect_type=FirmwareEffect.COLOR_SWEEP, speed=-1)
+
     def test_effect_validation_zero_speed_for_off(self) -> None:
         """Test that zero speed is valid when effect is OFF."""
         effect = MatrixEffect(
@@ -1037,6 +1055,51 @@ class TestSkyEffectFirmwareGate:
             await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
 
         matrix.connection.send_packet.assert_not_called()
+
+    async def test_set_effect_color_sweep_sends_zero_speed(
+        self, mock_device_factory
+    ) -> None:
+        """Test that COLOR_SWEEP with speed 0 goes on the wire as 0 ms."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        await matrix.set_effect(
+            effect_type=FirmwareEffect.COLOR_SWEEP,
+            speed=0,
+            duration=30_000_000_000,
+        )
+
+        matrix.connection.send_packet.assert_awaited_once()
+        packet = matrix.connection.send_packet.await_args.args[0]
+        assert packet.settings.speed == 0
+        assert packet.settings.duration == 30_000_000_000
+
+    async def test_set_effect_converts_speed_to_milliseconds(
+        self, mock_device_factory
+    ) -> None:
+        """Test that speed in seconds is rounded to whole milliseconds."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        await matrix.set_effect(effect_type=FirmwareEffect.FLAME, speed=1.2346)
+
+        packet = matrix.connection.send_packet.await_args.args[0]
+        assert packet.settings.speed == 1235
+
+    async def test_set_effect_zero_speed_keeps_default_for_other_effects(
+        self, mock_device_factory
+    ) -> None:
+        """Test that speed 0 still means the 3 second default outside COLOR_SWEEP."""
+        matrix = self._matrix_light(
+            mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
+        )
+
+        await matrix.set_effect(effect_type=FirmwareEffect.FLAME, speed=0)
+
+        packet = matrix.connection.send_packet.await_args.args[0]
+        assert packet.settings.speed == 3000
 
     async def test_set_effect_sky_sends_when_support_probe_times_out(
         self, mock_device_factory
