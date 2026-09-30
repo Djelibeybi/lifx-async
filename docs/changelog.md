@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v7.6.4 (2026-09-30)
+
+### Bug Fixes
+
+- **matrix**: Require a duration for COLOR_SWEEP at speed 0
+  ([`8cc3048`](https://github.com/Djelibeybi/lifx-async/commit/8cc3048dfeea663659f312a615ece8215012368a))
+
+### Documentation
+
+- Document speed 0 for COLOR_SWEEP and SKY effects
+  ([`a1c9783`](https://github.com/Djelibeybi/lifx-async/commit/a1c9783e6b21536f432999ddcf95adc0c13e5650))
+
+
 ## v7.6.3 (2026-09-30)
 
 ### Bug Fixes
