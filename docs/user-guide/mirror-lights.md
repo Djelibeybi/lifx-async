@@ -239,6 +239,19 @@ reporting its underlying tile colours from `get_all_tile_colors()`, not the
 colours it is actually displaying. See [`MatrixLight.set_effect()`](../api/devices.md#matrix-light)
 for details.
 
+To sweep once, as the Mirror's button does, pass `speed=0` with a duration.
+The button-started sweep runs once over 30 seconds:
+
+```python
+from lifx import FirmwareEffect
+
+await mirror.set_effect(
+    FirmwareEffect.COLOR_SWEEP,
+    speed=0,
+    duration=30_000_000_000,  # nanoseconds
+)
+```
+
 ## Whole-Device Operations
 
 `set_power()` and `set_color()` still act on the entire fixture. Both keep the
