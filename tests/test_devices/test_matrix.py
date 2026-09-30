@@ -183,6 +183,34 @@ class TestMatrixLight:
         assert effect.palette is not None
         assert [color.kelvin for color in effect.palette] == [1500, 6500]
 
+    async def test_get_effect_accepts_undocumented_effect_type(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """A StateEffect carrying an undocumented effect type decodes."""
+        reply = packets.Tile.StateEffect(
+            settings=TileEffectSettings(
+                instanceid=0,
+                effect_type=FirmwareEffect(99),
+                speed=0,
+                duration=0,
+                parameter=TileEffectParameter(
+                    sky_type=TileEffectSkyType.SUNRISE,
+                    cloud_saturation_min=0,
+                    cloud_saturation_max=0,
+                ),
+                palette_count=0,
+                palette=[LightHsbk(hue=0, saturation=0, brightness=0, kelvin=0)] * 16,
+            )
+        )
+        matrix_light.connection.request.return_value = packets.Tile.StateEffect.unpack(
+            reply.pack()
+        )
+
+        effect = await matrix_light.get_effect()
+
+        assert effect.effect_type == 99
+        assert isinstance(effect.effect_type, FirmwareEffect)
+
     def test_effect_still_validates_user_input(self) -> None:
         """Outbound construction keeps the send-time guards."""
         with pytest.raises(ValueError, match="Effect speed must be positive"):

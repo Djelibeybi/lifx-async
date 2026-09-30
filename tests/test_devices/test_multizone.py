@@ -892,6 +892,41 @@ class TestMultiZoneEffect:
         assert effect is not None
         assert effect.effect_type is FirmwareEffect.OFF
 
+    async def test_get_effect_accepts_undocumented_effect_type(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """A StateEffect carrying an undocumented effect type decodes.
+
+        The effect is not MOVE, so no direction is read from its parameters.
+        """
+        reply = packets.MultiZone.StateEffect(
+            settings=MultiZoneEffectSettings(
+                instanceid=0,
+                effect_type=FirmwareEffect(99),
+                speed=0,
+                duration=0,
+                parameter=MultiZoneEffectParameter(
+                    parameter0=0,
+                    parameter1=7,
+                    parameter2=0,
+                    parameter3=0,
+                    parameter4=0,
+                    parameter5=0,
+                    parameter6=0,
+                    parameter7=0,
+                ),
+            )
+        )
+        multizone_light.connection.request.return_value = (
+            packets.MultiZone.StateEffect.unpack(reply.pack())
+        )
+
+        effect = await multizone_light.get_effect()
+
+        assert effect.effect_type == 99
+        assert isinstance(effect.effect_type, FirmwareEffect)
+        assert effect.direction is None
+
     async def test_set_effect(self, multizone_light: MultiZoneLight) -> None:
         """Test setting multizone effect."""
         # Mock SET operation returns True

@@ -37,6 +37,16 @@ class FirmwareEffect(IntEnum):
     SKY = 5
     COLOR_SWEEP = 6
 
+    @classmethod
+    def _missing_(cls, value: object) -> FirmwareEffect | None:
+        """Represent a value the protocol does not document."""
+        if not isinstance(value, int) or not 0 <= value <= 0xFF:
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"UNKNOWN_{value}"
+        member._value_ = value
+        return member
+
 
 class LightLastHevCycleResult(IntEnum):
     """Auto-generated enum."""

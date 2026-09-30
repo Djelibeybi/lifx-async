@@ -70,7 +70,9 @@ class MultiZoneEffect:
     """MultiZone effect configuration.
 
     Attributes:
-        effect_type: Type of effect (OFF, MOVE)
+        effect_type: Type of effect (OFF, MOVE). A device can report a value
+            outside these, which reads back as an ``UNKNOWN_<n>`` member rather
+            than raising
         speed: Effect speed in milliseconds
         duration: Total effect duration (0 for infinite)
         parameters: Effect-specific parameters (8 uint32 values)

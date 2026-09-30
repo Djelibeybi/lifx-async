@@ -466,8 +466,9 @@ Local generator quirks:
   - This keeps the library focused on LIFX lighting devices
 - **open enums**: Enums listed in `OPEN_ENUMS` get a `_missing_` hook, so an undocumented value
   the firmware reports unpacks to an `UNKNOWN_<n>` pseudo-member instead of raising, and packs
-  back to the same value. Only `TileEffectSkyType` is open: a Mirror running the button-started
-  Colour Sweep reports `sky_type` 13
+  back to the same value. `FirmwareEffect` and `TileEffectSkyType` are open: LIFX say effect
+  replies are polymorphic by effect type until they rebuild the effect messages, and a Mirror
+  running the button-started Colour Sweep reports `sky_type` 13
 - **sensor packets**: Adds undocumented ambient light sensor packets:
   - `SensorGetAmbientLight` (401): Request packet with no parameters
   - `SensorStateAmbientLight` (402): Response packet with lux field (float32)
