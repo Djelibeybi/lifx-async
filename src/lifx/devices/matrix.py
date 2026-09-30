@@ -185,7 +185,9 @@ class MatrixEffect:
         effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP). A
             device can report a value outside these, which reads back as an
             ``UNKNOWN_<n>`` member rather than raising
-        speed: Effect speed in milliseconds
+        speed: Effect speed in milliseconds. Must be positive for an active
+            effect, except COLOR_SWEEP, where 0 sweeps once across
+            ``duration``
         duration: Effect duration in nanoseconds (0 for infinite). A value
             read back from a device is the time remaining, not the total
         palette: Color palette for the effect (max 16 colors)
@@ -216,8 +218,10 @@ class MatrixEffect:
             return
 
         # Validate all fields
-        # Speed can be 0 only when effect is OFF
-        if self.effect_type != FirmwareEffect.OFF:
+        # Speed can be 0 only when effect is OFF, or COLOR_SWEEP: the
+        # button-started Colour Sweep reports speed 0 and sweeps once across
+        # its duration.
+        if self.effect_type not in (FirmwareEffect.OFF, FirmwareEffect.COLOR_SWEEP):
             self._validate_speed_active(self.speed)
         elif self.speed < 0:
             raise ValueError(f"Effect speed must be non-negative, got {self.speed}")
@@ -1256,7 +1260,9 @@ class MatrixLight(Light):
 
         Args:
             effect_type: Type of effect (OFF, MORPH, FLAME, SKY, COLOR_SWEEP)
-            speed: Effect speed in seconds (default: 3)
+            speed: Effect speed in seconds (default: 3), rounded to the
+                nearest millisecond. 0 means the 3 second default, except
+                for COLOR_SWEEP, where 0 sweeps once across ``duration``
             duration: Total effect duration in nanoseconds (0 for infinite)
             palette: Color palette for the effect (max 16 colors). An explicit
                 palette is always sent exactly as given, with no extra read.
@@ -1289,6 +1295,9 @@ class MatrixLight(Light):
             LifxProtocolError: If MORPH is requested with no palette and the
                 colour read gets a malformed reply, or the device reports no
                 colours
+            ValueError: If speed is negative, or a non-zero speed rounds to
+                0 ms for an active effect other than COLOR_SWEEP, or another
+                field fails ``MatrixEffect`` validation
 
         Example:
             >>> # Set MORPH effect with rainbow palette
@@ -1329,12 +1338,18 @@ class MatrixLight(Light):
                     )
 
         _LOGGER.debug(
-            "Setting matrix effect %s (speed=%d) for %s",
+            "Setting matrix effect %s (speed=%gs) for %s",
             effect_type,
             speed,
             self.label or self.serial,
         )
-        speed_ms = round(speed * 1000) if speed else 3000
+        # A falsy speed has always meant the 3 second default. COLOR_SWEEP is
+        # the exception: speed 0 is a real setting that sweeps once across
+        # the duration, matching the button-started Colour Sweep.
+        if speed or effect_type == FirmwareEffect.COLOR_SWEEP:
+            speed_ms = round(speed * 1000)
+        else:
+            speed_ms = 3000
 
         # Create and validate MatrixEffect
         effect = MatrixEffect(
