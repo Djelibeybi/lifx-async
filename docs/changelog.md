@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.6.3 (2026-09-30)
+
+### Bug Fixes
+
+- **matrix**: Allow speed 0 for SKY when it has a duration
+  ([`2027936`](https://github.com/Djelibeybi/lifx-async/commit/2027936d37ad41529f95157c0a27941960e5c88d))
+
+
 ## v7.6.2 (2026-09-30)
 
 ### Bug Fixes
