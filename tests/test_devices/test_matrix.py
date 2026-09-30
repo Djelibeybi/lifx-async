@@ -840,7 +840,7 @@ class TestMatrixEffect:
             )
 
     def test_effect_validation_zero_speed_for_color_sweep(self) -> None:
-        """Test that zero speed is valid for COLOR_SWEEP.
+        """Test that zero speed is valid for COLOR_SWEEP with a finite duration.
 
         The button-started Colour Sweep reports speed 0 and sweeps once
         across its duration.
@@ -871,10 +871,27 @@ class TestMatrixEffect:
         ):
             MatrixEffect(effect_type=FirmwareEffect.SKY, speed=0)
 
+    def test_effect_validation_zero_speed_for_color_sweep_without_duration(
+        self,
+    ) -> None:
+        """Test that zero speed is rejected for COLOR_SWEEP with no duration.
+
+        A Mirror given speed 0 with an infinite duration repeats the sweep
+        every second or two rather than sweeping once.
+        """
+        with pytest.raises(
+            ValueError, match="speed must be positive for active effects"
+        ):
+            MatrixEffect(effect_type=FirmwareEffect.COLOR_SWEEP, speed=0)
+
     def test_effect_validation_negative_speed_for_color_sweep(self) -> None:
         """Test that negative speed is still rejected for COLOR_SWEEP."""
         with pytest.raises(ValueError, match="speed must be non-negative"):
-            MatrixEffect(effect_type=FirmwareEffect.COLOR_SWEEP, speed=-1)
+            MatrixEffect(
+                effect_type=FirmwareEffect.COLOR_SWEEP,
+                speed=-1,
+                duration=30_000_000_000,
+            )
 
     def test_effect_validation_zero_speed_for_off(self) -> None:
         """Test that zero speed is valid when effect is OFF."""
@@ -1113,15 +1130,22 @@ class TestSkyEffectFirmwareGate:
         assert packet.settings.speed == 0
         assert packet.settings.duration == 10_000_000_000
 
-    async def test_set_effect_sky_without_duration_keeps_default_speed(
-        self, mock_device_factory
+    @pytest.mark.parametrize(
+        "effect_type", [FirmwareEffect.SKY, FirmwareEffect.COLOR_SWEEP]
+    )
+    async def test_set_effect_without_duration_keeps_default_speed(
+        self, mock_device_factory, effect_type: FirmwareEffect
     ) -> None:
-        """Test that SKY speed 0 with an infinite duration keeps the default."""
+        """Test that speed 0 with an infinite duration keeps the default.
+
+        A Mirror given COLOR_SWEEP at 0 ms with no duration repeats the sweep
+        every second or two, so 0 must not reach the wire here.
+        """
         matrix = self._matrix_light(
             mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
         )
 
-        await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=0)
+        await matrix.set_effect(effect_type=effect_type, speed=0)
 
         packet = matrix.connection.send_packet.await_args.args[0]
         assert packet.settings.speed == 3000
@@ -1167,7 +1191,7 @@ class TestSkyEffectFirmwareGate:
     async def test_set_effect_zero_speed_keeps_default_for_other_effects(
         self, mock_device_factory
     ) -> None:
-        """Test that speed 0 still means the 3 second default outside COLOR_SWEEP."""
+        """Test that speed 0 still means the 3 second default for FLAME."""
         matrix = self._matrix_light(
             mock_device_factory, self.MATRIX_PRODUCT, major=4, minor=4
         )
