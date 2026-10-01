@@ -274,7 +274,7 @@ class TestMirrorLightLifecycle:
         ] * 25
         refreshed_back = [DARK] * 25
 
-        async def _parent_refresh(_self) -> None:
+        async def _parent_refresh(_self, *, extended: bool = True) -> None:
             mirror._state.tile_colors = _buffer(refreshed_front, refreshed_back)
 
         with patch.object(MirrorLight.__mro__[1], "refresh_state", _parent_refresh):

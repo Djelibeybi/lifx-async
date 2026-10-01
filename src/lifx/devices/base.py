@@ -2503,7 +2503,7 @@ class Device(Generic[StateT]):
 
         return self._state
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, *, extended: bool = True) -> None:
         """Refresh device state from hardware.
 
         On a device whose state has not been initialized yet, this delegates to
@@ -2522,6 +2522,13 @@ class Device(Generic[StateT]):
         :class:`~lifx.devices.light.Light` replaces the label and power queries
         with a single colour request that returns all three, and its own
         subclasses add zones, tiles, infrared, HEV and ceiling components.
+
+        Args:
+            extended: When False, subclasses skip the state they add on top of
+                label, power and the opt-in readings, so a caller can read that
+                state on its own schedule through the matching getters. A base
+                device has no such state, so it reads the same either way. An
+                uninitialized device is always fully initialized.
 
         Raises:
             LifxTimeoutError: If device does not respond

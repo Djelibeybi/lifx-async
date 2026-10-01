@@ -1570,16 +1570,22 @@ class MatrixLight(Light):
             f"MatrixLight(label={self.label!r}, serial={self.serial!r}, ip={self.ip!r})"
         )
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, *, extended: bool = True) -> None:
         """Refresh matrix light state from hardware.
 
         Fetches color, tiles, tile colors for all tiles, and effect.
+
+        Args:
+            extended: When False, only the colour batch is read; see
+                :meth:`~lifx.devices.light.Light.refresh_state`.
 
         Raises:
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state()
+        await super().refresh_state(extended=extended)
+        if not extended:
+            return
 
         # Fetch all matrix light state sequentially to avoid overwhelming device
         all_tile_colors = await self.get_all_tile_colors()

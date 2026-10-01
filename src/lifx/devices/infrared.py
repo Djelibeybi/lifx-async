@@ -247,16 +247,22 @@ class InfraredLight(Light):
         """
         return self._infrared
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, *, extended: bool = True) -> None:
         """Refresh infrared light state from hardware.
 
         Fetches color and infrared brightness.
+
+        Args:
+            extended: When False, only the colour batch is read; see
+                :meth:`~lifx.devices.light.Light.refresh_state`.
 
         Raises:
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state()
+        await super().refresh_state(extended=extended)
+        if not extended:
+            return
 
         infrared = await self.get_infrared()
         self._state.infrared = infrared

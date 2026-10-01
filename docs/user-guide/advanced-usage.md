@@ -78,6 +78,28 @@ been entered yet — and to `fetch_ambient_light` on lights.
 See the [Discovery Guide](discovery.md#choosing-a-discovery-method) for the
 full method-selection table.
 
+### Refreshing only the core state
+
+`refresh_state(extended=False)` reads only the colour batch: colour, power and
+label in one request, plus the opt-in readings whose flags are set. It skips
+the zones, tiles, effect, infrared and HEV reads that the device subclasses
+add, so an application that polls often can read those on their own schedule
+through the matching getters, which update state as well:
+
+```python
+async with await Device.connect(ip="192.168.1.100") as light:
+    # Every poll: the colour batch, with the signal only when it is due
+    light.fetch_radio_info = signal_due
+    await light.refresh_state(extended=False)
+
+    # Less often, and only for the state the application shows
+    if isinstance(light, MultiZoneLight):
+        await light.get_effect()
+```
+
+A device whose state has not been initialised yet is always fully initialised,
+whatever `extended` is set to.
+
 ## Storing State
 
 Device properties return cached values that were last retrieved from the device.

@@ -931,10 +931,17 @@ class TestRefreshState:
         assert cancelled.is_set()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "extended",
+        [pytest.param(True, id="extended"), pytest.param(False, id="core")],
+    )
     async def test_base_device_refresh_state_rereads_label_and_power(
-        self, device, mock_product_info
+        self, device, mock_product_info, extended
     ):
-        """Device.refresh_state() re-queries what it stamps as fresh."""
+        """Device.refresh_state() re-queries what it stamps as fresh.
+
+        A base device has no extended state, so both modes read the same.
+        """
         device._capabilities = mock_product_info(has_color=False)
         device.connection.request.side_effect = _state_request_handler()
         await device._initialize_state()
@@ -943,7 +950,7 @@ class TestRefreshState:
         device._state.power = 0
         device.connection.request.reset_mock()
 
-        await device.refresh_state()
+        await device.refresh_state(extended=extended)
 
         requested = [call.args[0] for call in device.connection.request.await_args_list]
         assert any(isinstance(packet, packets.Device.GetLabel) for packet in requested)

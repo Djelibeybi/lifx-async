@@ -1033,13 +1033,18 @@ class Light(Device[LightState]):
 
         return INVALID_AMBIENT_LIGHT_RESPONSE if power > 0 else lux
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, *, extended: bool = True) -> None:
         """Refresh light state from hardware.
 
         Fetches color (which includes power and label), plus the WiFi signal
         and ambient light reading when :attr:`fetch_wifi_info` and
         :attr:`fetch_ambient_light` are set, and updates state. Initializes
         state first when the device has none yet.
+
+        Args:
+            extended: When False, subclasses skip their zones, tiles, effect,
+                infrared and HEV reads, leaving only this colour batch. A plain
+                light reads the same either way.
 
         Raises:
             LifxTimeoutError: If device does not respond

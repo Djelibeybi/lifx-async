@@ -350,16 +350,22 @@ class CeilingLight(ComponentMatrixLight):
 
         return ceiling_state
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, *, extended: bool = True) -> None:
         """Refresh ceiling light state from hardware.
 
         Fetches color, tiles, tile colors, effect, and ceiling component state.
+
+        Args:
+            extended: When False, only the colour batch is read; see
+                :meth:`~lifx.devices.light.Light.refresh_state`.
 
         Raises:
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state()
+        await super().refresh_state(extended=extended)
+        if not extended:
+            return
 
         # Extract ceiling component colors from already-fetched tile_colors
         # (parent refresh_state already called get_all_tile_colors)

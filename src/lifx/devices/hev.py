@@ -443,16 +443,22 @@ class HevLight(Light):
         """
         return self._hev_result
 
-    async def refresh_state(self) -> None:
+    async def refresh_state(self, *, extended: bool = True) -> None:
         """Refresh HEV light state from hardware.
 
         Fetches color, HEV cycle, config, and last result.
+
+        Args:
+            extended: When False, only the colour batch is read; see
+                :meth:`~lifx.devices.light.Light.refresh_state`.
 
         Raises:
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
-        await super().refresh_state()
+        await super().refresh_state(extended=extended)
+        if not extended:
+            return
 
         # Fetch all HEV light state
         hev_cycle, hev_result = await asyncio.gather(
