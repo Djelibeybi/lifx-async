@@ -100,6 +100,26 @@ async with await Device.connect(ip="192.168.1.100") as light:
 A device whose state has not been initialised yet is always fully initialised,
 whatever `extended` is set to.
 
+### Knowing when a write has been read back
+
+Every write schedules a debounced `refresh_state()`, so an application does not
+need to read the device again after sending a command. `add_state_listener()`
+tells it when that refresh has landed, and returns a function that removes the
+listener:
+
+```python
+def show(state: LightState) -> None:
+    print(f"{state.label}: power {state.power}")
+
+remove = light.add_state_listener(show)
+await light.set_power(True)  # show() runs once the refresh completes
+remove()
+```
+
+Listeners run on the event loop. They are not called for refreshes the
+application makes itself, or for a refresh that fails, and a listener that
+raises is logged without stopping the others.
+
 ## Storing State
 
 Device properties return cached values that were last retrieved from the device.

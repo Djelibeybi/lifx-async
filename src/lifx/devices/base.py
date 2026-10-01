@@ -6,7 +6,7 @@ import asyncio
 import logging
 import time
 import uuid
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
 from enum import Enum
@@ -683,6 +683,7 @@ class Device(Generic[StateT]):
         self._state: StateT | None = None
         self._refresh_task: asyncio.Task[None] | None = None
         self._refresh_lock = asyncio.Lock()
+        self._state_listeners: list[Callable[[StateT], None]] = []
         self._is_closed = False
 
     def _set_connectivity(
@@ -2563,6 +2564,55 @@ class Device(Generic[StateT]):
 
         self._state.last_updated = time.time()
 
+    def add_state_listener(
+        self, listener: Callable[[StateT], None]
+    ) -> Callable[[], None]:
+        """Call a listener with the state after each write's own refresh.
+
+        Every write schedules a debounced :meth:`refresh_state`, so an
+        application that reads :attr:`state` instead of refreshing it can learn
+        when that refresh has landed. The listener runs on the event loop and
+        is not called for refreshes the application makes itself, or for one
+        that fails.
+
+        Args:
+            listener: Called with the refreshed state
+
+        Returns:
+            A function that removes the listener
+
+        Example:
+            ```python
+            remove = light.add_state_listener(lambda state: print(state.power))
+            await light.set_power(True)
+            remove()
+            ```
+        """
+        self._state_listeners.append(listener)
+
+        def remove_state_listener() -> None:
+            self._state_listeners.remove(listener)
+
+        return remove_state_listener
+
+    def _notify_state_listeners(self) -> None:
+        """Call every listener, so one that raises cannot silence the rest."""
+        state = self._state
+        if state is None:
+            return
+        for listener in list(self._state_listeners):
+            try:
+                listener(state)
+            except Exception:
+                _LOGGER.exception(
+                    {
+                        "class": "Device",
+                        "method": "_notify_state_listeners",
+                        "action": "listener_failed",
+                        "serial": self.serial,
+                    }
+                )
+
     async def _schedule_refresh(self) -> None:
         """Schedule debounced state refresh.
 
@@ -2592,6 +2642,7 @@ class Device(Generic[StateT]):
                 if not self._is_closed:
                     async with self._refresh_lock:
                         await self.refresh_state()
+                    self._notify_state_listeners()
             except asyncio.CancelledError:
                 pass
             except Exception as e:
