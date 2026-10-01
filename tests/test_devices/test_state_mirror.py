@@ -16,6 +16,8 @@ from lifx.devices.matrix import MatrixLightState
 from lifx.devices.mirror import MirrorLight, MirrorLightState, _gather
 from lifx.exceptions import LifxError
 from lifx.products import get_mirror_layout
+from lifx.protocol import packets
+from lifx.protocol.protocol_types import LightHsbk
 
 FRONT = [HSBK(hue=120, saturation=1.0, brightness=0.9, kelvin=3500)] * 25
 BACK = [HSBK(hue=200, saturation=0.8, brightness=0.4, kelvin=2700)] * 25
@@ -111,6 +113,15 @@ def _connected_mirror(power: int = 65535, product: int = 267) -> MirrorLight:
     mirror.get_all_tile_colors = AsyncMock(return_value=[_buffer(FRONT, BACK)])
     mirror.get_power = AsyncMock(return_value=power)
     return mirror
+
+
+def _state_color(power: int) -> packets.Light.StateColor:
+    """Build the GetColor reply a refresh would receive."""
+    return packets.Light.StateColor(
+        color=LightHsbk(hue=0, saturation=0, brightness=65535, kelvin=3500),
+        power=power,
+        label="Mirror",
+    )
 
 
 class TestMirrorLightStateDataclass:
@@ -340,6 +351,29 @@ class TestMirrorComponentFlags:
         mirror.state.last_front_colors = None
 
         assert mirror.front_is_on is False
+
+    @pytest.mark.parametrize(
+        ("power", "is_on"),
+        [pytest.param(0, False, id="off"), pytest.param(65535, True, id="on")],
+    )
+    def test_reported_power_updates_state_flags(self, power: int, is_on: bool) -> None:
+        """A GetColor reply re-derives the stored flags without a tile read."""
+        mirror = _connected_mirror(power=65535 - power)
+
+        mirror._adopt_state_color(_state_color(power))
+
+        assert mirror.state.front_is_on is is_on
+        assert mirror.state.back_is_on is is_on
+
+    def test_reported_power_keeps_flags_during_pending_power_write(self) -> None:
+        """A stale power reply during a power-off fade keeps the recorded flags."""
+        mirror = _connected_mirror()
+        mirror._record_power(False, 2.0)
+
+        mirror._adopt_state_color(_state_color(65535))
+
+        assert mirror.state.front_is_on is False
+        assert mirror.state.back_is_on is False
 
     def test_flags_false_without_state(self) -> None:
         """Test that the flags are false before state initialisation."""

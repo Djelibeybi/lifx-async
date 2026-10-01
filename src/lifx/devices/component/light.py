@@ -22,6 +22,7 @@ from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 
 if TYPE_CHECKING:
+    from lifx.protocol import packets
     from lifx.theme import Theme
 
 _POWER_ON = 65535
@@ -252,6 +253,19 @@ class ComponentMatrixLight(MatrixLight):
         if self._state is not None:
             self._state.power = _POWER_ON if on else 0
             self._update_component_flags()
+
+    def _adopt_state_color(
+        self, state: packets.Light.StateColor
+    ) -> tuple[HSBK, int, str]:
+        """Re-derive component on/off flags from the reported power.
+
+        A pending power write keeps the flags it recorded: firmware can still
+        report the old power while a power-off fade runs.
+        """
+        result = super()._adopt_state_color(state)
+        if self._pending_power.get() is None:
+            self._update_component_flags()
+        return result
 
     async def _write_power(self, on: bool | int, duration: float) -> None:
         """Send power without re-entering whole-light colour capture."""
