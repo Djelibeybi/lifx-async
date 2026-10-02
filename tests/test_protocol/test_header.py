@@ -304,13 +304,13 @@ class TestHeaderValidation:
                 pkt_type=2,
             )
 
-    def test_nonzero_origin_raises(self) -> None:
-        """The origin bits (14-15 of the protocol field) must be zero."""
-        packed = bytearray(self._valid_header().pack())
+    def test_nonzero_origin_is_ignored(self) -> None:
+        """Origin bits (14-15) are not validated; early firmware sets them."""
+        valid = self._valid_header()
+        packed = bytearray(valid.pack())
         packed[3] |= 0b0100_0000  # set origin bit 14
 
-        with pytest.raises(ValueError, match="Invalid origin"):
-            LifxHeader.unpack(bytes(packed))
+        assert LifxHeader.unpack(bytes(packed)) == valid
 
     def test_unset_addressable_bit_raises(self) -> None:
         """The addressable bit (12 of the protocol field) must be set."""

@@ -75,8 +75,10 @@ def parse_message(data: bytes) -> tuple[LifxHeader, bytes]:
             f"Message too short: {len(data)} < {LifxHeader.HEADER_SIZE} bytes"
         )
 
-    # Parse header
-    header = LifxHeader.unpack(data[: LifxHeader.HEADER_SIZE])
+    try:
+        header = LifxHeader.unpack(data[: LifxHeader.HEADER_SIZE])
+    except ValueError as e:
+        raise LifxProtocolError(f"Invalid header: {e}") from e
 
     # Extract payload
     payload = data[LifxHeader.HEADER_SIZE :]

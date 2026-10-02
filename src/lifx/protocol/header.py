@@ -190,14 +190,12 @@ class LifxHeader:
         size, protocol_field, source = struct.unpack("<HHI", data[0:8])
 
         # Extract protocol field components
-        origin = (protocol_field >> 14) & 0b11
         tagged = bool((protocol_field >> 13) & 0b1)
         addressable = bool((protocol_field >> 12) & 0b1)
         protocol = protocol_field & 0xFFF
 
-        # Validate origin and addressable
-        if origin != cls.ORIGIN:
-            raise ValueError(f"Invalid origin: {origin}")
+        # Origin is ignored on receive: the spec says "must be zero", but early
+        # firmware sends other values and aiolifx never validated it either.
         if not addressable:
             raise ValueError("Addressable bit must be set")
 
