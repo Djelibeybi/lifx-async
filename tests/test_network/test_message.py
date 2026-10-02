@@ -132,6 +132,24 @@ class TestParseMessage:
         with pytest.raises(ProtocolError):
             parse_message(b"too short")
 
+    @pytest.mark.parametrize("origin", [1, 2, 3])
+    def test_parse_message_ignores_origin(self, origin: int) -> None:
+        """Early firmware sets non-zero origin bits; they must still parse."""
+        message = bytearray(create_message(Device.GetService(), source=12345))
+        message[3] = (message[3] & 0x3F) | (origin << 6)
+
+        header, _ = parse_message(bytes(message))
+
+        assert header.pkt_type == Device.GetService.PKT_TYPE
+
+    def test_parse_message_invalid_header_is_protocol_error(self) -> None:
+        """A header that fails validation raises ProtocolError, not ValueError."""
+        message = bytearray(create_message(Device.GetService(), source=12345))
+        message[3] &= ~0x10  # clear the addressable bit
+
+        with pytest.raises(ProtocolError, match="Addressable bit"):
+            parse_message(bytes(message))
+
     def test_parse_message_invalid_size(self) -> None:
         """Test parsing message with invalid size field."""
         # Create valid message then corrupt size
