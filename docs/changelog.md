@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.6.5 (2026-10-02)
+
+### Bug Fixes
+
+- **protocol**: Ignore the origin bits when parsing a header
+  ([`07fa7d4`](https://github.com/Djelibeybi/lifx-async/commit/07fa7d447611ac7ea5b3ac48ed4467470a38f5c7))
+
+
 ## v7.6.4 (2026-09-30)
 
 ### Bug Fixes
