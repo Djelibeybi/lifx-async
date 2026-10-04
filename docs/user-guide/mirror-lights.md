@@ -35,25 +35,39 @@ anti-fog endpoints.
 ### Zone Map
 
 The device is driven as a 4×13 matrix, so a single Set64 packet is sufficient to
-update both front and back LEDs. **Zone numbering does not match zone
-order.** Columns 0–1 carry the front ring and columns 2–3 carry the back ring,
-each running bottom to top:
+update both front and back LEDs. **Zone numbering does not match buffer
+order.** Each ring occupies two columns: column 0 holds the front ring's left
+half and column 1 its right half, with columns 2 and 3 doing the same for the
+back. Row 0 is the top of the fixture and row 12 the bottom, so each column
+reads downwards:
 
 ```
-  9  --  40  --
-  8  10  41  39
-  7  11  42  38
-  6  12  43  37
-  5  13  44  36
-  4  14  45  35
-  3  15  46  34
-  2  16  47  33
-  1  17  48  32
-  0  18  49  31
- 24  19  25  30
- 23  20  26  29
- 22  21  27  28
+          col 0    col 1    col 2    col 3
+         front L  front R   back L   back R
+row  0      9       --        40       --     top centre
+row  1      8       10        41       39
+row  2      7       11        42       38
+row  3      6       12        43       37
+row  4      5       13        44       36
+row  5      4       14        45       35
+row  6      3       15        46       34
+row  7      2       16        47       33
+row  8      1       17        48       32
+row  9      0       18        49       31
+row 10     24       19        25       30
+row 11     23       20        26       29
+row 12     22       21        27       28     bottom centre
 ```
+
+The two `--` cells carry no LED: the chip at the top centre of each ring sits in
+the left column, so the right column starts one row down. That is why the buffer
+holds 52 positions but only 50 zones.
+
+Each ring is a single LED strip. The front starts at zone 0 on the lower left,
+runs up the left side to zone 9 at the top centre, down the right side to zone
+21 at the bottom centre, then back along the lower left through zones 22–24,
+ending beside zone 0 with the strip gap between them. The back ring follows the
+same path anticlockwise, from zone 25 on the lower left round to zone 49.
 
 `MirrorLight` handles the translation: component methods take and return
 colors in zone order, and gather from or scatter to the correct physical
@@ -61,8 +75,10 @@ zones. The whole matrix fits in a single `Set64` packet, so any component
 write is one packet on the wire, and the unused positions are never touched.
 
 !!! note
-    The zone map comes from the LIFX firmware team and has not yet been
-    verified against hardware.
+    This map was supplied by the LIFX firmware team and has since been verified
+    against hardware: the column assignment, the orientation of the rows, the
+    left and right halves, the two chipless buffer positions, the bottom split
+    and the position of zones 0, 9 and 24 all match the fixture.
 
 ## Quick Start
 
