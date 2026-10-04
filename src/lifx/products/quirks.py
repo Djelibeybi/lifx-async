@@ -236,8 +236,13 @@ def _buffer_positions(zone_map: tuple[int, ...], zones: range) -> tuple[int, ...
 # Mirror product component layouts
 # Zone map supplied by the LIFX firmware team: a 36x22 capsule, portrait by
 # default, driven as a 4x13 matrix. The Matter buttons sit just above the
-# bottom half-circle endpoint, between front zones 21 and 22. Not yet verified
-# against hardware.
+# bottom half-circle endpoint, between front zones 21 and 22.
+#
+# Verified against hardware: columns 0-1 are the front ring and 2-3 the back,
+# row 0 is the top of the fixture and row 12 the bottom, the even column of
+# each pair is that ring's left half, and the two -1 cells carry no chip, which
+# is why the top-centre zone (9 front, 40 back) sits in the left column. Zones
+# 0 and 24 light adjacent on the lower left, with the strip gap between them.
 # TODO: Remove once LIFX adds component layout metadata to products.json
 _MIRROR_LAYOUT = MirrorComponentLayout(
     width=4,
