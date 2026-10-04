@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v7.6.6 (2026-10-04)
+
+### Bug Fixes
+
+- **examples**: Balance the Mirror demo's component brightness
+  ([`902b073`](https://github.com/Djelibeybi/lifx-async/commit/902b07302f043061c017dbc19dbf81697d8bed34))
+
+### Documentation
+
+- **mirror**: Record the hardware-verified zone map
+  ([`edf96d6`](https://github.com/Djelibeybi/lifx-async/commit/edf96d623b302e37165c1453a30955b10951adf0))
+
+
 ## v7.6.5 (2026-10-02)
 
 ### Bug Fixes
