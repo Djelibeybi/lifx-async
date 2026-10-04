@@ -17,11 +17,16 @@ import asyncio
 from lifx import HSBK, Device, MirrorLight
 from lifx.theme import get_theme
 
-# Soft white for the front ring and full-brightness amber for the back ring.
-# The back ring washes the wall, so it is hard to see against a lit front;
-# keeping the front at 30% makes each component's changes easy to tell apart.
-TASK_WHITE = HSBK(hue=0, saturation=0.0, brightness=0.3, kelvin=4500)
-BACKWASH = HSBK(hue=30, saturation=0.4, brightness=1.0, kelvin=2700)
+# Soft white for the front ring and warm amber for the back ring. The two
+# components interfere in opposite ways, so neither is run at full brightness:
+# the back washes the wall and that spill lands on the front, drowning it,
+# while the front faces the room and at full brightness simply dazzles, so the
+# back stops registering even though nothing is spilling onto it. Keeping both
+# mid-range, with the back a little ahead, is what lets each component's
+# changes be followed at once. Judged by eye in a dim room, so treat it as a
+# starting point rather than a measurement.
+TASK_WHITE = HSBK(hue=0, saturation=0.0, brightness=0.35, kelvin=4500)
+BACKWASH = HSBK(hue=30, saturation=0.4, brightness=0.6, kelvin=2700)
 
 
 def gradient(zone_count: int, start_hue: float, end_hue: float) -> list[HSBK]:
