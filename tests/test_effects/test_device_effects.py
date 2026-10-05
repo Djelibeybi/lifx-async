@@ -179,6 +179,46 @@ class TestStartAndStopOnALight:
             await conductor.stop([second])
             assert (await second.get_color())[0] == DIM_BLUE
 
+    async def test_add_lights_takes_a_light_out_of_its_old_run(self, emulator_devices):
+        first, second = emulator_devices[0], emulator_devices[1]
+        async with first, second:
+            for light in (first, second):
+                await light.set_power(True)
+                await light.set_color(DIM_BLUE)
+            old = _SolidFrames(RED)
+            await second.start_effect(old)
+            shared = _FollowOnFrames(GREEN)
+            conductor = Conductor()
+            await conductor.start(shared, [first])
+            await _eventually(lambda: _shows(second, RED))
+
+            await conductor.add_lights(shared, [first, second])
+
+            assert await _stopped_drawing(old)
+            await _eventually(lambda: _shows(second, GREEN))
+            assert conductor.effect(first) is shared
+            assert conductor.effect(second) is shared
+
+            await conductor.stop([first, second])
+            for light in (first, second):
+                assert (await light.get_color())[0] == DIM_BLUE
+
+    async def test_add_lights_to_an_effect_that_is_not_running_changes_nothing(
+        self, emulator_devices
+    ):
+        light = emulator_devices[0]
+        async with light:
+            await light.set_power(True)
+            await light.set_color(DIM_BLUE)
+            old = _SolidFrames(RED)
+            await light.start_effect(old)
+
+            await Conductor().add_lights(_FollowOnFrames(GREEN), [light])
+
+            assert not await _stopped_drawing(old)
+            await light.stop_effect()
+            assert (await light.get_color())[0] == DIM_BLUE
+
     async def test_stop_effect_stops_a_matrix_firmware_effect(self, emulator_devices):
         matrix = emulator_devices[6]
         async with matrix:

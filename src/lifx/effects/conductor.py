@@ -93,7 +93,7 @@ class Conductor:
             key = participant_key(light)
             for conductor in list(Conductor._live):
                 running = conductor._running.get(key)
-                if running is None:
+                if running is None or running.effect is effect:
                     continue
                 if effect.inherit_prestate(running.effect):
                     inherited[key] = running.prestate
@@ -404,6 +404,13 @@ class Conductor:
         if not compatible:
             return
 
+        # Newest wins, as in start(): a light running another effect leaves
+        # that run with no restore in between. An effect that is not running
+        # here takes no light from anywhere.
+        inherited: dict[ParticipantKey, PreState] = {}
+        if any(running.effect is effect for running in self._running.values()):
+            inherited = await self._take_over(effect, compatible)
+
         async with self._lock:
             # Skip lights already running this effect
             new_lights: list[Light] = []
@@ -437,12 +444,16 @@ class Conductor:
                 )
                 return
 
-            # Capture prestates in parallel
+            # Capture prestates in parallel for lights that do not inherit one
+            to_capture = [
+                light for light in new_lights if participant_key(light) not in inherited
+            ]
             captured = await asyncio.gather(
-                *(self._state_manager.capture_state(light) for light in new_lights)
+                *(self._state_manager.capture_state(light) for light in to_capture)
             )
-            prestates = dict(
-                zip([participant_key(light) for light in new_lights], captured)
+            prestates = dict(inherited)
+            prestates.update(
+                zip([participant_key(light) for light in to_capture], captured)
             )
 
             # Create animators for frame-based effects
