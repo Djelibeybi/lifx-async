@@ -247,7 +247,7 @@ wheels = [
 
 [[package]]
 name = "lifx-async"
-version = "7.6.7"
+version = "7.6.8"
 source = { editable = "." }
 
 [package.dev-dependencies]

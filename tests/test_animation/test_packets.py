@@ -249,7 +249,7 @@ class TestMatrixPacketGeneratorLargeTile:
         assert payload[8] == 16
         # Offset 9: height
         assert payload[9] == 8
-        # Offset 10-13: duration = 0 (instant for animation)
+        # Offset 10-13: duration = 0 (the default)
         (duration,) = struct.unpack_from("<I", payload, 10)
         assert duration == 0
         # Offset 14: reserved = 0
@@ -798,21 +798,27 @@ class TestMatrixPacketGeneratorDuration:
         assert duration == 100
 
     def test_custom_duration_large_tile(self) -> None:
-        """Test custom duration on large tile Set64 packets."""
+        """Test custom duration rides on the copy that brings the frame into view.
+
+        Frame buffer 1 is never displayed, so a duration on its Set64s does
+        nothing visible. The transition belongs on the CopyFrameBuffer to fb 0.
+        """
         gen = MatrixPacketGenerator(
-            tile_count=1, tile_width=16, tile_height=8, duration_ms=200
+            tile_count=2, tile_width=16, tile_height=8, duration_ms=200
         )
         templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
 
-        # Set64 packets should have the custom duration
-        (duration1,) = struct.unpack_from("<I", get_payload(templates[0]), 6)
-        (duration2,) = struct.unpack_from("<I", get_payload(templates[1]), 6)
-        assert duration1 == 200
-        assert duration2 == 200
+        # Per tile: Set64 to fb 1, Set64 to fb 1, CopyFrameBuffer 1 -> 0
+        for tile_idx in range(2):
+            set64_a, set64_b, copy = templates[tile_idx * 3 : tile_idx * 3 + 3]
 
-        # CopyFrameBuffer should still have duration=0
-        (copy_duration,) = struct.unpack_from("<I", get_payload(templates[2]), 10)
-        assert copy_duration == 0
+            (duration1,) = struct.unpack_from("<I", get_payload(set64_a), 6)
+            (duration2,) = struct.unpack_from("<I", get_payload(set64_b), 6)
+            assert duration1 == 0
+            assert duration2 == 0
+
+            (copy_duration,) = struct.unpack_from("<I", get_payload(copy), 10)
+            assert copy_duration == 200
 
 
 class TestMultiZonePacketGeneratorDuration:

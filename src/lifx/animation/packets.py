@@ -406,8 +406,9 @@ class MatrixPacketGenerator(PacketGenerator):
                 payload[1] = 1  # length
                 # TileBufferRect: fb_index=1 (temp), x=0, y=y_offset, width
                 struct.pack_into("<BBBB", payload, 2, 1, 0, y_offset, self._tile_width)
-                # duration
-                struct.pack_into("<I", payload, 6, self._duration_ms)
+                # duration = 0: fb 1 is never displayed, so the transition
+                # belongs on the CopyFrameBuffer that brings the frame into view
+                struct.pack_into("<I", payload, 6, 0)
                 # colors filled with black as default
                 for i in range(64):
                     offset = self._COLORS_OFFSET_IN_PAYLOAD + i * 8
@@ -441,7 +442,7 @@ class MatrixPacketGenerator(PacketGenerator):
             struct.pack_into("<BBBB", payload, 4, 0, 0, 0, 0)  # src/dst x,y
             payload[8] = self._tile_width
             payload[9] = self._tile_height
-            struct.pack_into("<I", payload, 10, 0)  # duration = 0
+            struct.pack_into("<I", payload, 10, self._duration_ms)  # duration
             payload[14] = 0  # reserved
 
             packet = header + payload
