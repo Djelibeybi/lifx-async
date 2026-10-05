@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.6.8 (2026-10-05)
+
+### Bug Fixes
+
+- **animation**: Carry the duration on the frame-buffer copy
+  ([`57fd72a`](https://github.com/Djelibeybi/lifx-async/commit/57fd72a5e91ca679a1b6bf1ec2e5e9e12dbeb96c))
+
+
 ## v7.6.7 (2026-10-05)
 
 ### Bug Fixes
