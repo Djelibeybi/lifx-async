@@ -125,6 +125,36 @@ class DeviceStateManager:
         if isinstance(light, ComponentMatrixLight) and prestate.stored_colors:
             await light._reinstate_stored_colors(prestate.stored_colors)
 
+    async def restore_component(
+        self, light: ComponentMatrixLight, component: str, prestate: PreState
+    ) -> None:
+        """Restore one light component after its software effect.
+
+        Writes back the light component's colours from the tile captured
+        before the effect, leaving the other light component as it is now,
+        then restores the light's power. Neither write changes stored colours,
+        so the other light component keeps any its caller set meanwhile.
+
+        Args:
+            light: The Ceiling or Mirror light the light component belongs to
+            component: The light component's name
+            prestate: State captured from the light before the effect
+        """
+        try:
+            if prestate.tile_colors:
+                await light._restore_component_tile(component, prestate.tile_colors[0])
+            await light._write_power(prestate.power, 0.0)
+        except Exception as e:
+            _LOGGER.warning(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "restore_component",
+                    "action": "restore",
+                    "error": str(e),
+                    "values": {"serial": light.serial, "component": component},
+                }
+            )
+
     async def _capture_zones(self, light: MultiZoneLight) -> list[HSBK] | None:
         """Capture zone colors from multizone device.
 

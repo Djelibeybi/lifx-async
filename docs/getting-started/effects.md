@@ -66,6 +66,10 @@ Starting an effect on a light that already runs one replaces it, wherever it was
 no flash back to the light's earlier state. `start_effect()` takes software effects only; firmware effects keep their own API, such as
 `set_effect()`.
 
+A light component, such as a Ceiling's `ceiling.downlight`, is an effect participant too, with
+its own `start_effect()` and `stop_effect()`; see
+[Ceiling lights](../user-guide/ceiling-lights.md#effects-on-one-light-component).
+
 ## Software Effects
 
 | Category | Effects |

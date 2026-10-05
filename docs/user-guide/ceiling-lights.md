@@ -328,9 +328,11 @@ made in the LIFX app are picked up. A colour change made through an inherited
 or a waveform) resets this tracking, so the next component call starts from
 what the device reports rather than undoing that change. Starting an
 `Animator` (which the effects `Conductor` does for every frame effect) resets it
-too. Frames sent while an animation runs bypass the component methods
-entirely, so a component call made during an animation writes over the
-current frame: stop the animation before switching components.
+too. Frames sent while a whole-light animation runs bypass the component
+methods entirely, so a component call made during one writes over the current
+frame: stop the animation before switching components. While a software effect
+runs on one light component instead, the other light component's methods keep
+working (see [Effects on one light component](#effects-on-one-light-component)).
 
 The second write restarts both components' transitions with its own duration.
 Concurrent component operations on the same `CeilingLight` instance serialise
@@ -427,6 +429,44 @@ async def evening_mode(ip: str):
             duration=2.0
         )
 ```
+
+## Effects on One Light Component
+
+`ceiling.uplight` and `ceiling.downlight` are light components that can each be
+an effect participant. They carry `start_effect()`, `stop_effect()` and
+`animator`, and nothing else: colours and power stay on the methods above.
+
+```python
+from lifx.effects import EffectFlicker
+
+async with await Device.connect("192.168.1.100") as ceiling:
+    await ceiling.downlight.start_effect(EffectFlicker())
+
+    # The uplight is not animating, so its methods work as usual
+    await ceiling.set_uplight_color(HSBK(hue=30, saturation=0.2, brightness=0.3, kelvin=2700))
+    await ceiling.turn_uplight_off(duration=2.0)
+
+    await asyncio.sleep(10)
+    await ceiling.downlight.stop_effect()
+```
+
+A software effect on the downlight draws on the full grid, 16x8 on a Ceiling
+13x26 or 8x8 on the others, and the uplight cell of each frame is dropped. On
+the uplight it draws on a single pixel. Any effect that draws frames can run on
+either light component, whether or not it suits the shape; an effect that draws
+no frames, such as `EffectPulse`, cannot.
+
+The light component with no effect keeps its colours. Its colour and power
+methods change what it shows on the next frame, fades included, and later
+frames do not overwrite the change. Calling the animating light component's
+own methods raises `LifxError` until its effect stops. Light components also
+take part in a `Conductor` run like whole lights:
+`await conductor.start(effect, [ceiling.uplight])`.
+
+Both light components draw through the light's one `Animator`
+(`ceiling.animator`): each light component is a slot on it, and every frame
+sends one tile composed from both slots. `ceiling.stop_effect()` stops the
+effects on both light components as well as any whole-light effect.
 
 ## Sunrise and Sunset Effects
 

@@ -36,7 +36,7 @@ from __future__ import annotations
 import socket
 import time
 import warnings
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, cast
 
@@ -52,6 +52,8 @@ from lifx.animation.packets import (
     PacketGenerator,
     PacketTemplate,
 )
+from lifx.animation.slots import ComponentSlot, HeldTile
+from lifx.color import HSBK
 from lifx.const import LIFX_UDP_PORT
 from lifx.exceptions import LifxNetworkError
 from lifx.network.address import (
@@ -133,6 +135,18 @@ class _RingCanvas(FrameBuffer):
         return tile
 
 
+def _check_length(canvas: FrameBuffer, hsbk: list[tuple[int, int, int, int]]) -> None:
+    """Reject a frame that does not cover a writer's canvas.
+
+    This runs even when the ack gate is closed: a full gate must never
+    suppress input validation.
+    """
+    if len(hsbk) != canvas.canvas_size:
+        raise ValueError(
+            f"HSBK length ({len(hsbk)}) must match pixel_count ({canvas.canvas_size})"
+        )
+
+
 def _warn_deprecated(factory: str) -> None:
     warnings.warn(
         f"Animator.{factory}() is deprecated; use device.animator instead",
@@ -199,16 +213,23 @@ class AnimatorWriter:
         *,
         duration_ms: int,
         wraps: bool,
+        slot: ComponentSlot | None = None,
     ) -> None:
         self._animator = animator
         self._canvas = canvas
         self._duration_ms = duration_ms
         self._wraps = wraps
+        self._slot = slot
 
     @property
     def animator(self) -> Animator:
         """The device's Animator this writer borrows."""
         return self._animator
+
+    @property
+    def component(self) -> str | None:
+        """The light component this writer draws on, or None for the whole light."""
+        return self._slot.component if self._slot is not None else None
 
     @property
     def pixel_count(self) -> int:
@@ -231,11 +252,23 @@ class AnimatorWriter:
         return self._wraps
 
     def send_frame(self, hsbk: list[tuple[int, int, int, int]]) -> AnimatorStats:
-        """Send a frame drawn on this writer's canvas through the Animator."""
+        """Send a frame drawn on this writer's canvas through the Animator.
+
+        A light component's writer stores the frame in its slot and sends the
+        tile composed from every slot.
+        """
+        if self._slot is not None:
+            return self._animator._send_slot(self, self._slot, hsbk)
         return self._animator._send(self._canvas, hsbk, self._duration_ms)
 
     def close(self) -> None:
-        """Stop writing. The device's Animator stays open for other writers."""
+        """Stop writing. The device's Animator stays open for other writers.
+
+        A light component's writer gives its slot back: the light component
+        shows the held tile again once no other writer draws on it.
+        """
+        if self._slot is not None:
+            self._animator._release_slot(self, self._slot)
 
 
 class Animator:
@@ -319,6 +352,14 @@ class Animator:
         self._ack_gate = AckGate()
         self._geometry: _Geometry | None = None
         self._device: Light | None = None
+        # Light component slots: the open writers, each slot's latest frame,
+        # and the held tile shown where no slot has a frame.
+        self._slot_writers: dict[AnimatorWriter, ComponentSlot] = {}
+        self._slot_frames: dict[
+            str,
+            tuple[ComponentSlot, FrameBuffer, list[tuple[int, int, int, int]]],
+        ] = {}
+        self._hold: HeldTile | None = None
 
         # Scope resolution is deliberately deferred until the first send so
         # a named IPv6 interface is re-resolved for each new socket session.
@@ -641,12 +682,119 @@ class Animator:
     ) -> AnimatorStats:
         """Send one writer's frame, mapped by its canvas, at its duration."""
         start_time = time.perf_counter()
+        _check_length(canvas, hsbk)
+        if not self._slot_writers:
+            # A whole-tile frame replaces a tile left over from slots.
+            self._hold = None
+        return self._transmit(lambda: canvas.apply(hsbk), duration_ms, start_time)
 
-        if len(hsbk) != canvas.canvas_size:
-            raise ValueError(
-                f"HSBK length ({len(hsbk)}) must match "
-                f"pixel_count ({canvas.canvas_size})"
-            )
+    def _slot_writer(
+        self,
+        slot: ComponentSlot,
+        canvas: FrameBuffer,
+        tile: list[HSBK],
+        *,
+        duration_ms: int = 0,
+    ) -> AnimatorWriter:
+        """Borrow this Animator to draw on one light component's slot.
+
+        The first slot holds ``tile``, the light component colours in buffer
+        order, so a light component with no effect keeps showing them. Later
+        slots share that held tile.
+
+        Args:
+            slot: The light component's buffer positions
+            canvas: The canvas the light component's effect draws on
+            tile: Current colours of the whole tile, in buffer order
+            duration_ms: Transition duration for this writer's frames
+
+        Returns:
+            A writer whose frames land on the light component's slot
+
+        Raises:
+            RuntimeError: If the Animator has not been prepared yet
+        """
+        self._require_geometry()
+        if not self._slot_writers:
+            self._hold = HeldTile(tile)
+        writer = AnimatorWriter(
+            self, canvas, duration_ms=duration_ms, wraps=False, slot=slot
+        )
+        self._slot_writers[writer] = slot
+        return writer
+
+    def _animating(self) -> frozenset[str]:
+        """Names of the light components that writers are drawing on."""
+        return frozenset(slot.component for slot in self._slot_writers.values())
+
+    def _held_tile(self) -> list[HSBK] | None:
+        """Colours the held tile shows, or None if nothing is held.
+
+        A tile stays held after the last slot is released, until something
+        else writes the tile, so the light components keep the colours their
+        callers gave them while effects ran.
+        """
+        return self._hold.target if self._hold is not None else None
+
+    def _retarget_hold(self, tile: list[HSBK], duration: float) -> None:
+        """Fade the held tile towards new colours; the next frame shows them.
+
+        Only called while a slot is open, and an open slot always has a held
+        tile beneath it.
+        """
+        hold = self._hold
+        assert hold is not None
+        hold.retarget(tile, duration)
+
+    def _forget_hold(self) -> None:
+        """Forget a held tile no slot is using, after the tile was rewritten."""
+        if not self._slot_writers:
+            self._hold = None
+
+    def _release_slot(self, writer: AnimatorWriter, slot: ComponentSlot) -> None:
+        """Stop composing a writer's frames into its light component's slot."""
+        if writer not in self._slot_writers:
+            return
+        del self._slot_writers[writer]
+        if slot.component not in self._animating():
+            self._slot_frames.pop(slot.component, None)
+
+    def _send_slot(
+        self,
+        writer: AnimatorWriter,
+        slot: ComponentSlot,
+        hsbk: list[tuple[int, int, int, int]],
+    ) -> AnimatorStats:
+        """Keep a light component's frame and send the tile of every slot."""
+        start_time = time.perf_counter()
+        _check_length(writer._canvas, hsbk)
+        if writer not in self._slot_writers:
+            # A released writer no longer draws on the light.
+            return AnimatorStats(packets_sent=0, total_time_ms=0.0)
+        self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
+        hold = self._hold
+        # An open slot writer always has a held tile beneath it.
+        assert hold is not None
+        return self._transmit(
+            lambda: self._compose(hold), writer._duration_ms, start_time
+        )
+
+    def _compose(self, hold: HeldTile) -> list[tuple[int, int, int, int]]:
+        """Build the whole tile: the held tile, overlaid with each slot's frame."""
+        tile = hold.tuples_at(time.monotonic())
+        for slot, canvas, frame in self._slot_frames.values():
+            mapped = canvas.apply(frame)
+            for position, source in zip(slot.positions, slot.sources):
+                tile[position] = mapped[source]
+        return tile
+
+    def _transmit(
+        self,
+        build: Callable[[], list[tuple[int, int, int, int]]],
+        duration_ms: int,
+        start_time: float,
+    ) -> AnimatorStats:
+        """Send the tile ``build`` produces, unless the ack gate is closed."""
 
         # Ensure socket exists. The socket family follows the device
         # address, derived by the one shared rule: Thread devices are
@@ -681,8 +829,8 @@ class Animator:
                 acks_outstanding=self._ack_gate.outstanding_count,
             )
 
-        # Apply the writer's canvas mapping (orientation, ring scatter)
-        device_data = canvas.apply(hsbk)
+        # Apply the writer's canvas mapping (orientation, ring scatter, slots)
+        device_data = build()
 
         # Writers sharing this Animator may use different durations; rebake
         # the templates only when the duration changes.

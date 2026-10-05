@@ -29,6 +29,7 @@ from typing import Any, cast
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.component.light import ComponentMatrixLight, _ComponentFields
+from lifx.devices.component.participant import LightComponent
 from lifx.devices.component.state import (
     color_as_dict,
     colors_as_dict,
@@ -211,6 +212,38 @@ class CeilingLight(ComponentMatrixLight):
         if component == "uplight":
             return (self.uplight_zone,)
         return tuple(range(self.downlight_zone_count))
+
+    @property
+    def uplight(self) -> LightComponent:
+        """The uplight as an effect participant.
+
+        It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
+        software effect started on it draws on a single pixel, while the
+        downlight keeps its colours and stays under the existing downlight
+        methods. Reading it changes nothing.
+
+        Example:
+            ```python
+            await ceiling.uplight.start_effect(EffectColorloop())
+            ```
+        """
+        return self._light_component("uplight")
+
+    @property
+    def downlight(self) -> LightComponent:
+        """The downlight as an effect participant.
+
+        It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
+        software effect started on it draws on the full grid, with the uplight
+        cell dropped, while the uplight keeps its colours and stays under the
+        existing uplight methods. Reading it changes nothing.
+
+        Example:
+            ```python
+            await ceiling.downlight.start_effect(EffectFlicker())
+            ```
+        """
+        return self._light_component("downlight")
 
     def __init__(
         self,

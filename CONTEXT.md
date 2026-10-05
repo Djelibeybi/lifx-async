@@ -27,7 +27,8 @@ they can be intermediate colours rather than the transition target.
 
 **Software effect**:
 An effect built into the library. The library computes each frame and streams it
-to the light for as long as the effect runs. It draws on a whole light.
+to the light for as long as the effect runs. It draws on its effect
+participants: whole lights, or single light components.
 
 **Firmware effect**:
 An effect built into the light: Move on strips, Morph and Flame on matrix lights,
@@ -44,8 +45,20 @@ or pulse) for a set period and number of cycles. Breathe and pulse are waveforms
 _Avoid_: effect (a waveform is neither a software nor a firmware effect).
 
 **Effect participant**:
-A light that a software effect draws on. One effect can draw on several
-participants in step.
+A light, or a single light component of a light, that a software effect draws
+on. One effect can draw on several participants in step. A light component
+participant sees its own shape: a Ceiling uplight is one pixel, and a Ceiling
+downlight is the full grid with the uplight cell dropped. The light component
+that no effect draws on keeps its colours and stays under the caller's control.
+Only an effect that draws frames can have a light component as a participant.
+
+**Stopping an effect**:
+Ending a software effect on a participant and restoring the participant's
+prior state, while any other participants of the same effect carry on.
+Stopping a light stops every effect on it, software or firmware, including
+the effect on either light component; stopping a light component stops only
+that light component's effect. _Avoid_: cancelling (that leaves the prior
+state unrestored).
 
 **Brightness inference**:
 Choosing turn-on brightness when no colour is supplied: use suitable stored

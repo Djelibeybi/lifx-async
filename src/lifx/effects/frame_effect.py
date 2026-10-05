@@ -29,6 +29,18 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def writer_component(writer: object) -> str | None:
+    """The light component a borrowed Animator writer draws on, if any.
+
+    Args:
+        writer: One entry of a frame effect's borrowed Animators
+
+    Returns:
+        The light component's name, or None for a whole light
+    """
+    return writer.component if isinstance(writer, AnimatorWriter) else None
+
+
 @dataclass(frozen=True)
 class FrameContext:
     """Context passed to generate_frame() with timing and layout info.
@@ -220,9 +232,8 @@ class FrameEffect(LIFXEffect):
                 # Track HSBK frame for state restoration (populated by
                 # default generate_protocol_frame, None for direct overrides)
                 if idx < len(participants) and self._last_generated_hsbk is not None:
-                    self._last_frames[participant_key(participants[idx])] = (
-                        self._last_generated_hsbk
-                    )
+                    key = participant_key(participants[idx], writer_component(animator))
+                    self._last_frames[key] = self._last_generated_hsbk
                 # Always clear to prevent stale frames leaking across iterations
                 self._last_generated_hsbk = None
 

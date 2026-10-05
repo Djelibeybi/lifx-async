@@ -175,23 +175,29 @@ class Light(Device[LightState]):
             ```
         """
         from lifx.effects.base import LIFXEffect
-        from lifx.effects.conductor import Conductor
 
         if not isinstance(effect, LIFXEffect):
             raise TypeError(
                 f"start_effect() takes a software effect, got {type(effect).__name__}"
             )
+        await self._own_conductor().start(effect, [self])
+
+    def _own_conductor(self) -> Conductor:
+        """The Conductor this light keeps for runs started on it directly."""
+        from lifx.effects.conductor import Conductor
+
         conductor = self._conductor
         if conductor is None:
             conductor = Conductor()
             self._conductor = conductor
-        await conductor.start(effect, [self])
+        return conductor
 
     async def stop_effect(self) -> None:
         """Stop every effect on this light.
 
         Stops any running firmware effect, then any software effect the light
-        is part of and restores the light's prior state. The software effect
+        or one of its light components is part of, and restores the prior
+        state of each. The software effect
         may have been started with ``start_effect()`` or on any Conductor: if
         the light is one participant of a multi-light run, it leaves that run
         and the other participants carry on.

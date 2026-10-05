@@ -15,8 +15,12 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from lifx.animation.animator import AnimatorWriter
+from lifx.animation.framebuffer import FrameBuffer
+from lifx.animation.slots import ComponentSlot
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component.participant import LightComponent
 from lifx.devices.component.state import Pending, hsk_matches, is_dark
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
@@ -97,10 +101,98 @@ class ComponentMatrixLight(MatrixLight):
         # entire component is dark after observing all of its zones.
         self._observed_positions: set[int] = set()
         self._changed_positions: set[int] = set()
+        self._light_components: dict[str, LightComponent] = {}
 
     def _component_positions(self, component: str) -> tuple[int, ...]:
         """Return buffer positions in the device's public colour order."""
         raise NotImplementedError
+
+    def _component_canvas(
+        self, component: str, light_canvas: FrameBuffer
+    ) -> tuple[FrameBuffer, tuple[int, ...]]:
+        """Return the canvas an effect on a light component draws on.
+
+        A light component with one zone, such as a Ceiling uplight, draws on
+        a single pixel. Any other draws on the whole light's canvas, and only
+        its own cells reach the tile: a Ceiling downlight's frames drop the
+        uplight cell.
+
+        Args:
+            component: The light component's name
+            light_canvas: The whole light's canvas on its Animator
+
+        Returns:
+            The canvas, and for each of the light component's buffer positions
+            the index of the mapped frame that colours it
+        """
+        positions = self._component_positions(component)
+        if len(positions) == 1:
+            return FrameBuffer(pixel_count=1, canvas_width=1, canvas_height=1), (0,)
+        return light_canvas, positions
+
+    def _light_component(self, component: str) -> LightComponent:
+        """Return the effect participant for a light component, made once."""
+        participant = self._light_components.get(component)
+        if participant is None:
+            self._fields(component)
+            participant = LightComponent(self, component)
+            self._light_components[component] = participant
+        return participant
+
+    def _animating_components(self) -> frozenset[str]:
+        """Names of the light components a software effect is drawing on."""
+        if self._animator is None:
+            return frozenset()
+        return self._animator._animating()
+
+    def _check_component_writable(self, component: str) -> None:
+        """Refuse a change to a light component that an effect is drawing on."""
+        if component in self._animating_components():
+            raise LifxError(
+                f"The {component} is running a software effect; "
+                f"call {component}.stop_effect() before changing it"
+            )
+
+    async def _component_writer(
+        self, component: str, duration_ms: int
+    ) -> AnimatorWriter:
+        """Borrow the light's Animator to draw on one light component's slot.
+
+        The first slot holds the tile the light shows now, so the other light
+        component keeps its colours while the effect runs.
+
+        Args:
+            component: The light component's name
+            duration_ms: Transition duration for the writer's frames
+
+        Returns:
+            A writer whose frames land on the light component's slot
+        """
+        async with self._component_operation():
+            tile = await self._tile_colors_for_update()
+        animator = await self.animator.prepare()
+        canvas, sources = self._component_canvas(
+            component, animator._require_geometry().framebuffer
+        )
+        slot = ComponentSlot(component, self._component_positions(component), sources)
+        return animator._slot_writer(slot, canvas, tile, duration_ms=duration_ms)
+
+    async def _restore_component_tile(self, component: str, before: list[HSBK]) -> None:
+        """Write back one light component's colours from a tile captured earlier.
+
+        The other light component keeps the colours it shows now, including
+        any change its caller made while the effect ran. Stored colours are
+        not changed.
+
+        Args:
+            component: The light component's name
+            before: The whole tile, in buffer order, captured before the effect
+        """
+        async with self._component_operation():
+            tile = await self._tile_colors_for_update()
+            for position in self._component_positions(component):
+                tile[position] = before[position]
+            await self._write_tile(tile, 0.0)
 
     async def _save_state_to_file(self) -> None:
         """Persist through the device's existing schema and error policy."""
@@ -151,6 +243,8 @@ class ComponentMatrixLight(MatrixLight):
 
     def _zones_changed(self) -> None:
         """Forget pending colours after raw writes, effects or Animator startup."""
+        if self._animator is not None:
+            self._animator._forget_hold()
         self._pending_tile.clear()
         self._known_tile.clear()
         self._observed_positions.clear()
@@ -229,7 +323,14 @@ class ComponentMatrixLight(MatrixLight):
         self._update_component_flags()
 
     async def _tile_colors_for_update(self) -> list[HSBK]:
-        """Compose from our pending target, otherwise from a fresh device read."""
+        """Compose from the held tile, our pending target, or a fresh read.
+
+        While a software effect draws on a light component, the other light
+        component lives in the Animator's held tile, and so do its changes.
+        """
+        held = self._animator._held_tile() if self._animator is not None else None
+        if held is not None:
+            return held
         pending = self._pending_tile.get()
         if pending is not None:
             return pending
@@ -245,7 +346,16 @@ class ComponentMatrixLight(MatrixLight):
         return tile
 
     async def _write_tile(self, tile_colors: list[HSBK], duration: float) -> None:
-        """Write and publish a complete tile only after the write succeeds."""
+        """Write and publish a complete tile only after the write succeeds.
+
+        While a software effect draws on a light component, the tile goes to
+        the Animator's held tile instead: the effect's next frame carries it.
+        """
+        if self._animator is not None and self._animator._animating():
+            self._animator._retarget_hold(tile_colors, duration)
+            self._known_tile = dict(enumerate(tile_colors))
+            self._publish_tile(tile_colors)
+            return
         self._writing_tile = True
         self._observed_positions.clear()
         self._changed_positions.clear()
@@ -325,6 +435,7 @@ class ComponentMatrixLight(MatrixLight):
                 f"Use turn_{component}_off() instead."
             ),
         )
+        self._check_component_writable(component)
         async with self._component_operation():
             await self._set_component_colors_owned(component, targets, duration)
         await self._persist_component_state()
@@ -360,6 +471,7 @@ class ComponentMatrixLight(MatrixLight):
             if colors is not None
             else None
         )
+        self._check_component_writable(component)
         async with self._component_operation():
             if await self._power_for_update() == 0:
                 tile = await self._tile_colors_for_update()
@@ -420,6 +532,7 @@ class ComponentMatrixLight(MatrixLight):
             if colors is not None
             else None
         )
+        self._check_component_writable(component)
         async with self._component_operation():
             tile = await self._tile_colors_for_update()
             positions = self._component_positions(component)
@@ -430,7 +543,11 @@ class ComponentMatrixLight(MatrixLight):
                     previous if is_dark(current) and previous is not None else current
                 )
             other = self._other_component(component)
-            other_dark = is_dark([tile[p] for p in self._component_positions(other)])
+            # Both light components share power: while an effect draws on the
+            # other one, darken this side rather than powering the light off.
+            other_dark = other not in self._animating_components() and is_dark(
+                [tile[p] for p in self._component_positions(other)]
+            )
             if other_dark:
                 await self._write_power(False, duration)
                 # Power-off succeeded. Publish that progress before attempting
@@ -560,8 +677,10 @@ class ComponentMatrixLight(MatrixLight):
         if (x == 0 and y == 0) or self._observed_positions.intersection(observed):
             self._observed_positions.clear()
             self._changed_positions.clear()
+        # Frames an effect draws are not colours anyone chose to remember.
         protected = (
-            self._writing_tile
+            bool(self._animating_components())
+            or self._writing_tile
             or self._writing_power
             or self._pending_tile.get() is not None
             or self._pending_power.get() is not None

@@ -9,10 +9,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import weakref
-from typing import TYPE_CHECKING, ClassVar
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
+from lifx.devices.component.participant import LightComponent
 from lifx.effects.models import (
     ParticipantKey,
     PreState,
@@ -22,11 +24,42 @@ from lifx.effects.models import (
 from lifx.effects.state_manager import DeviceStateManager
 
 if TYPE_CHECKING:
+    from lifx.devices.component.light import ComponentMatrixLight
     from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
     from lifx.effects.frame_effect import FrameEffect
 
+    # An effect participant: a whole light, or one light component of a light.
+    Participant = Light | LightComponent
+
 _LOGGER = logging.getLogger(__name__)
+
+
+def _resolve(participant: Participant) -> tuple[Light, str | None]:
+    """Split an effect participant into its light and light component."""
+    if isinstance(participant, LightComponent):
+        return participant._light, participant._name
+    return participant, None
+
+
+def _key(participant: Participant) -> ParticipantKey:
+    """Return the Conductor key for an effect participant."""
+    return participant_key(*_resolve(participant))
+
+
+def _members(effect: LIFXEffect, lights: list[Light]) -> list[tuple[Light, str | None]]:
+    """Pair each light of an effect with the light component it draws on.
+
+    A frame effect's borrowed writers line up with its participants, and a
+    light component's writer names its light component.
+    """
+    from lifx.effects.frame_effect import FrameEffect, writer_component
+
+    writers = effect._animators if isinstance(effect, FrameEffect) else []
+    return [
+        (light, writer_component(writers[idx]) if idx < len(writers) else None)
+        for idx, light in enumerate(lights)
+    ]
 
 
 class Conductor:
@@ -70,7 +103,7 @@ class Conductor:
         Conductor._live.add(self)
 
     async def _take_over(
-        self, effect: LIFXEffect, lights: list[Light]
+        self, effect: LIFXEffect, participants: Sequence[Participant]
     ) -> dict[ParticipantKey, PreState]:
         """Stop the software effect each light already runs, on any Conductor.
 
@@ -82,15 +115,16 @@ class Conductor:
         there before any effect.
 
         Args:
-            effect: The effect about to start on the lights
-            lights: The lights it is about to start on
+            effect: The effect about to start on the participants
+            participants: The lights and light components it is about to
+                start on
 
         Returns:
-            The inherited prior state of each light that has one
+            The inherited prior state of each participant that has one
         """
         inherited: dict[ParticipantKey, PreState] = {}
-        for light in lights:
-            key = participant_key(light)
+        for participant in participants:
+            key = _key(participant)
             for conductor in list(Conductor._live):
                 running = conductor._running.get(key)
                 if running is None or running.effect is effect:
@@ -103,36 +137,47 @@ class Conductor:
                             "method": "_take_over",
                             "action": "inherit_prestate",
                             "values": {
-                                "serial": light.serial,
+                                "participant": repr(participant),
                                 "previous_effect": type(running.effect).__name__,
                                 "new_effect": type(effect).__name__,
                             },
                         }
                     )
-                await conductor.remove_lights([light], restore_state=False)
+                await conductor.remove_lights([participant], restore_state=False)
         return inherited
 
     @classmethod
-    async def _leave_every_run(cls, light: Light) -> None:
-        """Remove a light from every run it is part of, on any Conductor.
+    async def _leave_every_run(cls, participant: Participant) -> None:
+        """Remove a participant from every run it is part of, on any Conductor.
 
-        The light's prior state is restored and the other participants of
-        each run carry on. Runs are matched by participant key, so a second
-        object for the same light finds them too.
+        The participant's prior state is restored and the other participants
+        of each run carry on. A whole light also leaves the runs of its light
+        components. Runs are matched by participant key, so a second object
+        for the same light finds them too.
 
         Args:
-            light: The light leaving its runs
+            participant: The light or light component leaving its runs
         """
-        key = participant_key(light)
+        light, component = _resolve(participant)
         for conductor in list(cls._live):
-            if key in conductor._running:
-                await conductor.remove_lights([light])
+            members = [
+                (light, key[1] if isinstance(key, tuple) else None)
+                for key in conductor._running
+                if key == _key(participant)
+                or (
+                    component is None
+                    and isinstance(key, tuple)
+                    and key[0] == light.serial
+                )
+            ]
+            if members:
+                await conductor._remove(members, restore_state=True)
 
-    def effect(self, light: Light) -> LIFXEffect | None:
-        """Return the effect currently running on a device, or None if idle.
+    def effect(self, light: Participant) -> LIFXEffect | None:
+        """Return the effect currently running on a participant, or None if idle.
 
         Args:
-            light: The device to check
+            light: The light or light component to check
 
         Returns:
             Currently running LIFXEffect instance, or None
@@ -144,10 +189,10 @@ class Conductor:
                 print(f"Running: {type(current_effect).__name__}")
             ```
         """
-        running = self._running.get(participant_key(light))
+        running = self._running.get(_key(light))
         return running.effect if running else None
 
-    def get_last_frame(self, light: Light) -> list[HSBK] | None:
+    def get_last_frame(self, light: Participant) -> list[HSBK] | None:
         """Return the most recent HSBK frame sent to a device, or None.
 
         For frame-based effects, returns the list of HSBK colors from the
@@ -157,7 +202,7 @@ class Conductor:
         generate_protocol_frame() directly (bypassing HSBK construction).
 
         Args:
-            light: The device to query
+            light: The light or light component to query
 
         Returns:
             List of HSBK colors from the last frame, or None
@@ -170,7 +215,8 @@ class Conductor:
                 print(f"Average brightness: {avg_brightness:.1%}")
             ```
         """
-        running = self._running.get(participant_key(light))
+        key = _key(light)
+        running = self._running.get(key)
         if not running:
             return None
 
@@ -178,23 +224,26 @@ class Conductor:
 
         effect = running.effect
         if isinstance(effect, FrameEffect):
-            return effect._last_frames.get(participant_key(light))
+            return effect._last_frames.get(key)
         return None
 
     async def start(
         self,
         effect: LIFXEffect,
-        participants: list[Light],
+        participants: Sequence[Participant],
     ) -> None:
-        """Start an effect on one or more lights.
+        """Start an effect on one or more lights or light components.
 
         Captures current light state, powers on if needed, and launches
         the effect. State is automatically restored when effect completes
         or stop() is called.
 
+        A light component, such as ``ceiling.downlight``, takes part only in
+        effects that draw frames; any other effect leaves it out.
+
         Args:
             effect: The effect instance to execute
-            participants: List of Light instances to apply effect to
+            participants: Lights and light components to apply effect to
 
         Raises:
             LifxTimeoutError: If light state capture times out
@@ -234,24 +283,22 @@ class Conductor:
         async with self._lock:
             # Set conductor reference in effect
             effect.conductor = self
+            members = [_resolve(p) for p in filtered_participants]
+            lights = [light for light, _ in members]
 
-            # Determine which lights need new prestate capture
-            lights_needing_capture: list[tuple[int, Light]] = []
+            # Capture prestates in parallel for participants that inherit none
             prestates: dict[ParticipantKey, PreState] = {}
-
-            for idx, light in enumerate(filtered_participants):
-                key = participant_key(light)
+            to_capture: list[tuple[ParticipantKey, Light]] = []
+            for light, component in members:
+                key = participant_key(light, component)
                 if key in inherited:
                     prestates[key] = inherited[key]
                 else:
-                    lights_needing_capture.append((idx, light))
+                    to_capture.append((key, light))
 
-            # Capture prestates in parallel for all lights that need it
-            if lights_needing_capture:
+            if to_capture:
 
-                async def capture_and_log(
-                    device: Light,
-                ) -> tuple[ParticipantKey, PreState]:
+                async def capture_and_log(device: Light) -> PreState:
                     prestate = await self._state_manager.capture_state(device)
                     _LOGGER.debug(
                         {
@@ -271,15 +318,12 @@ class Conductor:
                             },
                         }
                     )
-                    return (participant_key(device), prestate)
+                    return prestate
 
                 captured = await asyncio.gather(
-                    *(capture_and_log(light) for _, light in lights_needing_capture)
+                    *(capture_and_log(light) for _, light in to_capture)
                 )
-
-                # Store captured prestates
-                for key, prestate in captured:
-                    prestates[key] = prestate
+                prestates.update(zip((key for key, _ in to_capture), captured))
 
             # Set up animators for frame-based effects
             from lifx.effects.frame_effect import FrameEffect
@@ -287,33 +331,32 @@ class Conductor:
             if isinstance(effect, FrameEffect):
                 # Set participants early so async_setup() can access them
                 # (async_perform() sets this too but runs in a background task)
-                effect.participants = filtered_participants
+                effect.participants = lights
                 animators = await self._create_animators(effect, filtered_participants)
                 effect._animators = animators
-                await effect.async_setup(filtered_participants)
+                await effect.async_setup(lights)
 
             # Create background task for the effect
-            task = asyncio.create_task(
-                self._run_effect_with_cleanup(effect, filtered_participants)
-            )
+            task = asyncio.create_task(self._run_effect_with_cleanup(effect, lights))
 
             # Register running effects for all participants
-            for light in filtered_participants:
-                key = participant_key(light)
+            for light, component in members:
+                key = participant_key(light, component)
                 self._running[key] = RunningEffect(
                     effect=effect,
                     prestate=prestates[key],
                     task=task,
                 )
 
-    async def stop(self, lights: list[Light]) -> None:
+    async def stop(self, lights: Sequence[Participant]) -> None:
         """Stop effects and restore light state.
 
-        Halts any running effects on the specified lights and restores
-        them to their pre-effect state (power, color, zones).
+        Halts any running effects on the specified lights or light
+        components and restores them to their pre-effect state (power,
+        color, zones).
 
         Args:
-            lights: List of lights to stop
+            lights: Lights and light components to stop
 
         Example:
             ```python
@@ -325,12 +368,13 @@ class Conductor:
             ```
         """
         async with self._lock:
-            # Collect lights that need restoration and tasks to cancel
-            lights_to_restore: list[tuple[Light, PreState]] = []
+            # Collect participants that need restoration and tasks to cancel
+            to_restore: list[tuple[Light, str | None, PreState]] = []
             tasks_to_cancel: set[asyncio.Task[None]] = set()
 
-            for light in lights:
-                running = self._running.get(participant_key(light))
+            for participant in lights:
+                light, component = _resolve(participant)
+                running = self._running.get(participant_key(light, component))
 
                 if running:
                     _LOGGER.debug(
@@ -344,15 +388,15 @@ class Conductor:
                             },
                         }
                     )
-                    lights_to_restore.append((light, running.prestate))
+                    to_restore.append((light, component, running.prestate))
                     tasks_to_cancel.add(running.task)
 
             # Close animators for frame effects (once per effect, not per device)
             from lifx.effects.frame_effect import FrameEffect
 
             closed_effects: set[int] = set()
-            for light in lights:
-                running = self._running.get(participant_key(light))
+            for participant in lights:
+                running = self._running.get(_key(participant))
                 if running and isinstance(running.effect, FrameEffect):
                     effect_id = id(running.effect)
                     if effect_id not in closed_effects:
@@ -369,29 +413,26 @@ class Conductor:
             await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
         async with self._lock:
-            # Restore all lights in parallel
-            if lights_to_restore:
-                await asyncio.gather(
-                    *(
-                        self._state_manager.restore_state(light, prestate)
-                        for light, prestate in lights_to_restore
-                    )
-                )
+            # Restore all participants in parallel
+            if to_restore:
+                await asyncio.gather(*(self._restore(*item) for item in to_restore))
 
             # Remove from running registry after restoration
-            for light in lights:
-                self._running.pop(participant_key(light), None)
+            for participant in lights:
+                self._running.pop(_key(participant), None)
 
-    async def add_lights(self, effect: LIFXEffect, lights: list[Light]) -> None:
-        """Add lights to a running effect without restarting it.
+    async def add_lights(
+        self, effect: LIFXEffect, lights: Sequence[Participant]
+    ) -> None:
+        """Add lights or light components to a running effect without restarting it.
 
         Captures state, creates animators (for FrameEffects), and registers
-        lights as participants of the already-running effect. Lights that
-        are already running this effect or are incompatible are skipped.
+        them as participants of the already-running effect. Participants
+        that are already running this effect or are incompatible are skipped.
 
         Args:
-            effect: The effect to add lights to (must already be running)
-            lights: List of lights to add
+            effect: The effect to add participants to (must already be running)
+            lights: Lights and light components to add
 
         Example:
             ```python
@@ -412,15 +453,15 @@ class Conductor:
             inherited = await self._take_over(effect, compatible)
 
         async with self._lock:
-            # Skip lights already running this effect
-            new_lights: list[Light] = []
-            for light in compatible:
-                running = self._running.get(participant_key(light))
+            # Skip participants already running this effect
+            new_participants: list[Participant] = []
+            for participant in compatible:
+                running = self._running.get(_key(participant))
                 if running and running.effect is effect:
                     continue
-                new_lights.append(light)
+                new_participants.append(participant)
 
-            if not new_lights:
+            if not new_participants:
                 return
 
             # Find the task reference from existing participants
@@ -438,37 +479,33 @@ class Conductor:
                         "action": "no_task",
                         "values": {
                             "effect": type(effect).__name__,
-                            "lights": len(new_lights),
+                            "lights": len(new_participants),
                         },
                     }
                 )
                 return
 
-            # Capture prestates in parallel for lights that do not inherit one
-            to_capture = [
-                light for light in new_lights if participant_key(light) not in inherited
-            ]
+            # Capture prestates in parallel for participants inheriting none
+            to_capture = [p for p in new_participants if _key(p) not in inherited]
             captured = await asyncio.gather(
-                *(self._state_manager.capture_state(light) for light in to_capture)
+                *(self._state_manager.capture_state(_resolve(p)[0]) for p in to_capture)
             )
             prestates = dict(inherited)
-            prestates.update(
-                zip([participant_key(light) for light in to_capture], captured)
-            )
+            prestates.update(zip([_key(p) for p in to_capture], captured))
 
             # Create animators for frame-based effects
             from lifx.effects.frame_effect import FrameEffect
 
             if isinstance(effect, FrameEffect):
-                new_animators = await self._create_animators(effect, new_lights)
+                new_animators = await self._create_animators(effect, new_participants)
                 effect._animators.extend(new_animators)
 
             # Add to participants
-            effect.participants.extend(new_lights)
+            effect.participants.extend(_resolve(p)[0] for p in new_participants)
 
             # Register in running map
-            for light in new_lights:
-                key = participant_key(light)
+            for participant in new_participants:
+                key = _key(participant)
                 self._running[key] = RunningEffect(
                     effect=effect,
                     prestate=prestates[key],
@@ -482,21 +519,22 @@ class Conductor:
                     "action": "added",
                     "values": {
                         "effect": type(effect).__name__,
-                        "added_count": len(new_lights),
+                        "added_count": len(new_participants),
                     },
                 }
             )
 
     async def remove_lights(
-        self, lights: list[Light], restore_state: bool = True
+        self, lights: Sequence[Participant], restore_state: bool = True
     ) -> None:
-        """Remove lights from their running effect without stopping others.
+        """Remove participants from their running effect without stopping others.
 
-        Closes animators, optionally restores state, and deregisters lights.
-        If the last participant is removed, cancels the background task.
+        Closes animators, optionally restores state, and deregisters the
+        lights or light components. If the last participant is removed,
+        cancels the background task.
 
         Args:
-            lights: List of lights to remove
+            lights: Lights and light components to remove
             restore_state: Whether to restore pre-effect state (default True)
 
         Example:
@@ -508,38 +546,39 @@ class Conductor:
             await conductor.remove_lights([light2], restore_state=False)
             ```
         """
+        await self._remove([_resolve(p) for p in lights], restore_state=restore_state)
+
+    async def _remove(
+        self, members: list[tuple[Light, str | None]], *, restore_state: bool
+    ) -> None:
+        """Remove each light or light component from its run; see remove_lights()."""
         from lifx.effects.frame_effect import FrameEffect
 
         tasks_to_cancel: set[asyncio.Task[None]] = set()
-        lights_to_restore: list[tuple[Light, PreState]] = []
+        to_restore: list[tuple[Light, str | None, PreState]] = []
 
         async with self._lock:
-            for light in lights:
-                key = participant_key(light)
+            for light, component in members:
+                key = participant_key(light, component)
                 running = self._running.get(key)
                 if not running:
                     continue
 
                 effect = running.effect
 
-                # Remove animator for frame effects
-                if isinstance(effect, FrameEffect):
-                    # Find index by matching key in participants
-                    for idx, participant in enumerate(effect.participants):
-                        if participant_key(participant) == key:
-                            if idx < len(effect._animators):
-                                effect._animators[idx].close()
-                                effect._animators.pop(idx)
-                            break
-
-                # Remove from participants
-                effect.participants = [
-                    p for p in effect.participants if participant_key(p) != key
-                ]
+                # Drop the participant and, for frame effects, its writer
+                for idx, member in enumerate(_members(effect, effect.participants)):
+                    if participant_key(*member) == key:
+                        if isinstance(effect, FrameEffect) and idx < len(
+                            effect._animators
+                        ):
+                            effect._animators.pop(idx).close()
+                        del effect.participants[idx]
+                        break
 
                 # Track for restoration
                 if restore_state:
-                    lights_to_restore.append((light, running.prestate))
+                    to_restore.append((light, component, running.prestate))
 
                 # Check if this was the last participant
                 remaining = sum(
@@ -560,6 +599,7 @@ class Conductor:
                         "action": "removed",
                         "values": {
                             "serial": light.serial,
+                            "component": component,
                             "effect": type(effect).__name__,
                             "restore_state": restore_state,
                         },
@@ -574,12 +614,18 @@ class Conductor:
             await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
         # Restore state (outside lock)
-        if lights_to_restore:
-            await asyncio.gather(
-                *(
-                    self._state_manager.restore_state(light, prestate)
-                    for light, prestate in lights_to_restore
-                )
+        if to_restore:
+            await asyncio.gather(*(self._restore(*item) for item in to_restore))
+
+    async def _restore(
+        self, light: Light, component: str | None, prestate: PreState
+    ) -> None:
+        """Restore a whole light, or one light component of it."""
+        if component is None:
+            await self._state_manager.restore_state(light, prestate)
+        else:
+            await self._state_manager.restore_component(
+                cast("ComponentMatrixLight", light), component, prestate
             )
 
     async def _run_effect_with_cleanup(
@@ -595,9 +641,11 @@ class Conductor:
             # Run the effect
             await effect.async_perform(participants)
 
-            # Close animators for frame effects
+            # Close animators for frame effects, once each writer has said
+            # which light component its light draws on
             from lifx.effects.frame_effect import FrameEffect
 
+            members = _members(effect, participants)
             if isinstance(effect, FrameEffect):
                 effect.close_animators()
 
@@ -616,24 +664,21 @@ class Conductor:
             async with self._lock:
                 # Only restore state if the effect wants it
                 if effect.restore_on_complete:
-                    lights_to_restore: list[tuple[Light, PreState]] = []
-                    for light in participants:
-                        running = self._running.get(participant_key(light))
+                    to_restore: list[tuple[Light, str | None, PreState]] = []
+                    for light, component in members:
+                        running = self._running.get(participant_key(light, component))
                         if running:
-                            lights_to_restore.append((light, running.prestate))
+                            to_restore.append((light, component, running.prestate))
 
-                    # Restore all lights in parallel
-                    if lights_to_restore:
+                    # Restore all participants in parallel
+                    if to_restore:
                         await asyncio.gather(
-                            *(
-                                self._state_manager.restore_state(light, prestate)
-                                for light, prestate in lights_to_restore
-                            )
+                            *(self._restore(*item) for item in to_restore)
                         )
 
                 # Remove from running registry
-                for light in participants:
-                    self._running.pop(participant_key(light), None)
+                for member in members:
+                    self._running.pop(participant_key(*member), None)
 
         except asyncio.CancelledError:
             # Effect was cancelled via stop() - this is expected
@@ -667,34 +712,45 @@ class Conductor:
             # Close animators for frame effects
             from lifx.effects.frame_effect import FrameEffect
 
+            members = _members(effect, participants)
             if isinstance(effect, FrameEffect):
                 effect.close_animators()
 
             # Clean up by removing from running registry
             async with self._lock:
-                for light in participants:
-                    self._running.pop(participant_key(light), None)
+                for member in members:
+                    self._running.pop(participant_key(*member), None)
 
     async def _filter_compatible_lights(
-        self, effect: LIFXEffect, participants: list[Light]
-    ) -> list[Light]:
-        """Filter lights based on effect requirements.
+        self, effect: LIFXEffect, participants: Sequence[Participant]
+    ) -> list[Participant]:
+        """Filter lights and light components based on effect requirements.
 
         Delegates compatibility checking to the effect's is_light_compatible()
-        method, allowing effects to define their own requirements.
+        method, allowing effects to define their own requirements. A light
+        component is checked through its light. It takes part only in effects
+        that draw frames: suitability for its shape is advice, so an effect is
+        refused only when it cannot draw on a light component at all.
 
         Args:
             effect: The effect to filter for
-            participants: List of all lights
+            participants: All lights and light components
 
         Returns:
-            List of lights compatible with the effect
+            The participants compatible with the effect
         """
+        from lifx.effects.frame_effect import FrameEffect
 
-        # Check all lights in parallel using effect's compatibility check
-        async def check_compatibility(light: Light) -> tuple[Light, bool]:
-            """Check if a single light is compatible with the effect."""
-            is_compatible = await effect.is_light_compatible(light)
+        # Check all participants in parallel using the effect's own check
+        async def check_compatibility(
+            participant: Participant,
+        ) -> tuple[Participant, bool]:
+            """Check if a single participant is compatible with the effect."""
+            light, component = _resolve(participant)
+            if component is not None and not isinstance(effect, FrameEffect):
+                is_compatible = False
+            else:
+                is_compatible = await effect.is_light_compatible(light)
 
             if not is_compatible:
                 _LOGGER.debug(
@@ -704,36 +760,36 @@ class Conductor:
                         "action": "filter",
                         "values": {
                             "serial": light.serial,
+                            "component": component,
                             "effect": type(effect).__name__,
                             "compatible": False,
                         },
                     }
                 )
 
-            return (light, is_compatible)
+            return (participant, is_compatible)
 
         results = await asyncio.gather(
-            *(check_compatibility(light) for light in participants)
+            *(check_compatibility(participant) for participant in participants)
         )
 
-        # Filter to only compatible lights
-        compatible = [light for light, is_compatible in results if is_compatible]
-
-        return compatible
+        # Filter to only compatible participants
+        return [participant for participant, is_compatible in results if is_compatible]
 
     async def _create_animators(
-        self, effect: FrameEffect, participants: list[Light]
+        self, effect: FrameEffect, participants: Sequence[Participant]
     ) -> list[AnimatorWriter]:
         """Borrow each participant's own Animator for this effect run.
 
         Every light owns one Animator (``light.animator``), shared with
         direct frame senders such as LedFx, so the effect's frames and theirs
         go through one writer and one ack gate. The effect draws through a
-        writer with its own canvas and transition duration.
+        writer with its own canvas and transition duration. A light
+        component's writer draws on its slot of its light's Animator.
 
         Args:
             effect: The frame effect (used to determine duration_ms from fps)
-            participants: List of lights to borrow Animators from
+            participants: Lights and light components to borrow Animators for
 
         Returns:
             List of writers, one per participant
@@ -745,12 +801,15 @@ class Conductor:
         duration_ms = int(1500 / effect.fps)
         writers: list[AnimatorWriter] = []
 
-        for light in participants:
-            animator = await light.animator.prepare()
-            if isinstance(light, MirrorLight):
+        for participant in participants:
+            if isinstance(participant, LightComponent):
+                writers.append(await participant._writer(duration_ms))
+                continue
+            animator = await participant.animator.prepare()
+            if isinstance(participant, MirrorLight):
                 # A whole-light effect draws one ring frame on both rings.
                 writer = animator._writer(
-                    rings=[light.front_positions, light.back_positions],
+                    rings=[participant.front_positions, participant.back_positions],
                     duration_ms=duration_ms,
                 )
             else:

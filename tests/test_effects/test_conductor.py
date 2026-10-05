@@ -659,3 +659,70 @@ async def test_remove_lights_not_running(conductor, light1) -> None:
     await conductor.remove_lights([light1])
 
     assert light1.serial not in conductor._running
+
+
+class _WaitingEffect(LIFXEffect):
+    """Effect without frames that plays until cancelled."""
+
+    def __init__(self) -> None:
+        super().__init__(power_on=False)
+        self.playing = asyncio.Event()
+
+    @property
+    def name(self) -> str:
+        return "waiting"
+
+    async def async_play(self) -> None:
+        self.playing.set()
+        await asyncio.Event().wait()
+
+
+class _QuickEffect(LIFXEffect):
+    """Effect without frames that finishes at once."""
+
+    def __init__(self) -> None:
+        super().__init__(power_on=False)
+
+    @property
+    def name(self) -> str:
+        return "quick"
+
+    async def async_play(self) -> None:
+        return None
+
+
+async def test_removing_a_light_before_its_effect_plays(
+    conductor: Conductor, light1: MagicMock
+) -> None:
+    effect = _WaitingEffect()
+    await conductor.start(effect, [light1])
+
+    await conductor.remove_lights([light1], restore_state=False)
+
+    assert conductor.effect(light1) is None
+    assert not effect.playing.is_set()
+
+
+async def test_removing_a_light_from_a_playing_effect_without_frames(
+    conductor: Conductor, light1: MagicMock, light2: MagicMock
+) -> None:
+    effect = _WaitingEffect()
+    await conductor.start(effect, [light1, light2])
+    await effect.playing.wait()
+
+    await conductor.remove_lights([light1], restore_state=False)
+
+    assert effect.participants == [light2]
+    assert conductor.effect(light2) is effect
+    await conductor.stop([light2])
+
+
+async def test_an_effect_ending_with_no_registered_participant_restores_nothing(
+    conductor: Conductor, light1: MagicMock
+) -> None:
+    with patch.object(
+        conductor._state_manager, "restore_state", AsyncMock()
+    ) as restore:
+        await conductor._run_effect_with_cleanup(_QuickEffect(), [light1])
+
+    restore.assert_not_awaited()
