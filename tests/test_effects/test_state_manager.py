@@ -8,6 +8,7 @@ from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.models import PreState
 from lifx.effects.state_manager import DeviceStateManager
+from lifx.exceptions import LifxTimeoutError
 from lifx.protocol.protocol_types import MultiZoneApplicationRequest
 
 
@@ -354,3 +355,19 @@ async def test_restore_zones_failure_handling(
     # Color and power should still be restored despite zone failure
     mock_multizone_light.set_color.assert_called_once()
     mock_multizone_light.set_power.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_restore_to_off_still_writes_colours_when_power_cannot_be_read(
+    state_manager, mock_light, caplog
+) -> None:
+    """A failed power read is logged and the colours still go back."""
+    mock_light.set_power = AsyncMock()
+    mock_light.get_power = AsyncMock(side_effect=LifxTimeoutError("no reply"))
+    mock_light.set_color = AsyncMock()
+    color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+    await state_manager.restore_state(mock_light, PreState(power=False, color=color))
+
+    mock_light.set_color.assert_called_once_with(color, duration=0.0)
+    assert "_wait_until_off" in caplog.text

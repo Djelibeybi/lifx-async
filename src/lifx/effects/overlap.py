@@ -173,10 +173,14 @@ class OverlapRules:
         """
         inherited: dict[ParticipantKey, PreState] = {}
         components: TakenComponents = {}
+        loop = asyncio.get_running_loop()
         for participant in participants:
             key = key_of(participant)
             light, component = resolve(participant)
             for conductor in list(OverlapRules._live):
+                # A run on another event loop cannot be cancelled from this one.
+                if not conductor._runs_on(loop):
+                    continue
                 if component is None:
                     parts = await conductor._take_components(effect, light)
                     if parts:
@@ -208,6 +212,17 @@ class OverlapRules:
                 )
                 await conductor.remove_lights([participant], restore_state=False)
         return inherited, components
+
+    def _runs_on(self, loop: asyncio.AbstractEventLoop) -> bool:
+        """Whether every run on this Conductor belongs to ``loop``.
+
+        Args:
+            loop: The event loop the caller is running on
+
+        Returns:
+            True if no run here belongs to a different event loop
+        """
+        return all(run.task.get_loop() is loop for run in self._running.values())
 
     async def _take_components(
         self, effect: LIFXEffect, light: Light

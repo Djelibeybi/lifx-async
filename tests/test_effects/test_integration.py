@@ -2,6 +2,7 @@
 
 import asyncio
 import socket
+import threading
 import time
 from types import MethodType
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -141,10 +142,7 @@ async def test_pulse_effect_execution(conductor, mock_light) -> None:
 
     # Start effect and let it run briefly
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)  # Let effect start
-
-    # Verify waveform was called
-    mock_light.set_waveform.assert_called()
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Stop effect
     await conductor.stop([mock_light])
@@ -157,10 +155,9 @@ async def test_pulse_effect_with_color(conductor, mock_light) -> None:
     effect = EffectPulse(mode="blink", cycles=1, period=0.1, color=custom_color)
 
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Verify waveform was called with custom color
-    mock_light.set_waveform.assert_called()
     call_kwargs = mock_light.set_waveform.call_args.kwargs
     assert call_kwargs["color"] == custom_color
 
@@ -186,10 +183,9 @@ async def test_pulse_effect_breathe_mode(conductor, mock_light) -> None:
     effect = EffectPulse(mode="breathe", cycles=1, period=0.1)
 
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Verify waveform called with sine waveform
-    mock_light.set_waveform.assert_called()
 
     await conductor.stop([mock_light])
 
@@ -213,10 +209,7 @@ async def test_colorloop_effect_execution(conductor, mock_light) -> None:
     ):
         # Start effect and let it run briefly
         await conductor.start(effect, [mock_light])
-        await asyncio.sleep(0.05)  # Let effect iterate once
-
-        # Verify frames were sent via animator
-        assert mock_animator.send_frame.call_count > 0
+        await wait_for_mock_called(mock_animator.send_frame)
 
         # Stop effect
         await conductor.stop([mock_light])
@@ -262,11 +255,9 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     ):
         # Start effect
         await conductor.start(effect, [light1, light2])
-        await asyncio.sleep(0.05)
-
         # Both animators should have send_frame called
-        assert mock_animator1.send_frame.called
-        assert mock_animator2.send_frame.called
+        await wait_for_mock_called(mock_animator1.send_frame)
+        await wait_for_mock_called(mock_animator2.send_frame)
 
         await conductor.stop([light1, light2])
 
@@ -289,10 +280,7 @@ async def test_colorloop_with_brightness(conductor, mock_light) -> None:
         return_value=[mock_animator],
     ):
         await conductor.start(effect, [mock_light])
-        await asyncio.sleep(0.05)
-
-        # Verify frames were sent
-        assert mock_animator.send_frame.called
+        await wait_for_mock_called(mock_animator.send_frame)
 
         await conductor.stop([mock_light])
 
@@ -931,3 +919,45 @@ async def test_conductor_frame_effect_coexists_with_lifx_effect(
 
         # Stop both
         await conductor.stop([light1, light2])
+
+
+@pytest.mark.asyncio
+async def test_take_over_leaves_a_conductor_on_another_event_loop_alone(
+    mock_light,
+) -> None:
+    """Newest-wins only reaches runs on the caller's own event loop.
+
+    A run on another loop cannot be cancelled from this one; trying raised
+    ValueError ("The future belongs to a different loop").
+    """
+    other_loop = asyncio.new_event_loop()
+    foreign = Conductor()
+    started = threading.Event()
+
+    def run_other_loop() -> None:
+        asyncio.set_event_loop(other_loop)
+        other_loop.run_until_complete(
+            foreign.start(
+                EffectPulse(mode="blink", cycles=1000, period=1.0), [mock_light]
+            )
+        )
+        started.set()
+        other_loop.run_forever()
+
+    thread = threading.Thread(target=run_other_loop, daemon=True)
+    thread.start()
+    assert started.wait(5)
+    conductor = Conductor()
+    try:
+        await conductor.start(
+            EffectPulse(mode="blink", cycles=1, period=0.1), [mock_light]
+        )
+        assert foreign.effect(mock_light) is not None
+    finally:
+        await conductor.stop([mock_light])
+        asyncio.run_coroutine_threadsafe(foreign.stop([mock_light]), other_loop).result(
+            5
+        )
+        other_loop.call_soon_threadsafe(other_loop.stop)
+        thread.join(5)
+        other_loop.close()
