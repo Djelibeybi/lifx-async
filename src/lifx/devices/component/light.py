@@ -242,7 +242,10 @@ class ComponentMatrixLight(MatrixLight):
         dark, or whose light was off, is turned off again, which powers the
         light off when the other light component is dark and has no effect;
         the light component's earlier colours then go back on the tile while
-        the light is off, so no effect frame shows at the next power-on.
+        the light is off, so no effect frame shows at the next power-on. So
+        do the other light component's, when it still holds the darkened
+        colours the effect's turn-on left, so the next whole-light power-on
+        shows the picture from before the effect.
         While the other light component animates, the write goes to its held
         tile. Either way the light component's stored colours are those from
         before the effect, none if it had none, and the other light
@@ -265,8 +268,8 @@ class ComponentMatrixLight(MatrixLight):
             await self._set_component_colors(component, colours, 0.0)
         elif not was_on or colours is not None:
             await self._turn_component_off(component, None, 0.0)
-            if colours is not None:
-                await self._rewrite_while_off(component, colours)
+            if before is not None:
+                await self._rewrite_while_off(component, before)
         if snapshot is not None:
             stored = snapshot[component]
             async with self._component_operation():
@@ -276,20 +279,38 @@ class ComponentMatrixLight(MatrixLight):
                     self._set_stored_colors(component, stored)
             await self._persist_component_state()
 
-    async def _rewrite_while_off(self, component: str, colours: list[HSBK]) -> None:
-        """Put a light component's earlier colours back on a light that is off.
+    async def _rewrite_while_off(self, component: str, before: list[HSBK]) -> None:
+        """Put the earlier picture back on a light that is off.
 
         Turning a light component off can power the light off with the
         effect's last frame still on the tile, which a later power-on would
-        show. Writing the colours back while the light is off shows nothing
-        and leaves stored colours alone.
+        show. Writing its earlier colours back while the light is off shows
+        nothing and leaves stored colours alone.
+
+        Turning on only the light component for its effect darkened the other
+        one. While the other light component still holds exactly those
+        darkened colours and draws no effect, its earlier colours go back
+        too, so a whole-light power-on shows both light components as they
+        were. A darkened light component whose caller changed it since keeps
+        that change.
+
+        Args:
+            component: The light component the effect drew on
+            before: The whole tile, in buffer order, captured before the effect
         """
         async with self._component_operation():
             if await self._power_for_update() != 0:
                 return
             tile = await self._tile_colors_for_update()
-            for position, colour in zip(self._component_positions(component), colours):
-                tile[position] = colour
+            for position in self._component_positions(component):
+                tile[position] = before[position]
+            other = self._other_component(component)
+            other_positions = self._component_positions(other)
+            if other not in self._animating_components() and all(
+                tile[p] == self._unlit(before[p]) for p in other_positions
+            ):
+                for position in other_positions:
+                    tile[position] = before[position]
             await self._write_tile(tile, 0.0)
 
     async def _power_on_component(self, component: str, duration: float) -> None:

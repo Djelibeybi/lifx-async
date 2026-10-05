@@ -329,17 +329,13 @@ class TestMirrorRingEffects:
             assert mirror.state.stored_front_colors == [AMBER] * RING
             assert mirror.state.stored_back_colors == [BLUE] * RING
 
-            # As with turn_front_on() then turn_front_off(), the effect's ring
-            # comes back on with the light and the back keeps its stored colours.
+            # Powering the light on shows the whole picture from before the
+            # effect: the back ring the effect's turn-on darkened comes back too.
             await mirror.set_power(True)
 
-            front, back = await _rings(mirror)
-            assert front == [AMBER] * RING
-            assert _dark(back)
-
-            await mirror.turn_back_on()
-
-            await _shows(mirror, AMBER, BLUE)
+            assert await _rings(mirror) == ([AMBER] * RING, [BLUE] * RING)
+            assert mirror.state.stored_front_colors == [AMBER] * RING
+            assert mirror.state.stored_back_colors == [BLUE] * RING
 
     async def test_a_write_to_the_animating_ring_stops_its_effect_first(
         self, mirror_device
