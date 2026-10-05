@@ -293,7 +293,9 @@ class Conductor(OverlapRules):
         components and restores them to their pre-effect state (power,
         colour, zones). A light also stops the effects on its light
         components in this Conductor, including a whole-light effect that
-        moved onto one; a light component stops only its own effect.
+        moved onto one; a light component stops only its own effect. Any
+        other participants of the same run carry on: the run ends only when
+        its last participant stops.
 
         Args:
             lights: Lights and light components to stop
@@ -307,57 +309,7 @@ class Conductor(OverlapRules):
             await conductor.stop([light1, light2])
             ```
         """
-        async with self._lock:
-            # Collect participants that need restoration and tasks to cancel
-            to_restore: list[tuple[Light, ComponentName | None, PreState]] = []
-            tasks_to_cancel: set[asyncio.Task[None]] = set()
-
-            members = self._members_of(lights)
-            for light, component in members:
-                running = self._running.get(participant_key(light, component))
-
-                if running:
-                    _LOGGER.debug(
-                        {
-                            "class": self.__class__.__name__,
-                            "method": "stop",
-                            "action": "stop",
-                            "values": {
-                                "serial": light.serial,
-                                "effect": type(running.effect).__name__,
-                            },
-                        }
-                    )
-                    to_restore.append((light, component, running.prestate))
-                    tasks_to_cancel.add(running.task)
-
-            # Close animators for frame effects (once per effect, not per device)
-            closed_effects: set[int] = set()
-            for member in members:
-                running = self._running.get(participant_key(*member))
-                if running and isinstance(running.effect, FrameEffect):
-                    effect_id = id(running.effect)
-                    if effect_id not in closed_effects:
-                        running.effect.close_animators()
-                        closed_effects.add(effect_id)
-
-            # Cancel background tasks
-            for task in tasks_to_cancel:
-                if not task.done():
-                    task.cancel()
-
-        # Wait for tasks to be cancelled (outside lock)
-        if tasks_to_cancel:
-            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
-
-        async with self._lock:
-            # Restore all participants in parallel
-            if to_restore:
-                await asyncio.gather(*(self._restore(*item) for item in to_restore))
-
-            # Remove from running registry after restoration
-            for member in members:
-                self._running.pop(participant_key(*member), None)
+        await self._remove(self._members_of(lights), restore_state=True)
 
     def _members_of(self, participants: Sequence[Participant]) -> list[Member]:
         """Each participant, and for a whole light its light components here.

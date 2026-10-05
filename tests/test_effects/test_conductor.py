@@ -430,6 +430,43 @@ async def test_remove_lights_keeps_other_participants(
     await conductor.stop([light2])
 
 
+async def test_stop_one_light_keeps_the_rest_of_the_run(
+    conductor, light1, light2
+) -> None:
+    """Stopping one light restores it alone; the others keep running."""
+    effect = _SimpleFrameEffect()
+    writers = [
+        MagicMock(
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+            send_frame=MagicMock(),
+            close=MagicMock(),
+        )
+        for _ in range(2)
+    ]
+
+    with patch.object(conductor, "_create_animators") as mock_create:
+        mock_create.return_value = list(writers)
+        await conductor.start(effect, [light1, light2])
+    task = conductor._running[light2.serial].task
+
+    await conductor.stop([light1])
+
+    assert light1.serial not in conductor._running
+    assert conductor._running[light2.serial].effect is effect
+    assert not task.done()
+    writers[0].close.assert_called_once()
+    writers[1].close.assert_not_called()
+    assert effect.participants == [light2]
+
+    await conductor.stop([light2])
+
+    assert task.done()
+    writers[1].close.assert_called_once()
+    assert conductor._running == {}
+
+
 async def test_add_then_remove_roundtrip(conductor, light1, light2) -> None:
     """Test adding a light and then removing it leaves clean state."""
     effect = _SimpleFrameEffect()
