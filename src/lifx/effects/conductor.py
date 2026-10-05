@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, ClassVar, cast
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
 from lifx.devices.component.participant import LightComponent
+from lifx.effects.const import POWER_ON_TRANSITION_DURATION
 from lifx.effects.models import (
     ParticipantKey,
     PreState,
@@ -147,16 +148,19 @@ class Conductor:
         return inherited
 
     @classmethod
-    async def _leave_every_run(cls, participant: Participant) -> None:
+    async def _leave_every_run(
+        cls, participant: Participant, *, restore_state: bool = True
+    ) -> None:
         """Remove a participant from every run it is part of, on any Conductor.
 
-        The participant's prior state is restored and the other participants
-        of each run carry on. A whole light also leaves the runs of its light
-        components. Runs are matched by participant key, so a second object
-        for the same light finds them too.
+        The participant's prior state is restored, unless ``restore_state`` is
+        False, and the other participants of each run carry on. A whole light
+        also leaves the runs of its light components. Runs are matched by
+        participant key, so a second object for the same light finds them too.
 
         Args:
             participant: The light or light component leaving its runs
+            restore_state: Whether to restore the participant's prior state
         """
         light, component = _resolve(participant)
         for conductor in list(cls._live):
@@ -171,7 +175,7 @@ class Conductor:
                 )
             ]
             if members:
-                await conductor._remove(members, restore_state=True)
+                await conductor._remove(members, restore_state=restore_state)
 
     def effect(self, light: Participant) -> LIFXEffect | None:
         """Return the effect currently running on a participant, or None if idle.
@@ -332,6 +336,7 @@ class Conductor:
                 # Set participants early so async_setup() can access them
                 # (async_perform() sets this too but runs in a background task)
                 effect.participants = lights
+                await self._power_on_components(effect, filtered_participants)
                 animators = await self._create_animators(effect, filtered_participants)
                 effect._animators = animators
                 await effect.async_setup(lights)
@@ -497,6 +502,7 @@ class Conductor:
             from lifx.effects.frame_effect import FrameEffect
 
             if isinstance(effect, FrameEffect):
+                await self._power_on_components(effect, new_participants)
                 new_animators = await self._create_animators(effect, new_participants)
                 effect._animators.extend(new_animators)
 
@@ -775,6 +781,28 @@ class Conductor:
 
         # Filter to only compatible participants
         return [participant for participant, is_compatible in results if is_compatible]
+
+    async def _power_on_components(
+        self, effect: LIFXEffect, participants: Sequence[Participant]
+    ) -> None:
+        """Turn on only the light components an effect starts on, where off.
+
+        This happens before the light component draws, so its frames start on
+        a light whose other light component is already dark. A light that is
+        on is left as it is, and so is every whole-light participant: the
+        effect powers those on itself.
+
+        Args:
+            effect: The effect about to start
+            participants: The lights and light components it starts on
+        """
+        if not effect.power_on:
+            return
+        for participant in participants:
+            if isinstance(participant, LightComponent):
+                await participant._light._power_on_component(
+                    participant._name, POWER_ON_TRANSITION_DURATION
+                )
 
     async def _create_animators(
         self, effect: FrameEffect, participants: Sequence[Participant]

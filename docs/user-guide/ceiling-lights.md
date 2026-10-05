@@ -459,9 +459,19 @@ no frames, such as `EffectPulse`, cannot.
 The light component with no effect keeps its colours. Its colour and power
 methods change what it shows on the next frame, fades included, and later
 frames do not overwrite the change. Calling the animating light component's
-own methods raises `LifxError` until its effect stops. Light components also
-take part in a `Conductor` run like whole lights:
+own colour or power methods stops its effect first, with no restore in
+between, and then applies the change; if it was one participant of a larger
+run, only it leaves and the others carry on. Light components also take part
+in a `Conductor` run like whole lights:
 `await conductor.start(effect, [ceiling.uplight])`.
+
+Starting an effect on a light component of a light that is off turns on only
+that light component, at its stored colours or a brightness inferred from the
+other light component, which stays dark. Stopping it returns the light
+component to its colours from before the effect, or turns it off again if it
+was dark or the light was off, which powers the light off when the other light
+component is dark too. The other light component is left as it is, even while
+its own effect runs, and stored colours are those from before the effect.
 
 Both light components draw through the light's one `Animator`
 (`ceiling.animator`): each light component is a slot on it, and every frame

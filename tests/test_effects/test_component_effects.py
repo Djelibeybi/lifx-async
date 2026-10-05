@@ -15,7 +15,7 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.models import PreState
 from lifx.effects.registry import get_effect_registry
 from lifx.effects.state_manager import DeviceStateManager
-from lifx.exceptions import LifxError, LifxTimeoutError
+from lifx.exceptions import LifxTimeoutError
 from tests.test_devices.test_component_transitions import build_rig
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
@@ -31,8 +31,8 @@ DOWNLIGHT = 127  # zones 0-126 of the 16x8 tile
 class _SolidFrames(FrameEffect):
     """Frame effect painting every pixel one colour, recording each context."""
 
-    def __init__(self, colour: HSBK) -> None:
-        super().__init__(power_on=True, fps=20.0)
+    def __init__(self, colour: HSBK, *, power_on: bool = True) -> None:
+        super().__init__(power_on=power_on, fps=20.0)
         self.colour = colour
         self.contexts: list[FrameContext] = []
 
@@ -176,22 +176,227 @@ class TestCeilingComponentEffects:
             assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
             assert ceiling.state.stored_uplight_color == AMBER
 
-    async def test_the_animating_component_refuses_its_own_methods(
+    async def test_a_write_to_the_animating_component_stops_its_effect_first(
         self, ceiling_device
     ):
         ceiling = ceiling_device
         async with ceiling:
             await _prepare(ceiling)
-            await ceiling.downlight.start_effect(_SolidFrames(RED))
+            conductor = Conductor()
+            effect = _SolidFrames(RED)
+            await conductor.start(effect, [ceiling.downlight])
 
-            with pytest.raises(LifxError, match="downlight"):
-                await ceiling.set_downlight_colors(WHITE)
-            with pytest.raises(LifxError, match="downlight"):
-                await ceiling.turn_downlight_off()
+            async def downlight_red() -> bool:
+                return (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+
+            await _eventually(downlight_red)
+
+            await ceiling.set_downlight_colors(WHITE)
+
+            assert conductor.effect(ceiling.downlight) is None
+            for _ in range(5):  # no later frame overwrites the write
+                assert (await _tile(ceiling))[:DOWNLIGHT] == [WHITE] * DOWNLIGHT
+                await asyncio.sleep(0.05)
+            assert await ceiling.get_downlight_colors() == [WHITE] * DOWNLIGHT
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert ceiling.state.stored_downlight_colors == [WHITE] * DOWNLIGHT
+
+    async def test_turning_the_animating_component_off_stops_its_effect_first(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            conductor = Conductor()
+            await conductor.start(_SolidFrames(RED), [ceiling.uplight])
+
+            async def uplight_red() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == RED
+
+            await _eventually(uplight_red)
+
+            await ceiling.turn_uplight_off()
+
+            assert conductor.effect(ceiling.uplight) is None
+            assert (await _tile(ceiling))[UPLIGHT].brightness == 0
+            assert not ceiling.uplight_is_on
+            assert await ceiling.get_power() == 65535
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+
+            await ceiling.turn_uplight_on()
+
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+
+    async def test_a_write_to_one_participant_leaves_the_rest_of_the_run(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            conductor = Conductor()
+            effect = _SolidFrames(RED)
+            await conductor.start(effect, [ceiling.uplight, ceiling.downlight])
+
+            async def all_red() -> bool:
+                return (await _tile(ceiling)) == [RED] * 128
+
+            await _eventually(all_red)
+
+            await ceiling.set_uplight_color(AMBER)
+
+            assert conductor.effect(ceiling.uplight) is None
+            assert conductor.effect(ceiling.downlight) is effect
+
+            async def uplight_amber() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == AMBER
+
+            await _eventually(uplight_amber)
+            for _ in range(5):  # the downlight keeps drawing, the uplight keeps amber
+                tile = await _tile(ceiling)
+                assert tile[UPLIGHT] == AMBER
+                assert tile[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                await asyncio.sleep(0.05)
+
+            await conductor.stop([ceiling.downlight])
+
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+            assert await ceiling.get_uplight_color() == AMBER
+
+    async def test_a_component_dark_before_its_effect_goes_dark_again(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.turn_downlight_off()
+            effect = _SolidFrames(RED)
+            await ceiling.downlight.start_effect(effect)
+
+            async def downlight_red() -> bool:
+                return (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+
+            await _eventually(downlight_red)
 
             await ceiling.downlight.stop_effect()
-            await ceiling.set_downlight_colors(WHITE)
-            assert await ceiling.get_downlight_colors() == [WHITE] * DOWNLIGHT
+
+            tile = await _tile(ceiling)
+            assert all(colour.brightness == 0 for colour in tile[:DOWNLIGHT])
+            assert not ceiling.downlight_is_on
+            assert ceiling.uplight_is_on
+            assert await ceiling.get_power() == 65535
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
+
+            await ceiling.turn_downlight_on()
+
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+
+    async def test_a_component_effect_on_a_light_that_is_off_lights_only_it(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.set_power(False)
+            effect = _SolidFrames(RED)
+
+            await ceiling.uplight.start_effect(effect)
+
+            assert await ceiling.get_power() == 65535
+            assert ceiling.uplight_is_on
+            assert not ceiling.downlight_is_on
+            assert all(
+                colour.brightness == 0 for colour in (await _tile(ceiling))[:DOWNLIGHT]
+            )
+
+            async def uplight_red() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == RED
+
+            await _eventually(uplight_red)
+            for _ in range(5):  # the downlight stays dark under the frames
+                tile = await _tile(ceiling)
+                assert all(colour.brightness == 0 for colour in tile[:DOWNLIGHT])
+                await asyncio.sleep(0.05)
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_power() == 0
+            assert not ceiling.uplight_is_on
+            assert not ceiling.downlight_is_on
+            assert ceiling.state.stored_uplight_color == DIM_BLUE
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
+
+    async def test_a_component_effect_without_power_on_leaves_the_light_off(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.set_power(False)
+
+            await ceiling.uplight.start_effect(_SolidFrames(RED, power_on=False))
+            await asyncio.sleep(0.2)
+
+            assert await ceiling.get_power() == 0
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_power() == 0
+            assert ceiling.state.stored_uplight_color == DIM_BLUE
+
+    async def test_a_component_effect_infers_brightness_from_the_other_side(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.turn_uplight_off()
+            ceiling.state.stored_uplight_color = None
+            await ceiling.set_power(False)
+            ceiling.state.stored_uplight_color = None
+
+            await ceiling.uplight.start_effect(_SolidFrames(RED))
+
+            assert await ceiling.get_power() == 65535
+            assert ceiling.state.last_uplight_color.brightness == pytest.approx(
+                GREEN.brightness, abs=0.01
+            )
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_power() == 0
+
+    async def test_restoring_one_component_leaves_the_animating_other(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.uplight.start_effect(_SolidFrames(RED))
+            await ceiling.downlight.start_effect(_SolidFrames(WHITE))
+
+            async def both_drawn() -> bool:
+                tile = await _tile(ceiling)
+                return tile[UPLIGHT] == RED and tile[:DOWNLIGHT] == [WHITE] * DOWNLIGHT
+
+            await _eventually(both_drawn)
+
+            await ceiling.downlight.stop_effect()
+
+            async def downlight_back() -> bool:
+                return (await _tile(ceiling))[:DOWNLIGHT] == [GREEN] * DOWNLIGHT
+
+            await _eventually(downlight_back)
+            for _ in range(5):  # the uplight effect carries on
+                tile = await _tile(ceiling)
+                assert tile[UPLIGHT] == RED
+                assert tile[:DOWNLIGHT] == [GREEN] * DOWNLIGHT
+                await asyncio.sleep(0.05)
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
 
     async def test_stopping_the_light_stops_its_component_effects(self, ceiling_device):
         ceiling = ceiling_device
@@ -266,7 +471,7 @@ def test_every_frame_effect_draws_on_both_component_shapes(shape):
             assert len(frame) == width * height, info.name
 
 
-async def test_a_component_restore_without_a_captured_tile_restores_power(
+async def test_a_component_of_a_light_that_was_off_goes_dark_without_a_tile(
     monkeypatch: pytest.MonkeyPatch,
 ):
     rig = build_rig(176, monkeypatch)
@@ -276,7 +481,23 @@ async def test_a_component_restore_without_a_captured_tile_restores_power(
         rig.light, "uplight", PreState(power=False, color=RED)
     )
 
-    assert rig.wire.power == 0
+    # The downlight is lit, so turning the uplight off leaves the light on.
+    assert rig.wire.power == 65535
+    assert rig.wire.colours[63].brightness == 0
+    assert rig.wire.colours[:63] == before[:63]
+
+
+async def test_a_lit_component_without_a_captured_tile_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    rig = build_rig(176, monkeypatch)
+    before = list(rig.wire.colours)
+
+    await DeviceStateManager().restore_component(
+        rig.light, "uplight", PreState(power=True, color=RED)
+    )
+
+    assert rig.wire.power == 65535
     assert rig.wire.colours == before
 
 

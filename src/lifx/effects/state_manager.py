@@ -130,20 +130,26 @@ class DeviceStateManager:
     ) -> None:
         """Restore one light component after its software effect.
 
-        Writes back the light component's colours from the tile captured
-        before the effect, leaving the other light component as it is now,
-        then restores the light's power. Neither write changes stored colours,
-        so the other light component keeps any its caller set meanwhile.
+        A light component that was lit gets back its colours from the tile
+        captured before the effect; one that was dark, or whose light was
+        off, is turned off again, powering the light off if the other light
+        component is dark too. The other light component is left as it is
+        now, including any change its caller made meanwhile, and the light
+        component's stored colours are those from before the effect.
 
         Args:
             light: The Ceiling or Mirror light the light component belongs to
             component: The light component's name
             prestate: State captured from the light before the effect
         """
+        stored = (prestate.stored_colors or {}).get(component)
         try:
-            if prestate.tile_colors:
-                await light._restore_component_tile(component, prestate.tile_colors[0])
-            await light._write_power(prestate.power, 0.0)
+            await light._restore_component(
+                component,
+                prestate.tile_colors[0] if prestate.tile_colors else None,
+                prestate.power,
+                stored,
+            )
         except Exception as e:
             _LOGGER.warning(
                 {

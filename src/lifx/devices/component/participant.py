@@ -65,7 +65,9 @@ class LightComponent:
         uplight is a single pixel, and a Ceiling downlight is the full grid
         with the uplight cell dropped. The other light component keeps its
         colours, and its colour and power methods keep working while the
-        effect runs.
+        effect runs. On a light that is off, only this light component turns
+        on and the other stays dark. Calling this light component's own
+        colour or power methods stops the effect first.
 
         Args:
             effect: The software effect to run. It must draw frames: an
@@ -87,8 +89,10 @@ class LightComponent:
     async def stop_effect(self) -> None:
         """Stop the software effect on this light component only.
 
-        An effect on the other light component, or on other lights in the
-        same run, carries on.
+        The light component gets its colours from before the effect back, or
+        turns off again if it was dark or its light was off. An effect on the
+        other light component, or on other lights in the same run, carries
+        on.
         """
         from lifx.effects.conductor import Conductor
 
