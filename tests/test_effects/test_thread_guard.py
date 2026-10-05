@@ -58,6 +58,18 @@ class TestEvidence:
         with pytest.raises(LifxUnsupportedCommandError, match="enable_thread=True"):
             await _thread_light().start_effect(EffectRainbow())
 
+    async def test_the_refusal_names_the_method_the_caller_used(
+        self, filtered: AsyncMock
+    ):
+        with pytest.raises(LifxUnsupportedCommandError, match=r"^start_effect\(\)"):
+            await _thread_light().start_effect(EffectRainbow())
+        with pytest.raises(LifxUnsupportedCommandError, match=r"^Conductor\.start\(\)"):
+            await Conductor().start(EffectRainbow(), [_thread_light()])
+        with pytest.raises(
+            LifxUnsupportedCommandError, match=r"^Conductor\.add_lights\(\)"
+        ):
+            await Conductor().add_lights(EffectRainbow(), [_thread_light()])
+
         filtered.assert_not_awaited()
 
     async def test_an_mdns_thread_record_is_evidence(self, filtered: AsyncMock):

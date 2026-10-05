@@ -876,6 +876,10 @@ class _LightEffects:
             raise TypeError(
                 f"start_effect() takes a software effect, got {type(effect).__name__}"
             )
+        # Refuse here so the message names the method the caller used.
+        _refuse_thread_frames(
+            effect, [participant], "start_effect()", enable_thread=enable_thread
+        )
         await self.conductor_for(resolve(participant)[0]).start(
             effect, [participant], enable_thread=enable_thread
         )
