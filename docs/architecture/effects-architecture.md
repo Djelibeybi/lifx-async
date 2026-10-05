@@ -285,19 +285,22 @@ await conductor.start(effect, [light1, light2])
 
 ```
 For each light:
-  1. Check if prestate can be inherited from running effect
-  2. If not, capture new prestate:
+  1. If the light already runs an effect, on this or any other Conductor,
+     take it out of that run with no restore (newest wins); the old run's
+     other lights carry on
+  2. Check if prestate can be inherited from that effect
+  3. If not, capture new prestate:
      a. Get power state (get_power)
      b. Get current color (get_color)
      c. Get zone colors if multizone (get_color_zones or get_extended_color_zones)
-  3. Store in RunningEffect and register in conductor._running
+  4. Store in RunningEffect and register in conductor._running
 ```
 
 **Timing:** <1 second per device (mostly network I/O)
 
 **Special Cases:**
 
-- **Prestate Inheritance:** If `effect.inherit_prestate(current_effect)` returns `True`, reuses existing PreState
+- **Prestate Inheritance:** If `effect.inherit_prestate(current_effect)` returns `True`, reuses the replaced run's PreState, so a later stop restores what was there before any effect
 - **Multizone Devices:** Uses extended messages if supported, falls back to standard messages
 - **Powered-off Devices:** All state is still captured (including zone colors that may be inaccurate)
 

@@ -62,7 +62,8 @@ await light.stop_effect()
 `stop_effect()` stops every effect on the light: a running firmware effect such as Morph or
 Move, and any software effect the light is part of, however it was started. If the light is one
 of several participants in a Conductor run, it leaves that run and the other lights carry on.
-`start_effect()` takes software effects only; firmware effects keep their own API, such as
+Starting an effect on a light that already runs one replaces it, wherever it was started, with
+no flash back to the light's earlier state. `start_effect()` takes software effects only; firmware effects keep their own API, such as
 `set_effect()`.
 
 ## Software Effects

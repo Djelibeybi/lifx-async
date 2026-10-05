@@ -69,6 +69,49 @@ class Conductor:
         self._lock = asyncio.Lock()
         Conductor._live.add(self)
 
+    async def _take_over(
+        self, effect: LIFXEffect, lights: list[Light]
+    ) -> dict[ParticipantKey, PreState]:
+        """Stop the software effect each light already runs, on any Conductor.
+
+        The light leaves its old run with no restore, so it never flashes back
+        to its prior state; the old run's other participants carry on, and a
+        run left with no participants is cancelled. Where ``effect`` inherits
+        from the old effect (``inherit_prestate()``), the old run's prior
+        state is returned for the light, so a later stop restores what was
+        there before any effect.
+
+        Args:
+            effect: The effect about to start on the lights
+            lights: The lights it is about to start on
+
+        Returns:
+            The inherited prior state of each light that has one
+        """
+        inherited: dict[ParticipantKey, PreState] = {}
+        for light in lights:
+            key = participant_key(light)
+            for conductor in list(Conductor._live):
+                running = conductor._running.get(key)
+                if running is None:
+                    continue
+                if effect.inherit_prestate(running.effect):
+                    inherited[key] = running.prestate
+                    _LOGGER.debug(
+                        {
+                            "class": self.__class__.__name__,
+                            "method": "_take_over",
+                            "action": "inherit_prestate",
+                            "values": {
+                                "serial": light.serial,
+                                "previous_effect": type(running.effect).__name__,
+                                "new_effect": type(effect).__name__,
+                            },
+                        }
+                    )
+                await conductor.remove_lights([light], restore_state=False)
+        return inherited
+
     @classmethod
     async def _leave_every_run(cls, light: Light) -> None:
         """Remove a light from every run it is part of, on any Conductor.
@@ -184,6 +227,10 @@ class Conductor:
             )
             return
 
+        # Newest wins: stop whatever each participant already runs, with no
+        # restore in between, before this effect captures or inherits.
+        inherited = await self._take_over(effect, filtered_participants)
+
         async with self._lock:
             # Set conductor reference in effect
             effect.conductor = self
@@ -194,26 +241,9 @@ class Conductor:
 
             for idx, light in enumerate(filtered_participants):
                 key = participant_key(light)
-                current_running = self._running.get(key)
-
-                if current_running and effect.inherit_prestate(current_running.effect):
-                    # Reuse existing prestate
-                    prestates[key] = current_running.prestate
-                    effect_name = type(current_running.effect).__name__
-                    _LOGGER.debug(
-                        {
-                            "class": self.__class__.__name__,
-                            "method": "start",
-                            "action": "inherit_prestate",
-                            "values": {
-                                "serial": light.serial,
-                                "previous_effect": effect_name,
-                                "new_effect": type(effect).__name__,
-                            },
-                        }
-                    )
+                if key in inherited:
+                    prestates[key] = inherited[key]
                 else:
-                    # Mark for capture
                     lights_needing_capture.append((idx, light))
 
             # Capture prestates in parallel for all lights that need it

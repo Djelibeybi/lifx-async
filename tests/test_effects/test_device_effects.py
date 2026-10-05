@@ -10,11 +10,13 @@ import pytest
 from lifx import Direction, FirmwareEffect
 from lifx.color import HSBK
 from lifx.devices.light import Light
+from lifx.effects.base import LIFXEffect
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())
+WHITE = HSBK.from_protocol(HSBK(0, 0, 1, 4000).to_protocol())
 DIM_BLUE = HSBK.from_protocol(HSBK(240, 1, 0.3, 3500).to_protocol())
 
 
@@ -24,13 +26,44 @@ class _SolidFrames(FrameEffect):
     def __init__(self, colour: HSBK) -> None:
         super().__init__(power_on=True, fps=20.0)
         self.colour = colour
+        self.frames = 0
 
     @property
     def name(self) -> str:
         return "solid"
 
     def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        self.frames += 1
         return [self.colour] * ctx.pixel_count
+
+
+async def _stopped_drawing(effect: _SolidFrames) -> bool:
+    """True if the effect draws no frame over a few frame intervals."""
+    frames = effect.frames
+    await asyncio.sleep(0.3)
+    return effect.frames == frames
+
+
+class _FollowOnFrames(_SolidFrames):
+    """Solid frames that take over another solid run's prior state."""
+
+    def inherit_prestate(self, other: LIFXEffect) -> bool:
+        return isinstance(other, _SolidFrames)
+
+
+async def _shows(light: Light, colour: HSBK) -> bool:
+    return (await light.get_color())[0] == colour
+
+
+async def _keeps_showing(light: Light, colour: HSBK) -> None:
+    """Fail if any read over about half a second shows another colour.
+
+    The reads are spaced out of step with the 20 fps frames, so a second
+    writer cannot hide between them.
+    """
+    for _ in range(30):
+        assert (await light.get_color())[0] == colour
+        await asyncio.sleep(0.017)
 
 
 async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
@@ -79,6 +112,72 @@ class TestStartAndStopOnALight:
                 await light.stop_effect()
 
                 assert (await light.get_color())[0] == DIM_BLUE
+
+    async def test_a_new_effect_replaces_the_running_one(self, emulator_devices):
+        light = emulator_devices[0]
+        async with light:
+            await light.set_power(True)
+            await light.set_color(DIM_BLUE)
+            first = _SolidFrames(RED)
+            await light.start_effect(first)
+            await _eventually(lambda: _shows(light, RED))
+
+            await light.start_effect(_FollowOnFrames(GREEN))
+
+            assert await _stopped_drawing(first)
+            await _eventually(lambda: _shows(light, GREEN))
+            await _keeps_showing(light, GREEN)
+            await light.stop_effect()
+            assert (await light.get_color())[0] == DIM_BLUE
+            await asyncio.sleep(0.3)
+            assert (await light.get_color())[0] == DIM_BLUE
+
+    async def test_a_replacement_that_does_not_inherit_still_replaces(
+        self, emulator_devices
+    ):
+        light = emulator_devices[0]
+        async with light:
+            await light.set_power(True)
+            await light.set_color(DIM_BLUE)
+            conductor = Conductor()
+            first = _SolidFrames(RED)
+            await conductor.start(first, [light])
+            await _eventually(lambda: _shows(light, RED))
+
+            await conductor.start(_SolidFrames(GREEN), [light])
+
+            assert await _stopped_drawing(first)
+            await _eventually(lambda: _shows(light, GREEN))
+            await _keeps_showing(light, GREEN)
+            await conductor.stop([light])
+
+    async def test_start_effect_takes_one_light_out_of_a_shared_run(
+        self, emulator_devices
+    ):
+        first, second = emulator_devices[0], emulator_devices[1]
+        async with first, second:
+            for light in (first, second):
+                await light.set_power(True)
+                await light.set_color(DIM_BLUE)
+            shared = _SolidFrames(RED)
+            conductor = Conductor()
+            await conductor.start(shared, [first, second])
+            await _eventually(lambda: _shows(first, RED))
+
+            await first.start_effect(_FollowOnFrames(GREEN))
+            shared.colour = WHITE
+
+            await _eventually(lambda: _shows(first, GREEN))
+            await _eventually(lambda: _shows(second, WHITE))
+            await _keeps_showing(first, GREEN)
+            assert conductor.effect(first) is None
+            assert conductor.effect(second) is shared
+
+            await first.stop_effect()
+            assert (await first.get_color())[0] == DIM_BLUE
+            await _eventually(lambda: _shows(second, WHITE))
+            await conductor.stop([second])
+            assert (await second.get_color())[0] == DIM_BLUE
 
     async def test_stop_effect_stops_a_matrix_firmware_effect(self, emulator_devices):
         matrix = emulator_devices[6]
