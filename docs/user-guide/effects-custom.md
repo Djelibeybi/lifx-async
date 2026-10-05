@@ -24,7 +24,6 @@ Subclass `FrameEffect` and implement `generate_frame()`. This is the recommended
 2. Implement `generate_frame(ctx)` returning a list of HSBK colors
 3. Optionally override `async_setup()` for initialization
 4. Optionally override `from_poweroff_hsbk()` for custom startup colors
-5. Optionally override `inherit_prestate()` for state inheritance optimization
 
 ### Imperative Effects
 
@@ -33,7 +32,6 @@ Subclass `LIFXEffect` and implement `async_play()`. Use this when you need direc
 1. Subclass `LIFXEffect`
 2. Implement `async_play()` with your effect logic
 3. Optionally override `from_poweroff_hsbk()` for custom startup colors
-4. Optionally override `inherit_prestate()` for state inheritance optimization
 
 The conductor handles all state management automatically — you just focus on the visual effect.
 
@@ -73,10 +71,47 @@ class MyFrameEffect(FrameEffect):
 Every call to `generate_frame()` receives a `FrameContext` with:
 
 - `elapsed_s`: Seconds since effect started (use for time-based animation)
-- `device_index`: Index in participants list (use for per-device offsets)
+- `device_index`: Index in participants list (use for per-device offsets). Both rings of a
+  whole-light Mirror share the Mirror's one index
 - `pixel_count`: Number of pixels to generate (1 for Light, N for zones, W*H for matrix)
 - `canvas_width`: Width in pixels (for 2D effects on matrix devices)
 - `canvas_height`: Height in pixels (for 2D effects on matrix devices)
+- `wraps`: `True` when the canvas is a ring whose last pixel sits next to its first, such as
+  a Mirror ring; `False` for every other canvas. Effects that move a pattern along the canvas
+  can read it to avoid a seam or a false end. Effects that ignore it keep working unchanged.
+
+### State That Carries Across Frames
+
+`generate_frame()` is called once for each participant in every frame, and every participant
+shares the one effect object. An effect that simulates something across frames, such as heat,
+particles or a cellular automaton, names the attributes holding that simulation in the
+`participant_state` class attribute. The frame loop then gives each participant its own copy of
+those attributes, so drawing one light (or one ring of a Mirror) never advances or resets
+another's simulation:
+
+```python
+class GlowEffect(FrameEffect):
+    participant_state = ("_heat",)
+
+    def __init__(self, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=20.0, duration=None)
+        self._heat: list[float] = []
+
+    @property
+    def name(self) -> str:
+        return "glow"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        if len(self._heat) != ctx.pixel_count:
+            self._heat = [0.0] * ctx.pixel_count
+        self._heat = [min(1.0, h * 0.9 + 0.05) for h in self._heat]
+        return [
+            HSBK(hue=20, saturation=1.0, brightness=h, kelvin=3500) for h in self._heat
+        ]
+```
+
+Each participant starts from the values the attributes held when the run drew its first frame.
+Attributes left out of `participant_state`, such as a palette, stay shared by every participant.
 
 ### Minimal Example
 
@@ -322,7 +357,7 @@ Override this to customize the color used when powering on a device.
 
 **Default behavior:** Returns random hue, full saturation, zero brightness, neutral white.
 
-**When called:** When a device needs to be powered on for the effect (if it was off when effect started).
+**When called:** When a device needs to be powered on for the effect (if it was off when effect started). Matrix lights (including Ceiling and Mirror) are powered on without a startup colour, so this is not called for them.
 
 **Example:**
 
@@ -340,32 +375,7 @@ async def from_poweroff_hsbk(self, light: Light) -> HSBK:
 
 ### `inherit_prestate(other: LIFXEffect) -> bool`
 
-Override this to enable state inheritance optimization.
-
-**Default behavior:** Returns `False` (always capture fresh state).
-
-**When called:** Before starting effect, to check if previous effect's state can be reused.
-
-**Example:**
-
-```python
-def inherit_prestate(self, other: LIFXEffect) -> bool:
-    """Can inherit from same effect type."""
-    return type(self) == type(other)
-```
-
-**Returns:**
-
-- `True`: Skip state capture/restore, reuse existing `PreState`
-- `False`: Capture fresh state as normal
-
-**Benefits:**
-
-- Faster effect transitions
-- No visible reset between compatible effects
-- Reduces network traffic
-
-**Use with caution:** Only return `True` if the incoming effect is truly compatible (won't cause visual artifacts).
+Superseded: the Conductor no longer consults `inherit_prestate()`. A new effect that replaces a running one always inherits that run's original prior state, so stopping it restores what was there before any effect. The method stays for compatibility; overriding it has no effect.
 
 ## Common Patterns
 
@@ -691,10 +701,6 @@ class RandomColorEffect(LIFXEffect):
     def stop(self) -> None:
         """Stop the continuous effect."""
         self._running = False
-
-    def inherit_prestate(self, other: LIFXEffect) -> bool:
-        """Can inherit from other RandomColorEffect instances."""
-        return isinstance(other, RandomColorEffect)
 ```
 
 **Usage:**

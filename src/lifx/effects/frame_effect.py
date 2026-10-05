@@ -12,20 +12,76 @@ HSBK object construction entirely.
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import time
 from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
+from lifx.effects.models import ParticipantKey, participant_key
 
 if TYPE_CHECKING:
-    from lifx.animation.animator import Animator
+    from lifx.devices.component.participant import ComponentName
     from lifx.devices.light import Light
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def writer_component(writer: object) -> ComponentName | None:
+    """The light component a borrowed Animator writer draws on, if any.
+
+    Args:
+        writer: One entry of a frame effect's borrowed Animators
+
+    Returns:
+        The light component's name, or None for a whole light
+    """
+    if not isinstance(writer, AnimatorWriter):
+        return None
+    return cast("ComponentName | None", writer.component)
+
+
+def writer_participant(writer: object) -> ComponentName | None:
+    """The light component a borrowed writer's participant is, if any.
+
+    A writer drawing one ring of a whole-light Mirror effect belongs to the
+    whole light, so it names no light component here.
+
+    Args:
+        writer: One entry of a frame effect's borrowed Animators
+
+    Returns:
+        The light component's name, or None for a whole light
+    """
+    if isinstance(writer, AnimatorWriter) and writer.whole_light:
+        return None
+    return writer_component(writer)
+
+
+def _staged_writers(writers: Sequence[object]) -> frozenset[int]:
+    """Indices of writers whose frame a later writer's tile carries.
+
+    When one effect draws on both light components of a light, both writers
+    share that light's tile. Every writer but the last on each tile stages
+    its frame, so each frame of the effect sends the tile once.
+
+    Args:
+        writers: A frame effect's borrowed Animators, in participant order
+
+    Returns:
+        The indices of the writers that stage instead of sending
+    """
+    return frozenset(
+        idx
+        for idx, writer in enumerate(writers)
+        if isinstance(writer, AnimatorWriter)
+        and any(writer.shares_tile_with(later) for later in writers[idx + 1 :])
+    )
 
 
 @dataclass(frozen=True)
@@ -34,10 +90,16 @@ class FrameContext:
 
     Attributes:
         elapsed_s: Seconds since effect started
-        device_index: Index of this device in the participants list
+        device_index: Index of this participant in the run. Both rings of a
+            whole-light Mirror effect are the Mirror's one participant, so
+            they share one index, and a light after the Mirror keeps the
+            index it would have had beside any other light.
         pixel_count: Number of pixels (1 for light, N for zones, W*H for matrix)
         canvas_width: Width in pixels (pixel_count for 1D, W for matrix)
         canvas_height: Height in pixels (1 for 1D, H for matrix)
+        wraps: True if the canvas is a ring whose last pixel sits next to its
+            first (a Mirror ring), so a pattern should run on with no seam or
+            end. False for every other canvas.
     """
 
     elapsed_s: float
@@ -45,6 +107,7 @@ class FrameContext:
     pixel_count: int
     canvas_width: int
     canvas_height: int
+    wraps: bool = False
 
 
 class FrameEffect(LIFXEffect):
@@ -54,15 +117,30 @@ class FrameEffect(LIFXEffect):
     FPS. Implement generate_frame() to return a list of HSBK colors
     matching ctx.pixel_count.
 
-    The Conductor creates Animators for each participant and sets them
-    on this effect before starting. The frame loop calls
+    The Conductor borrows each participant's own Animator (``light.animator``)
+    and sets a writer for it on this effect before starting. The frame loop calls
     generate_protocol_frame() per device, which by default delegates to
     generate_frame() and converts the result. Performance-critical effects
     can override generate_protocol_frame() directly to skip HSBK allocation.
 
+    An effect that simulates something across frames (heat, particles, a
+    cellular automaton) names the attributes holding that simulation in
+    ``participant_state``. Each participant of a run then keeps its own copy:
+    before the frame loop draws a participant it swaps that participant's
+    values into those attributes, so generate_frame() reads and writes them as
+    usual, and drawing one participant never advances or resets another's.
+    A participant's first frame starts from the values the attributes held
+    when the run drew its first frame. Attributes left out of
+    ``participant_state``, such as a palette or a shared clock, stay shared by
+    every participant. Both rings of a whole-light Mirror effect are the
+    Mirror's one participant: the loop draws one frame for them, from one
+    simulation, and both rings show it.
+
     Attributes:
         fps: Frames per second
         duration: Effect duration in seconds, or None for infinite
+        participant_state: Names of the attributes holding one participant's
+            simulation
 
     Example:
         ```python
@@ -77,6 +155,8 @@ class FrameEffect(LIFXEffect):
                 return colors
         ```
     """
+
+    participant_state: ClassVar[tuple[str, ...]] = ()
 
     def __init__(
         self,
@@ -104,11 +184,17 @@ class FrameEffect(LIFXEffect):
         self._fps = fps
         self._duration = duration
         self._stop_event = asyncio.Event()
-        self._animators: list[Animator] = []
-        self._last_frames: dict[str, list[HSBK]] = {}
+        self._animators: list[AnimatorWriter] = []
+        self._last_frames: dict[ParticipantKey, list[HSBK]] = {}
         # Cache for HSBK frame from default generate_protocol_frame()
         # Allows _last_frames tracking without coupling to the loop
         self._last_generated_hsbk: list[HSBK] | None = None
+        # Per-participant simulation: the attributes' starting values, the
+        # participant whose values the attributes hold now, and every other
+        # participant's values, set aside until it draws again
+        self._fresh_state: dict[str, Any] | None = None
+        self._drawing: object = None
+        self._set_aside: dict[object, dict[str, Any]] = {}
 
     @property
     def fps(self) -> float:
@@ -159,6 +245,55 @@ class FrameEffect(LIFXEffect):
         self._last_generated_hsbk = frame
         return [color.as_tuple() for color in frame]
 
+    def _draw_as(self, key: object, current: Sequence[object]) -> None:
+        """Swap in the simulation of the participant about to be drawn.
+
+        Args:
+            key: The participant about to be drawn
+            current: Every participant drawn this frame, so the simulation of
+                a participant that left the run is dropped
+        """
+        names = self.participant_state
+        if not names or key == self._drawing:
+            return
+        if self._fresh_state is None:
+            # The run's first frame: the attributes are this participant's
+            self._fresh_state = {
+                name: copy.deepcopy(getattr(self, name)) for name in names
+            }
+            self._drawing = key
+            return
+        self._set_aside[self._drawing] = {name: getattr(self, name) for name in names}
+        if len(self._set_aside) > len(current):
+            self._set_aside = {
+                other: state
+                for other, state in self._set_aside.items()
+                if other in current
+            }
+        state = self._set_aside.pop(key, None)
+        if state is None:
+            state = copy.deepcopy(self._fresh_state)
+        for name, value in state.items():
+            setattr(self, name, value)
+        self._drawing = key
+
+    def _rename_participant(self, old: object, new: object) -> None:
+        """Carry a participant's simulation over to the key it draws as now.
+
+        A whole-light effect that moves onto one light component goes on
+        drawing as that light component, so its simulation goes with it and
+        its frames carry on rather than start again.
+
+        Args:
+            old: The key the participant drew as
+            new: The key it draws as from now on
+        """
+        if self._drawing == old:
+            self._drawing = new
+        state = self._set_aside.pop(old, None)
+        if state is not None:
+            self._set_aside[new] = state
+
     async def async_setup(self, _participants: list[Light]) -> None:
         """Optional setup hook called before the frame loop starts.
 
@@ -196,32 +331,67 @@ class FrameEffect(LIFXEffect):
             # Snapshot animators and participants for safe iteration
             animators = list(self._animators)
             participants = list(self.participants)
+            staged = _staged_writers(animators)
+
+            # A writer's frame is kept under its light component, its drawing
+            # under its participant: both rings of a whole-light Mirror draw
+            # as the Mirror, so they share its index, simulation and frame.
+            frame_keys: list[object] = []
+            draw_keys: list[object] = []
+            for idx, animator in enumerate(animators):
+                if idx < len(participants):
+                    light = participants[idx]
+                    frame_keys.append(
+                        participant_key(light, writer_component(animator))
+                    )
+                    draw_keys.append(
+                        participant_key(light, writer_participant(animator))
+                    )
+                else:
+                    frame_keys.append(idx)
+                    draw_keys.append(idx)
+            indices = {key: index for index, key in enumerate(dict.fromkeys(draw_keys))}
+            drawn: dict[
+                object, tuple[list[tuple[int, int, int, int]], list[HSBK] | None]
+            ] = {}
 
             # Generate and send frames for each device
             for idx, animator in enumerate(animators):
-                ctx = FrameContext(
-                    elapsed_s=elapsed_s,
-                    device_index=idx,
-                    pixel_count=animator.pixel_count,
-                    canvas_width=animator.canvas_width,
-                    canvas_height=animator.canvas_height,
-                )
-
-                # Generate protocol-ready frame (subclasses can override
-                # generate_protocol_frame for zero-HSBK-allocation path)
-                protocol_frame = self.generate_protocol_frame(ctx)
-
-                # Track HSBK frame for state restoration (populated by
-                # default generate_protocol_frame, None for direct overrides)
-                if idx < len(participants) and self._last_generated_hsbk is not None:
-                    self._last_frames[participants[idx].serial] = (
-                        self._last_generated_hsbk
+                key = draw_keys[idx]
+                if key in drawn:
+                    # The other ring of a whole-light Mirror: the same frame
+                    protocol_frame, hsbk = drawn[key]
+                else:
+                    self._draw_as(key, draw_keys)
+                    ctx = FrameContext(
+                        elapsed_s=elapsed_s,
+                        device_index=indices[key],
+                        pixel_count=animator.pixel_count,
+                        canvas_width=animator.canvas_width,
+                        canvas_height=animator.canvas_height,
+                        wraps=animator.wraps,
                     )
-                # Always clear to prevent stale frames leaking across iterations
-                self._last_generated_hsbk = None
 
-                # Send via direct UDP
-                animator.send_frame(protocol_frame)
+                    # Generate protocol-ready frame (subclasses can override
+                    # generate_protocol_frame for zero-HSBK-allocation path)
+                    protocol_frame = self.generate_protocol_frame(ctx)
+                    # Populated by the default generate_protocol_frame, None
+                    # for direct overrides; always cleared so no stale frame
+                    # leaks across iterations
+                    hsbk = self._last_generated_hsbk
+                    self._last_generated_hsbk = None
+                    drawn[key] = (protocol_frame, hsbk)
+
+                # Track HSBK frame for state restoration
+                if idx < len(participants) and hsbk is not None:
+                    self._last_frames[cast("ParticipantKey", frame_keys[idx])] = hsbk
+
+                # Send via direct UDP; a light component whose tile a later
+                # writer sends this frame only keeps its frame in its slot
+                if idx in staged:
+                    cast("AnimatorWriter", animator).stage(protocol_frame)
+                else:
+                    animator.send_frame(protocol_frame)
 
             # Sleep for remaining frame time
             frame_elapsed = time.monotonic() - frame_start
@@ -238,10 +408,55 @@ class FrameEffect(LIFXEffect):
         self._stop_event.set()
 
     def close_animators(self) -> None:
-        """Close all animators and clear the list.
+        """Release every borrowed Animator and clear the list.
 
-        Called by the Conductor during cleanup.
+        Called by the Conductor during cleanup. Each light's own Animator
+        stays open for its other writers.
         """
         for animator in self._animators:
             animator.close()
         self._animators.clear()
+
+
+# The Conductor's seam onto a frame effect it runs: it lends the effect the
+# writers it draws through, and moves or drops participants, only through
+# these functions.
+
+
+def borrowed_writers(effect: FrameEffect) -> list[AnimatorWriter]:
+    """The writers a frame effect draws through, in participant order."""
+    return list(effect._animators)
+
+
+def lend_writers(effect: FrameEffect, writers: list[AnimatorWriter]) -> None:
+    """Give a frame effect the writers it draws through, one per participant."""
+    effect._animators = writers
+
+
+def add_writers(effect: FrameEffect, writers: list[AnimatorWriter]) -> None:
+    """Add writers for participants joining a running frame effect."""
+    effect._animators.extend(writers)
+
+
+def drop_participant(effect: FrameEffect, idx: int) -> None:
+    """Remove one participant from a frame effect and close its writer."""
+    if idx < len(effect._animators):
+        effect._animators.pop(idx).close()
+    del effect.participants[idx]
+
+
+def replace_writer(effect: FrameEffect, idx: int, writer: AnimatorWriter) -> None:
+    """Draw one participant through a new writer and close the old one."""
+    old = effect._animators[idx]
+    effect._animators[idx] = writer
+    old.close()
+
+
+def rename_participant(effect: FrameEffect, old: object, new: object) -> None:
+    """Carry a participant's simulation over to the key it draws as now."""
+    effect._rename_participant(old, new)
+
+
+def last_frame(effect: FrameEffect, key: ParticipantKey) -> list[HSBK] | None:
+    """The most recent HSBK frame a frame effect drew for a participant."""
+    return effect._last_frames.get(key)

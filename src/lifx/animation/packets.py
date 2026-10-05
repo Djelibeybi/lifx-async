@@ -127,6 +127,21 @@ class PacketGenerator(ABC):
     are updated in place.
     """
 
+    _duration_ms: int = 0
+
+    @property
+    def duration_ms(self) -> int:
+        """Transition duration, in milliseconds, baked into new templates.
+
+        Changing it affects only templates created afterwards; the Animator
+        recreates its templates when a frame needs a different duration.
+        """
+        return self._duration_ms
+
+    @duration_ms.setter
+    def duration_ms(self, value: int) -> None:
+        self._duration_ms = value
+
     @abstractmethod
     def create_templates(self, source: int, target: bytes) -> list[PacketTemplate]:
         """Create prebaked packet templates.
@@ -185,15 +200,12 @@ class MatrixPacketGenerator(PacketGenerator):
     Set64 packet covers whole rows of the tile (rows_per_packet = 64 //
     tile_width), matching the device's row-major Set64 fill order from
     (x=0, y=y_offset). The colour slice offset (hsbk_start = y_offset *
-    tile_width) therefore always matches the rect's y offset, even on
-    widths that do not evenly divide 64:
+    tile_width) therefore always matches the rect's y offset, and a final
+    batch of fewer rows covers any rows left over:
 
-        - Ceiling 16x8 (128 pixels, divides evenly): 2 Set64 packets of 64
-          colours each (rows 0-3, 4-7) + 1 CopyFrameBuffer = 3 packets/tile.
-        - Ceiling 13x26 (338 pixels, does not divide evenly): 7 Set64
-          packets of 52 colours each for the first 6 (4 rows x 13 width)
-          plus a final partial batch of 26 colours (2 rows x 13 width) +
-          1 CopyFrameBuffer = 8 packets/tile.
+        - Ceiling 16x8 (128 pixels; the "Ceiling 13x26" products, 201 and
+          202, report this tile): 2 Set64 packets of 64 colours each (rows
+          0-3, 4-7) + 1 CopyFrameBuffer = 3 packets/tile.
         - Multiple Set64 packets to temp buffer (fb_index=1)
         - CopyFrameBuffer packet to copy fb_index=1 → fb_index=0
 

@@ -67,6 +67,10 @@ class Wire:
             )
         if isinstance(packet, packets.Light.GetPower):
             return packets.Light.StatePower(level=self.power)
+        if isinstance(packet, packets.Light.GetColor):
+            return packets.Light.StateColor(
+                color=self.colours[0].to_protocol(), power=self.power, label=b""
+            )
         if isinstance(packet, packets.Light.SetPower):
             self.power = packet.level
         elif isinstance(packet, packets.Light.SetColor):
@@ -126,9 +130,8 @@ class Rig:
         self.clock[0] += duration + WRITE_SETTLE_MARGIN + 0.1
 
 
-@pytest.fixture(params=[176, 201, 267], ids=["ceiling", "capsule", "mirror"])
-def rig(request, monkeypatch) -> Rig:
-    product = request.param
+def build_rig(product: int, monkeypatch: pytest.MonkeyPatch) -> Rig:
+    """Wire a real Ceiling or Mirror object to an in-memory tile peer."""
     clock = [100.0]
     monkeypatch.setattr("lifx.devices.component.state.time.monotonic", lambda: clock[0])
     width, height = (4, 13) if product == 267 else (16, 8) if product == 201 else (8, 8)
@@ -182,9 +185,15 @@ def rig(request, monkeypatch) -> Rig:
     wire = Wire(width, height, colours)
     light.connection = AsyncMock()
     light.connection.request.side_effect = wire.exchange
-    light.connection.send_packet.side_effect = wire.exchange
+    # The simulated light answers as WiFi, as a real reply's frame address says.
+    light.connection.thread_connection = False
     light._schedule_refresh = AsyncMock()
     return Rig(light, wire, names, positions, clock)
+
+
+@pytest.fixture(params=[176, 201, 267], ids=["ceiling", "capsule", "mirror"])
+def rig(request, monkeypatch) -> Rig:
+    return build_rig(request.param, monkeypatch)
 
 
 @pytest.mark.parametrize("side", [0, 1])
@@ -664,3 +673,30 @@ async def test_read_during_incomplete_component_initialisation(rig: Rig):
     await rig.light.get_all_tile_colors()
     assert rig.colours(0, "last_") == [BLUE] * len(rig.positions[0])
     assert rig.colours(1) == []
+
+
+def test_component_writes_contend_safely_in_a_later_event_loop(rig: Rig):
+    """Two component writes contend for the light in each of two event loops.
+
+    Every tile write now waits for its acknowledgement, so overlapping
+    component writes queue on the light. The queue must not stay bound to
+    the event loop that first used it: a light outlives one ``asyncio.run()``.
+    """
+
+    async def acknowledge_later(_packet: Packet) -> None:
+        await asyncio.sleep(0)
+
+    rig.wire.before = acknowledge_later
+
+    async def both_sides(first: HSBK, second: HSBK) -> None:
+        await asyncio.gather(rig.on(0, first), rig.on(1, second))
+
+    asyncio.run(both_sides(BLUE, GREEN))
+    asyncio.run(both_sides(GREEN, BLUE))
+
+    assert [rig.wire.colours[p] for p in rig.positions[0]] == [GREEN] * len(
+        rig.positions[0]
+    )
+    assert [rig.wire.colours[p] for p in rig.positions[1]] == [BLUE] * len(
+        rig.positions[1]
+    )

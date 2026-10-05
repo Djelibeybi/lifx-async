@@ -439,12 +439,15 @@ def write_state_file(
     process pointed at the same file.
 
     The on-disk entry is merged rather than replaced so absent in-memory values
-    (e.g. state that failed to load in ``__aenter__``) are not clobbered.
+    (e.g. state that failed to load in ``__aenter__``) are not clobbered. A key
+    whose value is None is removed from the entry instead: the caller reset it
+    on purpose.
 
     Args:
         state_file: Path to the JSON state file; resolved here
         serial: Serial number of the device whose entry is being updated
-        device_state: Serialisable state to merge into that device's entry
+        device_state: Serialisable state to merge into that device's entry,
+            with None for each key to remove from it
 
     Raises:
         ValueError: If the existing file does not contain a JSON object, which
@@ -465,7 +468,11 @@ def write_state_file(
             data = {}
 
         entry = data.get(serial, {})
-        entry.update(device_state)
+        for key, value in device_state.items():
+            if value is None:
+                entry.pop(key, None)
+            else:
+                entry[key] = value
         data[serial] = entry
 
         # Ensure directory exists

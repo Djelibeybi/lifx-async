@@ -410,6 +410,19 @@ The `CeilingLight` class extends `MatrixLight` with independent control over upl
       filters:
         - "!^_"
 
+### LightComponent
+
+`ceiling.uplight`, `ceiling.downlight`, `mirror.front` and `mirror.back` return a `LightComponent`: one light component as an effect participant, carrying only `start_effect()`, `stop_effect()` and `animator`.
+
+::: lifx.devices.component.participant.LightComponent
+    options:
+      show_root_heading: true
+      heading_level: 4
+      members_order: source
+      show_if_no_docstring: false
+      filters:
+        - "!^_"
+
 ### CeilingLightState
 
 The `CeilingLightState` dataclass extends `MatrixLightState` with ceiling-specific component information. It is returned by `CeilingLight.state` after connecting to a device.

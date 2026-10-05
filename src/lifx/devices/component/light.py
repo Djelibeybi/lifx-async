@@ -15,9 +15,15 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from lifx.animation.animator import AnimatorWriter
+from lifx.animation.framebuffer import FrameBuffer
+from lifx.animation.slots import ComponentSlot
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.devices.component.participant import ComponentName, LightComponent
 from lifx.devices.component.state import Pending, hsk_matches, is_dark
+from lifx.devices.effect_runner import effect_runner
+from lifx.devices.light import wait_until_off
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 
@@ -31,7 +37,7 @@ _POWER_ON = 65535
 class _ComponentFields:
     """Map one light component to its existing named state fields."""
 
-    name: str
+    name: ComponentName
     colours: str
     scalar: bool = False
 
@@ -87,6 +93,7 @@ class ComponentMatrixLight(MatrixLight):
         self._pending_tile: Pending[list[HSBK]] = Pending()
         self._pending_power: Pending[int] = Pending()
         self._component_lock = asyncio.Lock()
+        self._component_lock_loop: asyncio.AbstractEventLoop | None = None
         self._component_owner: asyncio.Task[Any] | None = None
         self._writing_tile = False
         self._writing_power = False
@@ -97,10 +104,248 @@ class ComponentMatrixLight(MatrixLight):
         # entire component is dark after observing all of its zones.
         self._observed_positions: set[int] = set()
         self._changed_positions: set[int] = set()
+        self._light_components: dict[str, LightComponent] = {}
+        # Light components whose stored colours were deliberately reset to
+        # None, so the next save removes them from the state file too.
+        self._unset_stored: set[str] = set()
 
     def _component_positions(self, component: str) -> tuple[int, ...]:
         """Return buffer positions in the device's public colour order."""
         raise NotImplementedError
+
+    def _component_canvas(
+        self, component: str, light_canvas: FrameBuffer
+    ) -> tuple[FrameBuffer, tuple[int, ...]]:
+        """Return the canvas an effect on a light component draws on.
+
+        A light component with one zone, such as a Ceiling uplight, draws on
+        a single pixel. Any other draws on the whole light's canvas, and only
+        its own cells reach the tile: a Ceiling downlight's frames drop the
+        uplight cell.
+
+        Args:
+            component: The light component's name
+            light_canvas: The whole light's canvas on its Animator
+
+        Returns:
+            The canvas, and for each of the light component's buffer positions
+            the index of the mapped frame that colours it
+        """
+        positions = self._component_positions(component)
+        if len(positions) == 1:
+            return FrameBuffer(pixel_count=1, canvas_width=1, canvas_height=1), (0,)
+        return light_canvas, positions
+
+    def _component_wraps(self, _component: str) -> bool:
+        """Whether a light component's canvas is a ring that wraps."""
+        return False
+
+    def _light_component(self, component: str) -> LightComponent:
+        """Return the effect participant for a light component, made once."""
+        participant = self._light_components.get(component)
+        if participant is None:
+            participant = LightComponent(self, self._fields(component).name)
+            self._light_components[component] = participant
+        return participant
+
+    def _animating_components(self) -> frozenset[str]:
+        """Names of the light components a software effect is drawing on."""
+        if self._animator is None:
+            return frozenset()
+        return self._animator._animating()
+
+    async def _stop_component_effect(self, component: str) -> bool:
+        """Stop the software effect drawing on a light component, if any.
+
+        A caller's colour or power change to the animating light component
+        wins over its effect, as a newer effect would: the effect stops with
+        no restore in between, and any other participants of its run carry
+        on.
+
+        Returns:
+            True if an effect was drawing on the light component
+        """
+        runner = effect_runner()
+        if component not in self._animating_components() and (
+            not runner.runs_whole_light(self)
+        ):
+            return False
+        # A whole-light effect moves onto the other light component.
+        await runner.leave_every_run(
+            self._light_component(component), restore_state=False
+        )
+        return True
+
+    async def _component_writer(
+        self,
+        component: str,
+        duration_ms: int,
+        *,
+        whole_light: bool = False,
+        canvas: FrameBuffer | None = None,
+    ) -> AnimatorWriter:
+        """Borrow the light's Animator to draw on one light component's slot.
+
+        The first slot holds the tile the light shows now, so the other light
+        component keeps its colours while the effect runs.
+
+        Args:
+            component: The light component's name
+            duration_ms: Transition duration for the writer's frames
+            whole_light: True if the writer draws this light component's
+                share of a whole-light effect
+            canvas: The whole light's canvas, for a whole-light effect that
+                moved onto this light component and keeps drawing the canvas
+                it started with; each of the light component's cells then
+                takes its own cell of the frame. None draws on the light
+                component's own shape.
+
+        Returns:
+            A writer whose frames land on the light component's slot
+        """
+        async with self._component_operation():
+            tile = await self._tile_colors_for_update()
+        if whole_light:
+            # A whole-light effect owns the whole tile: positions that belong
+            # to no light component, such as a Mirror's chipless ones, stay
+            # dark while it runs.
+            owned = {
+                position
+                for fields in self._component_fields
+                for position in self._component_positions(fields.name)
+            }
+            tile = [
+                colour if position in owned else self._unlit(colour)
+                for position, colour in enumerate(tile)
+            ]
+        # Only an effect run reaches here, after the Conductor's Thread guard.
+        animator = await self.animator.prepare(enable_thread=True)
+        positions = self._component_positions(component)
+        canvas, sources = (
+            self._component_canvas(component, animator._require_geometry().framebuffer)
+            if canvas is None
+            else (canvas, positions)
+        )
+        slot = ComponentSlot(component, positions, sources)
+        return animator._slot_writer(
+            slot,
+            canvas,
+            tile,
+            duration_ms=duration_ms,
+            wraps=self._component_wraps(component),
+            whole_light=whole_light,
+        )
+
+    async def _restore_component(
+        self,
+        component: str,
+        before: list[HSBK] | None,
+        was_on: bool,
+        snapshot: dict[str, list[HSBK] | None] | None,
+    ) -> None:
+        """Return one light component to its state before a software effect.
+
+        A light component that was lit gets its colours back. One that was
+        dark, or whose light was off, is turned off again, which powers the
+        light off when the other light component is dark and has no effect;
+        the light component's earlier colours then go back on the tile while
+        the light is off, so no effect frame shows at the next power-on. So
+        do the other light component's, when it still holds the darkened
+        colours the effect's turn-on left, so the next whole-light power-on
+        shows the picture from before the effect.
+        While the other light component animates, the write goes to its held
+        tile. Either way the light component's stored colours are those from
+        before the effect, none if it had none, and the other light
+        component is left as it is, stored colours included.
+
+        Args:
+            component: The light component's name
+            before: The whole tile, in buffer order, captured before the
+                effect, or None if it could not be read
+            was_on: Whether the light was on before the effect
+            snapshot: Both light components' stored colours before the
+                effect, or None if they were not known
+        """
+        colours = (
+            [before[p] for p in self._component_positions(component)]
+            if before is not None
+            else None
+        )
+        if was_on and colours is not None and not is_dark(colours):
+            await self._set_component_colors(component, colours, 0.0)
+        elif not was_on or colours is not None:
+            await self._turn_component_off(component, None, 0.0)
+            if before is not None:
+                await self._rewrite_while_off(component, before)
+        if snapshot is not None:
+            stored = snapshot[component]
+            async with self._component_operation():
+                if stored is None:
+                    self._unset_stored_colors(component)
+                else:
+                    self._set_stored_colors(component, stored)
+            await self._persist_component_state()
+
+    async def _rewrite_while_off(self, component: str, before: list[HSBK]) -> None:
+        """Put the earlier picture back on a light that is off.
+
+        Turning a light component off can power the light off with the
+        effect's last frame still on the tile, which a later power-on would
+        show. Writing its earlier colours back while the light is off shows
+        nothing and leaves stored colours alone. If the light does not report
+        off, or its power cannot be read, nothing is written: a write to a
+        light that may still be lit would flash.
+
+        Turning on only the light component for its effect darkened the other
+        one. While the other light component still holds exactly those
+        darkened colours and draws no effect, its earlier colours go back
+        too, so a whole-light power-on shows both light components as they
+        were. A darkened light component whose caller changed it since keeps
+        that change.
+
+        Args:
+            component: The light component the effect drew on
+            before: The whole tile, in buffer order, captured before the effect
+        """
+        async with self._component_operation():
+            if await self._power_for_update() != 0:
+                return
+            # The light acknowledges the power-off before it goes dark; a
+            # write in that window flashes the earlier picture, so nothing is
+            # written until the light reports off.
+            try:
+                off = await wait_until_off(self)
+            except LifxError:
+                off = False
+            if not off:
+                return
+            tile = await self._tile_colors_for_update()
+            for position in self._component_positions(component):
+                tile[position] = before[position]
+            other = self._other_component(component)
+            other_positions = self._component_positions(other)
+            if other not in self._animating_components() and all(
+                tile[p] == self._unlit(before[p]) for p in other_positions
+            ):
+                for position in other_positions:
+                    tile[position] = before[position]
+            await self._write_tile(tile, 0.0)
+
+    async def _power_on_component(self, component: str, duration: float) -> None:
+        """Turn on only one light component of a light that is off.
+
+        The light component gets its stored colours or a brightness inferred
+        from the other light component, the other light component is darkened
+        and the light powers on. A light that is already on is left as it is.
+
+        Args:
+            component: The light component's name
+            duration: Power-on transition in seconds
+        """
+        async with self._component_operation():
+            if await self._power_for_update() == 0:
+                await self._light_component_from_off(component, None, duration)
+        await self._persist_component_state()
 
     async def _save_state_to_file(self) -> None:
         """Persist through the device's existing schema and error policy."""
@@ -113,7 +358,7 @@ class ComponentMatrixLight(MatrixLight):
                 return fields
         raise ValueError(f"Unknown light component: {component}")
 
-    def _other_component(self, component: str) -> str:
+    def _other_component(self, component: str) -> ComponentName:
         """Return the other side of this light."""
         first, second = self._component_fields
         return second.name if component == first.name else first.name
@@ -137,6 +382,13 @@ class ComponentMatrixLight(MatrixLight):
         if task is not None and task is self._component_owner:
             yield
             return
+        # An asyncio.Lock binds to the loop that first waits on it. A light
+        # outlives one asyncio.run(), and nothing from an earlier loop can
+        # still hold the lock, so each new loop gets a fresh one.
+        loop = asyncio.get_running_loop()
+        if self._component_lock_loop is not loop:
+            self._component_lock = asyncio.Lock()
+            self._component_lock_loop = loop
         async with self._component_lock:
             self._component_owner = task
             try:
@@ -151,6 +403,8 @@ class ComponentMatrixLight(MatrixLight):
 
     def _zones_changed(self) -> None:
         """Forget pending colours after raw writes, effects or Animator startup."""
+        if self._animator is not None:
+            self._animator._forget_hold()
         self._pending_tile.clear()
         self._known_tile.clear()
         self._observed_positions.clear()
@@ -166,6 +420,56 @@ class ComponentMatrixLight(MatrixLight):
     def _set_stored_colors(self, component: str, colors: list[HSBK]) -> None:
         """Remember restoration colours in the existing named fields."""
         self._fields(component).write(self.state, colors, "stored_")
+
+    def _unset_stored_colors(self, component: str) -> None:
+        """Forget a light component's stored colours, in memory and on save."""
+        setattr(self.state, "stored_" + self._fields(component).colours, None)
+        self._unset_stored.add(component)
+
+    def _unset_state_entries(self) -> dict[str, None]:
+        """State-file entries to remove: stored colours reset and still unset.
+
+        A stored colour that is merely absent, such as one that failed to
+        load, leaves its saved entry alone; only a deliberate reset removes
+        it.
+        """
+        return {
+            name: None
+            for name in sorted(self._unset_stored)
+            if self._fields(name).read(self.state, "stored_") is None
+        }
+
+    def _saved_state_entries(self, entries: dict[str, Any]) -> None:
+        """Note that a save wrote these entries, so resets are not resent."""
+        self._unset_stored.difference_update(entries)
+
+    def _stored_colors_snapshot(self) -> dict[str, list[HSBK] | None] | None:
+        """Copy both components' stored colours, or None before state exists."""
+        if not self._has_component_state():
+            return None
+        return {
+            fields.name: fields.read(self.state, "stored_")
+            for fields in self._component_fields
+        }
+
+    async def _reinstate_stored_colors(
+        self, snapshot: dict[str, list[HSBK] | None]
+    ) -> None:
+        """Put back stored colours copied before a whole-light software effect.
+
+        Restoring the tile and power after an effect goes through paths that
+        remember colours (uniform-tile SetColor, power-off capture), and tile
+        reads while frames play adopt frame colours. None of those are colours
+        the user chose, so the copy taken before the effect wins.
+        """
+        async with self._component_operation():
+            for fields in self._component_fields:
+                colours = snapshot[fields.name]
+                if colours is None:
+                    self._unset_stored_colors(fields.name)
+                else:
+                    fields.write(self.state, colours, "stored_")
+        await self._persist_component_state()
 
     def _set_component_state(
         self, component: str, colors: list[HSBK], *, stored: bool = False
@@ -201,7 +505,14 @@ class ComponentMatrixLight(MatrixLight):
         self._update_component_flags()
 
     async def _tile_colors_for_update(self) -> list[HSBK]:
-        """Compose from our pending target, otherwise from a fresh device read."""
+        """Compose from the held tile, our pending target, or a fresh read.
+
+        While a software effect draws on a light component, the other light
+        component lives in the Animator's held tile, and so do its changes.
+        """
+        held = self._animator._held_tile() if self._animator is not None else None
+        if held is not None:
+            return held
         pending = self._pending_tile.get()
         if pending is not None:
             return pending
@@ -217,7 +528,16 @@ class ComponentMatrixLight(MatrixLight):
         return tile
 
     async def _write_tile(self, tile_colors: list[HSBK], duration: float) -> None:
-        """Write and publish a complete tile only after the write succeeds."""
+        """Write and publish a complete tile only after the write succeeds.
+
+        While a software effect draws on a light component, the tile goes to
+        the Animator's held tile instead: the effect's next frame carries it.
+        """
+        if self._animator is not None and self._animator._animating():
+            self._animator._retarget_hold(tile_colors, duration)
+            self._known_tile = dict(enumerate(tile_colors))
+            self._publish_tile(tile_colors)
+            return
         self._writing_tile = True
         self._observed_positions.clear()
         self._changed_positions.clear()
@@ -297,6 +617,7 @@ class ComponentMatrixLight(MatrixLight):
                 f"Use turn_{component}_off() instead."
             ),
         )
+        await self._stop_component_effect(component)
         async with self._component_operation():
             await self._set_component_colors_owned(component, targets, duration)
         await self._persist_component_state()
@@ -332,29 +653,10 @@ class ComponentMatrixLight(MatrixLight):
             if colors is not None
             else None
         )
+        await self._stop_component_effect(component)
         async with self._component_operation():
             if await self._power_for_update() == 0:
-                tile = await self._tile_colors_for_update()
-                if targets is None:
-                    targets = await self._determine_component_brightness(
-                        component, tile
-                    )
-                other = self._other_component(component)
-                other_positions = self._component_positions(other)
-                other_colours = [tile[p] for p in other_positions]
-                for position, colour in zip(
-                    self._component_positions(component), targets
-                ):
-                    tile[position] = colour
-                for position in other_positions:
-                    tile[position] = self._unlit(tile[position])
-                preload = duration if self._pending_power.transitioning() else 0.0
-                await self._write_tile(tile, preload)
-                # The tile is confirmed even if the subsequent power write fails.
-                self._set_stored_colors(component, targets)
-                if not is_dark(other_colours):
-                    self._set_stored_colors(other, other_colours)
-                await self._write_power(True, duration)
+                await self._light_component_from_off(component, targets, duration)
             else:
                 # Adopt a new observation before selecting restoration colours;
                 # an external change discovered by this read must win too.
@@ -367,6 +669,28 @@ class ComponentMatrixLight(MatrixLight):
                     component, targets, duration, tile
                 )
         await self._persist_component_state()
+
+    async def _light_component_from_off(
+        self, component: str, targets: list[HSBK] | None, duration: float
+    ) -> None:
+        """Preload one side, darken the other and power on; caller owns the op."""
+        tile = await self._tile_colors_for_update()
+        if targets is None:
+            targets = await self._determine_component_brightness(component, tile)
+        other = self._other_component(component)
+        other_positions = self._component_positions(other)
+        other_colours = [tile[p] for p in other_positions]
+        for position, colour in zip(self._component_positions(component), targets):
+            tile[position] = colour
+        for position in other_positions:
+            tile[position] = self._unlit(tile[position])
+        preload = duration if self._pending_power.transitioning() else 0.0
+        await self._write_tile(tile, preload)
+        # The tile is confirmed even if the subsequent power write fails.
+        self._set_stored_colors(component, targets)
+        if not is_dark(other_colours):
+            self._set_stored_colors(other, other_colours)
+        await self._write_power(True, duration)
 
     @staticmethod
     def _unlit(colour: HSBK) -> HSBK:
@@ -392,17 +716,26 @@ class ComponentMatrixLight(MatrixLight):
             if colors is not None
             else None
         )
+        stopped = await self._stop_component_effect(component)
         async with self._component_operation():
             tile = await self._tile_colors_for_update()
             positions = self._component_positions(component)
             current = [tile[p] for p in positions]
+            # Darkening keeps the shown colours' hue, saturation and kelvin.
+            # Dark cells copied from white stored colours under a saturated
+            # effect frame switch the firmware to white mode, which flashes.
+            dark_source = current if stopped and colors is None else None
             if stored is None:
                 previous = self._stored_colors(component)
-                stored = (
-                    previous if is_dark(current) and previous is not None else current
-                )
+                # An effect's last frame is transient, never colours to keep.
+                keep_previous = stopped or is_dark(current)
+                stored = previous if keep_previous and previous is not None else current
             other = self._other_component(component)
-            other_dark = is_dark([tile[p] for p in self._component_positions(other)])
+            # Both light components share power: while an effect draws on the
+            # other one, darken this side rather than powering the light off.
+            other_dark = other not in self._animating_components() and is_dark(
+                [tile[p] for p in self._component_positions(other)]
+            )
             if other_dark:
                 await self._write_power(False, duration)
                 # Power-off succeeded. Publish that progress before attempting
@@ -417,7 +750,7 @@ class ComponentMatrixLight(MatrixLight):
                         )
                     await self._write_tile(tile, 0.0)
             else:
-                for position, colour in zip(positions, stored):
+                for position, colour in zip(positions, dark_source or stored):
                     tile[position] = self._unlit(colour)
                 await self._write_tile(tile, duration)
             self._set_stored_colors(component, stored)
@@ -532,8 +865,10 @@ class ComponentMatrixLight(MatrixLight):
         if (x == 0 and y == 0) or self._observed_positions.intersection(observed):
             self._observed_positions.clear()
             self._changed_positions.clear()
+        # Frames an effect draws are not colours anyone chose to remember.
         protected = (
-            self._writing_tile
+            bool(self._animating_components())
+            or self._writing_tile
             or self._writing_power
             or self._pending_tile.get() is not None
             or self._pending_power.get() is not None

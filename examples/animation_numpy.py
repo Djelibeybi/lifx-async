@@ -377,13 +377,12 @@ async def run_profile(
     """
     is_matrix = isinstance(device, MatrixLight)
 
+    animator = await device.animator.prepare()
     if is_matrix:
-        animator = await Animator.for_matrix(device)
         tiles = device.device_chain
         width = tiles[0].width if tiles else 8
         height = tiles[0].height if tiles else 8
     else:
-        animator = await Animator.for_multizone(device)
         width = animator.pixel_count
         height = 1
 
@@ -531,14 +530,13 @@ async def run_animation(
     """Run animation with NumPy-optimized frame generation."""
     is_matrix = isinstance(device, MatrixLight)
 
-    # Create animator
+    # Borrow the device's own Animator
+    animator = await device.animator.prepare()
     if is_matrix:
-        animator = await Animator.for_matrix(device)
         tiles = device.device_chain
         width = tiles[0].width if tiles else 8
         height = tiles[0].height if tiles else 8
     else:
-        animator = await Animator.for_multizone(device)
         width = animator.pixel_count
         height = 1
 

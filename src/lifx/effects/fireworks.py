@@ -182,6 +182,12 @@ class EffectFireworks(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_rockets",
+        "_next_launch_t",
+        "_initialized",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

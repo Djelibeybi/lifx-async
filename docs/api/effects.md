@@ -235,6 +235,9 @@ Return startup color when light is powered off.
 
 **Override this** to customize the color used when powering on a light.
 
+Matrix lights (including Ceiling and Mirror) are powered on without a startup
+colour, so this is not called for them.
+
 **Default behavior:** Returns random hue, full saturation, zero brightness, neutral white.
 
 **Example:**
@@ -247,19 +250,7 @@ async def from_poweroff_hsbk(self, light: Light) -> HSBK:
 
 #### `inherit_prestate(other: LIFXEffect) -> bool`
 
-Whether this effect can skip device state restoration.
-
-**Override this** if your effect can run without resetting when following certain other effects.
-
-**Default behavior:** Returns `False` (always reset)
-
-**Example:**
-
-```python
-def inherit_prestate(self, other: LIFXEffect) -> bool:
-    # Can inherit from same effect type
-    return type(self) == type(other)
-```
+Superseded: the Conductor no longer consults `inherit_prestate()`. A new effect that replaces a running one always inherits that run's original prior state, so stopping it restores what was there before any effect. The method stays for compatibility; overriding it has no effect.
 
 ### Creating Custom Effects
 
@@ -312,11 +303,17 @@ Frozen dataclass passed to `generate_frame()` with timing and layout info:
 @dataclass(frozen=True)
 class FrameContext:
     elapsed_s: float    # Seconds since effect started
-    device_index: int   # Index in participants list
+    device_index: int   # Index in participants list (a Mirror's two rings share one)
     pixel_count: int    # Number of pixels (1 for light, N for zones, W*H for matrix)
     canvas_width: int   # Width (pixel_count for 1D, W for matrix)
     canvas_height: int  # Height (1 for 1D, H for matrix)
+    wraps: bool = False # True for a ring canvas (Mirror), where the last pixel
+                        # sits next to the first
 ```
+
+Rainbow, Spin, Cylon and Colorloop read `wraps` so a ring shows no seam or false end: Spin
+spreads its palette round the ring without repeating a colour, and Cylon's eye circles the
+ring instead of bouncing.
 
 ### Methods
 
@@ -346,15 +343,16 @@ Signal the frame loop to stop.
 
 #### `close_animators() -> None`
 
-Close all animators and clear the list. Called by the Conductor during cleanup.
+Release every borrowed Animator and clear the list. Called by the Conductor during cleanup. Each
+light's own Animator stays open.
 
 ### Device Type Support
 
-FrameEffect works across all device types via the animation module:
+FrameEffect works across all device types through each light's own Animator, `light.animator`:
 
-- **Light**: `Animator.for_light()` — 1 pixel via SetColor packets
-- **MultiZoneLight**: `Animator.for_multizone()` — N pixels via SetExtendedColorZones
-- **MatrixLight**: `Animator.for_matrix()` — W×H pixels via Set64 packets
+- **Light**: 1 pixel via SetColor packets
+- **MultiZoneLight**: N pixels via SetExtendedColorZones
+- **MatrixLight**: W×H pixels via Set64 packets
 
 ### Creating Custom FrameEffects
 

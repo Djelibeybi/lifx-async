@@ -8,6 +8,7 @@ from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.models import PreState
 from lifx.effects.state_manager import DeviceStateManager
+from lifx.exceptions import LifxTimeoutError
 from lifx.protocol.protocol_types import MultiZoneApplicationRequest
 
 
@@ -187,6 +188,8 @@ async def test_restore_state_powered_off_light(state_manager, mock_light) -> Non
     mock_light.set_color = AsyncMock()
     mock_light.set_power = AsyncMock()
 
+    mock_light.get_power = AsyncMock(return_value=0)
+
     # Create powered-off prestate
     color = HSBK(hue=0, saturation=0, brightness=0, kelvin=3500)
     prestate = PreState(power=False, color=color, zone_colors=None)
@@ -196,6 +199,33 @@ async def test_restore_state_powered_off_light(state_manager, mock_light) -> Non
 
     # Verify power restored to off
     mock_light.set_power.assert_called_once_with(False, duration=0.0)
+
+
+@pytest.mark.asyncio
+async def test_restore_to_off_turns_off_before_writing_colours(
+    state_manager, mock_light
+) -> None:
+    """A light that was off goes dark first, then gets its colours back.
+
+    Writing colours while the light is still on shows them as a flash, and
+    real firmware keeps reporting power on for a moment after an
+    acknowledged power-off, so the colours wait until it reports off.
+    """
+    order = MagicMock()
+    mock_light.set_power = AsyncMock()
+    mock_light.get_power = AsyncMock(side_effect=[65535, 65535, 0])
+    mock_light.set_color = AsyncMock()
+    order.attach_mock(mock_light.set_power, "set_power")
+    order.attach_mock(mock_light.get_power, "get_power")
+    order.attach_mock(mock_light.set_color, "set_color")
+    color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+    await state_manager.restore_state(mock_light, PreState(power=False, color=color))
+
+    names = [c[0] for c in order.mock_calls]
+    assert names == ["set_power", "get_power", "get_power", "get_power", "set_color"]
+    mock_light.set_power.assert_called_once_with(False, duration=0.0)
+    mock_light.set_color.assert_called_once_with(color, duration=0.0)
 
 
 @pytest.mark.asyncio
@@ -325,3 +355,33 @@ async def test_restore_zones_failure_handling(
     # Color and power should still be restored despite zone failure
     mock_multizone_light.set_color.assert_called_once()
     mock_multizone_light.set_power.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "get_power",
+    [
+        AsyncMock(return_value=65535),
+        AsyncMock(side_effect=LifxTimeoutError("no reply")),
+    ],
+    ids=["never-reports-off", "power-read-fails"],
+)
+@pytest.mark.asyncio
+async def test_restore_to_off_writes_no_colours_unless_off_is_confirmed(
+    state_manager, mock_light, caplog, monkeypatch, get_power
+) -> None:
+    """Colours written to a light that may still be lit would flash.
+
+    When the light never reports off, or its power cannot be read, the
+    colours are left alone and the restore says so.
+    """
+    monkeypatch.setattr("lifx.devices.light.POWER_OFF_WAIT_SECONDS", 0.05)
+    mock_light.set_power = AsyncMock()
+    mock_light.get_power = get_power
+    mock_light.set_color = AsyncMock()
+    color = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+
+    await state_manager.restore_state(mock_light, PreState(power=False, color=color))
+
+    mock_light.set_power.assert_called_once_with(False, duration=0.0)
+    mock_light.set_color.assert_not_called()
+    assert "_wait_until_off" in caplog.text

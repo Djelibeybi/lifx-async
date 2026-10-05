@@ -21,13 +21,13 @@ For simple, one-time color changes, use the device methods directly (`set_color(
 
 ```python
 import asyncio
-from lifx import Animator, Device, MatrixLight
+from lifx import Device, MatrixLight
 
 async def main():
     async with await Device.connect("192.168.1.100") as device:
         assert isinstance(device, MatrixLight)
-        # Create animator (queries device for tile info)
-        animator = await Animator.for_matrix(device)
+        # Borrow the device's own Animator (queries tile info once)
+        animator = await device.animator.prepare()
 
     # Device connection closed - animator sends via direct UDP
     print(f"Canvas: {animator.canvas_width}x{animator.canvas_height}")
@@ -54,13 +54,13 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from lifx import Animator, Device, MultiZoneLight
+from lifx import Device, MultiZoneLight
 
 async def main():
     async with await Device.connect("192.168.1.100") as device:
         assert isinstance(device, MultiZoneLight)
-        # Create animator
-        animator = await Animator.for_multizone(device)
+        # Borrow the device's own Animator (queries zone count once)
+        animator = await device.animator.prepare()
 
     print(f"Device has {animator.pixel_count} zones")
 
@@ -77,6 +77,39 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## One Animator per Light
+
+Every light owns exactly one Animator, `device.animator`, created on first access. Library
+effects run by the Conductor borrow it too, so your frames and an effect's frames on the same
+light go through one writer and one ack gate, and traffic to the light stays capped.
+
+- A single light's Animator is ready at once.
+- A matrix or multizone light's Animator must be prepared before its first frame:
+  `await device.animator.prepare()` queries the tile info or zone count once and returns the
+  Animator. Later calls make no query.
+- Set `animator.duration_ms` for firmware interpolation between your frames (default 0).
+- `animator.close()` closes the UDP socket. The next frame reopens it, so closing is safe even
+  while an effect shares the Animator.
+
+`Animator.for_matrix()`, `Animator.for_multizone()` and `Animator.for_light()` still work but are
+deprecated: they emit a `DeprecationWarning` and return the device's own Animator, so two calls
+return the same object. `for_light()` cannot prepare a matrix or multizone light; use
+`device.animator` instead.
+
+## Lights on Thread
+
+A Thread mesh is not built for a steady stream of frames. `prepare()` refuses a light evidenced
+as Thread with `LifxUnsupportedCommandError`, unless you pass `enable_thread=True`:
+
+```python
+animator = await device.animator.prepare(enable_thread=True)
+```
+
+The evidence is the same as for `get_wifi_info()` and `get_thread_info()`: the light's own
+replies, or an mDNS record that says Thread. A light the library has not heard from yet is not
+refused. With `enable_thread=True` the frames go out without a warning. The deprecated
+`for_matrix()`, `for_multizone()` and `for_light()` factories take the same keyword.
 
 ## Multi-Tile Canvas
 
@@ -99,7 +132,7 @@ as one continuous image, rather than each tile showing a mirrored copy.
 ```python
 async with await Device.connect("192.168.1.100") as device:
     assert isinstance(device, MatrixLight)
-    animator = await Animator.for_matrix(device)
+    animator = await device.animator.prepare()
 
 # For 5 tiles arranged horizontally:
 # - canvas_width = 40 (5 tiles x 8 pixels)
@@ -233,7 +266,7 @@ physically rotated. The animator automatically handles orientation correction:
 async with await Device.connect("192.168.1.100") as device:
     assert isinstance(device, MatrixLight)
     # Orientation is detected from device accelerometer data
-    animator = await Animator.for_matrix(device)
+    animator = await device.animator.prepare()
 
 # Your frame uses logical canvas coordinates
 # The animator remaps to physical tile positions
@@ -256,7 +289,7 @@ animator.send_frame(logical_frame)
 ```python
 async with await Device.connect("192.168.1.100") as device:
     assert isinstance(device, MatrixLight)
-    animator = await Animator.for_matrix(device)
+    animator = await device.animator.prepare()
 
 # Device connection closed here - animator works via direct UDP
 
@@ -360,7 +393,7 @@ Your whole job is to produce frames and send them at your chosen FPS:
 ```python
 async with await Device.connect("192.168.1.100") as device:
     assert isinstance(device, MatrixLight)
-    animator = await Animator.for_matrix(device)
+    animator = await device.animator.prepare()
 
 target_fps = 20  # platform ceiling over WiFi; large matrix devices sustain less
 try:

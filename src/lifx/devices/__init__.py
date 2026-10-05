@@ -14,6 +14,7 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.devices.ceiling import CeilingLight, CeilingLightState
+from lifx.devices.component.participant import LightComponent
 from lifx.devices.hev import HevLight, HevLightState
 from lifx.devices.infrared import InfraredLight, InfraredLightState
 from lifx.devices.light import Light, LightState
@@ -37,6 +38,7 @@ __all__ = [
     "InfraredLight",
     "InfraredLightState",
     "Light",
+    "LightComponent",
     "LightState",
     "MatrixEffect",
     "MatrixLight",

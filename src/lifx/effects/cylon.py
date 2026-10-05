@@ -79,6 +79,8 @@ class EffectCylon(FrameEffect):
         ```
     """
 
+    participant_state = ("_trail_buffer",)
+
     def __init__(
         self,
         power_on: bool = True,
@@ -147,10 +149,12 @@ class EffectCylon(FrameEffect):
         """Generate a frame of the Cylon scanner.
 
         The eye position is computed via sinusoidal easing across the
-        zone range. Each zone's brightness is the cosine falloff from
-        the eye center, floored at the background brightness. When
-        trail > 0, previous frame brightness decays and blends with
-        the current frame to create a glowing tail behind the eye.
+        zone range. On a ring (``ctx.wraps``) the eye circles at a steady
+        pace instead, and distance is measured the short way round. Each
+        zone's brightness is the cosine falloff from the eye centre,
+        floored at the background brightness. When trail > 0, previous
+        frame brightness decays and blends with the current frame to
+        create a glowing tail behind the eye.
 
         Args:
             ctx: Frame context with timing and layout info
@@ -169,9 +173,14 @@ class EffectCylon(FrameEffect):
         # Phase within the current sweep cycle (0.0 to 1.0).
         phase = (ctx.elapsed_s % self.speed) / self.speed
 
-        # Sinusoidal easing: cos maps [0..2pi] to [1..-1..1], scaled to
-        # [0..travel..0] for a smooth bounce at both ends.
-        position = travel * (1 - math.cos(phase * _FULL_CYCLE)) / _COSINE_DIVISOR
+        if ctx.wraps:
+            # A ring has no ends to bounce off: the eye circles it once per
+            # sweep at a steady pace.
+            position = bulb_count * phase
+        else:
+            # Sinusoidal easing: cos maps [0..2pi] to [1..-1..1], scaled to
+            # [0..travel..0] for a smooth bounce at both ends.
+            position = travel * (1 - math.cos(phase * _FULL_CYCLE)) / _COSINE_DIVISOR
 
         # Initialise or resize trail buffer if needed.
         if len(self._trail_buffer) != bulb_count:
@@ -186,6 +195,9 @@ class EffectCylon(FrameEffect):
         bulb_colors: list[HSBK] = []
         for i in range(bulb_count):
             dist = abs(i - position)
+            if ctx.wraps:
+                # Measure the short way round, across the closing seam.
+                dist = min(dist, bulb_count - dist)
 
             if dist < half:
                 # Cosine falloff: full brightness at center, tapering to zero

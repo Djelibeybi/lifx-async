@@ -5,21 +5,43 @@ from __future__ import annotations
 import asyncio
 import inspect
 import socket
-import struct
-from unittest.mock import AsyncMock, MagicMock, patch
+import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import lifx.animation
 from lifx.animation.animator import Animator, AnimatorStats
 from lifx.animation.framebuffer import FrameBuffer
-from lifx.animation.packets import HEADER_SIZE, MatrixPacketGenerator
+from lifx.animation.packets import MatrixPacketGenerator
+from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
-from lifx.devices.mirror import MirrorLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError
 from lifx.protocol.models import Serial
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
+
+
+async def _drain_probe_acks(animator: Animator, timeout: float = 2.0) -> None:
+    """Wait until every outstanding probe ack has arrived and been swept.
+
+    A fixed sleep assumes the emulator answers within that window, which a
+    loaded CI runner does not guarantee. Sweeping until the gate is empty,
+    bounded by ``timeout``, waits exactly as long as the reply takes.
+
+    ``sweep()`` also prunes probes older than ``ACK_EXPIRY_SECONDS``, which
+    would empty the gate with no ack at all. Every sweep here is given the
+    time the wait started, so a probe sent just before cannot expire and an
+    empty gate proves its ack was received.
+    """
+    started = time.monotonic()
+    deadline = started + timeout
+    while animator._ack_gate.outstanding_count:
+        if time.monotonic() > deadline:
+            raise AssertionError("probe ack did not arrive within the timeout")
+        await asyncio.sleep(0.01)
+        assert animator._socket is not None
+        animator._ack_gate.sweep(animator._socket, animator._source, started)
 
 
 class TestAnimatorStats:
@@ -510,12 +532,7 @@ class TestAnimatorProbeBaking:
 
     def test_for_light_bakes_flag_on_its_single_template(self) -> None:
         """Single Light animator: the one template carries the flag."""
-        device = MagicMock()
-        device.ip = "192.168.1.100"
-        device.serial = "d073d5123456"
-        device.port = 56700
-
-        animator = Animator.for_light(device)
+        animator = Light(serial="d073d5123456", ip="192.0.2.10").animator
 
         assert animator._templates[0].data[22] & 0x02
 
@@ -582,9 +599,9 @@ class TestAnimatorGating:
         animator.send_frame(hsbk)  # outstanding 1
         animator.send_frame(hsbk)  # outstanding 2, gated
 
-        original_apply = animator._framebuffer.apply
+        original_apply = animator._require_geometry().framebuffer.apply
         apply_spy = MagicMock(side_effect=original_apply)
-        animator._framebuffer.apply = apply_spy  # type: ignore[method-assign]
+        animator._require_geometry().framebuffer.apply = apply_spy  # type: ignore[method-assign]
 
         animator.send_frame(hsbk)
 
@@ -733,154 +750,9 @@ class TestAnimatorGating:
         assert "AckGate" not in lifx.animation.__all__
 
 
-class TestAnimatorForMatrixFactory:
-    """Tests for Animator.for_matrix factory method."""
-
-    @pytest.mark.asyncio
-    async def test_for_matrix_fetches_device_chain_when_none(self) -> None:
-        """Test for_matrix fetches device chain if not already loaded."""
-        tile = MagicMock()
-        tile.width = 8
-        tile.height = 8
-        tile.user_x = 0.0
-        tile.user_y = 0.0
-        tile.nearest_orientation = "Upright"
-
-        device = MagicMock()
-        device.ip = "192.168.1.100"
-        device.serial = "d073d5123456"
-        device.port = 56700
-        device.device_chain = None  # Not loaded yet
-        device.capabilities = MagicMock()
-        device.capabilities.has_chain = False
-
-        # get_device_chain should be called and populate device_chain
-        async def mock_get_device_chain() -> list:
-            device.device_chain = [tile]
-            return [tile]
-
-        device.get_device_chain = mock_get_device_chain
-
-        animator = await Animator.for_matrix(device)
-
-        assert animator.pixel_count == 64
-
-    @pytest.mark.asyncio
-    async def test_for_matrix_tells_the_device_its_zones_change(self) -> None:
-        """Test that a component light forgets its remembered tile.
-
-        Frames bypass set64(), so without this a Ceiling or Mirror component
-        call made just after starting an animation would undo its frames.
-        """
-        device = MirrorLight(serial="d073d5000001", ip="192.0.2.10")
-        tile = MagicMock(width=4, height=13, user_x=0.0, user_y=0.0)
-        tile.nearest_orientation = "Upright"
-        device._device_chain = [tile]
-        device._capabilities = MagicMock(has_chain=False)
-        device._pending_tile.record([MagicMock()] * 52, 5.0)
-
-        with patch(
-            "lifx.animation.animator.FrameBuffer.for_matrix",
-            new=AsyncMock(return_value=MagicMock(pixel_count=52)),
-        ):
-            await Animator.for_matrix(device)
-
-        assert device._pending_tile.get() is None
-
-
-class TestAnimatorForMultizoneFactory:
-    """Tests for Animator.for_multizone factory method."""
-
-    @pytest.mark.asyncio
-    async def test_for_multizone_no_extended_capability_raises(self) -> None:
-        """Test for_multizone raises error when device lacks extended multizone."""
-        device = MagicMock()
-        device.capabilities = MagicMock()
-        device.capabilities.has_extended_multizone = False
-
-        with pytest.raises(ValueError, match="extended multizone"):
-            await Animator.for_multizone(device)
-
-    @pytest.mark.asyncio
-    async def test_for_multizone_loads_capabilities_when_none(self) -> None:
-        """Test for_multizone calls ensure_capabilities when None.
-
-        If capabilities haven't been fetched, we should load them first.
-        Then if device doesn't support extended multizone, raise error.
-        """
-        device = MagicMock()
-        device.capabilities = None
-
-        # Mock ensure_capabilities to set capabilities without extended multizone
-        async def set_capabilities() -> None:
-            device.capabilities = MagicMock()
-            device.capabilities.has_extended_multizone = False
-
-        device.ensure_capabilities = AsyncMock(side_effect=set_capabilities)
-
-        with pytest.raises(ValueError, match="extended multizone"):
-            await Animator.for_multizone(device)
-
-        # Verify ensure_capabilities was called
-        device.ensure_capabilities.assert_called_once()
-
-
-class TestAnimatorForLightFactory:
-    """Tests for Animator.for_light factory method."""
-
-    def test_for_light_creates_animator(self) -> None:
-        """Test for_light creates an animator with correct pixel count."""
-        device = MagicMock()
-        device.ip = "192.168.1.100"
-        device.serial = "d073d5123456"
-        device.port = 56700
-
-        animator = Animator.for_light(device)
-
-        assert animator.pixel_count == 1
-        assert animator.canvas_width == 1
-        assert animator.canvas_height == 1
-
-    def test_for_light_sends_single_packet(
-        self, mock_udp_socket: MockUdpSocket
-    ) -> None:
-        """Test for_light sends exactly 1 packet per frame."""
-        device = MagicMock()
-        device.ip = "192.168.1.100"
-        device.serial = "d073d5123456"
-        device.port = 56700
-
-        animator = Animator.for_light(device)
-        hsbk: list[tuple[int, int, int, int]] = [(65535, 65535, 65535, 3500)]
-
-        stats = animator.send_frame(hsbk)
-
-        assert stats.packets_sent == 1
-        mock_udp_socket.sock.sendto.assert_called_once()
-
-    def test_for_light_is_synchronous(self) -> None:
-        """Test for_light factory is synchronous (not async)."""
-        assert not inspect.iscoroutinefunction(Animator.for_light)
-
-    def test_for_light_with_duration(self) -> None:
-        """Test for_light passes duration_ms to packet generator."""
-        device = MagicMock()
-        device.ip = "192.168.1.100"
-        device.serial = "d073d5123456"
-        device.port = 56700
-
-        animator = Animator.for_light(device, duration_ms=500)
-
-        # Verify by checking the packet template's duration
-        template = animator._templates[0]
-        payload = bytes(template.data[HEADER_SIZE:])
-        (duration,) = struct.unpack_from("<I", payload, 9)
-        assert duration == 500
-
-
 @pytest.mark.emulator
 class TestAnimatorForMatrixIntegration:
-    """Integration tests for Animator.for_matrix with emulator."""
+    """Integration tests for a matrix light's own Animator with emulator."""
 
     async def test_for_matrix_creates_animator(self, emulator_devices) -> None:
         """Test factory method works with real device."""
@@ -894,7 +766,7 @@ class TestAnimatorForMatrixIntegration:
         assert matrix is not None, "No MatrixLight in emulator_devices"
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
 
             assert animator.pixel_count > 0
 
@@ -909,7 +781,7 @@ class TestAnimatorForMatrixIntegration:
         assert matrix is not None
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
 
             # Create frame
             hsbk: list[tuple[int, int, int, int]] = [
@@ -934,7 +806,7 @@ class TestAnimatorForMatrixIntegration:
         assert matrix is not None
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
 
             total_packets = 0
             for frame_num in range(5):
@@ -962,7 +834,7 @@ class TestAnimatorForMatrixIntegration:
 
 @pytest.mark.emulator
 class TestAnimatorForMultizoneIntegration:
-    """Integration tests for Animator.for_multizone with emulator."""
+    """Integration tests for a multizone light's own Animator with emulator."""
 
     async def test_for_multizone_creates_animator(self, emulator_devices) -> None:
         """Test factory method works with real device."""
@@ -975,7 +847,7 @@ class TestAnimatorForMultizoneIntegration:
         assert multizone is not None, "No MultiZoneLight in emulator_devices"
 
         async with multizone:
-            animator = await Animator.for_multizone(multizone)
+            animator = await multizone.animator.prepare()
 
             assert animator.pixel_count > 0
 
@@ -992,7 +864,7 @@ class TestAnimatorForMultizoneIntegration:
         assert multizone is not None
 
         async with multizone:
-            animator = await Animator.for_multizone(multizone)
+            animator = await multizone.animator.prepare()
 
             hsbk: list[tuple[int, int, int, int]] = [
                 (65535, 65535, 32768, 3500)
@@ -1014,7 +886,7 @@ class TestAnimatorForMultizoneIntegration:
         assert multizone is not None
 
         async with multizone:
-            animator = await Animator.for_multizone(multizone)
+            animator = await multizone.animator.prepare()
 
             total_packets = 0
             for frame_num in range(5):
@@ -1087,7 +959,7 @@ class TestAnimatorFlowControlIntegration:
         )
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
 
             hsbk: list[tuple[int, int, int, int]] = [
                 (65535, 65535, 32768, 3500)
@@ -1145,7 +1017,7 @@ class TestAnimatorFlowControlIntegration:
         )
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
             hsbk: list[tuple[int, int, int, int]] = [
                 (65535, 65535, 32768, 3500)
             ] * animator.pixel_count
@@ -1187,7 +1059,7 @@ class TestAnimatorFlowControlIntegration:
         assert matrix is not None
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
             hsbk: list[tuple[int, int, int, int]] = [
                 (65535, 65535, 32768, 3500)
             ] * animator.pixel_count
@@ -1197,7 +1069,7 @@ class TestAnimatorFlowControlIntegration:
                 assert getattr(stats, "gated", None) is False
                 if frame_num >= 1:
                     assert getattr(stats, "acks_outstanding", None) == 1
-                await asyncio.sleep(0.1)
+                await _drain_probe_acks(animator)
 
             animator.close()
 
@@ -1207,13 +1079,13 @@ class TestAnimatorFlowControlIntegration:
         """13x26 large-tile path (needs plans 04-03 AND 04-04): pixel_count
         is 338, the first frame sends 8 packets (7 row-aligned Set64 + 1
         CopyFB), and after the CopyFB probe is acked and swept, a second
-        frame (after a short drain sleep) is gated False with
+        frame (once that ack has drained) is gated False with
         acks_outstanding < 2.
         """
         matrix = large_tile_matrix_device
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
             assert animator.pixel_count == 338
 
             hsbk: list[tuple[int, int, int, int]] = [
@@ -1223,7 +1095,7 @@ class TestAnimatorFlowControlIntegration:
             stats1 = animator.send_frame(hsbk)
             assert stats1.packets_sent == 8
 
-            await asyncio.sleep(0.1)
+            await _drain_probe_acks(animator)
 
             stats2 = animator.send_frame(hsbk)
             assert getattr(stats2, "gated", None) is False
@@ -1247,7 +1119,7 @@ class TestAnimatorErrorHandling:
         assert matrix is not None
 
         async with matrix:
-            animator = await Animator.for_matrix(matrix)
+            animator = await matrix.animator.prepare()
 
             # Wrong length
             hsbk: list[tuple[int, int, int, int]] = [(100, 100, 100, 3500)] * (
@@ -1259,23 +1131,27 @@ class TestAnimatorErrorHandling:
 
             animator.close()
 
-    async def test_for_matrix_no_tiles_raises(self, emulator_devices) -> None:
-        """Test for_matrix raises when device has no tiles."""
-        matrix = None
-        for device in emulator_devices:
-            if isinstance(device, MatrixLight):
-                matrix = device
-                break
 
-        assert matrix is not None
+async def test_drain_probe_acks_fails_when_no_ack_arrives(
+    mock_udp_socket: MockUdpSocket,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Probe expiry must not let the ack wait pass without a received ack.
 
-        async with matrix:
-            # Temporarily clear device chain to simulate no tiles
-            original_chain = matrix._device_chain
-            matrix._device_chain = []
+    The expiry is well above Windows' ~16 ms monotonic clock tick, so the probe
+    cannot already look expired when the wait starts.
+    """
+    monkeypatch.setattr("lifx.animation.flow.ACK_EXPIRY_SECONDS", 0.05)
+    animator = Animator(
+        ip="192.0.2.1",
+        serial=Serial.from_string("d073d5123456"),
+        framebuffer=FrameBuffer(pixel_count=64),
+        packet_generator=MatrixPacketGenerator(
+            tile_count=1, tile_width=8, tile_height=8
+        ),
+    )
+    animator.send_frame([(100, 100, 100, 3500)] * animator.pixel_count)
+    assert animator._ack_gate.outstanding_count == 1
 
-            with pytest.raises(ValueError, match="no tiles"):
-                await Animator.for_matrix(matrix)
-
-            # Restore
-            matrix._device_chain = original_chain
+    with pytest.raises(AssertionError, match="did not arrive"):
+        await _drain_probe_acks(animator, timeout=0.3)

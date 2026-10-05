@@ -482,6 +482,7 @@ class TestColorloopFrameLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -508,6 +509,7 @@ class TestColorloopFrameLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 

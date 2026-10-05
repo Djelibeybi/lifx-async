@@ -10,6 +10,14 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from lifx.devices.component.effect_support import (
+    reinstate_stored_colors,
+    restore_component,
+    stored_colors_snapshot,
+)
+from lifx.devices.component.light import ComponentMatrixLight
+from lifx.devices.light import wait_until_off
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.const import COLOR_UPDATE_SETTLE_DELAY, ZONE_UPDATE_SETTLE_DELAY
 from lifx.effects.models import PreState
@@ -19,6 +27,7 @@ from lifx.protocol.protocol_types import (
 
 if TYPE_CHECKING:
     from lifx.color import HSBK
+    from lifx.devices.component.participant import ComponentName
     from lifx.devices.light import Light
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,8 +56,9 @@ class DeviceStateManager:
     async def capture_state(self, light: Light) -> PreState:
         """Capture current device state.
 
-        Captures power state, color, and zone colors (for multizone devices)
-        to enable restoration after effects complete.
+        Captures power state, colour, zone colours (for multizone devices) and
+        the colours of every tile (for matrix lights) to enable restoration
+        after effects complete.
 
         Args:
             light: Light device to capture state from
@@ -73,13 +83,29 @@ class DeviceStateManager:
         if isinstance(light, MultiZoneLight):
             zone_colors = await self._capture_zones(light)
 
-        return PreState(power=bool(power > 0), color=color, zone_colors=zone_colors)
+        tile_colors = None
+        if isinstance(light, MatrixLight):
+            tile_colors = await self._capture_tiles(light)
+
+        # Taken after the tile read so the read's own observations count.
+        stored_colors = None
+        if isinstance(light, ComponentMatrixLight):
+            stored_colors = stored_colors_snapshot(light)
+
+        return PreState(
+            power=bool(power > 0),
+            color=color,
+            zone_colors=zone_colors,
+            tile_colors=tile_colors,
+            stored_colors=stored_colors,
+        )
 
     async def restore_state(self, light: Light, prestate: PreState) -> None:
         """Restore device to pre-effect state.
 
-        Restores power, color, and zones (for multizone devices) in the
-        correct order to ensure smooth transitions.
+        Restores power, colour, zones (for multizone devices) and whole tiles
+        (for matrix lights) in the correct order to ensure smooth transitions.
+        A matrix light gets back every tile it showed, not one colour.
 
         Args:
             light: Light device to restore
@@ -91,12 +117,67 @@ class DeviceStateManager:
             await state_manager.restore_state(light, prestate)
             ```
         """
-        # Restore in order: zones -> color -> power
-        if isinstance(light, MultiZoneLight) and prestate.zone_colors:
-            await self._restore_zones(light, prestate.zone_colors)
+        # A light that was on gets its colours back, then power. One that was
+        # off goes dark first and gets its colours back once it reports off,
+        # so they never show as a flash; if it never reports off, they are
+        # not written at all.
+        write_colours = True
+        if not prestate.power:
+            await self._restore_power(light, prestate.power)
+            write_colours = await self._wait_until_off(light)
 
-        await self._restore_color(light, prestate.color)
-        await self._restore_power(light, prestate.power)
+        if write_colours:
+            if isinstance(light, MultiZoneLight) and prestate.zone_colors:
+                await self._restore_zones(light, prestate.zone_colors)
+
+            if isinstance(light, MatrixLight) and prestate.tile_colors:
+                await self._restore_tiles(light, prestate.tile_colors)
+            else:
+                await self._restore_color(light, prestate.color)
+
+        if prestate.power:
+            await self._restore_power(light, prestate.power)
+
+        # Ceiling and Mirror: an effect never changes either component's
+        # stored colours, whatever the restore writes above remembered.
+        if isinstance(light, ComponentMatrixLight) and prestate.stored_colors:
+            await reinstate_stored_colors(light, prestate.stored_colors)
+
+    async def restore_component(
+        self, light: ComponentMatrixLight, component: ComponentName, prestate: PreState
+    ) -> None:
+        """Restore one light component after its software effect.
+
+        A light component that was lit gets back its colours from the tile
+        captured before the effect; one that was dark, or whose light was
+        off, is turned off again, powering the light off if the other light
+        component is dark too. The other light component is left as it is
+        now, including any change its caller made meanwhile, and the light
+        component's stored colours are those from before the effect.
+
+        Args:
+            light: The Ceiling or Mirror light the light component belongs to
+            component: The light component's name
+            prestate: State captured from the light before the effect
+        """
+        try:
+            await restore_component(
+                light,
+                component,
+                prestate.tile_colors[0] if prestate.tile_colors else None,
+                prestate.power,
+                prestate.stored_colors,
+            )
+        except Exception as e:
+            _LOGGER.warning(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "restore_component",
+                    "action": "restore",
+                    "error": str(e),
+                    "values": {"serial": light.serial, "component": component},
+                }
+            )
 
     async def _capture_zones(self, light: MultiZoneLight) -> list[HSBK] | None:
         """Capture zone colors from multizone device.
@@ -191,6 +272,53 @@ class DeviceStateManager:
                 }
             )
 
+    async def _capture_tiles(self, light: MatrixLight) -> list[list[HSBK]] | None:
+        """Capture the colours of every tile of a matrix light.
+
+        Args:
+            light: MatrixLight device to capture tiles from
+
+        Returns:
+            One list of colours per tile, or None if capture fails
+        """
+        try:
+            return [list(tile) for tile in await light.get_all_tile_colors()]
+        except Exception as e:
+            _LOGGER.warning(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "_capture_tiles",
+                    "action": "capture",
+                    "error": str(e),
+                    "values": {"serial": light.serial},
+                }
+            )
+            return None
+
+    async def _restore_tiles(
+        self, light: MatrixLight, tile_colors: list[list[HSBK]]
+    ) -> None:
+        """Write every captured tile back to a matrix light.
+
+        Args:
+            light: MatrixLight device to restore tiles to
+            tile_colors: One list of colours per tile
+        """
+        try:
+            for tile_index, colors in enumerate(tile_colors):
+                await light.set_matrix_colors(tile_index, colors, duration=0)
+            await asyncio.sleep(ZONE_UPDATE_SETTLE_DELAY)
+        except Exception as e:
+            _LOGGER.warning(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "_restore_tiles",
+                    "action": "restore",
+                    "error": str(e),
+                    "values": {"serial": light.serial, "tiles": len(tile_colors)},
+                }
+            )
+
     async def _restore_color(self, light: Light, color: HSBK) -> None:
         """Restore device color.
 
@@ -219,6 +347,34 @@ class DeviceStateManager:
                     },
                 }
             )
+
+    async def _wait_until_off(self, light: Light) -> bool:
+        """Wait for a power-off to take effect before colours are written.
+
+        Args:
+            light: Light device that was just turned off
+
+        Returns:
+            True once the light reports off; False, with a warning, if it
+            still reports on when the wait runs out or its power cannot be
+            read, in which case no colours should be written
+        """
+        try:
+            if await wait_until_off(light):
+                return True
+            error = "the light did not report off in time"
+        except Exception as e:
+            error = str(e)
+        _LOGGER.warning(
+            {
+                "class": self.__class__.__name__,
+                "method": "_wait_until_off",
+                "action": "skip_colours",
+                "error": error,
+                "values": {"serial": light.serial},
+            }
+        )
+        return False
 
     async def _restore_power(self, light: Light, power: bool) -> None:
         """Restore power state.

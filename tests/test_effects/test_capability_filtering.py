@@ -10,6 +10,11 @@ from lifx.effects.conductor import Conductor
 from lifx.effects.pulse import EffectPulse
 
 
+def _animator_for(light: MagicMock):
+    """A real single-light Animator for a mocked light."""
+    return Light(serial=light.serial, ip=light.ip).animator
+
+
 @pytest.fixture
 def color_light() -> MagicMock:
     """Create a mock color light."""
@@ -17,6 +22,7 @@ def color_light() -> MagicMock:
     light.serial = "d073d5000001"
     light.ip = "192.168.1.100"
     light.port = 56700
+    light.animator = _animator_for(light)
 
     # Mock capabilities with color support
     capabilities = MagicMock()
@@ -46,6 +52,7 @@ def white_light() -> MagicMock:
     light.serial = "d073d5000002"
     light.ip = "192.168.1.101"
     light.port = 56700
+    light.animator = _animator_for(light)
 
     # Mock capabilities without color support
     capabilities = MagicMock()
@@ -132,6 +139,7 @@ async def test_colorloop_with_all_color_lights(color_light) -> None:
     color_light2.serial = "d073d5000003"
     color_light2.ip = "192.168.1.102"
     color_light2.port = 56700
+    color_light2.animator = _animator_for(color_light2)
     capabilities = MagicMock()
     capabilities.has_color = True
     color_light2.capabilities = capabilities
@@ -169,6 +177,7 @@ async def test_colorloop_with_light_without_cached_capabilities() -> None:
     light.serial = "d073d5000004"
     light.ip = "192.168.1.103"
     light.port = 56700
+    light.animator = _animator_for(light)
 
     # Initially no capabilities cached
     light.capabilities = None

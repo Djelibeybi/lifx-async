@@ -15,6 +15,7 @@ from lifx_emulator.factories import create_device
 from lifx_emulator.protocol.protocol_types import LightHsbk
 
 from lifx.devices.ceiling import CeilingLight
+from tests.conftest import remove_emulated_device
 
 if TYPE_CHECKING:
     from lifx_emulator import EmulatedLifxServer
@@ -300,9 +301,10 @@ def _force_tile_dimensions(device: object, width: int, height: int) -> None:
 def large_tile_matrix_device(
     emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
 ) -> Generator[CeilingLight, None, None]:
-    """Create an emulated LIFX Ceiling 13x26 large-tile device (product 201).
+    """Create an emulated large-tile device forced to a synthetic 13x26 tile.
 
-    Mirrors the `ceiling_device` fixture pattern (`tests/conftest.py`), but
+    Product 201 (the "Ceiling 13x26", whose real tile is 16x8) is used as the
+    base device. Mirrors the `ceiling_device` fixture pattern (`tests/conftest.py`), but
     with a non-64-divisible tile width (13) to exercise the row-aligned
     large-tile chunking path end-to-end against a real emulated device:
     7 Set64 packets (6x52 + 1x26 colours) + 1 CopyFrameBuffer per frame.
@@ -333,4 +335,4 @@ def large_tile_matrix_device(
         max_retries=2,
     )
 
-    server.remove_device("d073d5000201")
+    remove_emulated_device(server, "d073d5000201")

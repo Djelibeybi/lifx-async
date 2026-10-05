@@ -733,6 +733,7 @@ class TestSonarFrameLoop:
         animator.pixel_count = 24
         animator.canvas_width = 24
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 

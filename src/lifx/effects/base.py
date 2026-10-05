@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
+from lifx.devices.matrix import MatrixLight
 from lifx.effects.const import (
     DEFAULT_BRIGHTNESS,
     MIN_VISIBLE_BRIGHTNESS,
@@ -90,6 +91,10 @@ class LIFXEffect(ABC):
         then calls async_play(). Subclasses should override async_play(),
         not this method.
 
+        A matrix light that is off is just powered on: its frames supply the
+        colours, so no startup colour is written first. Other lights get
+        from_poweroff_hsbk() before they power on.
+
         Args:
             participants: List of lights to apply effect to
         """
@@ -106,17 +111,19 @@ class LIFXEffect(ABC):
                 """
                 is_on = await light.get_power()
                 if not is_on:
-                    # Get startup color for this light
-                    startup_color = await self.from_poweroff_hsbk(light)
-                    # Set color immediately, then power on
-                    await light.set_color(startup_color, duration=0)
+                    if not isinstance(light, MatrixLight):
+                        # Set the startup colour immediately, then power on
+                        startup_color = await self.from_poweroff_hsbk(light)
+                        await light.set_color(startup_color, duration=0)
                     await light.set_power(True, duration=POWER_ON_TRANSITION_DURATION)
                     return True
                 return False
 
-            # Power on all lights concurrently
+            # Power on all lights concurrently, each once: a light can take
+            # part more than once, as a whole-light Mirror does for each ring
+            lights = list({id(light): light for light in self.participants}.values())
             results = await asyncio.gather(
-                *(power_on_if_needed(light) for light in self.participants)
+                *(power_on_if_needed(light) for light in lights)
             )
             needs_power_on = any(results)
 
@@ -169,9 +176,11 @@ class LIFXEffect(ABC):
     def inherit_prestate(self, _other: LIFXEffect) -> bool:
         """Whether this effect can skip device state restoration.
 
-        Optimization allowing consecutive compatible effects to avoid
-        resetting device state. Return True if the given effect type
-        can run without requiring state restoration first.
+        Superseded: the Conductor no longer consults this method. An effect
+        that replaces a running one on a light or light component always
+        inherits that run's original prior state, so stopping it restores
+        what was there before any effect. The method stays for
+        compatibility, and overriding it has no effect.
 
         Args:
             _other: The incoming effect (unused in base implementation)

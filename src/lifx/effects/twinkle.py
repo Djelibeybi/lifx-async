@@ -94,6 +94,11 @@ class EffectTwinkle(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_sparkle_timers",
+        "_last_elapsed_s",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

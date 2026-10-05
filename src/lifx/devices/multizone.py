@@ -9,6 +9,8 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from lifx.animation.framebuffer import FrameBuffer
+from lifx.animation.packets import MultiZonePacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
@@ -1067,14 +1069,37 @@ class MultiZoneLight(Light):
             }
         )
 
-    async def stop_effect(self) -> None:
-        """Stop any running multizone effect.
+    def _animation_geometry(self) -> tuple[FrameBuffer, PacketGenerator] | None:
+        """A multizone light's zone count is known only once the device is asked."""
+        return None
 
-        Example:
-            ```python
-            await light.stop_effect()
-            ```
+    async def _query_animation_geometry(
+        self,
+    ) -> tuple[FrameBuffer, PacketGenerator]:
+        """Ask the device for its zones; there is no orientation for multizone.
+
+        Raises:
+            ValueError: If the device does not support the extended multizone
+                protocol
         """
+        if self.capabilities is None:
+            await self.ensure_capabilities()
+
+        has_extended = bool(
+            self.capabilities and self.capabilities.has_extended_multizone
+        )
+        if not has_extended:
+            raise ValueError(
+                "Device does not support extended multizone protocol. "
+                "Only extended multizone devices are supported for animation."
+            )
+
+        framebuffer = await FrameBuffer.for_multizone(self)
+        zone_count = await self.get_zone_count()
+        return framebuffer, MultiZonePacketGenerator(zone_count=zone_count)
+
+    async def _stop_firmware_effect(self) -> None:
+        """Stop a running Move effect by sending the OFF effect."""
         await self.set_effect(
             MultiZoneEffect(
                 effect_type=FirmwareEffect.OFF,
@@ -1086,7 +1111,7 @@ class MultiZoneLight(Light):
         _LOGGER.debug(
             {
                 "class": "Device",
-                "method": "stop_effect",
+                "method": "_stop_firmware_effect",
                 "action": "change",
                 "values": {},
             }
@@ -1103,7 +1128,7 @@ class MultiZoneLight(Light):
 
         A timeout or a malformed reply reading the zones is logged at DEBUG
         and Move is still sent, with no palette, rather than turning a
-        fire-and-forget effect into a hard failure.
+        failed palette read into a failed effect.
 
         Returns:
             A derived palette, or None to send no palette.

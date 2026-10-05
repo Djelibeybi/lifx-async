@@ -348,8 +348,9 @@ class TestMatrixPacketGeneratorLargeTile:
 class TestMatrixPacketGeneratorRowAlignedChunking:
     """Pins the row-aligned large-tile chunking contract.
 
-    The Ceiling 13x26 (product 201, width=13 does not divide 64) would
-    otherwise expose a latent bug: colours sliced at raw 64-pixel boundaries
+    A 13-wide tile (width=13 does not divide 64; the "Ceiling 13x26"
+    product is really 16x8, so this geometry is synthetic) would otherwise
+    expose a latent bug: colours sliced at raw 64-pixel boundaries
     while rect y-offsets are stamped in whole rows, so packet colours and
     rect geometry disagree whenever tile_width does not divide 64. These
     tests pin the row-aligned fix: rows_per_packet = 64 // width;

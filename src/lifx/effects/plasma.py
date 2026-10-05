@@ -174,6 +174,12 @@ class EffectPlasma(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_tendrils",
+        "_next_spawn_t",
+        "_initialized",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

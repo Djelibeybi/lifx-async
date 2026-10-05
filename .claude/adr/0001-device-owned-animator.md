@@ -1,5 +1,5 @@
 ---
-status: accepted (not yet implemented; tracked in #241)
+status: accepted (implemented in #266)
 ---
 
 # Each device owns one Animator

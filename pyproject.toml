@@ -40,7 +40,7 @@ Issues = "https://github.com/Djelibeybi/lifx-async/issues"
 [dependency-groups]
 dev = [
     "hatchling>=1.27.0",
-    "lifx-emulator-core>=3.1.0",
+    "lifx-emulator-core>=3.12.4",
     "llmstxt-standalone>=0.2.0",
     "mkdocstrings-python>=2.0.3",
     "prek>=0.3.6",

@@ -8,6 +8,9 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
+from lifx.animation.animator import Animator
+from lifx.animation.framebuffer import FrameBuffer
+from lifx.animation.packets import LightPacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import (
     INVALID_AMBIENT_LIGHT_RESPONSE,
@@ -25,11 +28,13 @@ from lifx.devices.base import (
     DeviceState,
     WifiInfo,
 )
+from lifx.devices.effect_runner import effect_runner
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
 
 if TYPE_CHECKING:
+    from lifx.effects.base import LIFXEffect
     from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
@@ -114,6 +119,121 @@ class Light(Device[LightState]):
     """
 
     _discovery_snapshot: _DiscoveryLightSnapshot | None = None
+    _animator: Animator | None = None
+
+    @property
+    def animator(self) -> Animator:
+        """The one Animator this light owns, created on first access.
+
+        Library effects and direct frame senders such as LedFx borrow this
+        Animator, so every frame for the light goes through one writer and
+        one ack gate. A single light's Animator is ready at once; a matrix or
+        multizone light's Animator must be prepared before its first frame,
+        which queries the device for its geometry once.
+
+        Example:
+            ```python
+            async with await Device.connect("192.0.2.10") as device:
+                animator = await device.animator.prepare()
+
+            while running:
+                animator.send_frame(frame)
+                await asyncio.sleep(1 / 30)
+            ```
+        """
+        animator = self._animator
+        if animator is None:
+            animator = Animator._for_device(self)
+            self._animator = animator
+        return animator
+
+    def _animation_geometry(self) -> tuple[FrameBuffer, PacketGenerator] | None:
+        """The canvas and packets this light's Animator draws with, if known.
+
+        A single light needs no query: it is one pixel. A matrix or multizone
+        light returns None, and its Animator asks it with
+        ``_query_animation_geometry()`` when first prepared.
+        """
+        return FrameBuffer.for_light(self), LightPacketGenerator()
+
+    async def _query_animation_geometry(
+        self,
+    ) -> tuple[FrameBuffer, PacketGenerator]:
+        """Ask the device for the geometry its Animator draws with.
+
+        A single light knows its geometry without asking.
+        """
+        geometry = self._animation_geometry()
+        assert geometry is not None
+        return geometry
+
+    async def start_effect(
+        self, effect: LIFXEffect, *, enable_thread: bool = False
+    ) -> None:
+        """Start a software effect on this light alone.
+
+        A shortcut for a one-participant Conductor run: the light's prior
+        state is captured before the effect starts and restored when it ends
+        or when ``stop_effect()`` is called. Each light keeps one Conductor
+        for these runs, so starting another effect on the same light follows
+        the Conductor's rules: it replaces the running effect and inherits
+        its original prior state. On a Ceiling or Mirror it also replaces any
+        effects on the light components, and stopping it restores what was
+        there before any of them started.
+
+        Only software effects can be started here. Firmware effects keep
+        their own API, such as ``set_effect()`` on matrix and multizone
+        lights.
+
+        An effect that draws frames streams them to the light, and a Thread
+        mesh is not built for that traffic. On a light evidenced as Thread,
+        by its own replies or an mDNS record, it is refused unless
+        ``enable_thread`` is True. A light not yet heard from is not refused,
+        and neither is an effect that draws no frames, such as EffectPulse.
+
+        Args:
+            effect: The software effect to run
+            enable_thread: Stream frames to a light evidenced as Thread
+                anyway. Off by default.
+
+        Raises:
+            TypeError: If ``effect`` is not a software effect
+            LifxUnsupportedCommandError: If the effect draws frames, the
+                light is evidenced as Thread and ``enable_thread`` is False
+
+        Example:
+            ```python
+            from lifx.effects import EffectColorloop
+
+            await light.start_effect(EffectColorloop())
+            await asyncio.sleep(10)
+            await light.stop_effect()
+            ```
+        """
+        await effect_runner().start(self, effect, enable_thread=enable_thread)
+
+    async def stop_effect(self) -> None:
+        """Stop every effect on this light.
+
+        Stops any running firmware effect, then any software effect the light
+        or one of its light components is part of, and restores the prior
+        state of each. The software effect
+        may have been started with ``start_effect()`` or on any Conductor: if
+        the light is one participant of a multi-light run, it leaves that run
+        and the other participants carry on.
+
+        Example:
+            ```python
+            await light.stop_effect()
+            ```
+        """
+        try:
+            await self._stop_firmware_effect()
+        finally:
+            await effect_runner().leave_every_run(self)
+
+    async def _stop_firmware_effect(self) -> None:
+        """Stop a running firmware effect; a plain light has none to stop."""
 
     @property
     def state(self) -> LightState:
@@ -1139,3 +1259,46 @@ class Light(Device[LightState]):
             raise LifxTimeoutError(f"Error initializing state for {self.serial}") from e
         except LifxError as e:
             raise LifxError(f"Error initializing state for {self.serial}") from e
+
+
+#: How long to wait for a light to report that a power-off has taken effect.
+POWER_OFF_WAIT_SECONDS = 2.0
+
+#: How often to ask while waiting for a power-off to take effect.
+POWER_OFF_POLL_SECONDS = 0.05
+
+
+async def wait_until_off(
+    light: Light,
+    timeout: float | None = None,
+    interval: float = POWER_OFF_POLL_SECONDS,
+) -> bool:
+    """Wait until a light itself reports that it is off.
+
+    Firmware acknowledges a power-off straight away but keeps reporting power
+    on, and keeps lighting the old picture, for a few hundred milliseconds
+    until the power-off has taken effect. A colour written in that window
+    shows as a flash, so callers that turn a light off and then change its
+    colours wait here first.
+
+    Args:
+        light: The light to ask
+        timeout: Seconds to wait before giving up, ``POWER_OFF_WAIT_SECONDS``
+            when None
+        interval: Seconds between requests
+
+    Returns:
+        True once the light reports off, False if it still reports on when
+        ``timeout`` runs out
+
+    Raises:
+        LifxError: If the light's power cannot be read
+    """
+    if timeout is None:
+        timeout = POWER_OFF_WAIT_SECONDS
+    deadline = time.monotonic() + timeout
+    while await light.get_power() != 0:
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(interval)
+    return True

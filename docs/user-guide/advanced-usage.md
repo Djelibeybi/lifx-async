@@ -577,7 +577,7 @@ For sustained high-frame-rate streaming, prefer the [Animation Guide](animation.
 - No error detection (timeouts, unsupported commands)
 - Best for visual effects where occasional dropped frames are acceptable
 
-**Note:** `MatrixLight.set64()` is already fire-and-forget by default, making it ideal for tile animations without any additional parameters.
+**Note:** `MatrixLight.set64()` and the other tile writes wait for the device's acknowledgement and retransmit a write the device drops, so consecutive writes land in order. For tile animations, use the [Animation layer](animation.md), which streams frames without waiting on each one.
 
 ## Next Steps
 

@@ -14,12 +14,11 @@ Key Components:
 
 Quick Start:
     ```python
-    from lifx import Animator, MatrixLight
+    from lifx import Device
 
     async with await Device.connect("192.168.1.100") as device:
-        assert isinstance(device, MatrixLight)
-        # Query device once for tile info
-        animator = await Animator.for_matrix(device)
+        # Every light owns one Animator; preparing it queries tile info once
+        animator = await device.animator.prepare()
 
     # Device connection closed - animator sends via direct UDP
     while running:

@@ -1,7 +1,10 @@
 """Integration tests for effects system."""
 
 import asyncio
+import socket
+import threading
 import time
+from types import MethodType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -139,10 +142,7 @@ async def test_pulse_effect_execution(conductor, mock_light) -> None:
 
     # Start effect and let it run briefly
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)  # Let effect start
-
-    # Verify waveform was called
-    mock_light.set_waveform.assert_called()
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Stop effect
     await conductor.stop([mock_light])
@@ -155,10 +155,9 @@ async def test_pulse_effect_with_color(conductor, mock_light) -> None:
     effect = EffectPulse(mode="blink", cycles=1, period=0.1, color=custom_color)
 
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Verify waveform was called with custom color
-    mock_light.set_waveform.assert_called()
     call_kwargs = mock_light.set_waveform.call_args.kwargs
     assert call_kwargs["color"] == custom_color
 
@@ -184,10 +183,9 @@ async def test_pulse_effect_breathe_mode(conductor, mock_light) -> None:
     effect = EffectPulse(mode="breathe", cycles=1, period=0.1)
 
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Verify waveform called with sine waveform
-    mock_light.set_waveform.assert_called()
 
     await conductor.stop([mock_light])
 
@@ -201,6 +199,7 @@ async def test_colorloop_effect_execution(conductor, mock_light) -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -210,10 +209,7 @@ async def test_colorloop_effect_execution(conductor, mock_light) -> None:
     ):
         # Start effect and let it run briefly
         await conductor.start(effect, [mock_light])
-        await asyncio.sleep(0.05)  # Let effect iterate once
-
-        # Verify frames were sent via animator
-        assert mock_animator.send_frame.call_count > 0
+        await wait_for_mock_called(mock_animator.send_frame)
 
         # Stop effect
         await conductor.stop([mock_light])
@@ -241,6 +237,7 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     mock_animator1.pixel_count = 1
     mock_animator1.canvas_width = 1
     mock_animator1.canvas_height = 1
+    mock_animator1.wraps = False
     mock_animator1.send_frame = MagicMock()
     mock_animator1.close = MagicMock()
 
@@ -248,6 +245,7 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     mock_animator2.pixel_count = 1
     mock_animator2.canvas_width = 1
     mock_animator2.canvas_height = 1
+    mock_animator2.wraps = False
     mock_animator2.send_frame = MagicMock()
     mock_animator2.close = MagicMock()
 
@@ -257,11 +255,9 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     ):
         # Start effect
         await conductor.start(effect, [light1, light2])
-        await asyncio.sleep(0.05)
-
         # Both animators should have send_frame called
-        assert mock_animator1.send_frame.called
-        assert mock_animator2.send_frame.called
+        await wait_for_mock_called(mock_animator1.send_frame)
+        await wait_for_mock_called(mock_animator2.send_frame)
 
         await conductor.stop([light1, light2])
 
@@ -275,6 +271,7 @@ async def test_colorloop_with_brightness(conductor, mock_light) -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -283,10 +280,7 @@ async def test_colorloop_with_brightness(conductor, mock_light) -> None:
         return_value=[mock_animator],
     ):
         await conductor.start(effect, [mock_light])
-        await asyncio.sleep(0.05)
-
-        # Verify frames were sent
-        assert mock_animator.send_frame.called
+        await wait_for_mock_called(mock_animator.send_frame)
 
         await conductor.stop([mock_light])
 
@@ -302,6 +296,7 @@ async def test_colorloop_filters_white_lights(
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -402,6 +397,7 @@ async def test_consecutive_effects_inherit_prestate(conductor, mock_light) -> No
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -500,6 +496,7 @@ async def test_conductor_exception_during_effect() -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock(side_effect=Exception("Device error"))
     mock_animator.close = MagicMock()
 
@@ -581,6 +578,7 @@ async def test_conductor_stop_with_active_effects() -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -622,6 +620,7 @@ async def test_conductor_filter_lights_without_capabilities() -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -685,6 +684,7 @@ async def test_conductor_creates_animators_for_frame_effect(
         mock_animator.pixel_count = 1
         mock_animator.canvas_width = 1
         mock_animator.canvas_height = 1
+        mock_animator.wraps = False
         mock_animator.send_frame = MagicMock()
         mock_animator.close = MagicMock()
         mock_create.return_value = [mock_animator]
@@ -710,6 +710,7 @@ async def test_conductor_closes_animators_on_stop(conductor, mock_light) -> None
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -735,6 +736,7 @@ async def test_conductor_closes_animators_on_completion(conductor, mock_light) -
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -760,6 +762,7 @@ async def test_conductor_closes_animators_on_error(conductor, mock_light) -> Non
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -786,7 +789,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
 
     # Create mock devices of different types
     light = MagicMock(spec=Light)
-    light.serial = "d073d5light01"
+    light.serial = "d073d5000a01"
     light.ip = "192.168.1.1"
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
@@ -798,7 +801,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     light.set_power = AsyncMock()
 
     multizone = MagicMock(spec=MultiZoneLight)
-    multizone.serial = "d073d5multi01"
+    multizone.serial = "d073d5000a02"
     multizone.ip = "192.168.1.2"
     multizone.capabilities = MagicMock()
     multizone.capabilities.has_color = True
@@ -811,7 +814,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     multizone.get_zone_count = AsyncMock(return_value=16)
 
     matrix = MagicMock(spec=MatrixLight)
-    matrix.serial = "d073d5tile01"
+    matrix.serial = "d073d5000a03"
     matrix.ip = "192.168.1.3"
     matrix.capabilities = MagicMock()
     matrix.capabilities.has_color = True
@@ -831,55 +834,41 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     matrix.device_chain = [tile]
     matrix.get_device_chain = AsyncMock(return_value=[tile])
 
+    for device, device_class in (
+        (light, Light),
+        (multizone, MultiZoneLight),
+        (matrix, MatrixLight),
+    ):
+        device.port = 56700
+        # The Animator asks the light for its geometry through these hooks.
+        device._animation_geometry = MethodType(
+            device_class._animation_geometry, device
+        )
+        device._query_animation_geometry = MethodType(
+            device_class._query_animation_geometry, device
+        )
+        device.animator = Animator._for_device(device)
+
     effect = ConcreteFrameEffectForIntegration(fps=10.0, duration=0.05)
 
-    # Mock the Animator factory methods to avoid actual UDP sockets
-    mock_light_animator = MagicMock()
-    mock_light_animator.pixel_count = 1
-    mock_light_animator.canvas_width = 1
-    mock_light_animator.canvas_height = 1
-    mock_light_animator.send_frame = MagicMock()
-    mock_light_animator.close = MagicMock()
-
-    mock_mz_animator = MagicMock()
-    mock_mz_animator.pixel_count = 16
-    mock_mz_animator.canvas_width = 16
-    mock_mz_animator.canvas_height = 1
-    mock_mz_animator.send_frame = MagicMock()
-    mock_mz_animator.close = MagicMock()
-
-    mock_matrix_animator = MagicMock()
-    mock_matrix_animator.pixel_count = 64
-    mock_matrix_animator.canvas_width = 8
-    mock_matrix_animator.canvas_height = 8
-    mock_matrix_animator.send_frame = MagicMock()
-    mock_matrix_animator.close = MagicMock()
-
-    with (
-        patch.object(Animator, "for_light", return_value=mock_light_animator),
-        patch.object(
-            Animator,
-            "for_multizone",
-            new_callable=AsyncMock,
-            return_value=mock_mz_animator,
-        ),
-        patch.object(
-            Animator,
-            "for_matrix",
-            new_callable=AsyncMock,
-            return_value=mock_matrix_animator,
-        ),
-    ):
+    # Capture the UDP datagrams instead of sending them
+    with patch.object(socket, "socket") as socket_class:
+        socket_class.return_value.recvfrom_into.side_effect = BlockingIOError
         await conductor.start(effect, [light, multizone, matrix])
+        writers = list(effect._animators)
 
         # Wait for effect to complete
         await asyncio.sleep(0.3)
 
-        # All three factory methods should have been called
-        # duration_ms = int(1500 / fps) where fps=10 -> 150ms (1.5x frame interval)
-        Animator.for_light.assert_called_once_with(light, duration_ms=150)
-        Animator.for_multizone.assert_called_once_with(multizone, duration_ms=150)
-        Animator.for_matrix.assert_called_once_with(matrix, duration_ms=150)
+        # Each light lends its own Animator, sized for the device, and the
+        # effect draws at 1.5x its frame interval: fps=10 -> 150ms.
+        assert [w.animator for w in writers] == [
+            light.animator,
+            multizone.animator,
+            matrix.animator,
+        ]
+        assert [w.pixel_count for w in writers] == [1, 16, 64]
+        assert {w.duration_ms for w in writers} == {150}
 
         await conductor.stop([light, multizone, matrix])
 
@@ -912,6 +901,7 @@ async def test_conductor_frame_effect_coexists_with_lifx_effect(
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -929,3 +919,45 @@ async def test_conductor_frame_effect_coexists_with_lifx_effect(
 
         # Stop both
         await conductor.stop([light1, light2])
+
+
+@pytest.mark.asyncio
+async def test_take_over_leaves_a_conductor_on_another_event_loop_alone(
+    mock_light,
+) -> None:
+    """Newest-wins only reaches runs on the caller's own event loop.
+
+    A run on another loop cannot be cancelled from this one; trying raised
+    ValueError ("The future belongs to a different loop").
+    """
+    other_loop = asyncio.new_event_loop()
+    foreign = Conductor()
+    started = threading.Event()
+
+    def run_other_loop() -> None:
+        asyncio.set_event_loop(other_loop)
+        other_loop.run_until_complete(
+            foreign.start(
+                EffectPulse(mode="blink", cycles=1000, period=1.0), [mock_light]
+            )
+        )
+        started.set()
+        other_loop.run_forever()
+
+    thread = threading.Thread(target=run_other_loop, daemon=True)
+    thread.start()
+    assert started.wait(5)
+    conductor = Conductor()
+    try:
+        await conductor.start(
+            EffectPulse(mode="blink", cycles=1, period=0.1), [mock_light]
+        )
+        assert foreign.effect(mock_light) is not None
+    finally:
+        await conductor.stop([mock_light])
+        asyncio.run_coroutine_threadsafe(foreign.stop([mock_light]), other_loop).result(
+            5
+        )
+        other_loop.call_soon_threadsafe(other_loop.stop)
+        thread.join(5)
+        other_loop.close()

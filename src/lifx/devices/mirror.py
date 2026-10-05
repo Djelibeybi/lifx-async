@@ -32,9 +32,11 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
+from lifx.animation.framebuffer import FrameBuffer
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
 from lifx.devices.component.light import ComponentMatrixLight, _ComponentFields
+from lifx.devices.component.participant import LightComponent
 from lifx.devices.component.state import (
     colors_as_dict,
     decode_color,
@@ -483,6 +485,55 @@ class MirrorLight(ComponentMatrixLight):
         layout = self.layout
 
         return layout.front_positions if component == "front" else layout.back_positions
+
+    def _component_canvas(
+        self, component: str, light_canvas: FrameBuffer
+    ) -> tuple[FrameBuffer, tuple[int, ...]]:
+        """Draw a ring's effect on the ring itself: Nx1 in zone order.
+
+        Frame pixel k lands on the ring's k-th buffer position, so a pattern
+        travels round the ring in zone order.
+        """
+        count = len(self._component_positions(component))
+        canvas = FrameBuffer(pixel_count=count, canvas_width=count, canvas_height=1)
+        return canvas, tuple(range(count))
+
+    def _component_wraps(self, _component: str) -> bool:
+        """Each Mirror light component is a closed ring, so its canvas wraps."""
+        return True
+
+    @property
+    def front(self) -> LightComponent:
+        """The front ring as an effect participant.
+
+        It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
+        software effect started on it draws on the ring: 25 pixels in zone
+        order that wrap, so zone 24 sits next to zone 0. The back keeps its
+        colours and stays under the existing back methods. Reading it changes
+        nothing.
+
+        Example:
+            ```python
+            await mirror.front.start_effect(EffectRainbow())
+            ```
+        """
+        return self._light_component("front")
+
+    @property
+    def back(self) -> LightComponent:
+        """The back ring as an effect participant.
+
+        It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
+        software effect started on it draws on the ring: 25 pixels in zone
+        order that wrap. The front keeps its colours and stays under the
+        existing front methods. Reading it changes nothing.
+
+        Example:
+            ```python
+            await mirror.back.start_effect(EffectColorloop())
+            ```
+        """
+        return self._light_component("back")
 
     @property
     def front_positions(self) -> tuple[int, ...]:
@@ -1008,9 +1059,13 @@ class MirrorLight(ComponentMatrixLight):
                     encode_color(c) for c in state.stored_back_colors
                 ]
 
+            # A stored colour deliberately reset leaves the file too
+            device_state.update(self._unset_state_entries())
+
             await asyncio.to_thread(
                 write_state_file, self._state_file, self.serial, device_state
             )
+            self._saved_state_entries(device_state)
 
             _LOGGER.debug(
                 "Saved state to %s for device %s", self._state_file, self.serial

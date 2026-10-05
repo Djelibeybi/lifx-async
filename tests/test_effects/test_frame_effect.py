@@ -9,7 +9,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
-from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.frame_effect import FrameContext, FrameEffect, drop_participant
 
 
 class ConcreteFrameEffect(FrameEffect):
@@ -124,6 +124,7 @@ class TestFrameEffectLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -142,6 +143,7 @@ class TestFrameEffectLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -165,12 +167,14 @@ class TestFrameEffectLoop:
         animator1.pixel_count = 1
         animator1.canvas_width = 1
         animator1.canvas_height = 1
+        animator1.wraps = False
         animator1.send_frame = MagicMock()
 
         animator2 = MagicMock()
         animator2.pixel_count = 82
         animator2.canvas_width = 82
         animator2.canvas_height = 1
+        animator2.wraps = False
         animator2.send_frame = MagicMock()
 
         effect._animators = [animator1, animator2]
@@ -203,6 +207,7 @@ class TestFrameEffectLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -259,6 +264,30 @@ class TestFrameEffectCloseAnimators:
         effect.close_animators()
 
         assert len(effect._animators) == 0
+
+    def test_dropping_a_participant_closes_its_writer(self) -> None:
+        """A participant leaving a run takes its writer with it."""
+        effect = ConcreteFrameEffect()
+        first, second = MagicMock(), MagicMock()
+        effect._animators = [first, second]
+        effect.participants = [MagicMock(), MagicMock()]
+
+        drop_participant(effect, 0)
+
+        first.close.assert_called_once()
+        second.close.assert_not_called()
+        assert effect._animators == [second]
+        assert len(effect.participants) == 1
+
+    def test_dropping_a_participant_after_its_writers_closed(self) -> None:
+        """A run whose writers are already closed still drops the participant."""
+        effect = ConcreteFrameEffect()
+        effect.participants = [MagicMock(), MagicMock()]
+        effect.close_animators()
+
+        drop_participant(effect, 1)
+
+        assert len(effect.participants) == 1
 
 
 class TestGenerateProtocolFrame:
@@ -355,6 +384,7 @@ class TestGenerateProtocolFrame:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 

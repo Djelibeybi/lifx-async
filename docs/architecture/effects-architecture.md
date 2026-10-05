@@ -110,7 +110,7 @@ class Conductor:
 - Define effect interface (abstract `async_play()` method)
 - Handle power-on logic in `async_perform()`
 - Provide startup color via `from_poweroff_hsbk()`
-- Enable state inheritance optimization via `inherit_prestate()`
+- Keep `inherit_prestate()` for compatibility (superseded; no longer consulted)
 - Store conductor reference and participants
 
 **Key Methods:**
@@ -127,7 +127,7 @@ class LIFXEffect(ABC):
     async def from_poweroff_hsbk(light):    # Startup color (override)
         ...
 
-    def inherit_prestate(other):            # State inheritance (override)
+    def inherit_prestate(other):            # Superseded; not consulted
         ...
 ```
 
@@ -240,6 +240,8 @@ class PreState:
     power: bool                     # Power state (on/off)
     color: HSBK                     # Current color
     zone_colors: list[HSBK] | None  # Multizone colors (if applicable)
+    tile_colors: list[list[HSBK]] | None  # Every tile's colours (matrix lights)
+    stored_colors: dict[str, list[HSBK] | None] | None  # Ceiling/Mirror components
 ```
 
 **RunningEffect:**
@@ -283,19 +285,22 @@ await conductor.start(effect, [light1, light2])
 
 ```
 For each light:
-  1. Check if prestate can be inherited from running effect
-  2. If not, capture new prestate:
+  1. If the light already runs an effect, on this or any other Conductor,
+     take it out of that run with no restore (newest wins); the old run's
+     other lights carry on
+  2. Check if prestate can be inherited from that effect
+  3. If not, capture new prestate:
      a. Get power state (get_power)
      b. Get current color (get_color)
      c. Get zone colors if multizone (get_color_zones or get_extended_color_zones)
-  3. Store in RunningEffect and register in conductor._running
+  4. Store in RunningEffect and register in conductor._running
 ```
 
 **Timing:** <1 second per device (mostly network I/O)
 
 **Special Cases:**
 
-- **Prestate Inheritance:** If `effect.inherit_prestate(current_effect)` returns `True`, reuses existing PreState
+- **Prestate Inheritance:** A participant taken over from a running effect always reuses the replaced run's original PreState, so a later stop restores what was there before any effect
 - **Multizone Devices:** Uses extended messages if supported, falls back to standard messages
 - **Powered-off Devices:** All state is still captured (including zone colors that may be inaccurate)
 
@@ -314,16 +319,18 @@ if isinstance(effect, FrameEffect):
 
 ```
 For each participant:
-  1. Detect device type (MatrixLight, MultiZoneLight, Light)
-  2. Create appropriate Animator factory:
-     - MatrixLight → Animator.for_matrix(device, duration_ms)
-     - MultiZoneLight → Animator.for_multizone(device, duration_ms)
-     - Light → Animator.for_light(device, duration_ms)
-  3. duration_ms = int(1000 / effect.fps) for smooth interpolation
-  4. Call effect.async_setup(participants) for pre-loop initialization
+  1. Borrow the light's own Animator: await light.animator.prepare()
+     (the first prepare queries tile info or zone count; later ones do not)
+  2. Draw through a writer on that Animator with the effect's own canvas
+     and duration_ms = int(1500 / effect.fps), so transitions overlap:
+     - MirrorLight → one 25x1 ring that wraps, scattered to both rings
+     - every other light → the device's own canvas
+  3. Call effect.async_setup(participants) for pre-loop initialization
 ```
 
-**Note:** Animators use direct UDP — no device connection needed after creation.
+**Note:** Animators use direct UDP, so no device connection is needed after preparation. Each light
+owns one Animator, so an effect and a direct frame sender such as LedFx share one writer and one
+ack gate. Stopping an effect releases its writers; the light's Animator stays open.
 
 ### 4. Power-On (Optional)
 
@@ -335,8 +342,9 @@ async def async_perform(self, participants):
         for light in self.participants:
             power_level = await light.get_power()
             if power_level == 0:
-                startup_color = await self.from_poweroff_hsbk(light)
-                await light.set_color(startup_color, duration=0)
+                if not isinstance(light, MatrixLight):
+                    startup_color = await self.from_poweroff_hsbk(light)
+                    await light.set_color(startup_color, duration=0)
                 await light.set_power(True, duration=0.3)
 ```
 
@@ -344,8 +352,9 @@ async def async_perform(self, participants):
 
 ```
 For each powered-off light:
-  1. Get startup color from from_poweroff_hsbk()
-  2. Set color immediately (duration=0)
+  1. Matrix lights (including Ceiling and Mirror) skip to step 3: no colour
+     is written, so neither light component's stored colours change
+  2. Get startup colour from from_poweroff_hsbk() and set it (duration=0)
   3. Power on with 0.3s fade (duration=0.3)
 ```
 
@@ -461,7 +470,25 @@ if isinstance(light, MultiZoneLight):
 - Multiple messages required for >8 zones
 - Used as fallback for older devices
 
+#### Matrix State
+
+For `MatrixLight` devices (Tile, Candle, Path, Ceiling and Mirror), every
+tile's colours are captured with `get_all_tile_colors()`, so the light gets
+back the whole tile it showed, not one colour. If the read fails, restoration
+falls back to the single captured colour.
+
+Ceiling and Mirror lights also record both light components' stored colours.
+Restoring the tile and power, and any tile read while frames play, can change
+them; the restore puts the recorded colours back last, so an effect never
+changes what a component turns back on to.
+
 ### State Restoration Details
+
+#### Matrix Restoration
+
+Each captured tile is written back with `set_matrix_colors(tile_index,
+colours, duration=0)`, instead of the single colour, before power is
+restored.
 
 #### Multizone Restoration
 
@@ -520,42 +547,9 @@ Without these delays, subsequent operations may arrive before device finishes pr
 
 ### Prestate Inheritance
 
-Optimization that skips state capture/restore for compatible consecutive effects:
+When a new effect replaces a running one on a light or light component, on any Conductor, the new run inherits the replaced run's original prior state, so a later stop restores what was there before any effect rather than a frame captured mid-effect.
 
-```python
-def inherit_prestate(self, other: LIFXEffect) -> bool:
-    """Return True if can skip restoration."""
-    return isinstance(other, EffectColorloop)  # Example
-```
-
-**When used:**
-
-```python
-current_running = self._running.get(serial)
-if current_running and effect.inherit_prestate(current_running.effect):
-    # Reuse existing prestate
-    prestate = current_running.prestate
-else:
-    # Capture new prestate
-    prestate = await self._capture_prestate(light)
-```
-
-**Benefits:**
-
-- Eliminates flash/reset between compatible effects
-- Reduces network traffic
-- Faster effect transitions
-
-**Used by:**
-
-- `EffectColorloop.inherit_prestate()` → `True` for other `EffectColorloop`
-- `EffectRainbow.inherit_prestate()` → `True` for other `EffectRainbow`
-- `EffectFlicker.inherit_prestate()` → `True` for other `EffectFlicker`
-- `EffectAurora.inherit_prestate()` → `True` for other `EffectAurora`
-- `EffectProgress.inherit_prestate()` → `True` for other `EffectProgress`
-- `EffectSunrise.inherit_prestate()` → `True` for other `EffectSunrise`
-- `EffectSunset.inherit_prestate()` → `True` for other `EffectSunset`
-- `EffectPulse` doesn't use it (returns `False`)
+`inherit_prestate()` is superseded: the Conductor no longer consults it, and overriding it has no effect. It stays on `LIFXEffect` for compatibility.
 
 ## Concurrency Model
 
@@ -700,6 +694,13 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - **FrameEffect support:** Full 2D canvas via `FrameContext.canvas_width` / `canvas_height`
 - **Spatial effects:** Flicker (vertical gradient), Aurora (vertical brightness), Sunrise/Sunset (radial wavefront)
 - **Canvas mapping:** Multi-tile devices get a unified canvas based on tile positions
+- **Mirror:** Each ring, front and back, is a 25x1 canvas in zone order with
+  `FrameContext.wraps` set. A whole-light frame effect runs as two ring participants that share
+  the Mirror's one `device_index` and simulation, so both rings show the same frame and the two
+  chipless positions stay dark. An effect on `mirror.front` or `mirror.back` draws on that ring
+  alone. Each ring is a slot on the
+  light's Animator, which scatters the ring's frame to its buffer positions and sends the whole
+  tile in one Set64. The Mirror's own `send_frame()` still exposes the raw 4x13 tile.
 
 #### HEV Lights (`HevLight`)
 
@@ -812,7 +813,7 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 
 1. **Device Agnostic:** Effects work across all device types (Light, MultiZoneLight, MatrixLight) without device-specific code
 2. **Clean Separation:** Effect authors implement `generate_frame()` returning HSBK colors; animation module handles packet construction, tile mapping, and UDP delivery
-3. **Spatial Awareness:** `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` — enabling 2D effects (fire, rain) on matrix devices
+3. **Spatial Awareness:** `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` and `wraps`, enabling 2D effects (fire, rain) on matrix devices and seamless patterns on ring canvases
 4. **Performance:** Direct UDP via prebaked packet templates, no connection overhead
 5. **Smooth Transitions:** `duration_ms` parameter tells firmware to interpolate between frames
 
@@ -836,13 +837,12 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 
 **FrameEffect subclasses** (e.g., EffectColorloop) use the animation module for frame delivery:
 
-- `Animator.for_light()` — single-light SetColor packets
-- `Animator.for_multizone()` — multi-zone SetExtendedColorZones packets
-- `Animator.for_matrix()` — multi-tile Set64 packets with canvas mapping
+- `light.animator`: the one Animator each light owns: SetColor packets for a single light,
+  SetExtendedColorZones for a strip, Set64 with canvas mapping for a matrix
 - `animator.send_frame()` — synchronous frame dispatch (no async overhead)
-- `duration_ms` parameter — firmware-level interpolation between frames
+- `duration_ms`: firmware-level interpolation between frames, set per writer
 
-The Conductor creates and manages Animator lifecycle (creation in `start()`, cleanup in `stop()`).
+The Conductor borrows each light's Animator in `start()` and releases it in `stop()`.
 
 ### With Network Layer
 

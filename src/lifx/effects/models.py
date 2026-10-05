@@ -10,9 +10,34 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
+from lifx.devices.component.participant import ComponentName
 
 if TYPE_CHECKING:
+    from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
+
+# Identity of an effect participant: a light, or one component of a light. A
+# whole light keys as its bare serial string, so it is equivalent to the serial
+# key used before participants existed. A component keys as (serial, component).
+ParticipantKey = str | tuple[str, ComponentName]
+
+
+def participant_key(
+    light: Light, component: ComponentName | None = None
+) -> ParticipantKey:
+    """Return the Conductor key for an effect participant.
+
+    Args:
+        light: The light taking part in the effect
+        component: Optional light component (for example ``"downlight"``);
+            None means the whole light
+
+    Returns:
+        The light's serial for a whole light, else ``(serial, component)``
+    """
+    if component is None:
+        return light.serial
+    return (light.serial, component)
 
 
 @dataclass
@@ -26,6 +51,10 @@ class PreState:
         power: Device power state (True=on, False=off)
         color: Current HSBK color (for non-multizone or overall color)
         zone_colors: List of zone colors for multizone devices (None for regular lights)
+        tile_colors: Colours of every tile, one list per tile, for matrix lights
+            (None for other lights, or when the tiles could not be read)
+        stored_colors: Stored colours of each light component, keyed by component
+            name, for Ceiling and Mirror lights (None for other lights)
 
     Example:
         ```python
@@ -41,6 +70,8 @@ class PreState:
     power: bool
     color: HSBK
     zone_colors: list[HSBK] | None = None
+    tile_colors: list[list[HSBK]] | None = None
+    stored_colors: dict[str, list[HSBK] | None] | None = None
 
     def __repr__(self) -> str:
         """String representation of PreState."""
