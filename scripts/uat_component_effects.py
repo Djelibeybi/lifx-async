@@ -712,8 +712,10 @@ async def main(args: argparse.Namespace) -> int:
                     await restore()
     except OperatorQuitError:
         print("\nStopped early.")
-    except LifxUnsupportedCommandError as error:
-        print(f"\nRefused: {error}")
+    except LifxUnsupportedCommandError:
+        # The library's message names the device serial; this script never
+        # prints identifiers, so say what happened without it.
+        print("\nRefused: this light is on Thread, and effects stream frames.")
         print("Rerun with --enable-thread to stream effects to a Thread light.")
         return 2
     except KeyboardInterrupt:
