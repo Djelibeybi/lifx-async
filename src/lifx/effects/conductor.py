@@ -640,7 +640,7 @@ class Conductor:
 
         Halts any running effects on the specified lights or light
         components and restores them to their pre-effect state (power,
-        color, zones). A light also stops the effects on its light
+        colour, zones). A light also stops the effects on its light
         components in this Conductor, including a whole-light effect that
         moved onto one; a light component stops only its own effect.
 

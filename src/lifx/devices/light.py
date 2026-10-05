@@ -132,7 +132,7 @@ class Light(Device[LightState]):
 
         Example:
             ```python
-            async with await Device.connect("192.168.1.100") as device:
+            async with await Device.connect("192.0.2.10") as device:
                 animator = await device.animator.prepare()
 
             while running:

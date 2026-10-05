@@ -717,7 +717,7 @@ async def async_play(self) -> None:
 
 ### Per-Pixel Effects on Matrix and Multizone Devices
 
-`FrameEffect` subclasses have full per-pixel control via the animation module. The `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` and `wraps`, and `generate_frame()` returns individual colors for each pixel.
+`FrameEffect` subclasses have full per-pixel control via the animation module. The `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` and `wraps`, and `generate_frame()` returns individual colours for each pixel.
 
 **Matrix devices:** `generate_frame()` receives `pixel_count = W * H` (e.g., 64 for a single 8x8 tile, 320 for 5 tiles). Pixels are in row-major order across the canvas.
 

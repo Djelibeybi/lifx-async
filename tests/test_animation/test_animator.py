@@ -509,7 +509,7 @@ class TestAnimatorProbeBaking:
 
     def test_for_light_bakes_flag_on_its_single_template(self) -> None:
         """Single Light animator: the one template carries the flag."""
-        animator = Light(serial="d073d5123456", ip="192.168.1.100").animator
+        animator = Light(serial="d073d5123456", ip="192.0.2.10").animator
 
         assert animator._templates[0].data[22] & 0x02
 

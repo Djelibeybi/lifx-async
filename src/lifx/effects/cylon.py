@@ -151,7 +151,7 @@ class EffectCylon(FrameEffect):
         The eye position is computed via sinusoidal easing across the
         zone range. On a ring (``ctx.wraps``) the eye circles at a steady
         pace instead, and distance is measured the short way round. Each
-        zone's brightness is the cosine falloff from the eye center,
+        zone's brightness is the cosine falloff from the eye centre,
         floored at the background brightness. When trail > 0, previous
         frame brightness decays and blends with the current frame to
         create a glowing tail behind the eye.

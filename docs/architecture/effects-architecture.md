@@ -354,7 +354,7 @@ async def async_perform(self, participants):
 For each powered-off light:
   1. Matrix lights (including Ceiling and Mirror) skip to step 3: no colour
      is written, so neither light component's stored colours change
-  2. Get startup color from from_poweroff_hsbk() and set it (duration=0)
+  2. Get startup colour from from_poweroff_hsbk() and set it (duration=0)
   3. Power on with 0.3s fade (duration=0.3)
 ```
 

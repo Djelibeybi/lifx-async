@@ -441,7 +441,7 @@ an effect participant. They carry `start_effect()`, `stop_effect()` and
 ```python
 from lifx.effects import EffectFlicker
 
-async with await Device.connect("192.168.1.100") as ceiling:
+async with await Device.connect("192.0.2.10") as ceiling:
     await ceiling.downlight.start_effect(EffectFlicker())
 
     # The uplight is not animating, so its methods work as usual

@@ -311,7 +311,7 @@ effect participant. They carry `start_effect()`, `stop_effect()` and
 ```python
 from lifx.effects import EffectColorloop, EffectRainbow
 
-async with await Device.connect("192.168.1.100") as mirror:
+async with await Device.connect("192.0.2.10") as mirror:
     await mirror.front.start_effect(EffectRainbow(period=10))
 
     # The back is not animating, so its methods work as usual

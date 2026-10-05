@@ -49,7 +49,7 @@ class DeviceStateManager:
     async def capture_state(self, light: Light) -> PreState:
         """Capture current device state.
 
-        Captures power state, color, zone colors (for multizone devices) and
+        Captures power state, colour, zone colours (for multizone devices) and
         the colours of every tile (for matrix lights) to enable restoration
         after effects complete.
 
@@ -96,7 +96,7 @@ class DeviceStateManager:
     async def restore_state(self, light: Light, prestate: PreState) -> None:
         """Restore device to pre-effect state.
 
-        Restores power, color, zones (for multizone devices) and whole tiles
+        Restores power, colour, zones (for multizone devices) and whole tiles
         (for matrix lights) in the correct order to ensure smooth transitions.
         A matrix light gets back every tile it showed, not one colour.
 

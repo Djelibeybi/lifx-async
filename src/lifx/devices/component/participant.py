@@ -29,7 +29,7 @@ class LightComponent:
         ```python
         from lifx.effects import EffectFlicker
 
-        async with await Device.connect("192.168.1.100") as ceiling:
+        async with await Device.connect("192.0.2.10") as ceiling:
             await ceiling.downlight.start_effect(EffectFlicker())
             await ceiling.set_uplight_color(HSBK(30, 0.2, 0.3, 2700))
             await asyncio.sleep(10)
