@@ -358,3 +358,16 @@ async def test_non_matrix_light_still_gets_a_startup_colour():
     light.set_color.assert_awaited_once()
     assert light.set_color.await_args.args[0].brightness == 0
     light.set_power.assert_awaited_once()
+
+
+async def test_components_without_stored_colours_stay_without(
+    component_rig: transitions.Rig,
+):
+    """Restoring a uniform tile goes through SetColor, which remembers colours."""
+    rig = component_rig
+    assert _stored(rig) == (None, None)
+
+    await _run_effect(rig)
+
+    assert any(isinstance(p, packets.Light.SetColor) for p in rig.wire.packets)
+    assert _stored(rig) == (None, None)
