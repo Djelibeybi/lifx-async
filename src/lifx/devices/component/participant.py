@@ -69,7 +69,9 @@ class LightComponent:
         colours, and its colour and power methods keep working while the
         effect runs. On a light that is off, only this light component turns
         on and the other stays dark. Calling this light component's own
-        colour or power methods stops the effect first.
+        colour or power methods stops the effect first. A whole-light effect
+        running on the light moves onto the other light component and carries
+        on there.
 
         Args:
             effect: The software effect to run. It must draw frames: an
@@ -94,7 +96,9 @@ class LightComponent:
         The light component gets its colours from before the effect back, or
         turns off again if it was dark or its light was off. An effect on the
         other light component, or on other lights in the same run, carries
-        on.
+        on. A whole-light effect running on the light moves onto the other
+        light component, and this light component gets its colours from
+        before that effect back.
         """
         from lifx.effects.conductor import Conductor
 

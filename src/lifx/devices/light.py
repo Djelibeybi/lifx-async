@@ -153,7 +153,9 @@ class Light(Device[LightState]):
         state is captured before the effect starts and restored when it ends
         or when ``stop_effect()`` is called. Each light keeps one Conductor
         for these runs, so starting another effect on the same light follows
-        the Conductor's rules, including ``inherit_prestate()``.
+        the Conductor's rules, including ``inherit_prestate()``. On a Ceiling
+        or Mirror it also replaces any effects on the light components, and
+        stopping it restores what was there before any of them started.
 
         Only software effects can be started here. Firmware effects keep
         their own API, such as ``set_effect()`` on matrix and multizone

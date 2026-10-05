@@ -213,6 +213,15 @@ class AnimatorWriter:
         """
         return self._whole_light
 
+    def _leave_whole_light(self) -> None:
+        """Go on drawing this light component as an effect of its own.
+
+        A whole-light effect moves onto one light component when an effect
+        starts on, or a caller changes, the other. The ring this writer draws
+        then belongs to that light component alone.
+        """
+        self._whole_light = False
+
     @property
     def pixel_count(self) -> int:
         """Number of pixels in this writer's canvas."""

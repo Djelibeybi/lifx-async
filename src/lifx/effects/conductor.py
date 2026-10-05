@@ -97,6 +97,65 @@ def _drawn_lights(
     ]
 
 
+def _inherit_components(
+    prestates: dict[ParticipantKey, PreState],
+    components: dict[ParticipantKey, tuple[ComponentMatrixLight, dict[str, PreState]]],
+) -> None:
+    """Give each whole light the original prior state of its light components.
+
+    A whole-light effect that replaced light component effects captured a
+    light still showing their frames. Each light component it took over
+    gets its share of the tile and its stored colours from before its own
+    effect started, and the light was on only if it was on before every one
+    of them, so stopping the whole-light effect restores what was there
+    before any effect started.
+
+    Args:
+        prestates: The prior state captured for each participant, updated
+            in place
+        components: For each whole light that took over light component
+            effects, the light and each light component's original prior state
+    """
+    for key, (light, parts) in components.items():
+        captured = prestates[key]
+        owners = {
+            position: prestate.tile_colors[0]
+            for component, prestate in parts.items()
+            if prestate.tile_colors
+            for position in light._component_positions(component)
+        }
+        tile_colors = (
+            [
+                [
+                    owners[position][position] if position in owners else colour
+                    for position, colour in enumerate(captured.tile_colors[0])
+                ],
+                *captured.tile_colors[1:],
+            ]
+            if captured.tile_colors
+            else None
+        )
+        stored = captured.stored_colors
+        prestates[key] = PreState(
+            power=captured.power and all(p.power for p in parts.values()),
+            color=captured.color,
+            zone_colors=captured.zone_colors,
+            tile_colors=tile_colors,
+            stored_colors=(
+                {
+                    name: (
+                        (parts[name].stored_colors or {}).get(name)
+                        if name in parts
+                        else stored.get(name)
+                    )
+                    for name in stored
+                }
+                if stored is not None
+                else None
+            ),
+        )
+
+
 class Conductor:
     """Central orchestrator for managing light effects across multiple devices.
 
@@ -139,7 +198,10 @@ class Conductor:
 
     async def _take_over(
         self, effect: LIFXEffect, participants: Sequence[Participant]
-    ) -> dict[ParticipantKey, PreState]:
+    ) -> tuple[
+        dict[ParticipantKey, PreState],
+        dict[ParticipantKey, tuple[ComponentMatrixLight, dict[str, PreState]]],
+    ]:
         """Stop the software effect each light already runs, on any Conductor.
 
         The light leaves its old run with no restore, so it never flashes back
@@ -149,18 +211,44 @@ class Conductor:
         state is returned for the light, so a later stop restores what was
         there before any effect.
 
+        The overlap rules for light components apply too. A whole light also
+        takes over the effects on its light components, inheriting each
+        light component's original prior state, which the caller merges into
+        the state it captures. A light component takes its share of a
+        whole-light effect, which moves onto the other light component, and
+        inherits the whole light's original prior state.
+
         Args:
             effect: The effect about to start on the participants
             participants: The lights and light components it is about to
                 start on
 
         Returns:
-            The inherited prior state of each participant that has one
+            The inherited prior state of each participant that has one, and
+            for each whole light that took over light component effects, the
+            light and each light component's original prior state
         """
         inherited: dict[ParticipantKey, PreState] = {}
+        components: dict[
+            ParticipantKey, tuple[ComponentMatrixLight, dict[str, PreState]]
+        ] = {}
         for participant in participants:
             key = _key(participant)
+            light, component = _resolve(participant)
             for conductor in list(Conductor._live):
+                if component is None:
+                    parts = await conductor._take_components(effect, light)
+                    if parts:
+                        _, merged = components.setdefault(
+                            key, (cast("ComponentMatrixLight", light), {})
+                        )
+                        merged.update(parts)
+                else:
+                    whole = await conductor._take_share(
+                        cast("ComponentMatrixLight", light), component
+                    )
+                    if whole is not None:
+                        inherited[key] = whole
                 running = conductor._running.get(key)
                 if running is None or running.effect is effect:
                     continue
@@ -179,7 +267,130 @@ class Conductor:
                         }
                     )
                 await conductor.remove_lights([participant], restore_state=False)
-        return inherited
+        return inherited, components
+
+    async def _take_components(
+        self, effect: LIFXEffect, light: Light
+    ) -> dict[str, PreState]:
+        """Take a light's light components out of their runs here, unrestored.
+
+        A whole-light effect started on a light replaces the effects on its
+        light components, so the newest instruction wins. Each light
+        component leaves its run with no restore in between.
+
+        Args:
+            effect: The whole-light effect about to start
+            light: The light it is about to start on
+
+        Returns:
+            Each light component's original prior state, by name
+        """
+        parts = {
+            key[1]: running.prestate
+            for key, running in self._running.items()
+            if isinstance(key, tuple)
+            and key[0] == light.serial
+            and running.effect is not effect
+        }
+        if parts:
+            await self._remove(
+                [(light, component) for component in parts], restore_state=False
+            )
+        return parts
+
+    async def _take_share(
+        self, light: ComponentMatrixLight, component: str
+    ) -> PreState | None:
+        """Take one light component's share of a whole-light effect here.
+
+        A whole-light effect that draws frames moves onto the other light
+        component. One that draws none, such as a waveform, cannot draw on a
+        light component, so the light leaves it with no restore.
+
+        Args:
+            light: The light the light component belongs to
+            component: The light component an effect is about to start on
+
+        Returns:
+            The whole light's original prior state, or None if no whole-light
+            effect runs on the light here
+        """
+        running = self._running.get(light.serial)
+        if running is None:
+            return None
+        if await self._move_whole_light(light, component) is None:
+            await self._remove([(light, None)], restore_state=False)
+        return running.prestate
+
+    async def _move_whole_light(
+        self, light: ComponentMatrixLight, leaving: str
+    ) -> RunningEffect | None:
+        """Move a whole-light effect off one light component, onto the other.
+
+        The effect carries on with the same parameters and the whole light's
+        original prior state, now as an effect on the other light component.
+        It keeps the canvas it started with: on a Mirror it goes on drawing
+        the other ring, and on a Ceiling it goes on drawing the full grid, of
+        which only the other light component's cells reach the tile. It never
+        expands back to the whole light.
+
+        Args:
+            light: The light running a whole-light effect here
+            leaving: The light component the effect no longer draws on
+
+        Returns:
+            The moved run, or None if no whole-light effect that draws frames
+            runs on the light here
+        """
+        from lifx.effects.frame_effect import FrameEffect
+
+        async with self._lock:
+            running = self._running.get(light.serial)
+            if running is None or not isinstance(running.effect, FrameEffect):
+                return None
+            effect = running.effect
+            other = light._other_component(leaving)
+            matched = [
+                idx
+                for idx, member in enumerate(_members(effect, effect.participants))
+                if participant_key(*member) == light.serial
+            ]
+            for idx in reversed(matched):
+                writer = effect._animators[idx]
+                if writer.component == leaving:
+                    # A Mirror ring writer: the ring leaves the effect.
+                    effect._animators.pop(idx).close()
+                    del effect.participants[idx]
+                elif writer.component == other:
+                    # The other Mirror ring now draws as a light component.
+                    writer._leave_whole_light()
+                else:
+                    # A Ceiling draws the full grid onto the other light
+                    # component's slot, on the canvas the effect started with.
+                    effect._animators[idx] = await light._component_writer(
+                        other, writer._duration_ms, canvas=writer._canvas
+                    )
+                    writer.close()
+            del self._running[light.serial]
+            self._running[participant_key(light, other)] = running
+            _LOGGER.debug(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "_move_whole_light",
+                    "action": "move",
+                    "values": {
+                        "serial": light.serial,
+                        "component": other,
+                        "effect": type(effect).__name__,
+                    },
+                }
+            )
+            return running
+
+    @classmethod
+    def _runs_whole_light(cls, light: Light) -> bool:
+        """Whether a whole-light software effect runs on a light, on any Conductor."""
+        return any(light.serial in conductor._running for conductor in cls._live)
 
     @classmethod
     async def _leave_every_run(
@@ -189,7 +400,10 @@ class Conductor:
 
         The participant's prior state is restored, unless ``restore_state`` is
         False, and the other participants of each run carry on. A whole light
-        also leaves the runs of its light components. Runs are matched by
+        also leaves the runs of its light components. A light component also
+        leaves a whole-light effect that draws frames on its light: the effect
+        moves onto the other light component, and this light component gets
+        the whole light's original prior state back. Runs are matched by
         participant key, so a second object for the same light finds them too.
 
         Args:
@@ -198,6 +412,12 @@ class Conductor:
         """
         light, component = _resolve(participant)
         for conductor in list(cls._live):
+            if component is not None:
+                moved = await conductor._move_whole_light(
+                    cast("ComponentMatrixLight", light), component
+                )
+                if moved is not None and restore_state:
+                    await conductor._restore(light, component, moved.prestate)
             members = [
                 (light, key[1] if isinstance(key, tuple) else None)
                 for key in conductor._running
@@ -292,7 +512,10 @@ class Conductor:
         or stop() is called.
 
         A light component, such as ``ceiling.downlight``, takes part only in
-        effects that draw frames; any other effect leaves it out.
+        effects that draw frames; any other effect leaves it out. A whole
+        light replaces the effects on its light components and inherits each
+        one's original prior state; a light component moves a whole-light
+        effect on its light onto the other light component.
 
         Args:
             effect: The effect instance to execute
@@ -331,7 +554,7 @@ class Conductor:
 
         # Newest wins: stop whatever each participant already runs, with no
         # restore in between, before this effect captures or inherits.
-        inherited = await self._take_over(effect, filtered_participants)
+        inherited, components = await self._take_over(effect, filtered_participants)
 
         async with self._lock:
             # Set conductor reference in effect
@@ -377,6 +600,7 @@ class Conductor:
                     *(capture_and_log(light) for _, light in to_capture)
                 )
                 prestates.update(zip((key for key, _ in to_capture), captured))
+            _inherit_components(prestates, components)
 
             # Set up animators for frame-based effects
             from lifx.effects.frame_effect import FrameEffect
@@ -505,8 +729,11 @@ class Conductor:
         # that run with no restore in between. An effect that is not running
         # here takes no light from anywhere.
         inherited: dict[ParticipantKey, PreState] = {}
+        components: dict[
+            ParticipantKey, tuple[ComponentMatrixLight, dict[str, PreState]]
+        ] = {}
         if any(running.effect is effect for running in self._running.values()):
-            inherited = await self._take_over(effect, compatible)
+            inherited, components = await self._take_over(effect, compatible)
 
         async with self._lock:
             # Skip participants already running this effect
@@ -548,6 +775,7 @@ class Conductor:
             )
             prestates = dict(inherited)
             prestates.update(zip([_key(p) for p in to_capture], captured))
+            _inherit_components(prestates, components)
 
             # Create animators for frame-based effects
             from lifx.effects.frame_effect import FrameEffect

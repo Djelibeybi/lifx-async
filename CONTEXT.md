@@ -53,6 +53,9 @@ downlight is the full grid with the uplight cell dropped, and a Mirror ring is
 ring participants, the front and the back. The light component
 that no effect draws on keeps its colours and stays under the caller's control.
 Only an effect that draws frames can have a light component as a participant.
+A whole-light effect and a light component effect never share a light
+component: the newest wins, and a whole-light effect that loses one light
+component moves onto the other and stays there.
 
 **Stopping an effect**:
 Ending a software effect on a participant and restoring the participant's

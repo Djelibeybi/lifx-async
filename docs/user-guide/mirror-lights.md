@@ -191,8 +191,10 @@ what the device reports rather than undoing that change. Starting an
 `Animator` (which the effects `Conductor` does for every frame effect) resets it
 too. Frames sent directly through the light's `Animator` bypass the component
 methods entirely, so a component call made while they run writes over the
-current frame: stop sending them before switching components. While a software
-effect runs on one ring instead, the other ring's methods keep working (see
+current frame: stop sending them before switching components. Software effects
+need no such care. A component call made during a whole-light software effect
+moves the effect onto the other ring, and while a software effect runs on one
+ring, the other ring's methods keep working (see
 [Effects on one ring](#effects-on-one-ring)).
 
 The second write restarts both components' transitions with its own duration.
@@ -336,6 +338,19 @@ Both rings draw through the light's one `Animator` (`mirror.animator`): each
 ring is a slot on it, and every frame sends one tile composed from both slots.
 `mirror.stop_effect()` stops the effects on both rings as well as any
 whole-light or firmware effect.
+
+A whole-light software effect and ring effects follow the newest instruction,
+with nothing restored in between:
+
+- A whole-light effect started while effects run on the rings replaces them.
+  Stopping it restores what was there before any of those effects started.
+- A ring effect started while a whole-light effect runs moves the whole-light
+  effect onto the other ring, where it carries on with the same parameters.
+  Stopping a ring's effect, or calling its colour, power or theme methods,
+  during a whole-light effect does the same.
+- The moved effect stays on its ring, still drawing a 25-pixel ring, even after
+  the other ring's effect stops. Stopping it restores that ring's colours from
+  before the whole-light effect started, not a frame of it.
 
 ## Whole-Device Operations
 

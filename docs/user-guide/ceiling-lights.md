@@ -328,10 +328,12 @@ made in the LIFX app are picked up. A colour change made through an inherited
 or a waveform) resets this tracking, so the next component call starts from
 what the device reports rather than undoing that change. Starting an
 `Animator` (which the effects `Conductor` does for every frame effect) resets it
-too. Frames sent while a whole-light animation runs bypass the component
-methods entirely, so a component call made during one writes over the current
-frame: stop the animation before switching components. While a software effect
-runs on one light component instead, the other light component's methods keep
+too. Frames you send directly through the light's `Animator` bypass the
+component methods entirely, so a component call made while they run writes over
+the current frame: stop sending them before switching components. Software
+effects need no such care. A component call made during a whole-light software
+effect moves the effect onto the other light component, and while a software
+effect runs on one light component, the other light component's methods keep
 working (see [Effects on one light component](#effects-on-one-light-component)).
 
 The second write restarts both components' transitions with its own duration.
@@ -477,6 +479,39 @@ Both light components draw through the light's one `Animator`
 (`ceiling.animator`): each light component is a slot on it, and every frame
 sends one tile composed from both slots. `ceiling.stop_effect()` stops the
 effects on both light components as well as any whole-light effect.
+
+### Whole-Light and Light Component Effects Together
+
+The newest instruction wins, and nothing is restored in between:
+
+- A whole-light effect started while effects run on the light components
+  replaces them. Stopping it restores what was there before any of those
+  effects started: each light component's colours, the light's power and the
+  stored colours.
+- A light component effect started while a whole-light effect runs moves the
+  whole-light effect onto the other light component, where it carries on with
+  the same parameters. Stopping a light component's effect, or calling its
+  colour or power methods, during a whole-light effect does the same.
+- The moved effect stays on its light component, even after the other light
+  component's effect stops, and stopping it restores that light component's
+  colours from before the whole-light effect started, not a frame of it.
+
+A moved effect keeps the canvas it started with: it goes on drawing the full
+grid, and only its light component's cells reach the light. On the uplight
+that is the uplight cell, so an effect such as a rainbow shows the colour of that
+one cell rather than restarting on a single pixel.
+
+```python
+from lifx.effects import EffectAurora, EffectFlicker
+
+await ceiling.start_effect(EffectAurora())
+# Aurora moves onto the uplight; Flicker draws on the downlight
+await ceiling.downlight.start_effect(EffectFlicker())
+```
+
+An effect that draws no frames, such as `EffectPulse`, cannot move onto a light
+component: a light component effect started during it takes the light from it,
+and a light component's colour or power call leaves it running.
 
 ## Sunrise and Sunset Effects
 

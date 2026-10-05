@@ -157,16 +157,24 @@ class ComponentMatrixLight(MatrixLight):
         no restore in between, and any other participants of its run carry
         on.
         """
-        if component not in self._animating_components():
-            return
         from lifx.effects.conductor import Conductor
 
+        if component not in self._animating_components() and (
+            not Conductor._runs_whole_light(self)
+        ):
+            return
+        # A whole-light effect moves onto the other light component.
         await Conductor._leave_every_run(
             self._light_component(component), restore_state=False
         )
 
     async def _component_writer(
-        self, component: str, duration_ms: int, *, whole_light: bool = False
+        self,
+        component: str,
+        duration_ms: int,
+        *,
+        whole_light: bool = False,
+        canvas: FrameBuffer | None = None,
     ) -> AnimatorWriter:
         """Borrow the light's Animator to draw on one light component's slot.
 
@@ -178,6 +186,11 @@ class ComponentMatrixLight(MatrixLight):
             duration_ms: Transition duration for the writer's frames
             whole_light: True if the writer draws this light component's
                 share of a whole-light effect
+            canvas: The whole light's canvas, for a whole-light effect that
+                moved onto this light component and keeps drawing the canvas
+                it started with; each of the light component's cells then
+                takes its own cell of the frame. None draws on the light
+                component's own shape.
 
         Returns:
             A writer whose frames land on the light component's slot
@@ -185,10 +198,13 @@ class ComponentMatrixLight(MatrixLight):
         async with self._component_operation():
             tile = await self._tile_colors_for_update()
         animator = await self.animator.prepare()
-        canvas, sources = self._component_canvas(
-            component, animator._require_geometry().framebuffer
+        positions = self._component_positions(component)
+        canvas, sources = (
+            self._component_canvas(component, animator._require_geometry().framebuffer)
+            if canvas is None
+            else (canvas, positions)
         )
-        slot = ComponentSlot(component, self._component_positions(component), sources)
+        slot = ComponentSlot(component, positions, sources)
         return animator._slot_writer(
             slot,
             canvas,
