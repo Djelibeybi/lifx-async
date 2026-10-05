@@ -13,8 +13,8 @@ for your verdict. Press:
 - any key to start the described step (``s`` skips it, ``q`` quits)
 - ``p`` pass, ``f`` fail or ``n`` note-and-fail after watching the light
 
-The light's own colours and power are captured before the run and put back at
-the end, including after a quit or an error.
+The light's own colours, power and stored turn-on colours are captured before
+the run and put back at the end, including after a quit or an error.
 
 The summary names steps and verdicts only. It never prints serials, addresses
 or labels, so it can be pasted into a pull request as it is.
@@ -35,6 +35,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from lifx import HSBK, CeilingLight, Device, MirrorLight
+from lifx.devices.component.effect_support import (
+    reinstate_stored_colors,
+    stored_colors_snapshot,
+)
 from lifx.effects import (
     EffectColorloop,
     EffectCylon,
@@ -187,7 +191,8 @@ def render_report(results: list[Result], products: list[str]) -> str:
 
 
 async def capture_ceiling(ceiling: CeilingLight) -> Action:
-    """Capture the Ceiling's colours and power, returning a restorer."""
+    """Capture the Ceiling's colours, power and stored colours, returning a restorer."""
+    stored = stored_colors_snapshot(ceiling)
     power = await ceiling.get_power()
     uplight = await ceiling.get_uplight_color()
     downlight = await ceiling.get_downlight_colors()
@@ -203,6 +208,9 @@ async def capture_ceiling(ceiling: CeilingLight) -> Action:
         else:
             await ceiling.turn_downlight_off()
         await ceiling.set_power(power > 0)
+        # The writes above remember colours; the user's own stored colours win.
+        if stored is not None:
+            await reinstate_stored_colors(ceiling, stored)
 
     return restore
 
@@ -381,7 +389,8 @@ def ceiling_scenarios(ceiling: CeilingLight) -> list[Scenario]:
 
 
 async def capture_mirror(mirror: MirrorLight) -> Action:
-    """Capture the Mirror's colours and power, returning a restorer."""
+    """Capture the Mirror's colours, power and stored colours, returning a restorer."""
+    stored = stored_colors_snapshot(mirror)
     power = await mirror.get_power()
     front = await mirror.get_front_colors()
     back = await mirror.get_back_colors()
@@ -397,6 +406,9 @@ async def capture_mirror(mirror: MirrorLight) -> Action:
         else:
             await mirror.turn_back_off()
         await mirror.set_power(power > 0)
+        # The writes above remember colours; the user's own stored colours win.
+        if stored is not None:
+            await reinstate_stored_colors(mirror, stored)
 
     return restore
 
