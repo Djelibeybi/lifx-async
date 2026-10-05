@@ -14,6 +14,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.mirror import MirrorLight
+from lifx.effects import EffectCylon, EffectRainbow, EffectTwinkle
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
@@ -233,13 +234,6 @@ class TestMirrorRingEffects:
             assert await mirror.get_back_colors() == [BLUE] * RING
             assert await mirror.get_power() == 65535
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Conductor.stop() on one participant cancels the effect's shared "
-            "frame task, so the other ring stops drawing"
-        ),
-    )
     async def test_a_conductor_stopping_one_ring_leaves_the_other_drawing(
         self, mirror_device
     ):
@@ -264,6 +258,24 @@ class TestMirrorRingEffects:
 
             assert await mirror.get_front_colors() == [AMBER] * RING
             assert await mirror.get_back_colors() == [BLUE] * RING
+
+    async def test_a_chain_of_replaced_effects_restores_the_starting_picture(
+        self, mirror_device
+    ):
+        mirror = mirror_device
+        async with mirror:
+            await _prepare(mirror)
+            for effect in (EffectCylon(), EffectRainbow(), EffectTwinkle()):
+                # Each whole-light effect replaces the one before it.
+                await mirror.start_effect(effect)
+                await asyncio.sleep(0.5)
+
+            await mirror.stop_effect()
+
+            assert await mirror.get_front_colors() == [AMBER] * RING
+            assert await mirror.get_back_colors() == [BLUE] * RING
+            assert mirror.state.stored_front_colors == [AMBER] * RING
+            assert mirror.state.stored_back_colors == [BLUE] * RING
 
     async def test_a_ring_dark_before_its_effect_goes_dark_again(self, mirror_device):
         mirror = mirror_device

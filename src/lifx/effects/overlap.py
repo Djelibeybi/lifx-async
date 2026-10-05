@@ -149,10 +149,10 @@ class OverlapRules:
 
         The light leaves its old run with no restore, so it never flashes back
         to its prior state; the old run's other participants carry on, and a
-        run left with no participants is cancelled. Where ``effect`` inherits
-        from the old effect (``inherit_prestate()``), the old run's prior
-        state is returned for the light, so a later stop restores what was
-        there before any effect.
+        run left with no participants is cancelled. The old run's prior state
+        is always returned for the light, whatever the effects, so a later
+        stop restores what was there before any effect rather than a frame
+        captured mid-effect.
 
         The overlap rules for light components apply too. A whole light also
         takes over the effects on its light components, inheriting each
@@ -193,20 +193,19 @@ class OverlapRules:
                 running = conductor._running.get(key)
                 if running is None or running.effect is effect:
                     continue
-                if effect.inherit_prestate(running.effect):
-                    inherited[key] = running.prestate
-                    _LOGGER.debug(
-                        {
-                            "class": self.__class__.__name__,
-                            "method": "_take_over",
-                            "action": "inherit_prestate",
-                            "values": {
-                                "participant": repr(participant),
-                                "previous_effect": type(running.effect).__name__,
-                                "new_effect": type(effect).__name__,
-                            },
-                        }
-                    )
+                inherited[key] = running.prestate
+                _LOGGER.debug(
+                    {
+                        "class": self.__class__.__name__,
+                        "method": "_take_over",
+                        "action": "inherit_prestate",
+                        "values": {
+                            "participant": repr(participant),
+                            "previous_effect": type(running.effect).__name__,
+                            "new_effect": type(effect).__name__,
+                        },
+                    }
+                )
                 await conductor.remove_lights([participant], restore_state=False)
         return inherited, components
 

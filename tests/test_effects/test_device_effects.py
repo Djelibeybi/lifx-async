@@ -151,6 +151,26 @@ class TestStartAndStopOnALight:
             await _keeps_showing(light, GREEN)
             await conductor.stop([light])
 
+    async def test_a_replaced_effect_hands_on_the_original_prior_state(
+        self, emulator_devices
+    ):
+        light = emulator_devices[0]
+        async with light:
+            await light.set_power(True)
+            await light.set_color(DIM_BLUE)
+            first = Conductor()
+            await first.start(_SolidFrames(RED), [light])
+            await _eventually(lambda: _shows(light, RED))
+            await light.start_effect(_SolidFrames(GREEN))
+            await _eventually(lambda: _shows(light, GREEN))
+
+            await first.start(_SolidFrames(WHITE), [light])
+            await _eventually(lambda: _shows(light, WHITE))
+            await light.stop_effect()
+
+            assert (await light.get_color())[0] == DIM_BLUE
+            assert first.effect(light) is None
+
     async def test_start_effect_takes_one_light_out_of_a_shared_run(
         self, emulator_devices
     ):

@@ -165,31 +165,11 @@ async def async_play(self) -> None:
 
 ### Lights Flash/Reset Between Effects
 
-**Symptom:** When starting second effect, lights briefly return to original state before new effect starts.
+**Symptom:** When starting a second effect, lights briefly return to their original state before the new effect starts.
 
-**Cause:** State inheritance not enabled.
+**Cause:** The first effect was stopped before the second started.
 
-```python
-# Each effect resets to original state
-effect1 = EffectColorloop(period=30)
-await conductor.start(effect1, lights)
-await asyncio.sleep(10)
-
-effect2 = EffectColorloop(period=20)  # Lights briefly reset here
-await conductor.start(effect2, lights)
-```
-
-**Solution:** Effects must implement `inherit_prestate()` to prevent reset:
-
-```python
-class EffectColorloop(LIFXEffect):
-    def inherit_prestate(self, other: LIFXEffect) -> bool:
-        return isinstance(other, EffectColorloop)
-```
-
-This is already implemented for `EffectColorloop`, but custom effects may need it.
-
-**Note:** For different effect types, the reset is intentional behavior.
+**Solution:** Start the second effect without stopping the first. The new effect replaces the running one with no restore in between, and inherits its original prior state, so stopping it later restores what was there before either effect.
 
 ---
 
