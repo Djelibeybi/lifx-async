@@ -79,6 +79,28 @@ class _Solid(FrameEffect):
         return [self.colour] * ctx.pixel_count
 
 
+class _Counting(FrameEffect):
+    """Counts its own frames per participant, drawing the count as a hue."""
+
+    participant_state = ("_count",)
+
+    def __init__(self) -> None:
+        super().__init__(power_on=False, fps=20.0)
+        self._count = 0
+        self.counts: list[int] = []
+        self.drawn = asyncio.Event()
+
+    @property
+    def name(self) -> str:
+        return "counting"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        self._count += 1
+        self.counts.append(self._count)
+        self.drawn.set()
+        return [HSBK(self._count % 360, 1, 0.5, 3500)] * ctx.pixel_count
+
+
 def _zone_colour(device_index: int, zone: int) -> HSBK:
     return HSBK.from_protocol(
         HSBK(zone * 10 + device_index, 1, 0.5, 3500).to_protocol()
@@ -104,6 +126,10 @@ def udp() -> Iterator[MagicMock]:
 
 @pytest.fixture
 def rig(monkeypatch: pytest.MonkeyPatch) -> transitions.Rig:
+    return _frozen_rig(267, monkeypatch)
+
+
+def _frozen_rig(product: int, monkeypatch: pytest.MonkeyPatch) -> transitions.Rig:
     # The rig freezes the component clock, so settle delays must not wait on it.
     for module in ("state_manager", "base", "conductor"):
         for name in (
@@ -113,8 +139,8 @@ def rig(monkeypatch: pytest.MonkeyPatch) -> transitions.Rig:
             "POWER_ON_TRANSITION_DURATION",
         ):
             monkeypatch.setattr(f"lifx.effects.{module}.{name}", 0, raising=False)
-    rig = transitions.build_rig(267, monkeypatch)
-    rig.light._capabilities = get_product(267)
+    rig = transitions.build_rig(product, monkeypatch)
+    rig.light._capabilities = get_product(product)
     return rig
 
 
@@ -306,6 +332,52 @@ class TestMirrorOverlapRules:
         assert _on_wire(rig, BACK) == [BLUE] * 25
         assert _on_wire(rig, FRONT) == [GREEN] * 25
 
+    async def test_a_moved_ring_keeps_its_simulation(
+        self, rig: transitions.Rig, udp: MagicMock
+    ):
+        mirror = rig.light
+        await _amber_front_blue_back(rig)
+        whole = _Counting()
+        conductor = Conductor()
+        await conductor.start(whole, [mirror])
+        for _ in range(3):
+            await _next_frame(rig, whole)
+        # Each ring counts its own frames.
+        front_count = whole.counts[-2]
+
+        await mirror.back.start_effect(_Solid(GREEN))
+        await _next_frame(rig, whole)
+
+        # The front ring carries on counting rather than starting again.
+        assert whole.counts[-1] == front_count + 1
+        await mirror.front.stop_effect()
+        await mirror.back.stop_effect()
+
+
+async def test_a_moved_ceiling_keeps_its_simulation_beside_other_lights(
+    monkeypatch: pytest.MonkeyPatch, udp: MagicMock
+):
+    first = _frozen_rig(201, monkeypatch)
+    # The second rig's clock is the one both lights' frames run on.
+    second = _frozen_rig(201, monkeypatch)
+    second.light.serial = "d073d5000002"
+    conductor = Conductor()
+    whole = _Counting()
+    await conductor.start(whole, [first.light, second.light])
+    for _ in range(3):
+        await _next_frame(second, whole)
+    # Each light counts its own frames; the second light draws last.
+    first_count, second_count = whole.counts[-2:]
+
+    await first.light.downlight.start_effect(_Solid(RED))
+    await _next_frame(second, whole)
+
+    # The first light, now on its uplight, and the second carry on counting.
+    assert whole.counts[-2:] == [first_count + 1, second_count + 1]
+    assert conductor.effect(first.light.uplight) is whole
+    await conductor.stop([first.light, second.light])
+    await first.light.downlight.stop_effect()
+
 
 # Ceiling: the embedded emulator
 
@@ -340,6 +412,13 @@ async def _shows(ceiling: CeilingLight, uplight: HSBK, downlight: HSBK) -> None:
         return tile[UPLIGHT] == uplight and tile[:DOWNLIGHT] == [downlight] * DOWNLIGHT
 
     await _eventually(check)
+
+
+def _counted(effect: _Counting, frames: int) -> Callable[[], Awaitable[bool]]:
+    async def check() -> bool:
+        return len(effect.counts) >= frames
+
+    return check
 
 
 @pytest.mark.emulator
@@ -517,6 +596,63 @@ class TestCeilingOverlapRules:
             await ceiling.stop_effect()
             assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
             assert await ceiling.get_uplight_color() == AMBER
+
+    async def test_a_moved_effect_keeps_its_simulation(self, ceiling_device):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            conductor = Conductor()
+            whole = _Counting()
+            await conductor.start(whole, [ceiling])
+            await _eventually(_counted(whole, 3))
+            before = whole.counts[-1]
+
+            await ceiling.downlight.start_effect(_Solid(RED))
+            whole.drawn.clear()
+            await asyncio.wait_for(whole.drawn.wait(), 2)
+
+            # The uplight's frames continue the count rather than restart it.
+            assert whole.counts[-1] > before
+            await ceiling.stop_effect()
+
+    async def test_stopping_the_light_stops_a_moved_effect(self, ceiling_device):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            conductor = Conductor()
+            whole = _Solid(VIOLET)
+            await conductor.start(whole, [ceiling])
+            await _shows(ceiling, VIOLET, VIOLET)
+            downlight = _Solid(RED)
+            await conductor.start(downlight, [ceiling.downlight])
+            await _shows(ceiling, VIOLET, RED)
+
+            await conductor.stop([ceiling])
+
+            assert conductor.effect(ceiling.uplight) is None
+            assert conductor.effect(ceiling.downlight) is None
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+            for _ in range(5):  # no effect draws on any more
+                assert (await _tile(ceiling))[UPLIGHT] == DIM_BLUE
+                await asyncio.sleep(0.05)
+
+    async def test_removing_the_light_removes_a_moved_effect(self, ceiling_device):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            conductor = Conductor()
+            whole = _Solid(VIOLET)
+            await conductor.start(whole, [ceiling])
+            await _shows(ceiling, VIOLET, VIOLET)
+            await ceiling.set_downlight_colors(WHITE)
+            await _shows(ceiling, VIOLET, WHITE)
+
+            await conductor.remove_lights([ceiling])
+
+            assert conductor.effect(ceiling.uplight) is None
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert await ceiling.get_downlight_colors() == [WHITE] * DOWNLIGHT
 
     async def test_a_component_effect_takes_the_light_from_a_waveform_effect(
         self, ceiling_device

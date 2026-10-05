@@ -269,6 +269,23 @@ class FrameEffect(LIFXEffect):
             setattr(self, name, value)
         self._drawing = key
 
+    def _rename_participant(self, old: object, new: object) -> None:
+        """Carry a participant's simulation over to the key it draws as now.
+
+        A whole-light effect that moves onto one light component goes on
+        drawing as that light component, so its simulation goes with it and
+        its frames carry on rather than start again.
+
+        Args:
+            old: The key the participant drew as
+            new: The key it draws as from now on
+        """
+        if self._drawing == old:
+            self._drawing = new
+        state = self._set_aside.pop(old, None)
+        if state is not None:
+            self._set_aside[new] = state
+
     async def async_setup(self, _participants: list[Light]) -> None:
         """Optional setup hook called before the frame loop starts.
 

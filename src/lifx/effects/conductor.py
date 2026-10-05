@@ -371,6 +371,10 @@ class Conductor:
                         other, writer._duration_ms, canvas=writer._canvas
                     )
                     writer.close()
+            # A Ceiling's writer drew as the whole light and now draws as the
+            # other light component; its simulation carries on there. A
+            # Mirror's ring writers already drew as their rings.
+            effect._rename_participant(light.serial, participant_key(light, other))
             del self._running[light.serial]
             self._running[participant_key(light, other)] = running
             _LOGGER.debug(
@@ -633,7 +637,9 @@ class Conductor:
 
         Halts any running effects on the specified lights or light
         components and restores them to their pre-effect state (power,
-        color, zones).
+        color, zones). A light also stops the effects on its light
+        components in this Conductor, including a whole-light effect that
+        moved onto one; a light component stops only its own effect.
 
         Args:
             lights: Lights and light components to stop
@@ -652,8 +658,8 @@ class Conductor:
             to_restore: list[tuple[Light, str | None, PreState]] = []
             tasks_to_cancel: set[asyncio.Task[None]] = set()
 
-            for participant in lights:
-                light, component = _resolve(participant)
+            members = self._members_of(lights)
+            for light, component in members:
                 running = self._running.get(participant_key(light, component))
 
                 if running:
@@ -675,8 +681,8 @@ class Conductor:
             from lifx.effects.frame_effect import FrameEffect
 
             closed_effects: set[int] = set()
-            for participant in lights:
-                running = self._running.get(_key(participant))
+            for member in members:
+                running = self._running.get(participant_key(*member))
                 if running and isinstance(running.effect, FrameEffect):
                     effect_id = id(running.effect)
                     if effect_id not in closed_effects:
@@ -698,8 +704,36 @@ class Conductor:
                 await asyncio.gather(*(self._restore(*item) for item in to_restore))
 
             # Remove from running registry after restoration
-            for participant in lights:
-                self._running.pop(_key(participant), None)
+            for member in members:
+                self._running.pop(participant_key(*member), None)
+
+    def _members_of(
+        self, participants: Sequence[Participant]
+    ) -> list[tuple[Light, str | None]]:
+        """Each participant, and for a whole light its light components here.
+
+        Stopping or removing a light covers every effect on it in this
+        Conductor, including one on either light component, such as a
+        whole-light effect that moved onto one. A light component covers only
+        itself.
+
+        Args:
+            participants: The lights and light components to stop or remove
+
+        Returns:
+            Each light and light component to stop or remove
+        """
+        members: list[tuple[Light, str | None]] = []
+        for participant in participants:
+            light, component = _resolve(participant)
+            members.append((light, component))
+            if component is None:
+                members.extend(
+                    (light, key[1])
+                    for key in self._running
+                    if isinstance(key, tuple) and key[0] == light.serial
+                )
+        return members
 
     async def add_lights(
         self, effect: LIFXEffect, lights: Sequence[Participant]
@@ -815,8 +849,9 @@ class Conductor:
         """Remove participants from their running effect without stopping others.
 
         Closes animators, optionally restores state, and deregisters the
-        lights or light components. If the last participant is removed,
-        cancels the background task.
+        lights or light components. A light also leaves the effects on its
+        light components in this Conductor. If the last participant is
+        removed, cancels the background task.
 
         Args:
             lights: Lights and light components to remove
@@ -831,7 +866,7 @@ class Conductor:
             await conductor.remove_lights([light2], restore_state=False)
             ```
         """
-        await self._remove([_resolve(p) for p in lights], restore_state=restore_state)
+        await self._remove(self._members_of(lights), restore_state=restore_state)
 
     async def _remove(
         self, members: list[tuple[Light, str | None]], *, restore_state: bool
