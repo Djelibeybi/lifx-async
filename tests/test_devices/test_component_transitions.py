@@ -549,6 +549,23 @@ async def test_component_write_preserves_other_and_unused_buffer_positions(rig: 
     assert [rig.wire.colours[p] for p in untouched] == [before[p] for p in untouched]
 
 
+async def test_component_fade_rides_on_the_write_that_reaches_the_display(rig: Rig):
+    await rig.on(0, BLUE, duration=2)
+    displayed = [
+        p
+        for p in rig.wire.packets
+        if (isinstance(p, packets.Tile.Set64) and p.rect.fb_index == 0)
+        or (isinstance(p, packets.Tile.CopyFrameBuffer) and p.dst_fb_index == 0)
+    ]
+    hidden = [
+        p
+        for p in rig.wire.packets
+        if isinstance(p, packets.Tile.Set64) and p.rect.fb_index != 0
+    ]
+    assert [p.duration for p in displayed] == [2000]
+    assert all(p.duration == 0 for p in hidden)
+
+
 @pytest.mark.parametrize("delivered", [False, True])
 async def test_retry_power_on_during_pending_power_off(rig: Rig, delivered: bool):
     await rig.off(1)
