@@ -261,6 +261,26 @@ class AnimatorWriter:
             return self._animator._send_slot(self, self._slot, hsbk)
         return self._animator._send(self._canvas, hsbk, self._duration_ms)
 
+    def _shares_tile_with(self, other: object) -> bool:
+        """True if both writers draw on slots of the same Animator's tile."""
+        return (
+            isinstance(other, AnimatorWriter)
+            and self._slot is not None
+            and other._slot is not None
+            and other._animator is self._animator
+        )
+
+    def _stage(self, hsbk: list[tuple[int, int, int, int]]) -> None:
+        """Keep a light component's frame for the next tile, sending nothing.
+
+        An effect drawing on both light components of one light stages the
+        first light component's frame, then sends the second, so each frame
+        of the effect is one tile. Only a light component's writer stages.
+        """
+        slot = self._slot
+        assert slot is not None
+        self._animator._store_slot(self, slot, hsbk)
+
     def close(self) -> None:
         """Stop writing. The device's Animator stays open for other writers.
 
@@ -759,6 +779,26 @@ class Animator:
         if slot.component not in self._animating():
             self._slot_frames.pop(slot.component, None)
 
+    def _store_slot(
+        self,
+        writer: AnimatorWriter,
+        slot: ComponentSlot,
+        hsbk: list[tuple[int, int, int, int]],
+    ) -> bool:
+        """Keep a light component's latest frame for the next composed tile.
+
+        A frame is kept even when the ack gate drops the tile it was sent
+        with, so the next tile any slot sends carries it.
+
+        Returns:
+            False if the writer was released and no longer draws on the light
+        """
+        _check_length(writer._canvas, hsbk)
+        if writer not in self._slot_writers:
+            return False
+        self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
+        return True
+
     def _send_slot(
         self,
         writer: AnimatorWriter,
@@ -767,11 +807,9 @@ class Animator:
     ) -> AnimatorStats:
         """Keep a light component's frame and send the tile of every slot."""
         start_time = time.perf_counter()
-        _check_length(writer._canvas, hsbk)
-        if writer not in self._slot_writers:
+        if not self._store_slot(writer, slot, hsbk):
             # A released writer no longer draws on the light.
             return AnimatorStats(packets_sent=0, total_time_ms=0.0)
-        self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
         hold = self._hold
         # An open slot writer always has a held tile beneath it.
         assert hold is not None
