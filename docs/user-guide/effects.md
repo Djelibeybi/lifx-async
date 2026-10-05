@@ -93,6 +93,17 @@ async def main():
 asyncio.run(main())
 ```
 
+Each step lasts `period * change / 360` seconds: 1.67 seconds in the example above. A colour
+loop writes each light once per step, with the step as the transition, and the light fades
+between steps itself. With the defaults that is one packet every 3.3 seconds per light, far less
+traffic than an effect that draws frames. `change` must be more than 0 and less than 180,
+because the firmware fades hue the short way round the colour wheel.
+
+On one light component of a Ceiling or Mirror, a colour loop writes the same way while it has the
+light to itself. The two light components share one tile, so while another effect draws on the
+other light component, or a fade of it is running, the colour loop draws frames through the
+light's Animator instead, and goes back to one write per step afterwards.
+
 ### Rainbow Effect
 
 The `EffectRainbow` spreads a full 360-degree rainbow across device pixels and scrolls it over time. Best on multizone strips and matrix lights:

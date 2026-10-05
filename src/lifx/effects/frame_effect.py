@@ -352,7 +352,8 @@ class FrameEffect(LIFXEffect):
                     draw_keys.append(idx)
             indices = {key: index for index, key in enumerate(dict.fromkeys(draw_keys))}
             drawn: dict[
-                object, tuple[list[tuple[int, int, int, int]], list[HSBK] | None]
+                object,
+                tuple[list[tuple[int, int, int, int]], list[HSBK] | None, FrameContext],
             ] = {}
 
             # Generate and send frames for each device
@@ -360,7 +361,7 @@ class FrameEffect(LIFXEffect):
                 key = draw_keys[idx]
                 if key in drawn:
                     # The other ring of a whole-light Mirror: the same frame
-                    protocol_frame, hsbk = drawn[key]
+                    protocol_frame, hsbk, ctx = drawn[key]
                 else:
                     self._draw_as(key, draw_keys)
                     ctx = FrameContext(
@@ -380,18 +381,13 @@ class FrameEffect(LIFXEffect):
                     # leaks across iterations
                     hsbk = self._last_generated_hsbk
                     self._last_generated_hsbk = None
-                    drawn[key] = (protocol_frame, hsbk)
+                    drawn[key] = (protocol_frame, hsbk, ctx)
 
                 # Track HSBK frame for state restoration
                 if idx < len(participants) and hsbk is not None:
                     self._last_frames[cast("ParticipantKey", frame_keys[idx])] = hsbk
 
-                # Send via direct UDP; a light component whose tile a later
-                # writer sends this frame only keeps its frame in its slot
-                if idx in staged:
-                    cast("AnimatorWriter", animator).stage(protocol_frame)
-                else:
-                    animator.send_frame(protocol_frame)
+                self._deliver(idx, animator, protocol_frame, ctx, idx in staged)
 
             # Sleep for remaining frame time
             frame_elapsed = time.monotonic() - frame_start
@@ -402,6 +398,31 @@ class FrameEffect(LIFXEffect):
                     break  # Stop event was set
                 except asyncio.TimeoutError:
                     pass  # Normal - continue to next frame
+
+    def _deliver(
+        self,
+        idx: int,
+        writer: Any,
+        frame: list[tuple[int, int, int, int]],
+        ctx: FrameContext,
+        staged: bool,
+    ) -> None:
+        """Send one participant's frame through its writer.
+
+        A light component whose tile a later writer sends this frame only
+        keeps its frame in its slot.
+
+        Args:
+            idx: The writer's index among the borrowed writers
+            writer: The borrowed writer
+            frame: The protocol-ready frame drawn for this participant
+            ctx: The frame context the frame was drawn with
+            staged: True if a later writer sends this writer's tile
+        """
+        if staged:
+            cast("AnimatorWriter", writer).stage(frame)
+        else:
+            writer.send_frame(frame)
 
     def stop(self) -> None:
         """Signal the frame loop to stop."""

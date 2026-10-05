@@ -1,15 +1,18 @@
 """Tests for EffectColorloop."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
+from lifx.animation.animator import AnimatorStats, AnimatorWriter
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
 from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.exceptions import LifxTimeoutError
 
 
 def test_colorloop_default_parameters() -> None:
@@ -55,9 +58,10 @@ def test_colorloop_invalid_period() -> None:
 
 
 def test_colorloop_invalid_change() -> None:
-    """Test EffectColorloop with invalid change raises ValueError."""
-    with pytest.raises(ValueError, match="Change must be 0-360"):
-        EffectColorloop(change=400)
+    """Test EffectColorloop rejects a change that is 0, or 180 or more."""
+    for change in (0, 180, 400):
+        with pytest.raises(ValueError, match="more than 0 and less than 180"):
+            EffectColorloop(change=change)
 
 
 def test_colorloop_invalid_spread() -> None:
@@ -195,11 +199,6 @@ class TestColorloopFpsCalculation:
         # Very fast: period=0.5, change=5 -> (360/5)/0.5 = 144.0 -> above minimum
         effect = EffectColorloop(period=0.5, change=5)
         assert effect.fps == 144.0
-
-    def test_change_zero_fps(self) -> None:
-        """Test change=0 produces 20.0 FPS (minimum)."""
-        effect = EffectColorloop(change=0)
-        assert effect.fps == 20.0
 
 
 class TestColorloopGenerateFrame:
@@ -464,62 +463,231 @@ class TestColorloopAsyncSetup:
         assert effect._direction in (1, -1)
 
 
-class TestColorloopFrameLoop:
-    """Tests for EffectColorloop running via FrameEffect frame loop."""
+def _loop(**kwargs: Any) -> EffectColorloop:
+    """A colour loop whose steps are 10 degrees and one second long."""
+    effect = EffectColorloop(period=36, change=10, **kwargs)
+    effect._initial_colors = [
+        HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+    ]
+    effect._direction = 1
+    return effect
 
-    @pytest.mark.asyncio
-    async def test_stop_method(self) -> None:
-        """Test colorloop stop() method via FrameEffect."""
-        effect = EffectColorloop(period=0.2, change=30)
 
-        # Set up initial colors and animators
-        effect._initial_colors = [
-            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-        ]
-        effect._direction = 1
+def _ctx(elapsed: float) -> FrameContext:
+    return FrameContext(
+        elapsed_s=elapsed,
+        device_index=0,
+        pixel_count=1,
+        canvas_width=1,
+        canvas_height=1,
+    )
 
-        animator = MagicMock()
-        animator.pixel_count = 1
-        animator.canvas_width = 1
-        animator.canvas_height = 1
-        animator.wraps = False
-        animator.send_frame = MagicMock()
-        effect._animators = [animator]
 
-        # Run in background
-        play_task = asyncio.create_task(effect.async_play())
-        await asyncio.sleep(0.05)
+def _light() -> MagicMock:
+    light = MagicMock()
+    light.serial = "d073d5000001"
+    light.set_color = AsyncMock()
+    return light
 
+
+def _hue_at(elapsed: float) -> tuple[int, int, int, int]:
+    """The protocol colour _loop() shows at a moment."""
+    return HSBK(
+        hue=round(120 + elapsed * 10) % 360, saturation=0.9, brightness=0.8, kelvin=3500
+    ).as_tuple()
+
+
+def _slot_writer(
+    *, busy: bool = False, version: int = 0, gated: bool = False, tile: object = None
+) -> MagicMock:
+    writer = MagicMock(spec=AnimatorWriter)
+    writer.draws_slot = True
+    writer.animator = tile if tile is not None else object()
+    writer.tile_busy.return_value = busy
+    writer.hold_version = version
+    writer.send_frame.return_value = AnimatorStats(
+        packets_sent=1, total_time_ms=0.0, gated=gated
+    )
+    return writer
+
+
+class TestColorloopWholeLight:
+    """A whole light gets one colour write per step."""
+
+    async def test_a_light_gets_one_write_per_step(self) -> None:
+        effect = _loop()
+        light = _light()
+        effect.participants = [light]
+        writer = MagicMock()
+
+        for elapsed in (0.0, 0.05, 0.5, 0.95):
+            effect._deliver(0, writer, [_hue_at(elapsed)], _ctx(elapsed), False)
+        await asyncio.sleep(0)
+
+        light.set_color.assert_awaited_once()
+        color = light.set_color.call_args.args[0]
+        assert color.hue == 130
+        assert light.set_color.call_args.kwargs["duration"] == 1.0
+        writer.send_frame.assert_not_called()
+
+        effect._deliver(0, writer, [_hue_at(1.25)], _ctx(1.25), False)
+        await asyncio.sleep(0)
+
+        assert light.set_color.await_count == 2
+        assert light.set_color.call_args.args[0].hue == 140
+        assert light.set_color.call_args.kwargs["duration"] == pytest.approx(0.75)
+
+    async def test_a_transition_replaces_the_steps_length(self) -> None:
+        effect = _loop(transition=0.25)
+        light = _light()
+        effect.participants = [light]
+
+        effect._deliver(0, MagicMock(), [_hue_at(0.4)], _ctx(0.4), False)
+        await asyncio.sleep(0)
+
+        assert light.set_color.call_args.args[0].hue == 130
+        assert light.set_color.call_args.kwargs["duration"] == 0.25
+
+    async def test_a_new_step_cancels_a_write_still_in_flight(self) -> None:
+        effect = _loop()
+        light = _light()
+        hang = asyncio.Event()
+
+        async def slow(_color: HSBK, duration: float) -> None:
+            await hang.wait()
+
+        light.set_color = AsyncMock(side_effect=slow)
+        effect.participants = [light]
+        writer = MagicMock()
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        (first,) = effect._writes.values()
+        await asyncio.sleep(0)
+        effect._deliver(0, writer, [_hue_at(1.0)], _ctx(1.0), False)
+        await asyncio.sleep(0)
+
+        assert first.cancelled()
+        assert light.set_color.await_count == 2
+        hang.set()
+        await asyncio.gather(*effect._writes.values())
+
+    async def test_a_failed_write_is_logged_and_the_loop_carries_on(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        effect = _loop()
+        light = _light()
+        light.set_color = AsyncMock(side_effect=LifxTimeoutError("no reply"))
+        effect.participants = [light]
+
+        effect._deliver(0, MagicMock(), [_hue_at(0.0)], _ctx(0.0), False)
+        await asyncio.gather(*effect._writes.values())
+
+        assert "no reply" in caplog.text
+
+    async def test_stopping_cancels_writes_in_flight(self) -> None:
+        effect = _loop()
+        light = _light()
+        hang = asyncio.Event()
+
+        async def slow(_color: HSBK, duration: float) -> None:
+            await hang.wait()
+
+        light.set_color = AsyncMock(side_effect=slow)
+        effect.participants = [light]
+        writer = MagicMock()
+        writer.pixel_count = 1
+        writer.canvas_width = 1
+        writer.canvas_height = 1
+        writer.wraps = False
+        effect._animators = [writer]
+
+        play = asyncio.create_task(effect.async_play())
+        while not effect._writes:
+            await asyncio.sleep(0.01)
+        (write,) = effect._writes.values()
         effect.stop()
-        await asyncio.wait_for(play_task, timeout=1.0)
+        await asyncio.wait_for(play, timeout=1.0)
 
-        assert effect._stop_event.is_set()
+        assert write.cancelled()
+        assert effect._writes == {}
+        writer.send_frame.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_sends_frames_via_animator(self) -> None:
-        """Test colorloop sends frames through animator.send_frame."""
-        effect = EffectColorloop(period=0.2, change=30)
 
-        effect._initial_colors = [
-            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+class TestColorloopComponent:
+    """A light component's tile is written once per step unless it is shared."""
+
+    def test_an_idle_tile_is_sent_once_per_step(self) -> None:
+        effect = _loop()
+        writer = _slot_writer()
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        effect._deliver(0, writer, [_hue_at(0.5)], _ctx(0.5), False)
+
+        writer.send_frame.assert_called_once_with([_hue_at(1.0)], duration_ms=1000)
+        writer.stage.assert_called_once_with([_hue_at(0.5)])
+
+    def test_a_shared_tile_streams_then_writes_once_alone(self) -> None:
+        effect = _loop()
+        writer = _slot_writer(busy=True)
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        writer.send_frame.assert_called_once_with([_hue_at(0.0)])
+
+        writer.tile_busy.return_value = False
+        effect._deliver(0, writer, [_hue_at(0.3)], _ctx(0.3), False)
+
+        assert writer.send_frame.call_args.args == ([_hue_at(1.0)],)
+        assert writer.send_frame.call_args.kwargs == {"duration_ms": 700}
+
+    def test_a_shared_tile_stages_a_frame_another_writer_sends(self) -> None:
+        effect = _loop()
+        writer = _slot_writer(busy=True)
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), True)
+
+        writer.stage.assert_called_once_with([_hue_at(0.0)])
+        writer.send_frame.assert_not_called()
+
+    def test_a_change_to_the_held_colours_is_sent_at_once(self) -> None:
+        effect = _loop()
+        writer = _slot_writer()
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        writer.hold_version = 1
+        effect._deliver(0, writer, [_hue_at(0.4)], _ctx(0.4), False)
+
+        assert writer.send_frame.call_count == 2
+        assert writer.send_frame.call_args.kwargs == {"duration_ms": 600}
+
+    def test_a_gated_send_is_tried_again_next_frame(self) -> None:
+        effect = _loop()
+        writer = _slot_writer(gated=True)
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        writer.send_frame.return_value = AnimatorStats(
+            packets_sent=1, total_time_ms=0.0
+        )
+        effect._deliver(0, writer, [_hue_at(0.05)], _ctx(0.05), False)
+        effect._deliver(0, writer, [_hue_at(0.1)], _ctx(0.1), False)
+
+        assert writer.send_frame.call_count == 2
+        writer.stage.assert_called_once_with([_hue_at(0.1)])
+
+    def test_two_writers_on_one_tile_send_it_once_per_step(self) -> None:
+        effect = _loop()
+        tile = object()
+        first = _slot_writer(tile=tile)
+        second = _slot_writer(tile=tile)
+
+        for elapsed in (0.0, 0.5):
+            effect._deliver(0, first, [_hue_at(elapsed)], _ctx(elapsed), True)
+            effect._deliver(1, second, [_hue_at(elapsed)], _ctx(elapsed), False)
+
+        assert first.stage.call_args_list == [
+            call([_hue_at(1.0)]),
+            call([_hue_at(0.5)]),
         ]
-        effect._direction = 1
-
-        animator = MagicMock()
-        animator.pixel_count = 1
-        animator.canvas_width = 1
-        animator.canvas_height = 1
-        animator.wraps = False
-        animator.send_frame = MagicMock()
-        effect._animators = [animator]
-
-        play_task = asyncio.create_task(effect.async_play())
-        await asyncio.sleep(0.1)
-        effect.stop()
-        await asyncio.wait_for(play_task, timeout=1.0)
-
-        # Should have sent frames via animator
-        assert animator.send_frame.call_count > 0
+        second.send_frame.assert_called_once_with([_hue_at(1.0)], duration_ms=1000)
 
 
 @pytest.mark.asyncio

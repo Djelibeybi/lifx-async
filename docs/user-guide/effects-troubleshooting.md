@@ -314,7 +314,7 @@ If restoring many zones times out, state may be incomplete.
 **Works Well:**
 
 - EffectPulse: sends one waveform to all zones, which the light runs itself
-- EffectColorloop: Entire device cycles color (via `MultiZonePacketGenerator`)
+- EffectColorloop: Entire device cycles color, one `SetColor` per step
 - Custom `FrameEffect`: Per-zone control via `generate_frame()` with `pixel_count = zone_count`
 
 **Special Considerations:**
@@ -334,7 +334,7 @@ If restoring many zones times out, state may be incomplete.
 **Works Well:**
 
 - EffectPulse: sends one waveform to all tiles, which the light runs itself
-- EffectColorloop: All pixels cycle color together (via `MatrixPacketGenerator`)
+- EffectColorloop: All pixels cycle color together, one `SetColor` per step
 - Custom `FrameEffect`: Per-pixel control via `generate_frame()` with `pixel_count = W * H`
 
 **Special Considerations:**

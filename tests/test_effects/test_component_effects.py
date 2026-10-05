@@ -11,7 +11,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.ceiling import CeilingLight
-from lifx.effects import EffectPulse
+from lifx.effects import EffectColorloop, EffectPulse
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.models import PreState
@@ -756,6 +756,68 @@ class TestCeilingComponentEffects:
             await conductor.stop([ceiling.uplight])
 
             assert conductor.effect(ceiling.uplight) is None
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+
+    async def test_a_lone_colour_loop_writes_its_component_once_per_step(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            # Steps of a quarter of a second, so about four tiles a second.
+            effect = EffectColorloop(period=9, change=10, brightness=0.5)
+            sends: list[int] = []
+            transmit = ceiling.animator._transmit
+
+            def count(build, duration_ms, start_time):
+                sends.append(duration_ms)
+                return transmit(build, duration_ms, start_time)
+
+            ceiling.animator._transmit = count
+            await ceiling.uplight.start_effect(effect)
+
+            async def uplight_moved() -> bool:
+                return (await _tile(ceiling))[UPLIGHT].hue != DIM_BLUE.hue
+
+            await _eventually(uplight_moved)
+            sends.clear()
+            await asyncio.sleep(1.0)
+            assert (await _tile(ceiling))[:DOWNLIGHT] == [GREEN] * DOWNLIGHT
+            await ceiling.uplight.stop_effect()
+
+            assert 2 <= len(sends) <= 6
+            assert all(duration > 75 for duration in sends)
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+
+    async def test_a_colour_loop_beside_another_effect_draws_frames(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            loop = EffectColorloop(period=9, change=10, brightness=0.5)
+            await ceiling.uplight.start_effect(loop)
+            await ceiling.downlight.start_effect(_SolidFrames(RED))
+            seen: set[float] = set()
+
+            async def uplight_keeps_moving() -> bool:
+                tile = await _tile(ceiling)
+                seen.add(tile[UPLIGHT].hue)
+                return tile[:DOWNLIGHT] == [RED] * DOWNLIGHT and len(seen) >= 3
+
+            await _eventually(uplight_keeps_moving)
+            assert ceiling.uplight.animator._animating() == {"uplight", "downlight"}
+            (schedule,) = loop._schedules.values()
+            assert schedule.streamed is True
+
+            await ceiling.downlight.stop_effect()
+
+            async def back_to_one_write_per_step() -> bool:
+                return schedule.streamed is False
+
+            await _eventually(back_to_one_write_per_step)
+            await ceiling.uplight.stop_effect()
+
             assert await ceiling.get_uplight_color() == DIM_BLUE
 
 

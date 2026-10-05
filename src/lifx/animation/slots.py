@@ -47,11 +47,21 @@ class HeldTile:
         self._began = 0.0
         self._duration = 0.0
         self._cached: list[tuple[int, int, int, int]] | None = None
+        self._version = 0
 
     @property
     def target(self) -> list[HSBK]:
         """Colours the held tile shows, or is fading towards."""
         return list(self._target)
+
+    @property
+    def version(self) -> int:
+        """A count that changes whenever the held colours are changed."""
+        return self._version
+
+    def fading(self, now: float) -> bool:
+        """Whether a fade asked of the held tile is still running at ``now``."""
+        return self._fading(now)
 
     def retarget(self, tile: list[HSBK], duration: float) -> None:
         """Fade from the colours shown now towards a new tile.
@@ -66,6 +76,7 @@ class HeldTile:
         self._began = now
         self._duration = max(0.0, duration)
         self._cached = None
+        self._version += 1
 
     def set_cells(self, colours: dict[int, HSBK]) -> None:
         """Show new colours at some positions at once, leaving any fade.
@@ -80,6 +91,7 @@ class HeldTile:
             self._source[position] = colour
             self._target[position] = colour
         self._cached = None
+        self._version += 1
 
     def tuples_at(self, now: float) -> list[tuple[int, int, int, int]]:
         """Protocol-ready colours at a moment, part-way through any fade."""

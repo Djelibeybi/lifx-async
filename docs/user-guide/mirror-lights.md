@@ -278,7 +278,7 @@ await mirror.set_effect(
 
 Each ring is a canvas of its own for a software effect: 25 pixels in zone
 order. The frame context's `wraps` flag is `True`, so effects such as Rainbow,
-Spin, Cylon and Colorloop run continuously round the ring with no seam. Zone
+Spin and Cylon run continuously round the ring with no seam. Zone
 order runs clockwise round the front ring and anticlockwise round the back
 ring, both from the lower left as seen from the front, so the same frame
 appears to move in opposite directions on the two rings.

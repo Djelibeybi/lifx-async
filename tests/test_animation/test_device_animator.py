@@ -290,6 +290,20 @@ class TestWriters:
         assert writer.wraps is False
         assert _durations(mock_udp_socket) == [50, 0, 50]
 
+    async def test_one_frame_can_carry_its_own_duration(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        animator = await _matrix().animator.prepare()
+        writer = animator._writer(duration_ms=50)
+        frame = [(0, 0, 0, 3500)] * 64
+
+        writer.send_frame(frame, duration_ms=3000)
+        mock_udp_socket.queue_datagram(make_ack_datagram(animator._source, 0))
+        writer.send_frame(frame)
+
+        assert writer.draws_slot is False
+        assert _durations(mock_udp_socket) == [3000, 50]
+
     async def test_closing_a_writer_leaves_the_animator_open(
         self, mock_udp_socket: MockUdpSocket
     ) -> None:

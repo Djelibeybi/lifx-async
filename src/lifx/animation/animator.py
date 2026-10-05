@@ -36,7 +36,7 @@ from __future__ import annotations
 import socket
 import time
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -210,15 +210,49 @@ class AnimatorWriter:
         """True if the canvas is a ring: its last pixel sits next to its first."""
         return self._wraps
 
-    def send_frame(self, hsbk: list[tuple[int, int, int, int]]) -> AnimatorStats:
+    def send_frame(
+        self,
+        hsbk: list[tuple[int, int, int, int]],
+        duration_ms: int | None = None,
+    ) -> AnimatorStats:
         """Send a frame drawn on this writer's canvas through the Animator.
 
         A light component's writer stores the frame in its slot and sends the
         tile composed from every slot.
+
+        Args:
+            hsbk: The frame, one protocol-ready colour per canvas pixel
+            duration_ms: Transition duration for this frame alone, or None
+                for the writer's own
         """
+        duration = self._duration_ms if duration_ms is None else duration_ms
         if self._slot is not None:
-            return self._animator._send_slot(self, self._slot, hsbk)
-        return self._animator._send(self._canvas, hsbk, self._duration_ms)
+            return self._animator._send_slot(self, self._slot, hsbk, duration)
+        return self._animator._send(self._canvas, hsbk, duration)
+
+    @property
+    def draws_slot(self) -> bool:
+        """True if this writer draws on a light component's slot."""
+        return self._slot is not None
+
+    def tile_busy(self, own: Collection[AnimatorWriter]) -> bool:
+        """Whether this writer's tile needs a steady stream of frames.
+
+        It does while a writer outside ``own`` draws on another slot of the
+        tile, or while a fade asked of the held tile is still running: the
+        firmware runs one transition per tile, so either can only be shown
+        frame by frame.
+
+        Args:
+            own: Writers that belong to the same effect as this one
+        """
+        return self._animator._tile_busy(own, time.monotonic())
+
+    @property
+    def hold_version(self) -> int:
+        """A count that changes whenever the tile's held colours change."""
+        hold = self._animator._hold
+        return hold.version if hold is not None else 0
 
     def shares_tile_with(self, other: object) -> bool:
         """True if both writers draw on slots of the same Animator's tile."""
@@ -808,11 +842,23 @@ class Animator:
         self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
         return True
 
+    def _tile_busy(self, own: Collection[AnimatorWriter], now: float) -> bool:
+        """Whether another effect draws on the tile or the held tile is fading.
+
+        Args:
+            own: Writers that belong to the asking effect
+            now: The current monotonic time
+        """
+        if any(writer not in own for writer in self._slot_writers):
+            return True
+        return self._hold is not None and self._hold.fading(now)
+
     def _send_slot(
         self,
         writer: AnimatorWriter,
         slot: ComponentSlot,
         hsbk: list[tuple[int, int, int, int]],
+        duration_ms: int,
     ) -> AnimatorStats:
         """Keep a light component's frame and send the tile of every slot."""
         start_time = time.perf_counter()
@@ -822,9 +868,7 @@ class Animator:
         hold = self._hold
         # An open slot writer always has a held tile beneath it.
         assert hold is not None
-        return self._transmit(
-            lambda: self._compose(hold), writer._duration_ms, start_time
-        )
+        return self._transmit(lambda: self._compose(hold), duration_ms, start_time)
 
     def _compose(self, hold: HeldTile) -> list[tuple[int, int, int, int]]:
         """Build the whole tile: the held tile, overlaid with each slot's frame."""
