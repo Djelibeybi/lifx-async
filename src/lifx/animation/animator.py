@@ -61,6 +61,7 @@ from lifx.network.address import (
 )
 from lifx.network.utils import allocate_source
 from lifx.protocol.models import Serial
+from lifx.protocol.protocol_types import LightHsbk
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -242,8 +243,9 @@ class AnimatorWriter:
     def close(self) -> None:
         """Stop writing. The device's Animator stays open for other writers.
 
-        A light component's writer gives its slot back: the light component
-        shows the held tile again once no other writer draws on it.
+        A light component's writer gives its slot back. Once no other writer
+        draws on the light component, its last frame becomes that part of the
+        held tile, so it keeps showing until a restore or a caller's write.
         """
         if self._slot is not None:
             self._animator._release_slot(self, self._slot)
@@ -758,12 +760,29 @@ class Animator:
             self._hold = None
 
     def _release_slot(self, writer: AnimatorWriter, slot: ComponentSlot) -> None:
-        """Stop composing a writer's frames into its light component's slot."""
+        """Stop composing a writer's frames into its light component's slot.
+
+        Once no writer draws on the light component, its last frame is what
+        the device shows there, so it becomes that part of the held tile. A
+        later change to the light component then starts from those colours,
+        and darkening it keeps the frame's hue, saturation and kelvin rather
+        than switching the firmware to white.
+        """
         if writer not in self._slot_writers:
             return
         del self._slot_writers[writer]
-        if slot.component not in self._animating():
-            self._slot_frames.pop(slot.component, None)
+        if slot.component in self._animating():
+            return
+        last = self._slot_frames.pop(slot.component, None)
+        hold = self._hold
+        if last is None or hold is None:
+            return
+        _, canvas, frame = last
+        mapped = canvas.apply(frame)
+        tile = hold.target
+        for position, source in zip(slot.positions, slot.sources):
+            tile[position] = HSBK.from_protocol(LightHsbk(*mapped[source]))
+        hold.retarget(tile, 0.0)
 
     def _store_slot(
         self,

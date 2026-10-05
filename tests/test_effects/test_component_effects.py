@@ -520,6 +520,53 @@ class TestCeilingComponentEffects:
             assert ceiling.state.stored_uplight_color == DIM_BLUE
             assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
 
+    @pytest.mark.parametrize("how", ["stop_effect", "caller_write"])
+    async def test_darkening_after_an_effect_keeps_the_frames_colour(
+        self, ceiling_device, monkeypatch: pytest.MonkeyPatch, how: str
+    ):
+        """A component that goes dark after its effect keeps the frame's hue.
+
+        Dropping only brightness keeps the firmware out of white mode; a dark
+        target with saturation 0 under a saturated frame showed as a white
+        flash on real hardware.
+        """
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.turn_downlight_off()
+            await asyncio.sleep(0.6)
+            await ceiling.downlight.start_effect(_SolidFrames(RED))
+
+            async def downlight_red() -> bool:
+                return (await _tile(ceiling))[0] == RED
+
+            await _eventually(downlight_red)
+
+            writes: list[list[HSBK]] = []
+            real_write_tile = ceiling._write_tile
+
+            async def recording_write_tile(tile: list[HSBK], duration: float) -> None:
+                writes.append(list(tile))
+                await real_write_tile(tile, duration)
+
+            monkeypatch.setattr(ceiling, "_write_tile", recording_write_tile)
+
+            if how == "stop_effect":
+                await ceiling.downlight.stop_effect()
+            else:
+                await ceiling.turn_downlight_off()
+
+            darkening = [t for t in writes if t[0].brightness == 0]
+            assert darkening
+            for tile in darkening:
+                assert (tile[0].hue, tile[0].saturation, tile[0].kelvin) == (
+                    RED.hue,
+                    RED.saturation,
+                    RED.kelvin,
+                )
+            assert (await _tile(ceiling))[0].brightness == 0
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
+
     async def test_a_restore_keeps_the_other_components_change_during_the_effect(
         self, ceiling_device
     ):

@@ -154,23 +154,27 @@ class ComponentMatrixLight(MatrixLight):
             return frozenset()
         return self._animator._animating()
 
-    async def _stop_component_effect(self, component: str) -> None:
+    async def _stop_component_effect(self, component: str) -> bool:
         """Stop the software effect drawing on a light component, if any.
 
         A caller's colour or power change to the animating light component
         wins over its effect, as a newer effect would: the effect stops with
         no restore in between, and any other participants of its run carry
         on.
+
+        Returns:
+            True if an effect was drawing on the light component
         """
         runner = effect_runner()
         if component not in self._animating_components() and (
             not runner.runs_whole_light(self)
         ):
-            return
+            return False
         # A whole-light effect moves onto the other light component.
         await runner.leave_every_run(
             self._light_component(component), restore_state=False
         )
+        return True
 
     async def _component_writer(
         self,
@@ -712,16 +716,20 @@ class ComponentMatrixLight(MatrixLight):
             if colors is not None
             else None
         )
-        await self._stop_component_effect(component)
+        stopped = await self._stop_component_effect(component)
         async with self._component_operation():
             tile = await self._tile_colors_for_update()
             positions = self._component_positions(component)
             current = [tile[p] for p in positions]
+            # Darkening keeps the shown colours' hue, saturation and kelvin.
+            # Dark cells copied from white stored colours under a saturated
+            # effect frame switch the firmware to white mode, which flashes.
+            dark_source = current if stopped and colors is None else None
             if stored is None:
                 previous = self._stored_colors(component)
-                stored = (
-                    previous if is_dark(current) and previous is not None else current
-                )
+                # An effect's last frame is transient, never colours to keep.
+                keep_previous = stopped or is_dark(current)
+                stored = previous if keep_previous and previous is not None else current
             other = self._other_component(component)
             # Both light components share power: while an effect draws on the
             # other one, darken this side rather than powering the light off.
@@ -742,7 +750,7 @@ class ComponentMatrixLight(MatrixLight):
                         )
                     await self._write_tile(tile, 0.0)
             else:
-                for position, colour in zip(positions, stored):
+                for position, colour in zip(positions, dark_source or stored):
                     tile[position] = self._unlit(colour)
                 await self._write_tile(tile, duration)
             self._set_stored_colors(component, stored)

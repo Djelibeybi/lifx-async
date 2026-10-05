@@ -13,6 +13,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.component.effect_support import component_writer
 from lifx.products import get_product
 from lifx.protocol import packets
+from lifx.protocol.protocol_types import LightHsbk
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
 from tests.test_devices.test_component_transitions import Rig, build_rig
 
@@ -179,6 +180,12 @@ class TestComponentSlots:
     async def test_a_slot_keeps_its_frame_while_another_writer_draws_on_it(
         self, sent: list[bytes], mock_udp_socket: MockUdpSocket
     ) -> None:
+        """Releasing the last writer leaves its last frame showing.
+
+        The light component's frame becomes part of the held tile, so the
+        other light component's next frame does not snap it back to the
+        colours from before the effect; a restore or a caller's write does.
+        """
         ceiling = _ceiling()
         first = await component_writer(ceiling, "uplight", 0)
         second = await component_writer(ceiling, "uplight", 0)
@@ -194,7 +201,10 @@ class TestComponentSlots:
 
         before, after = _tiles(sent)[-2:]
         assert before[UPLIGHT] == CYAN
-        assert after[UPLIGHT] == DIM_BLUE.as_tuple()
+        assert after[UPLIGHT] == CYAN
+        assert ceiling.animator._held_tile()[UPLIGHT] == HSBK.from_protocol(
+            LightHsbk(*CYAN)
+        )
 
     async def test_the_held_tile_outlives_the_effect_until_the_tile_is_rewritten(
         self, sent: list[bytes], rig: Rig
