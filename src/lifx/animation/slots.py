@@ -67,6 +67,20 @@ class HeldTile:
         self._duration = max(0.0, duration)
         self._cached = None
 
+    def set_cells(self, colours: dict[int, HSBK]) -> None:
+        """Show new colours at some positions at once, leaving any fade.
+
+        The other positions keep fading towards their targets over the time
+        that remains; only the given positions stop fading.
+
+        Args:
+            colours: New colour for each buffer position to change
+        """
+        for position, colour in colours.items():
+            self._source[position] = colour
+            self._target[position] = colour
+        self._cached = None
+
     def tuples_at(self, now: float) -> list[tuple[int, int, int, int]]:
         """Protocol-ready colours at a moment, part-way through any fade."""
         if self._fading(now):

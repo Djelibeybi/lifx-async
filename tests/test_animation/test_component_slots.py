@@ -164,6 +164,29 @@ class TestComponentSlots:
         assert halfway == expected.as_tuple()
         assert done == AMBER.as_tuple()
 
+    async def test_releasing_a_slot_keeps_the_other_components_fade(
+        self, sent: list[bytes], rig: Rig
+    ) -> None:
+        """Only the released light component's cells change when it lets go."""
+        ceiling = rig.light
+        assert isinstance(ceiling, CeilingLight)
+        writer = await component_writer(ceiling, "downlight", 0)
+        frame = _frame(64)
+
+        with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
+            await ceiling.set_uplight_color(AMBER, duration=2.0)
+        with patch("lifx.animation.animator.time.monotonic", return_value=100.5):
+            writer.send_frame(frame)
+        with patch("lifx.animation.slots.time.monotonic", return_value=101.0):
+            writer.close()
+
+        hold = ceiling.animator._hold
+        assert hold is not None
+        halfway = DIM_BLUE.lerp_hsb(AMBER, 0.5).with_kelvin(3100)
+        assert hold.tuples_at(101.0)[UPLIGHT] == halfway.as_tuple()
+        assert hold.tuples_at(103.0)[UPLIGHT] == AMBER.as_tuple()
+        assert hold.tuples_at(101.0)[0] == _tiles(sent)[-1][0]
+
     async def test_a_released_writer_draws_nothing(self, sent: list[bytes]) -> None:
         ceiling = _ceiling()
         writer = await component_writer(ceiling, "uplight", 0)

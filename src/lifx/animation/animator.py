@@ -779,10 +779,14 @@ class Animator:
             return
         _, canvas, frame = last
         mapped = canvas.apply(frame)
-        tile = hold.target
-        for position, source in zip(slot.positions, slot.sources):
-            tile[position] = HSBK.from_protocol(LightHsbk(*mapped[source]))
-        hold.retarget(tile, 0.0)
+        # Only this light component's cells change; the other light
+        # component keeps any fade its caller started.
+        hold.set_cells(
+            {
+                position: HSBK.from_protocol(LightHsbk(*mapped[source]))
+                for position, source in zip(slot.positions, slot.sources)
+            }
+        )
 
     def _store_slot(
         self,
