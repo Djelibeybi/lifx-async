@@ -49,17 +49,51 @@ def _key(participant: Participant) -> ParticipantKey:
 
 
 def _members(effect: LIFXEffect, lights: list[Light]) -> list[tuple[Light, str | None]]:
-    """Pair each light of an effect with the light component it draws on.
+    """Pair each light of an effect with the light component it takes part as.
 
     A frame effect's borrowed writers line up with its participants, and a
-    light component's writer names its light component.
+    light component's writer names its light component. A writer drawing a
+    ring of a whole-light Mirror effect belongs to the whole light.
     """
-    from lifx.effects.frame_effect import FrameEffect, writer_component
+    from lifx.effects.frame_effect import FrameEffect, writer_participant
 
     writers = effect._animators if isinstance(effect, FrameEffect) else []
     return [
-        (light, writer_component(writers[idx]) if idx < len(writers) else None)
+        (light, writer_participant(writers[idx]) if idx < len(writers) else None)
         for idx, light in enumerate(lights)
+    ]
+
+
+def _rings(participant: Participant) -> tuple[str, ...]:
+    """The rings a whole-light effect draws on, one effect participant each.
+
+    A whole-light effect on a Mirror runs as two ring participants, its front
+    and back, so each ring is a canvas that wraps. Any other participant
+    draws as itself.
+    """
+    from lifx.devices.mirror import MirrorLight
+
+    if isinstance(participant, MirrorLight):
+        return ("front", "back")
+    return ()
+
+
+def _drawn_lights(
+    effect: LIFXEffect, participants: Sequence[Participant]
+) -> list[Light]:
+    """The light of each participant, in writer order for a frame effect.
+
+    A frame effect draws a whole-light Mirror once for each ring; any other
+    effect takes part on the light once.
+    """
+    from lifx.effects.frame_effect import FrameEffect
+
+    drawn = isinstance(effect, FrameEffect)
+    return [
+        light
+        for participant in participants
+        for light in [_resolve(participant)[0]]
+        * (max(len(_rings(participant)), 1) if drawn else 1)
     ]
 
 
@@ -227,9 +261,24 @@ class Conductor:
         from lifx.effects.frame_effect import FrameEffect
 
         effect = running.effect
-        if isinstance(effect, FrameEffect):
-            return effect._last_frames.get(key)
-        return None
+        if not isinstance(effect, FrameEffect):
+            return None
+        frame = effect._last_frames.get(key)
+        rings = _rings(light)
+        if frame is None and rings:
+            # A whole-light Mirror effect draws each ring as a participant:
+            # its frame is every ring's frame in turn, so zone order.
+            frames = [
+                effect._last_frames.get(participant_key(cast("Light", light), ring))
+                for ring in rings
+            ]
+            whole: list[HSBK] = []
+            for ring_frame in frames:
+                if ring_frame is None:
+                    return None
+                whole.extend(ring_frame)
+            return whole
+        return frame
 
     async def start(
         self,
@@ -334,7 +383,9 @@ class Conductor:
 
             if isinstance(effect, FrameEffect):
                 # Set participants early so async_setup() can access them
-                # (async_perform() sets this too but runs in a background task)
+                # (async_perform() sets this too but runs in a background task).
+                # A whole-light Mirror takes part once for each ring.
+                lights = _drawn_lights(effect, filtered_participants)
                 effect.participants = lights
                 await self._power_on_components(effect, filtered_participants)
                 animators = await self._create_animators(effect, filtered_participants)
@@ -506,8 +557,8 @@ class Conductor:
                 new_animators = await self._create_animators(effect, new_participants)
                 effect._animators.extend(new_animators)
 
-            # Add to participants
-            effect.participants.extend(_resolve(p)[0] for p in new_participants)
+            # Add to participants, a whole-light Mirror once for each ring
+            effect.participants.extend(_drawn_lights(effect, new_participants))
 
             # Register in running map
             for participant in new_participants:
@@ -572,15 +623,17 @@ class Conductor:
 
                 effect = running.effect
 
-                # Drop the participant and, for frame effects, its writer
-                for idx, member in enumerate(_members(effect, effect.participants)):
-                    if participant_key(*member) == key:
-                        if isinstance(effect, FrameEffect) and idx < len(
-                            effect._animators
-                        ):
-                            effect._animators.pop(idx).close()
-                        del effect.participants[idx]
-                        break
+                # Drop the participant and, for frame effects, its writers:
+                # a whole-light Mirror draws through one for each ring
+                matched = [
+                    idx
+                    for idx, member in enumerate(_members(effect, effect.participants))
+                    if participant_key(*member) == key
+                ]
+                for idx in reversed(matched):
+                    if isinstance(effect, FrameEffect) and idx < len(effect._animators):
+                        effect._animators.pop(idx).close()
+                    del effect.participants[idx]
 
                 # Track for restoration
                 if restore_state:
@@ -670,16 +723,21 @@ class Conductor:
             async with self._lock:
                 # Only restore state if the effect wants it
                 if effect.restore_on_complete:
-                    to_restore: list[tuple[Light, str | None, PreState]] = []
+                    # A whole-light Mirror appears once for each ring, and is
+                    # restored once.
+                    to_restore: dict[
+                        ParticipantKey, tuple[Light, str | None, PreState]
+                    ] = {}
                     for light, component in members:
-                        running = self._running.get(participant_key(light, component))
+                        key = participant_key(light, component)
+                        running = self._running.get(key)
                         if running:
-                            to_restore.append((light, component, running.prestate))
+                            to_restore[key] = (light, component, running.prestate)
 
                     # Restore all participants in parallel
                     if to_restore:
                         await asyncio.gather(
-                            *(self._restore(*item) for item in to_restore)
+                            *(self._restore(*item) for item in to_restore.values())
                         )
 
                 # Remove from running registry
@@ -820,10 +878,9 @@ class Conductor:
             participants: Lights and light components to borrow Animators for
 
         Returns:
-            List of writers, one per participant
+            List of writers, one per participant, and one per ring of a
+            whole-light Mirror
         """
-        from lifx.devices.mirror import MirrorLight
-
         # Use 1.5x frame interval for duration so transitions overlap.
         # This prevents micro-gaps from asyncio scheduling jitter.
         duration_ms = int(1500 / effect.fps)
@@ -833,16 +890,19 @@ class Conductor:
             if isinstance(participant, LightComponent):
                 writers.append(await participant._writer(duration_ms))
                 continue
+            rings = _rings(participant)
+            if rings:
+                # A whole-light Mirror effect draws each ring as a participant
+                light = cast("ComponentMatrixLight", participant)
+                for ring in rings:
+                    writers.append(
+                        await light._component_writer(
+                            ring, duration_ms, whole_light=True
+                        )
+                    )
+                continue
             animator = await participant.animator.prepare()
-            if isinstance(participant, MirrorLight):
-                # A whole-light effect draws one ring frame on both rings.
-                writer = animator._writer(
-                    rings=[participant.front_positions, participant.back_positions],
-                    duration_ms=duration_ms,
-                )
-            else:
-                writer = animator._writer(duration_ms=duration_ms)
-            writers.append(writer)
+            writers.append(animator._writer(duration_ms=duration_ms))
 
         return writers
 

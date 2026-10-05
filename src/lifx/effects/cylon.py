@@ -137,6 +137,9 @@ class EffectCylon(FrameEffect):
         self.kelvin = kelvin
         self.zones_per_bulb = zones_per_bulb
         self._trail_buffer: list[float] = []
+        # When the trail last faded: each tick fades it once, however many
+        # participants (a Mirror's two rings, say) draw in that tick.
+        self._trail_faded_at: float | None = None
 
     @property
     def name(self) -> str:
@@ -184,8 +187,10 @@ class EffectCylon(FrameEffect):
         if len(self._trail_buffer) != bulb_count:
             self._trail_buffer = [0.0] * bulb_count
 
-        # Decay the trail buffer: previous brightness fades by the trail factor.
-        if self.trail > 0:
+        # Decay the trail buffer: previous brightness fades by the trail
+        # factor, once per tick.
+        if self.trail > 0 and ctx.elapsed_s != self._trail_faded_at:
+            self._trail_faded_at = ctx.elapsed_s
             for i in range(bulb_count):
                 self._trail_buffer[i] *= self.trail
 

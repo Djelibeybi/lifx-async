@@ -727,10 +727,11 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - **FrameEffect support:** Full 2D canvas via `FrameContext.canvas_width` / `canvas_height`
 - **Spatial effects:** Flicker (vertical gradient), Aurora (vertical brightness), Sunrise/Sunset (radial wavefront)
 - **Canvas mapping:** Multi-tile devices get a unified canvas based on tile positions
-- **Mirror:** A whole-light frame effect draws on one 25x1 ring in zone order with
-  `FrameContext.wraps` set. The Animator writes each frame to the buffer positions of both the
-  front and back rings in one Set64. The Mirror's own `send_frame()` still exposes the raw 4x13
-  tile.
+- **Mirror:** Each ring, front and back, is a 25x1 canvas in zone order with
+  `FrameContext.wraps` set. A whole-light frame effect runs as two ring participants, and an
+  effect on `mirror.front` or `mirror.back` draws on that ring alone. Each ring is a slot on the
+  light's Animator, which scatters the ring's frame to its buffer positions and sends the whole
+  tile in one Set64. The Mirror's own `send_frame()` still exposes the raw 4x13 tile.
 
 #### HEV Lights (`HevLight`)
 

@@ -47,8 +47,10 @@ _Avoid_: effect (a waveform is neither a software nor a firmware effect).
 **Effect participant**:
 A light, or a single light component of a light, that a software effect draws
 on. One effect can draw on several participants in step. A light component
-participant sees its own shape: a Ceiling uplight is one pixel, and a Ceiling
-downlight is the full grid with the uplight cell dropped. The light component
+participant sees its own shape: a Ceiling uplight is one pixel, a Ceiling
+downlight is the full grid with the uplight cell dropped, and a Mirror ring is
+25 pixels in zone order that wrap. A whole-light effect on a Mirror runs as two
+ring participants, the front and the back. The light component
 that no effect draws on keeps its colours and stays under the caller's control.
 Only an effect that draws frames can have a light component as a participant.
 

@@ -41,6 +41,23 @@ def writer_component(writer: object) -> str | None:
     return writer.component if isinstance(writer, AnimatorWriter) else None
 
 
+def writer_participant(writer: object) -> str | None:
+    """The light component a borrowed writer's participant is, if any.
+
+    A writer drawing one ring of a whole-light Mirror effect belongs to the
+    whole light, so it names no light component here.
+
+    Args:
+        writer: One entry of a frame effect's borrowed Animators
+
+    Returns:
+        The light component's name, or None for a whole light
+    """
+    if isinstance(writer, AnimatorWriter) and writer.whole_light:
+        return None
+    return writer_component(writer)
+
+
 @dataclass(frozen=True)
 class FrameContext:
     """Context passed to generate_frame() with timing and layout info.

@@ -412,7 +412,7 @@ The `CeilingLight` class extends `MatrixLight` with independent control over upl
 
 ### LightComponent
 
-`ceiling.uplight` and `ceiling.downlight` return a `LightComponent`: one light component as an effect participant, carrying only `start_effect()`, `stop_effect()` and `animator`.
+`ceiling.uplight`, `ceiling.downlight`, `mirror.front` and `mirror.back` return a `LightComponent`: one light component as an effect participant, carrying only `start_effect()`, `stop_effect()` and `animator`.
 
 ::: lifx.devices.component.participant.LightComponent
     options:

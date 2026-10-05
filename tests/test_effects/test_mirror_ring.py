@@ -1,4 +1,4 @@
-"""Whole-light software effects on a Mirror draw on a 25-zone ring that wraps."""
+"""Whole-light software effects on a Mirror draw on its two rings, which wrap."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import socket
 import struct
 from collections.abc import Iterator
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,6 +21,7 @@ from lifx.effects.rainbow import EffectRainbow
 from lifx.effects.spin import EffectSpin
 from lifx.products import get_product
 from lifx.protocol import packets
+from lifx.protocol.base import Packet
 from lifx.theme import Theme
 from tests.test_devices import test_component_transitions as transitions
 
@@ -60,8 +62,8 @@ def _rig(product: int, monkeypatch: pytest.MonkeyPatch) -> transitions.Rig:
 class _Recording(FrameEffect):
     """Frame effect that records its context and draws one hue per zone."""
 
-    def __init__(self) -> None:
-        super().__init__(power_on=False, fps=50.0)
+    def __init__(self, *, power_on: bool = False) -> None:
+        super().__init__(power_on=power_on, fps=50.0)
         self.contexts: list[FrameContext] = []
         self.drawn = asyncio.Event()
 
@@ -100,30 +102,97 @@ def _sent_tiles(udp: MagicMock) -> list[list[tuple[int, int, int, int]]]:
     return tiles
 
 
-async def test_whole_light_effect_on_a_mirror_draws_on_both_rings(
+async def test_whole_light_effect_on_a_mirror_runs_as_two_ring_participants(
     mirror_rig: transitions.Rig, udp: MagicMock
 ):
     rig = mirror_rig
-    effect = await _one_frame(rig)
+    conductor = Conductor()
+    effect = _Recording()
 
-    ctx = effect.contexts[0]
-    assert (ctx.pixel_count, ctx.canvas_width, ctx.canvas_height) == (25, 25, 1)
-    assert ctx.wraps is True
+    await conductor.start(effect, [rig.light])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
 
-    tiles = _sent_tiles(udp)
-    assert tiles, "the Animator sent no Set64"
-    # One Set64 carries the whole 4x13 tile for each frame.
-    assert len(tiles) == len(udp.sendto.call_args_list)
-    sent = tiles[0]
-    frame = [HSBK(i * 10, 1, 0.5, 3500).to_protocol() for i in range(25)]
-    expected = [(c.hue, c.saturation, c.brightness, c.kelvin) for c in frame]
+    # Each ring is a participant of its own: 25 zones in zone order that wrap.
+    front_ctx, back_ctx = effect.contexts[:2]
+    assert (front_ctx.device_index, back_ctx.device_index) == (0, 1)
+    for ctx in (front_ctx, back_ctx):
+        assert (ctx.pixel_count, ctx.canvas_width, ctx.canvas_height) == (25, 25, 1)
+        assert ctx.wraps is True
+    assert len(effect.contexts) == 2
+
+    # The tile carries each ring's frame on that ring's buffer positions.
+    sent = _sent_tiles(udp)[-1]
+    frame = [HSBK(i * 10, 1, 0.5, 3500).as_tuple() for i in range(25)]
     front, back = rig.positions
-    assert [sent[p] for p in front] == expected
-    assert [sent[p] for p in back] == expected
-    # The two buffer positions without a chip carry nothing.
-    unused = set(range(52)) - set(front) - set(back)
-    assert len(unused) == 2
-    assert all(sent[p][2] == 0 for p in unused)
+    assert [sent[p] for p in front] == frame
+    assert [sent[p] for p in back] == frame
+
+    # It is still one whole-light run.
+    assert conductor.effect(rig.light) is effect
+    assert conductor.effect(rig.light.front) is None
+    last = conductor.get_last_frame(rig.light)
+    assert last is not None
+    assert [c.as_tuple() for c in last] == frame + frame
+
+    await conductor.stop([rig.light])
+
+    assert conductor.effect(rig.light) is None
+
+
+async def test_a_whole_light_mirror_effect_restores_the_whole_tile(
+    mirror_rig: transitions.Rig, udp: MagicMock
+):
+    rig = mirror_rig
+    mirror = rig.light
+    await mirror.set_front_colors(transitions.GREEN)
+    await mirror.set_back_colors(transitions.BLUE)
+    await mirror.set_power(False)
+    rig.settle()
+    tile = list(rig.wire.colours)
+    stored = (rig.colours(0, "stored_"), rig.colours(1, "stored_"))
+    conductor = Conductor()
+    effect = _Recording(power_on=True)
+
+    rig.wire.packets.clear()
+
+    async def take_turns(_packet: Packet) -> None:
+        # Real replies take time, so concurrent requests interleave.
+        await asyncio.sleep(0)
+
+    rig.wire.before = take_turns
+    await conductor.start(effect, [mirror])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
+    # The light powers on once, with no colour written first.
+    assert rig.wire.power == 65535
+    sent = [type(packet) for packet in rig.wire.packets]
+    assert sent.count(packets.Light.SetPower) == 1
+    assert packets.Light.SetColor not in sent
+    assert packets.Tile.Set64 not in sent
+    await conductor.stop([mirror])
+
+    assert rig.wire.colours == tile
+    assert rig.wire.power == 0
+    assert (rig.colours(0, "stored_"), rig.colours(1, "stored_")) == stored
+
+
+async def test_a_mirror_leaving_a_run_takes_both_rings_with_it(
+    mirror_rig: transitions.Rig, monkeypatch: pytest.MonkeyPatch, udp: MagicMock
+):
+    rig = mirror_rig
+    other = _rig(267, monkeypatch)
+    other.light.serial = "d073d5000002"
+    conductor = Conductor()
+    effect = _Recording()
+    await conductor.start(effect, [rig.light, other.light])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
+    assert len(effect._animators) == 4
+
+    await conductor.remove_lights([rig.light])
+
+    assert effect.participants == [other.light, other.light]
+    assert [w.component for w in effect._animators] == ["front", "back"]
+    assert conductor.effect(other.light) is effect
+    await conductor.stop([other.light])
 
 
 async def test_whole_light_effect_on_a_ceiling_does_not_wrap(
@@ -231,6 +300,21 @@ def test_cylon_on_a_strip_still_bounces_off_the_ends():
     assert middle[_RING - 1].brightness == pytest.approx(0.8)
 
 
+def test_cylon_trail_on_two_rings_matches_one_ring():
+    # A whole-light Mirror effect draws each ring as a participant, so every
+    # tick generates two frames. The trail must fade once per tick, not once
+    # per ring, or the Mirror's trail is shorter than one ring's.
+    one = EffectCylon(speed=2.0, width=3, trail=0.7)
+    two = EffectCylon(speed=2.0, width=3, trail=0.7)
+    for elapsed in (0.0, 0.1, 0.2, 0.3):
+        alone = one.generate_frame(_ring_ctx(elapsed))
+        front = two.generate_frame(_ring_ctx(elapsed))
+        back = two.generate_frame(replace(_ring_ctx(elapsed), device_index=1))
+
+    assert front == alone
+    assert back == alone
+
+
 def test_rainbow_circulates_round_a_ring_without_a_seam():
     effect = EffectRainbow(period=10.0)
     before = effect.generate_frame(_ring_ctx(1.0))
@@ -266,11 +350,52 @@ async def test_an_effect_borrows_the_light_s_own_animator(
 
     await conductor.start(effect, [rig.light])
     await asyncio.wait_for(effect.drawn.wait(), 1)
-    (writer,) = effect._animators
+    writers = list(effect._animators)
     await conductor.stop([rig.light])
 
-    # One writer and one ack gate: the effect drew through LedFx's Animator,
+    # One Animator and one ack gate: both rings drew through LedFx's Animator,
     # which still exposes the raw tile and stays open after the effect.
-    assert writer.animator is ledfx is rig.light.animator
+    assert len(writers) == 2
+    assert all(writer.animator is ledfx is rig.light.animator for writer in writers)
     assert ledfx.pixel_count == 52
     assert udp.close.call_count == 0
+
+
+async def test_a_mirror_added_to_a_run_joins_as_both_rings(
+    mirror_rig: transitions.Rig, monkeypatch: pytest.MonkeyPatch, udp: MagicMock
+):
+    rig = mirror_rig
+    other = _rig(267, monkeypatch)
+    other.light.serial = "d073d5000002"
+    conductor = Conductor()
+    effect = _Recording()
+    await conductor.start(effect, [other.light])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
+
+    await conductor.add_lights(effect, [rig.light])
+
+    assert effect.participants == [other.light] * 2 + [rig.light] * 2
+    assert [w.component for w in effect._animators] == ["front", "back"] * 2
+    assert conductor.effect(rig.light) is effect
+    await conductor.stop([other.light, rig.light])
+
+
+class _Protocol(_Recording):
+    """Draws protocol tuples directly, so it keeps no HSBK frames."""
+
+    def generate_protocol_frame(self, ctx: FrameContext) -> list[tuple[int, ...]]:
+        self.drawn.set()
+        return [(0, 0, 0, 3500)] * ctx.pixel_count
+
+
+async def test_a_mirror_has_no_last_frame_from_an_effect_that_keeps_none(
+    mirror_rig: transitions.Rig, udp: MagicMock
+):
+    rig = mirror_rig
+    conductor = Conductor()
+    effect = _Protocol()
+    await conductor.start(effect, [rig.light])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
+
+    assert conductor.get_last_frame(rig.light) is None
+    await conductor.stop([rig.light])

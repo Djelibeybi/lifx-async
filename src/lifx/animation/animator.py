@@ -36,9 +36,9 @@ from __future__ import annotations
 import socket
 import time
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, cast
 
 from lifx.animation.flow import AckGate
 from lifx.animation.framebuffer import FrameBuffer
@@ -103,36 +103,6 @@ class _Geometry:
     framebuffer: FrameBuffer
     packet_generator: PacketGenerator
     wraps: bool
-
-
-class _RingCanvas(FrameBuffer):
-    """Draws one ring frame, in zone order, onto every ring of a tile.
-
-    A Mirror's front and back are 25-zone rings whose zones sit at scattered
-    buffer positions on one 4x13 tile. The canvas is one ring, Nx1. Each
-    frame is written to the buffer positions of every ring, so all rings
-    show the same frame. Buffer positions that belong to no ring stay dark.
-    """
-
-    _UNUSED: ClassVar[tuple[int, int, int, int]] = (0, 0, 0, 3500)
-
-    def __init__(self, tile_size: int, rings: Sequence[Sequence[int]]) -> None:
-        zone_counts = {len(positions) for positions in rings}
-        if len(zone_counts) != 1:
-            raise ValueError("Rings must all have the same number of zones")
-        super().__init__(pixel_count=zone_counts.pop())
-        self._rings = [tuple(positions) for positions in rings]
-        self._tile_size = tile_size
-
-    def apply(
-        self, hsbk: list[tuple[int, int, int, int]]
-    ) -> list[tuple[int, int, int, int]]:
-        """Scatter one ring frame onto every ring of the tile."""
-        tile = [self._UNUSED] * self._tile_size
-        for positions in self._rings:
-            for position, colour in zip(positions, hsbk):
-                tile[position] = colour
-        return tile
 
 
 def _check_length(canvas: FrameBuffer, hsbk: list[tuple[int, int, int, int]]) -> None:
@@ -214,12 +184,14 @@ class AnimatorWriter:
         duration_ms: int,
         wraps: bool,
         slot: ComponentSlot | None = None,
+        whole_light: bool = False,
     ) -> None:
         self._animator = animator
         self._canvas = canvas
         self._duration_ms = duration_ms
         self._wraps = wraps
         self._slot = slot
+        self._whole_light = whole_light
 
     @property
     def animator(self) -> Animator:
@@ -230,6 +202,16 @@ class AnimatorWriter:
     def component(self) -> str | None:
         """The light component this writer draws on, or None for the whole light."""
         return self._slot.component if self._slot is not None else None
+
+    @property
+    def whole_light(self) -> bool:
+        """True if this writer draws one light component's share of a whole light.
+
+        A whole-light effect on a Mirror draws through one writer per ring, so
+        each ring is a canvas of its own while the effect still runs on the
+        whole light.
+        """
+        return self._whole_light
 
     @property
     def pixel_count(self) -> int:
@@ -555,22 +537,10 @@ class Animator:
         animator.duration_ms = duration_ms
         return animator
 
-    def _writer(
-        self,
-        *,
-        rings: Sequence[Sequence[int]] | None = None,
-        duration_ms: int = 0,
-    ) -> AnimatorWriter:
-        """Borrow this Animator to draw on a canvas of the writer's own.
-
-        Without ``rings`` the writer draws on the device's own canvas. With
-        ``rings`` (single tile only) it draws one ring in zone order, Nx1,
-        that wraps, and each frame is scattered to every ring's buffer
-        positions. A Mirror uses this for whole-light effects, with its front
-        and back rings, while `send_frame()` keeps the raw tile canvas.
+    def _writer(self, *, duration_ms: int = 0) -> AnimatorWriter:
+        """Borrow this Animator to draw on the device's own canvas.
 
         Args:
-            rings: Buffer positions of each ring, in zone order
             duration_ms: Transition duration for this writer's frames
 
         Returns:
@@ -578,15 +548,11 @@ class Animator:
 
         Raises:
             RuntimeError: If the Animator has not been prepared yet
-            ValueError: If the rings differ in size
         """
         geometry = self._require_geometry()
-        canvas: FrameBuffer = geometry.framebuffer
-        wraps = geometry.wraps
-        if rings is not None:
-            canvas = _RingCanvas(geometry.packet_generator.pixel_count(), rings)
-            wraps = True
-        return AnimatorWriter(self, canvas, duration_ms=duration_ms, wraps=wraps)
+        return AnimatorWriter(
+            self, geometry.framebuffer, duration_ms=duration_ms, wraps=geometry.wraps
+        )
 
     def _require_geometry(self) -> _Geometry:
         """Return the device's geometry, or explain how to resolve it."""
@@ -695,6 +661,8 @@ class Animator:
         tile: list[HSBK],
         *,
         duration_ms: int = 0,
+        wraps: bool = False,
+        whole_light: bool = False,
     ) -> AnimatorWriter:
         """Borrow this Animator to draw on one light component's slot.
 
@@ -707,6 +675,9 @@ class Animator:
             canvas: The canvas the light component's effect draws on
             tile: Current colours of the whole tile, in buffer order
             duration_ms: Transition duration for this writer's frames
+            wraps: True if the canvas is a ring, such as a Mirror ring
+            whole_light: True if the writer draws this light component's
+                share of a whole-light effect
 
         Returns:
             A writer whose frames land on the light component's slot
@@ -718,7 +689,12 @@ class Animator:
         if not self._slot_writers:
             self._hold = HeldTile(tile)
         writer = AnimatorWriter(
-            self, canvas, duration_ms=duration_ms, wraps=False, slot=slot
+            self,
+            canvas,
+            duration_ms=duration_ms,
+            wraps=wraps,
+            slot=slot,
+            whole_light=whole_light,
         )
         self._slot_writers[writer] = slot
         return writer

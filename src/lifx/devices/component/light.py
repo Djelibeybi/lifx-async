@@ -130,6 +130,10 @@ class ComponentMatrixLight(MatrixLight):
             return FrameBuffer(pixel_count=1, canvas_width=1, canvas_height=1), (0,)
         return light_canvas, positions
 
+    def _component_wraps(self, _component: str) -> bool:
+        """Whether a light component's canvas is a ring that wraps."""
+        return False
+
     def _light_component(self, component: str) -> LightComponent:
         """Return the effect participant for a light component, made once."""
         participant = self._light_components.get(component)
@@ -162,7 +166,7 @@ class ComponentMatrixLight(MatrixLight):
         )
 
     async def _component_writer(
-        self, component: str, duration_ms: int
+        self, component: str, duration_ms: int, *, whole_light: bool = False
     ) -> AnimatorWriter:
         """Borrow the light's Animator to draw on one light component's slot.
 
@@ -172,6 +176,8 @@ class ComponentMatrixLight(MatrixLight):
         Args:
             component: The light component's name
             duration_ms: Transition duration for the writer's frames
+            whole_light: True if the writer draws this light component's
+                share of a whole-light effect
 
         Returns:
             A writer whose frames land on the light component's slot
@@ -183,7 +189,14 @@ class ComponentMatrixLight(MatrixLight):
             component, animator._require_geometry().framebuffer
         )
         slot = ComponentSlot(component, self._component_positions(component), sources)
-        return animator._slot_writer(slot, canvas, tile, duration_ms=duration_ms)
+        return animator._slot_writer(
+            slot,
+            canvas,
+            tile,
+            duration_ms=duration_ms,
+            wraps=self._component_wraps(component),
+            whole_light=whole_light,
+        )
 
     async def _restore_component(
         self,

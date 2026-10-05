@@ -1,10 +1,10 @@
 """Light components as effect participants.
 
-A Ceiling's uplight and downlight are light components: regions of one light
-with their own colours and apparent on/off state. Each is also an effect
-participant, so a software effect can draw on one light component while the
-other stays under the caller's control through the light's existing component
-methods.
+A Ceiling's uplight and downlight, and a Mirror's front and back rings, are
+light components: regions of one light with their own colours and apparent
+on/off state. Each is also an effect participant, so a software effect can draw
+on one light component while the other stays under the caller's control through
+the light's existing component methods.
 """
 
 from __future__ import annotations
@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 class LightComponent:
     """One light component of a light, as an effect participant.
 
-    Read it from the light, for example ``ceiling.downlight``. It carries
+    Read it from the light, for example ``ceiling.downlight`` or
+    ``mirror.front``. It carries
     only effect control: the light component's colours and power stay on the
     light's existing methods, such as ``set_uplight_color()``.
 
@@ -62,8 +63,9 @@ class LightComponent:
         """Start a software effect on this light component alone.
 
         The effect draws on the light component's own shape: a Ceiling
-        uplight is a single pixel, and a Ceiling downlight is the full grid
-        with the uplight cell dropped. The other light component keeps its
+        uplight is a single pixel, a Ceiling downlight is the full grid
+        with the uplight cell dropped, and a Mirror ring is 25 pixels in zone
+        order that wrap. The other light component keeps its
         colours, and its colour and power methods keep working while the
         effect runs. On a light that is off, only this light component turns
         on and the other stays dark. Calling this light component's own

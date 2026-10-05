@@ -119,9 +119,11 @@ class LIFXEffect(ABC):
                     return True
                 return False
 
-            # Power on all lights concurrently
+            # Power on all lights concurrently, each once: a light can take
+            # part more than once, as a whole-light Mirror does for each ring
+            lights = list({id(light): light for light in self.participants}.values())
             results = await asyncio.gather(
-                *(power_on_if_needed(light) for light in self.participants)
+                *(power_on_if_needed(light) for light in lights)
             )
             needs_power_on = any(results)
 

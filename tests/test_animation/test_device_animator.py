@@ -269,45 +269,6 @@ class TestDeprecatedFactories:
 
 
 class TestWriters:
-    async def test_a_mirror_ring_writer_draws_one_ring_on_both_rings(
-        self, mock_udp_socket: MockUdpSocket
-    ) -> None:
-        device = _mirror()
-        animator = await device.animator.prepare()
-        writer = animator._writer(
-            rings=[device.front_positions, device.back_positions], duration_ms=30
-        )
-        frame = [(i * 100, 1, 2, 3500) for i in range(25)]
-
-        writer.send_frame(frame)
-
-        assert writer.animator is animator
-        assert (writer.pixel_count, writer.canvas_width) == (25, 25)
-        assert writer.canvas_height == 1
-        assert writer.wraps is True
-        (sent,) = _set64_tiles(mock_udp_socket)
-        assert [sent[p] for p in device.front_positions] == frame
-        assert [sent[p] for p in device.back_positions] == frame
-        unused = set(range(52)) - set(device.front_positions)
-        unused -= set(device.back_positions)
-        assert [sent[p] for p in sorted(unused)] == [(0, 0, 0, 3500)] * 2
-
-    async def test_rings_must_match_in_size(self) -> None:
-        animator = await _mirror().animator.prepare()
-
-        with pytest.raises(ValueError, match="same number of zones"):
-            animator._writer(rings=[(0, 1, 2), (3, 4)])
-        with pytest.raises(ValueError, match="same number of zones"):
-            animator._writer(rings=[])
-
-    async def test_a_ring_frame_must_cover_one_ring(self) -> None:
-        device = _mirror()
-        animator = await device.animator.prepare()
-        writer = animator._writer(rings=[device.front_positions, device.back_positions])
-
-        with pytest.raises(ValueError, match=r"\(52\) must match pixel_count \(25\)"):
-            writer.send_frame([(0, 0, 0, 3500)] * 52)
-
     async def test_each_writer_sends_at_its_own_duration(
         self, mock_udp_socket: MockUdpSocket
     ) -> None:
