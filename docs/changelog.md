@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.6.7 (2026-10-05)
+
+### Bug Fixes
+
+- **matrix**: Carry the duration on the frame-buffer copy
+  ([`40c3dda`](https://github.com/Djelibeybi/lifx-async/commit/40c3ddab02aab9b57ebded3c04433a607bd3e9e5))
+
+
 ## v7.6.6 (2026-10-04)
 
 ### Bug Fixes
