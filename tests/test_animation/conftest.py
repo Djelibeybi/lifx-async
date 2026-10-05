@@ -15,6 +15,7 @@ from lifx_emulator.factories import create_device
 from lifx_emulator.protocol.protocol_types import LightHsbk
 
 from lifx.devices.ceiling import CeilingLight
+from tests.conftest import remove_emulated_device
 
 if TYPE_CHECKING:
     from lifx_emulator import EmulatedLifxServer
@@ -334,4 +335,4 @@ def large_tile_matrix_device(
         max_retries=2,
     )
 
-    server.remove_device("d073d5000201")
+    remove_emulated_device(server, "d073d5000201")
