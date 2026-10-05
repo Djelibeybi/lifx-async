@@ -81,6 +81,39 @@ Every call to `generate_frame()` receives a `FrameContext` with:
   a Mirror ring; `False` for every other canvas. Effects that move a pattern along the canvas
   can read it to avoid a seam or a false end. Effects that ignore it keep working unchanged.
 
+### State That Carries Across Frames
+
+`generate_frame()` is called once for each participant in every frame, and every participant
+shares the one effect object. An effect that simulates something across frames, such as heat,
+particles or a cellular automaton, names the attributes holding that simulation in the
+`participant_state` class attribute. The frame loop then gives each participant its own copy of
+those attributes, so drawing one light (or one ring of a Mirror) never advances or resets
+another's simulation:
+
+```python
+class GlowEffect(FrameEffect):
+    participant_state = ("_heat",)
+
+    def __init__(self, power_on: bool = True):
+        super().__init__(power_on=power_on, fps=20.0, duration=None)
+        self._heat: list[float] = []
+
+    @property
+    def name(self) -> str:
+        return "glow"
+
+    def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
+        if len(self._heat) != ctx.pixel_count:
+            self._heat = [0.0] * ctx.pixel_count
+        self._heat = [min(1.0, h * 0.9 + 0.05) for h in self._heat]
+        return [
+            HSBK(hue=20, saturation=1.0, brightness=h, kelvin=3500) for h in self._heat
+        ]
+```
+
+Each participant starts from the values the attributes held when the run drew its first frame.
+Attributes left out of `participant_state`, such as a palette, stay shared by every participant.
+
 ### Minimal Example
 
 ```python

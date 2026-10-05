@@ -12,12 +12,13 @@ HSBK object construction entirely.
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import time
 from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
@@ -116,9 +117,22 @@ class FrameEffect(LIFXEffect):
     generate_frame() and converts the result. Performance-critical effects
     can override generate_protocol_frame() directly to skip HSBK allocation.
 
+    An effect that simulates something across frames (heat, particles, a
+    cellular automaton) names the attributes holding that simulation in
+    ``participant_state``. Each participant of a run then keeps its own copy:
+    before the frame loop draws a participant it swaps that participant's
+    values into those attributes, so generate_frame() reads and writes them as
+    usual, and drawing one participant never advances or resets another's.
+    A participant's first frame starts from the values the attributes held
+    when the run drew its first frame. Attributes left out of
+    ``participant_state``, such as a palette or a shared clock, stay shared by
+    every participant.
+
     Attributes:
         fps: Frames per second
         duration: Effect duration in seconds, or None for infinite
+        participant_state: Names of the attributes holding one participant's
+            simulation
 
     Example:
         ```python
@@ -133,6 +147,8 @@ class FrameEffect(LIFXEffect):
                 return colors
         ```
     """
+
+    participant_state: ClassVar[tuple[str, ...]] = ()
 
     def __init__(
         self,
@@ -165,6 +181,12 @@ class FrameEffect(LIFXEffect):
         # Cache for HSBK frame from default generate_protocol_frame()
         # Allows _last_frames tracking without coupling to the loop
         self._last_generated_hsbk: list[HSBK] | None = None
+        # Per-participant simulation: the attributes' starting values, the
+        # participant whose values the attributes hold now, and every other
+        # participant's values, set aside until it draws again
+        self._fresh_state: dict[str, Any] | None = None
+        self._drawing: object = None
+        self._set_aside: dict[object, dict[str, Any]] = {}
 
     @property
     def fps(self) -> float:
@@ -215,6 +237,38 @@ class FrameEffect(LIFXEffect):
         self._last_generated_hsbk = frame
         return [color.as_tuple() for color in frame]
 
+    def _draw_as(self, key: object, current: Sequence[object]) -> None:
+        """Swap in the simulation of the participant about to be drawn.
+
+        Args:
+            key: The participant about to be drawn
+            current: Every participant drawn this frame, so the simulation of
+                a participant that left the run is dropped
+        """
+        names = self.participant_state
+        if not names or key == self._drawing:
+            return
+        if self._fresh_state is None:
+            # The run's first frame: the attributes are this participant's
+            self._fresh_state = {
+                name: copy.deepcopy(getattr(self, name)) for name in names
+            }
+            self._drawing = key
+            return
+        self._set_aside[self._drawing] = {name: getattr(self, name) for name in names}
+        if len(self._set_aside) > len(current):
+            self._set_aside = {
+                other: state
+                for other, state in self._set_aside.items()
+                if other in current
+            }
+        state = self._set_aside.pop(key, None)
+        if state is None:
+            state = copy.deepcopy(self._fresh_state)
+        for name, value in state.items():
+            setattr(self, name, value)
+        self._drawing = key
+
     async def async_setup(self, _participants: list[Light]) -> None:
         """Optional setup hook called before the frame loop starts.
 
@@ -254,8 +308,16 @@ class FrameEffect(LIFXEffect):
             participants = list(self.participants)
             staged = _staged_writers(animators)
 
+            keys: list[object] = [
+                participant_key(participants[idx], writer_component(animator))
+                if idx < len(participants)
+                else idx
+                for idx, animator in enumerate(animators)
+            ]
+
             # Generate and send frames for each device
             for idx, animator in enumerate(animators):
+                self._draw_as(keys[idx], keys)
                 ctx = FrameContext(
                     elapsed_s=elapsed_s,
                     device_index=idx,
@@ -272,8 +334,9 @@ class FrameEffect(LIFXEffect):
                 # Track HSBK frame for state restoration (populated by
                 # default generate_protocol_frame, None for direct overrides)
                 if idx < len(participants) and self._last_generated_hsbk is not None:
-                    key = participant_key(participants[idx], writer_component(animator))
-                    self._last_frames[key] = self._last_generated_hsbk
+                    self._last_frames[cast("ParticipantKey", keys[idx])] = (
+                        self._last_generated_hsbk
+                    )
                 # Always clear to prevent stale frames leaking across iterations
                 self._last_generated_hsbk = None
 

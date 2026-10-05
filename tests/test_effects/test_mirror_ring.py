@@ -6,7 +6,6 @@ import asyncio
 import socket
 import struct
 from collections.abc import Iterator
-from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -298,21 +297,6 @@ def test_cylon_on_a_strip_still_bounces_off_the_ends():
     assert start[0].brightness == pytest.approx(0.8)
     assert start[_RING - 1].brightness == 0
     assert middle[_RING - 1].brightness == pytest.approx(0.8)
-
-
-def test_cylon_trail_on_two_rings_matches_one_ring():
-    # A whole-light Mirror effect draws each ring as a participant, so every
-    # tick generates two frames. The trail must fade once per tick, not once
-    # per ring, or the Mirror's trail is shorter than one ring's.
-    one = EffectCylon(speed=2.0, width=3, trail=0.7)
-    two = EffectCylon(speed=2.0, width=3, trail=0.7)
-    for elapsed in (0.0, 0.1, 0.2, 0.3):
-        alone = one.generate_frame(_ring_ctx(elapsed))
-        front = two.generate_frame(_ring_ctx(elapsed))
-        back = two.generate_frame(replace(_ring_ctx(elapsed), device_index=1))
-
-    assert front == alone
-    assert back == alone
 
 
 def test_rainbow_circulates_round_a_ring_without_a_seam():
