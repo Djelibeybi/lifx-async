@@ -7,12 +7,12 @@ import os
 import socket
 import sys
 import threading
-from collections.abc import Generator, Iterator
+from collections.abc import Coroutine, Generator, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Literal, cast
+from typing import Literal, TypeVar, cast
 
 import pytest
 from lifx_emulator import EmulatedLifxServer
@@ -36,6 +36,7 @@ from lifx.devices import HevLight, InfraredLight, Light, MultiZoneLight
 from lifx.devices.base import Device
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
+from lifx.devices.mirror import MirrorLight
 from lifx.exceptions import LifxConnectionError, LifxNetworkError, LifxTimeoutError
 from lifx.network.connection import DeviceConnection
 from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
@@ -147,6 +148,7 @@ _EMULATOR_FIXTURES = frozenset(
         "emulator_server",
         "emulator_devices",
         "ceiling_device",
+        "mirror_device",
         "switch_device",
     }
 )
@@ -247,6 +249,22 @@ def get_free_port6() -> int:
     return port
 
 
+_T = TypeVar("_T")
+
+#: Each running embedded emulator's runner, keyed by the server's identity.
+_RUNNERS: dict[int, EmulatorRunner] = {}
+
+
+def remove_emulated_device(server: EmulatedLifxServer, serial: str) -> None:
+    """Remove a device from a running embedded emulator.
+
+    ``EmulatedLifxServer.remove_device()`` is a coroutine, so it has to run on
+    the loop the emulator's thread owns. Calling it bare only creates the
+    coroutine and leaves the device in place.
+    """
+    assert _RUNNERS[id(server)].run(server.remove_device(serial)), serial
+
+
 class EmulatorRunner:
     """Manages the emulator server in a background thread with its own event loop."""
 
@@ -255,6 +273,12 @@ class EmulatorRunner:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._started = threading.Event()
+        _RUNNERS[id(server)] = self
+
+    def run(self, coro: Coroutine[object, object, _T]) -> _T:
+        """Run a coroutine on the emulator's own event loop and return its result."""
+        assert self._loop is not None, "the emulator has not started"
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout=5.0)
 
     def _run_loop(self) -> None:
         """Run the event loop in the background thread."""
@@ -281,6 +305,7 @@ class EmulatorRunner:
 
     def stop(self) -> None:
         """Stop the emulator and its event loop."""
+        _RUNNERS.pop(id(self.server), None)
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread is not None:
@@ -844,7 +869,44 @@ def ceiling_device(
     )
 
     # Clean up: remove the device
-    server.remove_device("d073d5000100")
+    remove_emulated_device(server, "d073d5000100")
+
+
+@pytest.fixture(scope="session")
+def mirror_device(
+    emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
+):
+    """Create a LIFX Mirror device (product 267) for component effect testing.
+
+    The Mirror is one 4x13 tile carrying two 25-zone rings, front and back.
+    This fixture dynamically adds the device to the running emulator.
+
+    Returns:
+        MirrorLight instance for the Mirror device
+    """
+    port, server, scenario_manager = emulator_server
+
+    if server is None:
+        pytest.skip("Cannot create mirror device with external emulator")
+
+    # Let the emulator use its internal product configuration
+    mirror = create_device(
+        product_id=267,
+        serial="d073d5000300",
+        scenario_manager=scenario_manager,
+    )
+    server.add_device(mirror)
+
+    yield MirrorLight(
+        serial="d073d5000300",
+        ip="127.0.0.1",
+        port=port,
+        timeout=2.0,
+        max_retries=2,
+    )
+
+    # Clean up: remove the device
+    remove_emulated_device(server, "d073d5000300")
 
 
 @pytest.fixture(scope="session")
@@ -881,7 +943,7 @@ def switch_device(
     )
 
     # Clean up: remove the device
-    server.remove_device("d073d5000200")
+    remove_emulated_device(server, "d073d5000200")
 
 
 @pytest.fixture
