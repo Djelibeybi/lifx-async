@@ -322,3 +322,13 @@ class TestWriters:
     def test_a_writer_needs_a_prepared_animator(self) -> None:
         with pytest.raises(RuntimeError, match="prepare"):
             _matrix().animator._writer()
+
+
+async def test_a_single_light_describes_its_own_geometry() -> None:
+    """A single light answers a geometry query without asking the device."""
+    light = Light(serial="d073d5000001", ip="192.0.2.13")
+
+    framebuffer, generator = await light._query_animation_geometry()
+
+    assert framebuffer.canvas_size == 1
+    assert generator.pixel_count() == 1

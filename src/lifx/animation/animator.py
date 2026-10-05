@@ -38,7 +38,7 @@ import time
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from lifx.animation.flow import AckGate
 from lifx.animation.framebuffer import FrameBuffer
@@ -46,9 +46,6 @@ from lifx.animation.packets import (
     ACK_REQUIRED_FLAG,
     FLAGS_OFFSET,
     SEQUENCE_OFFSET,
-    LightPacketGenerator,
-    MatrixPacketGenerator,
-    MultiZonePacketGenerator,
     PacketGenerator,
     PacketTemplate,
 )
@@ -125,46 +122,6 @@ def _warn_deprecated(factory: str) -> None:
     )
 
 
-async def _query_geometry(device: Light) -> tuple[FrameBuffer, PacketGenerator]:
-    """Ask a matrix or multizone light for the geometry its Animator draws on."""
-    from lifx.devices.matrix import MatrixLight
-
-    if isinstance(device, MatrixLight):
-        if device.device_chain is None:
-            await device.get_device_chain()
-
-        tiles = device.device_chain
-        if not tiles:
-            raise ValueError("Device has no tiles")
-
-        # Framebuffer with orientation correction
-        framebuffer = await FrameBuffer.for_matrix(device)
-        return framebuffer, MatrixPacketGenerator(
-            tile_count=len(tiles),
-            tile_width=tiles[0].width,
-            tile_height=tiles[0].height,
-        )
-
-    # _for_device() resolves every other light at once, so this is multizone.
-    multizone = cast("MultiZoneLight", device)
-    if multizone.capabilities is None:
-        await multizone.ensure_capabilities()
-
-    has_extended = bool(
-        multizone.capabilities and multizone.capabilities.has_extended_multizone
-    )
-    if not has_extended:
-        raise ValueError(
-            "Device does not support extended multizone protocol. "
-            "Only extended multizone devices are supported for animation."
-        )
-
-    # No orientation for multizone
-    framebuffer = await FrameBuffer.for_multizone(multizone)
-    zone_count = await multizone.get_zone_count()
-    return framebuffer, MultiZonePacketGenerator(zone_count=zone_count)
-
-
 class AnimatorWriter:
     """One writer's canvas on a device's Animator.
 
@@ -204,6 +161,16 @@ class AnimatorWriter:
         return self._slot.component if self._slot is not None else None
 
     @property
+    def canvas(self) -> FrameBuffer:
+        """The canvas this writer's frames are drawn on."""
+        return self._canvas
+
+    @property
+    def duration_ms(self) -> int:
+        """Transition duration, in milliseconds, of this writer's frames."""
+        return self._duration_ms
+
+    @property
     def whole_light(self) -> bool:
         """True if this writer draws one light component's share of a whole light.
 
@@ -213,7 +180,7 @@ class AnimatorWriter:
         """
         return self._whole_light
 
-    def _leave_whole_light(self) -> None:
+    def leave_whole_light(self) -> None:
         """Go on drawing this light component as an effect of its own.
 
         A whole-light effect moves onto one light component when an effect
@@ -252,7 +219,7 @@ class AnimatorWriter:
             return self._animator._send_slot(self, self._slot, hsbk)
         return self._animator._send(self._canvas, hsbk, self._duration_ms)
 
-    def _shares_tile_with(self, other: object) -> bool:
+    def shares_tile_with(self, other: object) -> bool:
         """True if both writers draw on slots of the same Animator's tile."""
         return (
             isinstance(other, AnimatorWriter)
@@ -261,7 +228,7 @@ class AnimatorWriter:
             and other._animator is self._animator
         )
 
-    def _stage(self, hsbk: list[tuple[int, int, int, int]]) -> None:
+    def stage(self, hsbk: list[tuple[int, int, int, int]]) -> None:
         """Keep a light component's frame for the next tile, sending nothing.
 
         An effect drawing on both light components of one light stages the
@@ -417,18 +384,17 @@ class Animator:
 
         A single light's geometry needs no query, so its Animator is ready at
         once. A matrix or multizone light's geometry is resolved by the first
-        `prepare()`.
+        `prepare()`. The light describes its own geometry, so the Animator
+        never needs to know the device classes.
         """
-        from lifx.devices.matrix import MatrixLight
-        from lifx.devices.multizone import MultiZoneLight
-
         serial = Serial.from_string(device.serial)
         animator = cls.__new__(cls)
         animator._open_session(device.ip, serial, device.port)
         animator._device = device
         animator._duration_ms = 0
-        if not isinstance(device, (MatrixLight, MultiZoneLight)):
-            animator._install(FrameBuffer.for_light(device), LightPacketGenerator())
+        geometry = device._animation_geometry()
+        if geometry is not None:
+            animator._install(*geometry)
         return animator
 
     async def prepare(self) -> Animator:
@@ -463,7 +429,7 @@ class Animator:
         if device is None:
             return self
         if self._geometry is None:
-            framebuffer, packet_generator = await _query_geometry(device)
+            framebuffer, packet_generator = await device._query_animation_geometry()
             # A concurrent prepare() may have finished first; keep its templates.
             if self._geometry is None:
                 self._install(framebuffer, packet_generator)

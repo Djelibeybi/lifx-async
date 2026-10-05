@@ -3,6 +3,7 @@
 import asyncio
 import socket
 import time
+from types import MethodType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -845,8 +846,19 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     matrix.device_chain = [tile]
     matrix.get_device_chain = AsyncMock(return_value=[tile])
 
-    for device in (light, multizone, matrix):
+    for device, device_class in (
+        (light, Light),
+        (multizone, MultiZoneLight),
+        (matrix, MatrixLight),
+    ):
         device.port = 56700
+        # The Animator asks the light for its geometry through these hooks.
+        device._animation_geometry = MethodType(
+            device_class._animation_geometry, device
+        )
+        device._query_animation_geometry = MethodType(
+            device_class._query_animation_geometry, device
+        )
         device.animator = Animator._for_device(device)
 
     effect = ConcreteFrameEffectForIntegration(fps=10.0, duration=0.05)
@@ -868,7 +880,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
             matrix.animator,
         ]
         assert [w.pixel_count for w in writers] == [1, 16, 64]
-        assert {w._duration_ms for w in writers} == {150}
+        assert {w.duration_ms for w in writers} == {150}
 
         await conductor.stop([light, multizone, matrix])
 

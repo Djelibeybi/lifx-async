@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
+from lifx.devices.component.participant import ComponentName
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -18,10 +19,12 @@ if TYPE_CHECKING:
 # Identity of an effect participant: a light, or one component of a light. A
 # whole light keys as its bare serial string, so it is equivalent to the serial
 # key used before participants existed. A component keys as (serial, component).
-ParticipantKey = str | tuple[str, str]
+ParticipantKey = str | tuple[str, ComponentName]
 
 
-def participant_key(light: Light, component: str | None = None) -> ParticipantKey:
+def participant_key(
+    light: Light, component: ComponentName | None = None
+) -> ParticipantKey:
     """Return the Conductor key for an effect participant.
 
     Args:

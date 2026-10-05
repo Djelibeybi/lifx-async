@@ -26,12 +26,13 @@ from lifx.effects.base import LIFXEffect
 from lifx.effects.models import ParticipantKey, participant_key
 
 if TYPE_CHECKING:
+    from lifx.devices.component.participant import ComponentName
     from lifx.devices.light import Light
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def writer_component(writer: object) -> str | None:
+def writer_component(writer: object) -> ComponentName | None:
     """The light component a borrowed Animator writer draws on, if any.
 
     Args:
@@ -40,10 +41,12 @@ def writer_component(writer: object) -> str | None:
     Returns:
         The light component's name, or None for a whole light
     """
-    return writer.component if isinstance(writer, AnimatorWriter) else None
+    if not isinstance(writer, AnimatorWriter):
+        return None
+    return cast("ComponentName | None", writer.component)
 
 
-def writer_participant(writer: object) -> str | None:
+def writer_participant(writer: object) -> ComponentName | None:
     """The light component a borrowed writer's participant is, if any.
 
     A writer drawing one ring of a whole-light Mirror effect belongs to the
@@ -77,7 +80,7 @@ def _staged_writers(writers: Sequence[object]) -> frozenset[int]:
         idx
         for idx, writer in enumerate(writers)
         if isinstance(writer, AnimatorWriter)
-        and any(writer._shares_tile_with(later) for later in writers[idx + 1 :])
+        and any(writer.shares_tile_with(later) for later in writers[idx + 1 :])
     )
 
 
@@ -386,7 +389,7 @@ class FrameEffect(LIFXEffect):
                 # Send via direct UDP; a light component whose tile a later
                 # writer sends this frame only keeps its frame in its slot
                 if idx in staged:
-                    cast("AnimatorWriter", animator)._stage(protocol_frame)
+                    cast("AnimatorWriter", animator).stage(protocol_frame)
                 else:
                     animator.send_frame(protocol_frame)
 
@@ -413,3 +416,47 @@ class FrameEffect(LIFXEffect):
         for animator in self._animators:
             animator.close()
         self._animators.clear()
+
+
+# The Conductor's seam onto a frame effect it runs: it lends the effect the
+# writers it draws through, and moves or drops participants, only through
+# these functions.
+
+
+def borrowed_writers(effect: FrameEffect) -> list[AnimatorWriter]:
+    """The writers a frame effect draws through, in participant order."""
+    return list(effect._animators)
+
+
+def lend_writers(effect: FrameEffect, writers: list[AnimatorWriter]) -> None:
+    """Give a frame effect the writers it draws through, one per participant."""
+    effect._animators = writers
+
+
+def add_writers(effect: FrameEffect, writers: list[AnimatorWriter]) -> None:
+    """Add writers for participants joining a running frame effect."""
+    effect._animators.extend(writers)
+
+
+def drop_participant(effect: FrameEffect, idx: int) -> None:
+    """Remove one participant from a frame effect and close its writer."""
+    if idx < len(effect._animators):
+        effect._animators.pop(idx).close()
+    del effect.participants[idx]
+
+
+def replace_writer(effect: FrameEffect, idx: int, writer: AnimatorWriter) -> None:
+    """Draw one participant through a new writer and close the old one."""
+    old = effect._animators[idx]
+    effect._animators[idx] = writer
+    old.close()
+
+
+def rename_participant(effect: FrameEffect, old: object, new: object) -> None:
+    """Carry a participant's simulation over to the key it draws as now."""
+    effect._rename_participant(old, new)
+
+
+def last_frame(effect: FrameEffect, key: ParticipantKey) -> list[HSBK] | None:
+    """The most recent HSBK frame a frame effect drew for a participant."""
+    return effect._last_frames.get(key)

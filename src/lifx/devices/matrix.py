@@ -19,7 +19,9 @@ import time
 from dataclasses import InitVar, asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
+from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.orientation import Orientation, build_orientation_lut
+from lifx.animation.packets import MatrixPacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -1272,6 +1274,32 @@ class MatrixLight(Light):
         if palette is None:
             return sample_effect_palette(flattened)
         return palette
+
+    def _animation_geometry(self) -> tuple[FrameBuffer, PacketGenerator] | None:
+        """A matrix light's tiles are known only once the device is asked."""
+        return None
+
+    async def _query_animation_geometry(
+        self,
+    ) -> tuple[FrameBuffer, PacketGenerator]:
+        """Ask the device for its tiles, for a canvas with orientation correction.
+
+        Raises:
+            ValueError: If the device reports no tiles
+        """
+        if self.device_chain is None:
+            await self.get_device_chain()
+
+        tiles = self.device_chain
+        if not tiles:
+            raise ValueError("Device has no tiles")
+
+        framebuffer = await FrameBuffer.for_matrix(self)
+        return framebuffer, MatrixPacketGenerator(
+            tile_count=len(tiles),
+            tile_width=tiles[0].width,
+            tile_height=tiles[0].height,
+        )
 
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect by sending the OFF effect.

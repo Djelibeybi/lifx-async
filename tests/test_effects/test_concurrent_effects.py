@@ -9,7 +9,7 @@ import pytest
 from lifx.color import HSBK
 from lifx.devices.light import Light
 from lifx.devices.multizone import MultiZoneLight
-from lifx.effects.conductor import Conductor
+from lifx.effects.conductor import Conductor, own_conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from tests.test_effects.test_component_effects import (
     AMBER,
@@ -61,7 +61,7 @@ class TestConcurrentComponentEffects:
             await ceiling.uplight.start_effect(flicker)
             await ceiling.downlight.start_effect(solid)
 
-            conductor = ceiling._own_conductor()
+            conductor = own_conductor(ceiling)
             assert conductor.effect(ceiling.uplight) is flicker
             assert conductor.effect(ceiling.downlight) is solid
 
@@ -102,7 +102,7 @@ class TestConcurrentComponentEffects:
 
             await ceiling.uplight.stop_effect()
 
-            conductor = ceiling._own_conductor()
+            conductor = own_conductor(ceiling)
             assert conductor.effect(ceiling.uplight) is None
             assert conductor.effect(ceiling.downlight) is solid
 

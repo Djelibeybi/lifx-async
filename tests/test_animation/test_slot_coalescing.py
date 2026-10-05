@@ -6,6 +6,7 @@ import pytest
 
 from lifx.animation.flow import ACK_INFLIGHT_LIMIT
 from lifx.color import HSBK
+from lifx.devices.component.effect_support import component_writer
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
 from tests.test_animation.test_component_slots import (
@@ -50,8 +51,8 @@ class TestSlotCoalescing:
         effect = _OneFrame([ORANGE, VIOLET])
         effect.participants = [ceiling, ceiling]
         effect._animators = [
-            await ceiling.uplight._writer(0),
-            await ceiling.downlight._writer(0),
+            await component_writer(ceiling, "uplight", 0),
+            await component_writer(ceiling, "downlight", 0),
         ]
 
         await effect.async_play()
@@ -67,8 +68,8 @@ class TestSlotCoalescing:
         self, sent: list[bytes], mock_udp_socket: MockUdpSocket
     ) -> None:
         ceiling = _ceiling()
-        uplight = await ceiling.uplight._writer(0)
-        downlight = await ceiling.downlight._writer(0)
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
         frame = _frame(64)
         for _ in range(ACK_INFLIGHT_LIMIT):
             downlight.send_frame(frame)
@@ -84,8 +85,8 @@ class TestSlotCoalescing:
         self, sent: list[bytes]
     ) -> None:
         ceiling = _ceiling()
-        uplight = await ceiling.uplight._writer(0)
-        downlight = await ceiling.downlight._writer(0)
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
         frame = _frame(64)
 
         stats = []
@@ -108,7 +109,10 @@ async def test_one_tile_per_frame_whatever_the_participant_order(
         components.reverse()
     effect = _OneFrame([ORANGE, VIOLET])
     effect.participants = [ceiling, ceiling]
-    effect._animators = [await component._writer(0) for component in components]
+    effect._animators = [
+        await component_writer(component.light, component.name, 0)
+        for component in components
+    ]
 
     await effect.async_play()
 

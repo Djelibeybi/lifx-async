@@ -66,7 +66,7 @@ def _writer(
         writer = MagicMock(spec=AnimatorWriter)
         writer.component = ring
         writer.whole_light = True
-        writer._shares_tile_with.return_value = False
+        writer.shares_tile_with.return_value = False
     writer.pixel_count = pixel_count
     writer.canvas_width = pixel_count
     writer.canvas_height = 1

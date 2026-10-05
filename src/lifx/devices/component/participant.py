@@ -9,12 +9,18 @@ the light's existing component methods.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
+
+from lifx.devices.effect_runner import effect_runner
 
 if TYPE_CHECKING:
-    from lifx.animation.animator import Animator, AnimatorWriter
+    from lifx.animation.animator import Animator
     from lifx.devices.component.light import ComponentMatrixLight
     from lifx.effects.base import LIFXEffect
+
+# The name of a light component: a Ceiling's uplight or downlight, or a
+# Mirror's front or back ring.
+ComponentName = Literal["uplight", "downlight", "front", "back"]
 
 
 class LightComponent:
@@ -39,7 +45,7 @@ class LightComponent:
 
     __slots__ = ("_light", "_name")
 
-    def __init__(self, light: ComponentMatrixLight, name: str) -> None:
+    def __init__(self, light: ComponentMatrixLight, name: ComponentName) -> None:
         """Name one light component of a light.
 
         Args:
@@ -47,7 +53,17 @@ class LightComponent:
             name: The light component's name, such as ``"uplight"``
         """
         self._light = light
-        self._name = name
+        self._name: ComponentName = name
+
+    @property
+    def light(self) -> ComponentMatrixLight:
+        """The light this light component belongs to."""
+        return self._light
+
+    @property
+    def name(self) -> ComponentName:
+        """The light component's name, such as ``"downlight"``."""
+        return self._name
 
     @property
     def animator(self) -> Animator:
@@ -81,14 +97,7 @@ class LightComponent:
         Raises:
             TypeError: If ``effect`` does not draw frames
         """
-        from lifx.effects.frame_effect import FrameEffect
-
-        if not isinstance(effect, FrameEffect):
-            raise TypeError(
-                "A light component runs software effects that draw frames, "
-                f"not {type(effect).__name__}"
-            )
-        await self._light._own_conductor().start(effect, [self])
+        await effect_runner().start(self, effect)
 
     async def stop_effect(self) -> None:
         """Stop the software effect on this light component only.
@@ -100,13 +109,7 @@ class LightComponent:
         light component, and this light component gets its colours from
         before that effect back.
         """
-        from lifx.effects.conductor import Conductor
-
-        await Conductor._leave_every_run(self)
-
-    async def _writer(self, duration_ms: int) -> AnimatorWriter:
-        """Borrow the light's Animator to draw on this light component's slot."""
-        return await self._light._component_writer(self._name, duration_ms)
+        await effect_runner().leave_every_run(self)
 
     def __repr__(self) -> str:
         """Name the light component and its light."""

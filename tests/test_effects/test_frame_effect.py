@@ -9,7 +9,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
-from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.frame_effect import FrameContext, FrameEffect, drop_participant
 
 
 class ConcreteFrameEffect(FrameEffect):
@@ -264,6 +264,30 @@ class TestFrameEffectCloseAnimators:
         effect.close_animators()
 
         assert len(effect._animators) == 0
+
+    def test_dropping_a_participant_closes_its_writer(self) -> None:
+        """A participant leaving a run takes its writer with it."""
+        effect = ConcreteFrameEffect()
+        first, second = MagicMock(), MagicMock()
+        effect._animators = [first, second]
+        effect.participants = [MagicMock(), MagicMock()]
+
+        drop_participant(effect, 0)
+
+        first.close.assert_called_once()
+        second.close.assert_not_called()
+        assert effect._animators == [second]
+        assert len(effect.participants) == 1
+
+    def test_dropping_a_participant_after_its_writers_closed(self) -> None:
+        """A run whose writers are already closed still drops the participant."""
+        effect = ConcreteFrameEffect()
+        effect.participants = [MagicMock(), MagicMock()]
+        effect.close_animators()
+
+        drop_participant(effect, 1)
+
+        assert len(effect.participants) == 1
 
 
 class TestGenerateProtocolFrame:

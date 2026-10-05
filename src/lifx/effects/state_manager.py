@@ -10,6 +10,11 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from lifx.devices.component.effect_support import (
+    reinstate_stored_colors,
+    restore_component,
+    stored_colors_snapshot,
+)
 from lifx.devices.component.light import ComponentMatrixLight
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
@@ -21,6 +26,7 @@ from lifx.protocol.protocol_types import (
 
 if TYPE_CHECKING:
     from lifx.color import HSBK
+    from lifx.devices.component.participant import ComponentName
     from lifx.devices.light import Light
 
 _LOGGER = logging.getLogger(__name__)
@@ -83,7 +89,7 @@ class DeviceStateManager:
         # Taken after the tile read so the read's own observations count.
         stored_colors = None
         if isinstance(light, ComponentMatrixLight):
-            stored_colors = light._stored_colors_snapshot()
+            stored_colors = stored_colors_snapshot(light)
 
         return PreState(
             power=bool(power > 0),
@@ -123,10 +129,10 @@ class DeviceStateManager:
         # Ceiling and Mirror: an effect never changes either component's
         # stored colours, whatever the restore writes above remembered.
         if isinstance(light, ComponentMatrixLight) and prestate.stored_colors:
-            await light._reinstate_stored_colors(prestate.stored_colors)
+            await reinstate_stored_colors(light, prestate.stored_colors)
 
     async def restore_component(
-        self, light: ComponentMatrixLight, component: str, prestate: PreState
+        self, light: ComponentMatrixLight, component: ComponentName, prestate: PreState
     ) -> None:
         """Restore one light component after its software effect.
 
@@ -144,7 +150,8 @@ class DeviceStateManager:
         """
         stored = (prestate.stored_colors or {}).get(component)
         try:
-            await light._restore_component(
+            await restore_component(
+                light,
                 component,
                 prestate.tile_colors[0] if prestate.tile_colors else None,
                 prestate.power,

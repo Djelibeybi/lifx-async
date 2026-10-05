@@ -20,8 +20,9 @@ from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.slots import ComponentSlot
 from lifx.color import HSBK
 from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
-from lifx.devices.component.participant import LightComponent
+from lifx.devices.component.participant import ComponentName, LightComponent
 from lifx.devices.component.state import Pending, hsk_matches, is_dark
+from lifx.devices.effect_runner import effect_runner
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 
@@ -35,7 +36,7 @@ _POWER_ON = 65535
 class _ComponentFields:
     """Map one light component to its existing named state fields."""
 
-    name: str
+    name: ComponentName
     colours: str
     scalar: bool = False
 
@@ -138,8 +139,7 @@ class ComponentMatrixLight(MatrixLight):
         """Return the effect participant for a light component, made once."""
         participant = self._light_components.get(component)
         if participant is None:
-            self._fields(component)
-            participant = LightComponent(self, component)
+            participant = LightComponent(self, self._fields(component).name)
             self._light_components[component] = participant
         return participant
 
@@ -157,14 +157,13 @@ class ComponentMatrixLight(MatrixLight):
         no restore in between, and any other participants of its run carry
         on.
         """
-        from lifx.effects.conductor import Conductor
-
+        runner = effect_runner()
         if component not in self._animating_components() and (
-            not Conductor._runs_whole_light(self)
+            not runner.runs_whole_light(self)
         ):
             return
         # A whole-light effect moves onto the other light component.
-        await Conductor._leave_every_run(
+        await runner.leave_every_run(
             self._light_component(component), restore_state=False
         )
 
@@ -311,7 +310,7 @@ class ComponentMatrixLight(MatrixLight):
                 return fields
         raise ValueError(f"Unknown light component: {component}")
 
-    def _other_component(self, component: str) -> str:
+    def _other_component(self, component: str) -> ComponentName:
         """Return the other side of this light."""
         first, second = self._component_fields
         return second.name if component == first.name else first.name

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 from lifx.animation.animator import Animator
+from lifx.animation.framebuffer import FrameBuffer
+from lifx.animation.packets import LightPacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import (
     INVALID_AMBIENT_LIGHT_RESPONSE,
@@ -26,13 +28,13 @@ from lifx.devices.base import (
     DeviceState,
     WifiInfo,
 )
+from lifx.devices.effect_runner import effect_runner
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
 
 if TYPE_CHECKING:
     from lifx.effects.base import LIFXEffect
-    from lifx.effects.conductor import Conductor
     from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,7 +120,6 @@ class Light(Device[LightState]):
 
     _discovery_snapshot: _DiscoveryLightSnapshot | None = None
     _animator: Animator | None = None
-    _conductor: Conductor | None = None
 
     @property
     def animator(self) -> Animator:
@@ -145,6 +146,26 @@ class Light(Device[LightState]):
             animator = Animator._for_device(self)
             self._animator = animator
         return animator
+
+    def _animation_geometry(self) -> tuple[FrameBuffer, PacketGenerator] | None:
+        """The canvas and packets this light's Animator draws with, if known.
+
+        A single light needs no query: it is one pixel. A matrix or multizone
+        light returns None, and its Animator asks it with
+        ``_query_animation_geometry()`` when first prepared.
+        """
+        return FrameBuffer.for_light(self), LightPacketGenerator()
+
+    async def _query_animation_geometry(
+        self,
+    ) -> tuple[FrameBuffer, PacketGenerator]:
+        """Ask the device for the geometry its Animator draws with.
+
+        A single light knows its geometry without asking.
+        """
+        geometry = self._animation_geometry()
+        assert geometry is not None
+        return geometry
 
     async def start_effect(self, effect: LIFXEffect) -> None:
         """Start a software effect on this light alone.
@@ -176,23 +197,7 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
-        from lifx.effects.base import LIFXEffect
-
-        if not isinstance(effect, LIFXEffect):
-            raise TypeError(
-                f"start_effect() takes a software effect, got {type(effect).__name__}"
-            )
-        await self._own_conductor().start(effect, [self])
-
-    def _own_conductor(self) -> Conductor:
-        """The Conductor this light keeps for runs started on it directly."""
-        from lifx.effects.conductor import Conductor
-
-        conductor = self._conductor
-        if conductor is None:
-            conductor = Conductor()
-            self._conductor = conductor
-        return conductor
+        await effect_runner().start(self, effect)
 
     async def stop_effect(self) -> None:
         """Stop every effect on this light.
@@ -209,12 +214,10 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
-        from lifx.effects.conductor import Conductor
-
         try:
             await self._stop_firmware_effect()
         finally:
-            await Conductor._leave_every_run(self)
+            await effect_runner().leave_every_run(self)
 
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect; a plain light has none to stop."""

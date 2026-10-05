@@ -10,6 +10,7 @@ import pytest
 from lifx.animation.packets import HEADER_SIZE
 from lifx.color import HSBK
 from lifx.devices.ceiling import CeilingLight
+from lifx.devices.component.effect_support import component_writer
 from lifx.products import get_product
 from lifx.protocol import packets
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
@@ -86,7 +87,7 @@ class TestComponentSlots:
         self, sent: list[bytes]
     ) -> None:
         ceiling = _ceiling()
-        writer = await ceiling.downlight._writer(0)
+        writer = await component_writer(ceiling, "downlight", 0)
         frame = _frame(64)
 
         writer.send_frame(frame)
@@ -104,7 +105,7 @@ class TestComponentSlots:
         self, sent: list[bytes]
     ) -> None:
         ceiling = _ceiling()
-        writer = await ceiling.uplight._writer(0)
+        writer = await component_writer(ceiling, "uplight", 0)
 
         writer.send_frame([RED])
 
@@ -117,8 +118,8 @@ class TestComponentSlots:
         self, sent: list[bytes]
     ) -> None:
         ceiling = _ceiling()
-        downlight = await ceiling.downlight._writer(0)
-        uplight = await ceiling.uplight._writer(0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight = await component_writer(ceiling, "uplight", 0)
         frame = _frame(64)
 
         downlight.send_frame(frame)
@@ -132,7 +133,7 @@ class TestComponentSlots:
     ) -> None:
         ceiling = rig.light
         assert isinstance(ceiling, CeilingLight)
-        writer = await ceiling.downlight._writer(0)
+        writer = await component_writer(ceiling, "downlight", 0)
         frame = _frame(64)
 
         await ceiling.set_uplight_color(AMBER)
@@ -148,7 +149,7 @@ class TestComponentSlots:
     ) -> None:
         ceiling = rig.light
         assert isinstance(ceiling, CeilingLight)
-        writer = await ceiling.downlight._writer(0)
+        writer = await component_writer(ceiling, "downlight", 0)
         frame = _frame(64)
 
         with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
@@ -164,7 +165,7 @@ class TestComponentSlots:
 
     async def test_a_released_writer_draws_nothing(self, sent: list[bytes]) -> None:
         ceiling = _ceiling()
-        writer = await ceiling.uplight._writer(0)
+        writer = await component_writer(ceiling, "uplight", 0)
         writer.close()
         writer.close()
 
@@ -179,9 +180,9 @@ class TestComponentSlots:
         self, sent: list[bytes], mock_udp_socket: MockUdpSocket
     ) -> None:
         ceiling = _ceiling()
-        first = await ceiling.uplight._writer(0)
-        second = await ceiling.uplight._writer(0)
-        downlight = await ceiling.downlight._writer(0)
+        first = await component_writer(ceiling, "uplight", 0)
+        second = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
         frame = _frame(64)
         second.send_frame([CYAN])
 
@@ -200,7 +201,7 @@ class TestComponentSlots:
     ) -> None:
         ceiling = rig.light
         assert isinstance(ceiling, CeilingLight)
-        writer = await ceiling.downlight._writer(0)
+        writer = await component_writer(ceiling, "downlight", 0)
         await ceiling.set_uplight_color(AMBER)
         writer.close()
         reads = len(_tile_reads(rig))
@@ -215,7 +216,7 @@ class TestComponentSlots:
     ) -> None:
         ceiling = rig.light
         assert isinstance(ceiling, CeilingLight)
-        writer = await ceiling.downlight._writer(0)
+        writer = await component_writer(ceiling, "downlight", 0)
         await ceiling.set_uplight_color(AMBER)
         writer.close()
         reads = len(_tile_reads(rig))
@@ -230,7 +231,7 @@ class TestComponentSlots:
         self, sent: list[bytes], mock_udp_socket: MockUdpSocket
     ) -> None:
         ceiling = _ceiling()
-        writer = await ceiling.downlight._writer(0)
+        writer = await component_writer(ceiling, "downlight", 0)
         raw = _frame(64)
 
         ceiling.animator.send_frame(raw)
