@@ -26,6 +26,10 @@ class PreState:
         power: Device power state (True=on, False=off)
         color: Current HSBK color (for non-multizone or overall color)
         zone_colors: List of zone colors for multizone devices (None for regular lights)
+        tile_colors: Colours of every tile, one list per tile, for matrix lights
+            (None for other lights, or when the tiles could not be read)
+        stored_colors: Stored colours of each light component, keyed by component
+            name, for Ceiling and Mirror lights (None for other lights)
 
     Example:
         ```python
@@ -41,6 +45,8 @@ class PreState:
     power: bool
     color: HSBK
     zone_colors: list[HSBK] | None = None
+    tile_colors: list[list[HSBK]] | None = None
+    stored_colors: dict[str, list[HSBK] | None] | None = None
 
     def __repr__(self) -> str:
         """String representation of PreState."""

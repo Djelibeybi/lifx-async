@@ -190,10 +190,12 @@ class MatrixPacketGenerator(PacketGenerator):
 
         - Ceiling 16x8 (128 pixels, divides evenly): 2 Set64 packets of 64
           colours each (rows 0-3, 4-7) + 1 CopyFrameBuffer = 3 packets/tile.
-        - Ceiling 13x26 (338 pixels, does not divide evenly): 7 Set64
-          packets of 52 colours each for the first 6 (4 rows x 13 width)
-          plus a final partial batch of 26 colours (2 rows x 13 width) +
-          1 CopyFrameBuffer = 8 packets/tile.
+        - A hypothetical 13x26 tile (338 pixels, does not divide evenly):
+          7 Set64 packets, the first 6 of 52 colours each (4 rows x 13
+          width) plus a final partial batch of 26 colours (2 rows x 13
+          width) + 1 CopyFrameBuffer = 8 packets/tile. No current LIFX
+          product has this geometry; the "Ceiling 13x26" product is a 16x8
+          tile.
         - Multiple Set64 packets to temp buffer (fb_index=1)
         - CopyFrameBuffer packet to copy fb_index=1 → fb_index=0
 

@@ -240,6 +240,8 @@ class PreState:
     power: bool                     # Power state (on/off)
     color: HSBK                     # Current color
     zone_colors: list[HSBK] | None  # Multizone colors (if applicable)
+    tile_colors: list[list[HSBK]] | None  # Every tile's colours (matrix lights)
+    stored_colors: dict[str, list[HSBK] | None] | None  # Ceiling/Mirror components
 ```
 
 **RunningEffect:**
@@ -335,8 +337,9 @@ async def async_perform(self, participants):
         for light in self.participants:
             power_level = await light.get_power()
             if power_level == 0:
-                startup_color = await self.from_poweroff_hsbk(light)
-                await light.set_color(startup_color, duration=0)
+                if not isinstance(light, MatrixLight):
+                    startup_color = await self.from_poweroff_hsbk(light)
+                    await light.set_color(startup_color, duration=0)
                 await light.set_power(True, duration=0.3)
 ```
 
@@ -344,8 +347,9 @@ async def async_perform(self, participants):
 
 ```
 For each powered-off light:
-  1. Get startup color from from_poweroff_hsbk()
-  2. Set color immediately (duration=0)
+  1. Matrix lights (including Ceiling and Mirror) skip to step 3: no colour
+     is written, so neither light component's stored colours change
+  2. Get startup color from from_poweroff_hsbk() and set it (duration=0)
   3. Power on with 0.3s fade (duration=0.3)
 ```
 
@@ -461,7 +465,25 @@ if isinstance(light, MultiZoneLight):
 - Multiple messages required for >8 zones
 - Used as fallback for older devices
 
+#### Matrix State
+
+For `MatrixLight` devices (Tile, Candle, Path, Ceiling and Mirror), every
+tile's colours are captured with `get_all_tile_colors()`, so the light gets
+back the whole tile it showed, not one colour. If the read fails, restoration
+falls back to the single captured colour.
+
+Ceiling and Mirror lights also record both light components' stored colours.
+Restoring the tile and power, and any tile read while frames play, can change
+them; the restore puts the recorded colours back last, so an effect never
+changes what a component turns back on to.
+
 ### State Restoration Details
+
+#### Matrix Restoration
+
+Each captured tile is written back with `set_matrix_colors(tile_index,
+colours, duration=0)`, instead of the single colour, before power is
+restored.
 
 #### Multizone Restoration
 

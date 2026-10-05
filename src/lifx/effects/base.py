@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
+from lifx.devices.matrix import MatrixLight
 from lifx.effects.const import (
     DEFAULT_BRIGHTNESS,
     MIN_VISIBLE_BRIGHTNESS,
@@ -90,6 +91,10 @@ class LIFXEffect(ABC):
         then calls async_play(). Subclasses should override async_play(),
         not this method.
 
+        A matrix light that is off is just powered on: its frames supply the
+        colours, so no startup colour is written first. Other lights get
+        from_poweroff_hsbk() before they power on.
+
         Args:
             participants: List of lights to apply effect to
         """
@@ -106,10 +111,10 @@ class LIFXEffect(ABC):
                 """
                 is_on = await light.get_power()
                 if not is_on:
-                    # Get startup color for this light
-                    startup_color = await self.from_poweroff_hsbk(light)
-                    # Set color immediately, then power on
-                    await light.set_color(startup_color, duration=0)
+                    if not isinstance(light, MatrixLight):
+                        # Set the startup colour immediately, then power on
+                        startup_color = await self.from_poweroff_hsbk(light)
+                        await light.set_color(startup_color, duration=0)
                     await light.set_power(True, duration=POWER_ON_TRANSITION_DURATION)
                     return True
                 return False

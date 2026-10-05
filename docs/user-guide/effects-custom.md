@@ -322,7 +322,7 @@ Override this to customize the color used when powering on a device.
 
 **Default behavior:** Returns random hue, full saturation, zero brightness, neutral white.
 
-**When called:** When a device needs to be powered on for the effect (if it was off when effect started).
+**When called:** When a device needs to be powered on for the effect (if it was off when effect started). Matrix lights (including Ceiling and Mirror) are powered on without a startup colour, so this is not called for them.
 
 **Example:**
 

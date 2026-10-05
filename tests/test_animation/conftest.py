@@ -300,9 +300,10 @@ def _force_tile_dimensions(device: object, width: int, height: int) -> None:
 def large_tile_matrix_device(
     emulator_server: tuple[int, EmulatedLifxServer, HierarchicalScenarioManager],
 ) -> Generator[CeilingLight, None, None]:
-    """Create an emulated LIFX Ceiling 13x26 large-tile device (product 201).
+    """Create an emulated large-tile device forced to a synthetic 13x26 tile.
 
-    Mirrors the `ceiling_device` fixture pattern (`tests/conftest.py`), but
+    Product 201 (the "Ceiling 13x26", whose real tile is 16x8) is used as the
+    base device. Mirrors the `ceiling_device` fixture pattern (`tests/conftest.py`), but
     with a non-64-divisible tile width (13) to exercise the row-aligned
     large-tile chunking path end-to-end against a real emulated device:
     7 Set64 packets (6x52 + 1x26 colours) + 1 CopyFrameBuffer per frame.

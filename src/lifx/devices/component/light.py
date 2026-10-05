@@ -167,6 +167,34 @@ class ComponentMatrixLight(MatrixLight):
         """Remember restoration colours in the existing named fields."""
         self._fields(component).write(self.state, colors, "stored_")
 
+    def _stored_colors_snapshot(self) -> dict[str, list[HSBK] | None] | None:
+        """Copy both components' stored colours, or None before state exists."""
+        if not self._has_component_state():
+            return None
+        return {
+            fields.name: fields.read(self.state, "stored_")
+            for fields in self._component_fields
+        }
+
+    async def _reinstate_stored_colors(
+        self, snapshot: dict[str, list[HSBK] | None]
+    ) -> None:
+        """Put back stored colours copied before a whole-light software effect.
+
+        Restoring the tile and power after an effect goes through paths that
+        remember colours (uniform-tile SetColor, power-off capture), and tile
+        reads while frames play adopt frame colours. None of those are colours
+        the user chose, so the copy taken before the effect wins.
+        """
+        async with self._component_operation():
+            for fields in self._component_fields:
+                colours = snapshot[fields.name]
+                if colours is None:
+                    setattr(self.state, "stored_" + fields.colours, None)
+                else:
+                    fields.write(self.state, colours, "stored_")
+        await self._persist_component_state()
+
     def _set_component_state(
         self, component: str, colors: list[HSBK], *, stored: bool = False
     ) -> None:

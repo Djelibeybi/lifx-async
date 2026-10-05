@@ -67,6 +67,10 @@ class Wire:
             )
         if isinstance(packet, packets.Light.GetPower):
             return packets.Light.StatePower(level=self.power)
+        if isinstance(packet, packets.Light.GetColor):
+            return packets.Light.StateColor(
+                color=self.colours[0].to_protocol(), power=self.power, label=b""
+            )
         if isinstance(packet, packets.Light.SetPower):
             self.power = packet.level
         elif isinstance(packet, packets.Light.SetColor):
@@ -126,9 +130,8 @@ class Rig:
         self.clock[0] += duration + WRITE_SETTLE_MARGIN + 0.1
 
 
-@pytest.fixture(params=[176, 201, 267], ids=["ceiling", "capsule", "mirror"])
-def rig(request, monkeypatch) -> Rig:
-    product = request.param
+def build_rig(product: int, monkeypatch: pytest.MonkeyPatch) -> Rig:
+    """Wire a real Ceiling or Mirror object to an in-memory tile peer."""
     clock = [100.0]
     monkeypatch.setattr("lifx.devices.component.state.time.monotonic", lambda: clock[0])
     width, height = (4, 13) if product == 267 else (16, 8) if product == 201 else (8, 8)
@@ -185,6 +188,11 @@ def rig(request, monkeypatch) -> Rig:
     light.connection.send_packet.side_effect = wire.exchange
     light._schedule_refresh = AsyncMock()
     return Rig(light, wire, names, positions, clock)
+
+
+@pytest.fixture(params=[176, 201, 267], ids=["ceiling", "capsule", "mirror"])
+def rig(request, monkeypatch) -> Rig:
+    return build_rig(request.param, monkeypatch)
 
 
 @pytest.mark.parametrize("side", [0, 1])

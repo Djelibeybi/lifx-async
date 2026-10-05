@@ -235,6 +235,9 @@ Return startup color when light is powered off.
 
 **Override this** to customize the color used when powering on a light.
 
+Matrix lights (including Ceiling and Mirror) are powered on without a startup
+colour, so this is not called for them.
+
 **Default behavior:** Returns random hue, full saturation, zero brightness, neutral white.
 
 **Example:**
