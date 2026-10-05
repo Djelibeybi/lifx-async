@@ -231,7 +231,7 @@ class ComponentMatrixLight(MatrixLight):
         component: str,
         before: list[HSBK] | None,
         was_on: bool,
-        stored: list[HSBK] | None,
+        snapshot: dict[str, list[HSBK] | None] | None,
     ) -> None:
         """Return one light component to its state before a software effect.
 
@@ -242,14 +242,16 @@ class ComponentMatrixLight(MatrixLight):
         the light is off, so no effect frame shows at the next power-on.
         While the other light component animates, the write goes to its held
         tile. Either way the light component's stored colours are those from
-        before the effect, and the other light component is left as it is.
+        before the effect, none if it had none, and the other light
+        component is left as it is, stored colours included.
 
         Args:
             component: The light component's name
             before: The whole tile, in buffer order, captured before the
                 effect, or None if it could not be read
             was_on: Whether the light was on before the effect
-            stored: The light component's stored colours before the effect
+            snapshot: Both light components' stored colours before the
+                effect, or None if they were not known
         """
         colours = (
             [before[p] for p in self._component_positions(component)]
@@ -262,9 +264,15 @@ class ComponentMatrixLight(MatrixLight):
             await self._turn_component_off(component, None, 0.0)
             if colours is not None:
                 await self._rewrite_while_off(component, colours)
-        if stored is not None:
+        if snapshot is not None:
+            stored = snapshot[component]
             async with self._component_operation():
-                self._set_stored_colors(component, stored)
+                if stored is None:
+                    setattr(
+                        self.state, "stored_" + self._fields(component).colours, None
+                    )
+                else:
+                    self._set_stored_colors(component, stored)
             await self._persist_component_state()
 
     async def _rewrite_while_off(self, component: str, colours: list[HSBK]) -> None:

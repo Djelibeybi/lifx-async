@@ -181,7 +181,8 @@ async def test_the_idle_ring_stays_under_the_callers_control(
     assert [rig.wire.colours[p] for p in rig.positions[BACK]] == [GREEN] * 25
     assert [rig.wire.colours[p] for p in rig.positions[FRONT]] == [transitions.RED] * 25
     assert rig.colours(BACK, "stored_") == [GREEN] * 25
-    assert rig.colours(FRONT, "stored_") == [transitions.RED] * 25
+    # The front ring had no stored colours before its effect, and has none now.
+    assert rig.colours(FRONT, "stored_") is None
 
 
 async def test_a_ring_returns_to_its_colours_and_leaves_the_other_ring(

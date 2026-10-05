@@ -148,14 +148,13 @@ class DeviceStateManager:
             component: The light component's name
             prestate: State captured from the light before the effect
         """
-        stored = (prestate.stored_colors or {}).get(component)
         try:
             await restore_component(
                 light,
                 component,
                 prestate.tile_colors[0] if prestate.tile_colors else None,
                 prestate.power,
-                stored,
+                prestate.stored_colors,
             )
         except Exception as e:
             _LOGGER.warning(
