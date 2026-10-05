@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
+from lifx.effects.models import ParticipantKey, participant_key
 
 if TYPE_CHECKING:
     from lifx.animation.animator import Animator
@@ -105,7 +106,7 @@ class FrameEffect(LIFXEffect):
         self._duration = duration
         self._stop_event = asyncio.Event()
         self._animators: list[Animator] = []
-        self._last_frames: dict[str, list[HSBK]] = {}
+        self._last_frames: dict[ParticipantKey, list[HSBK]] = {}
         # Cache for HSBK frame from default generate_protocol_frame()
         # Allows _last_frames tracking without coupling to the loop
         self._last_generated_hsbk: list[HSBK] | None = None
@@ -214,7 +215,7 @@ class FrameEffect(LIFXEffect):
                 # Track HSBK frame for state restoration (populated by
                 # default generate_protocol_frame, None for direct overrides)
                 if idx < len(participants) and self._last_generated_hsbk is not None:
-                    self._last_frames[participants[idx].serial] = (
+                    self._last_frames[participant_key(participants[idx])] = (
                         self._last_generated_hsbk
                     )
                 # Always clear to prevent stale frames leaking across iterations

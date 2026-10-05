@@ -11,7 +11,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
-from lifx.effects.models import PreState, RunningEffect
+from lifx.effects.models import (
+    ParticipantKey,
+    PreState,
+    RunningEffect,
+    participant_key,
+)
 from lifx.effects.state_manager import DeviceStateManager
 
 if TYPE_CHECKING:
@@ -31,7 +36,7 @@ class Conductor:
     All effect execution is coordinated through the conductor.
 
     Attributes:
-        _running: Dictionary mapping device serial to RunningEffect
+        _running: Dictionary mapping effect participant key to RunningEffect
         _lock: Asyncio lock for thread-safe state management
 
     Example:
@@ -55,7 +60,7 @@ class Conductor:
     def __init__(self) -> None:
         """Initialize the Conductor."""
         self._state_manager = DeviceStateManager()
-        self._running: dict[str, RunningEffect] = {}
+        self._running: dict[ParticipantKey, RunningEffect] = {}
         self._lock = asyncio.Lock()
 
     def effect(self, light: Light) -> LIFXEffect | None:
@@ -74,7 +79,7 @@ class Conductor:
                 print(f"Running: {type(current_effect).__name__}")
             ```
         """
-        running = self._running.get(light.serial)
+        running = self._running.get(participant_key(light))
         return running.effect if running else None
 
     def get_last_frame(self, light: Light) -> list[HSBK] | None:
@@ -100,7 +105,7 @@ class Conductor:
                 print(f"Average brightness: {avg_brightness:.1%}")
             ```
         """
-        running = self._running.get(light.serial)
+        running = self._running.get(participant_key(light))
         if not running:
             return None
 
@@ -108,7 +113,7 @@ class Conductor:
 
         effect = running.effect
         if isinstance(effect, FrameEffect):
-            return effect._last_frames.get(light.serial)
+            return effect._last_frames.get(participant_key(light))
         return None
 
     async def start(
@@ -163,15 +168,15 @@ class Conductor:
 
             # Determine which lights need new prestate capture
             lights_needing_capture: list[tuple[int, Light]] = []
-            prestates: dict[str, PreState] = {}
+            prestates: dict[ParticipantKey, PreState] = {}
 
             for idx, light in enumerate(filtered_participants):
-                serial = light.serial
-                current_running = self._running.get(serial)
+                key = participant_key(light)
+                current_running = self._running.get(key)
 
                 if current_running and effect.inherit_prestate(current_running.effect):
                     # Reuse existing prestate
-                    prestates[serial] = current_running.prestate
+                    prestates[key] = current_running.prestate
                     effect_name = type(current_running.effect).__name__
                     _LOGGER.debug(
                         {
@@ -179,7 +184,7 @@ class Conductor:
                             "method": "start",
                             "action": "inherit_prestate",
                             "values": {
-                                "serial": serial,
+                                "serial": light.serial,
                                 "previous_effect": effect_name,
                                 "new_effect": type(effect).__name__,
                             },
@@ -192,7 +197,9 @@ class Conductor:
             # Capture prestates in parallel for all lights that need it
             if lights_needing_capture:
 
-                async def capture_and_log(device: Light) -> tuple[str, PreState]:
+                async def capture_and_log(
+                    device: Light,
+                ) -> tuple[ParticipantKey, PreState]:
                     prestate = await self._state_manager.capture_state(device)
                     _LOGGER.debug(
                         {
@@ -212,15 +219,15 @@ class Conductor:
                             },
                         }
                     )
-                    return (device.serial, prestate)
+                    return (participant_key(device), prestate)
 
                 captured = await asyncio.gather(
                     *(capture_and_log(light) for _, light in lights_needing_capture)
                 )
 
                 # Store captured prestates
-                for serial, prestate in captured:
-                    prestates[serial] = prestate
+                for key, prestate in captured:
+                    prestates[key] = prestate
 
             # Set up animators for frame-based effects
             from lifx.effects.frame_effect import FrameEffect
@@ -240,10 +247,10 @@ class Conductor:
 
             # Register running effects for all participants
             for light in filtered_participants:
-                serial = light.serial
-                self._running[serial] = RunningEffect(
+                key = participant_key(light)
+                self._running[key] = RunningEffect(
                     effect=effect,
-                    prestate=prestates[serial],
+                    prestate=prestates[key],
                     task=task,
                 )
 
@@ -271,8 +278,7 @@ class Conductor:
             tasks_to_cancel: set[asyncio.Task[None]] = set()
 
             for light in lights:
-                serial = light.serial
-                running = self._running.get(serial)
+                running = self._running.get(participant_key(light))
 
                 if running:
                     _LOGGER.debug(
@@ -281,7 +287,7 @@ class Conductor:
                             "method": "stop",
                             "action": "stop",
                             "values": {
-                                "serial": serial,
+                                "serial": light.serial,
                                 "effect": type(running.effect).__name__,
                             },
                         }
@@ -294,7 +300,7 @@ class Conductor:
 
             closed_effects: set[int] = set()
             for light in lights:
-                running = self._running.get(light.serial)
+                running = self._running.get(participant_key(light))
                 if running and isinstance(running.effect, FrameEffect):
                     effect_id = id(running.effect)
                     if effect_id not in closed_effects:
@@ -322,9 +328,7 @@ class Conductor:
 
             # Remove from running registry after restoration
             for light in lights:
-                serial = light.serial
-                if serial in self._running:
-                    del self._running[serial]
+                self._running.pop(participant_key(light), None)
 
     async def add_lights(self, effect: LIFXEffect, lights: list[Light]) -> None:
         """Add lights to a running effect without restarting it.
@@ -352,7 +356,7 @@ class Conductor:
             # Skip lights already running this effect
             new_lights: list[Light] = []
             for light in compatible:
-                running = self._running.get(light.serial)
+                running = self._running.get(participant_key(light))
                 if running and running.effect is effect:
                     continue
                 new_lights.append(light)
@@ -385,7 +389,9 @@ class Conductor:
             captured = await asyncio.gather(
                 *(self._state_manager.capture_state(light) for light in new_lights)
             )
-            prestates = dict(zip([light.serial for light in new_lights], captured))
+            prestates = dict(
+                zip([participant_key(light) for light in new_lights], captured)
+            )
 
             # Create animators for frame-based effects
             from lifx.effects.frame_effect import FrameEffect
@@ -399,9 +405,10 @@ class Conductor:
 
             # Register in running map
             for light in new_lights:
-                self._running[light.serial] = RunningEffect(
+                key = participant_key(light)
+                self._running[key] = RunningEffect(
                     effect=effect,
-                    prestate=prestates[light.serial],
+                    prestate=prestates[key],
                     task=task,
                 )
 
@@ -445,8 +452,8 @@ class Conductor:
 
         async with self._lock:
             for light in lights:
-                serial = light.serial
-                running = self._running.get(serial)
+                key = participant_key(light)
+                running = self._running.get(key)
                 if not running:
                     continue
 
@@ -454,9 +461,9 @@ class Conductor:
 
                 # Remove animator for frame effects
                 if isinstance(effect, FrameEffect):
-                    # Find index by matching serial in participants
+                    # Find index by matching key in participants
                     for idx, participant in enumerate(effect.participants):
-                        if participant.serial == serial:
+                        if participant_key(participant) == key:
                             if idx < len(effect._animators):
                                 effect._animators[idx].close()
                                 effect._animators.pop(idx)
@@ -464,7 +471,7 @@ class Conductor:
 
                 # Remove from participants
                 effect.participants = [
-                    p for p in effect.participants if p.serial != serial
+                    p for p in effect.participants if participant_key(p) != key
                 ]
 
                 # Track for restoration
@@ -481,7 +488,7 @@ class Conductor:
                 if remaining <= 1:
                     tasks_to_cancel.add(running.task)
 
-                del self._running[serial]
+                del self._running[key]
 
                 _LOGGER.debug(
                     {
@@ -489,7 +496,7 @@ class Conductor:
                         "method": "remove_lights",
                         "action": "removed",
                         "values": {
-                            "serial": serial,
+                            "serial": light.serial,
                             "effect": type(effect).__name__,
                             "restore_state": restore_state,
                         },
@@ -548,8 +555,7 @@ class Conductor:
                 if effect.restore_on_complete:
                     lights_to_restore: list[tuple[Light, PreState]] = []
                     for light in participants:
-                        serial = light.serial
-                        running = self._running.get(serial)
+                        running = self._running.get(participant_key(light))
                         if running:
                             lights_to_restore.append((light, running.prestate))
 
@@ -564,9 +570,7 @@ class Conductor:
 
                 # Remove from running registry
                 for light in participants:
-                    serial = light.serial
-                    if serial in self._running:
-                        del self._running[serial]
+                    self._running.pop(participant_key(light), None)
 
         except asyncio.CancelledError:
             # Effect was cancelled via stop() - this is expected
@@ -606,9 +610,7 @@ class Conductor:
             # Clean up by removing from running registry
             async with self._lock:
                 for light in participants:
-                    serial = light.serial
-                    if serial in self._running:
-                        del self._running[serial]
+                    self._running.pop(participant_key(light), None)
 
     async def _filter_compatible_lights(
         self, effect: LIFXEffect, participants: list[Light]
