@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 import pytest
 
@@ -16,7 +18,7 @@ from lifx.effects.models import PreState
 from lifx.effects.registry import get_effect_registry
 from lifx.effects.state_manager import DeviceStateManager
 from lifx.exceptions import LifxTimeoutError
-from tests.test_devices.test_component_transitions import build_rig
+from tests.test_devices.test_component_transitions import Rig, build_rig
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())
@@ -31,8 +33,14 @@ DOWNLIGHT = 127  # zones 0-126 of the 16x8 tile
 class _SolidFrames(FrameEffect):
     """Frame effect painting every pixel one colour, recording each context."""
 
-    def __init__(self, colour: HSBK, *, power_on: bool = True) -> None:
-        super().__init__(power_on=power_on, fps=20.0)
+    def __init__(
+        self,
+        colour: HSBK,
+        *,
+        power_on: bool = True,
+        duration: float | None = None,
+    ) -> None:
+        super().__init__(power_on=power_on, fps=20.0, duration=duration)
         self.colour = colour
         self.contexts: list[FrameContext] = []
 
@@ -262,6 +270,44 @@ class TestCeilingComponentEffects:
             assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
             assert await ceiling.get_uplight_color() == AMBER
 
+    async def test_stopping_one_participant_leaves_the_rest_of_the_run(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            conductor = Conductor()
+            effect = _SolidFrames(RED)
+            await conductor.start(effect, [ceiling.uplight, ceiling.downlight])
+
+            async def all_red() -> bool:
+                return (await _tile(ceiling)) == [RED] * 128
+
+            await _eventually(all_red)
+
+            await conductor.stop([ceiling.uplight])
+
+            assert conductor.effect(ceiling.uplight) is None
+            assert conductor.effect(ceiling.downlight) is effect
+
+            async def uplight_back() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == DIM_BLUE
+
+            await _eventually(uplight_back)
+            drawn = len(effect.contexts)
+            for _ in range(5):  # the downlight keeps drawing, the uplight is back
+                tile = await _tile(ceiling)
+                assert tile[UPLIGHT] == DIM_BLUE
+                assert tile[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                await asyncio.sleep(0.05)
+            assert len(effect.contexts) > drawn
+
+            await conductor.stop([ceiling.downlight])
+
+            assert conductor.effect(ceiling.downlight) is None
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+
     async def test_a_component_dark_before_its_effect_goes_dark_again(
         self, ceiling_device
     ):
@@ -390,6 +436,67 @@ class TestCeilingComponentEffects:
             await ceiling.uplight.stop_effect()
 
             assert await ceiling.get_power() == 0
+
+    async def test_stopping_a_component_keeps_its_stored_colour_unset(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            ceiling.state.stored_uplight_color = None
+            await ceiling.uplight.start_effect(_SolidFrames(RED))
+
+            async def uplight_red() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == RED
+
+            await _eventually(uplight_red)
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert ceiling.state.stored_uplight_color is None
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
+
+    async def test_a_finished_component_effect_keeps_its_stored_colour_unset(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            ceiling.state.stored_uplight_color = None
+            conductor = Conductor()
+            await conductor.start(_SolidFrames(RED, duration=0.3), [ceiling.uplight])
+
+            async def finished() -> bool:
+                return conductor.effect(ceiling.uplight) is None
+
+            await _eventually(finished)
+
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert ceiling.state.stored_uplight_color is None
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
+
+    async def test_a_finished_effect_without_power_on_keeps_stored_colour_unset(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.set_power(False)
+            ceiling.state.stored_uplight_color = None
+            conductor = Conductor()
+            await conductor.start(
+                _SolidFrames(RED, power_on=False, duration=0.3), [ceiling.uplight]
+            )
+
+            async def finished() -> bool:
+                return conductor.effect(ceiling.uplight) is None
+
+            await _eventually(finished)
+
+            assert await ceiling.get_power() == 0
+            assert ceiling.state.stored_uplight_color is None
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
 
     async def test_restoring_one_component_leaves_the_animating_other(
         self, ceiling_device
@@ -539,3 +646,104 @@ async def test_a_failed_component_restore_is_logged(
     )
 
     assert "restore_component" in caplog.text
+
+
+BLUE = HSBK.from_protocol(HSBK(240, 1, 1, 3500).to_protocol())
+OTHER_LIGHT = {"d073d5000002": {"uplight": {"hue": 1}}}
+
+
+def _saved_rig(
+    product: int, monkeypatch: pytest.MonkeyPatch, state_file: Path
+) -> tuple[Rig, dict[str, list[HSBK] | None]]:
+    """A light with both components' stored colours saved beside another light.
+
+    Returns the rig and a snapshot in which the first component had no
+    stored colours and the second had the colours it shows.
+    """
+    # The rig freezes the component clock, so settle delays must not wait on it.
+    for name in ("COLOR_UPDATE_SETTLE_DELAY", "ZONE_UPDATE_SETTLE_DELAY"):
+        monkeypatch.setattr(f"lifx.effects.state_manager.{name}", 0)
+    rig = build_rig(product, monkeypatch)
+    state_file.write_text(json.dumps(OTHER_LIGHT))
+    rig.light._state_file = str(state_file)
+    first, second = rig.names
+    shown = [rig.wire.colours[p] for p in rig.positions[1]]
+    rig.light._set_stored_colors(first, [BLUE] * len(rig.positions[0]))
+    rig.light._set_stored_colors(second, shown)
+    return rig, {first: None, second: shown}
+
+
+async def _assert_first_unset_on_disk(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch, state_file: Path, product: int
+) -> None:
+    first, second = rig.names
+    data = json.loads(state_file.read_text())
+    assert data["d073d5000002"] == OTHER_LIGHT["d073d5000002"]
+    assert first not in data[rig.light.serial]
+    assert second in data[rig.light.serial]
+    assert rig.colours(1, "stored_") == [rig.wire.colours[p] for p in rig.positions[1]]
+
+    fresh = build_rig(product, monkeypatch)
+    fresh.light._state_file = str(state_file)
+    await fresh.light._load_state_from_file()
+    assert fresh.colours(0, "stored_") is None
+    assert fresh.colours(1, "stored_") == rig.colours(1, "stored_")
+
+
+@pytest.mark.parametrize("product", [176, 267], ids=["ceiling", "mirror"])
+async def test_a_component_restore_saves_its_unset_stored_colours(
+    product: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    state_file = tmp_path / "state.json"
+    rig, snapshot = _saved_rig(product, monkeypatch, state_file)
+    await rig.light._save_state_to_file()
+    tile = list(rig.wire.colours)
+
+    await DeviceStateManager().restore_component(
+        rig.light,
+        rig.names[0],
+        PreState(power=True, color=RED, tile_colors=[tile], stored_colors=snapshot),
+    )
+
+    assert rig.colours(0, "stored_") is None
+    await _assert_first_unset_on_disk(rig, monkeypatch, state_file, product)
+
+
+@pytest.mark.parametrize("product", [176, 267], ids=["ceiling", "mirror"])
+async def test_a_whole_light_restore_saves_unset_stored_colours(
+    product: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    state_file = tmp_path / "state.json"
+    rig, snapshot = _saved_rig(product, monkeypatch, state_file)
+    await rig.light._save_state_to_file()
+    tile = list(rig.wire.colours)
+
+    await DeviceStateManager().restore_state(
+        rig.light,
+        PreState(power=True, color=RED, tile_colors=[tile], stored_colors=snapshot),
+    )
+
+    assert rig.colours(0, "stored_") is None
+    await _assert_first_unset_on_disk(rig, monkeypatch, state_file, product)
+
+
+@pytest.mark.parametrize("product", [176, 267], ids=["ceiling", "mirror"])
+async def test_stored_colours_set_after_an_unset_restore_are_saved(
+    product: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    state_file = tmp_path / "state.json"
+    rig, snapshot = _saved_rig(product, monkeypatch, state_file)
+    tile = list(rig.wire.colours)
+    rig.light._state_file = None  # the reset is not saved before the next set
+    await DeviceStateManager().restore_component(
+        rig.light,
+        rig.names[0],
+        PreState(power=True, color=RED, tile_colors=[tile], stored_colors=snapshot),
+    )
+
+    rig.light._set_stored_colors(rig.names[0], [BLUE] * len(rig.positions[0]))
+    rig.light._state_file = str(state_file)
+    await rig.light._save_state_to_file()
+
+    data = json.loads(state_file.read_text())
+    assert rig.names[0] in data[rig.light.serial]

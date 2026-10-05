@@ -176,9 +176,11 @@ class LIFXEffect(ABC):
     def inherit_prestate(self, _other: LIFXEffect) -> bool:
         """Whether this effect can skip device state restoration.
 
-        Optimization allowing consecutive compatible effects to avoid
-        resetting device state. Return True if the given effect type
-        can run without requiring state restoration first.
+        Superseded: the Conductor no longer consults this method. An effect
+        that replaces a running one on a light or light component always
+        inherits that run's original prior state, so stopping it restores
+        what was there before any effect. The method stays for
+        compatibility, and overriding it has no effect.
 
         Args:
             _other: The incoming effect (unused in base implementation)

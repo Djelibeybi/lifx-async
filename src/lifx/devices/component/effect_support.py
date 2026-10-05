@@ -84,7 +84,7 @@ async def restore_component(
     component: ComponentName,
     before: list[HSBK] | None,
     was_on: bool,
-    stored: list[HSBK] | None,
+    snapshot: dict[str, list[HSBK] | None] | None,
 ) -> None:
     """Return one light component to its state before a software effect.
 
@@ -94,6 +94,7 @@ async def restore_component(
         before: The whole tile, in buffer order, captured before the effect,
             or None if it could not be read
         was_on: Whether the light was on before the effect
-        stored: The light component's stored colours before the effect
+        snapshot: Both light components' stored colours before the effect,
+            or None if they were not known
     """
-    await light._restore_component(component, before, was_on, stored)
+    await light._restore_component(component, before, was_on, snapshot)

@@ -250,19 +250,7 @@ async def from_poweroff_hsbk(self, light: Light) -> HSBK:
 
 #### `inherit_prestate(other: LIFXEffect) -> bool`
 
-Whether this effect can skip device state restoration.
-
-**Override this** if your effect can run without resetting when following certain other effects.
-
-**Default behavior:** Returns `False` (always reset)
-
-**Example:**
-
-```python
-def inherit_prestate(self, other: LIFXEffect) -> bool:
-    # Can inherit from same effect type
-    return type(self) == type(other)
-```
+Superseded: the Conductor no longer consults `inherit_prestate()`. A new effect that replaces a running one always inherits that run's original prior state, so stopping it restores what was there before any effect. The method stays for compatibility; overriding it has no effect.
 
 ### Creating Custom Effects
 

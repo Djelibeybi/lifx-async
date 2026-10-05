@@ -110,7 +110,7 @@ class Conductor:
 - Define effect interface (abstract `async_play()` method)
 - Handle power-on logic in `async_perform()`
 - Provide startup color via `from_poweroff_hsbk()`
-- Enable state inheritance optimization via `inherit_prestate()`
+- Keep `inherit_prestate()` for compatibility (superseded; no longer consulted)
 - Store conductor reference and participants
 
 **Key Methods:**
@@ -127,7 +127,7 @@ class LIFXEffect(ABC):
     async def from_poweroff_hsbk(light):    # Startup color (override)
         ...
 
-    def inherit_prestate(other):            # State inheritance (override)
+    def inherit_prestate(other):            # Superseded; not consulted
         ...
 ```
 
@@ -300,7 +300,7 @@ For each light:
 
 **Special Cases:**
 
-- **Prestate Inheritance:** If `effect.inherit_prestate(current_effect)` returns `True`, reuses the replaced run's PreState, so a later stop restores what was there before any effect
+- **Prestate Inheritance:** A participant taken over from a running effect always reuses the replaced run's original PreState, so a later stop restores what was there before any effect
 - **Multizone Devices:** Uses extended messages if supported, falls back to standard messages
 - **Powered-off Devices:** All state is still captured (including zone colors that may be inaccurate)
 
@@ -547,42 +547,9 @@ Without these delays, subsequent operations may arrive before device finishes pr
 
 ### Prestate Inheritance
 
-Optimization that skips state capture/restore for compatible consecutive effects:
+When a new effect replaces a running one on a light or light component, on any Conductor, the new run inherits the replaced run's original prior state, so a later stop restores what was there before any effect rather than a frame captured mid-effect.
 
-```python
-def inherit_prestate(self, other: LIFXEffect) -> bool:
-    """Return True if can skip restoration."""
-    return isinstance(other, EffectColorloop)  # Example
-```
-
-**When used:**
-
-```python
-current_running = self._running.get(serial)
-if current_running and effect.inherit_prestate(current_running.effect):
-    # Reuse existing prestate
-    prestate = current_running.prestate
-else:
-    # Capture new prestate
-    prestate = await self._capture_prestate(light)
-```
-
-**Benefits:**
-
-- Eliminates flash/reset between compatible effects
-- Reduces network traffic
-- Faster effect transitions
-
-**Used by:**
-
-- `EffectColorloop.inherit_prestate()` → `True` for other `EffectColorloop`
-- `EffectRainbow.inherit_prestate()` → `True` for other `EffectRainbow`
-- `EffectFlicker.inherit_prestate()` → `True` for other `EffectFlicker`
-- `EffectAurora.inherit_prestate()` → `True` for other `EffectAurora`
-- `EffectProgress.inherit_prestate()` → `True` for other `EffectProgress`
-- `EffectSunrise.inherit_prestate()` → `True` for other `EffectSunrise`
-- `EffectSunset.inherit_prestate()` → `True` for other `EffectSunset`
-- `EffectPulse` doesn't use it (returns `False`)
+`inherit_prestate()` is superseded: the Conductor no longer consults it, and overriding it has no effect. It stays on `LIFXEffect` for compatibility.
 
 ## Concurrency Model
 

@@ -24,7 +24,6 @@ Subclass `FrameEffect` and implement `generate_frame()`. This is the recommended
 2. Implement `generate_frame(ctx)` returning a list of HSBK colors
 3. Optionally override `async_setup()` for initialization
 4. Optionally override `from_poweroff_hsbk()` for custom startup colors
-5. Optionally override `inherit_prestate()` for state inheritance optimization
 
 ### Imperative Effects
 
@@ -33,7 +32,6 @@ Subclass `LIFXEffect` and implement `async_play()`. Use this when you need direc
 1. Subclass `LIFXEffect`
 2. Implement `async_play()` with your effect logic
 3. Optionally override `from_poweroff_hsbk()` for custom startup colors
-4. Optionally override `inherit_prestate()` for state inheritance optimization
 
 The conductor handles all state management automatically — you just focus on the visual effect.
 
@@ -377,32 +375,7 @@ async def from_poweroff_hsbk(self, light: Light) -> HSBK:
 
 ### `inherit_prestate(other: LIFXEffect) -> bool`
 
-Override this to enable state inheritance optimization.
-
-**Default behavior:** Returns `False` (always capture fresh state).
-
-**When called:** Before starting effect, to check if previous effect's state can be reused.
-
-**Example:**
-
-```python
-def inherit_prestate(self, other: LIFXEffect) -> bool:
-    """Can inherit from same effect type."""
-    return type(self) == type(other)
-```
-
-**Returns:**
-
-- `True`: Skip state capture/restore, reuse existing `PreState`
-- `False`: Capture fresh state as normal
-
-**Benefits:**
-
-- Faster effect transitions
-- No visible reset between compatible effects
-- Reduces network traffic
-
-**Use with caution:** Only return `True` if the incoming effect is truly compatible (won't cause visual artifacts).
+Superseded: the Conductor no longer consults `inherit_prestate()`. A new effect that replaces a running one always inherits that run's original prior state, so stopping it restores what was there before any effect. The method stays for compatibility; overriding it has no effect.
 
 ## Common Patterns
 
@@ -728,10 +701,6 @@ class RandomColorEffect(LIFXEffect):
     def stop(self) -> None:
         """Stop the continuous effect."""
         self._running = False
-
-    def inherit_prestate(self, other: LIFXEffect) -> bool:
-        """Can inherit from other RandomColorEffect instances."""
-        return isinstance(other, RandomColorEffect)
 ```
 
 **Usage:**
