@@ -479,6 +479,47 @@ class TestCeilingComponentEffects:
             assert tile[UPLIGHT] == DIM_BLUE
             assert tile[:DOWNLIGHT] == [GREEN] * DOWNLIGHT
 
+    @pytest.mark.parametrize("failure", ["never-reports-off", "power-read-fails"])
+    async def test_a_restore_writes_no_colours_unless_off_is_confirmed(
+        self, ceiling_device, monkeypatch: pytest.MonkeyPatch, failure: str
+    ):
+        """Without a confirmed off, the earlier picture is not written."""
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.set_power(False)
+            await ceiling.uplight.start_effect(_SolidFrames(RED))
+
+            async def uplight_red() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == RED
+
+            await _eventually(uplight_red)
+
+            async def failing_get_power() -> int:
+                if failure == "power-read-fails":
+                    raise LifxTimeoutError("no reply")
+                return 65535
+
+            writes: list[list[HSBK]] = []
+            real_write_tile = ceiling._write_tile
+
+            async def recording_write_tile(tile: list[HSBK], duration: float) -> None:
+                writes.append(list(tile))
+                await real_write_tile(tile, duration)
+
+            monkeypatch.setattr("lifx.devices.light.POWER_OFF_WAIT_SECONDS", 0.05)
+            monkeypatch.setattr(ceiling, "get_power", failing_get_power)
+            monkeypatch.setattr(ceiling, "_write_tile", recording_write_tile)
+
+            await ceiling.uplight.stop_effect()
+
+            assert not any(
+                tile[UPLIGHT] == DIM_BLUE and tile[:DOWNLIGHT] == [GREEN] * DOWNLIGHT
+                for tile in writes
+            )
+            assert ceiling.state.stored_uplight_color == DIM_BLUE
+            assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
+
     async def test_a_restore_keeps_the_other_components_change_during_the_effect(
         self, ceiling_device
     ):

@@ -119,18 +119,21 @@ class DeviceStateManager:
         """
         # A light that was on gets its colours back, then power. One that was
         # off goes dark first and gets its colours back once it reports off,
-        # so they never show as a flash.
+        # so they never show as a flash; if it never reports off, they are
+        # not written at all.
+        write_colours = True
         if not prestate.power:
             await self._restore_power(light, prestate.power)
-            await self._wait_until_off(light)
+            write_colours = await self._wait_until_off(light)
 
-        if isinstance(light, MultiZoneLight) and prestate.zone_colors:
-            await self._restore_zones(light, prestate.zone_colors)
+        if write_colours:
+            if isinstance(light, MultiZoneLight) and prestate.zone_colors:
+                await self._restore_zones(light, prestate.zone_colors)
 
-        if isinstance(light, MatrixLight) and prestate.tile_colors:
-            await self._restore_tiles(light, prestate.tile_colors)
-        else:
-            await self._restore_color(light, prestate.color)
+            if isinstance(light, MatrixLight) and prestate.tile_colors:
+                await self._restore_tiles(light, prestate.tile_colors)
+            else:
+                await self._restore_color(light, prestate.color)
 
         if prestate.power:
             await self._restore_power(light, prestate.power)
@@ -345,32 +348,33 @@ class DeviceStateManager:
                 }
             )
 
-    async def _wait_until_off(self, light: Light) -> None:
+    async def _wait_until_off(self, light: Light) -> bool:
         """Wait for a power-off to take effect before colours are written.
 
         Args:
             light: Light device that was just turned off
+
+        Returns:
+            True once the light reports off; False, with a warning, if it
+            still reports on when the wait runs out or its power cannot be
+            read, in which case no colours should be written
         """
         try:
-            if not await wait_until_off(light):
-                _LOGGER.debug(
-                    {
-                        "class": self.__class__.__name__,
-                        "method": "_wait_until_off",
-                        "action": "timeout",
-                        "values": {"serial": light.serial},
-                    }
-                )
+            if await wait_until_off(light):
+                return True
+            error = "the light did not report off in time"
         except Exception as e:
-            _LOGGER.warning(
-                {
-                    "class": self.__class__.__name__,
-                    "method": "_wait_until_off",
-                    "action": "wait",
-                    "error": str(e),
-                    "values": {"serial": light.serial},
-                }
-            )
+            error = str(e)
+        _LOGGER.warning(
+            {
+                "class": self.__class__.__name__,
+                "method": "_wait_until_off",
+                "action": "skip_colours",
+                "error": error,
+                "values": {"serial": light.serial},
+            }
+        )
+        return False
 
     async def _restore_power(self, light: Light, power: bool) -> None:
         """Restore power state.

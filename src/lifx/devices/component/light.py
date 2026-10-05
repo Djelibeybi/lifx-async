@@ -288,7 +288,9 @@ class ComponentMatrixLight(MatrixLight):
         Turning a light component off can power the light off with the
         effect's last frame still on the tile, which a later power-on would
         show. Writing its earlier colours back while the light is off shows
-        nothing and leaves stored colours alone.
+        nothing and leaves stored colours alone. If the light does not report
+        off, or its power cannot be read, nothing is written: a write to a
+        light that may still be lit would flash.
 
         Turning on only the light component for its effect darkened the other
         one. While the other light component still holds exactly those
@@ -305,8 +307,14 @@ class ComponentMatrixLight(MatrixLight):
             if await self._power_for_update() != 0:
                 return
             # The light acknowledges the power-off before it goes dark; a
-            # write in that window flashes the earlier picture.
-            await wait_until_off(self)
+            # write in that window flashes the earlier picture, so nothing is
+            # written until the light reports off.
+            try:
+                off = await wait_until_off(self)
+            except LifxError:
+                off = False
+            if not off:
+                return
             tile = await self._tile_colors_for_update()
             for position in self._component_positions(component):
                 tile[position] = before[position]

@@ -1270,7 +1270,7 @@ POWER_OFF_POLL_SECONDS = 0.05
 
 async def wait_until_off(
     light: Light,
-    timeout: float = POWER_OFF_WAIT_SECONDS,
+    timeout: float | None = None,
     interval: float = POWER_OFF_POLL_SECONDS,
 ) -> bool:
     """Wait until a light itself reports that it is off.
@@ -1283,13 +1283,19 @@ async def wait_until_off(
 
     Args:
         light: The light to ask
-        timeout: Seconds to wait before giving up
+        timeout: Seconds to wait before giving up, ``POWER_OFF_WAIT_SECONDS``
+            when None
         interval: Seconds between requests
 
     Returns:
         True once the light reports off, False if it still reports on when
         ``timeout`` runs out
+
+    Raises:
+        LifxError: If the light's power cannot be read
     """
+    if timeout is None:
+        timeout = POWER_OFF_WAIT_SECONDS
     deadline = time.monotonic() + timeout
     while await light.get_power() != 0:
         if time.monotonic() >= deadline:
