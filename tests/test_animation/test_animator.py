@@ -1136,8 +1136,12 @@ async def test_drain_probe_acks_fails_when_no_ack_arrives(
     mock_udp_socket: MockUdpSocket,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Probe expiry must not let the ack wait pass without a received ack."""
-    monkeypatch.setattr("lifx.animation.flow.ACK_EXPIRY_SECONDS", 0.01)
+    """Probe expiry must not let the ack wait pass without a received ack.
+
+    The expiry is well above Windows' ~16 ms monotonic clock tick, so the probe
+    cannot already look expired when the wait starts.
+    """
+    monkeypatch.setattr("lifx.animation.flow.ACK_EXPIRY_SECONDS", 0.05)
     animator = Animator(
         ip="192.0.2.1",
         serial=Serial.from_string("d073d5123456"),
@@ -1150,4 +1154,4 @@ async def test_drain_probe_acks_fails_when_no_ack_arrives(
     assert animator._ack_gate.outstanding_count == 1
 
     with pytest.raises(AssertionError, match="did not arrive"):
-        await _drain_probe_acks(animator, timeout=0.2)
+        await _drain_probe_acks(animator, timeout=0.3)
