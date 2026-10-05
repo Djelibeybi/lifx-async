@@ -212,8 +212,9 @@ class TestMirrorOverlapRules:
         assert conductor.effect(mirror) is whole
         await _next_frame(rig, whole)
         tile = _sent_tiles(udp)[-1]
+        # Both rings are the Mirror's one participant, so they match.
         assert _ring(tile, rig, FRONT) == _zones(0)
-        assert _ring(tile, rig, BACK) == _zones(1)
+        assert _ring(tile, rig, BACK) == _zones(0)
 
         # Stopping it restores what was there before any effect started.
         await conductor.stop([mirror])
@@ -279,7 +280,7 @@ class TestMirrorOverlapRules:
         assert conductor.effect(mirror.back) is whole
         tile = _sent_tiles(udp)[-1]
         assert _ring(tile, rig, FRONT) == [AMBER.as_tuple()] * 25
-        # The back ring is the moved effect's first participant now.
+        # The back ring keeps the index the Mirror had.
         assert _ring(tile, rig, BACK) == _zones(0)
         assert whole.contexts[-1].pixel_count == 25
 
@@ -303,7 +304,7 @@ class TestMirrorOverlapRules:
         await _next_frame(rig, whole)
         tile = _sent_tiles(udp)[-1]
         assert _ring(tile, rig, FRONT) == [AMBER.as_tuple()] * 25
-        # The back ring is the effect's first participant now.
+        # The back ring keeps the index the Mirror had.
         assert _ring(tile, rig, BACK) == _zones(0)
 
         await conductor.stop([mirror.back])
@@ -342,8 +343,9 @@ class TestMirrorOverlapRules:
         await conductor.start(whole, [mirror])
         for _ in range(3):
             await _next_frame(rig, whole)
-        # Each ring counts its own frames.
-        front_count = whole.counts[-2]
+        # Both rings show one count, drawn once a frame.
+        front_count = whole.counts[-1]
+        assert whole.counts[-3:] == [front_count - 2, front_count - 1, front_count]
 
         await mirror.back.start_effect(_Solid(GREEN))
         await _next_frame(rig, whole)

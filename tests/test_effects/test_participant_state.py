@@ -2,9 +2,10 @@
 
 Several effects simulate something over time (embers' heat, Jacob's Ladder's
 arcs, a ripple's water). When one run draws on several participants, such as
-two lights or the two rings of a whole-light Mirror effect, each participant
-must advance its own simulation: drawing participant B must not change what
-participant A shows.
+two lights, each participant must advance its own simulation: drawing
+participant B must not change what participant A shows. The two rings of a
+whole-light Mirror effect are one participant, so they share one simulation
+and show one frame.
 """
 
 from __future__ import annotations
@@ -17,8 +18,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.animation.animator import AnimatorWriter
+from lifx.color import HSBK
+from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.cylon import EffectCylon
+from lifx.effects.embers import EffectEmbers
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.rainbow import EffectRainbow
 from lifx.effects.registry import get_effect_registry
 from lifx.effects.rule30 import EffectRule30
 
@@ -155,27 +160,174 @@ async def test_a_participant_frames_ignore_other_participants(
     assert together == alone
 
 
-@pytest.mark.parametrize("a_first", [True, False], ids=["front-first", "back-first"])
 @pytest.mark.parametrize(
     "make_effect", [make for _, make in _CASES], ids=[name for name, _ in _CASES]
 )
-async def test_a_mirror_ring_frames_ignore_the_other_ring(
+async def test_both_rings_of_a_whole_light_mirror_show_one_frame(
     make_effect: Callable[[], FrameEffect],
-    a_first: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A whole-light Mirror effect draws each ring as if it drew that ring alone.
+    """A whole-light Mirror effect draws its two rings as one participant.
 
-    Both rings belong to one light, so each ring's simulation is keyed by its
-    light component as well as the light.
+    The effect draws each frame once and both rings show it: they share one
+    simulation, which advances once a frame, so a random or stateful effect
+    looks as it did on the interim whole-light ring canvas. Every draw gets
+    fresh random numbers, as it would on a real run.
     """
-    alone = await _frames_of_a(make_effect(), None, monkeypatch, rings=True)
-    together = await _frames_of_a(
-        make_effect(), 16, monkeypatch, a_first=a_first, rings=True
+    front: list[list[tuple[int, int, int, int]]] = []
+    back: list[list[tuple[int, int, int, int]]] = []
+    contexts: list[FrameContext] = []
+    await _ring_run(
+        make_effect(), monkeypatch, front, back, contexts=contexts, seed_calls=True
     )
 
-    assert len(alone) == _TICKS
-    assert together == alone
+    assert len(front) == _TICKS
+    assert len(contexts) == _TICKS
+    assert front == back
+
+
+async def _ring_run(
+    effect: FrameEffect,
+    monkeypatch: pytest.MonkeyPatch,
+    front: list[list[tuple[int, int, int, int]]],
+    back: list[list[tuple[int, int, int, int]]],
+    *,
+    before: list[list[tuple[int, int, int, int]]] | None = None,
+    after: list[list[tuple[int, int, int, int]]] | None = None,
+    contexts: list[FrameContext] | None = None,
+    move_at: int | None = None,
+    seed_calls: bool = False,
+) -> None:
+    """Play a whole-light Mirror run, optionally between two other lights.
+
+    Random draws are seeded by size and tick, as in ``_frames_of_a()``, or
+    with ``seed_calls`` by how many frames the effect has drawn.
+
+    With ``move_at``, the back ring leaves the run at that tick and the front
+    ring carries on as a light component, as when an effect starts on the
+    back ring.
+    """
+    clock = _FakeClock()
+    monkeypatch.setattr("lifx.effects.frame_effect.time", clock)
+    mirror = _light(_SERIAL_A)
+    rings = [_writer(16, front, "front"), _writer(16, back, "back")]
+    writers: list[MagicMock] = list(rings)
+    participants = [mirror, mirror]
+    if before is not None:
+        writers.insert(0, _writer(16, before))
+        participants.insert(0, _light("d073d5000003"))
+    if after is not None:
+        writers.append(_writer(16, after))
+        participants.append(_light(_SERIAL_B))
+
+    last = writers[-1]
+    record = last.send_frame.side_effect
+    tick = 0
+
+    def end_frame(frame: list[tuple[int, int, int, int]]) -> None:
+        nonlocal tick
+        record(frame)
+        tick += 1
+        clock.now += 1.0 / effect.fps
+        if tick == move_at:
+            idx = effect._animators.index(rings[1])
+            del effect._animators[idx]
+            del effect.participants[idx]
+            rings[0].whole_light = False
+            effect._rename_participant(_SERIAL_A, (_SERIAL_A, "front"))
+        if tick >= _TICKS:
+            effect.stop()
+
+    last.send_frame.side_effect = end_frame
+
+    generate: Callable[[FrameContext], list[tuple[int, int, int, int]]] = (
+        effect.generate_protocol_frame
+    )
+    calls: list[FrameContext] = []
+
+    def seeded(ctx: FrameContext) -> list[tuple[int, int, int, int]]:
+        if contexts is not None:
+            contexts.append(ctx)
+        calls.append(ctx)
+        random.seed(len(calls) if seed_calls else f"{ctx.pixel_count}-{ctx.elapsed_s}")
+        return generate(ctx)
+
+    effect.generate_protocol_frame = seeded  # type: ignore[method-assign]
+    effect.participants = participants  # type: ignore[assignment]
+    effect._animators = writers  # type: ignore[assignment]
+    await effect.async_setup(participants)  # type: ignore[arg-type]
+    await effect.async_play()
+
+
+async def test_a_whole_light_mirror_takes_one_index_among_other_lights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both rings share the Mirror's index, and later lights keep theirs.
+
+    A spread effect offsets each participant by its index, so the rings match
+    and a light after the Mirror is offset as if the Mirror took part once.
+    """
+    front: list[list[tuple[int, int, int, int]]] = []
+    back: list[list[tuple[int, int, int, int]]] = []
+    before: list[list[tuple[int, int, int, int]]] = []
+    after: list[list[tuple[int, int, int, int]]] = []
+    contexts: list[FrameContext] = []
+    effect = EffectRainbow(period=10.0, spread=90.0)
+
+    await _ring_run(
+        effect, monkeypatch, front, back, before=before, after=after, contexts=contexts
+    )
+
+    assert [ctx.device_index for ctx in contexts[:3]] == [0, 1, 2]
+    assert len(contexts) == 3 * _TICKS
+    assert front == back
+    assert front != before
+    assert after != front
+
+
+async def test_unsynchronised_colorloop_paints_both_rings_alike(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Colorloop's spread offsets the Mirror once, not once per ring."""
+    front: list[list[tuple[int, int, int, int]]] = []
+    back: list[list[tuple[int, int, int, int]]] = []
+    effect = EffectColorloop(spread=90.0, synchronized=False)
+    effect._get_initial_colors = AsyncMock(  # type: ignore[method-assign]
+        return_value=[HSBK(0, 1, 0.5, 3500)]
+    )
+
+    await _ring_run(effect, monkeypatch, front, back)
+
+    assert front == back
+
+
+async def test_a_moved_ring_keeps_the_mirror_s_index_and_simulation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the back ring leaves, the front ring carries on where it was.
+
+    It keeps the index the Mirror had and the simulation both rings shared,
+    so its frames run on as if the run had always drawn that ring alone.
+    """
+    alone = await _frames_of_a(EffectEmbers(), None, monkeypatch, rings=True)
+    front: list[list[tuple[int, int, int, int]]] = []
+    back: list[list[tuple[int, int, int, int]]] = []
+    after: list[list[tuple[int, int, int, int]]] = []
+    contexts: list[FrameContext] = []
+
+    await _ring_run(
+        EffectEmbers(),
+        monkeypatch,
+        front,
+        back,
+        after=after,
+        contexts=contexts,
+        move_at=_TICKS // 2,
+    )
+
+    assert front == alone
+    assert len(back) == _TICKS // 2
+    assert [ctx.device_index for ctx in contexts] == [0, 1] * _TICKS
 
 
 async def test_a_participant_that_rejoins_starts_a_fresh_simulation(

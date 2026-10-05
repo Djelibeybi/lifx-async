@@ -87,7 +87,10 @@ class FrameContext:
 
     Attributes:
         elapsed_s: Seconds since effect started
-        device_index: Index of this device in the participants list
+        device_index: Index of this participant in the run. Both rings of a
+            whole-light Mirror effect are the Mirror's one participant, so
+            they share one index, and a light after the Mirror keeps the
+            index it would have had beside any other light.
         pixel_count: Number of pixels (1 for light, N for zones, W*H for matrix)
         canvas_width: Width in pixels (pixel_count for 1D, W for matrix)
         canvas_height: Height in pixels (1 for 1D, H for matrix)
@@ -126,7 +129,9 @@ class FrameEffect(LIFXEffect):
     A participant's first frame starts from the values the attributes held
     when the run drew its first frame. Attributes left out of
     ``participant_state``, such as a palette or a shared clock, stay shared by
-    every participant.
+    every participant. Both rings of a whole-light Mirror effect are the
+    Mirror's one participant: the loop draws one frame for them, from one
+    simulation, and both rings show it.
 
     Attributes:
         fps: Frames per second
@@ -325,37 +330,58 @@ class FrameEffect(LIFXEffect):
             participants = list(self.participants)
             staged = _staged_writers(animators)
 
-            keys: list[object] = [
-                participant_key(participants[idx], writer_component(animator))
-                if idx < len(participants)
-                else idx
-                for idx, animator in enumerate(animators)
-            ]
+            # A writer's frame is kept under its light component, its drawing
+            # under its participant: both rings of a whole-light Mirror draw
+            # as the Mirror, so they share its index, simulation and frame.
+            frame_keys: list[object] = []
+            draw_keys: list[object] = []
+            for idx, animator in enumerate(animators):
+                if idx < len(participants):
+                    light = participants[idx]
+                    frame_keys.append(
+                        participant_key(light, writer_component(animator))
+                    )
+                    draw_keys.append(
+                        participant_key(light, writer_participant(animator))
+                    )
+                else:
+                    frame_keys.append(idx)
+                    draw_keys.append(idx)
+            indices = {key: index for index, key in enumerate(dict.fromkeys(draw_keys))}
+            drawn: dict[
+                object, tuple[list[tuple[int, int, int, int]], list[HSBK] | None]
+            ] = {}
 
             # Generate and send frames for each device
             for idx, animator in enumerate(animators):
-                self._draw_as(keys[idx], keys)
-                ctx = FrameContext(
-                    elapsed_s=elapsed_s,
-                    device_index=idx,
-                    pixel_count=animator.pixel_count,
-                    canvas_width=animator.canvas_width,
-                    canvas_height=animator.canvas_height,
-                    wraps=animator.wraps,
-                )
-
-                # Generate protocol-ready frame (subclasses can override
-                # generate_protocol_frame for zero-HSBK-allocation path)
-                protocol_frame = self.generate_protocol_frame(ctx)
-
-                # Track HSBK frame for state restoration (populated by
-                # default generate_protocol_frame, None for direct overrides)
-                if idx < len(participants) and self._last_generated_hsbk is not None:
-                    self._last_frames[cast("ParticipantKey", keys[idx])] = (
-                        self._last_generated_hsbk
+                key = draw_keys[idx]
+                if key in drawn:
+                    # The other ring of a whole-light Mirror: the same frame
+                    protocol_frame, hsbk = drawn[key]
+                else:
+                    self._draw_as(key, draw_keys)
+                    ctx = FrameContext(
+                        elapsed_s=elapsed_s,
+                        device_index=indices[key],
+                        pixel_count=animator.pixel_count,
+                        canvas_width=animator.canvas_width,
+                        canvas_height=animator.canvas_height,
+                        wraps=animator.wraps,
                     )
-                # Always clear to prevent stale frames leaking across iterations
-                self._last_generated_hsbk = None
+
+                    # Generate protocol-ready frame (subclasses can override
+                    # generate_protocol_frame for zero-HSBK-allocation path)
+                    protocol_frame = self.generate_protocol_frame(ctx)
+                    # Populated by the default generate_protocol_frame, None
+                    # for direct overrides; always cleared so no stale frame
+                    # leaks across iterations
+                    hsbk = self._last_generated_hsbk
+                    self._last_generated_hsbk = None
+                    drawn[key] = (protocol_frame, hsbk)
+
+                # Track HSBK frame for state restoration
+                if idx < len(participants) and hsbk is not None:
+                    self._last_frames[cast("ParticipantKey", frame_keys[idx])] = hsbk
 
                 # Send via direct UDP; a light component whose tile a later
                 # writer sends this frame only keeps its frame in its slot

@@ -371,9 +371,10 @@ class Conductor:
                         other, writer._duration_ms, canvas=writer._canvas
                     )
                     writer.close()
-            # A Ceiling's writer drew as the whole light and now draws as the
-            # other light component; its simulation carries on there. A
-            # Mirror's ring writers already drew as their rings.
+            # The writers drew as the whole light and now draw as the other
+            # light component; their simulation carries on there, so a
+            # Mirror's remaining ring keeps the frames and index both rings
+            # shared.
             effect._rename_participant(light.serial, participant_key(light, other))
             del self._running[light.serial]
             self._running[participant_key(light, other)] = running
@@ -612,13 +613,15 @@ class Conductor:
             if isinstance(effect, FrameEffect):
                 # Set participants early so async_setup() can access them
                 # (async_perform() sets this too but runs in a background task).
-                # A whole-light Mirror takes part once for each ring.
+                # A whole-light Mirror draws through a writer for each ring,
+                # but setup sees each participant once, in index order.
+                setup = lights
                 lights = _drawn_lights(effect, filtered_participants)
                 effect.participants = lights
                 await self._power_on_components(effect, filtered_participants)
                 animators = await self._create_animators(effect, filtered_participants)
                 effect._animators = animators
-                await effect.async_setup(lights)
+                await effect.async_setup(setup)
 
             # Create background task for the effect
             task = asyncio.create_task(self._run_effect_with_cleanup(effect, lights))

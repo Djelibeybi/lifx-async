@@ -111,20 +111,26 @@ async def test_whole_light_effect_on_a_mirror_runs_as_two_ring_participants(
     await conductor.start(effect, [rig.light])
     await asyncio.wait_for(effect.drawn.wait(), 1)
 
-    # Each ring is a participant of its own: 25 zones in zone order that wrap.
-    front_ctx, back_ctx = effect.contexts[:2]
-    assert (front_ctx.device_index, back_ctx.device_index) == (0, 1)
-    for ctx in (front_ctx, back_ctx):
-        assert (ctx.pixel_count, ctx.canvas_width, ctx.canvas_height) == (25, 25, 1)
-        assert ctx.wraps is True
-    assert len(effect.contexts) == 2
+    # Each ring is drawn by a writer of its own on 25 zones in zone order
+    # that wrap, but both rings are the Mirror's one participant: the effect
+    # draws one frame, at the Mirror's index, and both rings show it.
+    (ctx,) = effect.contexts
+    assert ctx.device_index == 0
+    assert (ctx.pixel_count, ctx.canvas_width, ctx.canvas_height) == (25, 25, 1)
+    assert ctx.wraps is True
+    assert [w.component for w in effect._animators] == ["front", "back"]
 
-    # One tile per frame carries each ring's frame on that ring's positions.
+    # One tile per frame carries the frame on each ring's positions, and the
+    # two chipless positions stay dark, as on the interim ring canvas.
     (sent,) = _sent_tiles(udp)
     frame = [HSBK(i * 10, 1, 0.5, 3500).as_tuple() for i in range(25)]
     front, back = rig.positions
     assert [sent[p] for p in front] == frame
     assert [sent[p] for p in back] == frame
+    chipless = set(range(52)) - set(front) - set(back)
+    assert len(chipless) == 2
+    assert all(rig.wire.colours[p].brightness > 0 for p in chipless)
+    assert all(sent[p][2] == 0 for p in chipless)
 
     # It is still one whole-light run.
     assert conductor.effect(rig.light) is effect
@@ -362,6 +368,47 @@ async def test_a_mirror_added_to_a_run_joins_as_both_rings(
     assert [w.component for w in effect._animators] == ["front", "back"] * 2
     assert conductor.effect(rig.light) is effect
     await conductor.stop([other.light, rig.light])
+
+
+async def test_each_whole_light_mirror_takes_one_index_in_a_run(
+    mirror_rig: transitions.Rig, monkeypatch: pytest.MonkeyPatch, udp: MagicMock
+):
+    """Two Mirrors in one run are participants 0 and 1, not 0 to 3."""
+    rig = mirror_rig
+    other = _rig(267, monkeypatch)
+    other.light.serial = "d073d5000002"
+    conductor = Conductor()
+    effect = _Recording()
+
+    await conductor.start(effect, [other.light, rig.light])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
+    await conductor.stop([other.light, rig.light])
+
+    assert [ctx.device_index for ctx in effect.contexts[:2]] == [0, 1]
+
+
+async def test_colorloop_sets_up_each_whole_light_mirror_once(
+    mirror_rig: transitions.Rig, monkeypatch: pytest.MonkeyPatch, udp: MagicMock
+):
+    """Setup sees each participant once, so its colours line up with indices."""
+    rig = mirror_rig
+    other = _rig(267, monkeypatch)
+    other.light.serial = "d073d5000002"
+    conductor = Conductor()
+    effect = EffectColorloop(spread=90.0, synchronized=False)
+    seen: list[list[object]] = []
+    setup = effect.async_setup
+
+    async def record_setup(participants) -> None:
+        seen.append(list(participants))
+        await setup(participants)
+
+    effect.async_setup = record_setup  # type: ignore[method-assign]
+    await conductor.start(effect, [other.light, rig.light])
+    await conductor.stop([other.light, rig.light])
+
+    assert seen == [[other.light, rig.light]]
+    assert len(effect._initial_colors) == 2
 
 
 class _Protocol(_Recording):

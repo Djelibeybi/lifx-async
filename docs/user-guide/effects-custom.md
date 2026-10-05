@@ -73,7 +73,8 @@ class MyFrameEffect(FrameEffect):
 Every call to `generate_frame()` receives a `FrameContext` with:
 
 - `elapsed_s`: Seconds since effect started (use for time-based animation)
-- `device_index`: Index in participants list (use for per-device offsets)
+- `device_index`: Index in participants list (use for per-device offsets). Both rings of a
+  whole-light Mirror share the Mirror's one index
 - `pixel_count`: Number of pixels to generate (1 for Light, N for zones, W*H for matrix)
 - `canvas_width`: Width in pixels (for 2D effects on matrix devices)
 - `canvas_height`: Height in pixels (for 2D effects on matrix devices)

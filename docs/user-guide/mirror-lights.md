@@ -285,12 +285,15 @@ appears to move in opposite directions on the two rings.
 
 A software effect started on the whole Mirror, with `mirror.start_effect()` or
 `Conductor.start()`, runs as two ring participants of the one effect: the
-front ring, then the back ring. Effects that offset each participant, such as
-Colorloop's `spread`, offset the back ring from the front as they would a
-second light. The effect is still one whole-light run: stopping it restores the
-whole tile and power, and leaves both rings' stored colours alone.
-`Conductor.get_last_frame(mirror)` returns both rings' frames in zone order,
-front then back.
+front ring, then the back ring. Both rings show the same frame: they share the
+Mirror's one `device_index` and one simulation, so Colorloop's `spread`, a
+random effect such as Twinkle and a stateful one such as Embers look the same
+on both rings, and a light after the Mirror in the same run keeps the index it
+would have had beside any other light. The two chipless buffer positions stay
+dark while the effect runs. The effect is still one whole-light run: stopping
+it restores the whole tile and power, and leaves both rings' stored colours
+alone. `Conductor.get_last_frame(mirror)` returns both rings' frames in zone
+order, front then back.
 
 ```python
 from lifx import Conductor, EffectRainbow

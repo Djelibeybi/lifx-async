@@ -197,6 +197,19 @@ class ComponentMatrixLight(MatrixLight):
         """
         async with self._component_operation():
             tile = await self._tile_colors_for_update()
+        if whole_light:
+            # A whole-light effect owns the whole tile: positions that belong
+            # to no light component, such as a Mirror's chipless ones, stay
+            # dark while it runs.
+            owned = {
+                position
+                for fields in self._component_fields
+                for position in self._component_positions(fields.name)
+            }
+            tile = [
+                colour if position in owned else self._unlit(colour)
+                for position, colour in enumerate(tile)
+            ]
         animator = await self.animator.prepare()
         positions = self._component_positions(component)
         canvas, sources = (

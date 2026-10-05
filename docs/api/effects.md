@@ -315,7 +315,7 @@ Frozen dataclass passed to `generate_frame()` with timing and layout info:
 @dataclass(frozen=True)
 class FrameContext:
     elapsed_s: float    # Seconds since effect started
-    device_index: int   # Index in participants list
+    device_index: int   # Index in participants list (a Mirror's two rings share one)
     pixel_count: int    # Number of pixels (1 for light, N for zones, W*H for matrix)
     canvas_width: int   # Width (pixel_count for 1D, W for matrix)
     canvas_height: int  # Height (1 for 1D, H for matrix)
