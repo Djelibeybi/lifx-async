@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -966,7 +967,6 @@ class TestSkyEffectFirmwareGate:
         matrix.get_host_firmware = AsyncMock(
             return_value=FirmwareInfo(build=0, version_major=major, version_minor=minor)
         )
-        matrix.connection.send_packet = AsyncMock()
         return matrix
 
     def test_quirk_requires_matrix_and_firmware(self) -> None:
@@ -1023,7 +1023,7 @@ class TestSkyEffectFirmwareGate:
         ):
             await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
 
-        matrix.connection.send_packet.assert_not_called()
+        matrix.connection.request.assert_not_called()
 
     async def test_set_effect_sky_rejected_without_matrix_capability(
         self, mock_device_factory
@@ -1039,7 +1039,7 @@ class TestSkyEffectFirmwareGate:
         ):
             await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
 
-        matrix.connection.send_packet.assert_not_called()
+        matrix.connection.request.assert_not_called()
 
     async def test_set_effect_other_effects_skip_the_gate(
         self, mock_device_factory
@@ -1055,7 +1055,7 @@ class TestSkyEffectFirmwareGate:
 
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=2.0)
 
-        matrix.connection.send_packet.assert_awaited_once()
+        matrix.connection.request.assert_awaited_once()
 
     async def test_supports_sky_effect_without_capabilities_fails_closed(
         self, mock_device_factory
@@ -1090,7 +1090,7 @@ class TestSkyEffectFirmwareGate:
         ):
             await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
 
-        matrix.connection.send_packet.assert_not_called()
+        matrix.connection.request.assert_not_called()
 
     async def test_set_effect_color_sweep_sends_zero_speed(
         self, mock_device_factory
@@ -1106,8 +1106,8 @@ class TestSkyEffectFirmwareGate:
             duration=30_000_000_000,
         )
 
-        matrix.connection.send_packet.assert_awaited_once()
-        packet = matrix.connection.send_packet.await_args.args[0]
+        matrix.connection.request.assert_awaited_once()
+        packet = matrix.connection.request.await_args.args[0]
         assert packet.settings.speed == 0
         assert packet.settings.duration == 30_000_000_000
 
@@ -1126,7 +1126,7 @@ class TestSkyEffectFirmwareGate:
             sky_type=TileEffectSkyType.SUNSET,
         )
 
-        packet = matrix.connection.send_packet.await_args.args[0]
+        packet = matrix.connection.request.await_args.args[0]
         assert packet.settings.speed == 0
         assert packet.settings.duration == 10_000_000_000
 
@@ -1147,7 +1147,7 @@ class TestSkyEffectFirmwareGate:
 
         await matrix.set_effect(effect_type=effect_type, speed=0)
 
-        packet = matrix.connection.send_packet.await_args.args[0]
+        packet = matrix.connection.request.await_args.args[0]
         assert packet.settings.speed == 3000
 
     async def test_set_effect_converts_speed_to_milliseconds(
@@ -1160,7 +1160,7 @@ class TestSkyEffectFirmwareGate:
 
         await matrix.set_effect(effect_type=FirmwareEffect.FLAME, speed=1.2346)
 
-        packet = matrix.connection.send_packet.await_args.args[0]
+        packet = matrix.connection.request.await_args.args[0]
         assert packet.settings.speed == 1235
 
     @pytest.mark.parametrize(
@@ -1186,7 +1186,7 @@ class TestSkyEffectFirmwareGate:
                 duration=30_000_000_000,
             )
 
-        matrix.connection.send_packet.assert_not_called()
+        matrix.connection.request.assert_not_called()
 
     async def test_set_effect_zero_speed_keeps_default_for_other_effects(
         self, mock_device_factory
@@ -1198,7 +1198,7 @@ class TestSkyEffectFirmwareGate:
 
         await matrix.set_effect(effect_type=FirmwareEffect.FLAME, speed=0)
 
-        packet = matrix.connection.send_packet.await_args.args[0]
+        packet = matrix.connection.request.await_args.args[0]
         assert packet.settings.speed == 3000
 
     async def test_set_effect_sky_sends_when_support_probe_times_out(
@@ -1212,7 +1212,7 @@ class TestSkyEffectFirmwareGate:
 
         await matrix.set_effect(effect_type=FirmwareEffect.SKY, speed=2.0)
 
-        matrix.connection.send_packet.assert_awaited_once()
+        matrix.connection.request.assert_awaited_once()
 
 
 class TestTileInfo:
@@ -1300,7 +1300,7 @@ class TestSetMatrixColorsSolidShortcut:
         await matrix_light.set_matrix_colors(0, [Colors.RED] * 64)
 
         matrix_light.set_color.assert_awaited_once()
-        matrix_light.connection.send_packet.assert_not_called()
+        matrix_light.connection.request.assert_not_called()
 
     async def test_chain_does_not_use_set_color(
         self, matrix_light: MatrixLight
@@ -1313,13 +1313,12 @@ class TestSetMatrixColorsSolidShortcut:
         """
         matrix_light._device_chain = [self._tile(0), self._tile(1)]
         matrix_light.set_color = AsyncMock()
-        matrix_light.connection.send_packet = AsyncMock()
 
         await matrix_light.set_matrix_colors(1, [Colors.RED] * 64)
 
         matrix_light.set_color.assert_not_called()
-        matrix_light.connection.send_packet.assert_called_once()
-        sent = matrix_light.connection.send_packet.call_args[0][0]
+        matrix_light.connection.request.assert_called_once()
+        sent = matrix_light.connection.request.call_args[0][0]
         assert sent.tile_index == 1
 
 
@@ -1534,3 +1533,149 @@ class TestBatchedChainResponseHandling:
         assert len(all_colors) == 2
         assert all_colors[0][0].to_protocol().hue == 100
         assert all_colors[1][0].to_protocol().hue == 200
+
+
+class TestAckedTileWrites:
+    """Tests that tile state writes wait for the device's acknowledgement.
+
+    A real 8x8 Ceiling dropped the second of two Set64 packets sent about a
+    millisecond apart in 2 of 20 component writes. Sending each write as an
+    acknowledged request lets the connection retransmit a dropped write and
+    keeps the next write off the wire until the device has taken this one.
+    """
+
+    @staticmethod
+    def _tile(width: int, height: int) -> MagicMock:
+        tile = MagicMock()
+        tile.tile_index = 0
+        tile.width = width
+        tile.height = height
+        tile.total_zones = width * height
+        tile.requires_frame_buffer = width * height > 64
+        return tile
+
+    async def test_set64_waits_for_acknowledgement(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test set64 sends Set64 as an acknowledged request."""
+        await matrix_light.set64(
+            tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=[Colors.RED]
+        )
+
+        matrix_light.connection.request.assert_awaited_once()
+        packet = matrix_light.connection.request.await_args.args[0]
+        assert isinstance(packet, packets.Tile.Set64)
+        assert packet.colors[0] == Colors.RED.to_protocol()
+        matrix_light.connection.send_packet.assert_not_called()
+
+    async def test_copy_frame_buffer_waits_for_acknowledgement(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test copy_frame_buffer sends CopyFrameBuffer as an acknowledged request."""
+        matrix_light._device_chain = [self._tile(16, 8)]
+
+        await matrix_light.copy_frame_buffer(tile_index=0, duration=1.5)
+
+        matrix_light.connection.request.assert_awaited_once()
+        packet = matrix_light.connection.request.await_args.args[0]
+        assert isinstance(packet, packets.Tile.CopyFrameBuffer)
+        assert (packet.width, packet.height, packet.duration) == (16, 8, 1500)
+        matrix_light.connection.send_packet.assert_not_called()
+
+    async def test_set_user_position_waits_for_acknowledgement(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test set_user_position sends SetUserPosition as an acknowledged request."""
+        await matrix_light.set_user_position(tile_index=1, user_x=1.0, user_y=0.5)
+
+        matrix_light.connection.request.assert_awaited_once()
+        packet = matrix_light.connection.request.await_args.args[0]
+        assert isinstance(packet, packets.Tile.SetUserPosition)
+        assert (packet.tile_index, packet.user_x, packet.user_y) == (1, 1.0, 0.5)
+        matrix_light.connection.send_packet.assert_not_called()
+
+    async def test_frame_buffer_copy_waits_for_every_set64_ack(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test a >64-zone write copies fb 1 only after each Set64 is acked."""
+        matrix_light._device_chain = [self._tile(16, 8)]
+        events: list[tuple[str, str]] = []
+
+        async def exchange(packet, **_kwargs):
+            name = type(packet).__name__
+            events.append(("sent", name))
+            await asyncio.sleep(0)
+            events.append(("acked", name))
+            return True
+
+        matrix_light.connection.request.side_effect = exchange
+        colours = [
+            HSBK(hue=i * 2, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(128)
+        ]
+
+        await matrix_light.set_matrix_colors(0, colours)
+
+        assert events == [
+            ("sent", "Set64"),
+            ("acked", "Set64"),
+            ("sent", "Set64"),
+            ("acked", "Set64"),
+            ("sent", "CopyFrameBuffer"),
+            ("acked", "CopyFrameBuffer"),
+        ]
+        matrix_light.connection.send_packet.assert_not_called()
+
+    async def test_set64_raises_when_the_device_refuses_it(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        """Test a StateUnhandled reply to Set64 surfaces as unsupported."""
+        matrix_light.connection.request.return_value = packets.Device.StateUnhandled(
+            unhandled_type=packets.Tile.Set64.PKT_TYPE
+        )
+
+        with pytest.raises(LifxUnsupportedCommandError):
+            await matrix_light.set64(
+                tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=[]
+            )
+
+
+@pytest.mark.emulator
+class TestDroppedTileWriteIsRetried:
+    """Tests that a Set64 the device never received is sent again."""
+
+    async def test_dropped_set64_is_retransmitted(
+        self, emulator_devices, emulator_server, monkeypatch
+    ) -> None:
+        """Test the colours land even though the device drops the first Set64."""
+        _, server, scenario_manager = emulator_server
+        if server is None:
+            pytest.skip("Cannot drop packets on an external emulator")
+        delegate = scenario_manager.should_respond
+        dropped: list[int] = []
+
+        def drop_first_set64(packet_type: int, scenario) -> bool:
+            if packet_type == packets.Tile.Set64.PKT_TYPE and not dropped:
+                dropped.append(packet_type)
+                return False
+            return delegate(packet_type, scenario)
+
+        monkeypatch.setattr(scenario_manager, "should_respond", drop_first_set64)
+        template: MatrixLight = emulator_devices[6]  # d073d5000007, 8x8
+        colours = [
+            HSBK(hue=i * 5, saturation=1.0, brightness=0.5, kelvin=3500)
+            for i in range(64)
+        ]
+
+        async with await MatrixLight.connect(
+            serial=template.serial, ip=template.ip, port=template.port
+        ) as matrix:
+            await matrix.set64(
+                tile_index=0, length=1, x=0, y=0, width=8, duration=0, colors=colours
+            )
+            retrieved = await matrix.get64(tile_index=0)
+
+        assert dropped == [packets.Tile.Set64.PKT_TYPE]
+        assert [c.to_protocol() for c in retrieved] == [
+            c.to_protocol() for c in colours
+        ]

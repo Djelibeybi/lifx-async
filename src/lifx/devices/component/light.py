@@ -92,6 +92,7 @@ class ComponentMatrixLight(MatrixLight):
         self._pending_tile: Pending[list[HSBK]] = Pending()
         self._pending_power: Pending[int] = Pending()
         self._component_lock = asyncio.Lock()
+        self._component_lock_loop: asyncio.AbstractEventLoop | None = None
         self._component_owner: asyncio.Task[Any] | None = None
         self._writing_tile = False
         self._writing_power = False
@@ -365,6 +366,13 @@ class ComponentMatrixLight(MatrixLight):
         if task is not None and task is self._component_owner:
             yield
             return
+        # An asyncio.Lock binds to the loop that first waits on it. A light
+        # outlives one asyncio.run(), and nothing from an earlier loop can
+        # still hold the lock, so each new loop gets a fresh one.
+        loop = asyncio.get_running_loop()
+        if self._component_lock_loop is not loop:
+            self._component_lock = asyncio.Lock()
+            self._component_lock_loop = loop
         async with self._component_lock:
             self._component_owner = task
             try:

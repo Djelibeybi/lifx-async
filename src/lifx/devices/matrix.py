@@ -541,6 +541,10 @@ class MatrixLight(Light):
             user_y: Vertical position in tile-position units (1.0 = 8 pixels,
                 growing up)
 
+        Raises:
+            LifxTimeoutError: If the device never acknowledges the write
+            LifxUnsupportedCommandError: If device doesn't support this command
+
         Note:
             Only applicable for multi-tile devices (has_chain capability).
             Most MatrixLight devices have a single tile and don't need positioning.
@@ -557,13 +561,14 @@ class MatrixLight(Light):
             self.label or self.serial,
         )
 
-        await self.connection.send_packet(
+        result = await self.connection.request(
             packets.Tile.SetUserPosition(
                 tile_index=tile_index,
                 user_x=user_x,
                 user_y=user_y,
             )
         )
+        self._raise_if_unhandled(result)
 
     async def get64(
         self,
@@ -882,6 +887,14 @@ class MatrixLight(Light):
             colors: List of HSBK colors (up to 64)
             fb_index: Frame buffer index (0 for display, 1 for temp buffer)
 
+        The write waits for the device's acknowledgement and is retransmitted
+        if the device drops it, so the next write cannot overtake it. Use the
+        Animation layer for streaming frames.
+
+        Raises:
+            LifxTimeoutError: If the device never acknowledges the write
+            LifxUnsupportedCommandError: If device doesn't support this command
+
         Example:
             >>> # Set 8x8 tile to red
             >>> colors = [HSBK.from_rgb(1.0, 0.0, 0.0)] * 64
@@ -916,7 +929,10 @@ class MatrixLight(Light):
         while len(proto_colors) < 64:
             proto_colors.append(LightHsbk(0, 0, 0, 3500))
 
-        await self.connection.send_packet(
+        # Acknowledged, so a dropped write is retransmitted and the next write
+        # stays off the wire until the device has taken this one: a Ceiling
+        # drops a second Set64 that arrives about a millisecond after the first.
+        result = await self.connection.request(
             packets.Tile.Set64(
                 tile_index=tile_index,
                 length=length,
@@ -925,6 +941,7 @@ class MatrixLight(Light):
                 colors=proto_colors,
             )
         )
+        self._raise_if_unhandled(result)
         self._zones_changed()
 
     async def copy_frame_buffer(
@@ -946,6 +963,11 @@ class MatrixLight(Light):
             target_fb: Target frame buffer index (usually 0)
             duration: time in seconds to transition if target_fb is 0
             length: Number of tiles to update starting from tile_index (default 1)
+
+        Raises:
+            ValueError: If tile_index is not in the device chain
+            LifxTimeoutError: If the device never acknowledges the copy
+            LifxUnsupportedCommandError: If device doesn't support this command
 
         Example:
             >>> # For 16x8 tile (128 zones):
@@ -1000,7 +1022,7 @@ class MatrixLight(Light):
         tile = self._device_chain[tile_index]
         duration_ms = round(duration * 1000 if duration else 0)
 
-        await self.connection.send_packet(
+        result = await self.connection.request(
             packets.Tile.CopyFrameBuffer(
                 tile_index=tile_index,
                 length=length,
@@ -1015,6 +1037,7 @@ class MatrixLight(Light):
                 duration=duration_ms,
             )
         )
+        self._raise_if_unhandled(result)
         self._zones_changed()
 
     async def set_matrix_colors(
@@ -1389,8 +1412,8 @@ class MatrixLight(Light):
                 supported, reason = await self._resolve_sky_support()
             except LifxTimeoutError:
                 # The support probe is best-effort. A device that fails to
-                # answer is not evidence of missing support, and refusing here
-                # would turn a fire-and-forget send into a hard failure.
+                # answer is not evidence of missing support, so the effect is
+                # still sent and the device's own reply decides the outcome.
                 _LOGGER.debug(
                     "SKY support probe timed out for %s, sending the effect anyway",
                     self.label or self.serial,
@@ -1464,7 +1487,10 @@ class MatrixLight(Light):
             palette=proto_palette,
         )
 
-        await self.connection.send_packet(packets.Tile.SetEffect(settings=settings))
+        result = await self.connection.request(
+            packets.Tile.SetEffect(settings=settings)
+        )
+        self._raise_if_unhandled(result)
         self._tile_effect = effect
         self._zones_changed()
 

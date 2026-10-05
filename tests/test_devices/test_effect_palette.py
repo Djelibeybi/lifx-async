@@ -33,7 +33,7 @@ def _matrix_light() -> MatrixLight:
     """Build a mocked MatrixLight the way test_matrix.py's ``_matrix_light`` does.
 
     A SKY-capable matrix product on host firmware 4.4, with
-    ``connection.send_packet`` mocked so a test can capture the emitted
+    ``connection.request`` mocked so a test can capture the emitted
     ``Tile.SetEffect`` packet with no network I/O.
     """
     matrix = MatrixLight(
@@ -50,7 +50,6 @@ def _matrix_light() -> MatrixLight:
     matrix.get_host_firmware = AsyncMock(
         return_value=FirmwareInfo(build=0, version_major=4, version_minor=4)
     )
-    matrix.connection.send_packet = AsyncMock()
     return matrix
 
 
@@ -112,7 +111,7 @@ class TestTileSetEffectGoldens:
         """FLAME with no palette is byte-identical to before the change."""
         matrix = _matrix_light()
         await matrix.set_effect(effect_type=FirmwareEffect.FLAME, speed=3.0)
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.pack().hex() == _GOLDEN_FLAME_NO_PALETTE
 
     async def test_sky_no_palette(self) -> None:
@@ -123,7 +122,7 @@ class TestTileSetEffectGoldens:
             speed=3.0,
             sky_type=TileEffectSkyType.CLOUDS,
         )
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.pack().hex() == _GOLDEN_SKY_NO_PALETTE
 
     async def test_morph_explicit_palette(self) -> None:
@@ -134,7 +133,7 @@ class TestTileSetEffectGoldens:
             speed=5.0,
             palette=[Colors.RED, Colors.BLUE],
         )
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.pack().hex() == _GOLDEN_MORPH_EXPLICIT
 
     async def test_flame_explicit_palette(self) -> None:
@@ -145,7 +144,7 @@ class TestTileSetEffectGoldens:
             speed=3.0,
             palette=[Colors.RED, Colors.ORANGE],
         )
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.pack().hex() == _GOLDEN_FLAME_EXPLICIT
 
     async def test_morph_no_palette_never_sends_the_empty_palette(self) -> None:
@@ -160,7 +159,7 @@ class TestTileSetEffectGoldens:
         matrix.get_all_tile_colors = AsyncMock(return_value=[[Colors.RED, Colors.BLUE]])
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
         matrix.get_all_tile_colors.assert_awaited_once()
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.pack().hex() != _GOLDEN_MORPH_NO_PALETTE_BEFORE
         assert packet.settings.palette_count == 2
 
@@ -173,7 +172,7 @@ class TestTileSetEffectGoldens:
         matrix = _matrix_light()
         matrix.get_all_tile_colors = AsyncMock(return_value=[[Colors.RED, Colors.BLUE]])
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=5.0)
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.pack().hex() == _GOLDEN_MORPH_EXPLICIT
 
 
@@ -528,7 +527,7 @@ class TestMorphDerivationMock:
             with pytest.raises(ValueError, match="at most 16 colors"):
                 await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
-        matrix.connection.send_packet.assert_not_awaited()
+        matrix.connection.request.assert_not_awaited()
 
     async def test_single_white_with_unknown_range_falls_back_to_constants(
         self,
@@ -541,7 +540,7 @@ class TestMorphDerivationMock:
 
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         palette = [
             HSBK.from_protocol(c)
             for c in packet.settings.palette[: packet.settings.palette_count]
@@ -566,7 +565,7 @@ class TestMorphDerivationMock:
         palette_records = [r for r in caplog.records if "palette" in r.getMessage()]
         assert palette_records == []
 
-        matrix.connection.send_packet.assert_not_awaited()
+        matrix.connection.request.assert_not_awaited()
 
     async def test_negative_speed_raises_before_any_read(self) -> None:
         """Argument validation runs before the device's colours are read."""
@@ -577,7 +576,7 @@ class TestMorphDerivationMock:
             await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=-1.0)
 
         matrix.get_all_tile_colors.assert_not_awaited()
-        matrix.connection.send_packet.assert_not_awaited()
+        matrix.connection.request.assert_not_awaited()
 
     async def test_flame_sky_and_explicit_palette_never_read_colours(self) -> None:
         """Only palette-less MORPH reads the device's colours."""
@@ -603,7 +602,7 @@ class TestMorphDerivationMock:
             await matrix.set_effect(effect_type=effect_type, speed=speed, **kwargs)
 
             matrix.get_all_tile_colors.assert_not_awaited()
-            packet = matrix.connection.send_packet.call_args[0][0]
+            packet = matrix.connection.request.call_args[0][0]
             assert packet.pack().hex() == expected_hex
 
     async def test_empty_colour_result_raises_before_send(self) -> None:
@@ -616,7 +615,7 @@ class TestMorphDerivationMock:
                 await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
             matrix.get_all_tile_colors.assert_awaited_once()
-            matrix.connection.send_packet.assert_not_awaited()
+            matrix.connection.request.assert_not_awaited()
 
     async def test_two_tile_device_samples_across_the_flattened_chain(self) -> None:
         """A two-tile device's sample spans both tiles when flattened."""
@@ -634,7 +633,7 @@ class TestMorphDerivationMock:
 
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.settings.palette_count in range(2, 17)
         assert packet.settings.palette_count == 16
         palette = [
@@ -654,7 +653,7 @@ class TestMorphDerivationMock:
 
         await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.settings.palette_count == 4
         palette = [
             HSBK.from_protocol(cc)
@@ -675,7 +674,7 @@ class TestMorphDerivationMock:
             await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
         mock_sample.assert_not_called()
-        packet = matrix.connection.send_packet.call_args[0][0]
+        packet = matrix.connection.request.call_args[0][0]
         assert packet.settings.palette_count == 3
 
     async def test_multi_colour_device_calls_the_sampler_once(self) -> None:
@@ -701,4 +700,4 @@ class TestMorphDerivationMock:
             with pytest.raises(ValueError, match="at most 16 colors"):
                 await matrix.set_effect(effect_type=FirmwareEffect.MORPH, speed=3.0)
 
-        matrix.connection.send_packet.assert_not_awaited()
+        matrix.connection.request.assert_not_awaited()

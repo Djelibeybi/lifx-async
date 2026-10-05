@@ -1128,7 +1128,7 @@ class MultiZoneLight(Light):
 
         A timeout or a malformed reply reading the zones is logged at DEBUG
         and Move is still sent, with no palette, rather than turning a
-        fire-and-forget effect into a hard failure.
+        failed palette read into a failed effect.
 
         Returns:
             A derived palette, or None to send no palette.
