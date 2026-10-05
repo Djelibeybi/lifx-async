@@ -1099,14 +1099,18 @@ class MatrixLight(Light):
                     x=0,
                     y=start_row,
                     width=tile.width,
-                    duration=duration if batch == total_batches - 1 else 0,
+                    duration=0,
                     colors=batch_colors,
                     fb_index=1,
                 )
 
-            # Copy frame buffer 1 to 0 (display)
+            # Copy frame buffer 1 to 0 (display). fb 1 is never shown, so the
+            # fade belongs on the copy that brings the frame into view.
             await self.copy_frame_buffer(
-                tile_index=tile_index, source_fb=1, target_fb=0
+                tile_index=tile_index,
+                source_fb=1,
+                target_fb=0,
+                duration=duration / 1000.0,
             )
         else:
             # Tile has ≤64 zones, single set64() call
