@@ -203,6 +203,13 @@ class EffectRuleTrio(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_ca_a",
+        "_ca_b",
+        "_ca_c",
+        "_last_elapsed_s",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

@@ -138,6 +138,16 @@ class EffectSonar(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_obstacles",
+        "_wavefronts",
+        "_bulb_brightness",
+        "_sources",
+        "_last_pulse_t",
+        "_initialized",
+        "_prev_t",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

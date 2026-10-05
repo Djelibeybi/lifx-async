@@ -86,6 +86,11 @@ class EffectRule30(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_state",
+        "_generation",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

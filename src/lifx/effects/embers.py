@@ -151,6 +151,12 @@ class EffectEmbers(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_heat",
+        "_frame_count",
+        "_last_elapsed",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

@@ -166,6 +166,11 @@ class EffectJacobsLadder(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_arc_pairs",
+        "_initialized",
+    )
+
     def __init__(
         self,
         power_on: bool = True,

@@ -95,6 +95,15 @@ class EffectRipple(FrameEffect):
         ```
     """
 
+    participant_state = (
+        "_displacement",
+        "_velocity",
+        "_sim_time",
+        "_last_t",
+        "_next_drop_t",
+        "_n_cells",
+    )
+
     def __init__(
         self,
         power_on: bool = True,
