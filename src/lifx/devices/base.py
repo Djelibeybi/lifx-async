@@ -1654,6 +1654,31 @@ class Device(Generic[StateT]):
                 f"{radio} firmware cannot answer this query"
             )
 
+    def _refuse_thread_frames(self, caller: str, *, enable_thread: bool) -> None:
+        """Refuse to stream animation frames to a device evidenced as Thread.
+
+        A Thread mesh is not built for the steady stream of frames a software
+        effect or a direct frame sender produces. Unlike the radio-specific
+        queries, frames do reach a Thread device, so the caller can opt in.
+        The same evidence rule applies: an observed frame-address report or
+        an mDNS record, never the WiFi default of a device not yet heard from.
+
+        Args:
+            caller: The entry point that would stream, for the error message
+            enable_thread: The caller's opt-in; True streams without a word
+
+        Raises:
+            LifxUnsupportedCommandError: If the device is evidenced as Thread
+                and ``enable_thread`` is False
+        """
+        if enable_thread or self._evidenced_connectivity() is not Connectivity.THREAD:
+            return
+        raise LifxUnsupportedCommandError(
+            f"{caller} would stream animation frames to {self.serial}, a Thread "
+            "device, and a Thread mesh is not built for that traffic. Pass "
+            "enable_thread=True to stream to it anyway"
+        )
+
     async def get_location(self) -> CollectionInfo:
         """Get device location information.
 

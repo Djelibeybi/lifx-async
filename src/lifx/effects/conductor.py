@@ -162,6 +162,8 @@ class Conductor(OverlapRules):
         self,
         effect: LIFXEffect,
         participants: Sequence[Participant],
+        *,
+        enable_thread: bool = False,
     ) -> None:
         """Start an effect on one or more lights or light components.
 
@@ -175,13 +177,26 @@ class Conductor(OverlapRules):
         one's original prior state; a light component moves a whole-light
         effect on its light onto the other light component.
 
+        An effect that draws frames streams them to every participant, and
+        a Thread mesh is not built for that traffic. If any participant's
+        light is evidenced as Thread, by its own replies or an mDNS record,
+        the whole start is refused before anything is captured or changed,
+        unless ``enable_thread`` is True. A light not yet heard from is not
+        refused. An effect that draws no frames, such as EffectPulse, is
+        never refused.
+
         Args:
             effect: The effect instance to execute
             participants: Lights and light components to apply effect to
+            enable_thread: Stream frames to lights evidenced as Thread
+                anyway. Off by default.
 
         Raises:
             LifxTimeoutError: If light state capture times out
             LifxDeviceNotFoundError: If light becomes unreachable
+            LifxUnsupportedCommandError: If the effect draws frames, a
+                participant's light is evidenced as Thread and
+                ``enable_thread`` is False
 
         Example:
             ```python
@@ -190,6 +205,10 @@ class Conductor(OverlapRules):
             await conductor.start(effect, group.lights)
             ```
         """
+        _refuse_thread_frames(
+            effect, participants, "Conductor.start()", enable_thread=enable_thread
+        )
+
         # Filter participants based on effect requirements
         filtered_participants = await self._filter_compatible_lights(
             effect, participants
@@ -338,7 +357,11 @@ class Conductor(OverlapRules):
         return members
 
     async def add_lights(
-        self, effect: LIFXEffect, lights: Sequence[Participant]
+        self,
+        effect: LIFXEffect,
+        lights: Sequence[Participant],
+        *,
+        enable_thread: bool = False,
     ) -> None:
         """Add lights or light components to a running effect without restarting it.
 
@@ -346,9 +369,19 @@ class Conductor(OverlapRules):
         them as participants of the already-running effect. Participants
         that are already running this effect or are incompatible are skipped.
 
+        As in ``start()``, a light evidenced as Thread refuses the whole
+        addition of a frame-drawing effect, before anything is captured or
+        changed, unless ``enable_thread`` is True.
+
         Args:
             effect: The effect to add participants to (must already be running)
             lights: Lights and light components to add
+            enable_thread: Stream frames to lights evidenced as Thread
+                anyway. Off by default.
+
+        Raises:
+            LifxUnsupportedCommandError: If the effect draws frames, a light
+                is evidenced as Thread and ``enable_thread`` is False
 
         Example:
             ```python
@@ -356,6 +389,10 @@ class Conductor(OverlapRules):
             await conductor.add_lights(effect, [new_light])
             ```
         """
+        _refuse_thread_frames(
+            effect, lights, "Conductor.add_lights()", enable_thread=enable_thread
+        )
+
         # Filter compatible lights
         compatible = await self._filter_compatible_lights(effect, lights)
         if not compatible:
@@ -760,7 +797,8 @@ class Conductor(OverlapRules):
                         )
                     )
                 continue
-            animator = await participant.animator.prepare()
+            # start() and add_lights() already applied the Thread guard.
+            animator = await participant.animator.prepare(enable_thread=True)
             writers.append(animator._writer(duration_ms=duration_ms))
 
         return writers
@@ -768,6 +806,31 @@ class Conductor(OverlapRules):
     def __repr__(self) -> str:
         """String representation of Conductor."""
         return f"Conductor(running_effects={len(self._running)})"
+
+
+def _refuse_thread_frames(
+    effect: LIFXEffect,
+    participants: Sequence[Participant],
+    caller: str,
+    *,
+    enable_thread: bool,
+) -> None:
+    """Refuse a frame-drawing effect if any participant's light is Thread.
+
+    Checked before anything is captured or changed, so a refusal leaves
+    every participant as it was. See ``Conductor.start()``.
+
+    Raises:
+        LifxUnsupportedCommandError: If the effect draws frames, a
+            participant's light is evidenced as Thread and
+            ``enable_thread`` is False
+    """
+    if not isinstance(effect, FrameEffect):
+        return
+    for participant in participants:
+        resolve(participant)[0]._refuse_thread_frames(
+            caller, enable_thread=enable_thread
+        )
 
 
 class _LightEffects:
@@ -790,7 +853,13 @@ class _LightEffects:
             self._conductors[light] = conductor
         return conductor
 
-    async def start(self, participant: Participant, effect: object) -> None:
+    async def start(
+        self,
+        participant: Participant,
+        effect: object,
+        *,
+        enable_thread: bool = False,
+    ) -> None:
         """Start a software effect on one light or light component alone.
 
         Raises:
@@ -807,7 +876,9 @@ class _LightEffects:
             raise TypeError(
                 f"start_effect() takes a software effect, got {type(effect).__name__}"
             )
-        await self.conductor_for(resolve(participant)[0]).start(effect, [participant])
+        await self.conductor_for(resolve(participant)[0]).start(
+            effect, [participant], enable_thread=enable_thread
+        )
 
     async def leave_every_run(
         self, participant: Participant, *, restore_state: bool = True

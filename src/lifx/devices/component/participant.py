@@ -75,7 +75,9 @@ class LightComponent:
         """
         return self._light.animator
 
-    async def start_effect(self, effect: LIFXEffect) -> None:
+    async def start_effect(
+        self, effect: LIFXEffect, *, enable_thread: bool = False
+    ) -> None:
         """Start a software effect on this light component alone.
 
         The effect draws on the light component's own shape: a Ceiling
@@ -87,17 +89,23 @@ class LightComponent:
         on and the other stays dark. Calling this light component's own
         colour or power methods stops the effect first. A whole-light effect
         running on the light moves onto the other light component and carries
-        on there.
+        on there. On a light evidenced as Thread, by its own replies or an
+        mDNS record, the effect is refused unless ``enable_thread`` is True:
+        a Thread mesh is not built for a steady stream of frames.
 
         Args:
             effect: The software effect to run. It must draw frames: an
                 effect such as EffectPulse, which sends waveforms to the
                 whole light, cannot draw on a light component.
+            enable_thread: Stream frames to a light evidenced as Thread
+                anyway. Off by default.
 
         Raises:
             TypeError: If ``effect`` does not draw frames
+            LifxUnsupportedCommandError: If the light is evidenced as Thread
+                and ``enable_thread`` is False
         """
-        await effect_runner().start(self, effect)
+        await effect_runner().start(self, effect, enable_thread=enable_thread)
 
     async def stop_effect(self) -> None:
         """Stop the software effect on this light component only.

@@ -186,6 +186,8 @@ def build_rig(product: int, monkeypatch: pytest.MonkeyPatch) -> Rig:
     light.connection = AsyncMock()
     light.connection.request.side_effect = wire.exchange
     light.connection.send_packet.side_effect = wire.exchange
+    # The simulated light answers as WiFi, as a real reply's frame address says.
+    light.connection.thread_connection = False
     light._schedule_refresh = AsyncMock()
     return Rig(light, wire, names, positions, clock)
 

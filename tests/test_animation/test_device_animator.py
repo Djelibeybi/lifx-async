@@ -229,17 +229,21 @@ class TestDeprecatedFactories:
         assert first.duration_ms == 500
 
     def test_the_factories_keep_their_signatures(self) -> None:
+        # The positional parameters are unchanged; the Thread opt-in is
+        # keyword-only and off by default, so existing calls still bind.
         for factory in (Animator.for_matrix, Animator.for_multizone):
             assert inspect.iscoroutinefunction(factory)
-            assert list(inspect.signature(factory).parameters) == [
-                "device",
-                "duration_ms",
-            ]
         assert not inspect.iscoroutinefunction(Animator.for_light)
-        assert list(inspect.signature(Animator.for_light).parameters) == [
-            "device",
-            "duration_ms",
-        ]
+        for factory in (
+            Animator.for_matrix,
+            Animator.for_multizone,
+            Animator.for_light,
+        ):
+            parameters = inspect.signature(factory).parameters
+            assert list(parameters) == ["device", "duration_ms", "enable_thread"]
+            opt_in = parameters["enable_thread"]
+            assert opt_in.kind is inspect.Parameter.KEYWORD_ONLY
+            assert opt_in.default is False
 
     def test_the_warning_points_at_the_caller(self) -> None:
         light = Light(serial="d073d5000001", ip="192.0.2.10")

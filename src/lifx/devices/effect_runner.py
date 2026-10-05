@@ -20,12 +20,20 @@ if TYPE_CHECKING:
 class EffectRunner(Protocol):
     """What a light asks of the software effects package."""
 
-    async def start(self, participant: Light | LightComponent, effect: object) -> None:
+    async def start(
+        self,
+        participant: Light | LightComponent,
+        effect: object,
+        *,
+        enable_thread: bool = False,
+    ) -> None:
         """Start a software effect on one light or light component alone.
 
         Raises:
             TypeError: If ``effect`` is not a software effect the participant
                 can run
+            LifxUnsupportedCommandError: If the effect draws frames, the light
+                is evidenced as Thread and ``enable_thread`` is False
         """
         ...
 

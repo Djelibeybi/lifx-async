@@ -167,7 +167,9 @@ class Light(Device[LightState]):
         assert geometry is not None
         return geometry
 
-    async def start_effect(self, effect: LIFXEffect) -> None:
+    async def start_effect(
+        self, effect: LIFXEffect, *, enable_thread: bool = False
+    ) -> None:
         """Start a software effect on this light alone.
 
         A shortcut for a one-participant Conductor run: the light's prior
@@ -183,11 +185,21 @@ class Light(Device[LightState]):
         their own API, such as ``set_effect()`` on matrix and multizone
         lights.
 
+        An effect that draws frames streams them to the light, and a Thread
+        mesh is not built for that traffic. On a light evidenced as Thread,
+        by its own replies or an mDNS record, it is refused unless
+        ``enable_thread`` is True. A light not yet heard from is not refused,
+        and neither is an effect that draws no frames, such as EffectPulse.
+
         Args:
             effect: The software effect to run
+            enable_thread: Stream frames to a light evidenced as Thread
+                anyway. Off by default.
 
         Raises:
             TypeError: If ``effect`` is not a software effect
+            LifxUnsupportedCommandError: If the effect draws frames, the
+                light is evidenced as Thread and ``enable_thread`` is False
 
         Example:
             ```python
@@ -198,7 +210,7 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
-        await effect_runner().start(self, effect)
+        await effect_runner().start(self, effect, enable_thread=enable_thread)
 
     async def stop_effect(self) -> None:
         """Stop every effect on this light.

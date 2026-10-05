@@ -231,6 +231,22 @@ The effects framework automatically:
 
 This happens completely automatically - you don't need to manage state yourself.
 
+### Lights on Thread
+
+A software effect that draws frames, such as Rainbow or Flicker, streams them to every light it
+runs on, and a Thread mesh is not built for that traffic. `light.start_effect()`, a light
+component's `start_effect()`, `conductor.start()` and `conductor.add_lights()` refuse a light
+evidenced as Thread with `LifxUnsupportedCommandError`, unless you pass `enable_thread=True`:
+
+```python
+await conductor.start(EffectRainbow(), lights, enable_thread=True)
+```
+
+One Thread light refuses the whole start: nothing is captured, powered on or changed on any
+light. The evidence is the light's own replies, or an mDNS record that says Thread; a light the
+library has not heard from yet is not refused. EffectPulse sends waveforms rather than frames and
+is never refused, and neither are firmware effects started with `set_effect()`.
+
 ### Effect Completion
 
 Effects complete in different ways:

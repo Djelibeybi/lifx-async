@@ -397,7 +397,7 @@ class Animator:
             animator._install(*geometry)
         return animator
 
-    async def prepare(self) -> Animator:
+    async def prepare(self, *, enable_thread: bool = False) -> Animator:
         """Query the device for its geometry, once, and get ready to draw.
 
         A light's Animator learns its tile layout or zone count from the
@@ -407,6 +407,15 @@ class Animator:
         device instead of undoing the animation. A single light's Animator is
         ready without this, but preparing it is harmless.
 
+        A light evidenced as Thread, by its own replies or an mDNS record, is
+        refused unless the caller passes ``enable_thread=True``: a Thread mesh
+        is not built for a steady stream of frames. A light not yet heard
+        from is not refused.
+
+        Args:
+            enable_thread: Stream to a light evidenced as Thread anyway.
+                Off by default.
+
         Returns:
             This Animator, so `animator = await device.animator.prepare()`
             reads naturally.
@@ -414,6 +423,8 @@ class Animator:
         Raises:
             ValueError: If a matrix light reports no tiles, or a multizone
                 light does not support the extended multizone protocol.
+            LifxUnsupportedCommandError: If the light is evidenced as Thread
+                and ``enable_thread`` is False
 
         Example:
             ```python
@@ -428,6 +439,7 @@ class Animator:
         device = self._device
         if device is None:
             return self
+        device._refuse_thread_frames("Animator.prepare()", enable_thread=enable_thread)
         if self._geometry is None:
             framebuffer, packet_generator = await device._query_animation_geometry()
             # A concurrent prepare() may have finished first; keep its templates.
@@ -446,6 +458,8 @@ class Animator:
         cls,
         device: MatrixLight,
         duration_ms: int = 0,
+        *,
+        enable_thread: bool = False,
     ) -> Animator:
         """Return the device's Animator, prepared for a MatrixLight.
 
@@ -457,21 +471,27 @@ class Animator:
             device: MatrixLight device (must be connected)
             duration_ms: Transition duration in milliseconds (default 0 for
                 instant), applied to frames sent through `send_frame()`.
+            enable_thread: Stream to a light evidenced as Thread anyway;
+                see `prepare()`. Off by default.
 
         Returns:
             The device's Animator
 
         Raises:
+            LifxUnsupportedCommandError: If the device is evidenced as Thread
+                and ``enable_thread`` is False
             ValueError: If the device reports no tiles
         """
         _warn_deprecated("for_matrix")
-        return await cls._borrow(device, duration_ms)
+        return await cls._borrow(device, duration_ms, enable_thread)
 
     @classmethod
     async def for_multizone(
         cls,
         device: MultiZoneLight,
         duration_ms: int = 0,
+        *,
+        enable_thread: bool = False,
     ) -> Animator:
         """Return the device's Animator, prepared for a MultiZoneLight.
 
@@ -484,20 +504,26 @@ class Animator:
                    extended multizone protocol)
             duration_ms: Transition duration in milliseconds (default 0 for
                 instant), applied to frames sent through `send_frame()`.
+            enable_thread: Stream to a light evidenced as Thread anyway;
+                see `prepare()`. Off by default.
 
         Returns:
             The device's Animator
 
         Raises:
+            LifxUnsupportedCommandError: If the device is evidenced as Thread
+                and ``enable_thread`` is False
             ValueError: If device doesn't support extended multizone
         """
         _warn_deprecated("for_multizone")
-        return await cls._borrow(device, duration_ms)
+        return await cls._borrow(device, duration_ms, enable_thread)
 
     @classmethod
-    async def _borrow(cls, device: Light, duration_ms: int) -> Animator:
+    async def _borrow(
+        cls, device: Light, duration_ms: int, enable_thread: bool
+    ) -> Animator:
         """Prepare the device's Animator and set its transition duration."""
-        animator = await device.animator.prepare()
+        animator = await device.animator.prepare(enable_thread=enable_thread)
         animator.duration_ms = duration_ms
         return animator
 
@@ -506,6 +532,8 @@ class Animator:
         cls,
         device: Light,
         duration_ms: int = 0,
+        *,
+        enable_thread: bool = False,
     ) -> Animator:
         """Return the device's Animator for a single Light device.
 
@@ -517,16 +545,23 @@ class Animator:
             device: Light device (must have ip and serial set)
             duration_ms: Transition duration in milliseconds (default 0 for
                 instant), applied to frames sent through `send_frame()`.
+            enable_thread: Stream to a light evidenced as Thread anyway;
+                see `prepare()`. Off by default.
 
         Returns:
             The device's Animator
 
         Raises:
+            LifxUnsupportedCommandError: If the device is evidenced as Thread
+                and ``enable_thread`` is False
             RuntimeError: If the device is a matrix or multizone light whose
                 Animator has not been prepared yet; await
                 `device.animator.prepare()` instead.
         """
         _warn_deprecated("for_light")
+        device._refuse_thread_frames(
+            "Animator.for_light()", enable_thread=enable_thread
+        )
         animator = device.animator
         animator._require_geometry()
         animator.duration_ms = duration_ms

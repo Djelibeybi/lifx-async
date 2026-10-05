@@ -97,6 +97,20 @@ deprecated: they emit a `DeprecationWarning` and return the device's own Animato
 return the same object. `for_light()` cannot prepare a matrix or multizone light; use
 `device.animator` instead.
 
+## Lights on Thread
+
+A Thread mesh is not built for a steady stream of frames. `prepare()` refuses a light evidenced
+as Thread with `LifxUnsupportedCommandError`, unless you pass `enable_thread=True`:
+
+```python
+animator = await device.animator.prepare(enable_thread=True)
+```
+
+The evidence is the same as for `get_wifi_info()` and `get_thread_info()`: the light's own
+replies, or an mDNS record that says Thread. A light the library has not heard from yet is not
+refused. With `enable_thread=True` the frames go out without a warning. The deprecated
+`for_matrix()`, `for_multizone()` and `for_light()` factories take the same keyword.
+
 ## Multi-Tile Canvas
 
 For devices with multiple tiles (like the original 5-tile LIFX Tile), the animator automatically

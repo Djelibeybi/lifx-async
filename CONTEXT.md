@@ -28,7 +28,10 @@ they can be intermediate colours rather than the transition target.
 **Software effect**:
 An effect built into the library. The library computes each frame and streams it
 to the light for as long as the effect runs. It draws on its effect
-participants: whole lights, or single light components.
+participants: whole lights, or single light components. A light evidenced as
+Thread, by its own replies or an mDNS record, takes frames only when the caller
+passes `enable_thread=True`, because a Thread mesh is not built for that
+traffic.
 
 **Firmware effect**:
 An effect built into the light: Move on strips, Morph and Flame on matrix lights,

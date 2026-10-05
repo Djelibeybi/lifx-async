@@ -212,7 +212,8 @@ class ComponentMatrixLight(MatrixLight):
                 colour if position in owned else self._unlit(colour)
                 for position, colour in enumerate(tile)
             ]
-        animator = await self.animator.prepare()
+        # Only an effect run reaches here, after the Conductor's Thread guard.
+        animator = await self.animator.prepare(enable_thread=True)
         positions = self._component_positions(component)
         canvas, sources = (
             self._component_canvas(component, animator._require_geometry().framebuffer)
