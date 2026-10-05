@@ -1067,14 +1067,8 @@ class MultiZoneLight(Light):
             }
         )
 
-    async def stop_effect(self) -> None:
-        """Stop any running multizone effect.
-
-        Example:
-            ```python
-            await light.stop_effect()
-            ```
-        """
+    async def _stop_firmware_effect(self) -> None:
+        """Stop a running Move effect by sending the OFF effect."""
         await self.set_effect(
             MultiZoneEffect(
                 effect_type=FirmwareEffect.OFF,
@@ -1086,7 +1080,7 @@ class MultiZoneLight(Light):
         _LOGGER.debug(
             {
                 "class": "Device",
-                "method": "stop_effect",
+                "method": "_stop_firmware_effect",
                 "action": "change",
                 "values": {},
             }

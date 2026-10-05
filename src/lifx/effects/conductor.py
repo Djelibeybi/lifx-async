@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+import weakref
+from typing import TYPE_CHECKING, ClassVar
 
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
@@ -57,11 +58,32 @@ class Conductor:
         ```
     """
 
+    # Every live Conductor, so device.stop_effect() can find a run the light
+    # is part of without the device holding a link to each Conductor.
+    _live: ClassVar[weakref.WeakSet[Conductor]] = weakref.WeakSet()
+
     def __init__(self) -> None:
         """Initialize the Conductor."""
         self._state_manager = DeviceStateManager()
         self._running: dict[ParticipantKey, RunningEffect] = {}
         self._lock = asyncio.Lock()
+        Conductor._live.add(self)
+
+    @classmethod
+    async def _leave_every_run(cls, light: Light) -> None:
+        """Remove a light from every run it is part of, on any Conductor.
+
+        The light's prior state is restored and the other participants of
+        each run carry on. Runs are matched by participant key, so a second
+        object for the same light finds them too.
+
+        Args:
+            light: The light leaving its runs
+        """
+        key = participant_key(light)
+        for conductor in list(cls._live):
+            if key in conductor._running:
+                await conductor.remove_lights([light])
 
     def effect(self, light: Light) -> LIFXEffect | None:
         """Return the effect currently running on a device, or None if idle.

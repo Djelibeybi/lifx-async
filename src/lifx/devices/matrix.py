@@ -1273,6 +1273,13 @@ class MatrixLight(Light):
             return sample_effect_palette(flattened)
         return palette
 
+    async def _stop_firmware_effect(self) -> None:
+        """Stop a running firmware effect by sending the OFF effect.
+
+        Sent every time, since the cached ``tile_effect`` may be stale.
+        """
+        await self.set_effect(FirmwareEffect.OFF)
+
     async def set_effect(
         self,
         effect_type: FirmwareEffect,

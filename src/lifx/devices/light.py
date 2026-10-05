@@ -31,6 +31,8 @@ from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
 
 if TYPE_CHECKING:
+    from lifx.effects.base import LIFXEffect
+    from lifx.effects.conductor import Conductor
     from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
@@ -116,6 +118,7 @@ class Light(Device[LightState]):
 
     _discovery_snapshot: _DiscoveryLightSnapshot | None = None
     _animator: Animator | None = None
+    _conductor: Conductor | None = None
 
     @property
     def animator(self) -> Animator:
@@ -142,6 +145,71 @@ class Light(Device[LightState]):
             animator = Animator._for_device(self)
             self._animator = animator
         return animator
+
+    async def start_effect(self, effect: LIFXEffect) -> None:
+        """Start a software effect on this light alone.
+
+        A shortcut for a one-participant Conductor run: the light's prior
+        state is captured before the effect starts and restored when it ends
+        or when ``stop_effect()`` is called. Each light keeps one Conductor
+        for these runs, so starting another effect on the same light follows
+        the Conductor's rules, including ``inherit_prestate()``.
+
+        Only software effects can be started here. Firmware effects keep
+        their own API, such as ``set_effect()`` on matrix and multizone
+        lights.
+
+        Args:
+            effect: The software effect to run
+
+        Raises:
+            TypeError: If ``effect`` is not a software effect
+
+        Example:
+            ```python
+            from lifx.effects import EffectColorloop
+
+            await light.start_effect(EffectColorloop())
+            await asyncio.sleep(10)
+            await light.stop_effect()
+            ```
+        """
+        from lifx.effects.base import LIFXEffect
+        from lifx.effects.conductor import Conductor
+
+        if not isinstance(effect, LIFXEffect):
+            raise TypeError(
+                f"start_effect() takes a software effect, got {type(effect).__name__}"
+            )
+        conductor = self._conductor
+        if conductor is None:
+            conductor = Conductor()
+            self._conductor = conductor
+        await conductor.start(effect, [self])
+
+    async def stop_effect(self) -> None:
+        """Stop every effect on this light.
+
+        Stops any running firmware effect, then any software effect the light
+        is part of and restores the light's prior state. The software effect
+        may have been started with ``start_effect()`` or on any Conductor: if
+        the light is one participant of a multi-light run, it leaves that run
+        and the other participants carry on.
+
+        Example:
+            ```python
+            await light.stop_effect()
+            ```
+        """
+        from lifx.effects.conductor import Conductor
+
+        try:
+            await self._stop_firmware_effect()
+        finally:
+            await Conductor._leave_every_run(self)
+
+    async def _stop_firmware_effect(self) -> None:
+        """Stop a running firmware effect; a plain light has none to stop."""
 
     @property
     def state(self) -> LightState:

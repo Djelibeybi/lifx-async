@@ -46,6 +46,25 @@ Effects complete in different ways:
 - **Duration-based** (Sunrise, Sunset) — completes after a set duration
 - **Continuous** (ColorLoop, Rainbow, Flicker, Aurora): runs until `conductor.stop()` is called
 
+## Effects on One Light
+
+For a single light you don't need a Conductor. `start_effect()` runs a software effect on that
+light alone, with the same state capture and restore, and `stop_effect()` stops it:
+
+```python
+from lifx.effects import EffectColorloop
+
+await light.start_effect(EffectColorloop())
+await asyncio.sleep(10)
+await light.stop_effect()
+```
+
+`stop_effect()` stops every effect on the light: a running firmware effect such as Morph or
+Move, and any software effect the light is part of, however it was started. If the light is one
+of several participants in a Conductor run, it leaves that run and the other lights carry on.
+`start_effect()` takes software effects only; firmware effects keep their own API, such as
+`set_effect()`.
+
 ## Software Effects
 
 | Category | Effects |
