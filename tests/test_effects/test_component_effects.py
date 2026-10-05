@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 import pytest
 
@@ -16,7 +18,7 @@ from lifx.effects.models import PreState
 from lifx.effects.registry import get_effect_registry
 from lifx.effects.state_manager import DeviceStateManager
 from lifx.exceptions import LifxTimeoutError
-from tests.test_devices.test_component_transitions import build_rig
+from tests.test_devices.test_component_transitions import Rig, build_rig
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())
@@ -644,3 +646,104 @@ async def test_a_failed_component_restore_is_logged(
     )
 
     assert "restore_component" in caplog.text
+
+
+BLUE = HSBK.from_protocol(HSBK(240, 1, 1, 3500).to_protocol())
+OTHER_LIGHT = {"d073d5000002": {"uplight": {"hue": 1}}}
+
+
+def _saved_rig(
+    product: int, monkeypatch: pytest.MonkeyPatch, state_file: Path
+) -> tuple[Rig, dict[str, list[HSBK] | None]]:
+    """A light with both components' stored colours saved beside another light.
+
+    Returns the rig and a snapshot in which the first component had no
+    stored colours and the second had the colours it shows.
+    """
+    # The rig freezes the component clock, so settle delays must not wait on it.
+    for name in ("COLOR_UPDATE_SETTLE_DELAY", "ZONE_UPDATE_SETTLE_DELAY"):
+        monkeypatch.setattr(f"lifx.effects.state_manager.{name}", 0)
+    rig = build_rig(product, monkeypatch)
+    state_file.write_text(json.dumps(OTHER_LIGHT))
+    rig.light._state_file = str(state_file)
+    first, second = rig.names
+    shown = [rig.wire.colours[p] for p in rig.positions[1]]
+    rig.light._set_stored_colors(first, [BLUE] * len(rig.positions[0]))
+    rig.light._set_stored_colors(second, shown)
+    return rig, {first: None, second: shown}
+
+
+async def _assert_first_unset_on_disk(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch, state_file: Path, product: int
+) -> None:
+    first, second = rig.names
+    data = json.loads(state_file.read_text())
+    assert data["d073d5000002"] == OTHER_LIGHT["d073d5000002"]
+    assert first not in data[rig.light.serial]
+    assert second in data[rig.light.serial]
+    assert rig.colours(1, "stored_") == [rig.wire.colours[p] for p in rig.positions[1]]
+
+    fresh = build_rig(product, monkeypatch)
+    fresh.light._state_file = str(state_file)
+    await fresh.light._load_state_from_file()
+    assert fresh.colours(0, "stored_") is None
+    assert fresh.colours(1, "stored_") == rig.colours(1, "stored_")
+
+
+@pytest.mark.parametrize("product", [176, 267], ids=["ceiling", "mirror"])
+async def test_a_component_restore_saves_its_unset_stored_colours(
+    product: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    state_file = tmp_path / "state.json"
+    rig, snapshot = _saved_rig(product, monkeypatch, state_file)
+    await rig.light._save_state_to_file()
+    tile = list(rig.wire.colours)
+
+    await DeviceStateManager().restore_component(
+        rig.light,
+        rig.names[0],
+        PreState(power=True, color=RED, tile_colors=[tile], stored_colors=snapshot),
+    )
+
+    assert rig.colours(0, "stored_") is None
+    await _assert_first_unset_on_disk(rig, monkeypatch, state_file, product)
+
+
+@pytest.mark.parametrize("product", [176, 267], ids=["ceiling", "mirror"])
+async def test_a_whole_light_restore_saves_unset_stored_colours(
+    product: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    state_file = tmp_path / "state.json"
+    rig, snapshot = _saved_rig(product, monkeypatch, state_file)
+    await rig.light._save_state_to_file()
+    tile = list(rig.wire.colours)
+
+    await DeviceStateManager().restore_state(
+        rig.light,
+        PreState(power=True, color=RED, tile_colors=[tile], stored_colors=snapshot),
+    )
+
+    assert rig.colours(0, "stored_") is None
+    await _assert_first_unset_on_disk(rig, monkeypatch, state_file, product)
+
+
+@pytest.mark.parametrize("product", [176, 267], ids=["ceiling", "mirror"])
+async def test_stored_colours_set_after_an_unset_restore_are_saved(
+    product: int, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    state_file = tmp_path / "state.json"
+    rig, snapshot = _saved_rig(product, monkeypatch, state_file)
+    tile = list(rig.wire.colours)
+    rig.light._state_file = None  # the reset is not saved before the next set
+    await DeviceStateManager().restore_component(
+        rig.light,
+        rig.names[0],
+        PreState(power=True, color=RED, tile_colors=[tile], stored_colors=snapshot),
+    )
+
+    rig.light._set_stored_colors(rig.names[0], [BLUE] * len(rig.positions[0]))
+    rig.light._state_file = str(state_file)
+    await rig.light._save_state_to_file()
+
+    data = json.loads(state_file.read_text())
+    assert rig.names[0] in data[rig.light.serial]

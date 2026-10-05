@@ -958,9 +958,13 @@ class CeilingLight(ComponentMatrixLight):
                     encode_color(c) for c in state.stored_downlight_colors
                 ]
 
+            # A stored colour deliberately reset leaves the file too
+            device_state.update(self._unset_state_entries())
+
             await asyncio.to_thread(
                 write_state_file, self._state_file, self.serial, device_state
             )
+            self._saved_state_entries(device_state)
 
             _LOGGER.debug(
                 "Saved state to %s for device %s", self._state_file, self.serial

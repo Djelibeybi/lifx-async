@@ -103,6 +103,9 @@ class ComponentMatrixLight(MatrixLight):
         self._observed_positions: set[int] = set()
         self._changed_positions: set[int] = set()
         self._light_components: dict[str, LightComponent] = {}
+        # Light components whose stored colours were deliberately reset to
+        # None, so the next save removes them from the state file too.
+        self._unset_stored: set[str] = set()
 
     def _component_positions(self, component: str) -> tuple[int, ...]:
         """Return buffer positions in the device's public colour order."""
@@ -268,9 +271,7 @@ class ComponentMatrixLight(MatrixLight):
             stored = snapshot[component]
             async with self._component_operation():
                 if stored is None:
-                    setattr(
-                        self.state, "stored_" + self._fields(component).colours, None
-                    )
+                    self._unset_stored_colors(component)
                 else:
                     self._set_stored_colors(component, stored)
             await self._persist_component_state()
@@ -374,6 +375,28 @@ class ComponentMatrixLight(MatrixLight):
         """Remember restoration colours in the existing named fields."""
         self._fields(component).write(self.state, colors, "stored_")
 
+    def _unset_stored_colors(self, component: str) -> None:
+        """Forget a light component's stored colours, in memory and on save."""
+        setattr(self.state, "stored_" + self._fields(component).colours, None)
+        self._unset_stored.add(component)
+
+    def _unset_state_entries(self) -> dict[str, None]:
+        """State-file entries to remove: stored colours reset and still unset.
+
+        A stored colour that is merely absent, such as one that failed to
+        load, leaves its saved entry alone; only a deliberate reset removes
+        it.
+        """
+        return {
+            name: None
+            for name in sorted(self._unset_stored)
+            if self._fields(name).read(self.state, "stored_") is None
+        }
+
+    def _saved_state_entries(self, entries: dict[str, Any]) -> None:
+        """Note that a save wrote these entries, so resets are not resent."""
+        self._unset_stored.difference_update(entries)
+
     def _stored_colors_snapshot(self) -> dict[str, list[HSBK] | None] | None:
         """Copy both components' stored colours, or None before state exists."""
         if not self._has_component_state():
@@ -397,7 +420,7 @@ class ComponentMatrixLight(MatrixLight):
             for fields in self._component_fields:
                 colours = snapshot[fields.name]
                 if colours is None:
-                    setattr(self.state, "stored_" + fields.colours, None)
+                    self._unset_stored_colors(fields.name)
                 else:
                     fields.write(self.state, colours, "stored_")
         await self._persist_component_state()
