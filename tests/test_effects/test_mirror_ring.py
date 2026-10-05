@@ -120,8 +120,8 @@ async def test_whole_light_effect_on_a_mirror_runs_as_two_ring_participants(
         assert ctx.wraps is True
     assert len(effect.contexts) == 2
 
-    # The tile carries each ring's frame on that ring's buffer positions.
-    sent = _sent_tiles(udp)[-1]
+    # One tile per frame carries each ring's frame on that ring's positions.
+    (sent,) = _sent_tiles(udp)
     frame = [HSBK(i * 10, 1, 0.5, 3500).as_tuple() for i in range(25)]
     front, back = rig.positions
     assert [sent[p] for p in front] == frame

@@ -15,8 +15,9 @@ import asyncio
 import logging
 import time
 from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
@@ -56,6 +57,27 @@ def writer_participant(writer: object) -> str | None:
     if isinstance(writer, AnimatorWriter) and writer.whole_light:
         return None
     return writer_component(writer)
+
+
+def _staged_writers(writers: Sequence[object]) -> frozenset[int]:
+    """Indices of writers whose frame a later writer's tile carries.
+
+    When one effect draws on both light components of a light, both writers
+    share that light's tile. Every writer but the last on each tile stages
+    its frame, so each frame of the effect sends the tile once.
+
+    Args:
+        writers: A frame effect's borrowed Animators, in participant order
+
+    Returns:
+        The indices of the writers that stage instead of sending
+    """
+    return frozenset(
+        idx
+        for idx, writer in enumerate(writers)
+        if isinstance(writer, AnimatorWriter)
+        and any(writer._shares_tile_with(later) for later in writers[idx + 1 :])
+    )
 
 
 @dataclass(frozen=True)
@@ -230,6 +252,7 @@ class FrameEffect(LIFXEffect):
             # Snapshot animators and participants for safe iteration
             animators = list(self._animators)
             participants = list(self.participants)
+            staged = _staged_writers(animators)
 
             # Generate and send frames for each device
             for idx, animator in enumerate(animators):
@@ -254,8 +277,12 @@ class FrameEffect(LIFXEffect):
                 # Always clear to prevent stale frames leaking across iterations
                 self._last_generated_hsbk = None
 
-                # Send via direct UDP
-                animator.send_frame(protocol_frame)
+                # Send via direct UDP; a light component whose tile a later
+                # writer sends this frame only keeps its frame in its slot
+                if idx in staged:
+                    cast("AnimatorWriter", animator)._stage(protocol_frame)
+                else:
+                    animator.send_frame(protocol_frame)
 
             # Sleep for remaining frame time
             frame_elapsed = time.monotonic() - frame_start
