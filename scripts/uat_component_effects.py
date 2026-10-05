@@ -47,7 +47,6 @@ from lifx.devices.component.effect_support import (
     stored_colors_snapshot,
 )
 from lifx.effects import (
-    EffectAurora,
     EffectColorloop,
     EffectCylon,
     EffectFlicker,
@@ -308,7 +307,7 @@ def ceiling_scenarios(ceiling: CeilingLight, *, enable_thread: bool) -> list[Sce
                     "C7",
                     "Component effects, then a whole-light effect replaces them",
                     "first the downlight flickers and the uplight cycles; after a "
-                    "few seconds Aurora takes over the whole light",
+                    "few seconds a rainbow takes over the whole light",
                     lambda: _then(
                         ceiling.downlight.start_effect(
                             EffectFlicker(), enable_thread=enable_thread
@@ -317,7 +316,7 @@ def ceiling_scenarios(ceiling: CeilingLight, *, enable_thread: bool) -> list[Sce
                             EffectColorloop(period=10), enable_thread=enable_thread
                         ),
                         ceiling.start_effect(
-                            EffectAurora(), enable_thread=enable_thread
+                            EffectRainbow(period=10), enable_thread=enable_thread
                         ),
                         pause=4.0,
                     ),
@@ -331,13 +330,13 @@ def ceiling_scenarios(ceiling: CeilingLight, *, enable_thread: bool) -> list[Sce
                 ),
                 Step(
                     "C9",
-                    "Whole-light Aurora, then a downlight effect moves it",
-                    "Aurora runs on the whole light; after a few seconds the "
-                    "downlight switches to Flicker and Aurora carries on in the "
+                    "Whole-light Rainbow, then a downlight effect moves it",
+                    "a rainbow runs on the whole light; after a few seconds the "
+                    "downlight switches to Flicker and the rainbow carries on in the "
                     "uplight only",
                     lambda: _then(
                         ceiling.start_effect(
-                            EffectAurora(), enable_thread=enable_thread
+                            EffectRainbow(period=10), enable_thread=enable_thread
                         ),
                         ceiling.downlight.start_effect(
                             EffectFlicker(), enable_thread=enable_thread
@@ -349,7 +348,7 @@ def ceiling_scenarios(ceiling: CeilingLight, *, enable_thread: bool) -> list[Sce
                     "C10",
                     "Stop the downlight's effect",
                     "the downlight returns to soft white; the uplight keeps "
-                    "its aurora and it does not spread back over the downlight",
+                    "its colours and they do not spread back over the downlight",
                     lambda: ceiling.downlight.stop_effect(),
                 ),
                 Step(
@@ -588,11 +587,11 @@ def mirror_scenarios(mirror: MirrorLight, *, enable_thread: bool) -> list[Scenar
                     "M13",
                     "Whole-light Spin, then a front effect moves it",
                     "Spin runs on both rings; after a few seconds the front "
-                    "switches to Aurora and Spin carries on on the back only",
+                    "switches to Colorloop and Spin carries on on the back only",
                     lambda: _then(
                         mirror.start_effect(EffectSpin(), enable_thread=enable_thread),
                         mirror.front.start_effect(
-                            EffectAurora(), enable_thread=enable_thread
+                            EffectColorloop(period=10), enable_thread=enable_thread
                         ),
                         pause=4.0,
                     ),
