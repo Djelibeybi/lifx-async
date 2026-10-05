@@ -326,6 +326,31 @@ class TestCeilingComponentEffects:
             assert ceiling.state.stored_uplight_color == DIM_BLUE
             assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
 
+    async def test_a_light_powered_off_by_a_restore_keeps_no_effect_frame(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.set_power(False)
+            await ceiling.uplight.start_effect(_SolidFrames(RED))
+
+            async def uplight_red() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == RED
+
+            await _eventually(uplight_red)
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_power() == 0
+            assert not ceiling.uplight_is_on
+            assert ceiling.state.stored_uplight_color == DIM_BLUE
+
+            await ceiling.set_power(True)
+
+            assert (await _tile(ceiling))[UPLIGHT] == DIM_BLUE
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+
     async def test_a_component_effect_without_power_on_leaves_the_light_off(
         self, ceiling_device
     ):

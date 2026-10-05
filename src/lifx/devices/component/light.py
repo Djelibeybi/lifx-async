@@ -196,7 +196,9 @@ class ComponentMatrixLight(MatrixLight):
 
         A light component that was lit gets its colours back. One that was
         dark, or whose light was off, is turned off again, which powers the
-        light off when the other light component is dark and has no effect.
+        light off when the other light component is dark and has no effect;
+        the light component's earlier colours then go back on the tile while
+        the light is off, so no effect frame shows at the next power-on.
         While the other light component animates, the write goes to its held
         tile. Either way the light component's stored colours are those from
         before the effect, and the other light component is left as it is.
@@ -217,10 +219,28 @@ class ComponentMatrixLight(MatrixLight):
             await self._set_component_colors(component, colours, 0.0)
         elif not was_on or colours is not None:
             await self._turn_component_off(component, None, 0.0)
+            if colours is not None:
+                await self._rewrite_while_off(component, colours)
         if stored is not None:
             async with self._component_operation():
                 self._set_stored_colors(component, stored)
             await self._persist_component_state()
+
+    async def _rewrite_while_off(self, component: str, colours: list[HSBK]) -> None:
+        """Put a light component's earlier colours back on a light that is off.
+
+        Turning a light component off can power the light off with the
+        effect's last frame still on the tile, which a later power-on would
+        show. Writing the colours back while the light is off shows nothing
+        and leaves stored colours alone.
+        """
+        async with self._component_operation():
+            if await self._power_for_update() != 0:
+                return
+            tile = await self._tile_colors_for_update()
+            for position, colour in zip(self._component_positions(component), colours):
+                tile[position] = colour
+            await self._write_tile(tile, 0.0)
 
     async def _power_on_component(self, component: str, duration: float) -> None:
         """Turn on only one light component of a light that is off.
