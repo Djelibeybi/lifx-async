@@ -77,6 +77,9 @@ Every call to `generate_frame()` receives a `FrameContext` with:
 - `pixel_count`: Number of pixels to generate (1 for Light, N for zones, W*H for matrix)
 - `canvas_width`: Width in pixels (for 2D effects on matrix devices)
 - `canvas_height`: Height in pixels (for 2D effects on matrix devices)
+- `wraps`: `True` when the canvas is a ring whose last pixel sits next to its first, such as
+  a Mirror ring; `False` for every other canvas. Effects that move a pattern along the canvas
+  can read it to avoid a seam or a false end. Effects that ignore it keep working unchanged.
 
 ### Minimal Example
 

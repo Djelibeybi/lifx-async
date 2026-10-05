@@ -13,6 +13,7 @@ per frame.
 
 Supported Devices:
     - MatrixLight: Uses Set64 packets (64 pixels per packet per tile)
+    - MirrorLight: One Set64 per frame, a ring frame scattered onto both rings
     - MultiZoneLight: Uses SetExtendedColorZones (82 zones per packet)
 
 Example:
@@ -35,6 +36,7 @@ from __future__ import annotations
 
 import struct
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import chain
 from typing import ClassVar
@@ -475,6 +477,76 @@ class MatrixPacketGenerator(PacketGenerator):
                     hsbk[tmpl.hsbk_start : tmpl.hsbk_start + tmpl.color_count]
                 ),
             )
+
+
+class RingPacketGenerator(PacketGenerator):
+    """Packet generator that draws one ring frame onto every ring of a tile.
+
+    A Mirror's front and back are 25-zone rings whose zones sit at scattered
+    buffer positions on one 4x13 tile. The input is one frame in zone order;
+    it is written to the buffer positions of every ring, so all rings show
+    the same frame, and the whole tile goes out as a single Set64. Buffer
+    positions that belong to no ring stay dark.
+    """
+
+    _UNUSED: ClassVar[tuple[int, int, int, int]] = (0, 0, 0, 3500)
+
+    def __init__(
+        self,
+        tile_width: int,
+        tile_height: int,
+        rings: Sequence[Sequence[int]],
+        duration_ms: int = 0,
+    ) -> None:
+        """Initialize ring packet generator.
+
+        Args:
+            tile_width: Width of the tile in buffer positions
+            tile_height: Height of the tile in buffer positions
+            rings: Buffer positions of each ring, in zone order; every ring
+                must have the same number of zones
+            duration_ms: Transition duration in milliseconds (default 0)
+
+        Raises:
+            ValueError: If there are no rings, or the rings differ in size
+        """
+        zone_counts = {len(positions) for positions in rings}
+        if len(zone_counts) != 1:
+            raise ValueError("Rings must all have the same number of zones")
+        self._matrix = MatrixPacketGenerator(1, tile_width, tile_height, duration_ms)
+        self._rings = [tuple(positions) for positions in rings]
+        self._zone_count = zone_counts.pop()
+        self._tile_size = tile_width * tile_height
+
+    def pixel_count(self) -> int:
+        """Get the number of zones in one ring."""
+        return self._zone_count
+
+    def create_templates(self, source: int, target: bytes) -> list[PacketTemplate]:
+        """Create the single Set64 template for the tile."""
+        return self._matrix.create_templates(source, target)
+
+    def update_colors(
+        self, templates: list[PacketTemplate], hsbk: list[tuple[int, int, int, int]]
+    ) -> None:
+        """Scatter one ring frame onto every ring and write the tile.
+
+        Args:
+            templates: Prebaked packet templates
+            hsbk: Protocol-ready HSBK data for one ring, in zone order
+
+        Raises:
+            ValueError: If hsbk does not have one value per ring zone
+        """
+        if len(hsbk) != self._zone_count:
+            raise ValueError(
+                f"Expected {self._zone_count} HSBK values, got {len(hsbk)}"
+            )
+        tile = [self._UNUSED] * self._tile_size
+        for positions in self._rings:
+            for position, colour in zip(positions, hsbk):
+                tile[position] = colour
+        self._matrix.update_colors(templates, tile)
 
 
 class MultiZonePacketGenerator(PacketGenerator):

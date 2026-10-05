@@ -270,6 +270,22 @@ await mirror.set_effect(
 )
 ```
 
+## Software Effects
+
+A software effect started on the whole Mirror, for example with `Conductor.start()`, draws on
+a ring: the effect sees 25 pixels in zone order, and each frame is shown on both the front and
+back rings. The frame context's `wraps` flag is `True`, so effects such as Rainbow, Spin, Cylon
+and Colorloop run continuously round the ring with no seam. Zone order runs clockwise round the
+front ring and anticlockwise round the back ring, both from the lower left as seen from the
+front, so the same frame appears to move in opposite directions on the two rings.
+
+```python
+from lifx import Conductor, EffectRainbow
+
+conductor = Conductor()
+await conductor.start(EffectRainbow(period=10), [mirror])
+```
+
 ## Whole-Device Operations
 
 `set_power()` and `set_color()` still act on the entire fixture. Both keep the

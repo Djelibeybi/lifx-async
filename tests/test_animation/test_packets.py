@@ -13,6 +13,7 @@ from lifx.animation.packets import (
     MatrixPacketGenerator,
     MultiZonePacketGenerator,
     PacketTemplate,
+    RingPacketGenerator,
 )
 
 # Test source and target for templates
@@ -503,6 +504,40 @@ class TestMatrixPacketGeneratorRowAlignedChunking:
         for idx in (7, 15):
             (pkt_type,) = struct.unpack_from("<H", templates[idx].data, 32)
             assert pkt_type == self.COPY_FB_PKT_TYPE
+
+
+class TestRingPacketGenerator:
+    """Tests for RingPacketGenerator (one ring frame drawn on every ring)."""
+
+    def test_rings_must_match_in_size(self) -> None:
+        with pytest.raises(ValueError, match="same number of zones"):
+            RingPacketGenerator(4, 13, rings=[(0, 1, 2), (3, 4)])
+
+    def test_needs_a_ring(self) -> None:
+        with pytest.raises(ValueError, match="same number of zones"):
+            RingPacketGenerator(4, 13, rings=[])
+
+    def test_frame_must_cover_one_ring(self) -> None:
+        gen = RingPacketGenerator(4, 13, rings=[(5, 9, 1), (2, 6, 10)])
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+
+        assert gen.pixel_count() == 3
+        assert len(templates) == 1
+        with pytest.raises(ValueError, match="Expected 3 HSBK values, got 52"):
+            gen.update_colors(templates, [(0, 0, 0, 3500)] * 52)
+
+    def test_scatters_the_frame_onto_every_ring(self) -> None:
+        gen = RingPacketGenerator(4, 13, rings=[(5, 9, 1), (2, 6, 10)])
+        templates = gen.create_templates(TEST_SOURCE, TEST_TARGET)
+        frame = [(100, 1, 2, 3500), (200, 1, 2, 3500), (300, 1, 2, 3500)]
+
+        gen.update_colors(templates, frame)
+
+        flat = struct.unpack_from("<256H", get_payload(templates[0]), 10)
+        sent = [flat[i : i + 4] for i in range(0, 256, 4)]
+        assert [sent[p][0] for p in (5, 9, 1)] == [100, 200, 300]
+        assert [sent[p][0] for p in (2, 6, 10)] == [100, 200, 300]
+        assert all(sent[p] == (0, 0, 0, 3500) for p in (0, 3, 4, 7, 51))
 
 
 class TestMultiZonePacketGenerator:

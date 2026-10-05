@@ -39,6 +39,9 @@ class FrameContext:
         pixel_count: Number of pixels (1 for light, N for zones, W*H for matrix)
         canvas_width: Width in pixels (pixel_count for 1D, W for matrix)
         canvas_height: Height in pixels (1 for 1D, H for matrix)
+        wraps: True if the canvas is a ring whose last pixel sits next to its
+            first (a Mirror ring), so a pattern should run on with no seam or
+            end. False for every other canvas.
     """
 
     elapsed_s: float
@@ -46,6 +49,7 @@ class FrameContext:
     pixel_count: int
     canvas_width: int
     canvas_height: int
+    wraps: bool = False
 
 
 class FrameEffect(LIFXEffect):
@@ -206,6 +210,7 @@ class FrameEffect(LIFXEffect):
                     pixel_count=animator.pixel_count,
                     canvas_width=animator.canvas_width,
                     canvas_height=animator.canvas_height,
+                    wraps=animator.wraps,
                 )
 
                 # Generate protocol-ready frame (subclasses can override

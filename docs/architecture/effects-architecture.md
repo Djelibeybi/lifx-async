@@ -722,6 +722,9 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - **FrameEffect support:** Full 2D canvas via `FrameContext.canvas_width` / `canvas_height`
 - **Spatial effects:** Flicker (vertical gradient), Aurora (vertical brightness), Sunrise/Sunset (radial wavefront)
 - **Canvas mapping:** Multi-tile devices get a unified canvas based on tile positions
+- **Mirror:** A whole-light frame effect draws on one 25x1 ring in zone order with
+  `FrameContext.wraps` set. The Animator writes each frame to the buffer positions of both the
+  front and back rings in one Set64. `Animator.for_matrix()` still exposes the raw 4x13 tile.
 
 #### HEV Lights (`HevLight`)
 
@@ -834,7 +837,7 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 
 1. **Device Agnostic:** Effects work across all device types (Light, MultiZoneLight, MatrixLight) without device-specific code
 2. **Clean Separation:** Effect authors implement `generate_frame()` returning HSBK colors; animation module handles packet construction, tile mapping, and UDP delivery
-3. **Spatial Awareness:** `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` — enabling 2D effects (fire, rain) on matrix devices
+3. **Spatial Awareness:** `FrameContext` provides `pixel_count`, `canvas_width`, `canvas_height` and `wraps`, enabling 2D effects (fire, rain) on matrix devices and seamless patterns on ring canvases
 4. **Performance:** Direct UDP via prebaked packet templates, no connection overhead
 5. **Smooth Transitions:** `duration_ms` parameter tells firmware to interpolate between frames
 

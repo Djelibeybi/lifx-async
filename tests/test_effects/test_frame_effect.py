@@ -124,6 +124,7 @@ class TestFrameEffectLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -142,6 +143,7 @@ class TestFrameEffectLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -165,12 +167,14 @@ class TestFrameEffectLoop:
         animator1.pixel_count = 1
         animator1.canvas_width = 1
         animator1.canvas_height = 1
+        animator1.wraps = False
         animator1.send_frame = MagicMock()
 
         animator2 = MagicMock()
         animator2.pixel_count = 82
         animator2.canvas_width = 82
         animator2.canvas_height = 1
+        animator2.wraps = False
         animator2.send_frame = MagicMock()
 
         effect._animators = [animator1, animator2]
@@ -203,6 +207,7 @@ class TestFrameEffectLoop:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -355,6 +360,7 @@ class TestGenerateProtocolFrame:
         animator.pixel_count = 1
         animator.canvas_width = 1
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 

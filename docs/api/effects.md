@@ -319,7 +319,13 @@ class FrameContext:
     pixel_count: int    # Number of pixels (1 for light, N for zones, W*H for matrix)
     canvas_width: int   # Width (pixel_count for 1D, W for matrix)
     canvas_height: int  # Height (1 for 1D, H for matrix)
+    wraps: bool = False # True for a ring canvas (Mirror), where the last pixel
+                        # sits next to the first
 ```
+
+Rainbow, Spin, Cylon and Colorloop read `wraps` so a ring shows no seam or false end: Spin
+spreads its palette round the ring without repeating a colour, and Cylon's eye circles the
+ring instead of bouncing.
 
 ### Methods
 

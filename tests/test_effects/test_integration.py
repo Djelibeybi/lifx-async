@@ -201,6 +201,7 @@ async def test_colorloop_effect_execution(conductor, mock_light) -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -241,6 +242,7 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     mock_animator1.pixel_count = 1
     mock_animator1.canvas_width = 1
     mock_animator1.canvas_height = 1
+    mock_animator1.wraps = False
     mock_animator1.send_frame = MagicMock()
     mock_animator1.close = MagicMock()
 
@@ -248,6 +250,7 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     mock_animator2.pixel_count = 1
     mock_animator2.canvas_width = 1
     mock_animator2.canvas_height = 1
+    mock_animator2.wraps = False
     mock_animator2.send_frame = MagicMock()
     mock_animator2.close = MagicMock()
 
@@ -275,6 +278,7 @@ async def test_colorloop_with_brightness(conductor, mock_light) -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -302,6 +306,7 @@ async def test_colorloop_filters_white_lights(
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -402,6 +407,7 @@ async def test_consecutive_effects_inherit_prestate(conductor, mock_light) -> No
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -500,6 +506,7 @@ async def test_conductor_exception_during_effect() -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock(side_effect=Exception("Device error"))
     mock_animator.close = MagicMock()
 
@@ -581,6 +588,7 @@ async def test_conductor_stop_with_active_effects() -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -622,6 +630,7 @@ async def test_conductor_filter_lights_without_capabilities() -> None:
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -685,6 +694,7 @@ async def test_conductor_creates_animators_for_frame_effect(
         mock_animator.pixel_count = 1
         mock_animator.canvas_width = 1
         mock_animator.canvas_height = 1
+        mock_animator.wraps = False
         mock_animator.send_frame = MagicMock()
         mock_animator.close = MagicMock()
         mock_create.return_value = [mock_animator]
@@ -710,6 +720,7 @@ async def test_conductor_closes_animators_on_stop(conductor, mock_light) -> None
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -735,6 +746,7 @@ async def test_conductor_closes_animators_on_completion(conductor, mock_light) -
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -760,6 +772,7 @@ async def test_conductor_closes_animators_on_error(conductor, mock_light) -> Non
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 
@@ -838,6 +851,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     mock_light_animator.pixel_count = 1
     mock_light_animator.canvas_width = 1
     mock_light_animator.canvas_height = 1
+    mock_light_animator.wraps = False
     mock_light_animator.send_frame = MagicMock()
     mock_light_animator.close = MagicMock()
 
@@ -845,6 +859,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     mock_mz_animator.pixel_count = 16
     mock_mz_animator.canvas_width = 16
     mock_mz_animator.canvas_height = 1
+    mock_mz_animator.wraps = False
     mock_mz_animator.send_frame = MagicMock()
     mock_mz_animator.close = MagicMock()
 
@@ -852,6 +867,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     mock_matrix_animator.pixel_count = 64
     mock_matrix_animator.canvas_width = 8
     mock_matrix_animator.canvas_height = 8
+    mock_matrix_animator.wraps = False
     mock_matrix_animator.send_frame = MagicMock()
     mock_matrix_animator.close = MagicMock()
 
@@ -912,6 +928,7 @@ async def test_conductor_frame_effect_coexists_with_lifx_effect(
     mock_animator.pixel_count = 1
     mock_animator.canvas_width = 1
     mock_animator.canvas_height = 1
+    mock_animator.wraps = False
     mock_animator.send_frame = MagicMock()
     mock_animator.close = MagicMock()
 

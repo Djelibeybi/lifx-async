@@ -672,6 +672,7 @@ class Conductor:
         """
         from lifx.animation.animator import Animator
         from lifx.devices.matrix import MatrixLight
+        from lifx.devices.mirror import MirrorLight
         from lifx.devices.multizone import MultiZoneLight
 
         # Use 1.5x frame interval for duration so transitions overlap.
@@ -680,7 +681,14 @@ class Conductor:
         animators: list[Animator] = []
 
         for light in participants:
-            if isinstance(light, MatrixLight):
+            if isinstance(light, MirrorLight):
+                # A whole-light effect draws one ring frame on both rings.
+                animator = await Animator._for_rings(
+                    light,
+                    [light.front_positions, light.back_positions],
+                    duration_ms=duration_ms,
+                )
+            elif isinstance(light, MatrixLight):
                 animator = await Animator.for_matrix(light, duration_ms=duration_ms)
             elif isinstance(light, MultiZoneLight):
                 animator = await Animator.for_multizone(light, duration_ms=duration_ms)

@@ -128,7 +128,9 @@ class EffectSpin(FrameEffect):
         Each zone's position (0.0-1.0) plus a time offset determines
         which pair of theme colors it falls between. ``HSBK.lerp_oklab``
         interpolates smoothly between those neighbors. A small hue
-        shift per zone (``bulb_offset``) adds visual shimmer.
+        shift per zone (``bulb_offset``) adds visual shimmer. On a ring
+        (``ctx.wraps``) the palette closes without repeating a colour and
+        the shimmer rises and falls so the ring shows no seam.
 
         Args:
             ctx: Frame context with timing and layout info
@@ -145,10 +147,15 @@ class EffectSpin(FrameEffect):
         # Compute logical bulb count
         bulb_count = max(ctx.pixel_count // self.zones_per_bulb, 1)
 
+        # On a ring the last bulb sits next to the first, so positions stop
+        # one step short of 1.0 and the palette closes without a repeat.
+        # A strip spans the whole palette from end to end.
+        span = bulb_count if ctx.wraps else max(bulb_count - 1, 1)
+
         bulb_colors: list[HSBK] = []
         for i in range(bulb_count):
-            # Normalised position along the strip (0.0 - 1.0)
-            position = i / max(bulb_count - 1, 1)
+            # Normalised position along the strip or ring (0.0 - 1.0)
+            position = i / span
 
             # Continuous index into the theme palette, scrolling with time
             slot = (position + phase) * n_colors
@@ -161,8 +168,10 @@ class EffectSpin(FrameEffect):
             # Perceptually smooth interpolation via Oklab
             base_color = theme_colors[idx_a].lerp_oklab(theme_colors[idx_b], frac)
 
-            # Apply per-zone hue shimmer
-            shimmer_hue = (base_color.hue + i * self.bulb_offset) % 360
+            # Apply per-zone hue shimmer. A ring climbs to its far side and
+            # back down, so there is no jump where it closes.
+            steps = min(i, bulb_count - i) if ctx.wraps else i
+            shimmer_hue = (base_color.hue + steps * self.bulb_offset) % 360
 
             bulb_colors.append(
                 HSBK(

@@ -303,6 +303,7 @@ class TestSunriseFrameLoop:
         animator.pixel_count = 64
         animator.canvas_width = 8
         animator.canvas_height = 8
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -513,6 +514,7 @@ class TestSunsetPowerOff:
         animator.pixel_count = 64
         animator.canvas_width = 8
         animator.canvas_height = 8
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
@@ -536,6 +538,7 @@ class TestSunsetPowerOff:
         animator.pixel_count = 64
         animator.canvas_width = 8
         animator.canvas_height = 8
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 

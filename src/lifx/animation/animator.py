@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import socket
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -48,6 +49,7 @@ from lifx.animation.packets import (
     MultiZonePacketGenerator,
     PacketGenerator,
     PacketTemplate,
+    RingPacketGenerator,
 )
 from lifx.const import LIFX_UDP_PORT
 from lifx.exceptions import LifxNetworkError
@@ -136,6 +138,8 @@ class Animator:
         framebuffer: FrameBuffer,
         packet_generator: PacketGenerator,
         port: int = LIFX_UDP_PORT,
+        *,
+        wraps: bool = False,
     ) -> None:
         """Initialize animator for direct UDP sending.
 
@@ -148,6 +152,8 @@ class Animator:
             framebuffer: Configured FrameBuffer for orientation mapping
             packet_generator: Configured PacketGenerator for the device
             port: UDP port (default: 56700)
+            wraps: True if the canvas is a ring whose last pixel sits next
+                to its first (default: False)
 
         Raises:
             ValueError: If ``ip`` is not a valid IPv4 or IPv6 literal, including
@@ -168,6 +174,7 @@ class Animator:
         validate_address(ip)
         self._serial = serial
         self._framebuffer = framebuffer
+        self._wraps = wraps
         self._packet_generator = packet_generator
 
         # Protocol source ID (unique per-session, identifies this client)
@@ -320,6 +327,55 @@ class Animator:
         return cls(ip, serial, framebuffer, packet_generator, port=device.port)
 
     @classmethod
+    async def _for_rings(
+        cls,
+        device: MatrixLight,
+        rings: Sequence[Sequence[int]],
+        duration_ms: int = 0,
+    ) -> Animator:
+        """Create an Animator that draws one ring frame on every ring of a tile.
+
+        The canvas is one ring in zone order (Nx1) and wraps. Each frame is
+        scattered to every ring's buffer positions in one tile write. A Mirror
+        uses this for whole-light effects, with its front and back rings; the
+        public `for_matrix()` keeps the raw tile canvas.
+
+        Args:
+            device: Single-tile MatrixLight device (must be connected)
+            rings: Buffer positions of each ring, in zone order
+            duration_ms: Transition duration in milliseconds (default 0)
+
+        Returns:
+            Configured Animator instance
+        """
+        if device.device_chain is None:
+            await device.get_device_chain()
+
+        tiles = device.device_chain
+        if not tiles:
+            raise ValueError("Device has no tiles")
+
+        packet_generator = RingPacketGenerator(
+            tile_width=tiles[0].width,
+            tile_height=tiles[0].height,
+            rings=rings,
+            duration_ms=duration_ms,
+        )
+        framebuffer = FrameBuffer(pixel_count=packet_generator.pixel_count())
+
+        # Frames bypass set64(), as in for_matrix().
+        device._zones_changed()
+
+        return cls(
+            device.ip,
+            Serial.from_string(device.serial),
+            framebuffer,
+            packet_generator,
+            port=device.port,
+            wraps=True,
+        )
+
+    @classmethod
     def for_light(
         cls,
         device: Light,
@@ -372,6 +428,11 @@ class Animator:
     def canvas_height(self) -> int:
         """Get height of the logical canvas in pixels."""
         return self._framebuffer.canvas_height
+
+    @property
+    def wraps(self) -> bool:
+        """True if the canvas is a ring: its last pixel sits next to its first."""
+        return self._wraps
 
     def send_frame(
         self,

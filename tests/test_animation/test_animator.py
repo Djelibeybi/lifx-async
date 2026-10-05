@@ -788,6 +788,62 @@ class TestAnimatorForMatrixFactory:
         assert device._pending_tile.get() is None
 
 
+class TestAnimatorForMirrorRings:
+    """Tests for the whole-light Mirror ring Animator."""
+
+    @staticmethod
+    def _mirror() -> MirrorLight:
+        device = MirrorLight(serial="d073d5000001", ip="192.0.2.10")
+        device._version = MagicMock(product=267)
+        return device
+
+    @pytest.mark.asyncio
+    async def test_canvas_is_one_ring_that_wraps(self) -> None:
+        device = self._mirror()
+        tile = MagicMock(width=4, height=13)
+
+        async def load_chain() -> None:
+            device._device_chain = [tile]
+
+        device.get_device_chain = AsyncMock(side_effect=load_chain)
+        device._pending_tile.record([MagicMock()] * 52, 5.0)
+
+        animator = await Animator._for_rings(
+            device, [device.front_positions, device.back_positions]
+        )
+
+        device.get_device_chain.assert_awaited_once()
+        assert (animator.pixel_count, animator.canvas_width) == (25, 25)
+        assert animator.canvas_height == 1
+        assert animator.wraps is True
+        # Frames bypass set64(), so the device forgets its remembered tile.
+        assert device._pending_tile.get() is None
+
+    @pytest.mark.asyncio
+    async def test_no_tiles_raises(self) -> None:
+        device = self._mirror()
+        device._device_chain = []
+
+        with pytest.raises(ValueError, match="no tiles"):
+            await Animator._for_rings(
+                device, [device.front_positions, device.back_positions]
+            )
+
+    @pytest.mark.asyncio
+    async def test_for_matrix_keeps_the_raw_tile_canvas(self) -> None:
+        """LedFx and other direct users still get the 52-position tile."""
+        device = self._mirror()
+        tile = MagicMock(width=4, height=13, user_x=0.0, user_y=0.0)
+        tile.nearest_orientation = "Upright"
+        device._device_chain = [tile]
+        device._capabilities = MagicMock(has_chain=False)
+
+        animator = await Animator.for_matrix(device)
+
+        assert animator.pixel_count == 52
+        assert animator.wraps is False
+
+
 class TestAnimatorForMultizoneFactory:
     """Tests for Animator.for_multizone factory method."""
 

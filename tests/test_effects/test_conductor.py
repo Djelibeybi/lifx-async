@@ -97,6 +97,7 @@ async def _start_effect_with_mock_animators(
             animator.pixel_count = 1
             animator.canvas_width = 1
             animator.canvas_height = 1
+            animator.wraps = False
             animator.send_frame = MagicMock()
             animator.close = MagicMock()
             animators.append(animator)
@@ -114,6 +115,7 @@ async def test_add_lights_to_running_effect(conductor, light1, light2) -> None:
         animator1.pixel_count = 1
         animator1.canvas_width = 1
         animator1.canvas_height = 1
+        animator1.wraps = False
         animator1.send_frame = MagicMock()
         animator1.close = MagicMock()
         mock_create.return_value = [animator1]
@@ -128,6 +130,7 @@ async def test_add_lights_to_running_effect(conductor, light1, light2) -> None:
         animator2.pixel_count = 1
         animator2.canvas_width = 1
         animator2.canvas_height = 1
+        animator2.wraps = False
         animator2.send_frame = MagicMock()
         animator2.close = MagicMock()
         mock_create.return_value = [animator2]

@@ -619,6 +619,7 @@ class TestFrameLoop:
         animator.pixel_count = 82
         animator.canvas_width = 82
         animator.canvas_height = 1
+        animator.wraps = False
         animator.send_frame = MagicMock()
         effect._animators = [animator]
 
