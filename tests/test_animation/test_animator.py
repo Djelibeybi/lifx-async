@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import socket
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,6 +20,22 @@ from lifx.devices.multizone import MultiZoneLight
 from lifx.exceptions import LifxNetworkError
 from lifx.protocol.models import Serial
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
+
+
+async def _drain_probe_acks(animator: Animator, timeout: float = 2.0) -> None:
+    """Wait until every outstanding probe ack has arrived and been swept.
+
+    A fixed sleep assumes the emulator answers within that window, which a
+    loaded CI runner does not guarantee. Sweeping until the gate is empty,
+    bounded by ``timeout``, waits exactly as long as the reply takes.
+    """
+    deadline = time.monotonic() + timeout
+    while animator._ack_gate.outstanding_count:
+        if time.monotonic() > deadline:
+            raise AssertionError("probe ack did not arrive within the timeout")
+        await asyncio.sleep(0.01)
+        assert animator._socket is not None
+        animator._ack_gate.sweep(animator._socket, animator._source, time.monotonic())
 
 
 class TestAnimatorStats:
@@ -1046,7 +1063,7 @@ class TestAnimatorFlowControlIntegration:
                 assert getattr(stats, "gated", None) is False
                 if frame_num >= 1:
                     assert getattr(stats, "acks_outstanding", None) == 1
-                await asyncio.sleep(0.1)
+                await _drain_probe_acks(animator)
 
             animator.close()
 
@@ -1056,7 +1073,7 @@ class TestAnimatorFlowControlIntegration:
         """13x26 large-tile path (needs plans 04-03 AND 04-04): pixel_count
         is 338, the first frame sends 8 packets (7 row-aligned Set64 + 1
         CopyFB), and after the CopyFB probe is acked and swept, a second
-        frame (after a short drain sleep) is gated False with
+        frame (once that ack has drained) is gated False with
         acks_outstanding < 2.
         """
         matrix = large_tile_matrix_device
@@ -1072,7 +1089,7 @@ class TestAnimatorFlowControlIntegration:
             stats1 = animator.send_frame(hsbk)
             assert stats1.packets_sent == 8
 
-            await asyncio.sleep(0.1)
+            await _drain_probe_acks(animator)
 
             stats2 = animator.send_frame(hsbk)
             assert getattr(stats2, "gated", None) is False
