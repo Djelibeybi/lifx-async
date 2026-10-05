@@ -10,6 +10,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
 from lifx.effects.models import (
     ParticipantKey,
@@ -20,7 +21,6 @@ from lifx.effects.models import (
 from lifx.effects.state_manager import DeviceStateManager
 
 if TYPE_CHECKING:
-    from lifx.animation.animator import Animator
     from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
     from lifx.effects.frame_effect import FrameEffect
@@ -660,43 +660,41 @@ class Conductor:
 
     async def _create_animators(
         self, effect: FrameEffect, participants: list[Light]
-    ) -> list[Animator]:
-        """Create animators for each participant based on device type.
+    ) -> list[AnimatorWriter]:
+        """Borrow each participant's own Animator for this effect run.
+
+        Every light owns one Animator (``light.animator``), shared with
+        direct frame senders such as LedFx, so the effect's frames and theirs
+        go through one writer and one ack gate. The effect draws through a
+        writer with its own canvas and transition duration.
 
         Args:
             effect: The frame effect (used to determine duration_ms from fps)
-            participants: List of lights to create animators for
+            participants: List of lights to borrow Animators from
 
         Returns:
-            List of Animator instances, one per participant
+            List of writers, one per participant
         """
-        from lifx.animation.animator import Animator
-        from lifx.devices.matrix import MatrixLight
         from lifx.devices.mirror import MirrorLight
-        from lifx.devices.multizone import MultiZoneLight
 
         # Use 1.5x frame interval for duration so transitions overlap.
         # This prevents micro-gaps from asyncio scheduling jitter.
         duration_ms = int(1500 / effect.fps)
-        animators: list[Animator] = []
+        writers: list[AnimatorWriter] = []
 
         for light in participants:
+            animator = await light.animator.prepare()
             if isinstance(light, MirrorLight):
                 # A whole-light effect draws one ring frame on both rings.
-                animator = await Animator._for_rings(
-                    light,
-                    [light.front_positions, light.back_positions],
+                writer = animator._writer(
+                    rings=[light.front_positions, light.back_positions],
                     duration_ms=duration_ms,
                 )
-            elif isinstance(light, MatrixLight):
-                animator = await Animator.for_matrix(light, duration_ms=duration_ms)
-            elif isinstance(light, MultiZoneLight):
-                animator = await Animator.for_multizone(light, duration_ms=duration_ms)
             else:
-                animator = Animator.for_light(light, duration_ms=duration_ms)
-            animators.append(animator)
+                writer = animator._writer(duration_ms=duration_ms)
+            writers.append(writer)
 
-        return animators
+        return writers
 
     def __repr__(self) -> str:
         """String representation of Conductor."""

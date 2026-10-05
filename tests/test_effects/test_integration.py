@@ -1,6 +1,7 @@
 """Integration tests for effects system."""
 
 import asyncio
+import socket
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -799,7 +800,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
 
     # Create mock devices of different types
     light = MagicMock(spec=Light)
-    light.serial = "d073d5light01"
+    light.serial = "d073d5000a01"
     light.ip = "192.168.1.1"
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
@@ -811,7 +812,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     light.set_power = AsyncMock()
 
     multizone = MagicMock(spec=MultiZoneLight)
-    multizone.serial = "d073d5multi01"
+    multizone.serial = "d073d5000a02"
     multizone.ip = "192.168.1.2"
     multizone.capabilities = MagicMock()
     multizone.capabilities.has_color = True
@@ -824,7 +825,7 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     multizone.get_zone_count = AsyncMock(return_value=16)
 
     matrix = MagicMock(spec=MatrixLight)
-    matrix.serial = "d073d5tile01"
+    matrix.serial = "d073d5000a03"
     matrix.ip = "192.168.1.3"
     matrix.capabilities = MagicMock()
     matrix.capabilities.has_color = True
@@ -844,58 +845,30 @@ async def test_conductor_frame_effect_with_multiple_device_types() -> None:
     matrix.device_chain = [tile]
     matrix.get_device_chain = AsyncMock(return_value=[tile])
 
+    for device in (light, multizone, matrix):
+        device.port = 56700
+        device.animator = Animator._for_device(device)
+
     effect = ConcreteFrameEffectForIntegration(fps=10.0, duration=0.05)
 
-    # Mock the Animator factory methods to avoid actual UDP sockets
-    mock_light_animator = MagicMock()
-    mock_light_animator.pixel_count = 1
-    mock_light_animator.canvas_width = 1
-    mock_light_animator.canvas_height = 1
-    mock_light_animator.wraps = False
-    mock_light_animator.send_frame = MagicMock()
-    mock_light_animator.close = MagicMock()
-
-    mock_mz_animator = MagicMock()
-    mock_mz_animator.pixel_count = 16
-    mock_mz_animator.canvas_width = 16
-    mock_mz_animator.canvas_height = 1
-    mock_mz_animator.wraps = False
-    mock_mz_animator.send_frame = MagicMock()
-    mock_mz_animator.close = MagicMock()
-
-    mock_matrix_animator = MagicMock()
-    mock_matrix_animator.pixel_count = 64
-    mock_matrix_animator.canvas_width = 8
-    mock_matrix_animator.canvas_height = 8
-    mock_matrix_animator.wraps = False
-    mock_matrix_animator.send_frame = MagicMock()
-    mock_matrix_animator.close = MagicMock()
-
-    with (
-        patch.object(Animator, "for_light", return_value=mock_light_animator),
-        patch.object(
-            Animator,
-            "for_multizone",
-            new_callable=AsyncMock,
-            return_value=mock_mz_animator,
-        ),
-        patch.object(
-            Animator,
-            "for_matrix",
-            new_callable=AsyncMock,
-            return_value=mock_matrix_animator,
-        ),
-    ):
+    # Capture the UDP datagrams instead of sending them
+    with patch.object(socket, "socket") as socket_class:
+        socket_class.return_value.recvfrom_into.side_effect = BlockingIOError
         await conductor.start(effect, [light, multizone, matrix])
+        writers = list(effect._animators)
 
         # Wait for effect to complete
         await asyncio.sleep(0.3)
 
-        # All three factory methods should have been called
-        # duration_ms = int(1500 / fps) where fps=10 -> 150ms (1.5x frame interval)
-        Animator.for_light.assert_called_once_with(light, duration_ms=150)
-        Animator.for_multizone.assert_called_once_with(multizone, duration_ms=150)
-        Animator.for_matrix.assert_called_once_with(matrix, duration_ms=150)
+        # Each light lends its own Animator, sized for the device, and the
+        # effect draws at 1.5x its frame interval: fps=10 -> 150ms.
+        assert [w.animator for w in writers] == [
+            light.animator,
+            multizone.animator,
+            matrix.animator,
+        ]
+        assert [w.pixel_count for w in writers] == [1, 16, 64]
+        assert {w._duration_ms for w in writers} == {150}
 
         await conductor.stop([light, multizone, matrix])
 

@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
+from lifx.animation.animator import Animator
 from lifx.color import HSBK
 from lifx.const import (
     INVALID_AMBIENT_LIGHT_RESPONSE,
@@ -114,6 +115,33 @@ class Light(Device[LightState]):
     """
 
     _discovery_snapshot: _DiscoveryLightSnapshot | None = None
+    _animator: Animator | None = None
+
+    @property
+    def animator(self) -> Animator:
+        """The one Animator this light owns, created on first access.
+
+        Library effects and direct frame senders such as LedFx borrow this
+        Animator, so every frame for the light goes through one writer and
+        one ack gate. A single light's Animator is ready at once; a matrix or
+        multizone light's Animator must be prepared before its first frame,
+        which queries the device for its geometry once.
+
+        Example:
+            ```python
+            async with await Device.connect("192.168.1.100") as device:
+                animator = await device.animator.prepare()
+
+            while running:
+                animator.send_frame(frame)
+                await asyncio.sleep(1 / 30)
+            ```
+        """
+        animator = self._animator
+        if animator is None:
+            animator = Animator._for_device(self)
+            self._animator = animator
+        return animator
 
     @property
     def state(self) -> LightState:

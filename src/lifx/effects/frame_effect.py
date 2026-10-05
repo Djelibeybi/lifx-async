@@ -18,12 +18,12 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
 from lifx.effects.models import ParticipantKey, participant_key
 
 if TYPE_CHECKING:
-    from lifx.animation.animator import Animator
     from lifx.devices.light import Light
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,8 +59,8 @@ class FrameEffect(LIFXEffect):
     FPS. Implement generate_frame() to return a list of HSBK colors
     matching ctx.pixel_count.
 
-    The Conductor creates Animators for each participant and sets them
-    on this effect before starting. The frame loop calls
+    The Conductor borrows each participant's own Animator (``light.animator``)
+    and sets a writer for it on this effect before starting. The frame loop calls
     generate_protocol_frame() per device, which by default delegates to
     generate_frame() and converts the result. Performance-critical effects
     can override generate_protocol_frame() directly to skip HSBK allocation.
@@ -109,7 +109,7 @@ class FrameEffect(LIFXEffect):
         self._fps = fps
         self._duration = duration
         self._stop_event = asyncio.Event()
-        self._animators: list[Animator] = []
+        self._animators: list[AnimatorWriter] = []
         self._last_frames: dict[ParticipantKey, list[HSBK]] = {}
         # Cache for HSBK frame from default generate_protocol_frame()
         # Allows _last_frames tracking without coupling to the loop
@@ -244,9 +244,10 @@ class FrameEffect(LIFXEffect):
         self._stop_event.set()
 
     def close_animators(self) -> None:
-        """Close all animators and clear the list.
+        """Release every borrowed Animator and clear the list.
 
-        Called by the Conductor during cleanup.
+        Called by the Conductor during cleanup. Each light's own Animator
+        stays open for its other writers.
         """
         for animator in self._animators:
             animator.close()

@@ -8,18 +8,19 @@ non-blockingly sweeps the animator's own socket for arrived acks each call,
 dropping (never queuing) a frame while too many probes are outstanding.
 See `lifx.animation.flow` for the `AckGate` facility itself.
 
-The factory methods query the device once for configuration (tile info,
-zone count), then the Animator sends frames via raw UDP packets with
-prebaked packet templates for zero-allocation performance.
+Every light owns one Animator, `device.animator`. Library effects and
+direct frame senders such as LedFx borrow it, so each light has one writer
+and one ack gate. Preparing the Animator queries the device once for its
+geometry (tile info, zone count), then the Animator sends frames via raw UDP
+packets with prebaked packet templates for zero-allocation performance. The
+`for_matrix()`, `for_multizone()` and `for_light()` factories are deprecated
+and return the device's Animator.
 
 Example:
     ```python
-    from lifx.animation import Animator
-
     async with await Device.connect("192.168.1.100") as device:
-        assert isinstance(device, MatrixLight)
         # Query device once for tile info
-        animator = await Animator.for_matrix(device)
+        animator = await device.animator.prepare()
 
     # Device connection no longer needed - animator sends via direct UDP
     while running:
@@ -34,9 +35,10 @@ from __future__ import annotations
 
 import socket
 import time
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from lifx.animation.flow import AckGate
 from lifx.animation.framebuffer import FrameBuffer
@@ -49,7 +51,6 @@ from lifx.animation.packets import (
     MultiZonePacketGenerator,
     PacketGenerator,
     PacketTemplate,
-    RingPacketGenerator,
 )
 from lifx.const import LIFX_UDP_PORT
 from lifx.exceptions import LifxNetworkError
@@ -93,6 +94,150 @@ class AnimatorStats:
     acks_outstanding: int = 0
 
 
+@dataclass(frozen=True)
+class _Geometry:
+    """The device's own canvas and the generator for its full set of pixels."""
+
+    framebuffer: FrameBuffer
+    packet_generator: PacketGenerator
+    wraps: bool
+
+
+class _RingCanvas(FrameBuffer):
+    """Draws one ring frame, in zone order, onto every ring of a tile.
+
+    A Mirror's front and back are 25-zone rings whose zones sit at scattered
+    buffer positions on one 4x13 tile. The canvas is one ring, Nx1. Each
+    frame is written to the buffer positions of every ring, so all rings
+    show the same frame. Buffer positions that belong to no ring stay dark.
+    """
+
+    _UNUSED: ClassVar[tuple[int, int, int, int]] = (0, 0, 0, 3500)
+
+    def __init__(self, tile_size: int, rings: Sequence[Sequence[int]]) -> None:
+        zone_counts = {len(positions) for positions in rings}
+        if len(zone_counts) != 1:
+            raise ValueError("Rings must all have the same number of zones")
+        super().__init__(pixel_count=zone_counts.pop())
+        self._rings = [tuple(positions) for positions in rings]
+        self._tile_size = tile_size
+
+    def apply(
+        self, hsbk: list[tuple[int, int, int, int]]
+    ) -> list[tuple[int, int, int, int]]:
+        """Scatter one ring frame onto every ring of the tile."""
+        tile = [self._UNUSED] * self._tile_size
+        for positions in self._rings:
+            for position, colour in zip(positions, hsbk):
+                tile[position] = colour
+        return tile
+
+
+def _warn_deprecated(factory: str) -> None:
+    warnings.warn(
+        f"Animator.{factory}() is deprecated; use device.animator instead",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+async def _query_geometry(device: Light) -> tuple[FrameBuffer, PacketGenerator]:
+    """Ask a matrix or multizone light for the geometry its Animator draws on."""
+    from lifx.devices.matrix import MatrixLight
+
+    if isinstance(device, MatrixLight):
+        if device.device_chain is None:
+            await device.get_device_chain()
+
+        tiles = device.device_chain
+        if not tiles:
+            raise ValueError("Device has no tiles")
+
+        # Framebuffer with orientation correction
+        framebuffer = await FrameBuffer.for_matrix(device)
+        return framebuffer, MatrixPacketGenerator(
+            tile_count=len(tiles),
+            tile_width=tiles[0].width,
+            tile_height=tiles[0].height,
+        )
+
+    # _for_device() resolves every other light at once, so this is multizone.
+    multizone = cast("MultiZoneLight", device)
+    if multizone.capabilities is None:
+        await multizone.ensure_capabilities()
+
+    has_extended = bool(
+        multizone.capabilities and multizone.capabilities.has_extended_multizone
+    )
+    if not has_extended:
+        raise ValueError(
+            "Device does not support extended multizone protocol. "
+            "Only extended multizone devices are supported for animation."
+        )
+
+    # No orientation for multizone
+    framebuffer = await FrameBuffer.for_multizone(multizone)
+    zone_count = await multizone.get_zone_count()
+    return framebuffer, MultiZonePacketGenerator(zone_count=zone_count)
+
+
+class AnimatorWriter:
+    """One writer's canvas on a device's Animator.
+
+    The Conductor borrows a light's Animator through a writer, so an effect
+    can draw on a canvas of its own (a Mirror's ring, say) at its own
+    transition duration, while every frame still goes out through the
+    Animator's one socket and one ack gate. It has the frame-loop surface of
+    an Animator: `pixel_count`, `canvas_width`, `canvas_height`, `wraps`,
+    `send_frame()` and `close()`.
+    """
+
+    def __init__(
+        self,
+        animator: Animator,
+        canvas: FrameBuffer,
+        *,
+        duration_ms: int,
+        wraps: bool,
+    ) -> None:
+        self._animator = animator
+        self._canvas = canvas
+        self._duration_ms = duration_ms
+        self._wraps = wraps
+
+    @property
+    def animator(self) -> Animator:
+        """The device's Animator this writer borrows."""
+        return self._animator
+
+    @property
+    def pixel_count(self) -> int:
+        """Number of pixels in this writer's canvas."""
+        return self._canvas.canvas_size
+
+    @property
+    def canvas_width(self) -> int:
+        """Width of this writer's canvas in pixels."""
+        return self._canvas.canvas_width
+
+    @property
+    def canvas_height(self) -> int:
+        """Height of this writer's canvas in pixels."""
+        return self._canvas.canvas_height
+
+    @property
+    def wraps(self) -> bool:
+        """True if the canvas is a ring: its last pixel sits next to its first."""
+        return self._wraps
+
+    def send_frame(self, hsbk: list[tuple[int, int, int, int]]) -> AnimatorStats:
+        """Send a frame drawn on this writer's canvas through the Animator."""
+        return self._animator._send(self._canvas, hsbk, self._duration_ms)
+
+    def close(self) -> None:
+        """Stop writing. The device's Animator stays open for other writers."""
+
+
 class Animator:
     """High-level animator for LIFX devices.
 
@@ -119,8 +264,7 @@ class Animator:
     Example:
         ```python
         async with await Device.connect("192.168.1.100") as device:
-            assert isinstance(device, MatrixLight)
-            animator = await Animator.for_matrix(device)
+            animator = await device.animator.prepare()
 
         # No connection needed after this - direct UDP
         while running:
@@ -143,8 +287,9 @@ class Animator:
     ) -> None:
         """Initialize animator for direct UDP sending.
 
-        Use the `for_matrix()` or `for_multizone()` class methods for
-        automatic configuration from a device.
+        Prefer `device.animator`, which every light owns. Constructing an
+        Animator directly gives a second writer for the same device, with its
+        own ack gate.
 
         Args:
             ip: Device IP address
@@ -159,6 +304,12 @@ class Animator:
             ValueError: If ``ip`` is not a valid IPv4 or IPv6 literal, including
                 a link-local IPv6 address without a syntactically valid zone.
         """
+        self._open_session(ip, serial, port)
+        self._duration_ms = packet_generator.duration_ms
+        self._install(framebuffer, packet_generator, wraps=wraps)
+
+    def _open_session(self, ip: str, serial: Serial, port: int) -> None:
+        """Set up the writer identity: address, source, sequence and ack gate."""
         self._ip = ip
         self._port = port
         # Finalisation state exists before validation or packet-generator work
@@ -166,6 +317,8 @@ class Animator:
         self._addr: SocketAddress | None = None
         self._socket: socket.socket | None = None
         self._ack_gate = AckGate()
+        self._geometry: _Geometry | None = None
+        self._device: Light | None = None
 
         # Scope resolution is deliberately deferred until the first send so
         # a named IPv6 interface is re-resolved for each new socket session.
@@ -173,9 +326,6 @@ class Animator:
         # errors never reach the render loop.
         validate_address(ip)
         self._serial = serial
-        self._framebuffer = framebuffer
-        self._wraps = wraps
-        self._packet_generator = packet_generator
 
         # Protocol source ID (unique per-session, identifies this client)
         self._source = allocate_source()
@@ -183,10 +333,23 @@ class Animator:
         # Sequence number (0-255, wraps around)
         self._sequence = 0
 
-        # Create prebaked packet templates
+    def _install(
+        self,
+        framebuffer: FrameBuffer,
+        packet_generator: PacketGenerator,
+        *,
+        wraps: bool = False,
+    ) -> None:
+        """Install the device's geometry and prebake its packet templates."""
+        packet_generator.duration_ms = self._duration_ms
+        self._geometry = _Geometry(framebuffer, packet_generator, wraps)
+        self._bake(packet_generator)
+
+    def _bake(self, packet_generator: PacketGenerator) -> None:
+        """Prebake the packet templates at the generator's current duration."""
         self._templates: list[PacketTemplate] = packet_generator.create_templates(
             source=self._source,
-            target=serial.value,
+            target=self._serial.value,
         )
 
         # Ack-gated flow control (ANIM-01/ANIM-02, D4-03): bake the
@@ -197,67 +360,94 @@ class Animator:
         self._templates[self._probe_index].data[FLAGS_OFFSET] |= ACK_REQUIRED_FLAG
 
     @classmethod
-    async def for_matrix(
-        cls,
-        device: MatrixLight,
-        duration_ms: int = 0,
-    ) -> Animator:
-        """Create an Animator configured for a MatrixLight device.
+    def _for_device(cls, device: Light) -> Animator:
+        """Create the Animator a light owns; see `Light.animator`.
 
-        Queries the device for tile information, then returns an animator
-        that sends frames via direct UDP (no device connection needed
-        after creation).
+        A single light's geometry needs no query, so its Animator is ready at
+        once. A matrix or multizone light's geometry is resolved by the first
+        `prepare()`.
+        """
+        from lifx.devices.matrix import MatrixLight
+        from lifx.devices.multizone import MultiZoneLight
 
-        Args:
-            device: MatrixLight device (must be connected)
-            duration_ms: Transition duration in milliseconds (default 0 for instant).
-                        When non-zero, device smoothly interpolates between frames.
+        serial = Serial.from_string(device.serial)
+        animator = cls.__new__(cls)
+        animator._open_session(device.ip, serial, device.port)
+        animator._device = device
+        animator._duration_ms = 0
+        if not isinstance(device, (MatrixLight, MultiZoneLight)):
+            animator._install(FrameBuffer.for_light(device), LightPacketGenerator())
+        return animator
+
+    async def prepare(self) -> Animator:
+        """Query the device for its geometry, once, and get ready to draw.
+
+        A light's Animator learns its tile layout or zone count from the
+        device the first time it is prepared; later calls make no query.
+        Every call also tells the device that frames are about to bypass its
+        own colour methods, so a Ceiling or Mirror component call reads the
+        device instead of undoing the animation. A single light's Animator is
+        ready without this, but preparing it is harmless.
 
         Returns:
-            Configured Animator instance
+            This Animator, so `animator = await device.animator.prepare()`
+            reads naturally.
+
+        Raises:
+            ValueError: If a matrix light reports no tiles, or a multizone
+                light does not support the extended multizone protocol.
 
         Example:
             ```python
             async with await Device.connect("192.168.1.100") as device:
-                assert isinstance(device, MatrixLight)
-                animator = await Animator.for_matrix(device)
+                animator = await device.animator.prepare()
 
-            # Device connection closed, animator still works via UDP
             while running:
-                stats = animator.send_frame(frame)
-                await asyncio.sleep(1 / 30)  # 30 FPS
+                animator.send_frame(frame)
+                await asyncio.sleep(1 / 30)
             ```
         """
-        # Get device info
-        ip = device.ip
-        serial = Serial.from_string(device.serial)
-
-        # Ensure we have tile chain
-        if device.device_chain is None:
-            await device.get_device_chain()
-
-        tiles = device.device_chain
-        if not tiles:
-            raise ValueError("Device has no tiles")
-
-        # Create framebuffer with orientation correction
-        framebuffer = await FrameBuffer.for_matrix(device)
-
-        # Create packet generator
-        packet_generator = MatrixPacketGenerator(
-            tile_count=len(tiles),
-            tile_width=tiles[0].width,
-            tile_height=tiles[0].height,
-            duration_ms=duration_ms,
-        )
+        device = self._device
+        if device is None:
+            return self
+        if self._geometry is None:
+            framebuffer, packet_generator = await _query_geometry(device)
+            # A concurrent prepare() may have finished first; keep its templates.
+            if self._geometry is None:
+                self._install(framebuffer, packet_generator)
 
         # Frames go straight out over UDP rather than through set64(), so the
         # device never hears about them. Tell it now: a component light
         # (Ceiling, Mirror) forgets the tile it last wrote, so its next
         # component call reads the device instead of undoing the animation.
         device._zones_changed()
+        return self
 
-        return cls(ip, serial, framebuffer, packet_generator, port=device.port)
+    @classmethod
+    async def for_matrix(
+        cls,
+        device: MatrixLight,
+        duration_ms: int = 0,
+    ) -> Animator:
+        """Return the device's Animator, prepared for a MatrixLight.
+
+        Deprecated: use `device.animator` and `await device.animator.prepare()`.
+        Every call returns the same Animator, the one the device owns, so a
+        library effect and this caller share one writer and one ack gate.
+
+        Args:
+            device: MatrixLight device (must be connected)
+            duration_ms: Transition duration in milliseconds (default 0 for
+                instant), applied to frames sent through `send_frame()`.
+
+        Returns:
+            The device's Animator
+
+        Raises:
+            ValueError: If the device reports no tiles
+        """
+        _warn_deprecated("for_matrix")
+        return await cls._borrow(device, duration_ms)
 
     @classmethod
     async def for_multizone(
@@ -265,115 +455,33 @@ class Animator:
         device: MultiZoneLight,
         duration_ms: int = 0,
     ) -> Animator:
-        """Create an Animator configured for a MultiZoneLight device.
+        """Return the device's Animator, prepared for a MultiZoneLight.
 
-        Only devices with extended multizone capability are supported.
-        Queries the device for zone count, then returns an animator
-        that sends frames via direct UDP.
+        Deprecated: use `device.animator` and `await device.animator.prepare()`.
+        Every call returns the same Animator, the one the device owns. Only
+        devices with extended multizone capability are supported.
 
         Args:
             device: MultiZoneLight device (must be connected and support
                    extended multizone protocol)
-            duration_ms: Transition duration in milliseconds (default 0 for instant).
-                        When non-zero, device smoothly interpolates between frames.
+            duration_ms: Transition duration in milliseconds (default 0 for
+                instant), applied to frames sent through `send_frame()`.
 
         Returns:
-            Configured Animator instance
+            The device's Animator
 
         Raises:
             ValueError: If device doesn't support extended multizone
-
-        Example:
-            ```python
-            async with await Device.connect("192.168.1.100") as device:
-                assert isinstance(device, MultiZoneLight)
-                animator = await Animator.for_multizone(device)
-
-            # Device connection closed, animator still works via UDP
-            while running:
-                stats = animator.send_frame(frame)
-                await asyncio.sleep(1 / 30)  # 30 FPS
-            ```
         """
-        # Ensure capabilities are loaded
-        if device.capabilities is None:
-            await device.ensure_capabilities()
-
-        # Check extended multizone capability
-        has_extended = bool(
-            device.capabilities and device.capabilities.has_extended_multizone
-        )
-        if not has_extended:
-            raise ValueError(
-                "Device does not support extended multizone protocol. "
-                "Only extended multizone devices are supported for animation."
-            )
-
-        # Get device info
-        ip = device.ip
-        serial = Serial.from_string(device.serial)
-
-        # Create framebuffer (no orientation for multizone)
-        framebuffer = await FrameBuffer.for_multizone(device)
-
-        # Get zone count
-        zone_count = await device.get_zone_count()
-
-        # Create packet generator
-        packet_generator = MultiZonePacketGenerator(
-            zone_count=zone_count, duration_ms=duration_ms
-        )
-
-        return cls(ip, serial, framebuffer, packet_generator, port=device.port)
+        _warn_deprecated("for_multizone")
+        return await cls._borrow(device, duration_ms)
 
     @classmethod
-    async def _for_rings(
-        cls,
-        device: MatrixLight,
-        rings: Sequence[Sequence[int]],
-        duration_ms: int = 0,
-    ) -> Animator:
-        """Create an Animator that draws one ring frame on every ring of a tile.
-
-        The canvas is one ring in zone order (Nx1) and wraps. Each frame is
-        scattered to every ring's buffer positions in one tile write. A Mirror
-        uses this for whole-light effects, with its front and back rings; the
-        public `for_matrix()` keeps the raw tile canvas.
-
-        Args:
-            device: Single-tile MatrixLight device (must be connected)
-            rings: Buffer positions of each ring, in zone order
-            duration_ms: Transition duration in milliseconds (default 0)
-
-        Returns:
-            Configured Animator instance
-        """
-        if device.device_chain is None:
-            await device.get_device_chain()
-
-        tiles = device.device_chain
-        if not tiles:
-            raise ValueError("Device has no tiles")
-
-        packet_generator = RingPacketGenerator(
-            tile_width=tiles[0].width,
-            tile_height=tiles[0].height,
-            rings=rings,
-            duration_ms=duration_ms,
-        )
-        framebuffer = FrameBuffer(pixel_count=packet_generator.pixel_count())
-
-        # Frames bypass set64(), as in for_matrix().
-        device._zones_changed()
-
-        return cls(
-            device.ip,
-            Serial.from_string(device.serial),
-            framebuffer,
-            packet_generator,
-            port=device.port,
-            wraps=True,
-        )
+    async def _borrow(cls, device: Light, duration_ms: int) -> Animator:
+        """Prepare the device's Animator and set its transition duration."""
+        animator = await device.animator.prepare()
+        animator.duration_ms = duration_ms
+        return animator
 
     @classmethod
     def for_light(
@@ -381,58 +489,109 @@ class Animator:
         device: Light,
         duration_ms: int = 0,
     ) -> Animator:
-        """Create an Animator configured for a single Light device.
+        """Return the device's Animator for a single Light device.
 
-        Unlike the matrix/multizone factories, this does not need to be async
-        because single lights don't require any device queries for configuration.
+        Deprecated: use `device.animator`. Every call returns the same
+        Animator, the one the device owns. A single light's Animator needs no
+        device query, so this stays synchronous.
 
         Args:
             device: Light device (must have ip and serial set)
-            duration_ms: Transition duration in milliseconds (default 0 for instant).
-                        When non-zero, device smoothly interpolates between frames.
+            duration_ms: Transition duration in milliseconds (default 0 for
+                instant), applied to frames sent through `send_frame()`.
 
         Returns:
-            Configured Animator instance
+            The device's Animator
 
-        Example:
-            ```python
-            async with await Device.connect("192.168.1.100") as device:
-                animator = Animator.for_light(device)
-
-            # Device connection closed, animator still works via UDP
-            while running:
-                stats = animator.send_frame([(65535, 65535, 65535, 3500)])
-                await asyncio.sleep(1 / 30)  # 30 FPS
-            ```
+        Raises:
+            RuntimeError: If the device is a matrix or multizone light whose
+                Animator has not been prepared yet; await
+                `device.animator.prepare()` instead.
         """
-        ip = device.ip
-        serial = Serial.from_string(device.serial)
-        framebuffer = FrameBuffer.for_light(device)
-        packet_generator = LightPacketGenerator(duration_ms=duration_ms)
+        _warn_deprecated("for_light")
+        animator = device.animator
+        animator._require_geometry()
+        animator.duration_ms = duration_ms
+        return animator
 
-        return cls(ip, serial, framebuffer, packet_generator, port=device.port)
+    def _writer(
+        self,
+        *,
+        rings: Sequence[Sequence[int]] | None = None,
+        duration_ms: int = 0,
+    ) -> AnimatorWriter:
+        """Borrow this Animator to draw on a canvas of the writer's own.
+
+        Without ``rings`` the writer draws on the device's own canvas. With
+        ``rings`` (single tile only) it draws one ring in zone order, Nx1,
+        that wraps, and each frame is scattered to every ring's buffer
+        positions. A Mirror uses this for whole-light effects, with its front
+        and back rings, while `send_frame()` keeps the raw tile canvas.
+
+        Args:
+            rings: Buffer positions of each ring, in zone order
+            duration_ms: Transition duration for this writer's frames
+
+        Returns:
+            A writer that sends through this Animator's socket and ack gate
+
+        Raises:
+            RuntimeError: If the Animator has not been prepared yet
+            ValueError: If the rings differ in size
+        """
+        geometry = self._require_geometry()
+        canvas: FrameBuffer = geometry.framebuffer
+        wraps = geometry.wraps
+        if rings is not None:
+            canvas = _RingCanvas(geometry.packet_generator.pixel_count(), rings)
+            wraps = True
+        return AnimatorWriter(self, canvas, duration_ms=duration_ms, wraps=wraps)
+
+    def _require_geometry(self) -> _Geometry:
+        """Return the device's geometry, or explain how to resolve it."""
+        geometry = self._geometry
+        if geometry is None:
+            raise RuntimeError(
+                "The Animator does not know the device's geometry yet: "
+                "await device.animator.prepare() first"
+            )
+        return geometry
+
+    @property
+    def duration_ms(self) -> int:
+        """Transition duration, in milliseconds, of frames sent by `send_frame()`.
+
+        When non-zero, the device smoothly interpolates between frames.
+        """
+        return self._duration_ms
+
+    @duration_ms.setter
+    def duration_ms(self, value: int) -> None:
+        if value < 0:
+            raise ValueError(f"duration_ms must be non-negative, got {value}")
+        self._duration_ms = value
 
     @property
     def pixel_count(self) -> int:
         """Get total number of input pixels (canvas size for multi-tile)."""
         # For multi-tile devices, this returns the canvas size
         # For single-tile/multizone, this returns device pixel count
-        return self._framebuffer.canvas_size
+        return self._require_geometry().framebuffer.canvas_size
 
     @property
     def canvas_width(self) -> int:
         """Get width of the logical canvas in pixels."""
-        return self._framebuffer.canvas_width
+        return self._require_geometry().framebuffer.canvas_width
 
     @property
     def canvas_height(self) -> int:
         """Get height of the logical canvas in pixels."""
-        return self._framebuffer.canvas_height
+        return self._require_geometry().framebuffer.canvas_height
 
     @property
     def wraps(self) -> bool:
         """True if the canvas is a ring: its last pixel sits next to its first."""
-        return self._wraps
+        return self._require_geometry().wraps
 
     def send_frame(
         self,
@@ -469,13 +628,24 @@ class Animator:
                 a full gate must never suppress input validation.
             LifxNetworkError: If the destination is invalid or the UDP socket
                 cannot be created, or a frame datagram cannot be sent.
+            RuntimeError: If the Animator has not been prepared yet.
         """
+        geometry = self._require_geometry()
+        return self._send(geometry.framebuffer, hsbk, self._duration_ms)
+
+    def _send(
+        self,
+        canvas: FrameBuffer,
+        hsbk: list[tuple[int, int, int, int]],
+        duration_ms: int,
+    ) -> AnimatorStats:
+        """Send one writer's frame, mapped by its canvas, at its duration."""
         start_time = time.perf_counter()
 
-        if len(hsbk) != self._framebuffer.canvas_size:
+        if len(hsbk) != canvas.canvas_size:
             raise ValueError(
                 f"HSBK length ({len(hsbk)}) must match "
-                f"pixel_count ({self._framebuffer.canvas_size})"
+                f"pixel_count ({canvas.canvas_size})"
             )
 
         # Ensure socket exists. The socket family follows the device
@@ -511,11 +681,18 @@ class Animator:
                 acks_outstanding=self._ack_gate.outstanding_count,
             )
 
-        # Apply orientation mapping
-        device_data = self._framebuffer.apply(hsbk)
+        # Apply the writer's canvas mapping (orientation, ring scatter)
+        device_data = canvas.apply(hsbk)
+
+        # Writers sharing this Animator may use different durations; rebake
+        # the templates only when the duration changes.
+        packet_generator = self._require_geometry().packet_generator
+        if packet_generator.duration_ms != duration_ms:
+            packet_generator.duration_ms = duration_ms
+            self._bake(packet_generator)
 
         # Update colors in prebaked templates
-        self._packet_generator.update_colors(self._templates, device_data)
+        packet_generator.update_colors(self._templates, device_data)
 
         # Send each packet, updating sequence number
         for i, tmpl in enumerate(self._templates):

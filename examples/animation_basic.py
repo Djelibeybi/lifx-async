@@ -82,12 +82,11 @@ async def run_profile(
     """Profile the animation loop against a real device."""
     is_matrix = isinstance(device, MatrixLight)
 
+    animator = await device.animator.prepare()
     if is_matrix:
-        animator = await Animator.for_matrix(device)
         canvas_width = animator.canvas_width
         canvas_height = animator.canvas_height
     else:
-        animator = await Animator.for_multizone(device)
         canvas_width = animator.pixel_count
         canvas_height = 1
 
@@ -256,8 +255,8 @@ async def run_matrix_animation(
     print(f"\nRunning matrix animation for {duration:.1f} seconds...")
     print(f"Animation: Rainbow wave (30 degree angle) at {fps:.0f} FPS")
 
-    # Create animator (queries device once, then sends via direct UDP)
-    animator = await Animator.for_matrix(device)
+    # Borrow the device's own Animator (queries once, then sends via UDP)
+    animator = await device.animator.prepare()
 
     # Get canvas dimensions (may span multiple tiles)
     canvas_width = animator.canvas_width
@@ -361,8 +360,8 @@ async def run_multizone_animation(
     print(f"\nRunning multizone animation for {duration:.1f} seconds...")
     print(f"Animation: Rainbow wave at {fps:.0f} FPS")
 
-    # Create animator (queries device once, then sends via direct UDP)
-    animator = await Animator.for_multizone(device)
+    # Borrow the device's own Animator (queries once, then sends via UDP)
+    animator = await device.animator.prepare()
     zone_count = animator.pixel_count
 
     print(f"Device: {zone_count} zones")

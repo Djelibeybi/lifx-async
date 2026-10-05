@@ -355,15 +355,16 @@ Signal the frame loop to stop.
 
 #### `close_animators() -> None`
 
-Close all animators and clear the list. Called by the Conductor during cleanup.
+Release every borrowed Animator and clear the list. Called by the Conductor during cleanup. Each
+light's own Animator stays open.
 
 ### Device Type Support
 
-FrameEffect works across all device types via the animation module:
+FrameEffect works across all device types through each light's own Animator, `light.animator`:
 
-- **Light**: `Animator.for_light()` — 1 pixel via SetColor packets
-- **MultiZoneLight**: `Animator.for_multizone()` — N pixels via SetExtendedColorZones
-- **MatrixLight**: `Animator.for_matrix()` — W×H pixels via Set64 packets
+- **Light**: 1 pixel via SetColor packets
+- **MultiZoneLight**: N pixels via SetExtendedColorZones
+- **MatrixLight**: W×H pixels via Set64 packets
 
 ### Creating Custom FrameEffects
 

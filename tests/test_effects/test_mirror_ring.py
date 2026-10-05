@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from lifx.animation.animator import Animator
 from lifx.color import HSBK
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.conductor import Conductor
@@ -252,3 +253,24 @@ async def test_colorloop_paints_the_whole_ring_one_colour(
     assert len(frame) == _RING
     assert len(set(frame)) == 1
     assert effect.generate_frame(_ring_ctx(2.0, wraps=False)) == frame
+
+
+async def test_an_effect_borrows_the_light_s_own_animator(
+    mirror_rig: transitions.Rig, udp: MagicMock
+):
+    rig = mirror_rig
+    with pytest.warns(DeprecationWarning):
+        ledfx = await Animator.for_matrix(rig.light)
+    conductor = Conductor()
+    effect = _Recording()
+
+    await conductor.start(effect, [rig.light])
+    await asyncio.wait_for(effect.drawn.wait(), 1)
+    (writer,) = effect._animators
+    await conductor.stop([rig.light])
+
+    # One writer and one ack gate: the effect drew through LedFx's Animator,
+    # which still exposes the raw tile and stays open after the effect.
+    assert writer.animator is ledfx is rig.light.animator
+    assert ledfx.pixel_count == 52
+    assert udp.close.call_count == 0

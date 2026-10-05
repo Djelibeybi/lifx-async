@@ -316,16 +316,18 @@ if isinstance(effect, FrameEffect):
 
 ```
 For each participant:
-  1. Detect device type (MatrixLight, MultiZoneLight, Light)
-  2. Create appropriate Animator factory:
-     - MatrixLight → Animator.for_matrix(device, duration_ms)
-     - MultiZoneLight → Animator.for_multizone(device, duration_ms)
-     - Light → Animator.for_light(device, duration_ms)
-  3. duration_ms = int(1000 / effect.fps) for smooth interpolation
-  4. Call effect.async_setup(participants) for pre-loop initialization
+  1. Borrow the light's own Animator: await light.animator.prepare()
+     (the first prepare queries tile info or zone count; later ones do not)
+  2. Draw through a writer on that Animator with the effect's own canvas
+     and duration_ms = int(1500 / effect.fps), so transitions overlap:
+     - MirrorLight → one 25x1 ring that wraps, scattered to both rings
+     - every other light → the device's own canvas
+  3. Call effect.async_setup(participants) for pre-loop initialization
 ```
 
-**Note:** Animators use direct UDP — no device connection needed after creation.
+**Note:** Animators use direct UDP, so no device connection is needed after preparation. Each light
+owns one Animator, so an effect and a direct frame sender such as LedFx share one writer and one
+ack gate. Stopping an effect releases its writers; the light's Animator stays open.
 
 ### 4. Power-On (Optional)
 
@@ -724,7 +726,8 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - **Canvas mapping:** Multi-tile devices get a unified canvas based on tile positions
 - **Mirror:** A whole-light frame effect draws on one 25x1 ring in zone order with
   `FrameContext.wraps` set. The Animator writes each frame to the buffer positions of both the
-  front and back rings in one Set64. `Animator.for_matrix()` still exposes the raw 4x13 tile.
+  front and back rings in one Set64. The Mirror's own `send_frame()` still exposes the raw 4x13
+  tile.
 
 #### HEV Lights (`HevLight`)
 
@@ -861,13 +864,12 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 
 **FrameEffect subclasses** (e.g., EffectColorloop) use the animation module for frame delivery:
 
-- `Animator.for_light()` — single-light SetColor packets
-- `Animator.for_multizone()` — multi-zone SetExtendedColorZones packets
-- `Animator.for_matrix()` — multi-tile Set64 packets with canvas mapping
+- `light.animator`: the one Animator each light owns: SetColor packets for a single light,
+  SetExtendedColorZones for a strip, Set64 with canvas mapping for a matrix
 - `animator.send_frame()` — synchronous frame dispatch (no async overhead)
-- `duration_ms` parameter — firmware-level interpolation between frames
+- `duration_ms`: firmware-level interpolation between frames, set per writer
 
-The Conductor creates and manages Animator lifecycle (creation in `start()`, cleanup in `stop()`).
+The Conductor borrows each light's Animator in `start()` and releases it in `stop()`.
 
 ### With Network Layer
 
