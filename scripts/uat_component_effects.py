@@ -40,12 +40,13 @@ from lifx.devices.component.effect_support import (
     stored_colors_snapshot,
 )
 from lifx.effects import (
+    EffectAurora,
     EffectColorloop,
     EffectCylon,
     EffectFlicker,
+    EffectPlasma,
     EffectRainbow,
     EffectSpin,
-    EffectTwinkle,
 )
 
 # Single-key input differs by platform: msvcrt on Windows, termios/tty elsewhere.
@@ -293,11 +294,11 @@ def ceiling_scenarios(ceiling: CeilingLight) -> list[Scenario]:
                     "C7",
                     "Component effects, then a whole-light effect replaces them",
                     "first the downlight flickers and the uplight cycles; after a "
-                    "few seconds Twinkle takes over the whole light",
+                    "few seconds Aurora takes over the whole light",
                     lambda: _then(
                         ceiling.downlight.start_effect(EffectFlicker()),
                         ceiling.uplight.start_effect(EffectColorloop(period=10)),
-                        ceiling.start_effect(EffectTwinkle()),
+                        ceiling.start_effect(EffectAurora()),
                         pause=4.0,
                     ),
                 ),
@@ -310,12 +311,12 @@ def ceiling_scenarios(ceiling: CeilingLight) -> list[Scenario]:
                 ),
                 Step(
                     "C9",
-                    "Whole-light Twinkle, then a downlight effect moves it",
-                    "Twinkle runs on the whole light; after a few seconds the "
-                    "downlight switches to Flicker and Twinkle carries on in the "
+                    "Whole-light Aurora, then a downlight effect moves it",
+                    "Aurora runs on the whole light; after a few seconds the "
+                    "downlight switches to Flicker and Aurora carries on in the "
                     "uplight only",
                     lambda: _then(
-                        ceiling.start_effect(EffectTwinkle()),
+                        ceiling.start_effect(EffectAurora()),
                         ceiling.downlight.start_effect(EffectFlicker()),
                         pause=4.0,
                     ),
@@ -324,7 +325,7 @@ def ceiling_scenarios(ceiling: CeilingLight) -> list[Scenario]:
                     "C10",
                     "Stop the downlight's effect",
                     "the downlight returns to soft white; the uplight keeps "
-                    "twinkling and does not spread back over the downlight",
+                    "its aurora and it does not spread back over the downlight",
                     lambda: ceiling.downlight.stop_effect(),
                 ),
                 Step(
@@ -455,10 +456,10 @@ def mirror_scenarios(mirror: MirrorLight) -> list[Scenario]:
                 ),
                 Step(
                     "M3",
-                    "Whole-light Twinkle",
-                    "both rings twinkle in step: the same zones sparkle on the "
-                    "front and the back",
-                    lambda: mirror.start_effect(EffectTwinkle()),
+                    "Whole-light Plasma",
+                    "both rings show the same plasma: arcs appear at the same "
+                    "zones on the front and the back at the same moment",
+                    lambda: mirror.start_effect(EffectPlasma()),
                 ),
                 Step(
                     "M4",
@@ -545,10 +546,10 @@ def mirror_scenarios(mirror: MirrorLight) -> list[Scenario]:
                     "M13",
                     "Whole-light Spin, then a front effect moves it",
                     "Spin runs on both rings; after a few seconds the front "
-                    "switches to Twinkle and Spin carries on on the back only",
+                    "switches to Aurora and Spin carries on on the back only",
                     lambda: _then(
                         mirror.start_effect(EffectSpin()),
-                        mirror.front.start_effect(EffectTwinkle()),
+                        mirror.front.start_effect(EffectAurora()),
                         pause=4.0,
                     ),
                 ),
