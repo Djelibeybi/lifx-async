@@ -1,10 +1,11 @@
 """Tests for effects models."""
 
 import asyncio
+from unittest.mock import MagicMock
 
 from lifx.color import HSBK
 from lifx.effects.base import LIFXEffect
-from lifx.effects.models import PreState, RunningEffect
+from lifx.effects.models import PreState, RunningEffect, participant_key
 
 
 class DummyEffect(LIFXEffect):
@@ -92,3 +93,20 @@ async def test_running_effect_repr() -> None:
 
     # Clean up
     await task
+
+
+def test_whole_light_participant_key_is_the_bare_serial() -> None:
+    """A whole-light participant keys as its plain serial string."""
+    light = MagicMock()
+    light.serial = "d073d5e00001"
+
+    assert participant_key(light) == "d073d5e00001"
+
+
+def test_component_participant_key_pairs_serial_and_component() -> None:
+    """A component participant keys as (serial, component)."""
+    light = MagicMock()
+    light.serial = "d073d5e00001"
+
+    assert participant_key(light, "downlight") == ("d073d5e00001", "downlight")
+    assert participant_key(light, "downlight") != participant_key(light)

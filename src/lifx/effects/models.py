@@ -12,7 +12,29 @@ from typing import TYPE_CHECKING
 from lifx.color import HSBK
 
 if TYPE_CHECKING:
+    from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
+
+# Identity of an effect participant: a light, or one component of a light. A
+# whole light keys as its bare serial string, so it is equivalent to the serial
+# key used before participants existed. A component keys as (serial, component).
+ParticipantKey = str | tuple[str, str]
+
+
+def participant_key(light: Light, component: str | None = None) -> ParticipantKey:
+    """Return the Conductor key for an effect participant.
+
+    Args:
+        light: The light taking part in the effect
+        component: Optional light component (for example ``"downlight"``);
+            None means the whole light
+
+    Returns:
+        The light's serial for a whole light, else ``(serial, component)``
+    """
+    if component is None:
+        return light.serial
+    return (light.serial, component)
 
 
 @dataclass
