@@ -1259,3 +1259,40 @@ class Light(Device[LightState]):
             raise LifxTimeoutError(f"Error initializing state for {self.serial}") from e
         except LifxError as e:
             raise LifxError(f"Error initializing state for {self.serial}") from e
+
+
+#: How long to wait for a light to report that a power-off has taken effect.
+POWER_OFF_WAIT_SECONDS = 2.0
+
+#: How often to ask while waiting for a power-off to take effect.
+POWER_OFF_POLL_SECONDS = 0.05
+
+
+async def wait_until_off(
+    light: Light,
+    timeout: float = POWER_OFF_WAIT_SECONDS,
+    interval: float = POWER_OFF_POLL_SECONDS,
+) -> bool:
+    """Wait until a light itself reports that it is off.
+
+    Firmware acknowledges a power-off straight away but keeps reporting power
+    on, and keeps lighting the old picture, for a few hundred milliseconds
+    until the power-off has taken effect. A colour written in that window
+    shows as a flash, so callers that turn a light off and then change its
+    colours wait here first.
+
+    Args:
+        light: The light to ask
+        timeout: Seconds to wait before giving up
+        interval: Seconds between requests
+
+    Returns:
+        True once the light reports off, False if it still reports on when
+        ``timeout`` runs out
+    """
+    deadline = time.monotonic() + timeout
+    while await light.get_power() != 0:
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(interval)
+    return True

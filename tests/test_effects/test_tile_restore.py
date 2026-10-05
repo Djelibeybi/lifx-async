@@ -335,6 +335,7 @@ async def test_component_light_without_state_restores_tile_and_power():
     ceiling.get_all_tile_colors = AsyncMock(return_value=[tile])
     ceiling.set_matrix_colors = AsyncMock()
     ceiling.set_power = AsyncMock()
+    ceiling.get_power = AsyncMock(return_value=0)
     manager = DeviceStateManager()
 
     prestate = await manager.capture_state(ceiling)

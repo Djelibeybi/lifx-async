@@ -16,6 +16,7 @@ from lifx.devices.component.effect_support import (
     stored_colors_snapshot,
 )
 from lifx.devices.component.light import ComponentMatrixLight
+from lifx.devices.light import wait_until_off
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.const import COLOR_UPDATE_SETTLE_DELAY, ZONE_UPDATE_SETTLE_DELAY
@@ -116,7 +117,13 @@ class DeviceStateManager:
             await state_manager.restore_state(light, prestate)
             ```
         """
-        # Restore in order: zones -> tiles or color -> power
+        # A light that was on gets its colours back, then power. One that was
+        # off goes dark first and gets its colours back once it reports off,
+        # so they never show as a flash.
+        if not prestate.power:
+            await self._restore_power(light, prestate.power)
+            await self._wait_until_off(light)
+
         if isinstance(light, MultiZoneLight) and prestate.zone_colors:
             await self._restore_zones(light, prestate.zone_colors)
 
@@ -124,7 +131,9 @@ class DeviceStateManager:
             await self._restore_tiles(light, prestate.tile_colors)
         else:
             await self._restore_color(light, prestate.color)
-        await self._restore_power(light, prestate.power)
+
+        if prestate.power:
+            await self._restore_power(light, prestate.power)
 
         # Ceiling and Mirror: an effect never changes either component's
         # stored colours, whatever the restore writes above remembered.
@@ -333,6 +342,33 @@ class DeviceStateManager:
                             "kelvin": color.kelvin,
                         },
                     },
+                }
+            )
+
+    async def _wait_until_off(self, light: Light) -> None:
+        """Wait for a power-off to take effect before colours are written.
+
+        Args:
+            light: Light device that was just turned off
+        """
+        try:
+            if not await wait_until_off(light):
+                _LOGGER.debug(
+                    {
+                        "class": self.__class__.__name__,
+                        "method": "_wait_until_off",
+                        "action": "timeout",
+                        "values": {"serial": light.serial},
+                    }
+                )
+        except Exception as e:
+            _LOGGER.warning(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "_wait_until_off",
+                    "action": "wait",
+                    "error": str(e),
+                    "values": {"serial": light.serial},
                 }
             )
 

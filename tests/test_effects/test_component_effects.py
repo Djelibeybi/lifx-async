@@ -427,6 +427,58 @@ class TestCeilingComponentEffects:
             assert ceiling.state.stored_uplight_color == DIM_BLUE
             assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
 
+    async def test_a_restore_that_powers_off_writes_colours_only_once_dark(
+        self, ceiling_device, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The earlier picture goes back only after the light reports off.
+
+        Real firmware keeps reporting power on for a few hundred milliseconds
+        after an acknowledged power-off. Writing the earlier colours in that
+        window flashes them, so the write waits until the light is dark.
+        """
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            await ceiling.set_power(False)
+            await ceiling.uplight.start_effect(_SolidFrames(RED))
+
+            async def uplight_red() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == RED
+
+            await _eventually(uplight_red)
+
+            events: list[str] = []
+            real_get_power = ceiling.get_power
+            still_on = [2]
+
+            async def lagging_get_power() -> int:
+                power = await real_get_power()
+                if power == 0 and still_on[0]:
+                    still_on[0] -= 1
+                    events.append("reports on")
+                    return 65535
+                events.append(f"reports {power}")
+                return power
+
+            real_write_tile = ceiling._write_tile
+
+            async def recording_write_tile(tile: list[HSBK], duration: float) -> None:
+                events.append("write")
+                await real_write_tile(tile, duration)
+
+            monkeypatch.setattr(ceiling, "get_power", lagging_get_power)
+            monkeypatch.setattr(ceiling, "_write_tile", recording_write_tile)
+
+            await ceiling.uplight.stop_effect()
+
+            last_write = len(events) - 1 - events[::-1].index("write")
+            assert events[:last_write].count("reports on") == 2
+            assert "reports 0" in events[:last_write]
+            await ceiling.set_power(True)
+            tile = await _tile(ceiling)
+            assert tile[UPLIGHT] == DIM_BLUE
+            assert tile[:DOWNLIGHT] == [GREEN] * DOWNLIGHT
+
     async def test_a_restore_keeps_the_other_components_change_during_the_effect(
         self, ceiling_device
     ):

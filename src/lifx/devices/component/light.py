@@ -23,6 +23,7 @@ from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PO
 from lifx.devices.component.participant import ComponentName, LightComponent
 from lifx.devices.component.state import Pending, hsk_matches, is_dark
 from lifx.devices.effect_runner import effect_runner
+from lifx.devices.light import wait_until_off
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 
@@ -303,6 +304,9 @@ class ComponentMatrixLight(MatrixLight):
         async with self._component_operation():
             if await self._power_for_update() != 0:
                 return
+            # The light acknowledges the power-off before it goes dark; a
+            # write in that window flashes the earlier picture.
+            await wait_until_off(self)
             tile = await self._tile_colors_for_update()
             for position in self._component_positions(component):
                 tile[position] = before[position]
