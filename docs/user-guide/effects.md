@@ -411,7 +411,13 @@ for info, support in registry.get_effects_for_device_type(DeviceType.MULTIZONE):
 # Filter by actual device instance
 for info, support in registry.get_effects_for_device(my_light):
     print(f"{info.name}: {support.value}")
+
+# A Mirror classifies as DeviceType.MIRROR, and so does each of its rings
+for info, support in registry.get_effects_for_device(my_mirror.front):
+    print(f"{info.name}: {support.value}")
 ```
+
+A Mirror ring is a 25-pixel line that wraps, so it has its own `DeviceType.MIRROR` rather than counting as a matrix. A light component only takes part in effects that draw frames, so effects such as pulse are left out for one. A Ceiling downlight classifies as a matrix, and a Ceiling uplight as a single light without embers and plasma.
 
 ### Dynamic Light Management
 

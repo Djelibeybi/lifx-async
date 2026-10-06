@@ -386,9 +386,17 @@ Property returning all registered effects.
 
 Look up an effect by name.
 
-#### `get_effects_for_device(device: Light) -> list[tuple[EffectInfo, DeviceSupport]]`
+#### `get_effects_for_device(device: Light | LightComponent) -> list[tuple[EffectInfo, DeviceSupport]]`
 
-Get effects compatible with a specific device instance. Classifies the device automatically and returns RECOMMENDED + COMPATIBLE entries, sorted with RECOMMENDED first.
+Get effects compatible with a specific light or light component. Classifies the device automatically and returns RECOMMENDED + COMPATIBLE entries, sorted with RECOMMENDED first.
+
+A light component (such as `mirror.front` or `ceiling.uplight`) classifies by what it draws on:
+
+- A Mirror ring (`mirror.front` or `mirror.back`) classifies as `MIRROR`.
+- A Ceiling downlight classifies as `MATRIX`.
+- A Ceiling uplight, which is a single pixel, classifies as `LIGHT`. Embers and plasma are also left out for it, because they refuse the Ceiling it belongs to.
+
+A light component can only take part in an effect that draws frames, so effects that draw none (such as pulse and colorloop) are left out for a light component.
 
 #### `get_effects_for_device_type(device_type: DeviceType) -> list[tuple[EffectInfo, DeviceSupport]]`
 
@@ -400,7 +408,8 @@ Get effects compatible with a device type category.
 |-------|-------------|
 | `LIGHT` | Single bulb (Light, InfraredLight, HevLight) |
 | `MULTIZONE` | Strip/beam (MultiZoneLight) |
-| `MATRIX` | Tile/candle/ceiling (MatrixLight, CeilingLight) |
+| `MATRIX` | Tile/candle/ceiling (MatrixLight, CeilingLight); a Mirror is not included |
+| `MIRROR` | Mirror (MirrorLight), whose two rings are each a 25-pixel line that wraps |
 
 ### DeviceSupport Enum
 
@@ -423,34 +432,34 @@ class EffectInfo:
 
 ### Effect Support Matrix
 
-| Effect | Light | MultiZone | Matrix |
-|--------|-------|-----------|--------|
-| aurora | COMPATIBLE | RECOMMENDED | RECOMMENDED |
-| colorloop | RECOMMENDED | COMPATIBLE | COMPATIBLE |
-| cylon | COMPATIBLE | RECOMMENDED | — |
-| double_slit | — | RECOMMENDED | — |
-| embers | COMPATIBLE | RECOMMENDED | — |
-| fireworks | — | RECOMMENDED | — |
-| flicker | RECOMMENDED | RECOMMENDED | RECOMMENDED |
-| jacobs_ladder | — | RECOMMENDED | — |
-| newtons_cradle | — | RECOMMENDED | — |
-| pendulum_wave | — | RECOMMENDED | — |
-| plasma | COMPATIBLE | RECOMMENDED | — |
-| plasma2d | — | — | RECOMMENDED |
-| progress | — | RECOMMENDED | — |
-| pulse | RECOMMENDED | RECOMMENDED | RECOMMENDED |
-| rainbow | COMPATIBLE | RECOMMENDED | RECOMMENDED |
-| ripple | — | RECOMMENDED | — |
-| rule30 | — | RECOMMENDED | — |
-| rule_trio | — | RECOMMENDED | — |
-| sine | COMPATIBLE | RECOMMENDED | — |
-| sonar | — | RECOMMENDED | — |
-| spectrum_sweep | COMPATIBLE | RECOMMENDED | — |
-| spin | COMPATIBLE | RECOMMENDED | — |
-| sunrise | — | — | RECOMMENDED |
-| sunset | — | — | RECOMMENDED |
-| twinkle | RECOMMENDED | RECOMMENDED | COMPATIBLE |
-| wave | COMPATIBLE | RECOMMENDED | — |
+| Effect | Light | MultiZone | Matrix | Mirror |
+|--------|-------|-----------|--------|--------|
+| aurora | COMPATIBLE | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| colorloop | RECOMMENDED | COMPATIBLE | COMPATIBLE | COMPATIBLE |
+| cylon | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
+| double_slit | — | RECOMMENDED | — | RECOMMENDED |
+| embers | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
+| fireworks | — | RECOMMENDED | — | RECOMMENDED |
+| flicker | RECOMMENDED | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| jacobs_ladder | — | RECOMMENDED | — | RECOMMENDED |
+| newtons_cradle | — | RECOMMENDED | — | RECOMMENDED |
+| pendulum_wave | — | RECOMMENDED | — | RECOMMENDED |
+| plasma | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
+| plasma2d | — | — | RECOMMENDED | — |
+| progress | — | RECOMMENDED | — | RECOMMENDED |
+| pulse | RECOMMENDED | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| rainbow | COMPATIBLE | RECOMMENDED | RECOMMENDED | RECOMMENDED |
+| ripple | — | RECOMMENDED | — | RECOMMENDED |
+| rule30 | — | RECOMMENDED | — | RECOMMENDED |
+| rule_trio | — | RECOMMENDED | — | RECOMMENDED |
+| sine | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
+| sonar | — | RECOMMENDED | — | RECOMMENDED |
+| spectrum_sweep | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
+| spin | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
+| sunrise | — | — | RECOMMENDED | — |
+| sunset | — | — | RECOMMENDED | — |
+| twinkle | RECOMMENDED | RECOMMENDED | COMPATIBLE | RECOMMENDED |
+| wave | COMPATIBLE | RECOMMENDED | — | RECOMMENDED |
 
 ### Examples
 
