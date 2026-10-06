@@ -91,13 +91,19 @@ class TestMirrorDeviceType:
             mirror.front
         ) == registry.get_effects_for_device(mirror.back)
 
-    def test_a_ceiling_component_classifies_as_a_matrix(self) -> None:
+    def test_a_ceiling_downlight_classifies_as_a_matrix(self) -> None:
         ceiling = CeilingLight(serial="d073d5000301", ip="192.0.2.31")
         registry = get_effect_registry()
         matrix = registry.get_effects_for_device_type(DeviceType.MATRIX)
-        for component in (ceiling.uplight, ceiling.downlight):
-            listed = registry.get_effects_for_device(component)
-            assert _names(listed) == _names(matrix) - {"pulse"}
+        listed = registry.get_effects_for_device(ceiling.downlight)
+        assert _names(listed) == _names(matrix) - {"pulse"}
+
+    def test_a_ceiling_uplight_classifies_as_a_single_light(self) -> None:
+        ceiling = CeilingLight(serial="d073d5000301", ip="192.0.2.31")
+        registry = get_effect_registry()
+        light = registry.get_effects_for_device_type(DeviceType.LIGHT)
+        listed = registry.get_effects_for_device(ceiling.uplight)
+        assert _names(listed) == _names(light) - {"pulse", "embers", "plasma"}
 
 
 class TestMirrorSupportLevels:

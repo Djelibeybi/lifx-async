@@ -18,6 +18,12 @@ if TYPE_CHECKING:
     from lifx.effects.base import LIFXEffect
 
 
+# Effects that refuse every matrix light other than a Mirror. A Ceiling uplight
+# classifies as a single light, but the Conductor checks a light component
+# through its light, so these are refused there and must not be listed for it.
+_REFUSE_A_CEILING = frozenset({"embers", "plasma"})
+
+
 class DeviceType(Enum):
     """Device categories for effect compatibility classification."""
 
@@ -57,8 +63,9 @@ def _classify_device(device: Light | LightComponent) -> DeviceType:
 
     Uses isinstance checks with lazy imports to avoid circular dependencies.
     A Mirror is checked before a matrix light, so it never classifies as
-    ``MATRIX``. A light component classifies the same as its light, so a
-    Mirror ring is a Mirror and a Ceiling uplight or downlight is a matrix.
+    ``MATRIX``. A Ceiling uplight draws on a single pixel, so it classifies
+    as a single light. Every other light component classifies the same as its
+    light, so a Mirror ring is a Mirror and a Ceiling downlight is a matrix.
 
     Args:
         device: The light, or light component, to classify
@@ -72,6 +79,8 @@ def _classify_device(device: Light | LightComponent) -> DeviceType:
     from lifx.devices.multizone import MultiZoneLight
 
     if isinstance(device, LightComponent):
+        if device.name == "uplight":
+            return DeviceType.LIGHT
         device = device.light
     if isinstance(device, MirrorLight):
         return DeviceType.MIRROR
@@ -164,12 +173,14 @@ class EffectRegistry:
         """Get effects compatible with a specific light or light component.
 
         Classifies the device and returns effects that are RECOMMENDED
-        or COMPATIBLE, sorted with RECOMMENDED first. A light component
-        classifies as its light: a Mirror ring (``mirror.front`` or
-        ``mirror.back``) as a Mirror, and a Ceiling uplight or downlight as a
-        matrix. A light component can only be an effect participant for an
-        effect that draws frames, so effects such as pulse are left out for
-        a light component.
+        or COMPATIBLE, sorted with RECOMMENDED first. A Mirror ring
+        (``mirror.front`` or ``mirror.back``) classifies as a Mirror, a
+        Ceiling downlight as a matrix and a Ceiling uplight, which draws on a
+        single pixel, as a single light. A light component can only be an
+        effect participant for an effect that draws frames, so effects such
+        as pulse are left out for a light component. Embers and plasma are
+        also left out for a Ceiling uplight, because they refuse the Ceiling
+        it belongs to.
 
         Args:
             device: The light, or light component, to check
@@ -180,12 +191,15 @@ class EffectRegistry:
         from lifx.devices.component.participant import LightComponent
         from lifx.effects.frame_effect import FrameEffect
 
-        results = self.get_effects_for_device_type(_classify_device(device))
+        device_type = _classify_device(device)
+        results = self.get_effects_for_device_type(device_type)
         if isinstance(device, LightComponent):
+            refused = _REFUSE_A_CEILING if device_type is DeviceType.LIGHT else ()
             results = [
                 (info, support)
                 for info, support in results
                 if issubclass(info.effect_class, FrameEffect)
+                and info.name not in refused
             ]
         return results
 
