@@ -53,20 +53,18 @@ class EffectInfo:
 
 
 def _classify_device(device: Light | LightComponent) -> DeviceType:
-    """Classify a light, or a Mirror ring, into a DeviceType category.
+    """Classify a light, or a light component, into a DeviceType category.
 
     Uses isinstance checks with lazy imports to avoid circular dependencies.
     A Mirror is checked before a matrix light, so it never classifies as
-    ``MATRIX``, and a Mirror ring classifies the same as the whole Mirror.
+    ``MATRIX``. A light component classifies the same as its light, so a
+    Mirror ring is a Mirror and a Ceiling uplight or downlight is a matrix.
 
     Args:
         device: The light, or light component, to classify
 
     Returns:
         DeviceType classification for the device
-
-    Raises:
-        TypeError: If ``device`` is a light component other than a Mirror ring
     """
     from lifx.devices.component.participant import LightComponent
     from lifx.devices.matrix import MatrixLight
@@ -74,12 +72,7 @@ def _classify_device(device: Light | LightComponent) -> DeviceType:
     from lifx.devices.multizone import MultiZoneLight
 
     if isinstance(device, LightComponent):
-        if isinstance(device.light, MirrorLight):
-            return DeviceType.MIRROR
-        raise TypeError(
-            "Only a Mirror ring can be classified as a light component, "
-            f"not {device.name!r} of {type(device.light).__name__}"
-        )
+        device = device.light
     if isinstance(device, MirrorLight):
         return DeviceType.MIRROR
     if isinstance(device, MatrixLight):
@@ -168,23 +161,21 @@ class EffectRegistry:
     def get_effects_for_device(
         self, device: Light | LightComponent
     ) -> list[tuple[EffectInfo, DeviceSupport]]:
-        """Get effects compatible with a specific light or Mirror ring.
+        """Get effects compatible with a specific light or light component.
 
         Classifies the device and returns effects that are RECOMMENDED
-        or COMPATIBLE, sorted with RECOMMENDED first. A Mirror ring
-        (``mirror.front`` or ``mirror.back``) classifies as a Mirror, but a
-        light component can only be an effect participant for an effect that
-        draws frames, so effects such as pulse are left out for a ring.
+        or COMPATIBLE, sorted with RECOMMENDED first. A light component
+        classifies as its light: a Mirror ring (``mirror.front`` or
+        ``mirror.back``) as a Mirror, and a Ceiling uplight or downlight as a
+        matrix. A light component can only be an effect participant for an
+        effect that draws frames, so effects such as pulse are left out for
+        a light component.
 
         Args:
-            device: The light, or Mirror ring, to check
+            device: The light, or light component, to check
 
         Returns:
             List of (EffectInfo, DeviceSupport) tuples, sorted by support level
-
-        Raises:
-            TypeError: If ``device`` is a light component other than a Mirror
-                ring
         """
         from lifx.devices.component.participant import LightComponent
         from lifx.effects.frame_effect import FrameEffect
