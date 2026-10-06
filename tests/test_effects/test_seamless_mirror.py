@@ -27,8 +27,8 @@ EFFECTS = [
 
 # Digest of 120 strip frames of each effect, pinned before ``seamless`` existed.
 _STRIP_DIGEST = {
-    "pendulum_wave": "4c28f8764c892b5bdb17033d50655c961218bbd2d88c49b5521f4dff43b3a9e0",
-    "double_slit": "a293db59c3955261e761a4d54b93bee5252abb0ef0fb447845db1bb771f32968",
+    "pendulum_wave": "6bb23025fddbc4ed57130580edc653e0cbc48293ba2e38813056243a7b9b2bec",
+    "double_slit": "53dbd2359b77815009ded5eea7606d89f925d9e8da87174a2f811c54f9a16ad1",
 }
 
 

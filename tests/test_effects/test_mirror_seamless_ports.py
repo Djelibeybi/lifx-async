@@ -189,11 +189,11 @@ class TestEmbersCloseOnThemselves:
 
 
 _STRIP_DIGESTS = {
-    "fireworks": "d1a4c7933930ea223f79b6643151a390797223db15d175099a86e843aec97c5a",
-    "rule30": "adcfd3d6d3a426ef66ab9e84b4ff93f7a89ab985cb7fb227ac987b7fce6705a1",
-    "rule_trio": "86a7d3805c843a32de6c49e476b07c6b4f2414994f4494a498ff0fbc1cf8db5a",
-    "plasma": "7c2681bf163fefb04fb39dada0efc270364d7c9a4bc3fb5b95c26222bb93c1ff",
-    "embers": "fa235448e9c81f63ce2f96dde5345edcfad1756a698cb00677220e768a736b78",
+    "fireworks": "5e5d084935d9f9dba640196144ab621c9c3548ae56ddfd0e8502cc2b480a1144",
+    "rule30": "f247aac593daa3e7ebf1b62ae988df38843bbdfa8175201a0c7a6ad6597c21a6",
+    "rule_trio": "19fd458aa1921e8c54a502741d222e5ce004df0fce7c8fd16eeb7c7eecbe3501",
+    "plasma": "fe7e6d669d8171c6d9a8ab0ad04c67f379c1fe09c50ec157c24ac64f808e998e",
+    "embers": "91c02eaa2f456e6ad65399bab5a68c17b3f571a3b3ce1205a6645f55d261f1f4",
 }
 
 

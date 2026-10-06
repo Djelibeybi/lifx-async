@@ -134,4 +134,4 @@ class TestFrames:
             assert strip[RING - 1].brightness == pytest.approx(_FLOOR)
 
 
-_STRIP_DIGEST = "b8643c1a3e776c72f702802a7c4a5e3a763857b290f91419cc29acff41fb8f3c"
+_STRIP_DIGEST = "20c7c6c9712c0bc946e225d842c95a128db34141b624edce7a344d74dbc02409"

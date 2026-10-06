@@ -56,10 +56,15 @@ def brightness(drawn: list[list[HSBK]]) -> list[list[float]]:
 
 
 def strip_digest(effect: FrameEffect, count: int) -> str:
-    """SHA-256 of ``count`` frames drawn on a non-wrapping strip."""
+    """SHA-256 of ``count`` frames drawn on a non-wrapping strip.
+
+    It hashes the protocol values each frame puts on the wire, not the raw
+    floats, because the platform maths library can differ in the last bit of a
+    float, which would change a float digest without changing what a light shows.
+    """
     digest = hashlib.sha256()
     for frame in draw_frames(effect, count, wraps=False):
-        digest.update(repr(as_tuples(frame)).encode())
+        digest.update(repr([colour.as_tuple() for colour in frame]).encode())
     return digest.hexdigest()
 
 
