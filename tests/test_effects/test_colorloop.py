@@ -12,7 +12,12 @@ from lifx.const import KELVIN_NEUTRAL
 from lifx.devices.base import Connectivity
 from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
-from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.frame_effect import (
+    FrameContext,
+    FrameEffect,
+    drop_participant,
+    replace_writer,
+)
 from lifx.exceptions import LifxTimeoutError
 
 
@@ -733,12 +738,74 @@ class TestColorloopComponent:
             effect._deliver(1, second, [_hue_at(elapsed)], _ctx(elapsed), False)
 
         assert first.stage.call_args_list == [
-            call([_hue_at(1.0)]),
+            call([_hue_at(1.0)], settled=True),
             call([_hue_at(0.5)]),
         ]
         second.send_frame.assert_called_once_with(
             [_hue_at(1.0)], duration_ms=1000, settled=True
         )
+
+
+class TestColorloopLeavingWriters:
+    """A participant that leaves the run takes its colour write with it."""
+
+    async def test_dropping_a_participant_cancels_its_write(self) -> None:
+        effect = _loop()
+        effect._initial_colors = effect._initial_colors * 2
+        hang = asyncio.Event()
+
+        async def slow(_color: HSBK, duration: float) -> None:
+            await hang.wait()
+
+        leaving, staying = _light(), _light()
+        leaving.set_color = AsyncMock(side_effect=slow)
+        staying.set_color = AsyncMock(side_effect=slow)
+        first, second = MagicMock(), MagicMock()
+        effect.participants = [leaving, staying]
+        effect._animators = [first, second]
+        effect._deliver(0, first, [_hue_at(0.0)], _ctx(0.0), False)
+        effect._deliver(1, second, [_hue_at(0.0)], _ctx(0.0), False)
+        left, stayed = effect._writes[first], effect._writes[second]
+        await asyncio.sleep(0)
+
+        drop_participant(effect, 0)
+        await asyncio.sleep(0)
+
+        assert left.cancelled()
+        assert not stayed.done()
+        first.close.assert_called_once_with()
+        assert effect.participants == [staying]
+        hang.set()
+        await stayed
+
+    async def test_a_replaced_writer_cancels_its_write(self) -> None:
+        effect = _loop()
+        hang = asyncio.Event()
+
+        async def slow(_color: HSBK, duration: float) -> None:
+            await hang.wait()
+
+        light = _light()
+        light.set_color = AsyncMock(side_effect=slow)
+        old = MagicMock()
+        effect.participants = [light]
+        effect._animators = [old]
+        effect._deliver(0, old, [_hue_at(0.0)], _ctx(0.0), False)
+        write = effect._writes[old]
+        await asyncio.sleep(0)
+
+        replace_writer(effect, 0, _slot_writer())
+        await asyncio.sleep(0)
+
+        assert write.cancelled()
+        assert effect._writes == {}
+
+    def test_a_writer_with_no_write_leaves_quietly(self) -> None:
+        effect = _loop()
+
+        effect._writer_closed(MagicMock())
+
+        assert effect._writes == {}
 
 
 @pytest.mark.asyncio

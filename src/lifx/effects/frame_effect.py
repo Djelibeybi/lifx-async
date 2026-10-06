@@ -429,6 +429,16 @@ class FrameEffect(LIFXEffect):
         else:
             writer.send_frame(frame)
 
+    def _writer_closed(self, writer: object) -> None:
+        """React to a participant's writer leaving the run.
+
+        Called when a participant is dropped, or draws through a new writer,
+        before its light is restored or handed on.
+
+        Args:
+            writer: The writer that was closed
+        """
+
     def stop(self) -> None:
         """Signal the frame loop to stop."""
         self._stop_event.set()
@@ -467,7 +477,9 @@ def add_writers(effect: FrameEffect, writers: list[AnimatorWriter]) -> None:
 def drop_participant(effect: FrameEffect, idx: int) -> None:
     """Remove one participant from a frame effect and close its writer."""
     if idx < len(effect._animators):
-        effect._animators.pop(idx).close()
+        writer = effect._animators.pop(idx)
+        writer.close()
+        effect._writer_closed(writer)
     del effect.participants[idx]
 
 
@@ -476,6 +488,7 @@ def replace_writer(effect: FrameEffect, idx: int, writer: AnimatorWriter) -> Non
     old = effect._animators[idx]
     effect._animators[idx] = writer
     old.close()
+    effect._writer_closed(old)
 
 
 def rename_participant(effect: FrameEffect, old: object, new: object) -> None:

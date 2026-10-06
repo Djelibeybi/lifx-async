@@ -336,6 +336,36 @@ class TestComponentSlots:
 
         assert animator._writer().hold_version == 0
 
+    async def test_a_writer_that_does_not_stream_shares_no_tile(self) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+
+        downlight.streaming = False
+
+        assert uplight.tile_shared([uplight]) is False
+        assert downlight.streaming is False
+
+    async def test_a_settled_tile_carries_each_slots_target(
+        self, sent: list[bytes]
+    ) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        frame = _frame(64)
+        uplight.streaming = downlight.streaming = False
+
+        downlight.send_frame(frame, duration_ms=1000, settled=True)
+        downlight.stage(frame[::-1])
+        ceiling.animator._ack_gate.reset()
+        uplight.send_frame([RED], duration_ms=1000, settled=True)
+        uplight.close()
+
+        assert _tiles(sent)[-1] == frame[:UPLIGHT] + [RED]
+        assert ceiling.animator._held_tile()[UPLIGHT] == HSBK.from_protocol(
+            LightHsbk(*RED)
+        )
+
     def test_reading_the_components_changes_nothing(self) -> None:
         ceiling = _ceiling()
 

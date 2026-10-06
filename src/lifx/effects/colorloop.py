@@ -246,15 +246,18 @@ class EffectColorloop(FrameEffect):
         if slot:
             if writer.tile_shared(self._animators):
                 # Another effect's frames carry the slot.
+                writer.streaming = False
                 schedule.streamed = True
                 writer.stage(frame)
                 return
             fade = writer.hold_remaining
             if fade > 0 and not _on_thread(self.participants[idx]):
                 # Frames show the other light component's fade exactly.
+                writer.streaming = True
                 schedule.streamed = True
                 super()._deliver(idx, writer, frame, ctx, staged)
                 return
+            writer.streaming = False
 
         now = ctx.elapsed_s
         step = int(now // self._step)
@@ -280,7 +283,7 @@ class EffectColorloop(FrameEffect):
         if slot:
             target_frame = [color.as_tuple() for color in target]
             if staged:
-                writer.stage(target_frame)
+                writer.stage(target_frame, settled=True)
                 return
             stats = writer.send_frame(
                 target_frame, duration_ms=round(duration * 1000), settled=True
@@ -292,6 +295,16 @@ class EffectColorloop(FrameEffect):
         schedule.step = step
         schedule.hold_version = version
         schedule.streamed = False
+
+    def _writer_closed(self, writer: object) -> None:
+        """Cancel the colour write of a writer that left the run.
+
+        Its light is about to be restored or handed to another effect, which
+        a late write would overwrite.
+        """
+        write = self._writes.pop(writer, None)
+        if write is not None:
+            write.cancel()
 
     def _write_color(
         self, key: object, light: Light, color: HSBK, duration: float
