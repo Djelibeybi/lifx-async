@@ -26,16 +26,17 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class _Schedule:
-    """Which step of the loop a light, or a tile, was last given.
+    """When a light, or a tile, is next written.
 
     Attributes:
-        step: Index of the step last written, or -1 before the first write
+        next_at: Elapsed seconds at which the last write's transition ends
+            and the next write is due
         hold_version: The tile's held colours when it was last written
         streamed: True while the tile is streamed frame by frame, so the next
             step must be written as soon as the stream ends
     """
 
-    step: int = -1
+    next_at: float = 0.0
     hold_version: int = -1
     streamed: bool = True
 
@@ -260,19 +261,32 @@ class EffectColorloop(FrameEffect):
             writer.streaming = False
 
         now = ctx.elapsed_s
-        step = int(now // self._step)
         version = writer.hold_version if slot else 0
         if (
             not schedule.streamed
-            and step <= schedule.step
+            and now < schedule.next_at
             and version == schedule.hold_version
         ):
             if slot:
                 writer.stage(frame)
             return
 
-        ends_at = (step + 1) * self._step
-        duration = self.transition if self.transition is not None else ends_at - now
+        step_ends_at = (int(now // self._step) + 1) * self._step
+        ends_at = step_ends_at
+        if slot:
+            # One transition per tile: end no later than another slot's fade,
+            # then write again, so neither fade is stretched.
+            deadline = writer.slot_deadline(self._animators)
+            if deadline is not None and 1 / self.fps <= deadline < ends_at - now:
+                ends_at = now + deadline
+        duration = ends_at - now
+        if self.transition is not None:
+            # A shortened write never runs past the fade it was shortened for.
+            duration = (
+                self.transition
+                if ends_at == step_ends_at
+                else min(self.transition, duration)
+            )
         target = self.generate_frame(dataclasses.replace(ctx, elapsed_s=ends_at))
         if slot:
             # The slot's fade starts from the colour of the moment.
@@ -289,7 +303,7 @@ class EffectColorloop(FrameEffect):
                 return  # Still due: the next frame tries again
         else:
             self._write_color(writer, self.participants[idx], target[0], duration)
-        schedule.step = step
+        schedule.next_at = ends_at
         schedule.hold_version = version
         schedule.streamed = False
 

@@ -151,3 +151,73 @@ class TestTwoColourLoopsOnOneTile:
         expected = HSBK(140, 0.9, 0.8, 3500).as_tuple()[0]
         assert abs(tile[0] - expected) <= 1
         assert tile[63 * 4] == _hue_at(2.0)
+
+    async def test_both_loops_stay_on_course_whichever_sends_first(
+        self, mock_udp_socket: MockUdpSocket, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Neither loop's write stretches the other's fade, in either order.
+
+        Both loops turn 10 degrees a second, in steps of 1 s and 4 s, and the
+        4 s loop sends straight after the 1 s one. Replaying every tile the
+        way the firmware runs it (one transition per tile, from what it shows
+        towards the tile), both light components stay within a frame's turn
+        of where they should be. No tile the light keeps runs longer than the
+        1 s step: when both loops are due in one frame, the 4 s loop's tile is
+        replaced by the 1 s loop's straight after it.
+        """
+        monkeypatch.setattr(AckGate, "gated", property(lambda _self: False))
+        clock = [1000.0]
+        monkeypatch.setattr("lifx.animation.slots.time.monotonic", lambda: clock[0])
+        monkeypatch.setattr("lifx.animation.animator.time.monotonic", lambda: clock[0])
+        sent: list[tuple[float, bytes]] = []
+        mock_udp_socket.sock.sendto.side_effect = lambda data, _addr: sent.append(
+            (clock[0] - 1000.0, bytes(data))
+        )
+        ceiling = _ceiling()
+        up_writer = await component_writer(ceiling, "uplight", 75)
+        down_writer = await component_writer(ceiling, "downlight", 75)
+        up, down = _loop(change=10), _loop(change=40)
+        for effect, writer in ((up, up_writer), (down, down_writer)):
+            effect.participants = [ceiling]
+            effect._animators = [writer]
+
+        frames = [frame * 0.05 for frame in range(121)]
+        for elapsed in frames:
+            clock[0] = 1000.0 + elapsed
+            for effect, writer in ((down, down_writer), (up, up_writer)):
+                pixels, ctx = self._frame(effect, writer, elapsed)
+                effect._deliver(0, writer, pixels, ctx, False)
+
+        degrees = 360 / 65536
+        shown = {0: (120.0, 0.0, 120.0, 0.0), 63: (120.0, 0.0, 120.0, 0.0)}
+
+        def at(cell: int, now: float) -> float:
+            source, began, target, length = shown[cell]
+            if length <= 0 or now - began >= length:
+                return target
+            turn = (target - source + 180) % 360 - 180
+            return source + turn * (now - began) / length
+
+        kept = dict(sent)  # the later tile of a frame replaces the earlier
+        for data in kept.values():
+            assert struct.unpack_from("<I", data, HEADER_SIZE + 6)[0] <= 1000
+
+        tiles = iter(sent)
+        pending = next(tiles, None)
+        for now in frames[4:]:
+            while pending is not None and pending[0] <= now:
+                sent_at, data = pending
+                duration = struct.unpack_from("<I", data, HEADER_SIZE + 6)[0] / 1000
+                tile = struct.unpack_from("<256H", data, HEADER_SIZE + 10)
+                for cell in shown:
+                    shown[cell] = (
+                        at(cell, sent_at),
+                        sent_at,
+                        tile[cell * 4] * degrees,
+                        duration,
+                    )
+                pending = next(tiles, None)
+            for cell in shown:
+                expected = (120 + now * 10) % 360
+                off = abs((at(cell, now) - expected + 180) % 360 - 180)
+                assert off <= 1.0, (now, cell, at(cell, now), expected)

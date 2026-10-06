@@ -424,6 +424,27 @@ class TestComponentSlots:
 
         assert _tiles(sent)[-1][0] == CYAN
 
+    async def test_a_writer_sees_the_soonest_fade_on_another_slot(self) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+
+        assert uplight.slot_deadline([uplight]) is None
+
+        with (
+            patch("lifx.animation.slots.time.monotonic", return_value=100.0),
+            patch("lifx.animation.animator.time.monotonic", return_value=100.0),
+        ):
+            downlight.stage([CYAN] * 64, settled=True, duration_ms=4000)
+            uplight.stage([RED], settled=True, duration_ms=1000)
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.5):
+            assert uplight.slot_deadline([uplight]) == pytest.approx(2.5)
+            assert uplight.slot_deadline([uplight, downlight]) is None
+            assert downlight.slot_deadline([downlight]) is None
+        with patch("lifx.animation.animator.time.monotonic", return_value=100.5):
+            assert downlight.slot_deadline([downlight]) == pytest.approx(0.5)
+
     async def test_a_writer_that_does_not_stream_shares_no_tile(self) -> None:
         ceiling = _ceiling()
         uplight = await component_writer(ceiling, "uplight", 0)

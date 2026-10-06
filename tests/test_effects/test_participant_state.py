@@ -304,6 +304,7 @@ async def test_unsynchronised_colorloop_paints_both_rings_alike() -> None:
         ring.draws_slot = True
         ring.animator = tile
         ring.tile_shared.return_value = False
+        ring.slot_deadline.return_value = None
         ring.hold_remaining = 0.0
         ring.hold_version = 0
     front.shares_tile_with.return_value = True

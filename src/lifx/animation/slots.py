@@ -147,6 +147,10 @@ class SlotFade:
         """The colours the fade ends on."""
         return list(self._target)
 
+    def remaining(self, now: float) -> float:
+        """Seconds left of the fade at ``now``, or 0 once it has ended."""
+        return max(0.0, self._duration - (now - self._began))
+
     def frame_at(self, now: float) -> Frame:
         """The slot's protocol-ready colours at a moment, part-way through."""
         if self._duration <= 0 or now - self._began >= self._duration:

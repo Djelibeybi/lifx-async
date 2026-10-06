@@ -516,6 +516,7 @@ def _slot_writer(
     writer.draws_slot = True
     writer.animator = tile if tile is not None else object()
     writer.tile_shared.return_value = shared
+    writer.slot_deadline.return_value = None
     writer.hold_remaining = fade
     writer.hold_version = version
     writer.send_frame.return_value = AnimatorStats(
@@ -724,6 +725,44 @@ class TestColorloopComponent:
             "duration_ms": 600,
             "settled": True,
         }
+
+    def test_a_write_ends_no_later_than_another_slots_fade(self) -> None:
+        effect = _loop()
+        writer = _slot_writer()
+        writer.slot_deadline.return_value = 0.25
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        writer.slot_deadline.return_value = None
+        effect._deliver(0, writer, [_hue_at(0.2)], _ctx(0.2), False)
+        effect._deliver(0, writer, [_hue_at(0.25)], _ctx(0.25), False)
+
+        assert writer.send_frame.call_args_list == [
+            call([_hue_at(0.25)], duration_ms=250, settled=True),
+            call([_hue_at(1.0)], duration_ms=750, settled=True),
+        ]
+
+    def test_a_fade_ending_within_a_frame_does_not_shorten_a_write(self) -> None:
+        effect = _loop()
+        writer = _slot_writer()
+        writer.slot_deadline.return_value = 0.01
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+
+        writer.send_frame.assert_called_once_with(
+            [_hue_at(1.0)], duration_ms=1000, settled=True
+        )
+
+    def test_a_shortened_write_keeps_a_shorter_transition(self) -> None:
+        for transition, expected in ((0.1, 100), (2.0, 250)):
+            effect = _loop(transition=transition)
+            writer = _slot_writer()
+            writer.slot_deadline.return_value = 0.25
+
+            effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+
+            writer.send_frame.assert_called_once_with(
+                [_hue_at(0.25)], duration_ms=expected, settled=True
+            )
 
     def test_a_gated_send_is_tried_again_next_frame(self) -> None:
         effect = _loop()

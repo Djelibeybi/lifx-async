@@ -273,6 +273,30 @@ class AnimatorWriter:
             for writer in self._animator._slot_writers
         )
 
+    def slot_deadline(self, own: Collection[AnimatorWriter]) -> float | None:
+        """Seconds until the soonest fade on another slot of this tile ends.
+
+        The firmware runs one transition per tile, so a tile sent with a
+        longer transition would stretch that fade. Only fades still running
+        on slots no writer in ``own`` draws on count.
+
+        Args:
+            own: Writers that belong to the same effect as this one
+
+        Returns:
+            The time left of the soonest such fade, or None if none runs
+        """
+        animator = self._animator
+        mine = {animator._slot_writers[w].component for w in own if w._slot}
+        now = time.monotonic()
+        left = [
+            fade.remaining(now)
+            for component, (_, _, fade) in animator._slot_targets.items()
+            if component not in mine
+        ]
+        running = [seconds for seconds in left if seconds > 0]
+        return min(running) if running else None
+
     @property
     def hold_remaining(self) -> float:
         """Seconds left of a fade asked of the tile's held colours, or 0."""
