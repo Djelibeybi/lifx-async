@@ -275,12 +275,15 @@ class EffectColorloop(FrameEffect):
         duration = self.transition if self.transition is not None else ends_at - now
         target = self.generate_frame(dataclasses.replace(ctx, elapsed_s=ends_at))
         if slot:
+            # The slot's fade starts from the colour of the moment.
+            writer.stage(frame)
             target_frame = [color.as_tuple() for color in target]
+            duration_ms = round(duration * 1000)
             if staged:
-                writer.stage(target_frame, settled=True)
+                writer.stage(target_frame, settled=True, duration_ms=duration_ms)
                 return
             stats = writer.send_frame(
-                target_frame, duration_ms=round(duration * 1000), settled=True
+                target_frame, duration_ms=duration_ms, settled=True
             )
             if stats.gated:
                 return  # Still due: the next frame tries again

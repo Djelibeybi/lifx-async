@@ -22,9 +22,9 @@ from tests.test_animation.conftest import MockUdpSocket
 from tests.test_animation.test_component_slots import _ceiling
 
 
-def _loop() -> EffectColorloop:
-    """A colour loop whose steps are 10 degrees and one second long."""
-    effect = EffectColorloop(period=36, change=10)
+def _loop(change: float = 10) -> EffectColorloop:
+    """A colour loop turning 10 degrees a second, in steps of ``change``."""
+    effect = EffectColorloop(period=36, change=change)
     effect._initial_colors = [
         HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
     ]
@@ -116,3 +116,38 @@ class TestTwoColourLoopsOnOneTile:
         durations = self._sent_durations(mock_udp_socket)
         assert durations
         assert all(duration > 75 for duration in durations)
+
+    async def test_unequal_steps_carry_each_others_fade_as_of_the_tiles_end(
+        self, mock_udp_socket: MockUdpSocket, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A 1 s uplight step carries a 4 s downlight step only part-way.
+
+        The downlight fades 120 to 160 degrees over 4 s. The uplight's write
+        at 1 s ends at 2 s, so it carries the downlight at 140 degrees, not at
+        the 160 it is heading for.
+        """
+        monkeypatch.setattr(AckGate, "gated", property(lambda _self: False))
+        clock = [1000.0]
+        monkeypatch.setattr("lifx.animation.slots.time.monotonic", lambda: clock[0])
+        monkeypatch.setattr("lifx.animation.animator.time.monotonic", lambda: clock[0])
+        ceiling = _ceiling()
+        up_writer = await component_writer(ceiling, "uplight", 75)
+        down_writer = await component_writer(ceiling, "downlight", 75)
+        up, down = _loop(change=10), _loop(change=40)
+        for effect, writer in ((up, up_writer), (down, down_writer)):
+            effect.participants = [ceiling]
+            effect._animators = [writer]
+        loops = (up, up_writer, down, down_writer)
+
+        for elapsed in (0.0, 0.05, 1.0):
+            clock[0] = 1000.0 + elapsed
+            self._tick(loops, elapsed)
+
+        tile = struct.unpack_from(
+            "<256H",
+            bytes(mock_udp_socket.sock.sendto.call_args.args[0]),
+            HEADER_SIZE + 10,
+        )
+        expected = HSBK(140, 0.9, 0.8, 3500).as_tuple()[0]
+        assert abs(tile[0] - expected) <= 1
+        assert tile[63 * 4] == _hue_at(2.0)

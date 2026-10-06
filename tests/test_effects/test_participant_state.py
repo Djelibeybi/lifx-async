@@ -307,7 +307,9 @@ async def test_unsynchronised_colorloop_paints_both_rings_alike() -> None:
         ring.hold_remaining = 0.0
         ring.hold_version = 0
     front.shares_tile_with.return_value = True
-    front.stage.side_effect = lambda frame, **_kwargs: staged.append(frame)
+    front.stage.side_effect = lambda frame, settled=False, **_kwargs: (
+        staged.append(frame) if settled else None
+    )
 
     def send(frame: list[tuple[int, int, int, int]], **_kwargs: object) -> object:
         sent.append(frame)

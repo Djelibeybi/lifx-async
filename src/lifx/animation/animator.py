@@ -49,7 +49,7 @@ from lifx.animation.packets import (
     PacketGenerator,
     PacketTemplate,
 )
-from lifx.animation.slots import ComponentSlot, HeldTile
+from lifx.animation.slots import ComponentSlot, HeldTile, SlotFade
 from lifx.color import HSBK
 from lifx.const import LIFX_UDP_PORT
 from lifx.exceptions import LifxNetworkError
@@ -295,7 +295,11 @@ class AnimatorWriter:
         )
 
     def stage(
-        self, hsbk: list[tuple[int, int, int, int]], *, settled: bool = False
+        self,
+        hsbk: list[tuple[int, int, int, int]],
+        *,
+        settled: bool = False,
+        duration_ms: int = 0,
     ) -> None:
         """Keep a light component's frame for the next tile, sending nothing.
 
@@ -307,10 +311,13 @@ class AnimatorWriter:
             hsbk: The frame, one protocol-ready colour per canvas pixel
             settled: Keep the frame as the slot's target, the colours the
                 firmware fades it towards, as ``send_frame()`` does
+            duration_ms: With ``settled``, how long that fade takes
         """
         slot = self._slot
         assert slot is not None
-        self._animator._store_slot(self, slot, hsbk, settled=settled)
+        self._animator._store_slot(
+            self, slot, hsbk, settled=settled, duration_ms=duration_ms
+        )
 
     def close(self) -> None:
         """Stop writing. The device's Animator stays open for other writers.
@@ -412,11 +419,8 @@ class Animator:
             tuple[ComponentSlot, FrameBuffer, list[tuple[int, int, int, int]]],
         ] = {}
         # A slot written with a transition the firmware runs, such as a
-        # colour loop's step, also keeps the colours it is fading towards.
-        self._slot_targets: dict[
-            str,
-            tuple[ComponentSlot, FrameBuffer, list[tuple[int, int, int, int]]],
-        ] = {}
+        # colour loop's step, also keeps that fade.
+        self._slot_targets: dict[str, tuple[ComponentSlot, FrameBuffer, SlotFade]] = {}
         self._hold: HeldTile | None = None
 
         # Scope resolution is deliberately deferred until the first send so
@@ -851,9 +855,11 @@ class Animator:
         del self._slot_writers[writer]
         if slot.component in self._animating():
             return
-        current = self._slot_frames.pop(slot.component, None)
-        # A slot fading towards a target ends up showing it.
-        last = self._slot_targets.pop(slot.component, None) or current
+        last = self._slot_frames.pop(slot.component, None)
+        fade = self._slot_targets.pop(slot.component, None)
+        if fade is not None:
+            # A slot fading towards a target ends up showing it.
+            last = (fade[0], fade[1], fade[2].target)
         hold = self._hold
         if last is None or hold is None:
             return
@@ -875,6 +881,7 @@ class Animator:
         hsbk: list[tuple[int, int, int, int]],
         *,
         settled: bool = False,
+        duration_ms: int = 0,
     ) -> bool:
         """Keep a light component's latest frame for the next composed tile.
 
@@ -885,8 +892,9 @@ class Animator:
             writer: The writer drawing the frame
             slot: The writer's light component slot
             hsbk: The frame
-            settled: Keep the frame as the slot's target rather than as the
-                colours of the moment
+            settled: Keep the frame as the target of a fade the firmware
+                runs on the slot, rather than as the colours of the moment
+            duration_ms: With ``settled``, how long that fade takes
 
         Returns:
             False if the writer was released and no longer draws on the light
@@ -894,11 +902,26 @@ class Animator:
         _check_length(writer._canvas, hsbk)
         if writer not in self._slot_writers:
             return False
-        entry = (slot, writer._canvas, hsbk)
         if settled:
-            self._slot_targets[slot.component] = entry
+            # The fade starts from what the slot shows now: part-way through
+            # an earlier fade, or its colours of the moment.
+            earlier = self._slot_targets.get(slot.component)
+            current = self._slot_frames.get(slot.component)
+            if earlier is not None:
+                source = earlier[2].frame_at(time.monotonic())
+            elif current is not None:
+                source = current[2]
+            else:
+                source = hsbk
+            if len(source) != len(hsbk):
+                source = hsbk
+            self._slot_targets[slot.component] = (
+                slot,
+                writer._canvas,
+                SlotFade(source, hsbk, duration_ms / 1000),
+            )
             return True
-        self._slot_frames[slot.component] = entry
+        self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
         if writer._streaming:
             # A streamed frame is what the slot shows; no fade runs there.
             self._slot_targets.pop(slot.component, None)
@@ -915,7 +938,9 @@ class Animator:
     ) -> AnimatorStats:
         """Keep a light component's frame and send the tile of every slot."""
         start_time = time.perf_counter()
-        if not self._store_slot(writer, slot, hsbk, settled=settled):
+        if not self._store_slot(
+            writer, slot, hsbk, settled=settled, duration_ms=duration_ms
+        ):
             # A released writer no longer draws on the light.
             return AnimatorStats(packets_sent=0, total_time_ms=0.0)
         hold = self._hold
@@ -935,15 +960,17 @@ class Animator:
 
         Args:
             hold: The held tile beneath the slots
-            settled: Use each slot's target rather than its colours of the
+            settled: Carry each slot's fade rather than its colours of the
                 moment
             ends_in: Seconds until the tile's transition ends: the held tile
-                shows its colours as of then, part-way through any fade
+                and every slot's fade show their colours as of then
         """
-        tile = hold.tuples_at(time.monotonic() + ends_in)
+        ends_at = time.monotonic() + ends_in
+        tile = hold.tuples_at(ends_at)
         frames = dict(self._slot_frames)
         if settled:
-            frames.update(self._slot_targets)
+            for component, (slot, canvas, fade) in self._slot_targets.items():
+                frames[component] = (slot, canvas, fade.frame_at(ends_at))
         for slot, canvas, frame in frames.values():
             mapped = canvas.apply(frame)
             for position, source in zip(slot.positions, slot.sources):

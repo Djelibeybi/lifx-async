@@ -353,6 +353,61 @@ class TestComponentSlots:
         assert tile[0] == halfway.as_tuple()
         assert tile[UPLIGHT] == RED
 
+    async def test_a_settled_tile_carries_another_slots_fade_as_of_its_end(
+        self, sent: list[bytes]
+    ) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+        source = [RED] * 64
+        target = [CYAN] * 64
+
+        with (
+            patch("lifx.animation.slots.time.monotonic", return_value=100.0),
+            patch("lifx.animation.animator.time.monotonic", return_value=100.0),
+        ):
+            downlight.stage(source)
+            downlight.send_frame(target, duration_ms=4000, settled=True)
+        ceiling.animator._ack_gate.reset()
+        with (
+            patch("lifx.animation.slots.time.monotonic", return_value=101.0),
+            patch("lifx.animation.animator.time.monotonic", return_value=101.0),
+        ):
+            uplight.send_frame([RED], duration_ms=1000, settled=True)
+
+        start = HSBK.from_protocol(LightHsbk(*RED))
+        end = HSBK.from_protocol(LightHsbk(*CYAN))
+        halfway = start.lerp_hsb(end, 0.5).as_tuple()
+        assert _tiles(sent)[-1][0] == halfway
+        assert _tiles(sent)[-1][UPLIGHT] == RED
+
+    async def test_a_slot_fade_starts_where_the_last_one_was_and_ends_on_target(
+        self, sent: list[bytes], mock_udp_socket: MockUdpSocket
+    ) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+
+        for now in (100.0, 102.0):
+            with (
+                patch("lifx.animation.slots.time.monotonic", return_value=100.0),
+                patch("lifx.animation.animator.time.monotonic", return_value=now),
+            ):
+                if now == 100.0:
+                    downlight.stage([RED] * 64)
+                    downlight.stage([CYAN] * 64, settled=True, duration_ms=0)
+                    downlight.stage([RED] * 64, settled=True, duration_ms=1000)
+                mock_udp_socket.queue_datagram(
+                    make_ack_datagram(ceiling.animator._source, 0)
+                )
+                uplight.send_frame([RED], duration_ms=0, settled=True)
+
+        began, ended = _tiles(sent)
+        assert began[0] == CYAN
+        assert ended[0] == RED
+
     async def test_a_writer_that_does_not_stream_shares_no_tile(self) -> None:
         ceiling = _ceiling()
         uplight = await component_writer(ceiling, "uplight", 0)

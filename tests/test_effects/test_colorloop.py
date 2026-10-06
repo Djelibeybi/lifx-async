@@ -639,7 +639,10 @@ class TestColorloopComponent:
         writer.send_frame.assert_called_once_with(
             [_hue_at(1.0)], duration_ms=1000, settled=True
         )
-        writer.stage.assert_called_once_with([_hue_at(0.5)])
+        assert writer.stage.call_args_list == [
+            call([_hue_at(0.0)]),
+            call([_hue_at(0.5)]),
+        ]
 
     def test_a_shared_tile_only_keeps_its_slot_then_writes_once_alone(self) -> None:
         effect = _loop()
@@ -734,7 +737,11 @@ class TestColorloopComponent:
         effect._deliver(0, writer, [_hue_at(0.1)], _ctx(0.1), False)
 
         assert writer.send_frame.call_count == 2
-        writer.stage.assert_called_once_with([_hue_at(0.1)])
+        assert writer.stage.call_args_list == [
+            call([_hue_at(0.0)]),
+            call([_hue_at(0.05)]),
+            call([_hue_at(0.1)]),
+        ]
 
     def test_two_writers_on_one_tile_send_it_once_per_step(self) -> None:
         effect = _loop()
@@ -747,7 +754,8 @@ class TestColorloopComponent:
             effect._deliver(1, second, [_hue_at(elapsed)], _ctx(elapsed), False)
 
         assert first.stage.call_args_list == [
-            call([_hue_at(1.0)], settled=True),
+            call([_hue_at(0.0)]),
+            call([_hue_at(1.0)], settled=True, duration_ms=1000),
             call([_hue_at(0.5)]),
         ]
         second.send_frame.assert_called_once_with(
