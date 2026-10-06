@@ -12,8 +12,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from lifx.devices.component.participant import LightComponent
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
+from lifx.effects.frame_effect import FrameEffect
+from lifx.effects.suitability import is_mirror
+
 if TYPE_CHECKING:
-    from lifx.devices.component.participant import LightComponent
     from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
 
@@ -61,7 +66,7 @@ class EffectInfo:
 def _classify_device(device: Light | LightComponent) -> DeviceType:
     """Classify a light, or a light component, into a DeviceType category.
 
-    Uses isinstance checks with lazy imports to avoid circular dependencies.
+    Uses isinstance checks on the device classes.
     A Mirror is checked before a matrix light, so it never classifies as
     ``MATRIX``. A Ceiling uplight draws on a single pixel, so it classifies
     as a single light. Every other light component classifies the same as its
@@ -73,16 +78,11 @@ def _classify_device(device: Light | LightComponent) -> DeviceType:
     Returns:
         DeviceType classification for the device
     """
-    from lifx.devices.component.participant import LightComponent
-    from lifx.devices.matrix import MatrixLight
-    from lifx.devices.mirror import MirrorLight
-    from lifx.devices.multizone import MultiZoneLight
-
     if isinstance(device, LightComponent):
         if device.name == "uplight":
             return DeviceType.LIGHT
         device = device.light
-    if isinstance(device, MirrorLight):
+    if is_mirror(device):
         return DeviceType.MIRROR
     if isinstance(device, MatrixLight):
         return DeviceType.MATRIX
@@ -188,9 +188,6 @@ class EffectRegistry:
         Returns:
             List of (EffectInfo, DeviceSupport) tuples, sorted by support level
         """
-        from lifx.devices.component.participant import LightComponent
-        from lifx.effects.frame_effect import FrameEffect
-
         device_type = _classify_device(device)
         results = self.get_effects_for_device_type(device_type)
         if isinstance(device, LightComponent):

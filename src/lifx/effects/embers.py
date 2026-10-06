@@ -348,14 +348,14 @@ class EffectEmbers(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Embers effect.
 
-        Embers requires color capability. Works on single lights, multizone
+        Embers requires colour capability. Works on single lights, multizone
         strips and a Mirror. Any other matrix device is not supported.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light is a Mirror, or has color support and is not a
+            True if light is a Mirror, or has colour support and is not a
             matrix device
         """
         if is_mirror(light):

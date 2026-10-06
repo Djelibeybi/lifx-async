@@ -264,7 +264,7 @@ class EffectRipple(FrameEffect):
         """
         n_cells = max(ctx.pixel_count, 1)
 
-        # Lazy initialization, or reinitialize when the zone count changes or
+        # Lazy initialisation, or reinitialise when the zone count changes or
         # the surface starts or stops closing on itself.
         if n_cells != self._n_cells or ctx.wraps != self._wraps:
             self._init_state(n_cells, ctx.wraps)

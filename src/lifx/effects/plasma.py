@@ -472,7 +472,7 @@ class EffectPlasma(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with plasma effect.
 
-        Plasma requires color capability. Works best on multizone devices
+        Plasma requires colour capability. Works best on multizone devices
         but is compatible with single lights and a Mirror. Not supported on
         any other matrix device.
 
@@ -480,7 +480,7 @@ class EffectPlasma(FrameEffect):
             light: The light device to check
 
         Returns:
-            True if light is a Mirror, or has color support and is not a
+            True if light is a Mirror, or has colour support and is not a
             matrix device
         """
         if is_mirror(light):
