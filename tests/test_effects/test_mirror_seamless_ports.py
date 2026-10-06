@@ -37,7 +37,10 @@ EffectFactory = Callable[[], LIFXEffect]
 
 # Each effect, built so its frames show plenty of activity in a short run.
 FACTORIES: dict[str, EffectFactory] = {
-    "fireworks": lambda: EffectFireworks(launch_rate=2.0, burst_spread=20.0),
+    # The strip digest was pinned with the earlier ascent and burst defaults.
+    "fireworks": lambda: EffectFireworks(
+        launch_rate=2.0, burst_spread=20.0, ascent_speed=0.3, burst_duration=2.0
+    ),
     "rule30": lambda: EffectRule30(seed="random", speed=5.0),
     "rule_trio": lambda: EffectRuleTrio(speed=5.0),
     "plasma": lambda: EffectPlasma(tendril_rate=2.0),

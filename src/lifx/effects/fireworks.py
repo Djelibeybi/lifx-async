@@ -197,10 +197,10 @@ class EffectFireworks(FrameEffect):
         self,
         power_on: bool = True,
         max_rockets: int = 3,
-        launch_rate: float = 0.5,
-        ascent_speed: float = 0.3,
+        launch_rate: float = 1.0,
+        ascent_speed: float = 10.0,
         burst_spread: float = 5.0,
-        burst_duration: float = 2.0,
+        burst_duration: float = 1.2,
         brightness: float = 0.8,
         kelvin: int = 3500,
     ) -> None:
@@ -209,10 +209,10 @@ class EffectFireworks(FrameEffect):
         Args:
             power_on: Power on devices if off (default True)
             max_rockets: Maximum simultaneous rockets, 1-20 (default 3)
-            launch_rate: Average launches per second, 0.05-5.0 (default 0.5)
-            ascent_speed: Zones per second travel speed, 0.1-60.0 (default 0.3)
+            launch_rate: Average launches per second, 0.05-5.0 (default 1.0)
+            ascent_speed: Zones per second travel speed, 0.1-60.0 (default 10.0)
             burst_spread: Max burst radius in zones, 2.0-60.0 (default 5.0)
-            burst_duration: Seconds for burst fade, 0.2-8.0 (default 2.0)
+            burst_duration: Seconds for burst fade, 0.2-8.0 (default 1.2)
             brightness: Peak brightness 0.0-1.0 (default 0.8)
             kelvin: Color temperature 1500-9000 (default 3500)
 

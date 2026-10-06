@@ -879,7 +879,7 @@ On a Mirror, whole or either ring alone, fireworks is seamless: bursts and trail
 ```python
 from lifx.effects import EffectFireworks
 
-effect = EffectFireworks(max_rockets=3, launch_rate=0.5, burst_spread=5.0)
+effect = EffectFireworks(max_rockets=3, launch_rate=1.0, burst_spread=5.0)
 await conductor.start(effect, lights)
 ```
 
