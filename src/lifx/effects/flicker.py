@@ -160,10 +160,11 @@ class EffectFlicker(FrameEffect):
                 1.0 - self.intensity + self.intensity * flicker
             )
 
-            # Matrix vertical falloff: bottom rows hotter
+            # Matrix vertical falloff: bottom rows hotter. Rows are row-major with
+            # row 0 at the top, so measure height up from the bottom row.
             if is_matrix:
-                y = i // ctx.canvas_width
-                y_factor = 1.0 - (y / ctx.canvas_height) ** 0.7
+                height_above_bottom = ctx.canvas_height - 1 - i // ctx.canvas_width
+                y_factor = 1.0 - (height_above_bottom / ctx.canvas_height) ** 0.7
                 pixel_brightness *= y_factor
 
             pixel_brightness = max(0.0, min(1.0, pixel_brightness))

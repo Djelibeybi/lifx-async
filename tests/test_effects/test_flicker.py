@@ -237,20 +237,11 @@ class TestFlickerGenerateFrame:
         )
         colors = effect.generate_frame(ctx)
 
-        # Average brightness of bottom row (y=7) vs top row (y=0)
-        # Bottom row is pixels 0..7 (y=0 in row-major), top is 56..63 (y=7)
-        # In the matrix, y=0 is the FIRST row (top), y=7 is LAST (bottom)
-        # The falloff formula: y_factor = 1.0 - (y/height)^0.7
-        # So y=0 → y_factor=1.0 (bright), y=7 → y_factor ≈ 0 (dark)
-        # This means TOP rows are brighter (hot bottom of fire at top of display)
-        # Actually, for "bottom rows hotter": if row 0 is top of display,
-        # we want bottom rows (high y) to be darker with this formula
-        # The formula actually makes y=0 (top) brightest
-
-        # Top row (y=0) should be brighter than bottom row (y=7)
+        # Row-major with row 0 at the top: the top row is pixels 0..7 and
+        # the bottom row is pixels 56..63
         top_row_avg = sum(colors[i].brightness for i in range(8)) / 8
         bottom_row_avg = sum(colors[i].brightness for i in range(56, 64)) / 8
-        assert top_row_avg > bottom_row_avg
+        assert bottom_row_avg > top_row_avg
 
     def test_intensity_affects_variation(self) -> None:
         """Test that higher intensity produces more brightness variation."""
