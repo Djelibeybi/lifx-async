@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.8.0 (2026-10-06)
+
+### Features
+
+- **effects**: Run 1-D effects on the Mirror and its rings
+  ([#277](https://github.com/Djelibeybi/lifx-async/pull/277),
+  [`c9ef197`](https://github.com/Djelibeybi/lifx-async/commit/c9ef197f19ffef89eeca31eab24098047f28eca4))
+
+
 ## v7.7.1 (2026-10-06)
 
 ### Bug Fixes
