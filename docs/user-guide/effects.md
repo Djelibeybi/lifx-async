@@ -756,6 +756,8 @@ await conductor.start(effect, lights)
 
 Fire simulation via 1D heat diffusion — heat injected at the bottom, diffuses upward with cooling and turbulence.
 
+On a Mirror, whole or either ring alone, embers is seamless: heat that rises off the last zone comes round to zone 0 and spreads across the join. Any other matrix light is still refused.
+
 ```python
 from lifx.effects import EffectEmbers
 
@@ -770,6 +772,8 @@ await conductor.start(effect, lights)
 ![Plasma effect](../assets/effects/plasma_zpb3.gif)
 
 Plasma ball — bright core pulsing at center with electric tendrils crackling outward. Tendrils random-walk and fork.
+
+On a Mirror, whole or either ring alone, plasma is seamless: the glow is measured the short way round and a tendril that reaches one end lights the other side of the join, so the colour field closes on itself. Any other matrix light is still refused.
 
 ```python
 from lifx.effects import EffectPlasma
@@ -821,6 +825,8 @@ await conductor.start(effect, lights)
 
 Wolfram's Rule 30 cellular automaton — generates chaotic/pseudo-random patterns. Configurable seed modes: center, random, or all.
 
+On a Mirror, whole or either ring alone, rule30 is seamless: the automaton treats the ring as periodic, so there is no edge at zone 0.
+
 ```python
 from lifx.effects import EffectRule30
 
@@ -841,6 +847,8 @@ await conductor.start(effect, lights)
 
 Three independent cellular automata running at irrational speed ratios, blended via Oklab. Produces evolving color interference patterns.
 
+On a Mirror, whole or either ring alone, rule trio is seamless: each automaton treats the ring as periodic, so there is no edge at zone 0.
+
 ```python
 from lifx.effects import EffectRuleTrio
 
@@ -855,6 +863,8 @@ await conductor.start(effect, lights)
 ![Fireworks effect](../assets/effects/fireworks.gif)
 
 Rockets launch from both ends, ascend with easing, and burst into expanding gaussian halos. Color evolves from white through chemical colors to orange.
+
+On a Mirror, whole or either ring alone, fireworks is seamless: bursts and trails take the short way round, so a burst near zone 0 spreads onto zone 24.
 
 ```python
 from lifx.effects import EffectFireworks

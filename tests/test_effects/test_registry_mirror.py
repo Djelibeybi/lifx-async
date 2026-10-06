@@ -31,21 +31,21 @@ RING_EFFECTS = (
     "rainbow",
     "colorloop",
     "ripple",
+    "rule30",
+    "rule_trio",
+    "fireworks",
+    "plasma",
+    "embers",
 )
 
 # Effects still to be ported: the registry must not advertise them.
 TO_BE_PORTED = (
     "sonar",
-    "rule30",
-    "rule_trio",
-    "fireworks",
     "progress",
     "jacobs_ladder",
     "newtons_cradle",
     "pendulum_wave",
     "double_slit",
-    "plasma",
-    "embers",
 )
 
 TWO_D = ("sunrise", "sunset", "plasma2d")

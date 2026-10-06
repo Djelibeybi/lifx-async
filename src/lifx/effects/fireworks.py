@@ -47,6 +47,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -147,6 +148,22 @@ class _Rocket:
 # ---------------------------------------------------------------------------
 
 
+def _ring_offset(offset: float, zone_count: int) -> float:
+    """Fold a signed distance along the zones onto the short way round a ring.
+
+    Args:
+        offset: Signed distance in zones
+        zone_count: Number of zones in the ring
+
+    Returns:
+        The equivalent offset in the range ``(-zone_count / 2, zone_count / 2]``
+    """
+    wrapped = offset % zone_count
+    if wrapped > zone_count / 2:
+        wrapped -= zone_count
+    return wrapped
+
+
 class EffectFireworks(FrameEffect):
     """Rockets from both ends burst into spreading color halos.
 
@@ -162,6 +179,9 @@ class EffectFireworks(FrameEffect):
 
     Multiple rockets overlap additively in RGB space for physically
     correct color mixing.
+
+    On a Mirror ring there are no ends: a burst or exhaust trail near zone 0
+    spreads onto zone 24 and beyond, so the effect is seamless there.
 
     Attributes:
         max_rockets: Maximum simultaneous rockets in flight
@@ -312,6 +332,7 @@ class EffectFireworks(FrameEffect):
         rocket: _Rocket,
         t: float,
         zone_count: int,
+        wraps: bool = False,
     ) -> list[tuple[float, float, float]]:
         """Compute this rocket's (hue_deg, sat_01, bri_01) for every zone.
 
@@ -321,6 +342,8 @@ class EffectFireworks(FrameEffect):
             rocket: The rocket to evaluate.
             t: Current global effect-time.
             zone_count: Total number of zones.
+            wraps: Whether the zones form a ring, so trails and bursts take
+                the short way round zone 0 instead of stopping at the ends.
 
         Returns:
             List of (hue_deg, sat_01, bri_01) per zone.
@@ -341,6 +364,8 @@ class EffectFireworks(FrameEffect):
 
             for z in range(zone_count):
                 behind = rocket.direction * (head_pos - z)
+                if wraps:
+                    behind = _ring_offset(behind, zone_count)
 
                 if -0.5 <= behind <= 0.5:
                     contrib[z] = (rocket.burst_hue, _HEAD_SATURATION, 1.0)
@@ -388,7 +413,10 @@ class EffectFireworks(FrameEffect):
                     zone_sat = _BURST_SATURATION * (1.0 - 0.5 * cool_frac)
 
                 for z in range(zone_count):
-                    dist_sq = float(z - rocket.zenith) ** 2
+                    offset = float(z - rocket.zenith)
+                    if wraps:
+                        offset = _ring_offset(offset, zone_count)
+                    dist_sq = offset**2
                     gaussian = math.exp(-dist_sq / two_sigma_sq)
                     bri = min(1.0, fade * gaussian * _BURST_BRIGHTNESS_BOOST)
 
@@ -435,7 +463,7 @@ class EffectFireworks(FrameEffect):
 
         for rocket in self._rockets:
             for z, (h_deg, s_01, b_01) in enumerate(
-                self._contribution(rocket, t, zone_count)
+                self._contribution(rocket, t, zone_count, ctx.wraps)
             ):
                 if b_01 <= 0.0:
                     continue
@@ -486,18 +514,17 @@ class EffectFireworks(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Fireworks effect.
 
-        Fireworks requires multizone capability (strips/beams). Single
-        lights are not supported; matrix devices are not supported.
+        Fireworks draws a line, so it suits a multizone strip or beam and a
+        Mirror (see ``draws_a_line``). Single lights and other matrix devices
+        are not supported.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light draws a line, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Fireworks can inherit prestate from another Fireworks effect.
