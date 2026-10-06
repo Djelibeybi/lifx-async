@@ -30,12 +30,12 @@ RING_EFFECTS = (
     "flicker",
     "rainbow",
     "colorloop",
+    "ripple",
 )
 
 # Effects still to be ported: the registry must not advertise them.
 TO_BE_PORTED = (
     "sonar",
-    "ripple",
     "rule30",
     "rule_trio",
     "fireworks",
