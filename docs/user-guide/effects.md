@@ -93,6 +93,21 @@ async def main():
 asyncio.run(main())
 ```
 
+Each step lasts `period * change / 360` seconds: 1.67 seconds in the example above. A colour
+loop writes each light once per step, with the step as the transition, and the light fades
+between steps itself. With the defaults that is one packet every 3.3 seconds per light, far less
+traffic than an effect that draws frames, so a colour loop runs on Thread lights without
+`enable_thread`. `change` must be more than 0 and less than 180, because the firmware fades hue
+the short way round the colour wheel.
+
+On one light component of a Ceiling or Mirror, a colour loop writes the same way while it has the
+light to itself. The two light components share one tile. While another effect draws on the other
+light component, that effect's frames carry the colour loop's colour, and the colour loop sends
+nothing itself. While a fade you asked of the other light component runs, the colour loop draws
+frames so the fade shows. On a Thread light it goes on writing once per step, and each write
+carries the other light component as far through its fade as it will be when the step ends, so the
+firmware follows that fade a step at a time.
+
 ### Rainbow Effect
 
 The `EffectRainbow` spreads a full 360-degree rainbow across device pixels and scrolls it over time. Best on multizone strips and matrix lights:
@@ -245,7 +260,8 @@ await conductor.start(EffectRainbow(), lights, enable_thread=True)
 One Thread light refuses the whole start: nothing is captured, powered on or changed on any
 light. The evidence is the light's own replies, or an mDNS record that says Thread; a light the
 library has not heard from yet is not refused. EffectPulse sends waveforms rather than frames and
-is never refused, and neither are firmware effects started with `set_effect()`.
+EffectColorloop writes each light once per step, so neither is refused, and nor are firmware
+effects started with `set_effect()`.
 
 ### Effect Completion
 

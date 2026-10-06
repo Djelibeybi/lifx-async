@@ -6,12 +6,15 @@ This module provides the EffectColorloop class for continuous hue rotation.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
+from lifx.devices.base import Connectivity
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
@@ -21,20 +24,60 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+@dataclasses.dataclass
+class _Schedule:
+    """When a light, or a tile, is next written.
+
+    Attributes:
+        next_at: Elapsed seconds at which the last write's transition ends
+            and the next write is due
+        hold_version: The tile's held colours when it was last written
+        streamed: True while the tile is streamed frame by frame, so the next
+            step must be written as soon as the stream ends
+    """
+
+    next_at: float = 0.0
+    hold_version: int = -1
+    streamed: bool = True
+
+
+def _on_thread(light: Light) -> bool:
+    """Whether a light is evidenced as Thread, so it must not be streamed to."""
+    return light._evidenced_connectivity() is Connectivity.THREAD
+
+
 class EffectColorloop(FrameEffect):
     """Continuous color rotation effect cycling through hue spectrum.
 
     Perpetually cycles through hues with configurable speed, spread,
     and color constraints. Continues until stopped.
 
+    The hue moves ``change`` degrees per step, and a full turn takes
+    ``period`` seconds, so each step lasts ``period * change / 360`` seconds.
+    Each light gets one colour write per step, with the step as its
+    transition, and the firmware fades between them. It streams no frames,
+    so it runs on Thread lights without ``enable_thread``.
+
+    A light component of a Ceiling or Mirror shares one tile with the other
+    light component, and is written the same way while colour loop has the
+    tile to itself. While another effect draws on the other light component,
+    that effect's frames carry colour loop's colour and colour loop sends
+    nothing. While a fade the caller asked of the other light component runs,
+    colour loop draws frames so the fade shows. On a Thread light it goes on
+    writing once per step instead, and each write carries the other light
+    component as far through its fade as it will be when the step ends, so
+    the firmware follows that fade a step at a time; no write turns colour
+    loop's hue further than ``change``.
+
     Attributes:
         period: Seconds per full cycle (default 60)
-        change: Hue degrees to shift per iteration (default 20)
+        change: Hue degrees to shift per step (default 20)
         spread: Hue degrees spread across devices (default 30)
         brightness: Fixed brightness, or None to preserve (default None)
         saturation_min: Minimum saturation (0.0-1.0, default 0.8)
         saturation_max: Maximum saturation (0.0-1.0, default 1.0)
-        transition: Color transition time in seconds, or None for random
+        transition: Transition time of each step's write in seconds, or None
+            for the step's length
         synchronized: If True, all lights show same color simultaneously (default False)
 
     Example:
@@ -59,6 +102,8 @@ class EffectColorloop(FrameEffect):
         ```
     """
 
+    _streams_frames = False
+
     def __init__(
         self,
         power_on: bool = True,
@@ -76,15 +121,16 @@ class EffectColorloop(FrameEffect):
         Args:
             power_on: Power on devices if off (default True)
             period: Seconds per full cycle (default 60)
-            change: Hue degrees to shift per iteration (default 20)
+            change: Hue degrees to shift per step, more than 0 and less
+                    than 180 (default 20). The firmware fades hue the short
+                    way round, so a step of 180 or more would turn backwards.
             spread: Hue degrees spread across devices (default 30).
                     Ignored if synchronized=True.
             brightness: Fixed brightness, or None to preserve (default None)
             saturation_min: Minimum saturation (0.0-1.0, default 0.8)
             saturation_max: Maximum saturation (0.0-1.0, default 1.0)
-            transition: Color transition time in seconds, or None for
-                        random per device (default None). When synchronized=True
-                        and transition=None, uses iteration_period as transition.
+            transition: Transition time of each step's write in seconds,
+                        or None for the step's length (default None)
             synchronized: If True, all lights display the same color
                          simultaneously with consistent transitions. When False,
                          lights are spread across the hue spectrum based on
@@ -95,8 +141,10 @@ class EffectColorloop(FrameEffect):
         """
         if period <= 0:
             raise ValueError(f"Period must be positive, got {period}")
-        if not (0 <= change <= 360):
-            raise ValueError(f"Change must be 0-360 degrees, got {change}")
+        if not (0 < change < 180):
+            raise ValueError(
+                f"Change must be more than 0 and less than 180 degrees, got {change}"
+            )
         if not (0 <= spread <= 360):
             raise ValueError(f"Spread must be 0-360 degrees, got {spread}")
         if brightness is not None and not (0.0 <= brightness <= 1.0):
@@ -113,13 +161,11 @@ class EffectColorloop(FrameEffect):
         if transition is not None and transition < 0:
             raise ValueError(f"Transition must be non-negative, got {transition}")
 
-        # Calculate FPS from period and change
-        # iterations_per_cycle = 360 / change (how many steps for a full rotation)
-        # fps = iterations_per_cycle / period (steps per second)
-        # Minimum 20 FPS ensures smooth animation on multizone/matrix devices.
-        # For single lights, the firmware interpolates between frames using
-        # duration_ms, so extra frames are harmless.
-        fps = max(20.0, (360.0 / change) / period) if change > 0 else 20.0
+        # A light gets one write per step, but the loop still runs at 20 FPS
+        # at least: it notices each step on time, and a light component that
+        # shares its tile with another effect is drawn frame by frame.
+        step = period * change / 360.0
+        fps = max(20.0, 1.0 / step)
 
         super().__init__(power_on=power_on, fps=fps, duration=None)
 
@@ -131,10 +177,13 @@ class EffectColorloop(FrameEffect):
         self.saturation_max = saturation_max
         self.transition = transition
         self.synchronized = synchronized
+        self._step = step
 
         # Runtime state (set during async_setup)
         self._initial_colors: list[HSBK] = []
         self._direction: int = 1
+        self._schedules: dict[object, _Schedule] = {}
+        self._writes: dict[object, asyncio.Task[None]] = {}
 
     @property
     def name(self) -> str:
@@ -153,6 +202,151 @@ class EffectColorloop(FrameEffect):
         """
         self._initial_colors = await self._get_initial_colors(participants)
         self._direction = random.choice([1, -1])
+
+    async def async_play(self) -> None:
+        """Run the loop, then cancel any colour write still in flight.
+
+        A write that lands after the loop stops would overwrite the colours
+        the Conductor restores.
+        """
+        self._schedules = {}
+        try:
+            await super().async_play()
+        finally:
+            writes = list(self._writes.values())
+            self._writes.clear()
+            for write in writes:
+                write.cancel()
+            await asyncio.gather(*writes, return_exceptions=True)
+
+    def _deliver(
+        self,
+        idx: int,
+        writer: Any,
+        frame: list[tuple[int, int, int, int]],
+        ctx: FrameContext,
+        staged: bool,
+    ) -> None:
+        """Write the next step's colour once per step.
+
+        Each light is written at the start of every step with the colour the
+        step ends on, so the firmware does the fading. A light component's
+        writer keeps its slot showing the colour of the moment, so another
+        effect that starts on the tile picks up from there.
+
+        Args:
+            idx: The writer's index among the borrowed writers
+            writer: The borrowed writer
+            frame: This frame, drawn for the current moment
+            ctx: The frame context the frame was drawn with
+            staged: True if a later writer sends this writer's tile
+        """
+        slot = isinstance(writer, AnimatorWriter) and writer.draws_slot
+        # Writers sharing a tile share one schedule: the last one sends it.
+        key: object = writer.animator if slot else writer
+        schedule = self._schedules.setdefault(key, _Schedule())
+        if slot:
+            if writer.tile_shared(self._animators):
+                # Another effect's frames carry the slot.
+                writer.streaming = False
+                schedule.streamed = True
+                writer.stage(frame)
+                return
+            if writer.hold_remaining > 0 and not _on_thread(self.participants[idx]):
+                # Frames show the other light component's fade exactly.
+                writer.streaming = True
+                schedule.streamed = True
+                super()._deliver(idx, writer, frame, ctx, staged)
+                return
+            writer.streaming = False
+
+        now = ctx.elapsed_s
+        version = writer.hold_version if slot else 0
+        if (
+            not schedule.streamed
+            and now < schedule.next_at
+            and version == schedule.hold_version
+        ):
+            if slot:
+                writer.stage(frame)
+            return
+
+        step_ends_at = (int(now // self._step) + 1) * self._step
+        ends_at = step_ends_at
+        if slot:
+            # One transition per tile: end no later than another slot's fade,
+            # then write again, so neither fade is stretched.
+            deadline = writer.slot_deadline(self._animators)
+            if deadline is not None and 1 / self.fps <= deadline < ends_at - now:
+                ends_at = now + deadline
+        duration = ends_at - now
+        if self.transition is not None:
+            # A shortened write never runs past the fade it was shortened for.
+            duration = (
+                self.transition
+                if ends_at == step_ends_at
+                else min(self.transition, duration)
+            )
+        target = self.generate_frame(dataclasses.replace(ctx, elapsed_s=ends_at))
+        if slot:
+            # The slot's fade starts from the colour of the moment.
+            writer.stage(frame)
+            target_frame = [color.as_tuple() for color in target]
+            duration_ms = round(duration * 1000)
+            if staged:
+                writer.stage(target_frame, settled=True, duration_ms=duration_ms)
+                return
+            stats = writer.send_frame(
+                target_frame, duration_ms=duration_ms, settled=True
+            )
+            if stats.gated:
+                return  # Still due: the next frame tries again
+        else:
+            self._write_color(writer, self.participants[idx], target[0], duration)
+        schedule.next_at = ends_at
+        schedule.hold_version = version
+        schedule.streamed = False
+
+    def _writer_closed(self, writer: object) -> None:
+        """Cancel the colour write of a writer that left the run.
+
+        Its light is about to be restored or handed to another effect, which
+        a late write would overwrite.
+        """
+        write = self._writes.pop(writer, None)
+        if write is not None:
+            write.cancel()
+
+    def _write_color(
+        self, key: object, light: Light, color: HSBK, duration: float
+    ) -> None:
+        """Start a light's colour write, replacing one still in flight.
+
+        Args:
+            key: The writer the light is drawn through
+            light: The light to write
+            color: The colour the step ends on
+            duration: Transition time in seconds
+        """
+        previous = self._writes.pop(key, None)
+        if previous is not None:
+            previous.cancel()
+        self._writes[key] = asyncio.create_task(self._set_color(light, color, duration))
+
+    async def _set_color(self, light: Light, color: HSBK, duration: float) -> None:
+        """Write one step's colour, logging a failure; the next step retries."""
+        try:
+            await light.set_color(color, duration=duration)
+        except Exception as error:
+            _LOGGER.warning(
+                {
+                    "class": self.__class__.__name__,
+                    "method": "_set_color",
+                    "action": "change",
+                    "error": str(error),
+                    "values": {"serial": light.serial, "duration": duration},
+                }
+            )
 
     def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
         """Generate a frame of colors for one device.

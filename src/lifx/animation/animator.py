@@ -36,7 +36,7 @@ from __future__ import annotations
 import socket
 import time
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -49,7 +49,7 @@ from lifx.animation.packets import (
     PacketGenerator,
     PacketTemplate,
 )
-from lifx.animation.slots import ComponentSlot, HeldTile
+from lifx.animation.slots import ComponentSlot, HeldTile, SlotFade
 from lifx.color import HSBK
 from lifx.const import LIFX_UDP_PORT
 from lifx.exceptions import LifxNetworkError
@@ -150,6 +150,7 @@ class AnimatorWriter:
         self._wraps = wraps
         self._slot = slot
         self._whole_light = whole_light
+        self._streaming = True
 
     @property
     def animator(self) -> Animator:
@@ -210,15 +211,103 @@ class AnimatorWriter:
         """True if the canvas is a ring: its last pixel sits next to its first."""
         return self._wraps
 
-    def send_frame(self, hsbk: list[tuple[int, int, int, int]]) -> AnimatorStats:
+    def send_frame(
+        self,
+        hsbk: list[tuple[int, int, int, int]],
+        duration_ms: int | None = None,
+        *,
+        settled: bool = False,
+    ) -> AnimatorStats:
         """Send a frame drawn on this writer's canvas through the Animator.
 
         A light component's writer stores the frame in its slot and sends the
         tile composed from every slot.
+
+        Args:
+            hsbk: The frame, one protocol-ready colour per canvas pixel
+            duration_ms: Transition duration for this frame alone, or None
+                for the writer's own
+            settled: For a light component's writer, the frame is the
+                colours the firmware fades this slot towards: it is kept as
+                the slot's target, and the tile composes every slot's target
+                and the held tile's colours as they will be when this
+                frame's transition ends, so the firmware runs both fades
         """
+        duration = self._duration_ms if duration_ms is None else duration_ms
         if self._slot is not None:
-            return self._animator._send_slot(self, self._slot, hsbk)
-        return self._animator._send(self._canvas, hsbk, self._duration_ms)
+            return self._animator._send_slot(
+                self, self._slot, hsbk, duration, settled=settled
+            )
+        return self._animator._send(self._canvas, hsbk, duration)
+
+    @property
+    def streaming(self) -> bool:
+        """Whether this writer's effect sends a frame of the tile every frame.
+
+        A writer that sends the tile only now and then, as a colour loop
+        does between steps, clears it, so another effect on the tile does
+        not wait for this writer's frames to carry its own slot.
+        """
+        return self._streaming
+
+    @streaming.setter
+    def streaming(self, value: bool) -> None:
+        self._streaming = value
+
+    @property
+    def draws_slot(self) -> bool:
+        """True if this writer draws on a light component's slot."""
+        return self._slot is not None
+
+    def tile_shared(self, own: Collection[AnimatorWriter]) -> bool:
+        """Whether a streaming writer outside ``own`` draws on this tile.
+
+        That writer's frames carry this writer's slot, so this writer need
+        only keep its slot current.
+
+        Args:
+            own: Writers that belong to the same effect as this one
+        """
+        return any(
+            writer not in own and writer._streaming
+            for writer in self._animator._slot_writers
+        )
+
+    def slot_deadline(self, own: Collection[AnimatorWriter]) -> float | None:
+        """Seconds until the soonest fade on another slot of this tile ends.
+
+        The firmware runs one transition per tile, so a tile sent with a
+        longer transition would stretch that fade. Only fades still running
+        on slots no writer in ``own`` draws on count.
+
+        Args:
+            own: Writers that belong to the same effect as this one
+
+        Returns:
+            The time left of the soonest such fade, or None if none runs
+        """
+        animator = self._animator
+        mine = {animator._slot_writers[w].component for w in own if w._slot}
+        now = time.monotonic()
+        left = [
+            fade.remaining(now)
+            for component, (_, _, fade) in animator._slot_targets.items()
+            if component not in mine
+        ]
+        running = [seconds for seconds in left if seconds > 0]
+        return min(running) if running else None
+
+    @property
+    def hold_remaining(self) -> float:
+        """Seconds left of a fade asked of the tile's held colours, or 0."""
+        hold = self._animator._hold
+        return hold.remaining(time.monotonic()) if hold is not None else 0.0
+
+    @property
+    def hold_version(self) -> int:
+        """A count that changes whenever the tile's held colours change."""
+        hold = self._animator._hold
+        return hold.version if hold is not None else 0
 
     def shares_tile_with(self, other: object) -> bool:
         """True if both writers draw on slots of the same Animator's tile."""
@@ -229,16 +318,30 @@ class AnimatorWriter:
             and other._animator is self._animator
         )
 
-    def stage(self, hsbk: list[tuple[int, int, int, int]]) -> None:
+    def stage(
+        self,
+        hsbk: list[tuple[int, int, int, int]],
+        *,
+        settled: bool = False,
+        duration_ms: int = 0,
+    ) -> None:
         """Keep a light component's frame for the next tile, sending nothing.
 
         An effect drawing on both light components of one light stages the
         first light component's frame, then sends the second, so each frame
         of the effect is one tile. Only a light component's writer stages.
+
+        Args:
+            hsbk: The frame, one protocol-ready colour per canvas pixel
+            settled: Keep the frame as the slot's target, the colours the
+                firmware fades it towards, as ``send_frame()`` does
+            duration_ms: With ``settled``, how long that fade takes
         """
         slot = self._slot
         assert slot is not None
-        self._animator._store_slot(self, slot, hsbk)
+        self._animator._store_slot(
+            self, slot, hsbk, settled=settled, duration_ms=duration_ms
+        )
 
     def close(self) -> None:
         """Stop writing. The device's Animator stays open for other writers.
@@ -339,6 +442,9 @@ class Animator:
             str,
             tuple[ComponentSlot, FrameBuffer, list[tuple[int, int, int, int]]],
         ] = {}
+        # A slot written with a transition the firmware runs, such as a
+        # colour loop's step, also keeps that fade.
+        self._slot_targets: dict[str, tuple[ComponentSlot, FrameBuffer, SlotFade]] = {}
         self._hold: HeldTile | None = None
 
         # Scope resolution is deliberately deferred until the first send so
@@ -774,6 +880,10 @@ class Animator:
         if slot.component in self._animating():
             return
         last = self._slot_frames.pop(slot.component, None)
+        fade = self._slot_targets.pop(slot.component, None)
+        if fade is not None:
+            # A slot fading towards a target ends up showing it.
+            last = (fade[0], fade[1], fade[2].target)
         hold = self._hold
         if last is None or hold is None:
             return
@@ -793,11 +903,22 @@ class Animator:
         writer: AnimatorWriter,
         slot: ComponentSlot,
         hsbk: list[tuple[int, int, int, int]],
+        *,
+        settled: bool = False,
+        duration_ms: int = 0,
     ) -> bool:
         """Keep a light component's latest frame for the next composed tile.
 
         A frame is kept even when the ack gate drops the tile it was sent
         with, so the next tile any slot sends carries it.
+
+        Args:
+            writer: The writer drawing the frame
+            slot: The writer's light component slot
+            hsbk: The frame
+            settled: Keep the frame as the target of a fade the firmware
+                runs on the slot, rather than as the colours of the moment
+            duration_ms: With ``settled``, how long that fade takes
 
         Returns:
             False if the writer was released and no longer draws on the light
@@ -805,7 +926,29 @@ class Animator:
         _check_length(writer._canvas, hsbk)
         if writer not in self._slot_writers:
             return False
+        if settled:
+            # The fade starts from what the slot shows now: part-way through
+            # an earlier fade, or its colours of the moment.
+            earlier = self._slot_targets.get(slot.component)
+            current = self._slot_frames.get(slot.component)
+            if earlier is not None:
+                source = earlier[2].frame_at(time.monotonic())
+            elif current is not None:
+                source = current[2]
+            else:
+                source = hsbk
+            if len(source) != len(hsbk):
+                source = hsbk
+            self._slot_targets[slot.component] = (
+                slot,
+                writer._canvas,
+                SlotFade(source, hsbk, duration_ms / 1000),
+            )
+            return True
         self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
+        if writer._streaming:
+            # A streamed frame is what the slot shows; no fade runs there.
+            self._slot_targets.pop(slot.component, None)
         return True
 
     def _send_slot(
@@ -813,23 +956,46 @@ class Animator:
         writer: AnimatorWriter,
         slot: ComponentSlot,
         hsbk: list[tuple[int, int, int, int]],
+        duration_ms: int,
+        *,
+        settled: bool = False,
     ) -> AnimatorStats:
         """Keep a light component's frame and send the tile of every slot."""
         start_time = time.perf_counter()
-        if not self._store_slot(writer, slot, hsbk):
+        if not self._store_slot(
+            writer, slot, hsbk, settled=settled, duration_ms=duration_ms
+        ):
             # A released writer no longer draws on the light.
             return AnimatorStats(packets_sent=0, total_time_ms=0.0)
         hold = self._hold
         # An open slot writer always has a held tile beneath it.
         assert hold is not None
+        ends_in = duration_ms / 1000 if settled else 0.0
         return self._transmit(
-            lambda: self._compose(hold), writer._duration_ms, start_time
+            lambda: self._compose(hold, settled=settled, ends_in=ends_in),
+            duration_ms,
+            start_time,
         )
 
-    def _compose(self, hold: HeldTile) -> list[tuple[int, int, int, int]]:
-        """Build the whole tile: the held tile, overlaid with each slot's frame."""
-        tile = hold.tuples_at(time.monotonic())
-        for slot, canvas, frame in self._slot_frames.values():
+    def _compose(
+        self, hold: HeldTile, *, settled: bool = False, ends_in: float = 0.0
+    ) -> list[tuple[int, int, int, int]]:
+        """Build the whole tile: the held tile, overlaid with each slot's frame.
+
+        Args:
+            hold: The held tile beneath the slots
+            settled: Carry each slot's fade rather than its colours of the
+                moment
+            ends_in: Seconds until the tile's transition ends: the held tile
+                and every slot's fade show their colours as of then
+        """
+        ends_at = time.monotonic() + ends_in
+        tile = hold.tuples_at(ends_at)
+        frames = dict(self._slot_frames)
+        if settled:
+            for component, (slot, canvas, fade) in self._slot_targets.items():
+                frames[component] = (slot, canvas, fade.frame_at(ends_at))
+        for slot, canvas, frame in frames.values():
             mapped = canvas.apply(frame)
             for position, source in zip(slot.positions, slot.sources):
                 tile[position] = mapped[source]

@@ -192,7 +192,7 @@ async def test_pulse_effect_breathe_mode(conductor, mock_light) -> None:
 
 @pytest.mark.asyncio
 async def test_colorloop_effect_execution(conductor, mock_light) -> None:
-    """Test colorloop effect executes and sends frames via animator."""
+    """Test colorloop writes each light's colour rather than streaming frames."""
     effect = EffectColorloop(period=0.2, change=30)
 
     mock_animator = MagicMock()
@@ -209,7 +209,8 @@ async def test_colorloop_effect_execution(conductor, mock_light) -> None:
     ):
         # Start effect and let it run briefly
         await conductor.start(effect, [mock_light])
-        await wait_for_mock_called(mock_animator.send_frame)
+        await wait_for_mock_called(mock_light.set_color)
+        mock_animator.send_frame.assert_not_called()
 
         # Stop effect
         await conductor.stop([mock_light])
@@ -217,7 +218,7 @@ async def test_colorloop_effect_execution(conductor, mock_light) -> None:
 
 @pytest.mark.asyncio
 async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
-    """Test colorloop in synchronized mode sends frames for all lights."""
+    """Test colorloop in synchronized mode gives every light the same colour."""
     # Create two mock lights
     light1 = mock_light
     light2 = MagicMock()
@@ -255,16 +256,18 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     ):
         # Start effect
         await conductor.start(effect, [light1, light2])
-        # Both animators should have send_frame called
-        await wait_for_mock_called(mock_animator1.send_frame)
-        await wait_for_mock_called(mock_animator2.send_frame)
+        # Both lights get the same colour, written rather than streamed
+        await wait_for_mock_called(light1.set_color)
+        await wait_for_mock_called(light2.set_color)
+        assert light1.set_color.call_args_list[0] == light2.set_color.call_args_list[0]
+        mock_animator1.send_frame.assert_not_called()
 
         await conductor.stop([light1, light2])
 
 
 @pytest.mark.asyncio
 async def test_colorloop_with_brightness(conductor, mock_light) -> None:
-    """Test colorloop with fixed brightness sends frames."""
+    """Test colorloop with fixed brightness writes that brightness."""
     effect = EffectColorloop(period=0.2, change=30, brightness=0.5)
 
     mock_animator = MagicMock()
@@ -280,7 +283,8 @@ async def test_colorloop_with_brightness(conductor, mock_light) -> None:
         return_value=[mock_animator],
     ):
         await conductor.start(effect, [mock_light])
-        await wait_for_mock_called(mock_animator.send_frame)
+        await wait_for_mock_called(mock_light.set_color)
+        assert mock_light.set_color.call_args_list[0].args[0].brightness == 0.5
 
         await conductor.stop([mock_light])
 

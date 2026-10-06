@@ -92,6 +92,7 @@ class LightComponent:
         on there. On a light evidenced as Thread, by its own replies or an
         mDNS record, the effect is refused unless ``enable_thread`` is True:
         a Thread mesh is not built for a steady stream of frames.
+        EffectColorloop streams none, so it is never refused.
 
         Args:
             effect: The software effect to run. It must draw frames: an

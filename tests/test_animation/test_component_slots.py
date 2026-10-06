@@ -275,6 +275,206 @@ class TestComponentSlots:
         assert whole == raw
         assert composed[UPLIGHT] == DIM_BLUE.as_tuple()
 
+    async def test_a_slot_frame_can_carry_its_own_duration(
+        self, sent: list[bytes]
+    ) -> None:
+        ceiling = _ceiling()
+        writer = await component_writer(ceiling, "uplight", 75)
+
+        writer.send_frame([RED], duration_ms=3000)
+
+        assert writer.draws_slot is True
+        (datagram,) = sent
+        assert struct.unpack_from("<I", datagram, HEADER_SIZE + 6) == (3000,)
+
+    async def test_a_tile_is_shared_while_another_effect_draws_on_it(self) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+
+        assert uplight.tile_shared([uplight]) is False
+
+        downlight = await component_writer(ceiling, "downlight", 0)
+
+        assert uplight.tile_shared([uplight]) is True
+        assert uplight.tile_shared([uplight, downlight]) is False
+        downlight.close()
+        assert uplight.tile_shared([uplight]) is False
+
+    async def test_a_writer_sees_a_held_fade_and_its_time_left(self, rig: Rig) -> None:
+        ceiling = rig.light
+        assert isinstance(ceiling, CeilingLight)
+        writer = await component_writer(ceiling, "uplight", 0)
+        before = writer.hold_version
+
+        with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
+            await ceiling.set_downlight_colors(AMBER, duration=2.0)
+
+        assert writer.hold_version != before
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.5):
+            assert writer.hold_remaining == pytest.approx(0.5)
+        with patch("lifx.animation.animator.time.monotonic", return_value=102.5):
+            assert writer.hold_remaining == 0.0
+
+    async def test_a_settled_frame_carries_the_held_fades_final_colours(
+        self, sent: list[bytes], rig: Rig
+    ) -> None:
+        ceiling = rig.light
+        assert isinstance(ceiling, CeilingLight)
+        writer = await component_writer(ceiling, "uplight", 0)
+        with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
+            await ceiling.set_downlight_colors(AMBER, duration=2.0)
+
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.0):
+            writer.send_frame([RED], duration_ms=1000, settled=True)
+
+        (tile,) = _tiles(sent)
+        assert tile[:UPLIGHT] == [AMBER.as_tuple()] * UPLIGHT
+        assert tile[UPLIGHT] == RED
+
+    async def test_a_tile_with_nothing_held_has_version_zero(self) -> None:
+        animator = await _ceiling().animator.prepare()
+
+        assert animator._writer().hold_version == 0
+
+    async def test_a_settled_frame_carries_a_held_fade_as_of_its_end(
+        self, sent: list[bytes], rig: Rig
+    ) -> None:
+        ceiling = rig.light
+        assert isinstance(ceiling, CeilingLight)
+        writer = await component_writer(ceiling, "uplight", 0)
+        with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
+            await ceiling.set_downlight_colors(AMBER, duration=4.0)
+
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.0):
+            writer.send_frame([RED], duration_ms=1000, settled=True)
+
+        (tile,) = _tiles(sent)
+        halfway = GREEN.lerp_hsb(AMBER, 0.5).with_kelvin(3100)
+        assert tile[0] == halfway.as_tuple()
+        assert tile[UPLIGHT] == RED
+
+    async def test_a_settled_tile_carries_another_slots_fade_as_of_its_end(
+        self, sent: list[bytes]
+    ) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+        source = [RED] * 64
+        target = [CYAN] * 64
+
+        with (
+            patch("lifx.animation.slots.time.monotonic", return_value=100.0),
+            patch("lifx.animation.animator.time.monotonic", return_value=100.0),
+        ):
+            downlight.stage(source)
+            downlight.send_frame(target, duration_ms=4000, settled=True)
+        ceiling.animator._ack_gate.reset()
+        with (
+            patch("lifx.animation.slots.time.monotonic", return_value=101.0),
+            patch("lifx.animation.animator.time.monotonic", return_value=101.0),
+        ):
+            uplight.send_frame([RED], duration_ms=1000, settled=True)
+
+        start = HSBK.from_protocol(LightHsbk(*RED))
+        end = HSBK.from_protocol(LightHsbk(*CYAN))
+        halfway = start.lerp_hsb(end, 0.5).as_tuple()
+        assert _tiles(sent)[-1][0] == halfway
+        assert _tiles(sent)[-1][UPLIGHT] == RED
+
+    async def test_a_slot_fade_starts_where_the_last_one_was_and_ends_on_target(
+        self, sent: list[bytes], mock_udp_socket: MockUdpSocket
+    ) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+
+        for now in (100.0, 102.0):
+            with (
+                patch("lifx.animation.slots.time.monotonic", return_value=100.0),
+                patch("lifx.animation.animator.time.monotonic", return_value=now),
+            ):
+                if now == 100.0:
+                    downlight.stage([RED] * 64)
+                    downlight.stage([CYAN] * 64, settled=True, duration_ms=0)
+                    downlight.stage([RED] * 64, settled=True, duration_ms=1000)
+                mock_udp_socket.queue_datagram(
+                    make_ack_datagram(ceiling.animator._source, 0)
+                )
+                uplight.send_frame([RED], duration_ms=0, settled=True)
+
+        began, ended = _tiles(sent)
+        assert began[0] == CYAN
+        assert ended[0] == RED
+
+    async def test_a_fade_after_a_frame_of_another_size_starts_at_its_target(
+        self, sent: list[bytes]
+    ) -> None:
+        """A slot's earlier frame from another canvas cannot start a fade."""
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+        slot = ceiling.animator._slot_writers[downlight]
+        ceiling.animator._slot_frames["downlight"] = (slot, downlight.canvas, [RED] * 3)
+
+        downlight.stage([CYAN] * 64, settled=True, duration_ms=60000)
+        uplight.send_frame([RED], duration_ms=0, settled=True)
+
+        assert _tiles(sent)[-1][0] == CYAN
+
+    async def test_a_writer_sees_the_soonest_fade_on_another_slot(self) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+
+        assert uplight.slot_deadline([uplight]) is None
+
+        with (
+            patch("lifx.animation.slots.time.monotonic", return_value=100.0),
+            patch("lifx.animation.animator.time.monotonic", return_value=100.0),
+        ):
+            downlight.stage([CYAN] * 64, settled=True, duration_ms=4000)
+            uplight.stage([RED], settled=True, duration_ms=1000)
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.5):
+            assert uplight.slot_deadline([uplight]) == pytest.approx(2.5)
+            assert uplight.slot_deadline([uplight, downlight]) is None
+            assert downlight.slot_deadline([downlight]) is None
+        with patch("lifx.animation.animator.time.monotonic", return_value=100.5):
+            assert downlight.slot_deadline([downlight]) == pytest.approx(0.5)
+
+    async def test_a_writer_that_does_not_stream_shares_no_tile(self) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+
+        downlight.streaming = False
+
+        assert uplight.tile_shared([uplight]) is False
+        assert downlight.streaming is False
+
+    async def test_a_settled_tile_carries_each_slots_target(
+        self, sent: list[bytes]
+    ) -> None:
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        frame = _frame(64)
+        uplight.streaming = downlight.streaming = False
+
+        downlight.send_frame(frame, duration_ms=1000, settled=True)
+        downlight.stage(frame[::-1])
+        ceiling.animator._ack_gate.reset()
+        uplight.send_frame([RED], duration_ms=1000, settled=True)
+        uplight.close()
+
+        assert _tiles(sent)[-1] == frame[:UPLIGHT] + [RED]
+        assert ceiling.animator._held_tile()[UPLIGHT] == HSBK.from_protocol(
+            LightHsbk(*RED)
+        )
+
     def test_reading_the_components_changes_nothing(self) -> None:
         ceiling = _ceiling()
 

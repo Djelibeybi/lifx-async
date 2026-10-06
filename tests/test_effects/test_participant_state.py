@@ -10,6 +10,7 @@ and show one frame.
 
 from __future__ import annotations
 
+import asyncio
 import random
 from collections.abc import Callable
 from typing import cast
@@ -17,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lifx.animation.animator import AnimatorWriter
+from lifx.animation.animator import AnimatorStats, AnimatorWriter
 from lifx.color import HSBK
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.cylon import EffectCylon
@@ -285,20 +286,45 @@ async def test_a_whole_light_mirror_takes_one_index_among_other_lights(
     assert after != front
 
 
-async def test_unsynchronised_colorloop_paints_both_rings_alike(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Colorloop's spread offsets the Mirror once, not once per ring."""
-    front: list[list[tuple[int, int, int, int]]] = []
-    back: list[list[tuple[int, int, int, int]]] = []
+async def test_unsynchronised_colorloop_paints_both_rings_alike() -> None:
+    """Colorloop's spread offsets the Mirror once, not once per ring.
+
+    Both rings share the Mirror's tile, so the front ring stages the step's
+    colour and the back ring sends the tile carrying both.
+    """
     effect = EffectColorloop(spread=90.0, synchronized=False)
-    effect._get_initial_colors = AsyncMock(  # type: ignore[method-assign]
-        return_value=[HSBK(0, 1, 0.5, 3500)]
+    effect._initial_colors = [HSBK(0, 1, 0.5, 3500), HSBK(0, 1, 0.5, 3500)]
+    effect._direction = 1
+    staged: list[list[tuple[int, int, int, int]]] = []
+    sent: list[list[tuple[int, int, int, int]]] = []
+    tile = object()
+    front = _writer(25, staged, "front")
+    back = _writer(25, sent, "back")
+    for ring in (front, back):
+        ring.draws_slot = True
+        ring.animator = tile
+        ring.tile_shared.return_value = False
+        ring.slot_deadline.return_value = None
+        ring.hold_remaining = 0.0
+        ring.hold_version = 0
+    front.shares_tile_with.return_value = True
+    front.stage.side_effect = lambda frame, settled=False, **_kwargs: (
+        staged.append(frame) if settled else None
     )
 
-    await _ring_run(effect, monkeypatch, front, back)
+    def send(frame: list[tuple[int, int, int, int]], **_kwargs: object) -> object:
+        sent.append(frame)
+        effect.stop()
+        return AnimatorStats(packets_sent=1, total_time_ms=0.0)
 
-    assert front == back
+    back.send_frame.side_effect = send
+    mirror = _light(_SERIAL_A)
+    effect.participants = [mirror, mirror]
+    effect._animators = [front, back]
+
+    await asyncio.wait_for(effect.async_play(), timeout=1.0)
+
+    assert staged[0] == sent[0]
 
 
 async def test_a_moved_ring_keeps_the_mirror_s_index_and_simulation(
