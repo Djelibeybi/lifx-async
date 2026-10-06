@@ -48,6 +48,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import fold_at_zone_zero
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -83,6 +84,8 @@ class EffectDoubleSlit(FrameEffect):
         brightness: Peak brightness (0.0-1.0)
         kelvin: Color temperature (1500-9000)
         zones_per_bulb: Number of physical zones per logical bulb
+        seamless: Whether the pattern is mirror-symmetric about zone 0 on a
+            canvas that wraps (a Mirror ring), so it meets itself with no jump
 
     Example:
         ```python
@@ -107,6 +110,7 @@ class EffectDoubleSlit(FrameEffect):
         brightness: float = 0.8,
         kelvin: int = 3500,
         zones_per_bulb: int = 1,
+        seamless: bool = False,
     ) -> None:
         """Initialize double slit interference effect.
 
@@ -124,6 +128,10 @@ class EffectDoubleSlit(FrameEffect):
             brightness: Peak brightness 0.0-1.0 (default 0.8)
             kelvin: Color temperature 1500-9000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
+            seamless: On a canvas that wraps, such as a Mirror ring, draw each
+                pixel at its ring distance from zone 0 so the pattern is
+                mirror-symmetric about zone 0 and has no seam. Ignored on a
+                canvas that does not wrap (default False)
 
         Raises:
             ValueError: If parameters are out of valid ranges
@@ -161,6 +169,7 @@ class EffectDoubleSlit(FrameEffect):
         self.brightness = brightness
         self.kelvin = kelvin
         self.zones_per_bulb = zones_per_bulb
+        self.seamless = seamless
 
     @property
     def name(self) -> str:
@@ -254,9 +263,6 @@ class EffectDoubleSlit(FrameEffect):
             )
 
         # Expand logical bulbs to physical zones.
-        if zpb == 1:
-            return bulb_colors
-
         colors: list[HSBK] = []
         for color in bulb_colors:
             colors.extend([color] * zpb)
@@ -267,6 +273,8 @@ class EffectDoubleSlit(FrameEffect):
         elif len(colors) > ctx.pixel_count:
             colors = colors[: ctx.pixel_count]
 
+        if self.seamless and ctx.wraps:
+            return fold_at_zone_zero(colors)
         return colors
 
     async def from_poweroff_hsbk(self, _light: Light) -> HSBK:
@@ -332,5 +340,5 @@ class EffectDoubleSlit(FrameEffect):
             f"hue1={self.hue1}, hue2={self.hue2}, "
             f"saturation={self.saturation}, brightness={self.brightness}, "
             f"kelvin={self.kelvin}, zones_per_bulb={self.zones_per_bulb}, "
-            f"power_on={self.power_on})"
+            f"seamless={self.seamless}, power_on={self.power_on})"
         )

@@ -791,6 +791,8 @@ await conductor.start(effect, lights)
 
 Pendulums with linearly varying periods drift in and out of phase, creating traveling waves, standing waves, and chaos before realigning.
 
+On a Mirror, whole or either ring alone, pass `seamless=True` to draw each pixel at its ring distance from zone 0. The pattern is then mirror-symmetric about zone 0 and meets itself with no jump. The default, `seamless=False`, draws as on a strip, with a seam at zone 0. The option is ignored on a strip or bulb.
+
 ```python
 from lifx.effects import EffectPendulumWave
 
@@ -798,13 +800,15 @@ effect = EffectPendulumWave(speed=30.0, cycles=8, hue1=0, hue2=240)
 await conductor.start(effect, lights)
 ```
 
-**Key parameters:** `speed` (realignment cycle), `cycles` (oscillations per cycle), `hue1`/`hue2`
+**Key parameters:** `speed` (realignment cycle), `cycles` (oscillations per cycle), `hue1`/`hue2`, `seamless` (fold about zone 0 on a Mirror ring)
 
 ### Double Slit
 
 ![Double Slit effect](../assets/effects/double_slit_zpb3.gif)
 
 Young's double slit interference — two coherent wave sources create constructive/destructive interference fringes that shift as wavelength breathes.
+
+On a Mirror, whole or either ring alone, pass `seamless=True` to draw each pixel at its ring distance from zone 0. The fringes are then mirror-symmetric about zone 0 and meet themselves with no jump. The default, `seamless=False`, draws as on a strip, with a seam at zone 0. The option is ignored on a strip or bulb.
 
 ```python
 from lifx.effects import EffectDoubleSlit
@@ -813,7 +817,7 @@ effect = EffectDoubleSlit(wavelength=0.3, separation=0.2, breathe=8.0)
 await conductor.start(effect, lights)
 ```
 
-**Key parameters:** `speed`, `wavelength`, `separation`, `breathe` (wavelength modulation period; 0 = off)
+**Key parameters:** `speed`, `wavelength`, `separation`, `breathe` (wavelength modulation period; 0 = off), `seamless` (fold about zone 0 on a Mirror ring)
 
 ### Rule 30
 

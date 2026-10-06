@@ -453,7 +453,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
-                DeviceType.MIRROR: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -467,7 +467,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
-                DeviceType.MIRROR: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )

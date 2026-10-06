@@ -31,6 +31,8 @@ RING_EFFECTS = (
     "rainbow",
     "colorloop",
     "ripple",
+    "pendulum_wave",
+    "double_slit",
 )
 
 # Effects still to be ported: the registry must not advertise them.
@@ -42,8 +44,6 @@ TO_BE_PORTED = (
     "progress",
     "jacobs_ladder",
     "newtons_cradle",
-    "pendulum_wave",
-    "double_slit",
     "plasma",
     "embers",
 )

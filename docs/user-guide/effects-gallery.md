@@ -38,7 +38,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Young's double slit interference with shifting fringe patterns.
 
-    **Class:** `EffectDoubleSlit` · **Best on:** Multizone
+    **Class:** `EffectDoubleSlit` · **Best on:** Multizone, Mirror (`seamless` option)
 
 -   ### Embers
 
@@ -87,7 +87,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Pendulums with varying periods drift in and out of phase.
 
-    **Class:** `EffectPendulumWave` · **Best on:** Multizone
+    **Class:** `EffectPendulumWave` · **Best on:** Multizone, Mirror (`seamless` option)
 
 -   ### Plasma
 

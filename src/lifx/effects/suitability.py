@@ -7,12 +7,14 @@ once.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from lifx.devices.mirror import MirrorLight
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
+
+_T = TypeVar("_T")
 
 
 def is_mirror(light: Light) -> bool:
@@ -52,3 +54,20 @@ async def draws_a_line(light: Light) -> bool:
     if light.capabilities is None:
         await light.ensure_capabilities()
     return light.capabilities.has_multizone if light.capabilities else False
+
+
+def fold_at_zone_zero(pixels: list[_T]) -> list[_T]:
+    """Mirror a ring's pixels about zone 0 so the pattern meets itself.
+
+    Pixel ``i`` takes the value of pixel ``min(i, n - i)``, its ring distance
+    from zone 0, so pixel ``i`` equals pixel ``n - i`` and the last pixel sits
+    beside a copy of itself rather than beside a jump.
+
+    Args:
+        pixels: One value per pixel, indexed from zone 0
+
+    Returns:
+        A new list of the same length, symmetric about zone 0
+    """
+    n = len(pixels)
+    return [pixels[min(i, n - i)] for i in range(n)]
