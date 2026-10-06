@@ -112,8 +112,8 @@ async def test_whole_light_effect_on_a_mirror_runs_as_two_ring_participants(
     await conductor.start(effect, [rig.light])
     await asyncio.wait_for(effect.drawn.wait(), 1)
 
-    # Each ring is drawn by a writer of its own on 25 zones in zone order
-    # that wrap, but both rings are the Mirror's one participant: the effect
+    # Each ring is drawn by a writer of its own on 25 pixels clockwise from
+    # zone 0 that wrap, but both rings are the Mirror's one participant: the effect
     # draws one frame, at the Mirror's index, and both rings show it.
     (ctx,) = effect.contexts
     assert ctx.device_index == 0
@@ -127,7 +127,9 @@ async def test_whole_light_effect_on_a_mirror_runs_as_two_ring_participants(
     frame = [HSBK(i * 10, 1, 0.5, 3500).as_tuple() for i in range(25)]
     front, back = rig.positions
     assert [sent[p] for p in front] == frame
-    assert [sent[p] for p in back] == frame
+    # The back ring's zones run the other way round, so it takes the frame
+    # reversed from zone 0 and both rings turn clockwise together.
+    assert [sent[back[-k % 25]] for k in range(25)] == frame
     chipless = set(range(52)) - set(front) - set(back)
     assert len(chipless) == 2
     assert all(rig.wire.colours[p].brightness > 0 for p in chipless)

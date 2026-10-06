@@ -276,12 +276,12 @@ await mirror.set_effect(
 
 ## Software Effects
 
-Each ring is a canvas of its own for a software effect: 25 pixels in zone
-order. The frame context's `wraps` flag is `True`, so effects such as Rainbow,
-Spin and Cylon run continuously round the ring with no seam. Zone
-order runs clockwise round the front ring and anticlockwise round the back
-ring, both from the lower left as seen from the front, so the same frame
-appears to move in opposite directions on the two rings.
+Each ring is a canvas of its own for a software effect: 25 pixels running
+clockwise from zone 0 at the lower left, as seen from the front. The back
+ring's zones run anticlockwise, so its canvas takes them in reverse from zone
+0, and a frame moves the same way round both rings. The frame context's
+`wraps` flag is `True`, so effects such as Rainbow, Spin and Cylon run
+continuously round the ring with no seam.
 
 A software effect started on the whole Mirror, with `mirror.start_effect()` or
 `Conductor.start()`, runs as two ring participants of the one effect: the
@@ -292,8 +292,8 @@ on both rings, and a light after the Mirror in the same run keeps the index it
 would have had beside any other light. The two chipless buffer positions stay
 dark while the effect runs. The effect is still one whole-light run: stopping
 it restores the whole tile and power, and leaves both rings' stored colours
-alone. `Conductor.get_last_frame(mirror)` returns both rings' frames in zone
-order, front then back.
+alone. `Conductor.get_last_frame(mirror)` returns both rings' frames as the effect
+drew them, clockwise from zone 0, front then back.
 
 ```python
 from lifx import Conductor, EffectRainbow

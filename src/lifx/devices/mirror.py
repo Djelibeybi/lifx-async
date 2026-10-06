@@ -489,13 +489,19 @@ class MirrorLight(ComponentMatrixLight):
     def _component_canvas(
         self, component: str, light_canvas: FrameBuffer
     ) -> tuple[FrameBuffer, tuple[int, ...]]:
-        """Draw a ring's effect on the ring itself: Nx1 in zone order.
+        """Draw a ring's effect on the ring itself: Nx1, clockwise from zone 0.
 
-        Frame pixel k lands on the ring's k-th buffer position, so a pattern
-        travels round the ring in zone order.
+        Both rings start at the lower left, but the front's zones run
+        clockwise and the back's anticlockwise, viewed from the front. Frame
+        pixel k lands on front zone k and on back zone ``-k mod N``, so frame
+        pixel 0 sits at the lower left of both rings and a pattern travels
+        clockwise round each, keeping the two rings of a whole-light effect in
+        step.
         """
         count = len(self._component_positions(component))
         canvas = FrameBuffer(pixel_count=count, canvas_width=count, canvas_height=1)
+        if component == "back":
+            return canvas, tuple((-zone) % count for zone in range(count))
         return canvas, tuple(range(count))
 
     def _component_wraps(self, _component: str) -> bool:
@@ -507,8 +513,8 @@ class MirrorLight(ComponentMatrixLight):
         """The front ring as an effect participant.
 
         It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
-        software effect started on it draws on the ring: 25 pixels in zone
-        order that wrap, so zone 24 sits next to zone 0. The back keeps its
+        software effect started on it draws on the ring: 25 pixels clockwise
+        from zone 0 that wrap, so zone 24 sits next to zone 0. The back keeps its
         colours and stays under the existing back methods. Reading it changes
         nothing.
 
@@ -524,8 +530,9 @@ class MirrorLight(ComponentMatrixLight):
         """The back ring as an effect participant.
 
         It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
-        software effect started on it draws on the ring: 25 pixels in zone
-        order that wrap. The front keeps its colours and stays under the
+        software effect started on it draws on the ring: 25 pixels that wrap,
+        clockwise from zone 0 like the front, so the ring's anticlockwise zones
+        are taken in reverse. The front keeps its colours and stays under the
         existing front methods. Reading it changes nothing.
 
         Example:

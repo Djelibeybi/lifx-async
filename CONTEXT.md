@@ -52,7 +52,7 @@ A light, or a single light component of a light, that a software effect draws
 on. One effect can draw on several participants in step. A light component
 participant sees its own shape: a Ceiling uplight is one pixel, a Ceiling
 downlight is the full grid with the uplight cell dropped, and a Mirror ring is
-25 pixels in zone order that wrap. A whole-light effect on a Mirror runs as two
+25 pixels that wrap, running clockwise from zone 0 on both rings. A whole-light effect on a Mirror runs as two
 ring participants, the front and the back, which share the Mirror's one index
 and simulation and so show the same frame. The light component
 that no effect draws on keeps its colours and stays under the caller's control.

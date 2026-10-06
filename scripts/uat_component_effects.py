@@ -468,7 +468,7 @@ def mirror_scenarios(mirror: MirrorLight, *, enable_thread: bool) -> list[Scenar
                     "Whole-light Cylon, ring order and direction",
                     "one eye on each ring circling smoothly with no jump or seam; "
                     "write down in a note which way each ring turns, viewed from "
-                    "the front (expected: front clockwise, back anticlockwise, "
+                    "the front (expected: both rings clockwise, in step, "
                     "both starting at the lower left)",
                     lambda: mirror.start_effect(
                         EffectCylon(speed=6.0, width=3, trail=0.0),

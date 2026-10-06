@@ -66,6 +66,9 @@ def _zone_colour(zone: int) -> HSBK:
 
 
 ZONES = [_zone_colour(k) for k in range(RING)]
+# The same frame on the back ring, whose zones run the other way round: it is
+# drawn clockwise from zone 0, so back zone k shows frame pixel -k mod RING.
+BACK_ZONES = [ZONES[-k % RING] for k in range(RING)]
 
 
 async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
@@ -150,8 +153,8 @@ class TestMirrorRingEffects:
 
             await mirror.start_effect(effect)
 
-            # Both rings are one participant, drawn in zone order round each.
-            await _shows(mirror, ZONES, ZONES)
+            # Both rings are one participant, drawn clockwise round each.
+            await _shows(mirror, ZONES, BACK_ZONES)
             ctx = effect.contexts[-1]
             assert (ctx.pixel_count, ctx.canvas_width, ctx.canvas_height) == (
                 RING,
@@ -394,7 +397,7 @@ class TestMirrorOverlapRules:
             conductor = Conductor()
             whole = _Zones()
             await conductor.start(whole, [mirror])
-            await _shows(mirror, ZONES, ZONES)
+            await _shows(mirror, ZONES, BACK_ZONES)
 
             await mirror.back.start_effect(_Solid(RED))
 
