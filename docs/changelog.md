@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.7.1 (2026-10-06)
+
+### Bug Fixes
+
+- Update the LIFX Path Intl temperature range
+  ([#278](https://github.com/Djelibeybi/lifx-async/pull/278),
+  [`8d7e9fa`](https://github.com/Djelibeybi/lifx-async/commit/8d7e9faae321739fca54442e497fd38569d9fdcb))
+
+
 ## v7.7.0 (2026-10-06)
 
 ### Bug Fixes
