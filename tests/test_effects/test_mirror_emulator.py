@@ -66,6 +66,10 @@ def _zone_colour(zone: int) -> HSBK:
 
 
 ZONES = [_zone_colour(k) for k in range(RING)]
+# The same frame on the back ring, whose zones run the other way round: it is
+# drawn clockwise, so back index k shows frame pixel RING - 1 - k, which puts it
+# level with front zone RING - 1 - k.
+BACK_ZONES = [ZONES[RING - 1 - k] for k in range(RING)]
 
 
 async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
@@ -117,7 +121,12 @@ def _dark(colours: list[HSBK]) -> bool:
 
 
 async def _prepare(mirror: MirrorLight) -> None:
-    """Both rings lit in known colours, settled."""
+    """Both rings lit in known colours, settled.
+
+    These tests are about ring behaviour, not placement, so frame pixel k lands
+    on front zone k.
+    """
+    mirror.ring_origin = 0
     await mirror.stop_effect()
     await mirror.set_power(True)
     await mirror.set_front_colors(AMBER)
@@ -150,8 +159,8 @@ class TestMirrorRingEffects:
 
             await mirror.start_effect(effect)
 
-            # Both rings are one participant, drawn in zone order round each.
-            await _shows(mirror, ZONES, ZONES)
+            # Both rings are one participant, drawn clockwise round each.
+            await _shows(mirror, ZONES, BACK_ZONES)
             ctx = effect.contexts[-1]
             assert (ctx.pixel_count, ctx.canvas_width, ctx.canvas_height) == (
                 RING,
@@ -394,7 +403,7 @@ class TestMirrorOverlapRules:
             conductor = Conductor()
             whole = _Zones()
             await conductor.start(whole, [mirror])
-            await _shows(mirror, ZONES, ZONES)
+            await _shows(mirror, ZONES, BACK_ZONES)
 
             await mirror.back.start_effect(_Solid(RED))
 

@@ -44,6 +44,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -60,7 +61,9 @@ class EffectRule30(FrameEffect):
 
     Each zone is a cell; alive cells are shown at the configured hue and
     brightness, dead cells at the background brightness. The CA rule is
-    applied once per generation; generation rate is set by ``speed``.
+    applied once per generation; generation rate is set by ``speed``. The
+    automaton is periodic, so on a Mirror ring it is seamless: the cells either
+    side of the ring origin (top centre by default) are neighbours and there is no edge.
 
     This is a stateful effect: the cell array and generation counter
     persist across frames and are initialized lazily on the first
@@ -302,18 +305,17 @@ class EffectRule30(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Rule 30 effect.
 
-        Rule 30 requires multizone capability (strips/beams). Single lights
-        are not supported; matrix devices are not supported.
+        Rule 30 draws a line, so it suits a multizone strip or beam and a
+        Mirror (see ``draws_a_line``). Single lights and other matrix devices
+        are not supported.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light draws a line, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Rule 30 can inherit prestate from another Rule 30 effect.

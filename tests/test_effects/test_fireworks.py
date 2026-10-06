@@ -28,10 +28,10 @@ class TestFireworksConstructor:
 
         assert effect.name == "fireworks"
         assert effect.max_rockets == 3
-        assert effect.launch_rate == 0.5
-        assert effect.ascent_speed == 0.3
+        assert effect.launch_rate == 1.0
+        assert effect.ascent_speed == 10.0
         assert effect.burst_spread == 5.0
-        assert effect.burst_duration == 2.0
+        assert effect.burst_duration == 1.2
         assert effect.brightness == 0.8
         assert effect.kelvin == 3500
         assert effect.power_on is True

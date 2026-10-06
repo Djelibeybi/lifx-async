@@ -12,9 +12,21 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from lifx.devices.component.participant import LightComponent
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
+from lifx.effects.frame_effect import FrameEffect
+from lifx.effects.suitability import is_mirror
+
 if TYPE_CHECKING:
     from lifx.devices.light import Light
     from lifx.effects.base import LIFXEffect
+
+
+# Effects that refuse every matrix light other than a Mirror. A Ceiling uplight
+# classifies as a single light, but the Conductor checks a light component
+# through its light, so these are refused there and must not be listed for it.
+_REFUSE_A_CEILING = frozenset({"embers", "plasma"})
 
 
 class DeviceType(Enum):
@@ -23,6 +35,7 @@ class DeviceType(Enum):
     LIGHT = "light"
     MULTIZONE = "multizone"
     MATRIX = "matrix"
+    MIRROR = "mirror"
 
 
 class DeviceSupport(Enum):
@@ -50,20 +63,27 @@ class EffectInfo:
     device_support: dict[DeviceType, DeviceSupport]
 
 
-def _classify_device(device: Light) -> DeviceType:
-    """Classify a device into a DeviceType category.
+def _classify_device(device: Light | LightComponent) -> DeviceType:
+    """Classify a light, or a light component, into a DeviceType category.
 
-    Uses isinstance checks with lazy imports to avoid circular dependencies.
+    Uses isinstance checks on the device classes.
+    A Mirror is checked before a matrix light, so it never classifies as
+    ``MATRIX``. A Ceiling uplight draws on a single pixel, so it classifies
+    as a single light. Every other light component classifies the same as its
+    light, so a Mirror ring is a Mirror and a Ceiling downlight is a matrix.
 
     Args:
-        device: The light device to classify
+        device: The light, or light component, to classify
 
     Returns:
         DeviceType classification for the device
     """
-    from lifx.devices.matrix import MatrixLight
-    from lifx.devices.multizone import MultiZoneLight
-
+    if isinstance(device, LightComponent):
+        if device.name == "uplight":
+            return DeviceType.LIGHT
+        device = device.light
+    if is_mirror(device):
+        return DeviceType.MIRROR
     if isinstance(device, MatrixLight):
         return DeviceType.MATRIX
     if isinstance(device, MultiZoneLight):
@@ -148,21 +168,37 @@ class EffectRegistry:
         return self._effects.get(name)
 
     def get_effects_for_device(
-        self, device: Light
+        self, device: Light | LightComponent
     ) -> list[tuple[EffectInfo, DeviceSupport]]:
-        """Get effects compatible with a specific device.
+        """Get effects compatible with a specific light or light component.
 
         Classifies the device and returns effects that are RECOMMENDED
-        or COMPATIBLE, sorted with RECOMMENDED first.
+        or COMPATIBLE, sorted with RECOMMENDED first. A Mirror ring
+        (``mirror.front`` or ``mirror.back``) classifies as a Mirror, a
+        Ceiling downlight as a matrix and a Ceiling uplight, which draws on a
+        single pixel, as a single light. A light component can only be an
+        effect participant for an effect that draws frames, so effects such
+        as pulse are left out for a light component. Embers and plasma are
+        also left out for a Ceiling uplight, because they refuse the Ceiling
+        it belongs to.
 
         Args:
-            device: The light device to check
+            device: The light, or light component, to check
 
         Returns:
             List of (EffectInfo, DeviceSupport) tuples, sorted by support level
         """
         device_type = _classify_device(device)
-        return self.get_effects_for_device_type(device_type)
+        results = self.get_effects_for_device_type(device_type)
+        if isinstance(device, LightComponent):
+            refused = _REFUSE_A_CEILING if device_type is DeviceType.LIGHT else ()
+            results = [
+                (info, support)
+                for info, support in results
+                if issubclass(info.effect_class, FrameEffect)
+                and info.name not in refused
+            ]
+        return results
 
     def get_effects_for_device_type(
         self, device_type: DeviceType
@@ -245,6 +281,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -258,6 +295,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
                 DeviceType.MULTIZONE: DeviceSupport.COMPATIBLE,
                 DeviceType.MATRIX: DeviceSupport.COMPATIBLE,
+                DeviceType.MIRROR: DeviceSupport.COMPATIBLE,
             },
         )
     )
@@ -271,6 +309,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -284,6 +323,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -298,6 +338,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -311,6 +352,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -324,6 +366,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -337,6 +380,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.NOT_SUPPORTED,
             },
         )
     )
@@ -350,6 +394,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.NOT_SUPPORTED,
             },
         )
     )
@@ -363,6 +408,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -376,6 +422,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -389,6 +436,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -402,6 +450,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -415,6 +464,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -428,6 +478,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.RECOMMENDED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.COMPATIBLE,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -441,6 +492,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -454,6 +506,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -467,6 +520,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -480,6 +534,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -493,6 +548,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -506,6 +562,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.COMPATIBLE,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -519,6 +576,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -532,6 +590,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -545,6 +604,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -558,6 +618,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.RECOMMENDED,
                 DeviceType.MATRIX: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MIRROR: DeviceSupport.RECOMMENDED,
             },
         )
     )
@@ -571,6 +632,7 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MULTIZONE: DeviceSupport.NOT_SUPPORTED,
                 DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.NOT_SUPPORTED,
             },
         )
     )

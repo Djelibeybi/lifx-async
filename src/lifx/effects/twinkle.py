@@ -61,6 +61,9 @@ class EffectTwinkle(FrameEffect):
     the pixel flashes to peak brightness then decays via quadratic falloff
     (fast flash, slow tail) back to the background color.
 
+    Zones never look at their neighbours, so a Mirror ring
+    (``FrameContext.wraps``) has no seam to hide and draws as a strip does.
+
     Attributes:
         speed: Sparkle fade duration in seconds
         density: Probability a pixel sparks per frame (0.0-1.0)

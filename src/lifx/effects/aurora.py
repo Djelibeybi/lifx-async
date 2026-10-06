@@ -43,6 +43,12 @@ if TYPE_CHECKING:
 
 _DEFAULT_PALETTE = [120, 160, 200, 260, 290]
 
+# Phase the brightness bands advance across the whole canvas: one and a half
+# cycles. A ring needs a whole number of cycles to close on itself, so it holds
+# two.
+_BAND_PHASE = 3.0 * math.pi
+_RING_BAND_PHASE = 4.0 * math.pi
+
 
 class EffectAurora(FrameEffect):
     """Northern lights effect with flowing colored bands.
@@ -50,6 +56,10 @@ class EffectAurora(FrameEffect):
     Uses palette interpolation and sine waves to create flowing aurora-like
     patterns. Best on multizone strips and matrix lights where per-pixel
     color variation creates beautiful flowing colored bands.
+
+    On a Mirror ring (``FrameContext.wraps``) the brightness bands hold two whole cycles
+    instead of one and a half, so they meet at the ring origin (top centre by default)
+    with no seam.
 
     Attributes:
         speed: Animation speed multiplier
@@ -159,6 +169,7 @@ class EffectAurora(FrameEffect):
             List of HSBK colors (length equals ctx.pixel_count)
         """
         t = ctx.elapsed_s * self.speed * 0.05
+        band_phase = _RING_BAND_PHASE if ctx.wraps else _BAND_PHASE
         device_offset = ctx.device_index * self.spread / 360.0
         is_matrix = ctx.canvas_height > 1
 
@@ -169,7 +180,7 @@ class EffectAurora(FrameEffect):
 
             # Brightness modulation: creates bright "curtain" bands
             brightness_mod = 0.5 + 0.5 * math.sin(
-                i / max(ctx.pixel_count, 1) * math.pi * 3 + t * 6
+                i / max(ctx.pixel_count, 1) * band_phase + t * 6
             )
 
             pixel_brightness = self.brightness * brightness_mod
@@ -214,6 +225,7 @@ class EffectAurora(FrameEffect):
             List of (hue, sat, brightness, kelvin) uint16 tuples
         """
         t = ctx.elapsed_s * self.speed * 0.05
+        band_phase = _RING_BAND_PHASE if ctx.wraps else _BAND_PHASE
         device_offset = ctx.device_index * self.spread / 360.0
         is_matrix = ctx.canvas_height > 1
         pixel_count = ctx.pixel_count
@@ -228,7 +240,7 @@ class EffectAurora(FrameEffect):
             hue = self._palette_hue(position)
 
             # Brightness modulation
-            brightness_mod = 0.5 + 0.5 * sin(i_norm * pi * 3 + t * 6)
+            brightness_mod = 0.5 + 0.5 * sin(i_norm * band_phase + t * 6)
             pixel_brightness = self.brightness * brightness_mod
 
             # Matrix vertical gradient

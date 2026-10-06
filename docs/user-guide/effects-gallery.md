@@ -38,7 +38,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Young's double slit interference with shifting fringe patterns.
 
-    **Class:** `EffectDoubleSlit` · **Best on:** Multizone
+    **Class:** `EffectDoubleSlit` · **Best on:** Multizone, Mirror (`seamless` option)
 
 -   ### Embers
 
@@ -46,7 +46,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     1D heat diffusion — rising embers with cooling and turbulence.
 
-    **Class:** `EffectEmbers` · **Best on:** Multizone
+    **Class:** `EffectEmbers` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Fireworks
 
@@ -54,7 +54,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Rockets launch, ascend, and burst into expanding color halos.
 
-    **Class:** `EffectFireworks` · **Best on:** Multizone
+    **Class:** `EffectFireworks` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Flicker
 
@@ -71,7 +71,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Electric arcs drift along the strip with flickering and crackling.
 
-    **Class:** `EffectJacobsLadder` · **Best on:** Multizone
+    **Class:** `EffectJacobsLadder` · **Best on:** Multizone, Mirror (seam at the ring origin)
 
 -   ### Newton's Cradle
 
@@ -79,7 +79,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Steel balls swing alternately with Phong sphere shading.
 
-    **Class:** `EffectNewtonsCradle` · **Best on:** Multizone
+    **Class:** `EffectNewtonsCradle` · **Best on:** Multizone, Mirror (seam at the ring origin)
 
 -   ### Pendulum Wave
 
@@ -87,7 +87,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Pendulums with varying periods drift in and out of phase.
 
-    **Class:** `EffectPendulumWave` · **Best on:** Multizone
+    **Class:** `EffectPendulumWave` · **Best on:** Multizone, Mirror (`seamless` option)
 
 -   ### Plasma
 
@@ -95,7 +95,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Plasma ball — electric tendrils crackle from a pulsing core.
 
-    **Class:** `EffectPlasma` · **Best on:** Multizone
+    **Class:** `EffectPlasma` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Progress
 
@@ -103,7 +103,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Animated progress bar with traveling bright spot.
 
-    **Class:** `EffectProgress` · **Best on:** Multizone
+    **Class:** `EffectProgress` · **Best on:** Multizone, Mirror (seam at the ring origin)
 
 -   ### Rainbow
 
@@ -119,7 +119,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Raindrops on water — wavefronts propagate, reflect, and interfere.
 
-    **Class:** `EffectRipple` · **Best on:** Multizone
+    **Class:** `EffectRipple` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Rule 30
 
@@ -127,7 +127,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Wolfram's Rule 30 cellular automaton — chaotic organic patterns.
 
-    **Class:** `EffectRule30` · **Best on:** Multizone
+    **Class:** `EffectRule30` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Rule Trio
 
@@ -135,7 +135,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Three cellular automata at irrational speed ratios, blended via Oklab.
 
-    **Class:** `EffectRuleTrio` · **Best on:** Multizone
+    **Class:** `EffectRuleTrio` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Sine
 
@@ -151,7 +151,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Sonar pulses bounce off drifting obstacles with decay tails.
 
-    **Class:** `EffectSonar` · **Best on:** Multizone
+    **Class:** `EffectSonar` · **Best on:** Multizone, Mirror (seam at the ring origin)
 
 -   ### Spectrum Sweep
 

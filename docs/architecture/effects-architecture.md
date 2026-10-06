@@ -694,8 +694,11 @@ if light.capabilities and light.capabilities.has_extended_multizone:
 - **FrameEffect support:** Full 2D canvas via `FrameContext.canvas_width` / `canvas_height`
 - **Spatial effects:** Flicker (vertical gradient), Aurora (vertical brightness), Sunrise/Sunset (radial wavefront)
 - **Canvas mapping:** Multi-tile devices get a unified canvas based on tile positions
-- **Mirror:** Each ring, front and back, is a 25x1 canvas in zone order with
-  `FrameContext.wraps` set. A whole-light frame effect runs as two ring participants that share
+- **Mirror:** Each ring, front and back, is a 25x1 canvas running clockwise from the ring
+  origin (top centre by default, set with `MirrorLight.ring_origin`), viewed from the front, with
+  `FrameContext.wraps` set. The back ring's zones run anticlockwise, so its slot takes them in
+  reverse, level with the front, and both rings turn the same way. The origin is read when a
+  writer is created, so a change applies from the next effect start. A whole-light frame effect runs as two ring participants that share
   the Mirror's one `device_index` and simulation, so both rings show the same frame and the two
   chipless positions stay dark. An effect on `mirror.front` or `mirror.back` draws on that ring
   alone. Each ring is a slot on the

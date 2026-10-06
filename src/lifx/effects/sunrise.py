@@ -14,6 +14,7 @@ from lifx.color import HSBK
 from lifx.const import KELVIN_COOL
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import is_mirror
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -244,14 +245,17 @@ class EffectSunrise(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with sunrise effect.
 
-        Sunrise requires matrix capability for 2D gradient simulation.
+        Sunrise requires matrix capability for 2D gradient simulation. A Mirror
+        is refused: its rings are one row.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has matrix support, False otherwise
+            True if light has matrix support and is not a Mirror, False otherwise
         """
+        if is_mirror(light):
+            return False
         if light.capabilities is None:
             await light.ensure_capabilities()
         return light.capabilities.has_matrix if light.capabilities else False
@@ -397,14 +401,17 @@ class EffectSunset(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with sunset effect.
 
-        Sunset requires matrix capability for 2D gradient simulation.
+        Sunset requires matrix capability for 2D gradient simulation. A Mirror
+        is refused: its rings are one row.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has matrix support, False otherwise
+            True if light has matrix support and is not a Mirror, False otherwise
         """
+        if is_mirror(light):
+            return False
         if light.capabilities is None:
             await light.ensure_capabilities()
         return light.capabilities.has_matrix if light.capabilities else False

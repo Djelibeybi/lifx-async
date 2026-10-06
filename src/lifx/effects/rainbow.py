@@ -24,6 +24,10 @@ class EffectRainbow(FrameEffect):
     lights, cycles through the hue spectrum (similar to colorloop but
     simpler).
 
+    On a Mirror ring (``FrameContext.wraps``) the rainbow closes on itself:
+    the pixel before the ring origin (top centre by default) is one step of hue
+    short of it, so it circulates with no seam.
+
     Attributes:
         period: Seconds per full rainbow scroll (default 10)
         brightness: Fixed brightness (default 0.8)

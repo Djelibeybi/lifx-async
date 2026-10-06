@@ -30,7 +30,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, cast
 
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.color import HSBK
@@ -56,6 +56,36 @@ if TYPE_CHECKING:
     from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
+
+# A named spot on a Mirror ring where a software effect starts.
+RingOrigin: TypeAlias = Literal["top", "bottom", "left", "right"]
+
+# Zones on each Mirror ring.
+_RING_ZONES = 25
+
+# The front zone at each named spot, from the zone map in the Mirror guide.
+_RING_ORIGIN_ZONES: dict[str, int] = {"top": 9, "bottom": 22, "left": 3, "right": 15}
+
+
+def _resolve_ring_origin(origin: object) -> int:
+    """Return the front zone a ring origin names.
+
+    Raises:
+        ValueError: If ``origin`` is not a named spot or a front zone number
+    """
+    if isinstance(origin, str) and origin in _RING_ORIGIN_ZONES:
+        return _RING_ORIGIN_ZONES[origin]
+    if (
+        isinstance(origin, int)
+        and not isinstance(origin, bool)
+        and 0 <= origin < _RING_ZONES
+    ):
+        return origin
+    raise ValueError(
+        f"ring_origin must be one of {', '.join(_RING_ORIGIN_ZONES)} or a front "
+        f"zone from 0 to {_RING_ZONES - 1}, not {origin!r}"
+    )
+
 
 #: Brightness used when neither stored nor inferred brightness is available.
 
@@ -230,6 +260,7 @@ class MirrorLight(ComponentMatrixLight):
         fetch_thread_info: bool = False,
         fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
+        ring_origin: RingOrigin | int = "top",
     ):
         """Initialize MirrorLight.
 
@@ -251,7 +282,14 @@ class MirrorLight(ComponentMatrixLight):
                 evidenced connectivity during state initialization
             fetch_ambient_light: Query the ambient light sensor during state
                 initialization
+            ring_origin: Where software effects start on each ring: "top",
+                "bottom", "left" or "right", or a front zone number from 0 to 24.
+                See the ``ring_origin`` property.
+
+        Raises:
+            ValueError: If ``ring_origin`` is not valid
         """
+        _resolve_ring_origin(ring_origin)
         super().__init__(
             serial,
             ip,
@@ -264,6 +302,33 @@ class MirrorLight(ComponentMatrixLight):
             fetch_ambient_light=fetch_ambient_light,
         )
         self._state_file = state_file
+        self._ring_origin: RingOrigin | int = ring_origin
+
+    @property
+    def ring_origin(self) -> RingOrigin | int:
+        """Where a software effect starts on each ring.
+
+        Frame pixel 0 lands on this spot of both rings and the pixels run
+        clockwise from it, so it is also where a pattern's seam sits. It is
+        "top" (top centre, front zone 9) by default, or "bottom" (zone 22),
+        "left" (zone 3) or "right" (zone 15), or a front zone number from 0 to
+        24. The back ring's index ``24 - k`` sits level with front zone ``k``,
+        so both rings start at the same spot.
+
+        The origin is read when an effect's writer is created, so changing it
+        applies from the next effect start. An effect that is already running
+        keeps the origin it started with.
+
+        Raises:
+            ValueError: On assignment, if the value is not a named spot or a
+                front zone number from 0 to 24
+        """
+        return self._ring_origin
+
+    @ring_origin.setter
+    def ring_origin(self, origin: RingOrigin | int) -> None:
+        _resolve_ring_origin(origin)
+        self._ring_origin = origin
 
     async def __aenter__(self) -> MirrorLight:
         """Async context manager entry.
@@ -489,14 +554,25 @@ class MirrorLight(ComponentMatrixLight):
     def _component_canvas(
         self, component: str, light_canvas: FrameBuffer
     ) -> tuple[FrameBuffer, tuple[int, ...]]:
-        """Draw a ring's effect on the ring itself: Nx1 in zone order.
+        """Draw a ring's effect on the ring itself: Nx1, clockwise from the ring origin.
 
-        Frame pixel k lands on the ring's k-th buffer position, so a pattern
-        travels round the ring in zone order.
+        The front's zones run clockwise and the back's anticlockwise, viewed
+        from the front. The back ring's index ``N - 1 - k`` sits level with
+        front zone ``k`` (front zone 0 and back index 24 are both at row 9 on
+        the left). Frame pixel 0 lands on the ring origin, a front zone, and
+        pixels run clockwise from it: front zone k shows pixel
+        ``(k - origin) % N`` and back index j shows pixel
+        ``(N - 1 - j - origin) % N``. A pattern travels clockwise round each
+        ring, and the two rings of a whole-light effect stay in step.
         """
         count = len(self._component_positions(component))
         canvas = FrameBuffer(pixel_count=count, canvas_width=count, canvas_height=1)
-        return canvas, tuple(range(count))
+        origin = _resolve_ring_origin(self._ring_origin)
+        if component == "back":
+            return canvas, tuple(
+                (count - 1 - index - origin) % count for index in range(count)
+            )
+        return canvas, tuple((zone - origin) % count for zone in range(count))
 
     def _component_wraps(self, _component: str) -> bool:
         """Each Mirror light component is a closed ring, so its canvas wraps."""
@@ -507,10 +583,10 @@ class MirrorLight(ComponentMatrixLight):
         """The front ring as an effect participant.
 
         It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
-        software effect started on it draws on the ring: 25 pixels in zone
-        order that wrap, so zone 24 sits next to zone 0. The back keeps its
-        colours and stays under the existing back methods. Reading it changes
-        nothing.
+        software effect started on it draws on the ring: 25 pixels clockwise
+        from the ring origin that wrap, so the last pixel sits next to the
+        first. The back keeps its colours and stays under the existing back
+        methods. Reading it changes nothing.
 
         Example:
             ```python
@@ -524,8 +600,9 @@ class MirrorLight(ComponentMatrixLight):
         """The back ring as an effect participant.
 
         It carries ``start_effect()``, ``stop_effect()`` and ``animator``. A
-        software effect started on it draws on the ring: 25 pixels in zone
-        order that wrap. The front keeps its colours and stays under the
+        software effect started on it draws on the ring: 25 pixels that wrap,
+        clockwise from the ring origin like the front, so the ring's anticlockwise zones
+        are taken in reverse. The front keeps its colours and stays under the
         existing front methods. Reading it changes nothing.
 
         Example:

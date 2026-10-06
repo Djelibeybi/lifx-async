@@ -44,6 +44,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import is_mirror
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -241,14 +242,16 @@ class EffectPlasma2D(FrameEffect):
         """Check if light is compatible with 2D plasma effect.
 
         Plasma2D requires matrix capability. Not supported on single lights
-        or multizone strips.
+        or multizone strips, nor on a Mirror, whose rings are one row.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has matrix support, False otherwise
+            True if light has matrix support and is not a Mirror, False otherwise
         """
+        if is_mirror(light):
+            return False
         if light.capabilities is None:
             await light.ensure_capabilities()
         return light.capabilities.has_matrix if light.capabilities else False
