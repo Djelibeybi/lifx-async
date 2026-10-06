@@ -7,10 +7,13 @@ import asyncio
 import pytest
 
 from lifx.color import HSBK
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
 from lifx.devices.multizone import MultiZoneLight
+from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.conductor import Conductor, own_conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.plasma2d import EffectPlasma2D
 from tests.test_effects.test_component_effects import (
     AMBER,
     DIM_BLUE,
@@ -45,6 +48,20 @@ class _Alternating(FrameEffect):
         self.frames += 1
         colour = self.first if self.frames % 2 else self.second
         return [colour] * ctx.pixel_count
+
+
+async def _sample(
+    ceiling: CeilingLight,
+) -> tuple[set[tuple[HSBK, ...]], set[HSBK]]:
+    """The distinct downlights and uplight colours seen over about two seconds."""
+    downlights: set[tuple[HSBK, ...]] = set()
+    uplights: set[HSBK] = set()
+    for _ in range(20):
+        tile = await _tile(ceiling)
+        downlights.add(tuple(tile[:DOWNLIGHT]))
+        uplights.add(tile[UPLIGHT])
+        await asyncio.sleep(0.1)
+    return downlights, uplights
 
 
 @pytest.mark.emulator
@@ -121,6 +138,86 @@ class TestConcurrentComponentEffects:
             await ceiling.downlight.stop_effect()
 
             assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+
+    async def test_plasma2d_on_the_downlight_beside_colour_loop_on_the_uplight(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            plasma = EffectPlasma2D(speed=4.0)
+            loop = EffectColorloop(period=3, change=60)
+
+            await ceiling.downlight.start_effect(plasma)
+            await ceiling.uplight.start_effect(loop)
+
+            conductor = own_conductor(ceiling)
+            assert conductor.effect(ceiling.downlight) is plasma
+            assert conductor.effect(ceiling.uplight) is loop
+
+            async def both_drawn() -> bool:
+                tile = await _tile(ceiling)
+                return GREEN not in tile[:DOWNLIGHT] and tile[UPLIGHT] != DIM_BLUE
+
+            await _eventually(both_drawn)
+            downlights, uplights = await _sample(ceiling)
+            assert len(downlights) > 1  # the plasma moves
+            assert all(len(set(frame)) > 1 for frame in downlights)  # and varies
+            assert len(uplights) > 1  # colour loop steps while plasma holds the tile
+
+            await ceiling.downlight.stop_effect()
+
+            assert conductor.effect(ceiling.uplight) is loop
+
+            # The restore rides on colour loop's next write to the held tile.
+            async def downlight_back() -> bool:
+                return await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+
+            await _eventually(downlight_back)
+            downlights, uplights = await _sample(ceiling)
+            assert downlights == {(GREEN,) * DOWNLIGHT}
+            assert len(uplights) > 1  # colour loop carries on with the tile alone
+
+            await ceiling.uplight.stop_effect()
+
+            assert await ceiling.get_uplight_color() == DIM_BLUE
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+
+    async def test_stopping_colour_loop_on_the_uplight_leaves_plasma2d_running(
+        self, ceiling_device
+    ):
+        ceiling = ceiling_device
+        async with ceiling:
+            await _prepare(ceiling)
+            plasma = EffectPlasma2D(speed=4.0)
+            loop = EffectColorloop(period=3, change=60)
+            await ceiling.downlight.start_effect(plasma)
+            await ceiling.uplight.start_effect(loop)
+
+            async def both_drawn() -> bool:
+                tile = await _tile(ceiling)
+                return GREEN not in tile[:DOWNLIGHT] and tile[UPLIGHT] != DIM_BLUE
+
+            await _eventually(both_drawn)
+
+            await ceiling.uplight.stop_effect()
+
+            conductor = own_conductor(ceiling)
+            assert conductor.effect(ceiling.uplight) is None
+            assert conductor.effect(ceiling.downlight) is plasma
+
+            async def uplight_back() -> bool:
+                return (await _tile(ceiling))[UPLIGHT] == DIM_BLUE
+
+            await _eventually(uplight_back)
+            downlights, uplights = await _sample(ceiling)
+            assert uplights == {DIM_BLUE}
+            assert len(downlights) > 1  # the plasma keeps moving
+
+            await ceiling.downlight.stop_effect()
+
+            assert await ceiling.get_downlight_colors() == [GREEN] * DOWNLIGHT
+            assert await ceiling.get_uplight_color() == DIM_BLUE
 
     async def test_both_components_share_one_effects_clock(self, ceiling_device):
         ceiling = ceiling_device
