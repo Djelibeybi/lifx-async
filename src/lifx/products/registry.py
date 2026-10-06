@@ -1528,7 +1528,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         name="LIFX Path Intl",
         vendor=1,
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
-        temperature_range=TemperatureRange(min=1500, max=9000),
+        temperature_range=TemperatureRange(min=1000, max=10000),
         min_ext_mz_firmware=None,
     ),
     265: ProductInfo(
