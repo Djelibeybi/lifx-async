@@ -47,6 +47,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_offset
 from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
@@ -146,22 +147,6 @@ class _Rocket:
 # ---------------------------------------------------------------------------
 # Effect
 # ---------------------------------------------------------------------------
-
-
-def _ring_offset(offset: float, zone_count: int) -> float:
-    """Fold a signed distance along the zones onto the short way round a ring.
-
-    Args:
-        offset: Signed distance in zones
-        zone_count: Number of zones in the ring
-
-    Returns:
-        The equivalent offset in the range ``(-zone_count / 2, zone_count / 2]``
-    """
-    wrapped = offset % zone_count
-    if wrapped > zone_count / 2:
-        wrapped -= zone_count
-    return wrapped
 
 
 class EffectFireworks(FrameEffect):
@@ -365,7 +350,7 @@ class EffectFireworks(FrameEffect):
             for z in range(zone_count):
                 behind = rocket.direction * (head_pos - z)
                 if wraps:
-                    behind = _ring_offset(behind, zone_count)
+                    behind = ring_offset(behind, zone_count)
 
                 if -0.5 <= behind <= 0.5:
                     contrib[z] = (rocket.burst_hue, _HEAD_SATURATION, 1.0)
@@ -415,7 +400,7 @@ class EffectFireworks(FrameEffect):
                 for z in range(zone_count):
                     offset = float(z - rocket.zenith)
                     if wraps:
-                        offset = _ring_offset(offset, zone_count)
+                        offset = ring_offset(offset, zone_count)
                     dist_sq = offset**2
                     gaussian = math.exp(-dist_sq / two_sigma_sq)
                     bri = min(1.0, fade * gaussian * _BURST_BRIGHTNESS_BOOST)

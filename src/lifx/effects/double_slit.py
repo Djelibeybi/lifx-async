@@ -48,7 +48,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
-from lifx.effects.suitability import fold_at_zone_zero
+from lifx.effects.ring import fold_at_zone_zero
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light

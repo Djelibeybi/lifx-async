@@ -49,6 +49,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_distance, ring_index
 from lifx.effects.suitability import is_mirror
 
 if TYPE_CHECKING:
@@ -285,11 +286,7 @@ class EffectPlasma(FrameEffect):
             step: float = direction * random.uniform(0.5, 1.5)
             jitter: float = random.uniform(-0.3, 0.3)
             pos += step + jitter
-            zone: int = (
-                int(pos) % bulb_count
-                if wraps
-                else max(0, min(bulb_count - 1, int(pos)))
-            )
+            zone: int = ring_index(pos, bulb_count, wraps)
             if zone not in zones:
                 zones.append(zone)
 
@@ -314,11 +311,7 @@ class EffectPlasma(FrameEffect):
             fork_reach: int = max(1, reach // 3)
             for _ in range(fork_reach):
                 pos += fork_dir * random.uniform(0.5, 1.5)
-                zone = (
-                    int(pos) % bulb_count
-                    if wraps
-                    else max(0, min(bulb_count - 1, int(pos)))
-                )
+                zone = ring_index(pos, bulb_count, wraps)
                 if zone not in fork_zones:
                     fork_zones.append(zone)
 
@@ -376,7 +369,7 @@ class EffectPlasma(FrameEffect):
         for b in range(bulb_count):
             dist: int = abs(b - center)
             if ctx.wraps:
-                dist = min(dist, bulb_count - dist)
+                dist = ring_distance(dist, bulb_count)
             if dist <= core_radius:
                 # Gaussian core glow.
                 sigma: float = max(0.5, core_radius / 2.0)

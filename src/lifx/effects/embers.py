@@ -50,6 +50,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_index
 from lifx.effects.suitability import is_mirror
 
 if TYPE_CHECKING:
@@ -272,7 +273,7 @@ class EffectEmbers(FrameEffect):
             if wraps:
                 # A burst near the bottom spills onto the top of the ring.
                 burst = {
-                    (center + k) % bulb_count
+                    ring_index(center + k, bulb_count, True)
                     for k in range(-_BURST_RADIUS, _BURST_RADIUS + 1)
                 }
             else:

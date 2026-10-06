@@ -39,6 +39,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_distance
 from lifx.theme.library import ThemeLibrary
 from lifx.theme.theme import Theme
 
@@ -173,7 +174,7 @@ class EffectSpin(FrameEffect):
 
             # Apply per-zone hue shimmer. A ring climbs to its far side and
             # back down, so there is no jump where it closes.
-            steps = min(i, bulb_count - i) if ctx.wraps else i
+            steps = ring_distance(i, bulb_count) if ctx.wraps else i
             shimmer_hue = (base_color.hue + steps * self.bulb_offset) % 360
 
             bulb_colors.append(

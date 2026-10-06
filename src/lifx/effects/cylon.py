@@ -39,6 +39,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_distance
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -200,7 +201,7 @@ class EffectCylon(FrameEffect):
             dist = abs(i - position)
             if ctx.wraps:
                 # Measure the short way round, across the closing seam.
-                dist = min(dist, bulb_count - dist)
+                dist = ring_distance(dist, bulb_count)
 
             if dist < half:
                 # Cosine falloff: full brightness at center, tapering to zero
