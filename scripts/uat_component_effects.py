@@ -465,11 +465,12 @@ def mirror_scenarios(mirror: MirrorLight, *, enable_thread: bool) -> list[Scenar
             [
                 Step(
                     "M1",
-                    "Whole-light Cylon, ring order and direction",
-                    "one eye on each ring circling smoothly with no jump or seam; "
-                    "write down in a note which way each ring turns, viewed from "
-                    "the front (expected: both rings clockwise, in step, "
-                    "both starting at the lower left)",
+                    "Whole-light Cylon, ring origin and direction",
+                    "one eye on each ring, level with the other: both start at "
+                    "the top centre (the default ring origin), sweep right round "
+                    "the ring and bounce back at the top centre; write down in a "
+                    "note which way each eye first moves, viewed from the front "
+                    "(expected: both clockwise, in step)",
                     lambda: mirror.start_effect(
                         EffectCylon(speed=6.0, width=3, trail=0.0),
                         enable_thread=enable_thread,
