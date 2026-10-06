@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
+from lifx.devices.base import Connectivity
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
 
@@ -39,6 +40,11 @@ class _Schedule:
     streamed: bool = True
 
 
+def _on_thread(light: Light) -> bool:
+    """Whether a light is evidenced as Thread, so it must not be streamed to."""
+    return light._evidenced_connectivity() is Connectivity.THREAD
+
+
 class EffectColorloop(FrameEffect):
     """Continuous color rotation effect cycling through hue spectrum.
 
@@ -48,11 +54,17 @@ class EffectColorloop(FrameEffect):
     The hue moves ``change`` degrees per step, and a full turn takes
     ``period`` seconds, so each step lasts ``period * change / 360`` seconds.
     Each light gets one colour write per step, with the step as its
-    transition, and the firmware fades between them. A light component of a
-    Ceiling or Mirror is written the same way, unless another effect is
-    drawing on its light's other light component or a fade of that light
-    component is running: the two share one tile, so colour loop then draws
-    frames through the light's Animator until it is alone again.
+    transition, and the firmware fades between them. It streams no frames,
+    so it runs on Thread lights without ``enable_thread``.
+
+    A light component of a Ceiling or Mirror shares one tile with the other
+    light component, and is written the same way while colour loop has the
+    tile to itself. While another effect draws on the other light component,
+    that effect's frames carry colour loop's colour and colour loop sends
+    nothing. While a fade the caller asked of the other light component runs,
+    colour loop draws frames so the fade shows; on a Thread light it instead
+    sends one tile with the other light component's final colours and the
+    fade's remaining time, because the firmware runs one transition per tile.
 
     Attributes:
         period: Seconds per full cycle (default 60)
@@ -86,6 +98,8 @@ class EffectColorloop(FrameEffect):
         await conductor.start(effect, lights)
         ```
     """
+
+    _streams_frames = False
 
     def __init__(
         self,
@@ -210,7 +224,7 @@ class EffectColorloop(FrameEffect):
         ctx: FrameContext,
         staged: bool,
     ) -> None:
-        """Write the next step's colour once per step, or stream if sharing.
+        """Write the next step's colour once per step.
 
         Each light is written at the start of every step with the colour the
         step ends on, so the firmware does the fading. A light component's
@@ -228,16 +242,26 @@ class EffectColorloop(FrameEffect):
         # Writers sharing a tile share one schedule: the last one sends it.
         key: object = writer.animator if slot else writer
         schedule = self._schedules.setdefault(key, _Schedule())
-        if slot and writer.tile_busy(self._animators):
-            schedule.streamed = True
-            super()._deliver(idx, writer, frame, ctx, staged)
-            return
+        fade = 0.0
+        if slot:
+            if writer.tile_shared(self._animators):
+                # Another effect's frames carry the slot.
+                schedule.streamed = True
+                writer.stage(frame)
+                return
+            fade = writer.hold_remaining
+            if fade > 0 and not _on_thread(self.participants[idx]):
+                # Frames show the other light component's fade exactly.
+                schedule.streamed = True
+                super()._deliver(idx, writer, frame, ctx, staged)
+                return
 
-        step = int(ctx.elapsed_s // self._step)
+        now = ctx.elapsed_s
+        step = int(now // self._step)
         version = writer.hold_version if slot else 0
         if (
             not schedule.streamed
-            and step == schedule.step
+            and step <= schedule.step
             and version == schedule.hold_version
         ):
             if slot:
@@ -245,16 +269,22 @@ class EffectColorloop(FrameEffect):
             return
 
         ends_at = (step + 1) * self._step
-        duration = (
-            self.transition if self.transition is not None else ends_at - ctx.elapsed_s
-        )
+        duration = self.transition if self.transition is not None else ends_at - now
+        if fade > duration:
+            # One transition per tile: this write runs the whole held fade,
+            # and the next waits for the step after it ends.
+            duration = fade
+            ends_at = now + fade
+            step = int(ends_at // self._step)
         target = self.generate_frame(dataclasses.replace(ctx, elapsed_s=ends_at))
         if slot:
             target_frame = [color.as_tuple() for color in target]
             if staged:
                 writer.stage(target_frame)
                 return
-            stats = writer.send_frame(target_frame, duration_ms=round(duration * 1000))
+            stats = writer.send_frame(
+                target_frame, duration_ms=round(duration * 1000), settled=True
+            )
             if stats.gated:
                 return  # Still due: the next frame tries again
         else:

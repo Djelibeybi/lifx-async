@@ -158,6 +158,11 @@ class FrameEffect(LIFXEffect):
 
     participant_state: ClassVar[tuple[str, ...]] = ()
 
+    # Whether the effect streams frames, so a Thread light refuses it unless
+    # the caller opts in. An effect that writes each light only now and then
+    # sets this to False.
+    _streams_frames: ClassVar[bool] = True
+
     def __init__(
         self,
         power_on: bool = True,

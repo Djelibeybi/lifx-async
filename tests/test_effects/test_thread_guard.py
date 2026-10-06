@@ -21,7 +21,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.effects import EffectPulse, EffectRainbow
+from lifx.effects import EffectColorloop, EffectPulse, EffectRainbow
 from lifx.effects.conductor import Conductor
 from lifx.exceptions import LifxUnsupportedCommandError
 
@@ -130,6 +130,27 @@ class TestOptIn:
             await ceiling.uplight.start_effect(EffectRainbow())
 
         await ceiling.uplight.start_effect(EffectRainbow(), enable_thread=True)
+        filtered.assert_awaited_once()
+
+
+class TestEffectsThatStreamNoFrames:
+    async def test_colour_loop_runs_on_a_thread_light_without_the_keyword(
+        self, filtered: AsyncMock
+    ):
+        await _thread_light().start_effect(EffectColorloop())
+        await Conductor().start(EffectColorloop(), [_thread_light()])
+        await Conductor().add_lights(EffectColorloop(), [_thread_light()])
+
+        assert filtered.await_count == 3
+
+    async def test_colour_loop_runs_on_a_thread_light_component(
+        self, filtered: AsyncMock
+    ):
+        ceiling = CeilingLight(THREAD_SERIAL, "192.0.2.2")
+        _observed(ceiling, thread=True)
+
+        await ceiling.uplight.start_effect(EffectColorloop())
+
         filtered.assert_awaited_once()
 
 

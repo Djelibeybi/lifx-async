@@ -189,7 +189,8 @@ class Light(Device[LightState]):
         mesh is not built for that traffic. On a light evidenced as Thread,
         by its own replies or an mDNS record, it is refused unless
         ``enable_thread`` is True. A light not yet heard from is not refused,
-        and neither is an effect that draws no frames, such as EffectPulse.
+        and neither is an effect that streams no frames, such as EffectPulse
+        or EffectColorloop.
 
         Args:
             effect: The software effect to run

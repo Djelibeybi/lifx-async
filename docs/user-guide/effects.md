@@ -96,13 +96,16 @@ asyncio.run(main())
 Each step lasts `period * change / 360` seconds: 1.67 seconds in the example above. A colour
 loop writes each light once per step, with the step as the transition, and the light fades
 between steps itself. With the defaults that is one packet every 3.3 seconds per light, far less
-traffic than an effect that draws frames. `change` must be more than 0 and less than 180,
-because the firmware fades hue the short way round the colour wheel.
+traffic than an effect that draws frames, so a colour loop runs on Thread lights without
+`enable_thread`. `change` must be more than 0 and less than 180, because the firmware fades hue
+the short way round the colour wheel.
 
 On one light component of a Ceiling or Mirror, a colour loop writes the same way while it has the
-light to itself. The two light components share one tile, so while another effect draws on the
-other light component, or a fade of it is running, the colour loop draws frames through the
-light's Animator instead, and goes back to one write per step afterwards.
+light to itself. The two light components share one tile. While another effect draws on the other
+light component, that effect's frames carry the colour loop's colour, and the colour loop sends
+nothing itself. While a fade you asked of the other light component runs, the colour loop draws
+frames so the fade shows; on a Thread light it sends one tile with that light component's final
+colours and the fade's remaining time instead, because the firmware runs one transition per tile.
 
 ### Rainbow Effect
 
@@ -256,7 +259,8 @@ await conductor.start(EffectRainbow(), lights, enable_thread=True)
 One Thread light refuses the whole start: nothing is captured, powered on or changed on any
 light. The evidence is the light's own replies, or an mDNS record that says Thread; a light the
 library has not heard from yet is not refused. EffectPulse sends waveforms rather than frames and
-is never refused, and neither are firmware effects started with `set_effect()`.
+EffectColorloop writes each light once per step, so neither is refused, and nor are firmware
+effects started with `set_effect()`.
 
 ### Effect Completion
 

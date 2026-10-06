@@ -9,6 +9,7 @@ import pytest
 from lifx.animation.animator import AnimatorStats, AnimatorWriter
 from lifx.color import HSBK
 from lifx.const import KELVIN_NEUTRAL
+from lifx.devices.base import Connectivity
 from lifx.effects.base import LIFXEffect
 from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.frame_effect import FrameContext, FrameEffect
@@ -498,12 +499,18 @@ def _hue_at(elapsed: float) -> tuple[int, int, int, int]:
 
 
 def _slot_writer(
-    *, busy: bool = False, version: int = 0, gated: bool = False, tile: object = None
+    *,
+    shared: bool = False,
+    fade: float = 0.0,
+    version: int = 0,
+    gated: bool = False,
+    tile: object = None,
 ) -> MagicMock:
     writer = MagicMock(spec=AnimatorWriter)
     writer.draws_slot = True
     writer.animator = tile if tile is not None else object()
-    writer.tile_busy.return_value = busy
+    writer.tile_shared.return_value = shared
+    writer.hold_remaining = fade
     writer.hold_version = version
     writer.send_frame.return_value = AnimatorStats(
         packets_sent=1, total_time_ms=0.0, gated=gated
@@ -623,30 +630,69 @@ class TestColorloopComponent:
         effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
         effect._deliver(0, writer, [_hue_at(0.5)], _ctx(0.5), False)
 
-        writer.send_frame.assert_called_once_with([_hue_at(1.0)], duration_ms=1000)
+        writer.send_frame.assert_called_once_with(
+            [_hue_at(1.0)], duration_ms=1000, settled=True
+        )
         writer.stage.assert_called_once_with([_hue_at(0.5)])
 
-    def test_a_shared_tile_streams_then_writes_once_alone(self) -> None:
+    def test_a_shared_tile_only_keeps_its_slot_then_writes_once_alone(self) -> None:
         effect = _loop()
-        writer = _slot_writer(busy=True)
+        writer = _slot_writer(shared=True)
 
         effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
-        writer.send_frame.assert_called_once_with([_hue_at(0.0)])
-
-        writer.tile_busy.return_value = False
-        effect._deliver(0, writer, [_hue_at(0.3)], _ctx(0.3), False)
-
-        assert writer.send_frame.call_args.args == ([_hue_at(1.0)],)
-        assert writer.send_frame.call_args.kwargs == {"duration_ms": 700}
-
-    def test_a_shared_tile_stages_a_frame_another_writer_sends(self) -> None:
-        effect = _loop()
-        writer = _slot_writer(busy=True)
-
-        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), True)
 
         writer.stage.assert_called_once_with([_hue_at(0.0)])
         writer.send_frame.assert_not_called()
+
+        writer.tile_shared.return_value = False
+        effect._deliver(0, writer, [_hue_at(0.3)], _ctx(0.3), False)
+
+        writer.send_frame.assert_called_once_with(
+            [_hue_at(1.0)], duration_ms=700, settled=True
+        )
+
+    def test_a_held_fade_on_wifi_is_streamed(self) -> None:
+        effect = _loop()
+        light = _light()
+        light._evidenced_connectivity.return_value = Connectivity.WIFI
+        effect.participants = [light]
+        writer = _slot_writer(fade=2.0)
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+
+        writer.send_frame.assert_called_once_with([_hue_at(0.0)])
+
+    def test_a_held_fade_on_thread_is_one_settled_write(self) -> None:
+        effect = _loop()
+        light = _light()
+        light._evidenced_connectivity.return_value = Connectivity.THREAD
+        effect.participants = [light]
+        writer = _slot_writer(fade=2.5)
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+        writer.hold_remaining = 1.5
+        for elapsed in (1.0, 2.0):
+            effect._deliver(0, writer, [_hue_at(elapsed)], _ctx(elapsed), False)
+        writer.hold_remaining = 0.0
+        effect._deliver(0, writer, [_hue_at(3.0)], _ctx(3.0), False)
+
+        assert writer.send_frame.call_args_list == [
+            call([_hue_at(2.5)], duration_ms=2500, settled=True),
+            call([_hue_at(4.0)], duration_ms=1000, settled=True),
+        ]
+
+    def test_a_held_fade_shorter_than_the_step_keeps_the_step(self) -> None:
+        effect = _loop()
+        light = _light()
+        light._evidenced_connectivity.return_value = Connectivity.THREAD
+        effect.participants = [light]
+        writer = _slot_writer(fade=0.25)
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+
+        writer.send_frame.assert_called_once_with(
+            [_hue_at(1.0)], duration_ms=1000, settled=True
+        )
 
     def test_a_change_to_the_held_colours_is_sent_at_once(self) -> None:
         effect = _loop()
@@ -657,7 +703,10 @@ class TestColorloopComponent:
         effect._deliver(0, writer, [_hue_at(0.4)], _ctx(0.4), False)
 
         assert writer.send_frame.call_count == 2
-        assert writer.send_frame.call_args.kwargs == {"duration_ms": 600}
+        assert writer.send_frame.call_args.kwargs == {
+            "duration_ms": 600,
+            "settled": True,
+        }
 
     def test_a_gated_send_is_tried_again_next_frame(self) -> None:
         effect = _loop()
@@ -687,7 +736,9 @@ class TestColorloopComponent:
             call([_hue_at(1.0)]),
             call([_hue_at(0.5)]),
         ]
-        second.send_frame.assert_called_once_with([_hue_at(1.0)], duration_ms=1000)
+        second.send_frame.assert_called_once_with(
+            [_hue_at(1.0)], duration_ms=1000, settled=True
+        )
 
 
 @pytest.mark.asyncio

@@ -214,6 +214,8 @@ class AnimatorWriter:
         self,
         hsbk: list[tuple[int, int, int, int]],
         duration_ms: int | None = None,
+        *,
+        settled: bool = False,
     ) -> AnimatorStats:
         """Send a frame drawn on this writer's canvas through the Animator.
 
@@ -224,10 +226,15 @@ class AnimatorWriter:
             hsbk: The frame, one protocol-ready colour per canvas pixel
             duration_ms: Transition duration for this frame alone, or None
                 for the writer's own
+            settled: For a light component's writer, compose the held tile's
+                final colours rather than those part-way through its fade, so
+                the firmware runs the fade
         """
         duration = self._duration_ms if duration_ms is None else duration_ms
         if self._slot is not None:
-            return self._animator._send_slot(self, self._slot, hsbk, duration)
+            return self._animator._send_slot(
+                self, self._slot, hsbk, duration, settled=settled
+            )
         return self._animator._send(self._canvas, hsbk, duration)
 
     @property
@@ -235,18 +242,22 @@ class AnimatorWriter:
         """True if this writer draws on a light component's slot."""
         return self._slot is not None
 
-    def tile_busy(self, own: Collection[AnimatorWriter]) -> bool:
-        """Whether this writer's tile needs a steady stream of frames.
+    def tile_shared(self, own: Collection[AnimatorWriter]) -> bool:
+        """Whether a writer outside ``own`` draws on this writer's tile.
 
-        It does while a writer outside ``own`` draws on another slot of the
-        tile, or while a fade asked of the held tile is still running: the
-        firmware runs one transition per tile, so either can only be shown
-        frame by frame.
+        That writer's frames carry this writer's slot, so this writer need
+        only keep its slot current.
 
         Args:
             own: Writers that belong to the same effect as this one
         """
-        return self._animator._tile_busy(own, time.monotonic())
+        return any(writer not in own for writer in self._animator._slot_writers)
+
+    @property
+    def hold_remaining(self) -> float:
+        """Seconds left of a fade asked of the tile's held colours, or 0."""
+        hold = self._animator._hold
+        return hold.remaining(time.monotonic()) if hold is not None else 0.0
 
     @property
     def hold_version(self) -> int:
@@ -842,23 +853,14 @@ class Animator:
         self._slot_frames[slot.component] = (slot, writer._canvas, hsbk)
         return True
 
-    def _tile_busy(self, own: Collection[AnimatorWriter], now: float) -> bool:
-        """Whether another effect draws on the tile or the held tile is fading.
-
-        Args:
-            own: Writers that belong to the asking effect
-            now: The current monotonic time
-        """
-        if any(writer not in own for writer in self._slot_writers):
-            return True
-        return self._hold is not None and self._hold.fading(now)
-
     def _send_slot(
         self,
         writer: AnimatorWriter,
         slot: ComponentSlot,
         hsbk: list[tuple[int, int, int, int]],
         duration_ms: int,
+        *,
+        settled: bool = False,
     ) -> AnimatorStats:
         """Keep a light component's frame and send the tile of every slot."""
         start_time = time.perf_counter()
@@ -868,11 +870,21 @@ class Animator:
         hold = self._hold
         # An open slot writer always has a held tile beneath it.
         assert hold is not None
-        return self._transmit(lambda: self._compose(hold), duration_ms, start_time)
+        return self._transmit(
+            lambda: self._compose(hold, settled=settled), duration_ms, start_time
+        )
 
-    def _compose(self, hold: HeldTile) -> list[tuple[int, int, int, int]]:
-        """Build the whole tile: the held tile, overlaid with each slot's frame."""
-        tile = hold.tuples_at(time.monotonic())
+    def _compose(
+        self, hold: HeldTile, *, settled: bool = False
+    ) -> list[tuple[int, int, int, int]]:
+        """Build the whole tile: the held tile, overlaid with each slot's frame.
+
+        Args:
+            hold: The held tile beneath the slots
+            settled: Use the held tile's final colours, not those part-way
+                through its fade
+        """
+        tile = hold.target_tuples() if settled else hold.tuples_at(time.monotonic())
         for slot, canvas, frame in self._slot_frames.values():
             mapped = canvas.apply(frame)
             for position, source in zip(slot.positions, slot.sources):

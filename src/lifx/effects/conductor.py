@@ -182,8 +182,8 @@ class Conductor(OverlapRules):
         light is evidenced as Thread, by its own replies or an mDNS record,
         the whole start is refused before anything is captured or changed,
         unless ``enable_thread`` is True. A light not yet heard from is not
-        refused. An effect that draws no frames, such as EffectPulse, is
-        never refused.
+        refused. An effect that streams no frames, such as EffectPulse or
+        EffectColorloop, is never refused.
 
         Args:
             effect: The effect instance to execute
@@ -825,7 +825,7 @@ def _refuse_thread_frames(
             participant's light is evidenced as Thread and
             ``enable_thread`` is False
     """
-    if not isinstance(effect, FrameEffect):
+    if not isinstance(effect, FrameEffect) or not effect._streams_frames:
         return
     for participant in participants:
         resolve(participant)[0]._refuse_thread_frames(

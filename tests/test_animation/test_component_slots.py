@@ -287,20 +287,20 @@ class TestComponentSlots:
         (datagram,) = sent
         assert struct.unpack_from("<I", datagram, HEADER_SIZE + 6) == (3000,)
 
-    async def test_a_tile_is_busy_while_another_effect_draws_on_it(self) -> None:
+    async def test_a_tile_is_shared_while_another_effect_draws_on_it(self) -> None:
         ceiling = _ceiling()
         uplight = await component_writer(ceiling, "uplight", 0)
 
-        assert uplight.tile_busy([uplight]) is False
+        assert uplight.tile_shared([uplight]) is False
 
         downlight = await component_writer(ceiling, "downlight", 0)
 
-        assert uplight.tile_busy([uplight]) is True
-        assert uplight.tile_busy([uplight, downlight]) is False
+        assert uplight.tile_shared([uplight]) is True
+        assert uplight.tile_shared([uplight, downlight]) is False
         downlight.close()
-        assert uplight.tile_busy([uplight]) is False
+        assert uplight.tile_shared([uplight]) is False
 
-    async def test_a_tile_is_busy_while_its_held_colours_fade(self, rig: Rig) -> None:
+    async def test_a_writer_sees_a_held_fade_and_its_time_left(self, rig: Rig) -> None:
         ceiling = rig.light
         assert isinstance(ceiling, CeilingLight)
         writer = await component_writer(ceiling, "uplight", 0)
@@ -310,10 +310,26 @@ class TestComponentSlots:
             await ceiling.set_downlight_colors(AMBER, duration=2.0)
 
         assert writer.hold_version != before
-        with patch("lifx.animation.animator.time.monotonic", return_value=101.0):
-            assert writer.tile_busy([writer]) is True
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.5):
+            assert writer.hold_remaining == pytest.approx(0.5)
         with patch("lifx.animation.animator.time.monotonic", return_value=102.5):
-            assert writer.tile_busy([writer]) is False
+            assert writer.hold_remaining == 0.0
+
+    async def test_a_settled_frame_carries_the_held_fades_final_colours(
+        self, sent: list[bytes], rig: Rig
+    ) -> None:
+        ceiling = rig.light
+        assert isinstance(ceiling, CeilingLight)
+        writer = await component_writer(ceiling, "uplight", 0)
+        with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
+            await ceiling.set_downlight_colors(AMBER, duration=2.0)
+
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.0):
+            writer.send_frame([RED], duration_ms=1000, settled=True)
+
+        (tile,) = _tiles(sent)
+        assert tile[:UPLIGHT] == [AMBER.as_tuple()] * UPLIGHT
+        assert tile[UPLIGHT] == RED
 
     async def test_a_tile_with_nothing_held_has_version_zero(self) -> None:
         animator = await _ceiling().animator.prepare()
