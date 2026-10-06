@@ -104,8 +104,9 @@ On one light component of a Ceiling or Mirror, a colour loop writes the same way
 light to itself. The two light components share one tile. While another effect draws on the other
 light component, that effect's frames carry the colour loop's colour, and the colour loop sends
 nothing itself. While a fade you asked of the other light component runs, the colour loop draws
-frames so the fade shows; on a Thread light it sends one tile with that light component's final
-colours and the fade's remaining time instead, because the firmware runs one transition per tile.
+frames so the fade shows. On a Thread light it goes on writing once per step, and each write
+carries the other light component as far through its fade as it will be when the step ends, so the
+firmware follows that fade a step at a time.
 
 ### Rainbow Effect
 

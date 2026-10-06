@@ -19,6 +19,7 @@ from lifx.effects.frame_effect import (
     replace_writer,
 )
 from lifx.exceptions import LifxTimeoutError
+from lifx.protocol.protocol_types import LightHsbk
 
 
 def test_colorloop_default_parameters() -> None:
@@ -667,24 +668,32 @@ class TestColorloopComponent:
 
         writer.send_frame.assert_called_once_with([_hue_at(0.0)])
 
-    def test_a_held_fade_on_thread_is_one_settled_write(self) -> None:
+    @pytest.mark.parametrize("fade", [18.0, 20.0, 36.0])
+    @pytest.mark.parametrize("direction", [1, -1])
+    def test_a_long_held_fade_on_thread_is_followed_a_step_at_a_time(
+        self, fade: float, direction: int
+    ) -> None:
+        """No write turns the hue further than one step, however long the fade.
+
+        Half a period (18 s) and more would reverse the loop if one write
+        covered the fade, since the firmware fades hue the short way round.
+        """
         effect = _loop()
+        effect._direction = direction
         light = _light()
         light._evidenced_connectivity.return_value = Connectivity.THREAD
         effect.participants = [light]
-        writer = _slot_writer(fade=2.5)
+        writer = _slot_writer(fade=fade)
 
-        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
-        writer.hold_remaining = 1.5
-        for elapsed in (1.0, 2.0):
-            effect._deliver(0, writer, [_hue_at(elapsed)], _ctx(elapsed), False)
-        writer.hold_remaining = 0.0
-        effect._deliver(0, writer, [_hue_at(3.0)], _ctx(3.0), False)
+        for step in range(6):
+            writer.hold_remaining = max(0.0, fade - step)
+            effect._deliver(0, writer, [_hue_at(step)], _ctx(float(step)), False)
 
-        assert writer.send_frame.call_args_list == [
-            call([_hue_at(2.5)], duration_ms=2500, settled=True),
-            call([_hue_at(4.0)], duration_ms=1000, settled=True),
-        ]
+        sends = writer.send_frame.call_args_list
+        assert [c.kwargs for c in sends] == [{"duration_ms": 1000, "settled": True}] * 6
+        hues = [HSBK.from_protocol(LightHsbk(*c.args[0][0])).hue for c in sends]
+        turns = [round((b - a) % 360) for a, b in zip(hues, hues[1:])]
+        assert turns == [10 if direction == 1 else 350] * 5
 
     def test_a_held_fade_shorter_than_the_step_keeps_the_step(self) -> None:
         effect = _loop()

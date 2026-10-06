@@ -65,12 +65,6 @@ class HeldTile:
             return 0.0
         return self._duration - (now - self._began)
 
-    def target_tuples(self) -> list[tuple[int, int, int, int]]:
-        """Protocol-ready colours the held tile shows, or is fading towards."""
-        if self._cached is None:
-            self._cached = [colour.as_tuple() for colour in self._target]
-        return list(self._cached)
-
     def retarget(self, tile: list[HSBK], duration: float) -> None:
         """Fade from the colours shown now towards a new tile.
 
@@ -105,7 +99,9 @@ class HeldTile:
         """Protocol-ready colours at a moment, part-way through any fade."""
         if self._fading(now):
             return [colour.as_tuple() for colour in self._colours_at(now)]
-        return self.target_tuples()
+        if self._cached is None:
+            self._cached = [colour.as_tuple() for colour in self._target]
+        return list(self._cached)
 
     def _fading(self, now: float) -> bool:
         return self._duration > 0 and now - self._began < self._duration

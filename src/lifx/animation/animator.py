@@ -230,8 +230,8 @@ class AnimatorWriter:
             settled: For a light component's writer, the frame is the
                 colours the firmware fades this slot towards: it is kept as
                 the slot's target, and the tile composes every slot's target
-                and the held tile's final colours rather than colours
-                part-way through a fade
+                and the held tile's colours as they will be when this
+                frame's transition ends, so the firmware runs both fades
         """
         duration = self._duration_ms if duration_ms is None else duration_ms
         if self._slot is not None:
@@ -921,21 +921,26 @@ class Animator:
         hold = self._hold
         # An open slot writer always has a held tile beneath it.
         assert hold is not None
+        ends_in = duration_ms / 1000 if settled else 0.0
         return self._transmit(
-            lambda: self._compose(hold, settled=settled), duration_ms, start_time
+            lambda: self._compose(hold, settled=settled, ends_in=ends_in),
+            duration_ms,
+            start_time,
         )
 
     def _compose(
-        self, hold: HeldTile, *, settled: bool = False
+        self, hold: HeldTile, *, settled: bool = False, ends_in: float = 0.0
     ) -> list[tuple[int, int, int, int]]:
         """Build the whole tile: the held tile, overlaid with each slot's frame.
 
         Args:
             hold: The held tile beneath the slots
-            settled: Use the held tile's final colours and each slot's target,
-                not colours part-way through a fade
+            settled: Use each slot's target rather than its colours of the
+                moment
+            ends_in: Seconds until the tile's transition ends: the held tile
+                shows its colours as of then, part-way through any fade
         """
-        tile = hold.target_tuples() if settled else hold.tuples_at(time.monotonic())
+        tile = hold.tuples_at(time.monotonic() + ends_in)
         frames = dict(self._slot_frames)
         if settled:
             frames.update(self._slot_targets)

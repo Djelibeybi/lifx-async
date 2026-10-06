@@ -336,6 +336,23 @@ class TestComponentSlots:
 
         assert animator._writer().hold_version == 0
 
+    async def test_a_settled_frame_carries_a_held_fade_as_of_its_end(
+        self, sent: list[bytes], rig: Rig
+    ) -> None:
+        ceiling = rig.light
+        assert isinstance(ceiling, CeilingLight)
+        writer = await component_writer(ceiling, "uplight", 0)
+        with patch("lifx.animation.slots.time.monotonic", return_value=100.0):
+            await ceiling.set_downlight_colors(AMBER, duration=4.0)
+
+        with patch("lifx.animation.animator.time.monotonic", return_value=101.0):
+            writer.send_frame([RED], duration_ms=1000, settled=True)
+
+        (tile,) = _tiles(sent)
+        halfway = GREEN.lerp_hsb(AMBER, 0.5).with_kelvin(3100)
+        assert tile[0] == halfway.as_tuple()
+        assert tile[UPLIGHT] == RED
+
     async def test_a_writer_that_does_not_stream_shares_no_tile(self) -> None:
         ceiling = _ceiling()
         uplight = await component_writer(ceiling, "uplight", 0)

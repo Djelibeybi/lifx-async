@@ -62,9 +62,11 @@ class EffectColorloop(FrameEffect):
     tile to itself. While another effect draws on the other light component,
     that effect's frames carry colour loop's colour and colour loop sends
     nothing. While a fade the caller asked of the other light component runs,
-    colour loop draws frames so the fade shows; on a Thread light it instead
-    sends one tile with the other light component's final colours and the
-    fade's remaining time, because the firmware runs one transition per tile.
+    colour loop draws frames so the fade shows. On a Thread light it goes on
+    writing once per step instead, and each write carries the other light
+    component as far through its fade as it will be when the step ends, so
+    the firmware follows that fade a step at a time; no write turns colour
+    loop's hue further than ``change``.
 
     Attributes:
         period: Seconds per full cycle (default 60)
@@ -242,7 +244,6 @@ class EffectColorloop(FrameEffect):
         # Writers sharing a tile share one schedule: the last one sends it.
         key: object = writer.animator if slot else writer
         schedule = self._schedules.setdefault(key, _Schedule())
-        fade = 0.0
         if slot:
             if writer.tile_shared(self._animators):
                 # Another effect's frames carry the slot.
@@ -250,8 +251,7 @@ class EffectColorloop(FrameEffect):
                 schedule.streamed = True
                 writer.stage(frame)
                 return
-            fade = writer.hold_remaining
-            if fade > 0 and not _on_thread(self.participants[idx]):
+            if writer.hold_remaining > 0 and not _on_thread(self.participants[idx]):
                 # Frames show the other light component's fade exactly.
                 writer.streaming = True
                 schedule.streamed = True
@@ -273,12 +273,6 @@ class EffectColorloop(FrameEffect):
 
         ends_at = (step + 1) * self._step
         duration = self.transition if self.transition is not None else ends_at - now
-        if fade > duration:
-            # One transition per tile: this write runs the whole held fade,
-            # and the next waits for the step after it ends.
-            duration = fade
-            ends_at = now + fade
-            step = int(ends_at // self._step)
         target = self.generate_frame(dataclasses.replace(ctx, elapsed_s=ends_at))
         if slot:
             target_frame = [color.as_tuple() for color in target]
