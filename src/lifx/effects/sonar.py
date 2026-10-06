@@ -45,6 +45,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -593,17 +594,16 @@ class EffectSonar(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Sonar effect.
 
-        Sonar requires multizone capability for zone-based animation.
+        Sonar needs a line of pixels. On a Mirror ring it keeps its seam at
+        the ring origin (top centre by default) and pings from it as on a strip.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light is a multizone strip or a Mirror, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Sonar can inherit prestate from another Sonar effect.

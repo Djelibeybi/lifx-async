@@ -145,7 +145,7 @@ class Conductor(OverlapRules):
         rings = ring_names(light)
         if frame is None and rings:
             # A whole-light Mirror effect draws each ring through a writer:
-            # its frame is every ring's frame in turn, so zone order.
+            # its frame is every ring's frame in turn, as the effect drew it.
             frames = [
                 last_frame(effect, participant_key(cast("Light", light), ring))
                 for ring in rings

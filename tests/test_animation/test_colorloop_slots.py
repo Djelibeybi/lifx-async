@@ -7,9 +7,13 @@ its slot: each sends the tile at its own steps, carrying the other's target.
 from __future__ import annotations
 
 import struct
+import time
+from types import SimpleNamespace
 
 import pytest
 
+from lifx.animation import animator as animator_module
+from lifx.animation import slots as slots_module
 from lifx.animation.animator import AnimatorWriter
 from lifx.animation.flow import AckGate
 from lifx.animation.packets import HEADER_SIZE
@@ -40,6 +44,21 @@ def _hue_at(elapsed: float) -> int:
 class TestTwoColourLoopsOnOneTile:
     """Two separate colour loops on a Ceiling's two light components."""
 
+    @pytest.fixture(autouse=True)
+    def _clock(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Run the Animator's fade clock on the same time as each tick.
+
+        The ticks pass a simulated elapsed time, but a slot's fade deadline is
+        read from the Animator's own clock and its slots'. Left on real time, a slow run
+        drifts the two apart and changes what each step sends.
+        """
+        self._now = 1000.0
+        clock = SimpleNamespace(
+            monotonic=lambda: self._now, perf_counter=time.perf_counter
+        )
+        for module in (animator_module, slots_module):
+            monkeypatch.setattr(module, "time", clock)
+
     @staticmethod
     async def _loops(
         ceiling: CeilingLight,
@@ -67,6 +86,7 @@ class TestTwoColourLoopsOnOneTile:
 
     def _tick(self, loops: tuple, elapsed: float) -> None:  # type: ignore[type-arg]
         up, up_writer, down, down_writer = loops
+        self._now = 1000.0 + elapsed
         for effect, writer in ((up, up_writer), (down, down_writer)):
             frame, ctx = self._frame(effect, writer, elapsed)
             effect._deliver(0, writer, frame, ctx, False)

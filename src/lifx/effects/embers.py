@@ -50,6 +50,8 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_index
+from lifx.effects.suitability import is_mirror
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -132,6 +134,11 @@ class EffectEmbers(FrameEffect):
     Heat is injected randomly at the bottom of the strip each frame.
     A 1D diffusion kernel with a cooling factor makes heat drift upward,
     dim, and die -- like glowing embers in a chimney.
+
+    On a Mirror ring there is no top or bottom edge: heat that rises off the
+    last zone comes round to the ring origin (top centre by default) and heat
+    spreads across the join, so the
+    effect is seamless there.
 
     Attributes:
         intensity: Probability of heat injection per frame (0.0-1.0)
@@ -241,6 +248,7 @@ class EffectEmbers(FrameEffect):
         zpb = self.zones_per_bulb
         bulb_count = max(ctx.pixel_count // zpb, 1)
         self._frame_count += 1
+        wraps = ctx.wraps
 
         # Lazily initialise or resize the heat buffer to match bulb count.
         if len(self._heat) != bulb_count:
@@ -250,9 +258,11 @@ class EffectEmbers(FrameEffect):
 
         # --- 1. Convection: shift heat upward periodically ----------------
         if bulb_count > 1 and self._frame_count % _CONVECTION_FRAMES == 0:
+            # On a ring the heat leaving the top comes round to the bottom.
+            carried = heat[-1] if wraps else 0.0
             for i in range(bulb_count - 1, 0, -1):
                 heat[i] = heat[i - 1]
-            heat[0] = 0.0
+            heat[0] = carried
 
         # --- 2. Inject heat at the bottom ---------------------------------
         if random.random() < self.intensity:
@@ -261,18 +271,32 @@ class EffectEmbers(FrameEffect):
         # --- 3. Occasional burst: a puff of heat at a random low position -
         if random.random() < _BURST_PROBABILITY:
             center = random.randint(0, max(0, bulb_count // 3))
-            for j in range(
-                max(0, center - _BURST_RADIUS),
-                min(bulb_count, center + _BURST_RADIUS + 1),
-            ):
+            if wraps:
+                # A burst near the bottom spills onto the top of the ring.
+                burst = {
+                    ring_index(center + k, bulb_count, True)
+                    for k in range(-_BURST_RADIUS, _BURST_RADIUS + 1)
+                }
+            else:
+                burst = set(
+                    range(
+                        max(0, center - _BURST_RADIUS),
+                        min(bulb_count, center + _BURST_RADIUS + 1),
+                    )
+                )
+            for j in burst:
                 heat[j] = min(heat[j] + _BURST_HEAT, 1.0)
 
         # --- 4. Diffusion + cooling: smooth and decay ---------------------
         cooling_factor = self._cooling_factor
         new_heat: list[float] = [0.0] * bulb_count
         for i in range(bulb_count):
-            below = heat[i - 1] if i > 0 else 0.0
-            above = heat[i + 1] if i < bulb_count - 1 else 0.0
+            if wraps:
+                below = heat[i - 1]
+                above = heat[(i + 1) % bulb_count]
+            else:
+                below = heat[i - 1] if i > 0 else 0.0
+                above = heat[i + 1] if i < bulb_count - 1 else 0.0
             new_heat[i] = (below + heat[i] + above) / 3.0 * cooling_factor
 
         # --- 5. Turbulence: random per-cell flicker -----------------------
@@ -326,15 +350,18 @@ class EffectEmbers(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Embers effect.
 
-        Embers requires color capability. Works on single lights and
-        multizone strips. Matrix devices are not supported.
+        Embers requires colour capability. Works on single lights, multizone
+        strips and a Mirror. Any other matrix device is not supported.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has color support and is not a matrix device
+            True if light is a Mirror, or has colour support and is not a
+            matrix device
         """
+        if is_mirror(light):
+            return True
         if light.capabilities is None:
             await light.ensure_capabilities()
         if light.capabilities is None:

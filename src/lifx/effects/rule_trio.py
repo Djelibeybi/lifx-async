@@ -52,6 +52,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 from lifx.theme.library import ThemeLibrary
 
 if TYPE_CHECKING:
@@ -176,6 +177,10 @@ class EffectRuleTrio(FrameEffect):
     The slight speed differences (controlled by *drift_b* and *drift_c*)
     cause the three patterns to slide relative to one another, producing
     slowly evolving macro-scale colour structures.
+
+    Each automaton is periodic, so on a Mirror ring the effect is seamless:
+    the cells either side of the ring origin (top centre by default) are
+    neighbours and there is no edge.
 
     This is a stateful effect: three cell state arrays and three generation
     counters persist across frames and are initialized lazily on the first
@@ -416,18 +421,17 @@ class EffectRuleTrio(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Rule Trio effect.
 
-        Rule Trio requires multizone capability (strips/beams). Single lights
-        are not supported; matrix devices are not supported.
+        Rule Trio draws a line, so it suits a multizone strip or beam and a
+        Mirror (see ``draws_a_line``). Single lights and other matrix devices
+        are not supported.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light draws a line, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Rule Trio can inherit prestate from another Rule Trio effect.

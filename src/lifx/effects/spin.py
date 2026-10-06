@@ -39,6 +39,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import ring_distance
 from lifx.theme.library import ThemeLibrary
 from lifx.theme.theme import Theme
 
@@ -52,6 +53,10 @@ class EffectSpin(FrameEffect):
     Colors from the theme are spread across the strip and scroll over
     time. Adjacent zones interpolate smoothly via Oklab, and each zone
     receives a tiny hue offset (``bulb_offset``) to add visual shimmer.
+
+    On a Mirror ring (``FrameContext.wraps``) the palette closes without repeating a
+    colour and the shimmer folds about the ring origin (top centre by default), so there
+    is no seam.
 
     Attributes:
         speed: Seconds per full color rotation
@@ -170,7 +175,7 @@ class EffectSpin(FrameEffect):
 
             # Apply per-zone hue shimmer. A ring climbs to its far side and
             # back down, so there is no jump where it closes.
-            steps = min(i, bulb_count - i) if ctx.wraps else i
+            steps = ring_distance(i, bulb_count) if ctx.wraps else i
             shimmer_hue = (base_color.hue + steps * self.bulb_offset) % 360
 
             bulb_colors.append(

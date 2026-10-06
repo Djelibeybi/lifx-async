@@ -50,6 +50,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.ring import fold_at_zone_zero
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -85,6 +86,9 @@ class EffectPendulumWave(FrameEffect):
         brightness: Overall brightness (0.0-1.0)
         kelvin: Color temperature (1500-9000)
         zones_per_bulb: Number of physical zones per logical bulb
+        seamless: Whether the pattern is mirror-symmetric about the ring origin
+            on a canvas that wraps (a Mirror ring), so it meets itself with no
+            jump
 
     Example:
         ```python
@@ -108,6 +112,7 @@ class EffectPendulumWave(FrameEffect):
         brightness: float = 0.8,
         kelvin: int = 3500,
         zones_per_bulb: int = 1,
+        seamless: bool = False,
     ) -> None:
         """Initialize pendulum wave effect.
 
@@ -122,6 +127,11 @@ class EffectPendulumWave(FrameEffect):
             brightness: Overall brightness 0.0-1.0 (default 0.8)
             kelvin: Color temperature 1500-9000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
+            seamless: On a canvas that wraps, such as a Mirror ring, draw each
+                pixel at its ring distance from the ring origin (top centre
+                by default) so the pattern is mirror-symmetric about it and has
+                no seam. Ignored on a canvas that does not wrap (default
+                False)
 
         Raises:
             ValueError: If parameters are out of valid ranges
@@ -156,6 +166,7 @@ class EffectPendulumWave(FrameEffect):
         self.brightness = brightness
         self.kelvin = kelvin
         self.zones_per_bulb = zones_per_bulb
+        self.seamless = seamless
 
     @property
     def name(self) -> str:
@@ -243,6 +254,8 @@ class EffectPendulumWave(FrameEffect):
         elif len(colors) > ctx.pixel_count:
             colors = colors[: ctx.pixel_count]
 
+        if self.seamless and ctx.wraps:
+            return fold_at_zone_zero(colors)
         return colors
 
     async def from_poweroff_hsbk(self, _light: Light) -> HSBK:
@@ -308,5 +321,5 @@ class EffectPendulumWave(FrameEffect):
             f"saturation1={self.saturation1}, saturation2={self.saturation2}, "
             f"brightness={self.brightness}, "
             f"kelvin={self.kelvin}, zones_per_bulb={self.zones_per_bulb}, "
-            f"power_on={self.power_on})"
+            f"seamless={self.seamless}, power_on={self.power_on})"
         )
