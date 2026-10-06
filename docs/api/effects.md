@@ -396,7 +396,7 @@ A light component (such as `mirror.front` or `ceiling.uplight`) classifies by wh
 - A Ceiling downlight classifies as `MATRIX`.
 - A Ceiling uplight, which is a single pixel, classifies as `LIGHT`. Embers and plasma are also left out for it, because they refuse the Ceiling it belongs to.
 
-A light component can only take part in an effect that draws frames, so effects that draw none (such as pulse and colorloop) are left out for a light component.
+A light component can only take part in an effect that draws frames, so effects that draw none (such as pulse) are left out for a light component.
 
 #### `get_effects_for_device_type(device_type: DeviceType) -> list[tuple[EffectInfo, DeviceSupport]]`
 
