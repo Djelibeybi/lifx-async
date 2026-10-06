@@ -96,11 +96,12 @@ def _sent_tiles(udp: MagicMock) -> list[list[Colour]]:
 def _ring(tile: list[Colour], rig: transitions.Rig, side: int) -> list[Colour]:
     """A ring as an effect draws it: clockwise from zone 0, viewed from the front.
 
-    The back ring's zones run anticlockwise, so it is read in reverse from zone 0.
+    The back ring's zones run anticlockwise, so it is read in reverse, which
+    puts back index 24 - k level with front zone k.
     """
     ring = [tile[p] for p in rig.positions[side]]
     if side == BACK:
-        return [ring[-k % len(ring)] for k in range(len(ring))]
+        return ring[::-1]
     return ring
 
 

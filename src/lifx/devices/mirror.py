@@ -492,16 +492,17 @@ class MirrorLight(ComponentMatrixLight):
         """Draw a ring's effect on the ring itself: Nx1, clockwise from zone 0.
 
         Both rings start at the lower left, but the front's zones run
-        clockwise and the back's anticlockwise, viewed from the front. Frame
-        pixel k lands on front zone k and on back zone ``-k mod N``, so frame
-        pixel 0 sits at the lower left of both rings and a pattern travels
-        clockwise round each, keeping the two rings of a whole-light effect in
-        step.
+        clockwise and the back's anticlockwise, viewed from the front. The
+        back ring's index ``N - 1 - k`` sits level with front zone ``k`` (front
+        zone 0 and back index 24 are both at row 9 on the left), so frame pixel
+        k lands on front zone k and on back index ``N - 1 - k``. A pattern
+        travels clockwise round each ring, and the two rings of a whole-light
+        effect stay in step.
         """
         count = len(self._component_positions(component))
         canvas = FrameBuffer(pixel_count=count, canvas_width=count, canvas_height=1)
         if component == "back":
-            return canvas, tuple((-zone) % count for zone in range(count))
+            return canvas, tuple(count - 1 - zone for zone in range(count))
         return canvas, tuple(range(count))
 
     def _component_wraps(self, _component: str) -> bool:

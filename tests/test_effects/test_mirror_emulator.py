@@ -67,8 +67,9 @@ def _zone_colour(zone: int) -> HSBK:
 
 ZONES = [_zone_colour(k) for k in range(RING)]
 # The same frame on the back ring, whose zones run the other way round: it is
-# drawn clockwise from zone 0, so back zone k shows frame pixel -k mod RING.
-BACK_ZONES = [ZONES[-k % RING] for k in range(RING)]
+# drawn clockwise, so back index k shows frame pixel RING - 1 - k, which puts it
+# level with front zone RING - 1 - k.
+BACK_ZONES = [ZONES[RING - 1 - k] for k in range(RING)]
 
 
 async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:

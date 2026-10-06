@@ -128,8 +128,9 @@ async def test_whole_light_effect_on_a_mirror_runs_as_two_ring_participants(
     front, back = rig.positions
     assert [sent[p] for p in front] == frame
     # The back ring's zones run the other way round, so it takes the frame
-    # reversed from zone 0 and both rings turn clockwise together.
-    assert [sent[back[-k % 25]] for k in range(25)] == frame
+    # reversed (pixel k on back index 24 - k, level with front zone k) and both
+    # rings turn clockwise together.
+    assert [sent[back[24 - k]] for k in range(25)] == frame
     chipless = set(range(52)) - set(front) - set(back)
     assert len(chipless) == 2
     assert all(rig.wire.colours[p].brightness > 0 for p in chipless)

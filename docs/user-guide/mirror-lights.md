@@ -278,8 +278,9 @@ await mirror.set_effect(
 
 Each ring is a canvas of its own for a software effect: 25 pixels running
 clockwise from zone 0 at the lower left, as seen from the front. The back
-ring's zones run anticlockwise, so its canvas takes them in reverse from zone
-0, and a frame moves the same way round both rings. The frame context's
+ring's zones run anticlockwise, so its canvas takes them in reverse, which puts
+each back pixel level with the same front pixel (back index 24 - k beside front
+zone k), and a frame moves the same way round both rings. The frame context's
 `wraps` flag is `True`, so effects such as Rainbow and Spin run
 continuously round the ring with no seam.
 
