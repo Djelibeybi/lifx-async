@@ -408,6 +408,22 @@ class TestComponentSlots:
         assert began[0] == CYAN
         assert ended[0] == RED
 
+    async def test_a_fade_after_a_frame_of_another_size_starts_at_its_target(
+        self, sent: list[bytes]
+    ) -> None:
+        """A slot's earlier frame from another canvas cannot start a fade."""
+        ceiling = _ceiling()
+        uplight = await component_writer(ceiling, "uplight", 0)
+        downlight = await component_writer(ceiling, "downlight", 0)
+        uplight.streaming = downlight.streaming = False
+        slot = ceiling.animator._slot_writers[downlight]
+        ceiling.animator._slot_frames["downlight"] = (slot, downlight.canvas, [RED] * 3)
+
+        downlight.stage([CYAN] * 64, settled=True, duration_ms=60000)
+        uplight.send_frame([RED], duration_ms=0, settled=True)
+
+        assert _tiles(sent)[-1][0] == CYAN
+
     async def test_a_writer_that_does_not_stream_shares_no_tile(self) -> None:
         ceiling = _ceiling()
         uplight = await component_writer(ceiling, "uplight", 0)
