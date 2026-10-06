@@ -18,6 +18,12 @@ if TYPE_CHECKING:
     from lifx.effects.base import LIFXEffect
 
 
+# Effects that refuse every matrix light other than a Mirror. A Ceiling uplight
+# classifies as a single light, but the Conductor checks a light component
+# through its light, so these are refused there and must not be listed for it.
+_REFUSE_A_CEILING = frozenset({"embers", "plasma"})
+
+
 class DeviceType(Enum):
     """Device categories for effect compatibility classification."""
 
@@ -53,20 +59,19 @@ class EffectInfo:
 
 
 def _classify_device(device: Light | LightComponent) -> DeviceType:
-    """Classify a light, or a Mirror ring, into a DeviceType category.
+    """Classify a light, or a light component, into a DeviceType category.
 
     Uses isinstance checks with lazy imports to avoid circular dependencies.
     A Mirror is checked before a matrix light, so it never classifies as
-    ``MATRIX``, and a Mirror ring classifies the same as the whole Mirror.
+    ``MATRIX``. A Ceiling uplight draws on a single pixel, so it classifies
+    as a single light. Every other light component classifies the same as its
+    light, so a Mirror ring is a Mirror and a Ceiling downlight is a matrix.
 
     Args:
         device: The light, or light component, to classify
 
     Returns:
         DeviceType classification for the device
-
-    Raises:
-        TypeError: If ``device`` is a light component other than a Mirror ring
     """
     from lifx.devices.component.participant import LightComponent
     from lifx.devices.matrix import MatrixLight
@@ -74,12 +79,9 @@ def _classify_device(device: Light | LightComponent) -> DeviceType:
     from lifx.devices.multizone import MultiZoneLight
 
     if isinstance(device, LightComponent):
-        if isinstance(device.light, MirrorLight):
-            return DeviceType.MIRROR
-        raise TypeError(
-            "Only a Mirror ring can be classified as a light component, "
-            f"not {device.name!r} of {type(device.light).__name__}"
-        )
+        if device.name == "uplight":
+            return DeviceType.LIGHT
+        device = device.light
     if isinstance(device, MirrorLight):
         return DeviceType.MIRROR
     if isinstance(device, MatrixLight):
@@ -168,33 +170,36 @@ class EffectRegistry:
     def get_effects_for_device(
         self, device: Light | LightComponent
     ) -> list[tuple[EffectInfo, DeviceSupport]]:
-        """Get effects compatible with a specific light or Mirror ring.
+        """Get effects compatible with a specific light or light component.
 
         Classifies the device and returns effects that are RECOMMENDED
         or COMPATIBLE, sorted with RECOMMENDED first. A Mirror ring
-        (``mirror.front`` or ``mirror.back``) classifies as a Mirror, but a
-        light component can only be an effect participant for an effect that
-        draws frames, so effects such as pulse are left out for a ring.
+        (``mirror.front`` or ``mirror.back``) classifies as a Mirror, a
+        Ceiling downlight as a matrix and a Ceiling uplight, which draws on a
+        single pixel, as a single light. A light component can only be an
+        effect participant for an effect that draws frames, so effects such
+        as pulse are left out for a light component. Embers and plasma are
+        also left out for a Ceiling uplight, because they refuse the Ceiling
+        it belongs to.
 
         Args:
-            device: The light, or Mirror ring, to check
+            device: The light, or light component, to check
 
         Returns:
             List of (EffectInfo, DeviceSupport) tuples, sorted by support level
-
-        Raises:
-            TypeError: If ``device`` is a light component other than a Mirror
-                ring
         """
         from lifx.devices.component.participant import LightComponent
         from lifx.effects.frame_effect import FrameEffect
 
-        results = self.get_effects_for_device_type(_classify_device(device))
+        device_type = _classify_device(device)
+        results = self.get_effects_for_device_type(device_type)
         if isinstance(device, LightComponent):
+            refused = _REFUSE_A_CEILING if device_type is DeviceType.LIGHT else ()
             results = [
                 (info, support)
                 for info, support in results
                 if issubclass(info.effect_class, FrameEffect)
+                and info.name not in refused
             ]
         return results
 

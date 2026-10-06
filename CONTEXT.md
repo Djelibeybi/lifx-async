@@ -61,6 +61,20 @@ A whole-light effect and a light component effect never share a light
 component: the newest wins, and a whole-light effect that loses one light
 component moves onto the other and stays there.
 
+**Device type**:
+The shape an effect participant presents to a software effect, used to say which
+effects suit it: a single light, a multizone strip, a matrix, or a Mirror. A Mirror
+ring is a Mirror whether the effect draws on the whole light or on that ring
+alone, because both present the same 25-pixel ring that wraps. A light component
+has a device type even though it is not a device.
+
+**Seam**:
+The point on a ring where an effect's first and last pixels meet. An effect is
+seamless when nothing visibly jumps there. Effects without meaningful ends are
+always seamless on a ring; effects whose meaning needs a start and an end keep
+their seam; effects where both looks suit, such as the pendulum wave and the
+double slit, let the caller choose.
+
 **Stopping an effect**:
 Ending a software effect on a participant and restoring the participant's
 prior state, while any other participants of the same effect carry on.
