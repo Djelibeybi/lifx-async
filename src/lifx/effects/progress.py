@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from lifx.color import HSBK, Colors
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -29,7 +30,8 @@ class EffectProgress(FrameEffect):
     across the full bar — so the gradient reveals progressively as the bar
     grows, like a thermometer.
 
-    Multizone only — ``is_light_compatible()`` checks for ``has_multizone``.
+    Multizone strips and Mirrors only. On a Mirror ring the bar keeps its seam at
+    zone 0: it fills from zone 0 exactly as it fills a strip.
 
     Attributes:
         start_value: Start of the value range
@@ -258,17 +260,15 @@ class EffectProgress(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with progress effect.
 
-        Progress requires multizone capability for a meaningful bar display.
+        Progress needs a line of pixels for a meaningful bar display.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light is a multizone strip or a Mirror, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Progress can inherit prestate from another progress effect.
