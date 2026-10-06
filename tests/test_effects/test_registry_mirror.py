@@ -31,6 +31,11 @@ RING_EFFECTS = (
     "rainbow",
     "colorloop",
     "ripple",
+    "rule30",
+    "rule_trio",
+    "fireworks",
+    "plasma",
+    "embers",
     "sonar",
     "progress",
     "jacobs_ladder",
@@ -39,14 +44,6 @@ RING_EFFECTS = (
     "double_slit",
 )
 
-# Effects still to be ported: the registry must not advertise them.
-TO_BE_PORTED = (
-    "rule30",
-    "rule_trio",
-    "fireworks",
-    "plasma",
-    "embers",
-)
 
 TWO_D = ("sunrise", "sunset", "plasma2d")
 
@@ -128,7 +125,7 @@ class TestMirrorSupportLevels:
         }
         assert listed["pulse"] is not DeviceSupport.NOT_SUPPORTED
 
-    @pytest.mark.parametrize("name", TWO_D + TO_BE_PORTED)
+    @pytest.mark.parametrize("name", TWO_D)
     def test_effects_that_do_not_run_on_a_mirror_are_not_listed(
         self, name: str
     ) -> None:

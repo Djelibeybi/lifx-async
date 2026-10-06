@@ -49,6 +49,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import is_mirror
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -152,8 +153,12 @@ class EffectPlasma(FrameEffect):
     constantly regenerating tendrils give the characteristic look of
     a plasma globe.
 
-    Compatible with single lights and multizone (strip/beam) devices.
-    Not supported on matrix devices.
+    Compatible with single lights, multizone (strip/beam) devices and a
+    Mirror. Not supported on any other matrix device.
+
+    On a Mirror ring there are no ends: the glow is measured the short way
+    round and a tendril that reaches zone 0 carries on across the join, so the
+    colour field closes on itself with no seam.
 
     Attributes:
         speed: Core pulse period in seconds
@@ -247,7 +252,7 @@ class EffectPlasma(FrameEffect):
         self._next_spawn_t = 0.0
         self._initialized = False
 
-    def _spawn_tendril(self, t: float, bulb_count: int) -> None:
+    def _spawn_tendril(self, t: float, bulb_count: int, wraps: bool = False) -> None:
         """Create a new tendril reaching from center toward an end.
 
         The tendril path is a biased random walk from the core outward.
@@ -256,6 +261,8 @@ class EffectPlasma(FrameEffect):
         Args:
             t: Current time.
             bulb_count: Number of bulbs (for positional math).
+            wraps: Whether the bulbs form a ring, so a tendril that reaches an
+                end carries on round the join instead of stopping there.
         """
         if bulb_count < _MIN_BULB_COUNT:
             return
@@ -278,7 +285,11 @@ class EffectPlasma(FrameEffect):
             step: float = direction * random.uniform(0.5, 1.5)
             jitter: float = random.uniform(-0.3, 0.3)
             pos += step + jitter
-            zone: int = max(0, min(bulb_count - 1, int(pos)))
+            zone: int = (
+                int(pos) % bulb_count
+                if wraps
+                else max(0, min(bulb_count - 1, int(pos)))
+            )
             if zone not in zones:
                 zones.append(zone)
 
@@ -303,7 +314,11 @@ class EffectPlasma(FrameEffect):
             fork_reach: int = max(1, reach // 3)
             for _ in range(fork_reach):
                 pos += fork_dir * random.uniform(0.5, 1.5)
-                zone = max(0, min(bulb_count - 1, int(pos)))
+                zone = (
+                    int(pos) % bulb_count
+                    if wraps
+                    else max(0, min(bulb_count - 1, int(pos)))
+                )
                 if zone not in fork_zones:
                     fork_zones.append(zone)
 
@@ -342,7 +357,7 @@ class EffectPlasma(FrameEffect):
 
         # Spawn new tendrils.
         if t >= self._next_spawn_t and len(self._tendrils) < _MAX_TENDRILS:
-            self._spawn_tendril(t, bulb_count)
+            self._spawn_tendril(t, bulb_count, ctx.wraps)
             # Exponential inter-arrival time based on tendril_rate.
             self._next_spawn_t = t + random.expovariate(self.tendril_rate)
 
@@ -360,6 +375,8 @@ class EffectPlasma(FrameEffect):
         core_radius: int = max(1, int(bulb_count * _CORE_RADIUS_FRAC))
         for b in range(bulb_count):
             dist: int = abs(b - center)
+            if ctx.wraps:
+                dist = min(dist, bulb_count - dist)
             if dist <= core_radius:
                 # Gaussian core glow.
                 sigma: float = max(0.5, core_radius / 2.0)
@@ -397,6 +414,8 @@ class EffectPlasma(FrameEffect):
                 # Also illuminate neighboring zones (tendril width).
                 for offset in (-1, 1):
                     neighbor: int = zone + offset
+                    if ctx.wraps:
+                        neighbor %= bulb_count
                     if 0 <= neighbor < bulb_count:
                         neighbor_bri: float = bri_contrib * _NEIGHBOR_BRI_FACTOR
                         if neighbor_bri > bulb_bri[neighbor]:
@@ -454,14 +473,18 @@ class EffectPlasma(FrameEffect):
         """Check if light is compatible with plasma effect.
 
         Plasma requires color capability. Works best on multizone devices
-        but is compatible with single lights. Not supported on matrix devices.
+        but is compatible with single lights and a Mirror. Not supported on
+        any other matrix device.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has color support and is not a matrix device
+            True if light is a Mirror, or has color support and is not a
+            matrix device
         """
+        if is_mirror(light):
+            return True
         if light.capabilities is None:
             await light.ensure_capabilities()
         if light.capabilities is None:

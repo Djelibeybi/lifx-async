@@ -46,7 +46,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     1D heat diffusion — rising embers with cooling and turbulence.
 
-    **Class:** `EffectEmbers` · **Best on:** Multizone
+    **Class:** `EffectEmbers` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Fireworks
 
@@ -54,7 +54,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Rockets launch, ascend, and burst into expanding color halos.
 
-    **Class:** `EffectFireworks` · **Best on:** Multizone
+    **Class:** `EffectFireworks` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Flicker
 
@@ -95,7 +95,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Plasma ball — electric tendrils crackle from a pulsing core.
 
-    **Class:** `EffectPlasma` · **Best on:** Multizone
+    **Class:** `EffectPlasma` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Progress
 
@@ -127,7 +127,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Wolfram's Rule 30 cellular automaton — chaotic organic patterns.
 
-    **Class:** `EffectRule30` · **Best on:** Multizone
+    **Class:** `EffectRule30` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Rule Trio
 
@@ -135,7 +135,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Three cellular automata at irrational speed ratios, blended via Oklab.
 
-    **Class:** `EffectRuleTrio` · **Best on:** Multizone
+    **Class:** `EffectRuleTrio` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Sine
 
