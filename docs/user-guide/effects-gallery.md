@@ -71,7 +71,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Electric arcs drift along the strip with flickering and crackling.
 
-    **Class:** `EffectJacobsLadder` · **Best on:** Multizone
+    **Class:** `EffectJacobsLadder` · **Best on:** Multizone, Mirror (seam at zone 0)
 
 -   ### Newton's Cradle
 
@@ -79,7 +79,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Steel balls swing alternately with Phong sphere shading.
 
-    **Class:** `EffectNewtonsCradle` · **Best on:** Multizone
+    **Class:** `EffectNewtonsCradle` · **Best on:** Multizone, Mirror (seam at zone 0)
 
 -   ### Pendulum Wave
 
@@ -103,7 +103,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Animated progress bar with traveling bright spot.
 
-    **Class:** `EffectProgress` · **Best on:** Multizone
+    **Class:** `EffectProgress` · **Best on:** Multizone, Mirror (seam at zone 0)
 
 -   ### Rainbow
 
@@ -151,7 +151,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Sonar pulses bounce off drifting obstacles with decay tails.
 
-    **Class:** `EffectSonar` · **Best on:** Multizone
+    **Class:** `EffectSonar` · **Best on:** Multizone, Mirror (seam at zone 0)
 
 -   ### Spectrum Sweep
 
