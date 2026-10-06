@@ -77,6 +77,10 @@ class EffectSine(FrameEffect):
     The negative half-cycle shows floor brightness, creating distinct
     bright humps separated by dim gaps that scroll continuously.
 
+    On a Mirror ring (``FrameContext.wraps``) the wave holds a whole number of
+    cycles, the nearest to ``1 / wavelength`` and at least one, and a ``hue2``
+    gradient runs out from zone 0 and back, so there is no seam at zone 0.
+
     Attributes:
         speed: Seconds per full wave cycle (travel speed)
         wavelength: Wavelength as fraction of strip length
@@ -211,6 +215,13 @@ class EffectSine(FrameEffect):
         # Direction multiplier.
         direction: float = -1.0 if self.reverse else 1.0
 
+        # On a ring the wave must come back to where it started, so it holds a
+        # whole number of cycles: the nearest whole number to the requested
+        # wavelength, and never fewer than one.
+        cycles: float = 1.0 / self.wavelength
+        if ctx.wraps:
+            cycles = max(round(cycles), 1)
+
         zpb = self.zones_per_bulb
         bulb_count = max(ctx.pixel_count // zpb, 1)
 
@@ -223,9 +234,7 @@ class EffectSine(FrameEffect):
             x: float = bulb_index / bulb_count if bulb_count > 0 else 0.0
 
             # Traveling wave: sin(2pi * (x/wavelength - t/speed))
-            phase = _TWO_PI * (
-                x / self.wavelength - direction * ctx.elapsed_s / self.speed
-            )
+            phase = _TWO_PI * (x * cycles - direction * ctx.elapsed_s / self.speed)
             displacement = math.sin(phase)
 
             if displacement <= 0.0:
@@ -244,7 +253,10 @@ class EffectSine(FrameEffect):
                 bri = self.floor + bri_range * eased
 
                 if use_gradient:
-                    blended = base_color.lerp_oklab(end_color, x)
+                    # The gradient runs out from zone 0 and back, so a ring
+                    # closes it without a jump.
+                    along = 1.0 - abs(2.0 * x - 1.0) if ctx.wraps else x
+                    blended = base_color.lerp_oklab(end_color, along)
                     bulb_colors.append(
                         HSBK(
                             hue=blended.hue,

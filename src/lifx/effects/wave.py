@@ -61,6 +61,11 @@ class EffectWave(FrameEffect):
     component ``sin(2pi * t / speed)`` makes segments between nodes
     swing back and forth in alternating directions.
 
+    On a Mirror ring (``FrameContext.wraps``) the string closes on itself:
+    bulbs are spaced evenly round the ring and an odd ``nodes`` is raised by
+    one, because a standing wave on a ring has an even number of nodes. There is
+    no seam at zone 0.
+
     Attributes:
         speed: Seconds per oscillation cycle
         nodes: Number of stationary nodes along the string
@@ -188,22 +193,31 @@ class EffectWave(FrameEffect):
         # Compute logical bulb count
         bulb_count = max(ctx.pixel_count // self.zones_per_bulb, 1)
 
+        # On a ring the last bulb sits next to the first, so the string closes
+        # on itself: bulbs are spaced evenly round the ring and the pattern
+        # holds a whole number of cycles. A standing wave on a ring has an
+        # even number of nodes, so an odd count is raised by one.
+        nodes = self.nodes
+        if ctx.wraps and nodes % 2:
+            nodes += 1
+
         # Render to logical bulbs
         bulb_colors: list[HSBK] = []
         for i in range(bulb_count):
             # Use bulb index so all zones within a polychrome bulb share
             # the same wave position (zones_per_bulb awareness).
             # Normalized position along the string (0.0 to 1.0).
-            x: float = i / (bulb_count - 1) if bulb_count > 1 else 0.0
+            if ctx.wraps:
+                x: float = i / bulb_count
+            else:
+                x = i / (bulb_count - 1) if bulb_count > 1 else 0.0
 
             # Spatial component: sin(nodes * pi * x) creates fixed nodes
             # where the string doesn't move. For a single-bulb device
             # x=0 is always a node (sin(0)=0), so force full antinode
             # amplitude so the temporal oscillation drives the output.
             spatial: float = (
-                1.0
-                if bulb_count == 1
-                else math.sin(self.nodes * math.pi * x + drift_rad)
+                1.0 if bulb_count == 1 else math.sin(nodes * math.pi * x + drift_rad)
             )
 
             # Combined displacement: -1.0 to +1.0.

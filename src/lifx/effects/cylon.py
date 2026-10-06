@@ -59,6 +59,9 @@ class EffectCylon(FrameEffect):
     The eye has a cosine-shaped brightness profile so it tapers smoothly
     on both sides. Eye width, color, speed, and trail are all tunable.
 
+    On a Mirror ring (``FrameContext.wraps``) the eye circles at a steady speed
+    and crosses zone 0 without turning, so there is no seam.
+
     Attributes:
         speed: Seconds per full sweep (there and back)
         width: Width of the eye in logical bulbs

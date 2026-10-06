@@ -69,6 +69,10 @@ class EffectSpectrumSweep(FrameEffect):
     transitions.  The result is a smooth, continuously shifting rainbow that
     wraps and travels.
 
+    On a Mirror ring (``FrameContext.wraps``) the zones are spaced evenly round
+    the ring and ``waves`` is rounded to a whole number (at least one), so the
+    spectrum closes on itself with no seam at zone 0.
+
     Attributes:
         speed: Seconds per full sweep cycle
         waves: Number of wave periods across the strip
@@ -154,10 +158,18 @@ class EffectSpectrumSweep(FrameEffect):
         bulb_colors: list[HSBK] = []
         for z in range(bulb_count):
             # Spatial position along the strip (0 to 1).
-            pos = z / max(bulb_count - 1, 1)
+            # On a ring the last zone sits next to the first, so zones are
+            # spaced evenly round it and the sweep holds a whole number of
+            # wave periods (never fewer than one).
+            if ctx.wraps:
+                pos = z / bulb_count
+                waves = max(round(self.waves), 1)
+            else:
+                pos = z / max(bulb_count - 1, 1)
+                waves = self.waves
 
             # Spatial frequency -- how many wave periods fit on the strip.
-            spatial = _TWO_PI * self.waves * pos
+            spatial = _TWO_PI * waves * pos
 
             # Three sine waves, 120 degrees apart.
             # Map sine (-1..+1) to amplitude (0..1).

@@ -17,6 +17,17 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 if TYPE_CHECKING:
     from lifx.devices.light import Light
 
+# Radians of spatial phase each flicker wave advances across the whole canvas.
+_SPATIAL: tuple[float, float, float] = (17.1, 31.7, 53.3)
+
+# A ring needs a whole number of cycles to close on itself, so each wave holds
+# the nearest whole number of cycles to the one above (about 3, 5 and 8).
+_RING_SPATIAL: tuple[float, float, float] = (
+    6.0 * math.pi,
+    10.0 * math.pi,
+    16.0 * math.pi,
+)
+
 
 class EffectFlicker(FrameEffect):
     """Fire/candle flicker effect using layered sine waves.
@@ -24,6 +35,10 @@ class EffectFlicker(FrameEffect):
     Creates organic brightness variation with warm colors ranging from
     deep red to yellow. On matrix devices, applies vertical brightness
     falloff so bottom rows are hotter.
+
+    On a Mirror ring (``FrameContext.wraps``) each flicker wave holds a whole
+    number of cycles round the ring, so zone 0 flickers in step with the last
+    zone and there is no seam.
 
     Attributes:
         intensity: Flicker intensity 0.0-1.0 (higher = more variation)
@@ -97,7 +112,7 @@ class EffectFlicker(FrameEffect):
         """Return the name of the effect."""
         return "flicker"
 
-    def _flicker(self, t: float, seed: float) -> float:
+    def _flicker(self, t: float, seed: float, ring: bool = False) -> float:
         """Return 0.0-1.0 flicker value from layered sine waves.
 
         Uses three sine waves with prime-ish frequency ratios for
@@ -106,13 +121,17 @@ class EffectFlicker(FrameEffect):
         Args:
             t: Time value (elapsed_s * speed)
             seed: Spatial seed (pixel position / pixel_count)
+            ring: True on a canvas that wraps. Each wave then holds a whole
+                number of cycles round the ring, so zone 0 carries on from the
+                last zone with no jump.
 
         Returns:
             Flicker intensity between 0.0 and 1.0
         """
-        v1 = math.sin(t * 3.7 + seed * 17.1) * 0.5 + 0.5
-        v2 = math.sin(t * 7.3 + seed * 31.7) * 0.25 + 0.5
-        v3 = math.sin(t * 13.1 + seed * 53.3) * 0.125 + 0.5
+        k1, k2, k3 = _RING_SPATIAL if ring else _SPATIAL
+        v1 = math.sin(t * 3.7 + seed * k1) * 0.5 + 0.5
+        v2 = math.sin(t * 7.3 + seed * k2) * 0.25 + 0.5
+        v3 = math.sin(t * 13.1 + seed * k3) * 0.125 + 0.5
         return (v1 + v2 + v3) / 3.0
 
     def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
@@ -134,7 +153,7 @@ class EffectFlicker(FrameEffect):
         colors: list[HSBK] = []
         for i in range(ctx.pixel_count):
             seed = i / max(ctx.pixel_count, 1)
-            flicker = self._flicker(t, seed)
+            flicker = self._flicker(t, seed, ctx.wraps)
 
             # Brightness: base * (1 - intensity + intensity * flicker)
             pixel_brightness = self.brightness * (

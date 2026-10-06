@@ -139,6 +139,10 @@ async def main():
 asyncio.run(main())
 ```
 
+!!! info "On a Mirror ring"
+    The rainbow closes on itself round a Mirror ring: zone 24 is one step of hue short of zone 0, so there is
+    no seam and it keeps circulating.
+
 ### Flicker Effect
 
 The `EffectFlicker` creates a warm fire/candle flicker using layered sine waves. On matrix devices, bottom rows glow hotter:
@@ -163,6 +167,10 @@ await asyncio.sleep(30)
 await conductor.stop(lights)
 ```
 
+!!! info "On a Mirror ring"
+    Each flicker wave holds a whole number of cycles round a Mirror ring, so zone 0 flickers in step with
+    zone 24 and there is no seam.
+
 ### Aurora Effect
 
 The `EffectAurora` simulates northern lights with flowing colored bands. Best on multizone strips and matrix lights:
@@ -181,6 +189,10 @@ await conductor.start(effect, lights)
 await asyncio.sleep(60)
 await conductor.stop(lights)
 ```
+
+!!! info "On a Mirror ring"
+    The brightness bands hold two whole cycles round a Mirror ring instead of one and a half, so the bands
+    meet at zone 0 with no seam. Strips and matrix lights keep the original pattern.
 
 ### Progress Bar Effect
 
@@ -620,6 +632,10 @@ await conductor.stop(lights)
 
 **Key parameters:** `speed` (seconds per sweep), `width` (eye width in bulbs), `hue`, `trail` (decay factor 0-1)
 
+!!! info "On a Mirror ring"
+    The eye circles the ring at a steady speed and crosses zone 0 without turning, so there is no seam.
+
+
 ### Wave
 
 ![Wave effect](../assets/effects/wave_zpb3.gif)
@@ -639,6 +655,11 @@ await conductor.start(effect, lights)
 ```
 
 **Key parameters:** `speed` (oscillation period), `nodes` (stationary points), `hue1`/`hue2`, `drift` (spatial drift degrees/s)
+
+!!! info "On a Mirror ring"
+    A standing wave on a ring has an even number of nodes, so an odd `nodes` is raised by one and the
+    zones are spaced evenly round the ring. The wave has no seam at zone 0.
+
 
 ### Sine
 
@@ -660,6 +681,11 @@ await conductor.start(effect, lights)
 
 **Key parameters:** `speed`, `wavelength` (fraction of strip), `hue`, `hue2` (optional gradient), `floor` (min brightness)
 
+!!! info "On a Mirror ring"
+    The wave holds a whole number of cycles round the ring (the nearest to `1 / wavelength`, at least one), so
+    the humps roll on past zone 0 with no seam. A `hue2` gradient runs out from zone 0 and back, so it closes too.
+
+
 ### Spectrum Sweep
 
 ![Spectrum Sweep effect](../assets/effects/spectrum_sweep_zpb3.gif)
@@ -674,6 +700,11 @@ await conductor.start(effect, lights)
 ```
 
 **Key parameters:** `speed` (sweep period), `waves` (number of wave periods across strip)
+
+!!! info "On a Mirror ring"
+    `waves` is rounded to a whole number (at least one) and the zones are spaced evenly round the ring, so the
+    spectrum closes on itself with no seam.
+
 
 ### Spin
 
@@ -690,6 +721,10 @@ await conductor.start(effect, lights)
 ```
 
 **Key parameters:** `speed` (rotation period), `bulb_offset` (per-zone hue shift for shimmer)
+
+!!! info "On a Mirror ring"
+    The palette closes without repeating a colour and the shimmer folds about zone 0, so there is no seam.
+
 
 ### Twinkle
 
@@ -710,6 +745,10 @@ await conductor.start(effect, lights)
 ```
 
 **Key parameters:** `speed` (fade duration), `density` (sparkle probability per frame), `hue`, `saturation`
+
+!!! info "On a Mirror ring"
+    Each zone sparkles on its own and never looks at its neighbours, so a ring has no seam to hide.
+
 
 ### Embers
 
