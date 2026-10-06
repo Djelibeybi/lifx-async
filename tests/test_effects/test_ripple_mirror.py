@@ -7,7 +7,6 @@ Conductor start on the emulated Mirror, and the frames the effect draws.
 
 from __future__ import annotations
 
-import hashlib
 import random
 
 import pytest
@@ -17,31 +16,17 @@ from lifx.devices.mirror import MirrorLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects import EffectRipple
 from lifx.effects.conductor import Conductor
-from lifx.effects.frame_effect import FrameContext
 from lifx.effects.registry import DeviceSupport, DeviceType, get_effect_registry
-
-_RING = 25
+from tests.test_effects.test_ring_helpers import (
+    RING,
+    brightness,
+    draw_frames,
+    ring_ctx,
+    strip_digest,
+)
 
 # Perceptual brightness of a pixel the surface has left untouched.
 _FLOOR = 0.8 * 0.02
-
-
-def _ctx(elapsed_s: float, wraps: bool) -> FrameContext:
-    return FrameContext(
-        elapsed_s=elapsed_s,
-        device_index=0,
-        pixel_count=_RING,
-        canvas_width=_RING,
-        canvas_height=1,
-        wraps=wraps,
-    )
-
-
-def _brightness(effect: EffectRipple, frames: int, wraps: bool) -> list[list[float]]:
-    return [
-        [c.brightness for c in effect.generate_frame(_ctx(f / 20, wraps))]
-        for f in range(frames)
-    ]
 
 
 class TestRegistry:
@@ -119,42 +104,34 @@ class TestConductor:
 class TestFrames:
     def test_a_ring_ripple_lights_both_sides_of_the_closing_zone(self) -> None:
         random.seed(11)
-        frames = _brightness(EffectRipple(drop_rate=2.0), 600, wraps=True)
+        frames = brightness(draw_frames(EffectRipple(drop_rate=2.0), 600, wraps=True))
         peak = 0.8
         # Waves cross zone 24 to 0 as freely as any other pair of zones.
         assert max(f[0] for f in frames) > peak / 2
-        assert max(f[_RING - 1] for f in frames) > peak / 2
+        assert max(f[RING - 1] for f in frames) > peak / 2
 
     def test_a_strip_ripple_keeps_its_ends_still(self) -> None:
         random.seed(11)
-        frames = _brightness(EffectRipple(drop_rate=2.0), 600, wraps=False)
+        frames = brightness(draw_frames(EffectRipple(drop_rate=2.0), 600, wraps=False))
         assert max(f[0] for f in frames) == pytest.approx(_FLOOR)
-        assert max(f[_RING - 1] for f in frames) == pytest.approx(_FLOOR)
+        assert max(f[RING - 1] for f in frames) == pytest.approx(_FLOOR)
 
     def test_a_strip_frame_is_unchanged(self) -> None:
         random.seed(7)
         effect = EffectRipple(drop_rate=2.0)
-        digest = hashlib.sha256()
-        for f in range(120):
-            frame = effect.generate_frame(_ctx(f / 20, wraps=False))
-            digest.update(
-                repr(
-                    [(c.hue, c.saturation, c.brightness, c.kelvin) for c in frame]
-                ).encode()
-            )
         # Pinned from the strip rendering before the Mirror port.
-        assert digest.hexdigest() == _STRIP_DIGEST
+        assert strip_digest(effect, 120) == _STRIP_DIGEST
 
     def test_a_ring_and_a_strip_do_not_share_one_surface(self) -> None:
         random.seed(5)
         effect = EffectRipple(drop_rate=2.0)
         for f in range(200):
-            effect.generate_frame(_ctx(f / 20, wraps=True))
+            effect.generate_frame(ring_ctx(f / 20, wraps=True))
         # Moving to a strip canvas restarts the surface: the ends are fixed.
         for f in range(200):
-            strip = effect.generate_frame(_ctx(10 + f / 20, wraps=False))
+            strip = effect.generate_frame(ring_ctx(10 + f / 20, wraps=False))
             assert strip[0].brightness == pytest.approx(_FLOOR)
-            assert strip[_RING - 1].brightness == pytest.approx(_FLOOR)
+            assert strip[RING - 1].brightness == pytest.approx(_FLOOR)
 
 
 _STRIP_DIGEST = "b8643c1a3e776c72f702802a7c4a5e3a763857b290f91419cc29acff41fb8f3c"

@@ -23,10 +23,9 @@ from lifx.effects import (
     EffectSonar,
 )
 from lifx.effects.conductor import Conductor
-from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.frame_effect import FrameEffect
 from lifx.effects.registry import DeviceSupport, DeviceType, get_effect_registry
-
-_RING = 25
+from tests.test_effects.test_ring_helpers import RING, ring_ctx, tuple_frames
 
 _FACTORIES: dict[str, Callable[[], FrameEffect]] = {
     "progress": lambda: EffectProgress(end_value=100, position=40.0),
@@ -37,27 +36,10 @@ _FACTORIES: dict[str, Callable[[], FrameEffect]] = {
 _NAMES = tuple(_FACTORIES)
 
 
-def _ctx(elapsed_s: float, wraps: bool) -> FrameContext:
-    return FrameContext(
-        elapsed_s=elapsed_s,
-        device_index=0,
-        pixel_count=_RING,
-        canvas_width=_RING,
-        canvas_height=1,
-        wraps=wraps,
-    )
-
-
 def _frames(name: str, wraps: bool, count: int = 120) -> list[list[tuple]]:
     random.seed(23)
     effect = _FACTORIES[name]()
-    return [
-        [
-            (c.hue, c.saturation, c.brightness, c.kelvin)
-            for c in effect.generate_frame(_ctx(f / 20, wraps))
-        ]
-        for f in range(count)
-    ]
+    return tuple_frames(effect, wraps, count)
 
 
 class TestRegistry:
@@ -156,6 +138,6 @@ class TestFrames:
 
     def test_progress_fills_from_zone_zero_and_leaves_the_end_empty(self) -> None:
         effect = EffectProgress(end_value=100, position=40.0)
-        frame = effect.generate_frame(_ctx(0.0, wraps=True))
-        assert frame[0].brightness > frame[_RING - 1].brightness
-        assert frame[_RING - 1] == effect.background
+        frame = effect.generate_frame(ring_ctx(0.0, wraps=True))
+        assert frame[0].brightness > frame[RING - 1].brightness
+        assert frame[RING - 1] == effect.background

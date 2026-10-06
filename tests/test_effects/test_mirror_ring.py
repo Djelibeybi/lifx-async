@@ -23,6 +23,7 @@ from lifx.protocol import packets
 from lifx.protocol.base import Packet
 from lifx.theme import Theme
 from tests.test_devices import test_component_transitions as transitions
+from tests.test_effects.test_ring_helpers import RING, advances_one_zone, ring_ctx
 
 # Set64 colours start after the 36-byte header and the 10-byte payload prefix
 # (tile index, length, rect and duration).
@@ -215,26 +216,13 @@ async def test_whole_light_effect_on_a_ceiling_does_not_wrap(
 # pattern that circulates must look the same one zone further on, and the
 # step from zone 24 to zone 0 must be no bigger than any other step.
 
-_RING = 25
-
-
-def _ring_ctx(elapsed_s: float, wraps: bool = True) -> FrameContext:
-    return FrameContext(
-        elapsed_s=elapsed_s,
-        device_index=0,
-        pixel_count=_RING,
-        canvas_width=_RING,
-        canvas_height=1,
-        wraps=wraps,
-    )
-
 
 def _hue_gap(a: float, b: float) -> float:
     gap = abs(a - b) % 360
     return min(gap, 360 - gap)
 
 
-def _same(a: HSBK, b: HSBK) -> bool:
+def _visibly_same(a: HSBK, b: HSBK) -> bool:
     return (
         _hue_gap(a.hue, b.hue) <= 1
         and abs(a.saturation - b.saturation) < 0.01
@@ -243,78 +231,73 @@ def _same(a: HSBK, b: HSBK) -> bool:
     )
 
 
-def _advances_one_zone(before: list[HSBK], after: list[HSBK], step: int) -> bool:
-    """True if ``after`` is ``before`` moved ``step`` zones round the ring."""
-    return all(_same(after[i], before[(i - step) % _RING]) for i in range(_RING))
-
-
 THEME = Theme([HSBK(0, 1, 0.8, 3500), HSBK(120, 1, 0.8, 3500), HSBK(240, 1, 0.8, 3500)])
 
 
 def test_spin_circulates_round_a_ring_without_a_seam():
     effect = EffectSpin(speed=10.0, theme=THEME, bulb_offset=0.0)
-    before = effect.generate_frame(_ring_ctx(1.0))
-    after = effect.generate_frame(_ring_ctx(1.0 + 10.0 / _RING))
+    before = effect.generate_frame(ring_ctx(1.0))
+    after = effect.generate_frame(ring_ctx(1.0 + 10.0 / RING))
 
     # Palette position rises with the zone, so the frame one zone-time later
     # is the frame moved one zone back.
-    assert _advances_one_zone(before, after, -1)
+    assert advances_one_zone(before, after, -1, _visibly_same)
 
 
 def test_spin_shimmer_has_no_jump_where_the_ring_closes():
     effect = EffectSpin(theme=Theme([HSBK(0, 1, 0.8, 3500)]), bulb_offset=5.0)
-    frame = effect.generate_frame(_ring_ctx(0.0))
+    frame = effect.generate_frame(ring_ctx(0.0))
 
-    gaps = [_hue_gap(frame[i].hue, frame[(i + 1) % _RING].hue) for i in range(_RING)]
+    gaps = [_hue_gap(frame[i].hue, frame[(i + 1) % RING].hue) for i in range(RING)]
     assert max(gaps) <= 5 + 1
 
 
 def test_spin_on_a_strip_is_unchanged():
     effect = EffectSpin(theme=Theme([HSBK(0, 1, 0.8, 3500)]), bulb_offset=5.0)
-    frame = effect.generate_frame(_ring_ctx(0.0, wraps=False))
+    frame = effect.generate_frame(ring_ctx(0.0, wraps=False))
 
     # The shimmer climbs 5 degrees a zone from one end to the other.
-    assert [round(c.hue) for c in frame] == [i * 5 for i in range(_RING)]
+    assert [round(c.hue) for c in frame] == [i * 5 for i in range(RING)]
 
 
 def test_cylon_eye_circulates_round_a_ring():
     effect = EffectCylon(speed=2.0, width=3, trail=0.0)
-    before = effect.generate_frame(_ring_ctx(0.3))
-    after = effect.generate_frame(_ring_ctx(0.3 + 2.0 / _RING))
+    before = effect.generate_frame(ring_ctx(0.3))
+    after = effect.generate_frame(ring_ctx(0.3 + 2.0 / RING))
 
     # The eye keeps going the same way: one zone-time later it is one zone on.
-    assert _advances_one_zone(before, after, 1)
+    assert advances_one_zone(before, after, 1, _visibly_same)
 
 
 def test_cylon_eye_crosses_where_the_ring_closes():
     effect = EffectCylon(speed=2.0, width=3, trail=0.0)
-    frame = effect.generate_frame(_ring_ctx(0.0))
+    frame = effect.generate_frame(ring_ctx(0.0))
 
     # The eye centred on zone 0 lights its neighbours on both sides.
     assert frame[1].brightness > 0
-    assert frame[_RING - 1].brightness == pytest.approx(frame[1].brightness)
+    assert frame[RING - 1].brightness == pytest.approx(frame[1].brightness)
 
 
 def test_cylon_on_a_strip_still_bounces_off_the_ends():
     effect = EffectCylon(speed=2.0, width=3, trail=0.0)
-    start = effect.generate_frame(_ring_ctx(0.0, wraps=False))
-    middle = effect.generate_frame(_ring_ctx(1.0, wraps=False))
+    start = effect.generate_frame(ring_ctx(0.0, wraps=False))
+    middle = effect.generate_frame(ring_ctx(1.0, wraps=False))
 
     assert start[0].brightness == pytest.approx(0.8)
-    assert start[_RING - 1].brightness == 0
-    assert middle[_RING - 1].brightness == pytest.approx(0.8)
+    assert start[RING - 1].brightness == 0
+    assert middle[RING - 1].brightness == pytest.approx(0.8)
 
 
 def test_rainbow_circulates_round_a_ring_without_a_seam():
     effect = EffectRainbow(period=10.0)
-    before = effect.generate_frame(_ring_ctx(1.0))
-    after = effect.generate_frame(_ring_ctx(1.0 + 10.0 / _RING))
+    before = effect.generate_frame(ring_ctx(1.0))
+    after = effect.generate_frame(ring_ctx(1.0 + 10.0 / RING))
 
-    assert _advances_one_zone(before, after, -1)
+    assert advances_one_zone(before, after, -1, _visibly_same)
     # The step from the last zone back to the first matches every other step.
-    gaps = [_hue_gap(before[i].hue, before[(i + 1) % _RING].hue) for i in range(_RING)]
+    gaps = [_hue_gap(before[i].hue, before[(i + 1) % RING].hue) for i in range(RING)]
     assert max(gaps) - min(gaps) <= 1
-    assert effect.generate_frame(_ring_ctx(1.0, wraps=False)) == before
+    assert effect.generate_frame(ring_ctx(1.0, wraps=False)) == before
 
 
 async def test_colorloop_paints_the_whole_ring_one_colour(
@@ -322,11 +305,11 @@ async def test_colorloop_paints_the_whole_ring_one_colour(
 ):
     effect = EffectColorloop(period=10.0)
     await effect.async_setup([mirror_rig.light])
-    frame = effect.generate_frame(_ring_ctx(2.0))
+    frame = effect.generate_frame(ring_ctx(2.0))
 
-    assert len(frame) == _RING
+    assert len(frame) == RING
     assert len(set(frame)) == 1
-    assert effect.generate_frame(_ring_ctx(2.0, wraps=False)) == frame
+    assert effect.generate_frame(ring_ctx(2.0, wraps=False)) == frame
 
 
 async def test_an_effect_borrows_the_light_s_own_animator(

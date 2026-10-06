@@ -16,25 +16,14 @@ import pytest
 from lifx.color import HSBK
 from lifx.effects.aurora import EffectAurora
 from lifx.effects.flicker import EffectFlicker
-from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.frame_effect import FrameEffect
 from lifx.effects.sine import EffectSine
 from lifx.effects.spectrum_sweep import EffectSpectrumSweep
 from lifx.effects.twinkle import EffectTwinkle
 from lifx.effects.wave import EffectWave
+from tests.test_effects.test_ring_helpers import RING, advances_one_zone, ring_ctx
 
-_RING = 25
 _TIMES = (0.0, 0.37, 1.1, 2.3, 3.9)
-
-
-def _ctx(elapsed_s: float, wraps: bool = True) -> FrameContext:
-    return FrameContext(
-        elapsed_s=elapsed_s,
-        device_index=0,
-        pixel_count=_RING,
-        canvas_width=_RING,
-        canvas_height=1,
-        wraps=wraps,
-    )
 
 
 def _step(a: HSBK, b: HSBK) -> float:
@@ -54,22 +43,17 @@ def _seam_excess(frame: list[HSBK]) -> float:
     A smooth pattern can change quickly in places, so the seam is held to the
     steps either side of it rather than to the steepest step on the ring.
     """
-    steps = [_step(frame[i], frame[(i + 1) % _RING]) for i in range(_RING)]
-    return steps[_RING - 1] - 1.5 * max(steps[_RING - 2], steps[0])
+    steps = [_step(frame[i], frame[(i + 1) % RING]) for i in range(RING)]
+    return steps[RING - 1] - 1.5 * max(steps[RING - 2], steps[0])
 
 
-def _same(a: HSBK, b: HSBK) -> bool:
+def _visibly_same(a: HSBK, b: HSBK) -> bool:
     return _step(a, b) < 0.01 and a.kelvin == b.kelvin
-
-
-def _advances_one_zone(before: list[HSBK], after: list[HSBK], step: int) -> bool:
-    """True if ``after`` is ``before`` moved ``step`` zones round the ring."""
-    return all(_same(after[i], before[(i - step) % _RING]) for i in range(_RING))
 
 
 def _assert_seamless(effect: FrameEffect) -> None:
     for elapsed_s in _TIMES:
-        frame = effect.generate_frame(_ctx(elapsed_s))
+        frame = effect.generate_frame(ring_ctx(elapsed_s))
         assert _seam_excess(frame) <= 0.02, f"seam at t={elapsed_s}"
 
 
@@ -79,12 +63,12 @@ def test_wave_with_an_odd_node_count_has_no_seam_on_a_ring():
 
 def test_wave_keeps_its_node_count_on_a_ring_when_it_is_even():
     effect = EffectWave(nodes=2)
-    frame = effect.generate_frame(_ctx(1.0))
+    frame = effect.generate_frame(ring_ctx(1.0))
 
     # Two nodes round the ring: the brightness dips twice, at the opposite
     # sides of the ring.
-    dim = [i for i in range(_RING) if frame[i].brightness < 0.4]
-    assert dim and min(dim) < _RING // 2 < max(dim)
+    dim = [i for i in range(RING) if frame[i].brightness < 0.4]
+    assert dim and min(dim) < RING // 2 < max(dim)
     _assert_seamless(effect)
 
 
@@ -92,7 +76,7 @@ def _probe(frame: list[HSBK]) -> list[tuple[int, float, float, int]]:
     """Hue, saturation, brightness and kelvin of zones 0, 1, 12 and 24."""
     return [
         (round(frame[i].hue), frame[i].saturation, frame[i].brightness, frame[i].kelvin)
-        for i in (0, 1, 12, _RING - 1)
+        for i in (0, 1, 12, RING - 1)
     ]
 
 
@@ -105,7 +89,7 @@ def _assert_strip_frame(frame: list[HSBK], expected: list[tuple]) -> None:
 
 
 def test_wave_on_a_strip_is_unchanged():
-    frame = EffectWave(nodes=3, drift=40.0).generate_frame(_ctx(1.1, wraps=False))
+    frame = EffectWave(nodes=3, drift=40.0).generate_frame(ring_ctx(1.1, wraps=False))
 
     _assert_strip_frame(
         frame,
@@ -123,7 +107,9 @@ def test_sine_with_a_fractional_cycle_count_has_no_seam_on_a_ring():
 
 
 def test_sine_on_a_strip_is_unchanged():
-    frame = EffectSine(wavelength=0.7, hue2=300).generate_frame(_ctx(1.1, wraps=False))
+    frame = EffectSine(wavelength=0.7, hue2=300).generate_frame(
+        ring_ctx(1.1, wraps=False)
+    )
 
     _assert_strip_frame(
         frame,
@@ -140,23 +126,23 @@ def test_spectrum_sweep_with_fractional_waves_has_no_seam_on_a_ring():
     # 1.5 waves cannot close on a ring, so the sweep holds two: a zone-time
     # later (speed * waves / zones) the pattern has moved exactly one zone.
     effect = EffectSpectrumSweep(speed=6.0, waves=1.5)
-    before = effect.generate_frame(_ctx(1.0))
-    after = effect.generate_frame(_ctx(1.0 + 6.0 * 2 / _RING))
+    before = effect.generate_frame(ring_ctx(1.0))
+    after = effect.generate_frame(ring_ctx(1.0 + 6.0 * 2 / RING))
 
-    assert _advances_one_zone(before, after, 1)
+    assert advances_one_zone(before, after, 1, _visibly_same)
 
 
 def test_spectrum_sweep_spaces_the_ring_evenly():
-    frame = EffectSpectrumSweep().generate_frame(_ctx(0.0))
+    frame = EffectSpectrumSweep().generate_frame(ring_ctx(0.0))
 
     # One wave round 25 zones: zone 0 is not repeated at zone 24.
-    assert _step(frame[_RING - 1], frame[0]) == pytest.approx(
+    assert _step(frame[RING - 1], frame[0]) == pytest.approx(
         _step(frame[0], frame[1]), abs=0.05
     )
 
 
 def test_spectrum_sweep_on_a_strip_is_unchanged():
-    frame = EffectSpectrumSweep(waves=1.5).generate_frame(_ctx(1.1, wraps=False))
+    frame = EffectSpectrumSweep(waves=1.5).generate_frame(ring_ctx(1.1, wraps=False))
 
     _assert_strip_frame(
         frame,
@@ -176,13 +162,13 @@ def test_aurora_has_no_seam_on_a_ring():
 def test_aurora_protocol_frame_has_no_seam_on_a_ring():
     effect = EffectAurora()
     for elapsed_s in _TIMES:
-        frame = effect.generate_protocol_frame(_ctx(elapsed_s))
-        steps = [abs(frame[i][2] - frame[(i + 1) % _RING][2]) for i in range(_RING)]
-        assert steps[_RING - 1] <= max(steps[: _RING - 1]) + 1300
+        frame = effect.generate_protocol_frame(ring_ctx(elapsed_s))
+        steps = [abs(frame[i][2] - frame[(i + 1) % RING][2]) for i in range(RING)]
+        assert steps[RING - 1] <= max(steps[: RING - 1]) + 1300
 
 
 def test_aurora_on_a_strip_is_unchanged():
-    frame = EffectAurora().generate_frame(_ctx(1.1, wraps=False))
+    frame = EffectAurora().generate_frame(ring_ctx(1.1, wraps=False))
 
     _assert_strip_frame(
         frame,
@@ -197,8 +183,8 @@ def test_aurora_on_a_strip_is_unchanged():
 
 def test_aurora_protocol_frame_on_a_strip_matches_its_frame():
     effect = EffectAurora()
-    frame = effect.generate_frame(_ctx(1.1, wraps=False))
-    protocol = effect.generate_protocol_frame(_ctx(1.1, wraps=False))
+    frame = effect.generate_frame(ring_ctx(1.1, wraps=False))
+    protocol = effect.generate_protocol_frame(ring_ctx(1.1, wraps=False))
 
     assert [p[2] for p in protocol] == pytest.approx(
         [round(65535 * c.brightness) for c in frame], abs=2
@@ -212,19 +198,19 @@ def test_flicker_has_no_seam_on_a_ring():
     seam = other = 0.0
     frames = 80
     for n in range(frames):
-        frame = effect.generate_frame(_ctx(n * 0.13))
+        frame = effect.generate_frame(ring_ctx(n * 0.13))
         steps = [
-            abs(frame[i].brightness - frame[(i + 1) % _RING].brightness)
-            for i in range(_RING)
+            abs(frame[i].brightness - frame[(i + 1) % RING].brightness)
+            for i in range(RING)
         ]
-        seam += steps[_RING - 1]
-        other += sum(steps[: _RING - 1]) / (_RING - 1)
+        seam += steps[RING - 1]
+        other += sum(steps[: RING - 1]) / (RING - 1)
 
     assert seam / frames <= 1.25 * other / frames
 
 
 def test_flicker_on_a_strip_is_unchanged():
-    frame = EffectFlicker().generate_frame(_ctx(1.1, wraps=False))
+    frame = EffectFlicker().generate_frame(ring_ctx(1.1, wraps=False))
 
     _assert_strip_frame(
         frame,
@@ -240,7 +226,9 @@ def test_flicker_on_a_strip_is_unchanged():
 def _twinkle_frames(wraps: bool) -> list[list[HSBK]]:
     random.seed(7)
     effect = EffectTwinkle(density=1.0)
-    return [effect.generate_frame(_ctx(0.05 * n, wraps=wraps)) for n in range(1, 40)]
+    return [
+        effect.generate_frame(ring_ctx(0.05 * n, wraps=wraps)) for n in range(1, 40)
+    ]
 
 
 def test_twinkle_has_no_seam_because_its_zones_are_independent():

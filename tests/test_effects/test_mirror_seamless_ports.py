@@ -7,7 +7,6 @@ effect draws on a wrapping 25-pixel ring and on a strip.
 
 from __future__ import annotations
 
-import hashlib
 import random
 from collections.abc import Callable
 
@@ -25,10 +24,14 @@ from lifx.effects import (
 )
 from lifx.effects.base import LIFXEffect
 from lifx.effects.conductor import Conductor
-from lifx.effects.frame_effect import FrameContext
 from lifx.effects.registry import DeviceSupport, DeviceType, get_effect_registry
-
-_RING = 25
+from tests.test_effects.test_ring_helpers import (
+    RING,
+    brightness,
+    draw_frames,
+    ring_ctx,
+    strip_digest,
+)
 
 EffectFactory = Callable[[], LIFXEffect]
 
@@ -43,25 +46,6 @@ FACTORIES: dict[str, EffectFactory] = {
 
 # Plasma and embers are refused by every matrix light except a Mirror.
 REFUSE_MATRIX = ("plasma", "embers")
-
-
-def _ctx(elapsed_s: float, wraps: bool, pixels: int = _RING) -> FrameContext:
-    return FrameContext(
-        elapsed_s=elapsed_s,
-        device_index=0,
-        pixel_count=pixels,
-        canvas_width=pixels,
-        canvas_height=1,
-        wraps=wraps,
-    )
-
-
-def _frames(effect, count: int, wraps: bool, step: float = 0.05):
-    return [effect.generate_frame(_ctx(f * step, wraps)) for f in range(count)]
-
-
-def _brightness(frames) -> list[list[float]]:
-    return [[c.brightness for c in frame] for frame in frames]
 
 
 @pytest.mark.parametrize("name", FACTORIES)
@@ -153,16 +137,8 @@ class TestStripFramesAreUnchanged:
     def test_a_non_wrapping_frame_matches_the_strip_rendering(self, name: str) -> None:
         random.seed(7)
         effect = FACTORIES[name]()
-        digest = hashlib.sha256()
-        for f in range(240):
-            frame = effect.generate_frame(_ctx(f / 20, wraps=False))
-            digest.update(
-                repr(
-                    [(c.hue, c.saturation, c.brightness, c.kelvin) for c in frame]
-                ).encode()
-            )
         # Pinned from the strip rendering before the Mirror port.
-        assert digest.hexdigest() == _STRIP_DIGESTS[name]
+        assert strip_digest(effect, 240) == _STRIP_DIGESTS[name]
 
 
 class TestAutomataTreatTheRingAsPeriodic:
@@ -171,9 +147,9 @@ class TestAutomataTreatTheRingAsPeriodic:
     def test_rule30_carries_the_pattern_across_zones_24_and_0(self) -> None:
         random.seed(2)
         effect = EffectRule30(rule=170, seed="random", speed=1.0)
-        first = effect.generate_frame(_ctx(0.0, wraps=True))
-        second = effect.generate_frame(_ctx(1.0, wraps=True))
-        assert second[_RING - 1].brightness == first[0].brightness
+        first = effect.generate_frame(ring_ctx(0.0, wraps=True))
+        second = effect.generate_frame(ring_ctx(1.0, wraps=True))
+        assert second[RING - 1].brightness == first[0].brightness
         assert second[:-1] == first[1:]
 
     def test_rule_trio_carries_the_pattern_across_zones_24_and_0(self) -> None:
@@ -181,9 +157,9 @@ class TestAutomataTreatTheRingAsPeriodic:
         effect = EffectRuleTrio(
             rule_a=170, rule_b=170, rule_c=170, speed=1.0, drift_b=1.0, drift_c=1.0
         )
-        first = effect.generate_frame(_ctx(0.0, wraps=True))
-        second = effect.generate_frame(_ctx(1.0, wraps=True))
-        assert second[_RING - 1] == first[0]
+        first = effect.generate_frame(ring_ctx(0.0, wraps=True))
+        second = effect.generate_frame(ring_ctx(1.0, wraps=True))
+        assert second[RING - 1] == first[0]
         assert second[:-1] == first[1:]
 
     def test_rule30_and_rule_trio_frames_are_identical_on_a_ring_and_a_strip(
@@ -191,9 +167,9 @@ class TestAutomataTreatTheRingAsPeriodic:
     ) -> None:
         for name in ("rule30", "rule_trio"):
             random.seed(9)
-            ring = _frames(FACTORIES[name](), 60, wraps=True)
+            ring = draw_frames(FACTORIES[name](), 60, wraps=True)
             random.seed(9)
-            strip = _frames(FACTORIES[name](), 60, wraps=False)
+            strip = draw_frames(FACTORIES[name](), 60, wraps=False)
             assert ring == strip
 
 
@@ -201,15 +177,15 @@ class TestEmbersCloseOnThemselves:
     def test_heat_injected_at_zone_0_spills_onto_zone_24_as_onto_zone_1(self) -> None:
         random.seed(4)
         effect = EffectEmbers(intensity=1.0, turbulence=0.0)
-        ring = effect.generate_frame(_ctx(0.0, wraps=True))
-        assert ring[_RING - 1].brightness == pytest.approx(ring[1].brightness)
-        assert ring[_RING - 1].brightness > ring[2].brightness
+        ring = effect.generate_frame(ring_ctx(0.0, wraps=True))
+        assert ring[RING - 1].brightness == pytest.approx(ring[1].brightness)
+        assert ring[RING - 1].brightness > ring[2].brightness
 
     def test_a_strip_keeps_zone_24_cold(self) -> None:
         random.seed(4)
         effect = EffectEmbers(intensity=1.0, turbulence=0.0)
-        strip = effect.generate_frame(_ctx(0.0, wraps=False))
-        assert strip[_RING - 1].brightness < strip[1].brightness
+        strip = effect.generate_frame(ring_ctx(0.0, wraps=False))
+        assert strip[RING - 1].brightness < strip[1].brightness
 
 
 _STRIP_DIGESTS = {
@@ -229,9 +205,9 @@ class TestFireworksSpreadAcrossTheJoin:
         for seed in (1, 2, 3):
             random.seed(seed)
             effect = FACTORIES["fireworks"]()
-            for frame in _brightness(_frames(effect, 600, wraps)):
-                if max(frame[0], frame[_RING - 1]) > 0.2 and (
-                    min(frame[0], frame[_RING - 1]) == 0.0
+            for frame in brightness(draw_frames(effect, 600, wraps)):
+                if max(frame[0], frame[RING - 1]) > 0.2 and (
+                    min(frame[0], frame[RING - 1]) == 0.0
                 ):
                     cuts += 1
         return cuts
@@ -250,7 +226,7 @@ class TestPlasmaCarriesAcrossTheJoin:
         for wraps in (False, True):
             random.seed(seed)
             effect = EffectPlasma(tendril_rate=5.0)
-            results.append(_brightness(_frames(effect, 400, wraps)))
+            results.append(brightness(draw_frames(effect, 400, wraps)))
         return results[0], results[1]
 
     def test_a_tendril_reaching_one_end_lights_the_other_side_of_the_join(
@@ -261,7 +237,7 @@ class TestPlasmaCarriesAcrossTheJoin:
             strip, ring = self._runs(seed)
             for flat, closed in zip(strip, ring):
                 lit_zone_0 += flat[0] == 0.0 and closed[0] > 0.0
-                lit_zone_24 += flat[_RING - 1] == 0.0 and closed[_RING - 1] > 0.0
+                lit_zone_24 += flat[RING - 1] == 0.0 and closed[RING - 1] > 0.0
         assert lit_zone_0 > 0
         assert lit_zone_24 > 0
 
@@ -271,8 +247,8 @@ class TestEmbersRunOnARing:
     def _mean_zone_24(wraps: bool) -> float:
         random.seed(6)
         effect = EffectEmbers(intensity=1.0)
-        frames = _brightness(_frames(effect, 400, wraps))
-        return sum(f[_RING - 1] for f in frames) / len(frames)
+        frames = brightness(draw_frames(effect, 400, wraps))
+        return sum(f[RING - 1] for f in frames) / len(frames)
 
     def test_a_ring_keeps_zone_24_as_warm_as_the_zones_beside_zone_0(self) -> None:
         assert self._mean_zone_24(wraps=True) > 2 * self._mean_zone_24(wraps=False)
