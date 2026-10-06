@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.8.1 (2026-10-06)
+
+### Bug Fixes
+
+- **effects**: Make flicker's bottom matrix rows hotter
+  ([#281](https://github.com/Djelibeybi/lifx-async/pull/281),
+  [`3f99f93`](https://github.com/Djelibeybi/lifx-async/commit/3f99f9376fc145d7171addadeb2f9475b7b1b0b7))
+
+
 ## v7.8.0 (2026-10-06)
 
 ### Features
