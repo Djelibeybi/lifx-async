@@ -42,6 +42,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -427,17 +428,16 @@ class EffectJacobsLadder(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Jacob's Ladder effect.
 
-        Jacob's Ladder requires multizone capability (strips/beams).
+        Jacob's Ladder needs a line of pixels (strips, beams or a Mirror). On a
+        Mirror ring it keeps its seam at zone 0 and climbs from zone 0.
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light is a multizone strip or a Mirror, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Jacob's Ladder can inherit prestate from another Jacob's Ladder.

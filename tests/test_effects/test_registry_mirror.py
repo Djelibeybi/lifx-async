@@ -36,14 +36,14 @@ RING_EFFECTS = (
     "fireworks",
     "plasma",
     "embers",
-)
-
-# Effects still to be ported: the registry must not advertise them.
-TO_BE_PORTED = (
     "sonar",
     "progress",
     "jacobs_ladder",
     "newtons_cradle",
+)
+
+# Effects still to be ported: the registry must not advertise them.
+TO_BE_PORTED = (
     "pendulum_wave",
     "double_slit",
 )

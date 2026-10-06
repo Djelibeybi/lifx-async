@@ -196,7 +196,7 @@ await conductor.stop(lights)
 
 ### Progress Bar Effect
 
-The `EffectProgress` creates an animated progress bar on multizone lights (strips/beams). The filled region has a traveling bright spot, and you update the position at any time:
+The `EffectProgress` creates an animated progress bar on multizone lights (strips/beams) and on a Mirror. The filled region has a traveling bright spot, and you update the position at any time. On a Mirror, whole or either ring alone, progress keeps a seam at zone 0: the bar fills from zone 0 exactly as it does on a strip.
 
 ```python
 from lifx.effects import EffectProgress
@@ -898,6 +898,8 @@ await conductor.start(effect, lights)
 
 Electric arcs drift along the strip with flickering, crackling spikes, and electrode glows. Inspired by Frankenstein lab props.
 
+On a Mirror, whole or either ring alone, Jacob's Ladder keeps a seam at zone 0: the arcs climb from zone 0 as they do on a strip.
+
 ```python
 from lifx.effects import EffectJacobsLadder
 
@@ -913,6 +915,8 @@ await conductor.start(effect, lights)
 
 Newton's cradle momentum transfer — steel balls swing alternately with Phong sphere shading and specular highlights.
 
+On a Mirror, whole or either ring alone, Newton's Cradle keeps a seam at zone 0: the end balls stay at the ends, as on a strip.
+
 ```python
 from lifx.effects import EffectNewtonsCradle
 
@@ -927,6 +931,8 @@ await conductor.start(effect, lights)
 ![Sonar effect](../assets/effects/sonar_zpb3.gif)
 
 Sonar/radar pulses bounce off drifting obstacles. Wavefronts emit from sources, reflect off obstacles, and decay with tails.
+
+On a Mirror, whole or either ring alone, sonar keeps a seam at zone 0: pings start from zone 0 as they do on a strip.
 
 ```python
 from lifx.effects import EffectSonar
