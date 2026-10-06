@@ -639,7 +639,7 @@ await conductor.stop(lights)
 **Key parameters:** `speed` (seconds per sweep), `width` (eye width in bulbs), `hue`, `trail` (decay factor 0-1)
 
 !!! info "On a Mirror ring"
-    The eye circles the ring at a steady speed and crosses zone 0 without turning, so there is no seam.
+    The eye bounces between zone 0 and the last zone exactly as on a strip, keeping a seam at zone 0.
 
 
 ### Wave

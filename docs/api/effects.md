@@ -311,9 +311,9 @@ class FrameContext:
                         # sits next to the first
 ```
 
-Rainbow, Spin and Cylon read `wraps` so a ring shows no seam or false end: Spin
-spreads its palette round the ring without repeating a colour, and Cylon's eye circles the
-ring instead of bouncing.
+Rainbow and Spin read `wraps` so a ring shows no seam or false end: Spin
+spreads its palette round the ring without repeating a colour. Cylon's eye bounces on a ring
+as on a strip.
 
 ### Methods
 

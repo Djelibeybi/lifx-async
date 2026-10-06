@@ -262,22 +262,24 @@ def test_spin_on_a_strip_is_unchanged():
     assert [round(c.hue) for c in frame] == [i * 5 for i in range(RING)]
 
 
-def test_cylon_eye_circulates_round_a_ring():
-    effect = EffectCylon(speed=2.0, width=3, trail=0.0)
-    before = effect.generate_frame(ring_ctx(0.3))
-    after = effect.generate_frame(ring_ctx(0.3 + 2.0 / RING))
+def test_cylon_eye_bounces_on_a_ring_as_on_a_strip():
+    ring = EffectCylon(speed=2.0, width=3, trail=0.6)
+    strip = EffectCylon(speed=2.0, width=3, trail=0.6)
+    for f in range(80):
+        t = f / 20
+        assert ring.generate_frame(ring_ctx(t)) == strip.generate_frame(
+            ring_ctx(t, wraps=False)
+        )
 
-    # The eye keeps going the same way: one zone-time later it is one zone on.
-    assert advances_one_zone(before, after, 1, _visibly_same)
 
-
-def test_cylon_eye_crosses_where_the_ring_closes():
+def test_cylon_eye_turns_at_zone_0_on_a_ring():
     effect = EffectCylon(speed=2.0, width=3, trail=0.0)
     frame = effect.generate_frame(ring_ctx(0.0))
 
-    # The eye centred on zone 0 lights its neighbours on both sides.
+    # The eye starts on zone 0 and lights nothing across the seam.
+    assert frame[0].brightness == pytest.approx(0.8)
     assert frame[1].brightness > 0
-    assert frame[RING - 1].brightness == pytest.approx(frame[1].brightness)
+    assert frame[RING - 1].brightness == 0
 
 
 def test_cylon_on_a_strip_still_bounces_off_the_ends():
