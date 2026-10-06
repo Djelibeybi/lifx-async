@@ -372,8 +372,8 @@ class EffectNewtonsCradle(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Newton's Cradle effect.
 
-        Newton's Cradle needs a line of pixels. On a Mirror ring it keeps its
-        seam at zone 0 and its end balls, as on a strip.
+        Newton's Cradle needs a line of pixels. On a Mirror ring it keeps its seam at
+        the ring origin (top centre by default) and its end balls, as on a strip.
 
         Args:
             light: The light device to check

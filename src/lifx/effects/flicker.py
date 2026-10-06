@@ -36,9 +36,9 @@ class EffectFlicker(FrameEffect):
     deep red to yellow. On matrix devices, applies vertical brightness
     falloff so bottom rows are hotter.
 
-    On a Mirror ring (``FrameContext.wraps``) each flicker wave holds a whole
-    number of cycles round the ring, so zone 0 flickers in step with the last
-    zone and there is no seam.
+    On a Mirror ring (``FrameContext.wraps``) each flicker wave holds a whole number of
+    cycles round the ring, so the ring origin (top centre by default) flickers in step
+    with the pixel before it and there is no seam.
 
     Attributes:
         intensity: Flicker intensity 0.0-1.0 (higher = more variation)
@@ -122,8 +122,8 @@ class EffectFlicker(FrameEffect):
             t: Time value (elapsed_s * speed)
             seed: Spatial seed (pixel position / pixel_count)
             ring: True on a canvas that wraps. Each wave then holds a whole
-                number of cycles round the ring, so zone 0 carries on from the
-                last zone with no jump.
+                number of cycles round the ring, so the ring origin carries on from the
+                last pixel with no jump.
 
         Returns:
             Flicker intensity between 0.0 and 1.0

@@ -71,7 +71,8 @@ class EffectSpectrumSweep(FrameEffect):
 
     On a Mirror ring (``FrameContext.wraps``) the zones are spaced evenly round
     the ring and ``waves`` is rounded to a whole number (at least one), so the
-    spectrum closes on itself with no seam at zone 0.
+    spectrum closes on itself with no seam at the ring origin (top centre by
+    default).
 
     Attributes:
         speed: Seconds per full sweep cycle

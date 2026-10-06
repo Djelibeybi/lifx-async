@@ -57,8 +57,9 @@ class EffectAurora(FrameEffect):
     patterns. Best on multizone strips and matrix lights where per-pixel
     color variation creates beautiful flowing colored bands.
 
-    On a Mirror ring (``FrameContext.wraps``) the brightness bands hold two whole
-    cycles instead of one and a half, so they meet at zone 0 with no seam.
+    On a Mirror ring (``FrameContext.wraps``) the brightness bands hold two whole cycles
+    instead of one and a half, so they meet at the ring origin (top centre by default)
+    with no seam.
 
     Attributes:
         speed: Animation speed multiplier

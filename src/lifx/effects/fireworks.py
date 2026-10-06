@@ -165,8 +165,9 @@ class EffectFireworks(FrameEffect):
     Multiple rockets overlap additively in RGB space for physically
     correct color mixing.
 
-    On a Mirror ring there are no ends: a burst or exhaust trail near zone 0
-    spreads onto zone 24 and beyond, so the effect is seamless there.
+    On a Mirror ring there are no ends: a burst or exhaust trail near the
+    ring origin (top centre by default) spreads onto the pixel before it and
+    beyond, so the effect is seamless there.
 
     Attributes:
         max_rockets: Maximum simultaneous rockets in flight
@@ -328,7 +329,7 @@ class EffectFireworks(FrameEffect):
             t: Current global effect-time.
             zone_count: Total number of zones.
             wraps: Whether the zones form a ring, so trails and bursts take
-                the short way round zone 0 instead of stopping at the ends.
+                the short way round the ring origin instead of stopping at the ends.
 
         Returns:
             List of (hue_deg, sat_01, bri_01) per zone.

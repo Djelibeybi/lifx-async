@@ -51,6 +51,9 @@ def rig(monkeypatch: pytest.MonkeyPatch) -> transitions.Rig:
             monkeypatch.setattr(f"lifx.effects.{module}.{name}", 0, raising=False)
     rig = transitions.build_rig(267, monkeypatch)
     rig.light._capabilities = get_product(267)
+    # These tests are about ring behaviour, not placement: frame pixel k on front
+    # zone k.
+    rig.light.ring_origin = 0
     return rig
 
 

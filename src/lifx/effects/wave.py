@@ -64,7 +64,7 @@ class EffectWave(FrameEffect):
     On a Mirror ring (``FrameContext.wraps``) the string closes on itself:
     bulbs are spaced evenly round the ring and an odd ``nodes`` is raised by
     one, because a standing wave on a ring has an even number of nodes. There is
-    no seam at zone 0.
+    no seam at the ring origin (top centre by default).
 
     Attributes:
         speed: Seconds per oscillation cycle

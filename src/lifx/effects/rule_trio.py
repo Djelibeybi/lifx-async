@@ -179,7 +179,8 @@ class EffectRuleTrio(FrameEffect):
     slowly evolving macro-scale colour structures.
 
     Each automaton is periodic, so on a Mirror ring the effect is seamless:
-    the cells either side of zone 0 are neighbours and there is no edge.
+    the cells either side of the ring origin (top centre by default) are
+    neighbours and there is no edge.
 
     This is a stateful effect: three cell state arrays and three generation
     counters persist across frames and are initialized lazily on the first

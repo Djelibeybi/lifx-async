@@ -44,6 +44,7 @@ from lifx.devices import (
     MultiZoneEffect,
     MultiZoneLight,
     MultiZoneLightState,
+    RingOrigin,
     ThreadInfo,
     TileInfo,
     WifiInfo,
@@ -114,6 +115,7 @@ __all__ = [
     "MatrixLightState",
     "MirrorLight",
     "MirrorLightState",
+    "RingOrigin",
     "CeilingLight",
     "CeilingLightState",
     # Color

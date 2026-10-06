@@ -277,10 +277,34 @@ await mirror.set_effect(
 ## Software Effects
 
 Each ring is a canvas of its own for a software effect: 25 pixels running
-clockwise from zone 0 at the lower left, as seen from the front. The back
-ring's zones run anticlockwise, so its canvas takes them in reverse, which puts
-each back pixel level with the same front pixel (back index 24 - k beside front
-zone k), and a frame moves the same way round both rings. The frame context's
+clockwise, as seen from the front, from the ring origin, which is top centre
+(front zone 9) by default. The back ring's zones run anticlockwise, so its
+canvas takes them in reverse, which puts each back pixel level with the same
+front pixel (back index 24 - k beside front zone k), and a frame moves the same
+way round both rings.
+
+Frame pixel 0, and so an effect's seam, sits at the ring origin. Set it with
+the `ring_origin` constructor keyword or property:
+
+| Origin | Front zone | Back zone |
+|--------|-----------:|----------:|
+| `"top"` (default) | 9 | 40 |
+| `"bottom"` | 22 | 27 |
+| `"left"` | 3 | 46 |
+| `"right"` | 15 | 34 |
+
+An integer from 0 to 24 names any front zone, and the back ring starts at the
+spot level with it. Anything else raises `ValueError`.
+
+```python
+mirror.ring_origin = "bottom"
+await mirror.start_effect(EffectRainbow())
+```
+
+The origin is read when an effect starts, so changing it applies from the next
+effect start; a running effect keeps the origin it began with.
+
+ The frame context's
 `wraps` flag is `True`, so effects such as Rainbow and Spin run
 continuously round the ring with no seam.
 
@@ -294,7 +318,7 @@ would have had beside any other light. The two chipless buffer positions stay
 dark while the effect runs. The effect is still one whole-light run: stopping
 it restores the whole tile and power, and leaves both rings' stored colours
 alone. `Conductor.get_last_frame(mirror)` returns both rings' frames as the effect
-drew them, clockwise from zone 0, front then back.
+drew them, clockwise from the ring origin, front then back.
 
 ```python
 from lifx import Conductor, EffectRainbow

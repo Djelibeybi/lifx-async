@@ -136,7 +136,8 @@ class EffectEmbers(FrameEffect):
     dim, and die -- like glowing embers in a chimney.
 
     On a Mirror ring there is no top or bottom edge: heat that rises off the
-    last zone comes round to zone 0 and heat spreads across the join, so the
+    last zone comes round to the ring origin (top centre by default) and heat
+    spreads across the join, so the
     effect is seamless there.
 
     Attributes:

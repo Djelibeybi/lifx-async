@@ -52,10 +52,10 @@ A light, or a single light component of a light, that a software effect draws
 on. One effect can draw on several participants in step. A light component
 participant sees its own shape: a Ceiling uplight is one pixel, a Ceiling
 downlight is the full grid with the uplight cell dropped, and a Mirror ring is
-25 pixels that wrap, running clockwise from zone 0 on both rings. A whole-light effect on a Mirror runs as two
-ring participants, the front and the back, which share the Mirror's one index
-and simulation and so show the same frame. The light component
-that no effect draws on keeps its colours and stays under the caller's control.
+25 pixels that wrap, running clockwise from the ring origin on both rings. A
+whole-light effect on a Mirror runs as two ring participants, the front and the
+back, which share the Mirror's one index and simulation and so show the same
+frame. The light component that no effect draws on keeps its colours and stays under the caller's control.
 Only an effect that draws frames can have a light component as a participant.
 A whole-light effect and a light component effect never share a light
 component: the newest wins, and a whole-light effect that loses one light
@@ -69,7 +69,9 @@ alone, because both present the same 25-pixel ring that wraps. A light component
 has a device type even though it is not a device.
 
 **Seam**:
-The point on a ring where an effect's first and last pixels meet. An effect is
+The point on a ring where an effect's first and last pixels meet. On a Mirror
+ring it sits at the ring origin (top centre by default, set with
+`MirrorLight.ring_origin`), not at zone 0. An effect is
 seamless when nothing visibly jumps there. Effects without meaningful ends are
 always seamless on a ring; effects whose meaning needs a start and an end keep
 their seam; effects where both looks suit, such as the pendulum wave and the

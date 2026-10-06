@@ -54,8 +54,9 @@ class EffectSpin(FrameEffect):
     time. Adjacent zones interpolate smoothly via Oklab, and each zone
     receives a tiny hue offset (``bulb_offset``) to add visual shimmer.
 
-    On a Mirror ring (``FrameContext.wraps``) the palette closes without
-    repeating a colour and the shimmer folds about zone 0, so there is no seam.
+    On a Mirror ring (``FrameContext.wraps``) the palette closes without repeating a
+    colour and the shimmer folds about the ring origin (top centre by default), so there
+    is no seam.
 
     Attributes:
         speed: Seconds per full color rotation

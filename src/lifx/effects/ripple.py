@@ -5,7 +5,8 @@ random positions, each injecting a sharp impulse into the surface.
 Wavefronts propagate outward in both directions at the configured speed,
 reflect off the strip endpoints, and interfere with one another. On a Mirror
 ring there are no endpoints: the surface closes on itself, so waves travel
-round the ring and cross zone 0 with no seam.
+round the ring and cross the ring origin (top centre by default) with no
+seam.
 
 The displacement at each zone is mapped to a blend factor between two
 colors via ``HSBK.lerp_oklab()`` for perceptually smooth transitions.
@@ -203,7 +204,7 @@ class EffectRipple(FrameEffect):
 
         On a strip the boundary conditions are fixed endpoints
         (displacement = 0). On a ring there are no endpoints: the first and
-        last cells are neighbours, so waves cross zone 0 with no seam.
+        last cells are neighbours, so waves cross the ring origin with no seam.
         """
         n = self._n_cells
         if n < 3:

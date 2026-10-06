@@ -63,7 +63,7 @@ class EffectRule30(FrameEffect):
     brightness, dead cells at the background brightness. The CA rule is
     applied once per generation; generation rate is set by ``speed``. The
     automaton is periodic, so on a Mirror ring it is seamless: the cells either
-    side of zone 0 are neighbours and there is no edge.
+    side of the ring origin (top centre by default) are neighbours and there is no edge.
 
     This is a stateful effect: the cell array and generation counter
     persist across frames and are initialized lazily on the first

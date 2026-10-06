@@ -157,9 +157,9 @@ class EffectPlasma(FrameEffect):
     Compatible with single lights, multizone (strip/beam) devices and a
     Mirror. Not supported on any other matrix device.
 
-    On a Mirror ring there are no ends: the glow is measured the short way
-    round and a tendril that reaches zone 0 carries on across the join, so the
-    colour field closes on itself with no seam.
+    On a Mirror ring there are no ends: the glow is measured the short way round and a
+    tendril that reaches the ring origin (top centre by default) carries on across the
+    join, so the colour field closes on itself with no seam.
 
     Attributes:
         speed: Core pulse period in seconds

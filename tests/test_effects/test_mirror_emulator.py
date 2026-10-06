@@ -121,7 +121,12 @@ def _dark(colours: list[HSBK]) -> bool:
 
 
 async def _prepare(mirror: MirrorLight) -> None:
-    """Both rings lit in known colours, settled."""
+    """Both rings lit in known colours, settled.
+
+    These tests are about ring behaviour, not placement, so frame pixel k lands
+    on front zone k.
+    """
+    mirror.ring_origin = 0
     await mirror.stop_effect()
     await mirror.set_power(True)
     await mirror.set_front_colors(AMBER)

@@ -59,9 +59,10 @@ class EffectCylon(FrameEffect):
     The eye has a cosine-shaped brightness profile so it tapers smoothly
     on both sides. Eye width, color, speed, and trail are all tunable.
 
-    On a Mirror ring (``FrameContext.wraps``) the eye bounces between zone 0
-    and the last zone exactly as on a strip, keeping a seam at zone 0: a
-    scanner's meaning is its sweep back and forth.
+    On a Mirror ring (``FrameContext.wraps``) the eye bounces between the ring
+    origin (top centre by default) and the ring's last pixel exactly as on a
+    strip, keeping a seam at the ring origin: a scanner's meaning is its sweep
+    back and forth.
 
     Attributes:
         speed: Seconds per full sweep (there and back)

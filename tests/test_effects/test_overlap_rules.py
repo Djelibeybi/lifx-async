@@ -19,6 +19,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.ceiling import CeilingLight
+from lifx.devices.mirror import MirrorLight
 from lifx.effects import EffectPulse
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
@@ -141,6 +142,10 @@ def _frozen_rig(product: int, monkeypatch: pytest.MonkeyPatch) -> transitions.Ri
             monkeypatch.setattr(f"lifx.effects.{module}.{name}", 0, raising=False)
     rig = transitions.build_rig(product, monkeypatch)
     rig.light._capabilities = get_product(product)
+    # These tests are about ring behaviour, not placement: frame pixel k on front
+    # zone k.
+    if isinstance(rig.light, MirrorLight):
+        rig.light.ring_origin = 0
     return rig
 
 

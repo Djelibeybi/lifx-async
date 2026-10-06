@@ -79,7 +79,8 @@ class EffectSine(FrameEffect):
 
     On a Mirror ring (``FrameContext.wraps``) the wave holds a whole number of
     cycles, the nearest to ``1 / wavelength`` and at least one, and a ``hue2``
-    gradient runs out from zone 0 and back, so there is no seam at zone 0.
+    gradient runs out from the ring origin (top centre by default) and back, so
+    there is no seam there.
 
     Attributes:
         speed: Seconds per full wave cycle (travel speed)
@@ -253,7 +254,7 @@ class EffectSine(FrameEffect):
                 bri = self.floor + bri_range * eased
 
                 if use_gradient:
-                    # The gradient runs out from zone 0 and back, so a ring
+                    # The gradient runs out from the ring origin and back, so a ring
                     # closes it without a jump.
                     along = 1.0 - abs(2.0 * x - 1.0) if ctx.wraps else x
                     blended = base_color.lerp_oklab(end_color, along)

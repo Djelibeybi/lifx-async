@@ -31,7 +31,8 @@ class EffectProgress(FrameEffect):
     grows, like a thermometer.
 
     Multizone strips and Mirrors only. On a Mirror ring the bar keeps its seam at
-    zone 0: it fills from zone 0 exactly as it fills a strip.
+    the ring origin (top centre by default): it fills from there exactly as it
+    fills a strip.
 
     Attributes:
         start_value: Start of the value range

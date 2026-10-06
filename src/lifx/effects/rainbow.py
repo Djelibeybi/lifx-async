@@ -25,7 +25,8 @@ class EffectRainbow(FrameEffect):
     simpler).
 
     On a Mirror ring (``FrameContext.wraps``) the rainbow closes on itself:
-    zone 24 is one step of hue short of zone 0, so it circulates with no seam.
+    the pixel before the ring origin (top centre by default) is one step of hue
+    short of it, so it circulates with no seam.
 
     Attributes:
         period: Seconds per full rainbow scroll (default 10)

@@ -595,7 +595,7 @@ class EffectSonar(FrameEffect):
         """Check if light is compatible with Sonar effect.
 
         Sonar needs a line of pixels. On a Mirror ring it keeps its seam at
-        zone 0 and pings from zone 0 as on a strip.
+        the ring origin (top centre by default) and pings from it as on a strip.
 
         Args:
             light: The light device to check

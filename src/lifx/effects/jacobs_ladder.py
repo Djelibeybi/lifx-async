@@ -428,8 +428,9 @@ class EffectJacobsLadder(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with Jacob's Ladder effect.
 
-        Jacob's Ladder needs a line of pixels (strips, beams or a Mirror). On a
-        Mirror ring it keeps its seam at zone 0 and climbs from zone 0.
+        Jacob's Ladder needs a line of pixels (strips, beams or a Mirror). On a Mirror
+        ring it keeps its seam at the ring origin (top centre by default) and climbs
+        from it.
 
         Args:
             light: The light device to check
