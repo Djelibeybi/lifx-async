@@ -2,6 +2,147 @@
 
 <!-- version list -->
 
+## v7.7.0 (2026-10-06)
+
+### Bug Fixes
+
+- **animation**: Keep the other component's fade when a slot is released
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **devices**: Remove reset stored colours from the state file
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **devices**: Restore the other component's cells when a restore leaves the light off
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Always inherit the original prior state on take-over
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Darken a light component from its effect's last frame
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Draw a whole-light Mirror's two rings as one participant
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Give each effect participant its own simulation
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Leave no effect frame on a light a restore powers off
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Let add_lights take a light from its old run
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Let the newest effect win on a light
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Name start_effect() when it refuses a Thread light
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Only take over runs on the caller's own event loop
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Put back unset stored colours after a component effect
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Stop a moved effect with its light and keep its simulation
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Stop only the selected participants of a shared run
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Turn the light off before writing its earlier colours
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Write no restored colours unless the light reports off
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **matrix**: Wait for the device to acknowledge tile writes
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **scripts**: Keep the device serial out of the UAT's Thread refusal
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **scripts**: Put back stored colours after the component effects UAT
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+### Documentation
+
+- Correct Ceiling geometry, spelling and example addresses
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+### Features
+
+- **animation**: Give every light one Animator
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **devices**: Start and stop effects on the light itself
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Apply overlap rules between whole-light and component effects
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Draw whole-light Mirror effects on a ring that wraps
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Refuse to stream frames to Thread lights without enable_thread
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Restore and power on a light component around its effect
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Restore the whole tile and power on without a colour write
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Run software effects on a Ceiling's light components
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Run software effects on a Mirror's front and back rings
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Send one tile per frame when an effect draws on both light components
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Software effects on light components
+  ([#266](https://github.com/Djelibeybi/lifx-async/pull/266),
+  [`5e89ac4`](https://github.com/Djelibeybi/lifx-async/commit/5e89ac4ca954f36a5f5c31704fca7290963dc709))
+
+- **effects**: Write colour loop once per step so it runs on Thread
+  ([#268](https://github.com/Djelibeybi/lifx-async/pull/268),
+  [`288931a`](https://github.com/Djelibeybi/lifx-async/commit/288931af4af9f92e98999d13ee622fd8e8af2e0b))
+
+
 ## v7.6.8 (2026-10-05)
 
 ### Bug Fixes
