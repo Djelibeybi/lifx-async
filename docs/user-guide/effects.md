@@ -871,6 +871,8 @@ await conductor.start(effect, lights)
 
 Ripple tank — raindrops hit a water surface, launching wavefronts that propagate, reflect, and interfere. Displacement maps to color via Oklab.
 
+On a Mirror, whole or either ring alone, ripple is seamless: the surface closes on itself, so waves travel round the ring and cross zone 0 with no jump. On a strip the ends stay fixed and waves reflect off them.
+
 ```python
 from lifx.effects import EffectRipple
 

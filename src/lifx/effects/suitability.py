@@ -29,3 +29,26 @@ def is_mirror(light: Light) -> bool:
         True if the light is a Mirror
     """
     return isinstance(light, MirrorLight)
+
+
+async def draws_a_line(light: Light) -> bool:
+    """Whether a light suits a one-dimensional effect.
+
+    A one-dimensional effect draws a single line of pixels, so it suits a
+    light that is one: a multizone strip or beam, or a Mirror, whose rings are
+    each a line of 25 pixels. This is the rule behind the compatibility check
+    of every effect that draws a line, so a future ring product needs one
+    change here rather than one per effect.
+
+    Args:
+        light: The light to check. Its capabilities are loaded if the answer
+            needs them.
+
+    Returns:
+        True if the light has multizone capability or is a Mirror
+    """
+    if is_mirror(light):
+        return True
+    if light.capabilities is None:
+        await light.ensure_capabilities()
+    return light.capabilities.has_multizone if light.capabilities else False

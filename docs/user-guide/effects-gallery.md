@@ -119,7 +119,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     Raindrops on water — wavefronts propagate, reflect, and interfere.
 
-    **Class:** `EffectRipple` · **Best on:** Multizone
+    **Class:** `EffectRipple` · **Best on:** Multizone, Mirror (seamless on the ring)
 
 -   ### Rule 30
 

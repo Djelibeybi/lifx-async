@@ -3,7 +3,9 @@
 Simulates a one-dimensional wave equation with damping. Drops fall at
 random positions, each injecting a sharp impulse into the surface.
 Wavefronts propagate outward in both directions at the configured speed,
-reflect off the strip endpoints, and interfere with one another.
+reflect off the strip endpoints, and interfere with one another. On a Mirror
+ring there are no endpoints: the surface closes on itself, so waves travel
+round the ring and cross zone 0 with no seam.
 
 The displacement at each zone is mapped to a blend factor between two
 colors via ``HSBK.lerp_oklab()`` for perceptually smooth transitions.
@@ -42,6 +44,7 @@ from lifx.color import HSBK
 from lifx.const import MAX_KELVIN, MIN_KELVIN
 from lifx.effects.base import LIFXEffect
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from lifx.effects.suitability import draws_a_line
 
 if TYPE_CHECKING:
     from lifx.devices.light import Light
@@ -102,6 +105,7 @@ class EffectRipple(FrameEffect):
         "_last_t",
         "_next_drop_t",
         "_n_cells",
+        "_wraps",
     )
 
     def __init__(
@@ -167,19 +171,22 @@ class EffectRipple(FrameEffect):
         self._last_t: float | None = None
         self._next_drop_t: float = 0.0
         self._n_cells: int = 0
+        self._wraps: bool = False
 
     @property
     def name(self) -> str:
         """Return the name of the effect."""
         return "ripple"
 
-    def _init_state(self, n_cells: int) -> None:
+    def _init_state(self, n_cells: int, wraps: bool = False) -> None:
         """Initialize or reinitialize wave simulation arrays.
 
         Args:
             n_cells: Number of simulation cells
+            wraps: Whether the surface closes on itself (a Mirror ring)
         """
         self._n_cells = n_cells
+        self._wraps = wraps
         self._displacement = [0.0] * n_cells
         self._velocity = [0.0] * n_cells
         self._sim_time = 0.0
@@ -194,26 +201,34 @@ class EffectRipple(FrameEffect):
           displacement[i] += velocity[i]
           both *= damping
 
-        Boundary conditions are fixed endpoints (displacement = 0).
+        On a strip the boundary conditions are fixed endpoints
+        (displacement = 0). On a ring there are no endpoints: the first and
+        last cells are neighbours, so waves cross zone 0 with no seam.
         """
         n = self._n_cells
         if n < 3:
             return
 
         speed_sq = self.speed * self.speed
+        cells = range(n) if self._wraps else range(1, n - 1)
 
-        for i in range(1, n - 1):
+        for i in cells:
             # Average of neighbors minus current position
-            neighbor_avg = (self._displacement[i - 1] + self._displacement[i + 1]) / 2.0
+            neighbor_avg = (
+                self._displacement[(i - 1) % n] + self._displacement[(i + 1) % n]
+            ) / 2.0
             self._velocity[i] += (neighbor_avg - self._displacement[i]) * speed_sq
 
-        for i in range(1, n - 1):
+        for i in cells:
             self._displacement[i] += self._velocity[i]
 
         # Apply damping to both arrays
         for i in range(n):
             self._displacement[i] *= self.damping
             self._velocity[i] *= self.damping
+
+        if self._wraps:
+            return
 
         # Fixed boundary conditions
         self._displacement[0] = 0.0
@@ -225,8 +240,12 @@ class EffectRipple(FrameEffect):
         """Inject a drop impulse if the schedule says it is time."""
         if self._sim_time >= self._next_drop_t:
             if self._n_cells > 2:
-                # Drop lands at a random interior position.
-                pos = random.randint(1, self._n_cells - 2)
+                # Drop lands at a random interior position, or anywhere on a
+                # ring, which has no ends to keep still.
+                if self._wraps:
+                    pos = random.randint(0, self._n_cells - 1)
+                else:
+                    pos = random.randint(1, self._n_cells - 2)
                 self._displacement[pos] += _DROP_IMPULSE
             # Schedule next drop (Poisson process).
             self._next_drop_t = self._sim_time + random.expovariate(self.drop_rate)
@@ -245,9 +264,10 @@ class EffectRipple(FrameEffect):
         """
         n_cells = max(ctx.pixel_count, 1)
 
-        # Lazy initialization or reinitialize on zone count change.
-        if n_cells != self._n_cells:
-            self._init_state(n_cells)
+        # Lazy initialization, or reinitialize when the zone count changes or
+        # the surface starts or stops closing on itself.
+        if n_cells != self._n_cells or ctx.wraps != self._wraps:
+            self._init_state(n_cells, ctx.wraps)
 
         # First-frame initialization.
         if self._last_t is None:
@@ -339,17 +359,16 @@ class EffectRipple(FrameEffect):
     async def is_light_compatible(self, light: Light) -> bool:
         """Check if light is compatible with ripple effect.
 
-        Ripple requires multizone capability (LED strips/beams).
+        Ripple draws a line, so it suits a multizone strip or beam and a
+        Mirror (see ``draws_a_line``).
 
         Args:
             light: The light device to check
 
         Returns:
-            True if light has multizone support, False otherwise
+            True if the light draws a line, False otherwise
         """
-        if light.capabilities is None:
-            await light.ensure_capabilities()
-        return light.capabilities.has_multizone if light.capabilities else False
+        return await draws_a_line(light)
 
     def inherit_prestate(self, other: LIFXEffect) -> bool:
         """Ripple can inherit prestate from another ripple effect.
