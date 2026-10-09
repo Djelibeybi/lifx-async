@@ -21,7 +21,11 @@ from lifx.const import (
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
 from lifx.devices.effect_runner import effect_runner
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxProtocolError, LifxTimeoutError
+from lifx.exceptions import (
+    LifxProtocolError,
+    LifxTimeoutError,
+    LifxUnsupportedCommandError,
+)
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     Direction,
@@ -1510,7 +1514,10 @@ class MultiZoneLight(Light):
         """Firmware MOVE, or a mood software effect."""
         if await super()._mood_effect_running():
             return True
-        return (await self.get_effect()).effect_type == FirmwareEffect.MOVE
+        try:
+            return (await self.get_effect()).effect_type == FirmwareEffect.MOVE
+        except LifxUnsupportedCommandError:
+            return False  # a light that rejects GetEffect runs no firmware effect
 
     def __repr__(self) -> str:
         """String representation of multizone light."""

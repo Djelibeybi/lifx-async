@@ -74,10 +74,11 @@ async def test_empty_group_does_nothing() -> None:
 async def test_running_mood_effect_restarts_instead_of_painting() -> None:
     busy = bulb("d073d5000a01", on=True)
     busy._mood_effect_running = AsyncMock(return_value=True)  # type: ignore[method-assign]
-    busy.animate_mood = AsyncMock()  # type: ignore[method-assign]
     idle = bulb("d073d5000a02", on=True)
-    await DeviceGroup([busy, idle]).apply_mood(THEME)
-    busy.animate_mood.assert_awaited_once_with(THEME)  # type: ignore[attr-defined]
+    with patch("lifx.api.effect_runner") as runner:
+        runner.return_value.start_together = AsyncMock()
+        await DeviceGroup([busy, idle]).apply_mood(THEME)
+    assert runner.return_value.start_together.await_args.args[0] == [busy]
     busy._paint_mood.assert_not_awaited()  # type: ignore[attr-defined]
     idle._paint_mood.assert_awaited_once()  # type: ignore[attr-defined]
 
@@ -105,3 +106,14 @@ async def test_group_animate_mood_starts_other_lights_alone() -> None:
         await DeviceGroup([strip, white]).animate_mood(THEME)
     strip.animate_mood.assert_awaited_once_with(THEME)  # type: ignore[attr-defined]
     assert runner.return_value.start_together.await_args.args[0] == []
+
+
+async def test_group_restart_keeps_one_shared_colour_loop() -> None:
+    a, b = bulb("d073d5000a01", on=True), bulb("d073d5000a02", on=True)
+    a._mood_effect_running = AsyncMock(return_value=True)  # type: ignore[method-assign]
+    b._mood_effect_running = AsyncMock(return_value=True)  # type: ignore[method-assign]
+    with patch("lifx.api.effect_runner") as runner:
+        runner.return_value.start_together = AsyncMock()
+        await DeviceGroup([a, b]).apply_mood(THEME)
+    runner.return_value.start_together.assert_awaited_once()
+    assert runner.return_value.start_together.await_args.args[0] == [a, b]

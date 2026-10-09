@@ -1718,7 +1718,10 @@ class MatrixLight(Light):
         """Firmware MORPH, or a mood software effect."""
         if await super()._mood_effect_running():
             return True
-        return (await self.get_effect()).effect_type == FirmwareEffect.MORPH
+        try:
+            return (await self.get_effect()).effect_type == FirmwareEffect.MORPH
+        except LifxUnsupportedCommandError:
+            return False  # a light that rejects GetEffect runs no firmware effect
 
     @property
     def device_chain(self) -> list[TileInfo] | None:

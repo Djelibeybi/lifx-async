@@ -1020,7 +1020,7 @@ class DeviceGroup:
         bulb_colors = {id(light): color for light, color in zip(bulbs, dealt)}
 
         await asyncio.gather(
-            *(light.animate_mood(theme) for light in restart),
+            self._start_mood_effects(restart, theme),
             *(
                 light._paint_mood(
                     theme,
@@ -1039,9 +1039,15 @@ class DeviceGroup:
             theme: Theme to animate
         """
         paints = await asyncio.gather(*(light._paints_moods() for light in self.lights))
-        lights = [light for light, ok in zip(self.lights, paints) if ok]
-        bulbs = [light for light in lights if _is_bulb(light)]
+        await self._start_mood_effects(
+            [light for light, ok in zip(self.lights, paints) if ok], theme
+        )
+
+    @staticmethod
+    async def _start_mood_effects(lights: list[Light], theme: Theme) -> None:
+        """Start mood effects: one colour loop for the bulbs, the rest alone."""
         runner = effect_runner()
+        bulbs = [light for light in lights if _is_bulb(light)]
         await asyncio.gather(
             runner.start_together(bulbs, runner.palette_effect(list(theme.colors))),
             *(light.animate_mood(theme) for light in lights if not _is_bulb(light)),

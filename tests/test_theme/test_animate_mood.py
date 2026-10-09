@@ -13,6 +13,7 @@ from lifx.devices.matrix import MatrixLight
 from lifx.devices.mirror import MirrorLight
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
 from lifx.effects import EffectColorloop, EffectScroll
+from lifx.exceptions import LifxUnsupportedCommandError
 from lifx.products import moves_as_morph
 from lifx.protocol.protocol_types import Direction, FirmwareEffect
 from lifx.theme import Theme
@@ -190,3 +191,15 @@ class TestRestart:
             finally:
                 await bulb.stop_effect()
             assert not await bulb._mood_effect_running()
+
+
+class TestRejectedGetEffect:
+    async def test_strip_treats_it_as_no_effect(self, mock_device_factory) -> None:
+        strip = mock_device_factory(MultiZoneLight, product=32)
+        strip.get_effect = AsyncMock(side_effect=LifxUnsupportedCommandError("no"))
+        assert not await strip._mood_effect_running()
+
+    async def test_matrix_treats_it_as_no_effect(self, mock_device_factory) -> None:
+        light = mock_device_factory(MatrixLight)
+        light.get_effect = AsyncMock(side_effect=LifxUnsupportedCommandError("no"))
+        assert not await light._mood_effect_running()
