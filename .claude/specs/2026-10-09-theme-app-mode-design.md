@@ -5,7 +5,7 @@ Status: draft, awaiting review
 Scope: `src/lifx/theme/` (new `app_mode.py`, `theme.py`), every `apply_theme()`
 (`devices/light.py`, `devices/multizone.py`, `devices/matrix.py`,
 `devices/component/light.py`, `api.py`), `devices/matrix.py` MORPH palette
-handling, `effects/colorloop.py`, one new software effect in `src/lifx/effects/`
+handling, `effects/colorloop.py`, new `src/lifx/effects/scroll.py`
 
 ## Problem
 
@@ -57,7 +57,7 @@ The bar is "looks and feels like the app", not pixel identity.
 ### 1. Renderer (`src/lifx/theme/app_mode.py`)
 
 Pure functions, no I/O. Each takes colours and a geometry and returns colours.
-Every device path and the rotation effect render through this module.
+Every device path and `EffectScroll` render through this module.
 
 - `stretch(colors, n)`: the app's run-weighted fit. Return the list unchanged
   if it already has `n` entries. Otherwise group consecutive equal colours
@@ -145,7 +145,7 @@ Tap rules, all applied under App Mode:
 - **Restart.** If a theme effect is running on the light, call
   `theme.animate()` on that light with the new theme instead of painting. A
   theme effect is firmware MORPH on a matrix light, firmware MOVE on a strip,
-  or the rotation or palette Colour Loop effect on the light's Conductor. It
+  or `EffectScroll` or the palette Colour Loop effect on the light's Conductor. It
   is read from the device and the Conductor, not remembered, so the rule
   survives a process restart.
 
@@ -166,7 +166,7 @@ default. Stopping is the existing `light.stop_effect()`.
 | Light | MOVE | MORPH |
 |---|---|---|
 | Strip (any multizone) | App Mode still, then firmware MOVE, FORWARD, `20 s * zones / 16` | same as MOVE |
-| Matrix (Ceiling, Tile, chain, Candle, Luna) | App Mode still, then the rotation effect | firmware MORPH, 3 s, no pre-paint |
+| Matrix (Ceiling, Tile, chain, Candle, Luna) | App Mode still, then `EffectScroll` | firmware MORPH, 3 s, no pre-paint |
 | Mirror | firmware MORPH | firmware MORPH |
 | Bulb | `EffectColorloop(palette=theme.colors)` | same |
 
@@ -186,7 +186,7 @@ starting colour.
   only the order is random. Today a palette over 16 raises `ValueError`; this
   is the one behaviour change to an existing API. Other effect types keep the
   16-colour limit, and `validate_effect_palette()` is unchanged for them.
-- **Rotation effect** (new, working name `EffectMove`). Matrix lights only.
+- **`EffectScroll`** (new, registry name `"scroll"`). Matrix lights only.
   Every 1250 ms it rotates every row one cell toward higher column numbers and
   writes one Set64 per tile with the step as the fade (capped at 2 s). It
   rotates whatever is painted and paints nothing itself. It streams no frames,
@@ -212,8 +212,9 @@ Before the Mirror and chain recipes are called verified:
 
 1. Trace the Mirror paint path and its MOVE-to-MORPH substitution in the 4.100
    app.
-2. Side by side, app against this recipe, on the Mirror and on a product 55
-   chain, for one mood of each `static_mode`.
+2. Side by side, app against this recipe, on the Mirror and on both product
+   55 Tiles on the operator's network, for one mood of each `static_mode`.
+   The probe reads each Tile's chain length rather than assuming it.
 3. The probe script stays local and is never committed. Every write is
    snapshotted and restored. Committed evidence carries only pseudonymised
    identifiers.
@@ -232,11 +233,6 @@ If the hardware disagrees, the recipe changes before release.
   because the emulator's Tile has one tile.
 - **animate().** Each row of the table in section 3, including Mirror's
   substitution and the strip MORPH-to-MOVE path.
-- **Effects.** MORPH reduction of a 64-entry grid to 16; the rotation effect's
+- **Effects.** MORPH reduction of a 64-entry grid to 16; `EffectScroll`'s
   step and rejection of non-matrix participants; Colour Loop with a palette.
 - **Coverage.** 100% branch patch coverage.
-
-## Open questions
-
-- Is a product 55 chain reachable for section 6?
-- The rotation effect's public name.
