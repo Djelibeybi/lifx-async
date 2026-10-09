@@ -84,7 +84,8 @@ A generator class shaped like its siblings, no I/O, exported from
 
 - `MoodGenerator(theme)`: the recipe comes from `theme.static_mode`; `None`
   and any mode with no recipe use `blended`.
-- `get_tile_colors(width, height, brightness) -> list[HSBK]`: one matrix tile.
+- `get_matrix_colors(width, height, brightness) -> list[HSBK]`: one matrix
+  device (a Ceiling, Candle, Luna or single Tile).
 - `get_chain_colors(tile_count, width, height, brightness) ->
   list[list[HSBK]]`: a Tile chain, one canvas in chain order, sliced per tile.
 - `get_zone_colors(zone_count, brightness) -> list[HSBK]`: a strip, or one
