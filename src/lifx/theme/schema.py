@@ -37,10 +37,12 @@ _COLOR_FIELD_RANGES: dict[str, tuple[float, float]] = {
 }
 
 #: Fields every record must carry.
-_REQUIRED_FIELDS = frozenset({"slug", "name", "category", "disposition", "colors"})
+_REQUIRED_FIELDS = frozenset(
+    {"slug", "name", "category", "disposition", "static_mode", "colors"}
+)
 
 #: Fields a record may carry in addition to the required set.
-_OPTIONAL_FIELDS = frozenset({"aliases", "replaced_by"})
+_OPTIONAL_FIELDS = frozenset({"aliases", "replaced_by", "dynamic_mode", "tags"})
 
 #: Allowed values of a record's authored ``disposition`` field (COMPAT-04).
 DISPOSITIONS = frozenset({"lifx-app", "library-only", "deprecated"})
@@ -109,6 +111,22 @@ def validate_key(key: object) -> bool:
         and key.isidentifier()
         and not keyword.iskeyword(key)
     )
+
+
+def tag_sort_key(tag: str) -> tuple[str, str]:
+    """Sort key for theme tags: case-insensitive first, then exact.
+
+    Shared by the generator, which emits each record's tags in this order,
+    and ``ThemeLibrary.get_tags()``, so both list tags identically. The
+    exact string breaks ties so the order is total and deterministic.
+
+    Args:
+        tag: A tag display string.
+
+    Returns:
+        The ``(casefolded, exact)`` sort key.
+    """
+    return (tag.casefold(), tag)
 
 
 def _record_label(record: Any) -> str:
@@ -224,6 +242,64 @@ def _validate_colors(line_number: int, record: dict[str, Any]) -> None:
             )
 
 
+def _validate_modes(line_number: int, record: dict[str, Any]) -> None:
+    """Validate ``static_mode`` and the optional ``dynamic_mode``.
+
+    No value set is enforced: the generator learns the set from the data,
+    so any canonical identifier passes. An explicit ``null`` dynamic mode is
+    rejected because absence is meaningful and must be spelled one way.
+    """
+    static_mode = record["static_mode"]
+    if not validate_key(static_mode):
+        raise _fail(
+            line_number,
+            record,
+            f"static_mode {static_mode!r} is not a canonical identifier "
+            f"(non-empty, ASCII, lowercase, valid identifier)",
+        )
+    if "dynamic_mode" in record:
+        dynamic_mode = record["dynamic_mode"]
+        if not validate_key(dynamic_mode):
+            raise _fail(
+                line_number,
+                record,
+                f"dynamic_mode {dynamic_mode!r} is not a canonical identifier "
+                f"(non-empty, ASCII, lowercase, valid identifier); omit the "
+                f"field when the theme has none",
+            )
+
+
+def _validate_tags(line_number: int, record: dict[str, Any]) -> None:
+    """Validate the optional ``tags`` list of display strings.
+
+    Tags are display text, not keys: they never join the slug and alias
+    collision pass and the same tag may appear on many records. Within one
+    record each tag must normalise (by the slug rule) to a distinct,
+    non-empty key, so normalised tag matching can never be ambiguous.
+    """
+    tags = record.get("tags", [])
+    if type(tags) is not list:
+        raise _fail(line_number, record, "'tags' is not a list")
+    seen: dict[str, str] = {}
+    for tag in tags:
+        if type(tag) is not str or not tag:
+            raise _fail(line_number, record, f"tag {tag!r} is not a non-empty string")
+        if not tag.isascii():
+            raise _fail(
+                line_number, record, f"tag {tag!r} contains non-ASCII characters"
+            )
+        key = derive_slug(tag)
+        if not key:
+            raise _fail(line_number, record, f"tag {tag!r} normalises to an empty key")
+        if key in seen:
+            raise _fail(
+                line_number,
+                record,
+                f"tags {seen[key]!r} and {tag!r} both normalise to {key!r}",
+            )
+        seen[key] = tag
+
+
 def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
     """Validate every record; abort on the first violation.
 
@@ -319,6 +395,8 @@ def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
                 f"replaced_by {replaced_by!r} is not a canonical key "
                 f"(non-empty, ASCII, lowercase, valid identifier)",
             )
+        _validate_modes(line_number, record)
+        _validate_tags(line_number, record)
         _validate_colors(line_number, record)
         aliases = record.get("aliases", [])
         if type(aliases) is not list:
