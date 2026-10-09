@@ -2,12 +2,12 @@
 
 Date: 2026-10-09
 Status: draft, awaiting review
-Scope: `src/lifx/theme/generators.py`; new `apply_mood()` and `animate_mood()` on
-`Light`, `MultiZoneLight`, `MatrixLight`, the component lights and
-`DeviceGroup` (`devices/light.py`, `devices/multizone.py`,
-`devices/matrix.py`, `devices/component/light.py`, `api.py`);
-`devices/matrix.py` and `devices/component/state.py` MORPH palette handling; `effects/colorloop.py`; new
-`src/lifx/effects/scroll.py`
+Scope: restructure `src/lifx/theme/` into a `generators` package (new
+`generators/mood.py`); new `apply_mood()` and `animate_mood()` on `Light`,
+`MultiZoneLight`, `MatrixLight`, the component lights and `DeviceGroup`
+(`devices/light.py`, `devices/multizone.py`, `devices/matrix.py`,
+`devices/component/light.py`, `api.py`); `devices/matrix.py` MORPH palette
+handling; `effects/colorloop.py`; new `src/lifx/effects/scroll.py`
 
 ## Problem
 
@@ -58,32 +58,66 @@ app", not pixel identity.
 
 ## Design
 
-### 1. Renderer (`src/lifx/theme/generators.py`)
+### 0. Restructure (a pure move, landed first)
 
-Module functions beside the existing generators, no I/O. Each takes colours
-and a geometry and returns colours. Every device path and `EffectScroll` render through this module.
+`src/lifx/theme/` gains a `generators` package:
 
-- `stretch(colors, n)`: the app's run-weighted fit. Return the list unchanged
+| Today | After |
+|---|---|
+| `theme/generators.py` | `theme/generators/theme.py` |
+| `theme/canvas.py` | `theme/generators/canvas.py` |
+| (new) | `theme/generators/mood.py` |
+
+`generators/__init__.py` re-exports `SingleZoneGenerator`,
+`MultiZoneGenerator` and `MatrixGenerator`, so `lifx.theme.generators` and
+`lifx.theme` imports keep working, and `from lifx.theme import Canvas` keeps
+its current unadvertised re-export. The `lifx.theme.canvas` path goes away;
+`Canvas` is internal, so that needs no major version. Every in-repo reference
+(`geometry.py`, `schema.py`, devices, tests, `docs/architecture/overview.md`)
+moves in the same commit. No behaviour changes, and the existing suite passes
+untouched apart from import paths.
+
+### 1. Renderer: `MoodGenerator` (`generators/mood.py`)
+
+A generator class shaped like its siblings, no I/O, exported from
+`lifx.theme` beside them. Public methods:
+
+- `MoodGenerator(theme)`: the recipe comes from `theme.static_mode`; `None`
+  and any mode with no recipe use `blended`.
+- `get_tile_colors(width, height, brightness) -> list[HSBK]`: one matrix tile.
+- `get_chain_colors(tile_count, width, height, brightness) ->
+  list[list[HSBK]]`: a Tile chain, one canvas in chain order, sliced per tile.
+- `get_zone_colors(zone_count, brightness) -> list[HSBK]`: a strip, or one
+  Mirror ring.
+- `get_bulb_colors(count) -> list[HSBK]`: the distinct colours, shuffled,
+  dealt one per bulb.
+- `morph_palette(colors) -> list[HSBK]` (static): the app's run-weighted
+  reduction to `MAX_PALETTE_COLORS` for the MORPH wire path; unchanged when
+  there are 16 or fewer. Selection is deterministic.
+
+Private methods, the recipe steps:
+
+- `_stretch(colors, n)`: the app's run-weighted fit. Return the list unchanged
   if it already has `n` entries. Otherwise group consecutive equal colours
   into runs, give each run `ceil(n * len(run) / len(colors))` copies of its
   colour, then walk the runs in order removing one copy from the front of each
   non-empty run until exactly `n` remain.
-- `rescale(colors, brightness)`: scale so the brightest entry equals
+- `_rescale(colors, brightness)`: scale so the brightest entry equals
   `brightness`; entries at or above 0.01 stay at least 0.01.
-- `gradient(colors, cells)`: `min(cells, len(colors) - 1)` segments, the
+- `_gradient(colors, cells)`: `min(cells, len(colors) - 1)` segments, the
   remainder going one extra cell each to the last segments, each filled by
   interpolation with a circular hue mean (a white carries no hue) and hue
   steps clamped to 90 degrees. A straight interpolation is acceptable where
   it looks the same on a diffused light.
-- `blended_matrix(colors, width, height)`: a shuffled gradient of
+- `_blended_matrix(colors, width, height)`: a shuffled gradient of
   `2 * (width - 2) + 2 * height` cells laid along the top row left to right,
   down both side edges together (left then right on each middle row), then
   the bottom row from the far end. Each interior cell is the circular mean of
   its five nearest edge cells, each repeated `floor(total distance / its
   distance)` times.
-- `grid(colors, width, height)`: `stretch` to `width * height`, rows laid out
-  serpentine (even rows left to right, odd rows right to left).
-- `stripes(colors, width, height)`: `stretch` to `width`, the same row on
+- `_grid(colors, width, height)`: `_stretch` to `width * height`, rows laid
+  out serpentine (even rows left to right, odd rows right to left).
+- `_stripes(colors, width, height)`: `_stretch` to `width`, the same row on
   every row.
 
 Moods do not go through `MatrixGenerator` or `Canvas`, because the app's
@@ -91,12 +125,8 @@ recipes differ from the interpolated gradient those build. Tile positions
 only matter on a multi-tile Tile chain, the one device with more than one
 tile; there a mood follows chain order, as the app does (section 2).
 
-These functions are importable, since the devices, `EffectScroll` and
-`palette_16()` call them, but like `Canvas` none joins `lifx.theme.__all__`
-or the published API docs, so their signatures can change without a major
-version.
-The only new public API is `apply_mood()`, `animate_mood()`, `EffectScroll`
-and `EffectColorloop(palette=...)`.
+New public API: `apply_mood()`, `animate_mood()`, `MoodGenerator` (its public
+methods only), `EffectScroll` and `EffectColorloop(palette=...)`.
 
 ### 2. `apply_mood(theme)`
 
@@ -112,11 +142,11 @@ recipe, render as `blended`.
 
 | static_mode | Matrix | Strip | Bulb |
 |---|---|---|---|
-| `blended` | `blended_matrix` | shuffled `gradient` over the zone count | distinct colours, shuffled, one per light |
-| `grid_static` | `grid` | `stretch` to the zone count | as above |
-| `solid_static` | `stripes` | `stretch` to the zone count | as above |
-| `solid_loop` | `stripes` | `stretch` to the zone count | as above |
-| `solid` | `stripes` over the distinct colours, shuffled each call | same, over the zone count | as above |
+| `blended` | `_blended_matrix` | shuffled `_gradient` over the zone count | distinct colours, shuffled, one per light |
+| `grid_static` | `_grid` | `_stretch` to the zone count | as above |
+| `solid_static` | `_stripes` | `_stretch` to the zone count | as above |
+| `solid_loop` | `_stripes` | `_stretch` to the zone count | as above |
+| `solid` | `_stripes` over the distinct colours, shuffled each call | same, over the zone count | as above |
 
 Device specifics:
 
@@ -138,7 +168,7 @@ Device specifics:
 
 The app's tap rules, all fixed:
 
-- **Brightness.** Read each light's current brightness and `rescale` to it.
+- **Brightness.** Read each light's current brightness and `_rescale` to it.
 - **Power.** Power on only when every targeted light is off.
   `DeviceGroup` checks all its lights; a single light checks itself.
 - **Fade.** 300 ms.
@@ -177,20 +207,18 @@ path.
 
 ### 4. Effects
 
-- **`palette_16(colors)`** in `devices/component/state.py`, beside
-  `derive_effect_palette()` and `sample_effect_palette()`: the app's
-  run-weighted reduction to `MAX_PALETTE_COLORS` (`stretch` with `n = 16`
-  when there are more than 16 entries). Selection is deterministic.
 - **MORPH palettes over 16 colours.** `MatrixLight.set_effect(MORPH,
   palette=...)` accepts any non-empty palette. More than 16 colours are reduced
-  with `palette_16()` and the result is shuffled; selection is deterministic,
+  with `MoodGenerator.morph_palette()` and the result is shuffled; selection
+  is deterministic,
   only the order is random. Today a palette over 16 raises `ValueError`; this
   is the one behaviour change to an existing API. Other effect types keep the
   16-colour limit, and `validate_effect_palette()` is unchanged for them.
 - **`EffectScroll`** (new, registry name `"scroll"`). Matrix lights only.
   Every 1250 ms it rotates every row one cell toward higher column numbers and
   writes one Set64 per tile with the step as the fade (capped at 2 s). It
-  rotates whatever is painted and paints nothing itself. It streams no frames,
+  reads the painted tiles once when it starts, then rotates that frame; it
+  paints nothing itself. It streams no frames,
   so like `EffectColorloop` it runs on Thread lights without `enable_thread`.
   A strip or bulb participant is rejected. The step is the effect's own,
   matching the app; the frame-paced 1500/fps transition of other frame effects
@@ -223,15 +251,18 @@ If the hardware disagrees, the recipe changes before release.
 ### 7. Testing
 
 - **Renderer.** Unit tests on small hand-built palettes for every function:
-  run counts and trimming in `stretch`, the 0.01 floor in `rescale`, segment
-  allocation in `gradient`, edge order in `blended_matrix`, serpentine rows in
-  `grid`, repeated rows in `stripes`. Nothing pinned to live catalogue data.
+  run counts and trimming in `_stretch`, the 0.01 floor in `_rescale`,
+  segment allocation in `_gradient`, edge order in `_blended_matrix`,
+  serpentine rows in `_grid`, repeated rows in `_stripes`, and
+  `morph_palette()`. Private steps are tested through the public methods
+  where that pins the behaviour, directly where it does not. Nothing pinned to live catalogue data.
 - **apply_mood().** Emulator tests per device kind and `static_mode`, a lone
   bulb and a `DeviceGroup` of bulbs, the power rule, the 300 ms fade,
   brightness rescale and the restart rule. Chains use the `tile_chain_light`
   fixture, because the emulator's Tile has one tile.
 - **animate_mood().** Each row of the table in section 3, including Mirror's
   substitution and the strip MORPH-to-MOVE path.
+- **Restructure.** The existing suite passes with only import paths changed.
 - **Effects.** MORPH reduction of a 64-entry grid to 16; `EffectScroll`'s
   step and rejection of non-matrix participants; Colour Loop with a palette.
 - **apply_theme().** Existing tests pass unchanged.
