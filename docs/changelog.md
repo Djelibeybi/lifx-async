@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.9.0 (2026-10-09)
+
+### Features
+
+- **themes**: Store theme effect modes and tags
+  ([#282](https://github.com/Djelibeybi/lifx-async/pull/282),
+  [`20e0da5`](https://github.com/Djelibeybi/lifx-async/commit/20e0da531aa777ee8418388cf27c3b68010e9f5f))
+
+
 ## v7.8.1 (2026-10-06)
 
 ### Bug Fixes
