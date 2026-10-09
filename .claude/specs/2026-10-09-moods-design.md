@@ -1,11 +1,13 @@
-# Theme App Mode and animate() design
+# Moods: apply_mood() and animate_mood() design
 
 Date: 2026-10-09
 Status: draft, awaiting review
-Scope: `src/lifx/theme/` (new `app_mode.py`, `theme.py`), every `apply_theme()`
-(`devices/light.py`, `devices/multizone.py`, `devices/matrix.py`,
-`devices/component/light.py`, `api.py`), `devices/matrix.py` MORPH palette
-handling, `effects/colorloop.py`, new `src/lifx/effects/scroll.py`
+Scope: new `src/lifx/theme/mood.py`; new `apply_mood()` and `animate_mood()` on
+`Light`, `MultiZoneLight`, `MatrixLight`, the component lights and
+`DeviceGroup` (`devices/light.py`, `devices/multizone.py`,
+`devices/matrix.py`, `devices/component/light.py`, `api.py`);
+`devices/matrix.py` MORPH palette handling; `effects/colorloop.py`; new
+`src/lifx/effects/scroll.py`
 
 ## Problem
 
@@ -22,28 +24,30 @@ wants a mood to look and feel like the app.
 
 ## Goals
 
-1. An opt-in App Mode for `apply_theme()` that paints a theme the way the
-   LIFX app paints a mood, chosen by `static_mode`.
-2. `Theme.animate()`, a thin shortcut that starts the mood's dynamic effect
-   (MOVE or MORPH) with the theme's colours. The effects do the work.
-3. The current painting stays the default, unchanged.
+1. `apply_mood(theme)`: paint a theme the way the LIFX app paints a mood,
+   chosen by `static_mode`.
+2. `animate_mood(theme)`: start the effect the app's Dynamic toggle starts,
+   with the theme's colours. The effects do the work.
+3. `apply_theme()` is untouched.
 
-The bar is "looks and feels like the app", not pixel identity.
+Both methods take only the theme. Everything else (fade, power, effect choice,
+speed, direction) is the app's own value. The bar is "looks and feels like the
+app", not pixel identity.
 
 ## Decisions
 
-1. App Mode is a default-off keyword, `app_mode=True`, on every
-   `apply_theme()` including `DeviceGroup.apply_theme()`. There is no
-   `ThemePainter` class in lifx-async.
-2. App Mode copies all of the app's tap rules: brightness rescale, the power
-   rule, the 300 ms default fade, and restarting a running theme effect with
-   the new theme.
-3. `Theme.animate()` only chooses an effect and hands it the colours. MOVE
-   paints the App Mode still first, then starts the effect. MORPH starts from
-   whatever is on the light, as the app does.
+1. Two new methods on every colour light and on `DeviceGroup`:
+   `apply_mood(theme)` and `animate_mood(theme)`. No keyword on
+   `apply_theme()`, no `Theme.animate()`, no `ThemePainter` class.
+2. Neither method takes options. `apply_mood()` copies all of the app's tap
+   rules: brightness rescale, the power rule, the 300 ms fade, and restarting
+   a running mood effect with the new theme.
+3. `animate_mood()` runs `theme.resolved_dynamic_mode`. MOVE paints the mood's
+   still first, then starts the effect. MORPH starts from whatever is on the
+   light, as the app does.
 4. Firmware does the work wherever the light has the effect. Every multizone
    light has firmware MOVE. Matrix lights have firmware MORPH and no MOVE.
-5. A matrix light's MOVE is app-driven: a new software effect rotates the
+5. A matrix light's MOVE is app-driven: the new `EffectScroll` rotates the
    painted rows. The Mirror gets firmware MORPH instead of MOVE, as in the app.
 6. Strips have no firmware MORPH, so MORPH on a strip runs firmware MOVE.
 7. Bulbs have no firmware effects. Both modes run `EffectColorloop` limited to
@@ -54,7 +58,7 @@ The bar is "looks and feels like the app", not pixel identity.
 
 ## Design
 
-### 1. Renderer (`src/lifx/theme/app_mode.py`)
+### 1. Renderer (`src/lifx/theme/mood.py`)
 
 Pure functions, no I/O. Each takes colours and a geometry and returns colours.
 Every device path and `EffectScroll` render through this module.
@@ -85,29 +89,20 @@ Every device path and `EffectScroll` render through this module.
   (`stretch` with `n = 16` when there are more than 16 entries), used only on
   the MORPH wire path.
 
-`Canvas` and `lifx.geometry` stay untouched; App Mode deliberately does not use
+`Canvas` and `lifx.geometry` stay untouched; moods deliberately do not use
 `user_x`/`user_y`.
 
 The module is internal: importable, absent from `lifx.theme.__all__` and from
 the published API docs, like `Canvas`.
 
-### 2. App Mode painting: `apply_theme(..., app_mode=True)`
-
-Signature on every `apply_theme()`:
+### 2. `apply_mood(theme)`
 
 ```python
-async def apply_theme(
-    self,
-    theme: Theme,
-    power_on: bool = False,
-    duration: float | None = None,
-    *,
-    app_mode: bool = False,
-) -> None
+async def apply_mood(self, theme: Theme) -> None
 ```
 
-`duration=None` means 0.0 without App Mode (today's default) and 0.3 s with it.
-With `app_mode=False` behaviour is unchanged.
+On `Light` (and so every subclass, with overrides where the geometry differs)
+and on `DeviceGroup`.
 
 The recipe is chosen by `theme.static_mode`. `None`, and any mode with no
 recipe, render as `blended`.
@@ -132,51 +127,48 @@ Device specifics:
   section 6 decides.*
 - **Candle (5x6), Luna (7x5).** The matrix recipe over the reported geometry.
   *Unverified; Luna's known mismatch stands.*
-- **Bulb.** `DeviceGroup.apply_theme()` deals the theme's distinct colours,
-  shuffled, one per bulb in turn. A lone `Light.apply_theme()` takes the
+- **Bulb.** `DeviceGroup.apply_mood()` deals the theme's distinct colours,
+  shuffled, one per bulb in turn. A lone `Light.apply_mood()` takes the
   first colour of a shuffle.
 
-Tap rules, all applied under App Mode:
+The app's tap rules, all fixed:
 
 - **Brightness.** Read each light's current brightness and `rescale` to it.
-- **Power.** With `power_on=True`, power on only when every targeted light is
-  off. `DeviceGroup` checks all its lights; a single device checks itself.
-- **Fade.** 0.3 s when the caller passes no `duration`.
-- **Restart.** If a theme effect is running on the light, call
-  `theme.animate()` on that light with the new theme instead of painting. A
-  theme effect is firmware MORPH on a matrix light, firmware MOVE on a strip,
-  or `EffectScroll` or the palette Colour Loop effect on the light's Conductor. It
-  is read from the device and the Conductor, not remembered, so the rule
+- **Power.** Power on only when every targeted light is off.
+  `DeviceGroup` checks all its lights; a single light checks itself.
+- **Fade.** 300 ms.
+- **Restart.** If a mood effect is running on the light, call
+  `animate_mood()` with the new theme instead of painting. A mood effect is
+  firmware MORPH on a matrix light, firmware MOVE on a strip, or
+  `EffectScroll` or the palette Colour Loop on the light's Conductor. It is
+  read from the device and the Conductor, not remembered, so the rule
   survives a process restart.
 
-### 3. `Theme.animate()`
+### 3. `animate_mood(theme)`
 
 ```python
-async def animate(
-    self,
-    lights: Light | Iterable[Light] | DeviceGroup,
-    mode: DynamicMode | None = None,
-    speed: float | None = None,
-) -> None
+async def animate_mood(self, theme: Theme) -> None
 ```
 
-`mode` defaults to `resolved_dynamic_mode`. `speed=None` uses each path's app
-default. Stopping is the existing `light.stop_effect()`.
+On the same classes as `apply_mood()`. It runs `theme.resolved_dynamic_mode`
+at the app's own speed and direction. Stopping is the existing
+`stop_effect()`.
 
 | Light | MOVE | MORPH |
 |---|---|---|
-| Strip (any multizone) | App Mode still, then firmware MOVE, FORWARD, `20 s * zones / 16` | same as MOVE |
-| Matrix (Ceiling, Tile, chain, Candle, Luna) | App Mode still, then `EffectScroll` | firmware MORPH, 3 s, no pre-paint |
+| Strip (any multizone) | mood still, then firmware MOVE, FORWARD, `20 s * zones / 16` | same as MOVE |
+| Matrix (Ceiling, Tile, chain, Candle, Luna) | mood still, then `EffectScroll` | firmware MORPH, 3 s, no pre-paint |
 | Mirror | firmware MORPH | firmware MORPH |
 | Bulb | `EffectColorloop(palette=theme.colors)` | same |
 
-The strip path paints with `apply_theme(app_mode=True)` then sends the raw
+The strip path paints with `apply_mood()` then sends the raw
 `set_effect(MultiZoneEffect)`, which never paints. `set_move_effect()` is not
 used, because with no palette it may repaint a single-colour strip with a
 derived palette.
 
-Bulbs in one call share one Colour Loop run, so `spread` offsets each bulb's
-starting colour.
+`DeviceGroup.animate_mood()` runs one Colour Loop across all its bulbs, so
+`spread` offsets each bulb's starting colour; every other light runs its own
+path.
 
 ### 4. Effects
 
@@ -201,10 +193,8 @@ starting colour.
 
 ### 5. Errors
 
-- `Theme.animate()` with an empty target does nothing.
-- A non-colour light is skipped by `apply_theme()`, as today, and by
-  `animate()`.
-- A `mode` that is not a known dynamic mode raises `ValueError`.
+- A non-colour light ignores both methods, as `apply_theme()` does today.
+- An empty `DeviceGroup` does nothing.
 
 ### 6. Hardware verification
 
@@ -227,12 +217,13 @@ If the hardware disagrees, the recipe changes before release.
   run counts and trimming in `stretch`, the 0.01 floor in `rescale`, segment
   allocation in `gradient`, edge order in `blended_matrix`, serpentine rows in
   `grid`, repeated rows in `stripes`. Nothing pinned to live catalogue data.
-- **Painting.** Emulator tests per device kind and `static_mode`, a lone bulb
-  and a `DeviceGroup` of bulbs, the power rule, the fade default, brightness
-  rescale and the restart rule. Chains use the `tile_chain_light` fixture,
-  because the emulator's Tile has one tile.
-- **animate().** Each row of the table in section 3, including Mirror's
+- **apply_mood().** Emulator tests per device kind and `static_mode`, a lone
+  bulb and a `DeviceGroup` of bulbs, the power rule, the 300 ms fade,
+  brightness rescale and the restart rule. Chains use the `tile_chain_light`
+  fixture, because the emulator's Tile has one tile.
+- **animate_mood().** Each row of the table in section 3, including Mirror's
   substitution and the strip MORPH-to-MOVE path.
 - **Effects.** MORPH reduction of a 64-entry grid to 16; `EffectScroll`'s
   step and rejection of non-matrix participants; Colour Loop with a palette.
+- **apply_theme().** Existing tests pass unchanged.
 - **Coverage.** 100% branch patch coverage.
