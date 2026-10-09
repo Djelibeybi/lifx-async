@@ -1162,7 +1162,7 @@ async def discover(
                 return
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return
 
             if event.kind == "leg_done":
@@ -1408,7 +1408,7 @@ async def _race_serial_sources(
                 return None
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return None
 
             if event.kind == "leg_done":

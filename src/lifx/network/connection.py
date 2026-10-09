@@ -9,14 +9,13 @@ from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
     REQUEST_RETRANSMIT_GAPS,
-    TIMEOUT_ERRORS,
 )
 from lifx.exceptions import (
     LifxConnectionError,
@@ -412,7 +411,7 @@ class DeviceConnection:
                         await asyncio.wait_for(
                             receiver_task, timeout=_RECEIVER_SHUTDOWN_TIMEOUT
                         )
-                    except TIMEOUT_ERRORS:
+                    except TimeoutError:
                         receiver_task.cancel()
                         try:
                             await receiver_task
@@ -1022,7 +1021,7 @@ class DeviceConnection:
                     response = await asyncio.wait_for(
                         response_queue.get(), timeout=wait
                     )
-                except TIMEOUT_ERRORS:
+                except TimeoutError:
                     continue  # slice ended -- loop top decides why
 
                 # Sampled immediately after the queue get returns, before any

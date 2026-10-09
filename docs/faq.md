@@ -28,7 +28,7 @@ account required.
 
 ### What Python versions are supported?
 
-Python 3.10 or higher is required.
+Python 3.11 or higher is required.
 
 ## Installation & Setup
 
@@ -289,7 +289,7 @@ await light.set_color(Colors.BLUE, duration=2.0)
 
 lifx-async is fully type-hinted. If you get type errors:
 
-1. Ensure you're using Python 3.10+
+1. Ensure you're using Python 3.11+
 1. Update your type checker (Pyright, mypy)
 1. Check you're using correct types
 

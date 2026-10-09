@@ -401,7 +401,7 @@ class FrameEffect(LIFXEffect):
                 try:
                     await asyncio.wait_for(self._stop_event.wait(), timeout=sleep_time)
                     break  # Stop event was set
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Normal - continue to next frame
 
     def _deliver(

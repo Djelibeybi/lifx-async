@@ -33,7 +33,6 @@ from lifx.const import (
     IDLE_TIMEOUT_MULTIPLIER,
     LIFX_MDNS_SERVICE,
     MAX_RESPONSE_TIME,
-    TIMEOUT_ERRORS,
 )
 from lifx.devices.base import Device
 from lifx.devices.detection import get_device_class_for_product
@@ -1426,7 +1425,7 @@ async def _verify_mdns_candidate(
         if isinstance(device, Light):
             device._adopt_state_color(cast(packets.Light.StateColor, response))
         return device
-    except (LifxTimeoutError, *TIMEOUT_ERRORS) as error:
+    except (LifxTimeoutError, TimeoutError) as error:
         _emit_candidate_failure(
             failure_sink,
             stage="request",

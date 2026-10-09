@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Coroutine
 from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from math import floor, log10
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
@@ -40,7 +40,7 @@ from lifx.protocol.models import (
 from lifx.protocol.protocol_types import ThreadRoutingRole
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from lifx.devices import (
         CeilingLight,
@@ -97,24 +97,20 @@ def _warn_unanswered_port(ip: str, port: int) -> None:
         )
 
 
-class Connectivity(str, Enum):
+class Connectivity(StrEnum):
     """How a device's radio reaches the network.
 
     A LIFX device operates in either WiFi or Thread mode. Changing between
     them requires a firmware crossgrade, so the value is invariant for a
     given device rather than a per-request transport choice.
 
-    The enum derives from ``str``, so existing comparisons such as
-    ``device.connectivity == "thread"`` continue to hold.
+    The enum is a ``StrEnum``, so existing comparisons such as
+    ``device.connectivity == "thread"`` continue to hold and ``str()``
+    renders the bare value.
     """
 
     WIFI = "wifi"
     THREAD = "thread"
-
-    # Render as the bare value on every supported Python version. Without
-    # this, a (str, Enum) member formats as "Connectivity.THREAD" on some
-    # versions and "thread" on others.
-    __str__ = str.__str__
 
 
 @dataclass

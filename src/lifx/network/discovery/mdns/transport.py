@@ -28,7 +28,7 @@ import socket
 from asyncio import DatagramTransport
 from ipaddress import AddressValueError, IPv4Address
 
-from lifx.const import MDNS_ADDRESS, MDNS_PORT, TIMEOUT_ERRORS
+from lifx.const import MDNS_ADDRESS, MDNS_PORT
 from lifx.exceptions import LifxNetworkError, LifxTimeoutError
 from lifx.network.transport import _UdpProtocol
 
@@ -280,7 +280,7 @@ class MdnsTransport:
             # shared UDP protocol's dual-family sockaddr type at this IPv4-only
             # boundary instead of leaking an impossible four-tuple downstream.
             return data, (addr[0], addr[1])
-        except TIMEOUT_ERRORS as e:
+        except TimeoutError as e:
             raise LifxTimeoutError(f"No mDNS data received within {timeout}s") from e
         except OSError as e:
             failure_log = {

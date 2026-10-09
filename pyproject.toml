@@ -3,7 +3,7 @@ name = "lifx-async"
 version = "7.9.3"
 description = "A modern, type-safe, async Python library for controlling LIFX lights"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = []
 license = "UPL-1.0"
 license-files = ["LICENSE"]
@@ -19,7 +19,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Natural Language :: English",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -54,8 +53,6 @@ dev = [
     "pytest-timeout>=2.4.0",
     "pyyaml>=6.0.3",
     "ruff>=0.14.2",
-    "tomli>=2.0.1 ; python_full_version < '3.11'",
-    "typing-extensions>=4.15.0",
     "zensical>=0.0.37",
 ]
 
@@ -69,7 +66,7 @@ packages = ["src/lifx"]
 [tool.ruff]
 line-length = 88
 indent-width = 4
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.format]
 quote-style = "double"
@@ -100,7 +97,7 @@ ignore = []
 
 [tool.pyright]
 typeCheckingMode = "standard"
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 # scripts/generate_theme_data.py is hand-written validation and path handling,
 # so it stays type-checked even though it lives outside the package. The two
 # maintainer CI tools in .github/ (patch_coverage_guard.py and

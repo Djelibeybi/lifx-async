@@ -9,7 +9,7 @@ A modern, type-safe, async Python library for controlling LIFX smart devices ove
 Built with Python's built-in `asyncio` for async/await patterns and features auto-generated protocol
 structures from a YAML specification. Published on PyPI as `lifx-async` (`pip install lifx-async`).
 
-**Python Versions**: 3.10, 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI)
+**Python Versions**: 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI)
 **Runtime Dependencies**: Zero - completely dependency-free!
 **Async Framework**: Python's built-in `asyncio` (no external async library required)
 **Test Isolation**: lifx-emulator-core runs embedded in-process for fast, cross-platform testing
@@ -344,7 +344,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 ### Concurrency Considerations
 
 - Concurrent requests on a single connection are supported: a background receiver task routes each response to its request via per-request queues keyed by (source, sequence, serial), so responses never mix
-- Different devices have different connections, so operations on multiple devices execute in parallel via `asyncio.gather()` (see `DeviceGroup` in `src/lifx/api.py`) or `asyncio.create_task()` for fire-and-forget fan-out. The project supports Python 3.10, where `asyncio.TaskGroup` (added in 3.11) is unavailable, so it is never used for this or any other internal concurrency
+- Different devices have different connections, so operations on multiple devices execute in parallel via `asyncio.gather()` (see `DeviceGroup` in `src/lifx/api.py`) or `asyncio.create_task()` for fire-and-forget fan-out. Internal concurrency uses these rather than `asyncio.TaskGroup`, so a batch operation raises its first failure rather than an `ExceptionGroup`, and `tests/test_api/test_api_batch_errors.py` pins that behaviour
 - Request/response uses async generators: single-response requests break after first response, multi-response requests stream until timeout or early exit
 - Sequence numbers (0-255, uint8) are atomically allocated per request for response correlation
 - **No rate limiting** built in — devices handle ~20 msg/sec; application developers should implement their own if needed
@@ -386,7 +386,7 @@ uv sync  # Installs lifx-emulator-core automatically
 - Tests marked with `@pytest.mark.emulator` use the embedded emulator
 - The emulator is a required development dependency; pytest collection fails
   if it is unavailable
-- **Works on all supported Python versions (3.10+)**
+- **Works on all supported Python versions (3.11+)**
 
 **External Emulator Management**:
 

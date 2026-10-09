@@ -4,21 +4,13 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
 import patch_coverage_guard as guard
 import pytest
 import yaml
-
-# tomllib is stdlib from 3.11; this project supports 3.10, where the same reader
-# ships as the tomli backport. Declared in the dev dependency group under the
-# matching marker rather than relied on as somebody else's transitive dependency.
-if sys.version_info >= (3, 11):
-    import tomllib
-else:  # pragma: no cover - exercised only on Python 3.10
-    import tomli as tomllib
 
 pytestmark = pytest.mark.tooling
 

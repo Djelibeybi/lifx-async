@@ -373,9 +373,7 @@ async def keep_awake(light: Light) -> None:
         await asyncio.sleep(15)  # 10-15 s keeps the wake tail away
 ```
 
-lifx-async supports Python 3.10, where `asyncio.TaskGroup` (added in 3.11) is
-unavailable, so run the poll alongside your application with
-`asyncio.create_task()` instead:
+Run the poll alongside your application with `asyncio.create_task()`:
 
 ```python
 poll_task = asyncio.create_task(keep_awake(light))
@@ -398,8 +396,7 @@ needed, because the library serialises requests per connection. The poll is
 read-only, so it is safe to run continuously, and one request every 15
 seconds stays far below the ~20 msg/sec a device can handle.
 
-Controlling several devices at once follows the same 3.10-compatible pattern
-with `asyncio.gather()` — see
+Controlling several devices at once uses `asyncio.gather()` — see
 [Multi-Device Control](advanced-usage.md#multi-device-control) for a worked
 example.
 

@@ -15,11 +15,6 @@ coverage:
 
 # Flag management: each Python version uploads separately
 flags:
-  python3.10:
-    paths:
-    - src/lifx/
-    - scripts/
-    carryforward: true
   python3.11:
     paths:
     - src/lifx/

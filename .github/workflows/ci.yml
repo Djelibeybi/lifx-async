@@ -177,9 +177,9 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{ needs.changes.outputs.source == 'true' && github.event_name == 'pull_request' && fromJSON('["ubuntu-latest","macos-latest","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
-    # Only the designated ubuntu-latest + Python 3.10 cell needs full
+    # Only the designated ubuntu-latest + Python 3.11 cell needs full
     # history: the vacuous-gate guard computes its own merge base there.
     # Both results are quoted strings, matching the LIFX_REQUIRE_IPV6
     # rendering below, because GitHub's expression language treats the
@@ -187,7 +187,7 @@ jobs:
     # shallow fallback for every cell, including the designated one.
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
-        fetch-depth: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10') && '0' || '1' }}
+        fetch-depth: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11') && '0' || '1' }}
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -210,15 +210,15 @@ jobs:
         # The designated must-not-skip IPv6 cell. Setting this to 1 makes the
         # ipv6_available probe fail instead of skip when ::1 cannot be bound,
         # so the IPv6 end-to-end tests can never skip on every job at once and
-        # still report green. ubuntu-latest with Python 3.10 is present in
+        # still report green. ubuntu-latest with Python 3.11 is present in
         # every matrix configuration, including the reduced ubuntu-only path,
         # and GitHub-hosted ubuntu runners have IPv6 loopback. Every other
         # cell gets an empty value and keeps its skip guard.
-        LIFX_REQUIRE_IPV6: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10') && '1' || '' }}
+        LIFX_REQUIRE_IPV6: ${{ (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11') && '1' || '' }}
       timeout-minutes: 10
 
     - name: Run targeted IPv6 discovery
-      if: ${{ !cancelled() && matrix.os == 'windows-latest' && matrix.python-version == '3.10' }}
+      if: ${{ !cancelled() && matrix.os == 'windows-latest' && matrix.python-version == '3.11' }}
       run: uv run --frozen pytest tests/test_api/test_ipv6_e2e.py -m targeted_ipv6_windows --no-cov -p no:cacheprovider -q
       env:
         LIFX_WINDOWS_IPV6_DISCOVERY: '1'
@@ -239,7 +239,7 @@ jobs:
 
     # D-06: runs immediately after the coverage upload above, the point
     # coverage.xml is guaranteed present. D-07: the designated ubuntu-latest
-    # + Python 3.10 cell, present in every matrix configuration. The live
+    # + Python 3.11 cell, present in every matrix configuration. The live
     # codecov/patch cross-check here is best-effort: it is computed only
     # after Codecov has merged the uploads from every matrix cell, and this
     # step runs inside one of those cells, so an UNUSABLE (pending) result is
@@ -251,12 +251,12 @@ jobs:
     # polling branch stays available for a manual run after CI has settled,
     # by passing a non-zero --status-timeout. D-08: this is a single-report
     # evaluation; matrix cells cannot union their coverage without
-    # artefacts. The gap is bounded by measurement (one version-gated site,
+    # artefacts. The gap is bounded by measurement (zero version-gated sites,
     # zero platform-gated sites); the upgrade path is artefact uploads plus a
     # union job. The step carries no failure-tolerance key: it must be able
     # to fail the job exactly like the unit test step above it.
     - name: Guard against a vacuous coverage gate
-      if: ${{ !cancelled() && github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10' }}
+      if: ${{ !cancelled() && github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
       run: >-
         uv run --frozen python .github/patch_coverage_guard.py
         --base ${{ github.event.pull_request.base.sha }}
