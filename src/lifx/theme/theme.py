@@ -21,11 +21,12 @@ if TYPE_CHECKING:
     from lifx.theme.data import DynamicMode, StaticMode
 
 #: The recorded fate of a library theme. ``"lifx-app"`` is a palette the LIFX
-#: app ships today; ``"library-only"`` is a pre-6.3.0 key this library keeps
-#: with no app counterpart; ``"deprecated"`` and ``"renamed"`` both name a
-#: successor in ``replaced_by`` — a deprecated key keeps its own palette and
-#: points at the closest survivor, a renamed key is the theme's former name
-#: and points at its current one.
+#: app ships today; ``"library-only"`` is a key this library keeps that the
+#: app does not offer, whether it predates the app's themes or the app has
+#: since dropped it; ``"deprecated"`` and ``"renamed"`` both name a successor
+#: in ``replaced_by`` — a deprecated key keeps its own palette and points at
+#: the closest survivor, a renamed key is the theme's former name and points
+#: at its current one.
 Disposition = Literal["lifx-app", "library-only", "deprecated", "renamed"]
 
 
