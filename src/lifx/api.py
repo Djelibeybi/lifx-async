@@ -55,7 +55,7 @@ from lifx.network.discovery.udp import (
 )
 from lifx.protocol import packets
 from lifx.protocol.models import Serial
-from lifx.theme import Theme
+from lifx.theme import MoodGenerator, Theme
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -321,6 +321,11 @@ class GroupGrouping:
     label: str
     devices: list[Device]
     updated_at: int
+
+
+def _is_bulb(light: Light) -> bool:
+    """A light with one colour: no zones and no tiles."""
+    return not isinstance(light, (MultiZoneLight, MatrixLight))
 
 
 class DeviceGroup:
@@ -976,6 +981,54 @@ class DeviceGroup:
         # a second time, racing two independently generated gradients.
         await asyncio.gather(
             *(light.apply_theme(theme, power_on, duration) for light in self.lights)
+        )
+
+    async def apply_mood(self, theme: Theme) -> None:
+        """Paint a theme across the group the way the LIFX app paints a mood.
+
+        Each light paints by its kind, as ``Light.apply_mood()`` describes.
+        Bulbs share the theme's distinct colours, shuffled and dealt one per
+        bulb in turn. Lights are turned on only when every colour light in
+        the group is off. Lights already running a mood effect restart it
+        with this theme instead.
+
+        Args:
+            theme: Theme to paint
+        """
+        lights = [
+            light
+            for light, paints in zip(
+                self.lights,
+                await asyncio.gather(*(light._paints_moods() for light in self.lights)),
+            )
+            if paints
+        ]
+        running = await asyncio.gather(
+            *(light._mood_effect_running() for light in lights)
+        )
+        restart = [light for light, busy in zip(lights, running) if busy]
+        paint = [light for light, busy in zip(lights, running) if not busy]
+        readings = await asyncio.gather(*(light._mood_reading() for light in lights))
+        power_on = bool(lights) and not any(is_on for is_on, _ in readings)
+        brightness = {id(light): level for light, (_, level) in zip(lights, readings)}
+
+        bulbs = [light for light in paint if _is_bulb(light)]
+        dealt = MoodGenerator(theme).get_bulb_colors(
+            [brightness[id(light)] for light in bulbs]
+        )
+        bulb_colors = {id(light): color for light, color in zip(bulbs, dealt)}
+
+        await asyncio.gather(
+            *(light.animate_mood(theme) for light in restart),
+            *(
+                light._paint_mood(
+                    theme,
+                    power_on=power_on,
+                    brightness=brightness[id(light)],
+                    bulb_color=bulb_colors.get(id(light)),
+                )
+                for light in paint
+            ),
         )
 
     def invalidate_metadata_cache(self) -> None:

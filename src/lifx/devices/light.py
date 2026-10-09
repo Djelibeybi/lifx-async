@@ -1128,11 +1128,14 @@ class Light(Device[LightState]):
         if not await self._paints_moods():
             return
         if await self._mood_effect_running():
-            # animate_mood() arrives with the mood effects task.
-            await self.animate_mood(theme)  # pyright: ignore[reportAttributeAccessIssue]
+            await self.animate_mood(theme)
             return
         is_on, brightness = await self._mood_reading()
         await self._paint_mood(theme, power_on=not is_on, brightness=brightness)
+
+    async def animate_mood(self, theme: Theme) -> None:
+        """Start the effect the LIFX app's Dynamic toggle starts for a mood."""
+        raise NotImplementedError
 
     async def _paints_moods(self) -> bool:
         """Whether this light shows colour, the only kind a mood paints."""
