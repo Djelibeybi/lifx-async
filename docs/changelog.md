@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.9.1 (2026-10-09)
+
+### Bug Fixes
+
+- **themes**: Add an accent-only unicode_name to theme records
+  ([#284](https://github.com/Djelibeybi/lifx-async/pull/284),
+  [`e9e4680`](https://github.com/Djelibeybi/lifx-async/commit/e9e468016453e980106a5336d39644f42ccb9fe4))
+
+
 ## v7.9.0 (2026-10-09)
 
 ### Features
