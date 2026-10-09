@@ -312,9 +312,10 @@ What a mood does depends on the light:
   one column every 1.25 seconds.
 - **Spot, Path and the Mirror** use firmware MORPH for every mood. The Mirror
   is painted as a single matrix light over its 4x13 buffer, not ring by ring.
-- **Every Candle and the Tube** paint stripe moods as bands along the long
-  axis, with the first colour at the bottom. A MOVE stripe mood scrolls the
-  bands down the light; blended and grid moods scroll sideways.
+- **Every Candle, the Tube and the Mirror** paint stripe moods as bands along
+  the long axis, with the first colour at the bottom. On every Candle and the
+  Tube, a MOVE stripe mood scrolls the bands down the light; blended and grid
+  moods scroll sideways. The Mirror runs MORPH instead.
 - **A Tile chain** is painted and scrolled as one canvas in chain order,
   whatever shape the tiles are arranged in. A Tile whose accelerometer
   reports a rotation (left, right or upside down) is remapped; FaceUp and

@@ -78,11 +78,12 @@ colour matches the light's brightness.
 | Bulb | One of the theme's colours; a `DeviceGroup` deals them one per bulb | `EffectColorloop` through the theme's colours; bulbs in one `DeviceGroup` share one loop |
 | Strip | The mood across the zones | Firmware MOVE, after painting the still image |
 | Matrix light | The mood's image, by `static_mode` | Firmware MORPH for a MORPH mood; `EffectScroll` for a MOVE mood |
-| Spot, Path and Mirror | The mood's image, painted like any other matrix light | Firmware MORPH for every mood |
+| Spot and Path | The mood's image, painted like any other matrix light | Firmware MORPH for every mood |
+| Mirror | Stripe moods paint as bands along the long axis, first colour at the bottom; other moods as for a matrix light | Firmware MORPH for every mood |
 | Candle and Tube | Stripe moods paint as bands along the long axis, first colour at the bottom | A MOVE stripe mood scrolls the bands down the light; other moods as for a matrix light |
 
 The Mirror's still image is painted over its 4x13 buffer as a single matrix
-light, not ring by ring. The app runs a firmware effect on Spot and Path that
+light, not ring by ring, with stripe moods as bands along its long axis. The app runs a firmware effect on Spot and Path that
 this library does not send, so MORPH stands in for it.
 
 A Tile chain is painted as one image in chain order, as the app does, so tiles
