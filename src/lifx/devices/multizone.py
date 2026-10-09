@@ -696,6 +696,10 @@ class MultiZoneLight(Light):
 
         return result
 
+    async def _shown_brightness(self, reported: float) -> float:
+        """The brightest zone, since GetColor reports zone 0 alone."""
+        return self._brightest_or(await self.get_all_color_zones(), reported)
+
     async def get_all_color_zones(self) -> list[HSBK]:
         """Get colors for all zones, automatically using the best method.
 

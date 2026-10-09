@@ -950,7 +950,8 @@ class ComponentMatrixLight(MatrixLight):
     async def _mood_reading(self) -> tuple[bool, float]:
         """Trust a recent power write, as every other write here does."""
         color, _power, _label = await self.get_color()
-        return await self._power_for_update() > 0, color.brightness
+        brightness = await self._shown_brightness(color.brightness)
+        return await self._power_for_update() > 0, brightness
 
     async def _write_mood_frames(
         self,

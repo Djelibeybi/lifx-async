@@ -1156,7 +1156,21 @@ class Light(Device[LightState]):
     async def _mood_reading(self) -> tuple[bool, float]:
         """The light's power and brightness, from one GetColor."""
         color, power, _label = await self.get_color()
-        return power > 0, color.brightness
+        return power > 0, await self._shown_brightness(color.brightness)
+
+    async def _shown_brightness(self, reported: float) -> float:
+        """The brightness a mood rescales to, given what GetColor reported.
+
+        A bulb is one zone, so GetColor is the whole answer. Zoned lights
+        override this, because GetColor reports zone 0 alone.
+        """
+        return reported
+
+    @staticmethod
+    def _brightest_or(colors: list[HSBK], reported: float) -> float:
+        """The brightest of ``colors``, or ``reported`` when every one is dark."""
+        brightest = max((color.brightness for color in colors), default=0.0)
+        return brightest if brightest > 0 else reported
 
     async def _mood_effect_running(self) -> bool:
         """Whether a mood effect runs here, so a new mood restarts it."""

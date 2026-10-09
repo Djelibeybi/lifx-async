@@ -741,6 +741,20 @@ class MatrixLight(Light):
 
         return all_colors
 
+    async def _shown_brightness(self, reported: float) -> float:
+        """The brightest pixel on the chain, since GetColor reports pixel 0 alone.
+
+        Only each tile's first ``width * height`` colours count: a tile's
+        buffer can be padded past its pixels (the Mirror's 4x13 is 64 long).
+        """
+        all_colors = await self.get_all_tile_colors()
+        shown = [
+            color
+            for tile, colors in zip(self._device_chain or [], all_colors)
+            for color in colors[: tile.width * tile.height]
+        ]
+        return self._brightest_or(shown, reported)
+
     @staticmethod
     def _can_batch_chain_fetch(device_chain: list[TileInfo]) -> bool:
         """Return whether the whole chain can be read with one Get64.
