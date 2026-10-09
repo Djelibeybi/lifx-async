@@ -2,11 +2,11 @@
 
 Date: 2026-10-09
 Status: draft, awaiting review
-Scope: new `src/lifx/theme/mood.py`; new `apply_mood()` and `animate_mood()` on
+Scope: `src/lifx/theme/generators.py`; new `apply_mood()` and `animate_mood()` on
 `Light`, `MultiZoneLight`, `MatrixLight`, the component lights and
 `DeviceGroup` (`devices/light.py`, `devices/multizone.py`,
 `devices/matrix.py`, `devices/component/light.py`, `api.py`);
-`devices/matrix.py` MORPH palette handling; `effects/colorloop.py`; new
+`devices/matrix.py` and `devices/component/state.py` MORPH palette handling; `effects/colorloop.py`; new
 `src/lifx/effects/scroll.py`
 
 ## Problem
@@ -58,10 +58,10 @@ app", not pixel identity.
 
 ## Design
 
-### 1. Renderer (`src/lifx/theme/mood.py`)
+### 1. Renderer (`src/lifx/theme/generators.py`)
 
-Pure functions, no I/O. Each takes colours and a geometry and returns colours.
-Every device path and `EffectScroll` render through this module.
+Module functions beside the existing generators, no I/O. Each takes colours
+and a geometry and returns colours. Every device path and `EffectScroll` render through this module.
 
 - `stretch(colors, n)`: the app's run-weighted fit. Return the list unchanged
   if it already has `n` entries. Otherwise group consecutive equal colours
@@ -85,15 +85,17 @@ Every device path and `EffectScroll` render through this module.
   serpentine (even rows left to right, odd rows right to left).
 - `stripes(colors, width, height)`: `stretch` to `width`, the same row on
   every row.
-- `palette_16(colors)`: the run-weighted reduction to `MAX_PALETTE_COLORS`
-  (`stretch` with `n = 16` when there are more than 16 entries), used only on
-  the MORPH wire path.
 
-`Canvas` and `lifx.geometry` stay untouched; moods deliberately do not use
+Moods do not go through `MatrixGenerator`, `Canvas` or `lifx.geometry`: they
+work from width, height and chain index and deliberately ignore
 `user_x`/`user_y`.
 
-The module is internal: importable, absent from `lifx.theme.__all__` and from
-the published API docs, like `Canvas`.
+These functions are importable, since the devices, `EffectScroll` and
+`palette_16()` call them, but like `Canvas` none joins `lifx.theme.__all__`
+or the published API docs, so their signatures can change without a major
+version.
+The only new public API is `apply_mood()`, `animate_mood()`, `EffectScroll`
+and `EffectColorloop(palette=...)`.
 
 ### 2. `apply_mood(theme)`
 
@@ -172,9 +174,13 @@ path.
 
 ### 4. Effects
 
+- **`palette_16(colors)`** in `devices/component/state.py`, beside
+  `derive_effect_palette()` and `sample_effect_palette()`: the app's
+  run-weighted reduction to `MAX_PALETTE_COLORS` (`stretch` with `n = 16`
+  when there are more than 16 entries). Selection is deterministic.
 - **MORPH palettes over 16 colours.** `MatrixLight.set_effect(MORPH,
   palette=...)` accepts any non-empty palette. More than 16 colours are reduced
-  with `palette_16` and the result is shuffled; selection is deterministic,
+  with `palette_16()` and the result is shuffled; selection is deterministic,
   only the order is random. Today a palette over 16 raises `ValueError`; this
   is the one behaviour change to an existing API. Other effect types keep the
   16-colour limit, and `validate_effect_palette()` is unchanged for them.
