@@ -193,7 +193,7 @@ class TestFoldAccents:
             ("Türkiye", "Turkiye"),
             ("São Tomé and Príncipe", "Sao Tome and Principe"),
             ("Côte d'Ivoire", "Cote d'Ivoire"),
-            ("Curaçao", "Curacao"),
+            ("Curac\u0327ao", "Curacao"),
             ("Plain", "Plain"),
         ],
     )

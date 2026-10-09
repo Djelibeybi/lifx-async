@@ -117,7 +117,7 @@ class Theme:
             colors: List of HSBK colors (defaults to white if None or empty)
             slug: Library key for the theme (attached by ``ThemeLibrary``)
             name: Display name for the theme (attached by ``ThemeLibrary``)
-            unicode_name: Display name with accents (attached by ``ThemeLibrary``)
+            unicode_name: Correctly spelt display name (attached by ``ThemeLibrary``)
             category: Category for the theme (attached by ``ThemeLibrary``)
             disposition: Recorded fate of the theme (attached by
                 ``ThemeLibrary``)
