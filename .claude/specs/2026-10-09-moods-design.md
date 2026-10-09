@@ -90,7 +90,7 @@ A generator class shaped like its siblings, no I/O, exported from
   Luna and a single Tile.
 - `get_chain_colors(tile_count, width, height, brightness) ->
   list[list[HSBK]]`: a Tile chain, one canvas in chain order, sliced per tile.
-- `get_zone_colors(zone_count, brightness) -> list[HSBK]`: a strip, or one
+- `get_multizone_colors(zone_count, brightness) -> list[HSBK]`: a strip, or one
   Mirror ring.
 - `get_bulb_colors(count) -> list[HSBK]`: the distinct colours, shuffled,
   dealt one per bulb.
