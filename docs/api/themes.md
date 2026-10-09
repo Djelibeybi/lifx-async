@@ -15,7 +15,7 @@ The `Theme` class represents a collection of HSBK colors forming a coordinated p
 
 ## ThemeLibrary Class
 
-The `ThemeLibrary` provides access to 166 themes, resolvable under 169 names.
+The `ThemeLibrary` provides access to 378 themes, resolvable under 381 names.
 
 ::: lifx.theme.ThemeLibrary
     options:
@@ -46,10 +46,9 @@ themes and other non-`blended` static modes: there the order is the layout.
 Tags are spelt as the app spells them (for example `Cozy`). Tag matching
 ignores case and punctuation, so `"calm"` finds `Calm`.
 
-Tags and the non-`blended` static modes arrive with a catalogue resync. Today
-every shipped theme is `blended` and has no tags, so `ThemeLibrary.get_tags()`
-returns an empty list. An unknown tag, category or static mode raises
-`ValueError`, so check `ThemeLibrary.get_tags()` first.
+Only the LIFX app's own themes carry tags; library-only and deprecated themes
+have none and use the `blended` static mode. An unknown tag, category or static
+mode raises `ValueError`, so check `ThemeLibrary.get_tags()` first.
 
 Find themes with `ThemeLibrary.get_tags()`, `ThemeLibrary.get_by_tag()` and
 `ThemeLibrary.find()`:

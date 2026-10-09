@@ -1,19 +1,24 @@
 """Built-in theme library generated from the LIFX app's own palettes.
 
 The theme data is generated from ``data/themes.jsonl`` by
-``scripts/generate_theme_data.py``, synced from the LIFX app via hardware capture on
-2026-08-14. The library carries 169 resolvable names: 138 app theme slugs,
-28 pre-6.3.0 keys with no app counterpart (category ``Library``), and 3
-rename aliases (``forest``, ``aurora_borealis`` and ``energizing``) that
-resolve to their renamed targets. Every name reports its fate in
-``disposition``, including the three aliases, which carry ``"renamed"`` and
-name the canonical key in ``replaced_by``.
+``scripts/generate_theme_data.py``, synced with the themes in LIFX app 4.100 on
+2026-10-09. The library carries 378 theme records under 381 resolvable names:
+
+* 290 app themes (disposition ``"lifx-app"``): every app theme except sport
+  themes;
+* 79 keys the app does not offer (``"library-only"``): 60 ``Archives`` themes
+  the app has since dropped, and 19 pre-6.3.0 keys under ``Library``;
+* 9 pre-6.3.0 keys under ``Library`` (``"deprecated"``) that keep their own
+  palette and name the closest surviving theme in ``replaced_by``;
+* 3 rename aliases (``forest``, ``aurora_borealis`` and ``energising``) that
+  resolve to their renamed targets. They carry ``"renamed"`` and name the
+  canonical key in ``replaced_by``.
 
 Colours are stored in source order. For most themes the order carries no
 meaning, but for a grid or stripe theme it is the layout, so it is never
 reordered. Palette comparison (``Theme.palette_equals()``) stays unordered.
 
-Attribution: the 28 ``Library`` records are not app captures. They ship
+Attribution: the 28 ``Library`` records are not app themes. They ship
 byte-identical at uint16 to the palettes this library carried before 6.3.0
 (the release that replaced the hand-written library with this generated
 data), which came from two upstream projects:
@@ -39,8 +44,9 @@ from lifx.theme.theme import Theme
 class ThemeLibrary:
     """Collection of built-in colour themes for LIFX devices.
 
-    Provides access to every theme in the LIFX app (sport themes excluded)
-    plus the pre-6.3.0 library keys, organised by the app's own categories.
+    Provides access to every theme in the LIFX app (sport themes excluded),
+    the themes the app has since dropped and the pre-6.3.0 library keys,
+    organised by the app's own categories.
 
     Example:
         ```python
@@ -54,8 +60,8 @@ class ThemeLibrary:
         categories = ThemeLibrary.get_categories()
         holidays = ThemeLibrary.get_by_category("Holidays")
 
-        # Find themes by tag, category and effect mode. Tags arrive with a
-        # catalogue resync, so check what exists first.
+        # Find themes by tag, category and effect mode. The available tags
+        # come from the app and change with each resync, so check first.
         tags = ThemeLibrary.get_tags()
         if "Calm" in tags:
             calm = ThemeLibrary.get_by_tag("Calm")
@@ -155,9 +161,9 @@ class ThemeLibrary:
     def _slugs_for_category(cls, key: str) -> set[str]:
         """Collect the slugs of every record whose category normalises to key.
 
-        The slug rule is applied to the *distinct* category names (nine
-        today), never once per record: a 169-record scan would run 169
-        regex substitutions to answer a question with nine possible
+        The slug rule is applied to the *distinct* category names (ten
+        today), never once per record: a 381-record scan would run 381
+        regex substitutions to answer a question with ten possible
         answers.
 
         Rename-alias records are skipped. An alias key carries
@@ -195,7 +201,7 @@ class ThemeLibrary:
                 resolve. The categories are Archives, Art Series, Holidays,
                 Library (pre-6.3.0 keys with no app counterpart, defined by
                 this library rather than the LIFX app), Moods, Music, Nature,
-                Play and Space.
+                Play, Space and Worldly.
 
         Returns:
             Dictionary of Theme objects in the category, keyed by slug and
