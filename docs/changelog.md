@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.9.3 (2026-10-09)
+
+### Bug Fixes
+
+- **devices**: Accept a colour list for ceiling uplight on/off
+  ([#288](https://github.com/Djelibeybi/lifx-async/pull/288),
+  [`b0335cd`](https://github.com/Djelibeybi/lifx-async/commit/b0335cd9c5bd604c0b0673a35834143a7905c444))
+
+
 ## v7.9.2 (2026-10-09)
 
 ### Bug Fixes

@@ -497,6 +497,61 @@ class TestCeilingLightTurnOnOff:
         assert result_color.hue == pytest.approx(120, abs=1)
         assert result_color.kelvin == 4000
 
+    async def test_turn_uplight_on_with_color_list_uses_first(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turning uplight on with a list uses its first color."""
+        first = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
+        second = HSBK(hue=240, saturation=0.5, brightness=0.4, kelvin=5000)
+
+        await ceiling_176.turn_uplight_on([first, second])
+
+        call_args = ceiling_176.set_matrix_colors.call_args
+        assert call_args.args[1][63] == first
+        assert ceiling_176.state.stored_uplight_color == first
+
+    async def test_turn_uplight_on_with_empty_list_uses_stored(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turning uplight on with an empty list behaves like no color."""
+        stored_color = HSBK(hue=60, saturation=0.5, brightness=0.7, kelvin=4000)
+        ceiling_176.state.stored_uplight_color = stored_color
+
+        await ceiling_176.turn_uplight_on([])
+
+        call_args = ceiling_176.set_matrix_colors.call_args
+        assert call_args.args[1][63] == stored_color
+
+    async def test_turn_uplight_off_with_color_list_stores_first(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turning uplight off with a list stores its first color."""
+        first = HSBK(hue=120, saturation=0.8, brightness=0.6, kelvin=4000)
+        second = HSBK(hue=240, saturation=0.5, brightness=0.4, kelvin=5000)
+
+        await ceiling_176.turn_uplight_off([first, second])
+
+        assert ceiling_176.state.stored_uplight_color == first
+        result_color = ceiling_176.set_matrix_colors.call_args.args[1][63]
+        assert result_color.brightness == 0.0
+        assert result_color.hue == pytest.approx(120, abs=1)
+
+    async def test_turn_uplight_off_with_empty_list_stores_current(
+        self, ceiling_176: CeilingLight
+    ) -> None:
+        """Test turning uplight off with an empty list behaves like no color."""
+        current_uplight = HSBK(hue=30, saturation=0.2, brightness=0.5, kelvin=2700)
+        white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=3500)
+        ceiling_176.get_all_tile_colors = AsyncMock(
+            return_value=[[white] * 63 + [current_uplight]]
+        )
+
+        await ceiling_176.turn_uplight_off([])
+
+        stored = ceiling_176.state.stored_uplight_color
+        assert stored is not None
+        assert stored.brightness == pytest.approx(0.5, abs=0.01)
+
     async def test_turn_downlight_on_with_single_color(
         self, ceiling_176: CeilingLight
     ) -> None:
