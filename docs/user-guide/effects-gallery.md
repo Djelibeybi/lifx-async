@@ -20,7 +20,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     ![Colorloop](../assets/effects/colorloop.gif)
 
-    Continuous hue rotation through the color spectrum, or through your own `palette=`.
+    Continuous hue rotation through the colour spectrum, or through your own `palette=`.
 
     **Class:** `EffectColorloop` · **Best on:** Light
 

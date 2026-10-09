@@ -69,9 +69,15 @@ if {"Calm", "Cozy"} <= set(tags):
 
 `apply_mood()` paints a theme the way the LIFX app paints a mood, and
 `animate_mood()` starts the effect the app's Dynamic toggle starts. Both take
-only the theme and use the app's own timings: a 0.3 second fade, power on
-only when every targeted light is off, and the mood rescaled so its brightest
-colour matches the light's brightness.
+only the theme and use the app's own timings: a 0.3 second fade, and the mood
+rescaled so its brightest colour matches the light's brightness, animated
+palettes included. `apply_mood()` powers lights on only when every targeted
+light is off; `animate_mood()` turns on every light it targets.
+
+`stop_effect()` after `animate_mood()` puts back what the light showed before
+its mood animation started: power, and its colour, zones or tiles. Starting
+another mood on an animating light keeps that state, and it is restored once.
+A `DeviceGroup` has no `stop_effect()`; call it on each light.
 
 | Light | Still image (`apply_mood`) | Effect (`animate_mood`) |
 |---|---|---|

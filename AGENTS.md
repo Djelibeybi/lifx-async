@@ -366,7 +366,7 @@ The `discover_devices()` function implements DoS protection through:
 - **Network Layer**: 183 tests (transport, discovery, connection, message, mDNS, async generator requests)
 - **Device Layer**: 375 tests (base, light, ceiling, hev, infrared, multizone, matrix, state management, MAC address)
 - **API Layer**: 63 tests (discovery, batch operations, organization, themes, error handling)
-- **Effects Layer**: 1249 tests (26 built-in effects, registry, state manager, integration, capability filtering)
+- **Effects Layer**: 1249 tests (27 built-in effects, registry, state manager, integration, capability filtering)
 - **Theme Layer**: 146 tests (themes, canvas, generators, library, apply_theme)
 - **Animation Layer**: 123 tests (animator, framebuffer, packets, orientation)
 - **Utilities**: 127 tests (color conversion, product registry, RGB roundtrip)

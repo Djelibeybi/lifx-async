@@ -290,16 +290,29 @@ await group.apply_mood(van_gogh)    # the still image, as a tap in the app
 await group.animate_mood(van_gogh)  # the Dynamic toggle
 ```
 
-Stop the animation with `light.stop_effect()`.
+Stop the animation by calling `stop_effect()` on each light of the group:
+`DeviceGroup` has no `stop_effect()`. Stopping puts back what each light
+showed before its mood animation started, power included, so a light that was
+off goes back off. Starting another mood on an animating light keeps that
+original state, and a second `stop_effect()` restores nothing more.
+
+```python
+for light in group.lights:
+    await light.stop_effect()
+```
 
 Moods use the app's own timings and rules:
 
 - The change fades in over 0.3 seconds.
-- Lights power on only when every targeted light is off.
+- `apply_mood()` powers lights on only when every targeted light is off.
+  `animate_mood()` turns on every light it targets.
 - The mood is rescaled so its brightest colour matches the light's
-  brightness.
+  brightness. So are the colours an animation steps through; bulbs in one
+  `DeviceGroup` share a loop rescaled to the brightest of them.
 - Calling `apply_mood()` on a light that is already running a mood effect
   restarts that effect with the new theme.
+- `apply_mood()` does not stop an effect that is not a mood, such as firmware
+  FLAME or the software Rainbow, just as `apply_theme()` does not.
 
 What a mood does depends on the light:
 
