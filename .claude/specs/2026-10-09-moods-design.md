@@ -1,7 +1,7 @@
 # Moods: apply_mood() and animate_mood() design
 
 Date: 2026-10-09
-Status: draft, awaiting review
+Status: approved; amended during implementation
 Scope: restructure `src/lifx/theme/` into a `generators` package (new
 `generators/mood.py`); new `apply_mood()` and `animate_mood()` on `Light`,
 `MultiZoneLight`, `MatrixLight`, the component lights and `DeviceGroup`
@@ -183,8 +183,8 @@ Device specifics:
   ignore the flag. *Verified against the app on a Tube and a Mirror.*
 - **Candle, Spot, Path, Tube, Luna and the 13x26 Ceiling.** The matrix
   recipe over the geometry the device reports, never an assumed 8x8.
-  *Tube verified; Candle, Spot, Path, Luna and the 13x26 Ceiling not checked
-  on hardware. Luna's known mismatch stands.*
+  *Tube and Luna verified (the Luna still matches the app cell for cell);
+  Candle, Spot, Path and the 13x26 Ceiling not checked on hardware.*
 - **Bulb.** `DeviceGroup.apply_mood()` deals the theme's distinct colours,
   shuffled, one per bulb in turn. A lone `Light.apply_mood()` takes the
   first colour of a shuffle.
@@ -215,6 +215,24 @@ async def animate_mood(self, theme: Theme) -> None
 On the same classes as `apply_mood()`. It runs `theme.resolved_dynamic_mode`
 at the app's own speed and direction. Stopping is the existing
 `stop_effect()`.
+
+Rules shared by every kind of light (decided after the final review):
+
+- **Power.** `animate_mood()` turns on every off light it targets, on every
+  path, MORPH included. `apply_mood()`'s "only when every targeted light is
+  off" rule does not apply to it.
+- **Brightness.** Every animated palette is rescaled to the light's
+  brightness, as `apply_mood()` rescales the still: the bulb Colour Loop
+  palette, the MORPH palette, and the stills MOVE starts from. A group's
+  shared bulb loop is rescaled to the brightest of its bulbs.
+- **Stop.** `stop_effect()` after `animate_mood()` puts back what the light
+  showed (power and colours) before its mood animation started. The state is
+  captured once, before anything is painted or powered on, when no mood
+  animation is running on the light. A restart (`animate_mood()` again, or
+  `apply_mood()` on an animating light) keeps that original state, even when
+  the new mood switches between firmware and software effects. Firmware MOVE
+  and MORPH restore it too, after the firmware effect is stopped. It is
+  restored once; a later `stop_effect()` restores nothing more.
 
 | Light | MOVE | MORPH |
 |---|---|---|
