@@ -192,6 +192,10 @@ Device specifics:
 The app's tap rules, all fixed:
 
 - **Brightness.** Read each light's current brightness and `_rescale` to it.
+  A bulb's brightness comes from GetColor. On a multizone or matrix light,
+  GetColor reports zone 0 only, so the brightness is that of the brightest
+  zone currently shown, as the app does. GetColor is used only when every
+  zone is dark.
 - **Power.** Power on only when every targeted light is off.
   `DeviceGroup` checks all its lights; a single light checks itself.
 - **Fade.** 300 ms.
