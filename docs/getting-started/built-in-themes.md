@@ -62,6 +62,20 @@ assert all(theme.category == "Holidays" for theme in holidays.values())
 `get_by_category()` accepts category punctuation and case insensitively, while returning each
 canonical primary once. Use `get_categories()` rather than assuming the table's display order.
 
+### Find themes by tag or effect mode
+
+```python
+from lifx.theme import ThemeLibrary
+
+for tag in ThemeLibrary.get_tags():
+    print(tag, sorted(ThemeLibrary.get_by_tag(tag)))
+
+grids = ThemeLibrary.find(static_mode="grid_static")
+```
+
+Tags and effect modes come from the LIFX app. Themes the app does not ship
+carry no tags and use the `blended` static mode.
+
 ## Compatibility and fidelity
 
 The redefined pre-6.4.0 palettes were not carried forward. Their historical taxonomy and

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
+import lifx.theme
 from lifx.color import HSBK, Colors
-from lifx.theme import Theme
+from lifx.theme import DynamicMode, StaticMode, Theme
 from lifx.theme.library import ThemeLibrary
 
 
@@ -567,3 +570,13 @@ class TestThemeEffectModesAndTags:
         b = Theme([Colors.RED])
 
         assert a.palette_equals(b)
+
+
+class TestModeTypeExports:
+    """The generated mode types are part of the public theme API."""
+
+    def test_mode_types_are_exported(self) -> None:
+        assert "StaticMode" in lifx.theme.__all__
+        assert "DynamicMode" in lifx.theme.__all__
+        assert "blended" in get_args(StaticMode)
+        assert {"morph", "move"} <= set(get_args(DynamicMode))

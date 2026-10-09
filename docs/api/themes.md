@@ -24,6 +24,37 @@ The `ThemeLibrary` provides access to 166 themes, resolvable under 169 names.
       members_order: source
       show_if_no_docstring: false
 
+## Effect Modes and Tags
+
+Every library theme records how the LIFX app shows it:
+
+- `Theme.static_mode` is the still image the app paints, such as `blended` (a
+  gradient from the palette) or `grid_static` (the colours are an ordered grid).
+  A theme you build yourself has none and is treated as `blended`.
+- `Theme.dynamic_mode` is the effect the app's Dynamic toggle starts, when the
+  theme names one. `Theme.resolved_dynamic_mode` gives the effect either way:
+  MORPH for `blended` themes and MOVE for the rest, unless the theme says
+  otherwise.
+- `Theme.tags` holds the app's search tags, such as `Calm`.
+
+`StaticMode` and `DynamicMode` are the matching `Literal` types. They list
+every mode the library's data contains, so a new release can widen them.
+
+Colours are stored in source order. For grid and stripe themes the order is
+the layout.
+
+Find themes with `ThemeLibrary.get_tags()`, `ThemeLibrary.get_by_tag()` and
+`ThemeLibrary.find()`:
+
+```python
+from lifx.theme import ThemeLibrary
+
+calm = ThemeLibrary.get_by_tag("calm")
+calm_or_cosy_grids = ThemeLibrary.find(
+    tags=["Calm", "Cozy"], match="any", static_mode="grid_static"
+)
+```
+
 ## Convenience Function
 
 ::: lifx.theme.get_theme
