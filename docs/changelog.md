@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v7.9.2 (2026-10-09)
+
+### Bug Fixes
+
+- Update themes to match LIFX Moods from v4.100
+  ([#287](https://github.com/Djelibeybi/lifx-async/pull/287),
+  [`62e11b5`](https://github.com/Djelibeybi/lifx-async/commit/62e11b559d65e63751d0b310ca3d56b22b137446))
+
+### Documentation
+
+- **themes**: Library-only also covers themes the app dropped
+  ([#285](https://github.com/Djelibeybi/lifx-async/pull/285),
+  [`907e752`](https://github.com/Djelibeybi/lifx-async/commit/907e7521793a6fb986117f97d148257a977eb49c))
+
+
 ## v7.9.1 (2026-10-09)
 
 ### Bug Fixes
