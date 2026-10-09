@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.10.0 (2026-10-09)
+
+### Features
+
+- **themes**: Add apply_mood() and animate_mood() to paint moods like the LIFX app
+  ([#289](https://github.com/Djelibeybi/lifx-async/pull/289),
+  [`3f29df9`](https://github.com/Djelibeybi/lifx-async/commit/3f29df9d72cd04050ae2663b325fe2a1676a20e0))
+
+
 ## v7.9.3 (2026-10-09)
 
 ### Bug Fixes
