@@ -70,11 +70,16 @@ from lifx.theme import ThemeLibrary
 for tag in ThemeLibrary.get_tags():
     print(tag, sorted(ThemeLibrary.get_by_tag(tag)))
 
-grids = ThemeLibrary.find(static_mode="grid_static")
+blended = ThemeLibrary.find(static_mode="blended")
 ```
 
 Tags and effect modes come from the LIFX app. Themes the app does not ship
-carry no tags and use the `blended` static mode.
+carry no tags and use the `blended` static mode. Tags and the non-`blended`
+static modes arrive with a catalogue resync: today every shipped theme is
+`blended` with no tags, so `get_tags()` returns an empty list. An unknown tag,
+category or static mode (such as `grid_static` today) raises `ValueError`, so check `get_tags()` first. Tags
+are spelt as the app spells them (for example `Cozy`) and are matched ignoring
+case and punctuation.
 
 ## Compatibility and fidelity
 

@@ -40,8 +40,16 @@ Every library theme records how the LIFX app shows it:
 `StaticMode` and `DynamicMode` are the matching `Literal` types. They list
 every mode the library's data contains, so a new release can widen them.
 
-Colours are stored in source order. For grid and stripe themes the order is
-the layout.
+Colours are stored in source order, which matters most for `grid_static`
+themes and other non-`blended` static modes: there the order is the layout.
+
+Tags are spelt as the app spells them (for example `Cozy`). Tag matching
+ignores case and punctuation, so `"calm"` finds `Calm`.
+
+Tags and the non-`blended` static modes arrive with a catalogue resync. Today
+every shipped theme is `blended` and has no tags, so `ThemeLibrary.get_tags()`
+returns an empty list. An unknown tag, category or static mode raises
+`ValueError`, so check `ThemeLibrary.get_tags()` first.
 
 Find themes with `ThemeLibrary.get_tags()`, `ThemeLibrary.get_by_tag()` and
 `ThemeLibrary.find()`:
@@ -49,10 +57,13 @@ Find themes with `ThemeLibrary.get_tags()`, `ThemeLibrary.get_by_tag()` and
 ```python
 from lifx.theme import ThemeLibrary
 
-calm = ThemeLibrary.get_by_tag("calm")
-calm_or_cosy_grids = ThemeLibrary.find(
-    tags=["Calm", "Cozy"], match="any", static_mode="grid_static"
-)
+tags = ThemeLibrary.get_tags()
+
+if "Calm" in tags:
+    calm = ThemeLibrary.get_by_tag("calm")
+
+if {"Calm", "Cozy"} <= set(tags):
+    calm_or_cosy = ThemeLibrary.find(tags=["Calm", "Cozy"], match="any")
 ```
 
 ## Convenience Function
