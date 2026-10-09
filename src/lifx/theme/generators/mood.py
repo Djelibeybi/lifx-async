@@ -71,7 +71,7 @@ class MoodGenerator:
     _NEAREST_EDGE_CELLS = 5
 
     def get_matrix_colors(
-        self, width: int, height: int, brightness: float
+        self, width: int, height: int, brightness: float, *, vertical: bool = False
     ) -> list[HSBK]:
         """Colours for one matrix light, in row-major order.
 
@@ -79,11 +79,13 @@ class MoodGenerator:
             width: Pixels per row, as the device reports
             height: Rows, as the device reports
             brightness: The light's current brightness, 0.0 to 1.0
+            vertical: Paint stripe moods as bands along the long axis, as the
+                app does on every Candle, the Tube and the Mirror
 
         Returns:
             ``width * height`` colours
         """
-        return self._rescale(self._paint(width, height), brightness)
+        return self._rescale(self._paint(width, height, vertical=vertical), brightness)
 
     def get_chain_colors(
         self, tile_count: int, width: int, height: int, brightness: float
@@ -261,17 +263,16 @@ class MoodGenerator:
         self._rng.shuffle(copy)
         return copy
 
-    def _paint(self, width: int, height: int) -> list[HSBK]:
+    def _paint(self, width: int, height: int, *, vertical: bool = False) -> list[HSBK]:
         """The still image for this theme's mode, unscaled."""
+        stripes = self._bands if vertical else self._stripes
         if self._mode == "blended":
             return self._blended_matrix(self._colors, width, height)
         if self._mode == "grid_static":
             return self._grid(self._colors, width, height)
         if self._mode == "solid":
-            return self._stripes(
-                self._shuffled(self._distinct(self._colors)), width, height
-            )
-        return self._stripes(self._colors, width, height)
+            return stripes(self._shuffled(self._distinct(self._colors)), width, height)
+        return stripes(self._colors, width, height)
 
     def _blended_matrix(
         self, colors: Sequence[HSBK], width: int, height: int
@@ -319,3 +320,9 @@ class MoodGenerator:
     def _stripes(colors: Sequence[HSBK], width: int, height: int) -> list[HSBK]:
         """Stretch to one row and repeat it on every row."""
         return MoodGenerator._stretch(colors, width) * height
+
+    @staticmethod
+    def _bands(colors: Sequence[HSBK], width: int, height: int) -> list[HSBK]:
+        """Stretch to the rows; every row one colour, the first at the bottom."""
+        band = MoodGenerator._stretch(colors, height)
+        return [band[height - 1 - row] for row in range(height) for _ in range(width)]

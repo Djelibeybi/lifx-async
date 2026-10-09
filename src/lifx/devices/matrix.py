@@ -39,7 +39,7 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
+from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR, has_vertical_theme
 from lifx.products import supports_sky_effect as firmware_supports_sky_effect
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
@@ -1630,8 +1630,11 @@ class MatrixLight(Light):
                 len(tiles), first.width, first.height, brightness
             )
         else:
+            vertical = bool(self.version and has_vertical_theme(self.version.product))
             frames = [
-                generator.get_matrix_colors(tiles[0].width, tiles[0].height, brightness)
+                generator.get_matrix_colors(
+                    tiles[0].width, tiles[0].height, brightness, vertical=vertical
+                )
             ]
 
         async def write(duration: float) -> None:

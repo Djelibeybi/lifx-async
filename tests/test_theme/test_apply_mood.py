@@ -12,7 +12,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
-from lifx.theme import Theme
+from lifx.theme import MoodGenerator, Theme
 from tests.test_theme.conftest import make_tile
 
 RED = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
@@ -203,15 +203,30 @@ class TestMoodOrientation:
         assert matrix_light.set_matrix_colors.await_args.args[1] == frames[0]
 
 
+class TestVerticalApplyMood:
+    async def test_candle_paints_stripe_moods_as_bands(
+        self, mock_device_factory
+    ) -> None:
+        candle = mock_device_factory(MatrixLight, product=57)
+        candle.set_matrix_colors = AsyncMock()
+        candle.set_power = AsyncMock()
+        reading(candle, on=True, brightness=1.0)
+        candle.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=5, height=6)]
+        )
+        await candle.apply_mood(Theme([RED, GREEN], static_mode="solid_static"))
+        colors = candle.set_matrix_colors.await_args.args[1]
+        rows = [colors[i : i + 5] for i in range(0, 30, 5)]
+        assert all(len({c.hue for c in row}) == 1 for row in rows)
+        assert rows[-1][0].hue == 0  # first colour on the bottom row
+
+
 @pytest.mark.emulator
-async def test_mirror_paints_each_ring_in_zone_order(mirror_device) -> None:
+async def test_mirror_paints_bands_over_its_buffer(mirror_device) -> None:
     async with mirror_device:
         await mirror_device.apply_mood(Theme([RED, GREEN], static_mode="solid_static"))
-        front = await mirror_device.get_front_colors()
-        back = await mirror_device.get_back_colors()
-    assert len(front) == len(back) == 25
-    # A 2-colour stripe mood stretched over 25 zones: each ceil(12.5) = 13
-    # run is trimmed once from the front, leaving 12 red then 13 green.
-    expected = [0] * 12 + [120] * 13
-    assert [round(c.hue) for c in front] == expected
-    assert [round(c.hue) for c in back] == expected
+        buffer = (await mirror_device.get_all_tile_colors())[0][:52]
+    rows = [buffer[i : i + 4] for i in range(0, 52, 4)]
+    band = MoodGenerator._stretch([RED, GREEN], 13)
+    assert [round(row[0].hue) for row in rows] == [round(c.hue) for c in reversed(band)]
+    assert all(len({round(c.hue) for c in row}) == 1 for row in rows)

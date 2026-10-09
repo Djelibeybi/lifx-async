@@ -51,15 +51,11 @@ from lifx.products import (
     get_mirror_layout,
     is_mirror_product,
 )
-from lifx.theme.generators.mood import MoodGenerator
 
 if TYPE_CHECKING:
     from lifx.theme import Theme
 
 _LOGGER = logging.getLogger(__name__)
-
-# Fill for buffer positions that belong to no zone.
-_DARK = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
 
 # A named spot on a Mirror ring where a software effect starts.
 RingOrigin: TypeAlias = Literal["top", "bottom", "left", "right"]
@@ -979,32 +975,6 @@ class MirrorLight(ComponentMatrixLight):
             await self._turn_component_on(component, colors, duration)
         else:
             await self._set_component_colors(component, colors, duration)
-
-    async def _paint_mood(
-        self,
-        theme: Theme,
-        *,
-        power_on: bool,
-        brightness: float,
-        bulb_color: HSBK | None = None,
-    ) -> list[list[HSBK]]:
-        """Paint each ring as a strip, in zone order.
-
-        Unverified on hardware until the app's Mirror path is traced; see
-        the moods design.
-        """
-        layout = self.layout
-        generator = MoodGenerator(theme)
-        buffer = [_DARK] * (layout.width * layout.height)
-        for component in ("front", "back"):
-            positions = self._component_positions(component)
-            colors = generator.get_multizone_colors(len(positions), brightness)
-            for position, color in zip(positions, colors, strict=True):
-                buffer[position] = color
-        await self._write_mood(
-            lambda duration: self._write_tile(buffer, duration), power_on
-        )
-        return [buffer]
 
     async def set_power(self, level: bool | int, duration: float = 0.0) -> None:
         """Set light power state, capturing component colors before turning off.

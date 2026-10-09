@@ -264,3 +264,30 @@ class TestChain:
             0.5, abs=1e-4
         )
         assert out[1][0].brightness == pytest.approx(0.25, abs=1e-4)
+
+
+class TestVertical:
+    def test_bands_put_the_first_colour_on_the_bottom_row(self) -> None:
+        assert MoodGenerator._bands([RED, GREEN], 2, 2) == [GREEN, GREEN, RED, RED]
+
+    @pytest.mark.parametrize("mode", ["solid_static", "solid_loop"])
+    def test_vertical_stripe_modes_are_bands(self, mode: str) -> None:
+        out = make([RED, GREEN], mode).get_matrix_colors(3, 2, 1.0, vertical=True)
+        assert out == [GREEN] * 3 + [RED] * 3
+
+    def test_vertical_solid_bands_use_distinct_colours(self) -> None:
+        out = make([RED, RED, GREEN], "solid").get_matrix_colors(
+            2, 4, 1.0, vertical=True
+        )
+        rows = [out[i : i + 2] for i in range(0, 8, 2)]
+        assert all(row[0] == row[1] for row in rows)
+        assert {c.hue for c in out} == {0, 120}
+
+    def test_grid_ignores_vertical(self) -> None:
+        gen = make([RED, GREEN], "grid_static")
+        assert gen.get_matrix_colors(2, 2, 1.0, vertical=True) == gen.get_matrix_colors(
+            2, 2, 1.0
+        )
+
+    def test_blended_ignores_vertical(self) -> None:
+        assert len(make([RED, BLUE]).get_matrix_colors(4, 13, 1.0, vertical=True)) == 52
