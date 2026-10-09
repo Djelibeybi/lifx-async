@@ -353,17 +353,16 @@ class TestThemePaletteEquals:
         assert library_theme.palette_equals(caller_theme)
 
     def test_distinct_themes_with_identical_palettes_match(self) -> None:
-        """Distinct library themes sharing a palette match.
+        """Themes with different identities over one palette match.
 
-        The app ships memorial_day, independence and old_glory with one
-        identical palette; identity is excluded, so their palettes match.
-        (Pre-6.3.0 the example pair was love/romance, but the resync gave
-        romance its own app palette.)
+        Identity is excluded, so two themes that differ in every identity
+        field but share their colours compare equal on palette alone.
         """
-        old_glory = ThemeLibrary.get("old_glory")
+        colors = list(ThemeLibrary.get("evening").colors)
+        a = Theme(colors, slug="a", name="A", category="Moods")
+        b = Theme(list(reversed(colors)), slug="b", name="B", category="Play")
 
-        assert ThemeLibrary.get("independence").palette_equals(old_glory)
-        assert ThemeLibrary.get("memorial_day").palette_equals(old_glory)
+        assert a.palette_equals(b)
 
     def test_different_palettes_do_not_match(self) -> None:
         """Themes with different palettes do not match."""
@@ -445,13 +444,12 @@ class TestThemeEquality:
 
 
 class TestPaletteThemes:
-    """Tests for palette themes ported from pkivolowitz/lifx.
+    """Every key ported from pkivolowitz/lifx still resolves.
 
-    Four of these keys — ``earth``, ``forest``, ``coral_reef`` and
-    ``aurora_borealis`` — no longer return the ported palette: 6.3.0 gave
-    them app themes or rename aliases. The rest still ship the ported
-    palettes byte-identically at uint16 (attribution in
-    ``lifx/theme/library.py``).
+    Some of these keys now return an app theme or a rename alias rather
+    than the ported palette, so only the key itself is asserted here; the
+    palettes are checked against the source data in ``test_data_parity``
+    (attribution in ``lifx/theme/library.py``).
     """
 
     PALETTE_NAMES = [
@@ -477,23 +475,6 @@ class TestPaletteThemes:
         """Each palette theme should be retrievable."""
         theme = ThemeLibrary.get(name)
         assert theme is not None
-
-    @pytest.mark.parametrize("name", PALETTE_NAMES)
-    def test_palette_theme_has_colors(self, name: str) -> None:
-        """Each palette theme should have at least 3 colors."""
-        theme = ThemeLibrary.get(name)
-        assert len(theme) >= 3
-
-    @pytest.mark.parametrize("name", PALETTE_NAMES)
-    def test_palette_theme_colors_are_valid_hsbk(self, name: str) -> None:
-        """Each color in a palette theme should be a valid HSBK."""
-        theme = ThemeLibrary.get(name)
-        for color in theme:
-            assert isinstance(color, HSBK)
-            assert 0 <= color.hue <= 360
-            assert 0.0 <= color.saturation <= 1.0
-            assert 0.0 <= color.brightness <= 1.0
-            assert 1500 <= color.kelvin <= 9000
 
     def test_palette_names_dont_collide_with_existing(self) -> None:
         """Palette names should not collide with existing themes."""

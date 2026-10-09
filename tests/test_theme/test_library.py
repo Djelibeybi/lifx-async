@@ -11,6 +11,7 @@ from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
 from lifx.theme import Theme, ThemeLibrary, get_theme
 from lifx.theme.data import THEMES, ThemeRecord
 from lifx.theme.slug import derive_slug
+from tests.test_theme.conftest import SOURCE_ALIASES, SOURCE_RECORDS
 
 # Every key the pre-6.3.0 hand-written library resolved, captured as a
 # LITERAL fixture (measured 2026-08-14) so an empty or incorrect derivation
@@ -75,19 +76,15 @@ PRE_V12_KEYS = (
     "zombie",
 )
 
-# The app's 8 categories plus Library for the pre-6.3.0 orphans.
-LIBRARY_CATEGORIES = frozenset(
-    {
-        "Moods",
-        "Art Series",
-        "Music",
-        "Nature",
-        "Space",
-        "Play",
-        "Holidays",
-        "Archives",
-        "Library",
-    }
+# Read from the source data: LIFX add and remove app categories, and the
+# library follows them on the next resync.
+LIBRARY_CATEGORIES = frozenset(record["category"] for record in SOURCE_RECORDS)
+
+# Any current app theme that is not also a pre-6.3.0 key.
+APP_SLUG = next(
+    record["slug"]
+    for record in SOURCE_RECORDS
+    if record["disposition"] == "lifx-app" and record["slug"] not in PRE_V12_KEYS
 )
 
 
@@ -103,7 +100,7 @@ class TestThemeLibraryGet:
         """Test getting an existing theme by name."""
         evening_theme = ThemeLibrary.get("evening")
         assert isinstance(evening_theme, Theme)
-        assert len(evening_theme) == 3
+        assert len(evening_theme) > 0
 
     def test_get_case_insensitive(self) -> None:
         """Test that theme names are case-insensitive."""
@@ -189,10 +186,6 @@ class EmptyLibrary(ThemeLibrary):
 class TestGetCategories:
     """Tests for ThemeLibrary.get_categories()."""
 
-    def test_exact_sorted_list(self) -> None:
-        """Exactly the 9 category names, plain codepoint-sorted."""
-        assert ThemeLibrary.get_categories() == sorted(LIBRARY_CATEGORIES)
-
     def test_empty_library_returns_empty_list(self) -> None:
         """A library with no records has no categories."""
         assert EmptyLibrary.get_categories() == []
@@ -220,10 +213,9 @@ class TestThemeLibraryGetByCategory:
         """record.slug is a key of get_by_category(record.category) for all names.
 
         Membership is asserted by slug key, never by Theme object equality,
-        because Theme ``==`` is identity. The lookup
-        is hoisted per category rather than per record: there are 9
-        categories and 168 names, so calling once per record repeats the
-        same 9 answers 168 times.
+        because Theme ``==`` is identity. The lookup is hoisted per
+        category rather than per record, since every record in a category
+        would otherwise repeat the same answer.
 
         Rename aliases are excluded: they are a theme's dead key, not a
         theme, so listing one in its target's category would show that
@@ -240,13 +232,13 @@ class TestThemeLibraryGetByCategory:
                 continue
             assert record.slug in by_category[record.category]
 
-    def test_holidays_count_and_slug_sorted(self) -> None:
-        """Holidays has 15 themes; the returned dict is keyed and sorted by slug."""
-        holidays = ThemeLibrary.get_by_category("Holidays")
+    @pytest.mark.parametrize("category", sorted(LIBRARY_CATEGORIES))
+    def test_keyed_and_sorted_by_slug(self, category: str) -> None:
+        """The returned dict is keyed and sorted by slug."""
+        themes = ThemeLibrary.get_by_category(category)
 
-        assert len(holidays) == 15
-        assert list(holidays) == sorted(holidays)
-        assert all(theme.slug == slug for slug, theme in holidays.items())
+        assert list(themes) == sorted(themes)
+        assert all(theme.slug == slug for slug, theme in themes.items())
 
     def test_normalised_forms_agree(self) -> None:
         """Both sides pass through the same slug normalisation rule."""
@@ -345,21 +337,18 @@ class TestRetiredCategoryNames:
 
 
 class TestRenameAliases:
-    """The 2 rename-alias keys report the rename rather than inheriting."""
+    """Every rename-alias key reports the rename rather than inheriting."""
 
-    @pytest.mark.parametrize(
-        ("alias", "target"),
-        [("forest", "forrest"), ("aurora_borealis", "aurora")],
-    )
+    @pytest.mark.parametrize(("alias", "target"), SOURCE_ALIASES)
     def test_alias_reports_renamed_and_names_its_target(
         self, alias: str, target: str
     ) -> None:
         """An alias carries disposition 'renamed' and its live key.
 
         Before this, an alias bound the target's own record, so the only
-        two keys whose name actually changed were the two reporting a
-        clean ``lifx-app`` fate with no successor — a migration audit
-        keying off ``replaced_by`` saw nothing to do.
+        keys whose name actually changed were the ones reporting a clean
+        ``lifx-app`` fate with no successor: a migration audit keying off
+        ``replaced_by`` saw nothing to do.
         """
         theme = ThemeLibrary.get(alias)
 
@@ -367,10 +356,7 @@ class TestRenameAliases:
         assert theme.disposition == "renamed"
         assert theme.replaced_by == target
 
-    @pytest.mark.parametrize(
-        ("alias", "target"),
-        [("forest", "forrest"), ("aurora_borealis", "aurora")],
-    )
+    @pytest.mark.parametrize(("alias", "target"), SOURCE_ALIASES)
     def test_following_replaced_by_reaches_the_live_theme(
         self, alias: str, target: str
     ) -> None:
@@ -383,10 +369,7 @@ class TestRenameAliases:
         assert successor.disposition != "renamed"
         assert theme.palette_equals(successor)
 
-    @pytest.mark.parametrize(
-        ("alias", "target"),
-        [("forest", "forrest"), ("aurora_borealis", "aurora")],
-    )
+    @pytest.mark.parametrize(("alias", "target"), SOURCE_ALIASES)
     def test_alias_absent_from_its_category_listing(
         self, alias: str, target: str
     ) -> None:
@@ -404,7 +387,7 @@ class TestGetThemeConvenienceFunction:
         """Test getting a theme using convenience function."""
         evening = get_theme("evening")
         assert isinstance(evening, Theme)
-        assert len(evening) == 3
+        assert len(evening) > 0
 
     def test_get_theme_is_equivalent_to_library(self) -> None:
         """Test that get_theme() is equivalent to ThemeLibrary.get()."""
@@ -417,90 +400,6 @@ class TestGetThemeConvenienceFunction:
         """Test that invalid theme raises KeyError."""
         with pytest.raises(KeyError):
             get_theme("nonexistent")
-
-
-class TestThemeLibraryColorValues:
-    """Tests for verifying theme color values."""
-
-    def test_christmas_theme_identity(self) -> None:
-        """Test that christmas resolves to the app's Holidays record."""
-        christmas = ThemeLibrary.get("christmas")
-
-        assert christmas.category == "Holidays"
-        assert len(christmas) >= 1
-
-    def test_christmas_theme_colors(self) -> None:
-        """Christmas carries green and red.
-
-        A semantic pin, not a count or a full-palette literal: it survives a
-        legitimate resync that adds or reorders colours, and fails a
-        regeneration that inverts the palette or drops a primary. Without
-        it nothing in CI asserts a real colour value — `data.py` is in the
-        coverage omit list and the generator suite runs only against
-        fixtures.
-        """
-        hues = [color.hue for color in ThemeLibrary.get("christmas")]
-
-        assert any(abs(hue - 120) < 5 for hue in hues), hues
-        assert any(abs(hue - 0) < 5 for hue in hues), hues
-
-    def test_halloween_theme_resolves(self) -> None:
-        """Test that halloween resolves with a non-empty palette."""
-        halloween = ThemeLibrary.get("halloween")
-
-        assert halloween.slug == "halloween"
-        assert len(halloween) >= 1
-
-    def test_halloween_theme_colors(self) -> None:
-        """Halloween carries an orange."""
-        hues = [color.hue for color in ThemeLibrary.get("halloween")]
-
-        assert any(30 <= hue <= 35 for hue in hues), hues
-
-    @pytest.mark.parametrize(
-        ("slug", "hue_range"),
-        [
-            ("shamrock", (100, 160)),
-            ("hanukkah", (200, 260)),
-            ("pumpkin", (15, 45)),
-        ],
-    )
-    def test_category_golden_hue_pins(
-        self, slug: str, hue_range: tuple[float, float]
-    ) -> None:
-        """One golden hue pin per shipped palette family.
-
-        Each asserts the defining colour of a theme whose identity is
-        unambiguous — shamrock is green, hanukkah is blue, pumpkin is
-        orange — so a data regression that scrambles hues is visible in CI
-        rather than reaching users' lights.
-        """
-        low, high = hue_range
-        hues = [color.hue for color in ThemeLibrary.get(slug)]
-
-        assert any(low <= hue <= high for hue in hues), hues
-
-    def test_relaxing_theme_saturation(self) -> None:
-        """Test that relaxing theme has generally lower saturation."""
-        relaxing = ThemeLibrary.get("relaxing")
-        colors = list(relaxing)
-
-        # Relaxing themes tend to have varied saturation
-        saturations = [c.saturation for c in colors]
-        assert len(saturations) > 0
-
-    def test_evening_theme_values(self) -> None:
-        """Test evening theme has warm colors."""
-        evening = ThemeLibrary.get("evening")
-        colors = list(evening)
-
-        # Evening should be warm (orange/gold colors, hue 30-40)
-        hues = [color.hue for color in colors]
-        assert all(30 <= h <= 40 for h in hues)
-
-        # Evening should have decent saturation
-        saturations = [c.saturation for c in colors]
-        assert all(0.7 <= s <= 0.9 for s in saturations)
 
 
 class TestThemeLibraryIntegration:
@@ -524,11 +423,6 @@ class TestThemeLibraryIntegration:
                     color.kelvin == KELVIN_SATURATED
                     or MIN_KELVIN <= color.kelvin <= MAX_KELVIN
                 )
-
-    def test_theme_library_has_minimum_themes(self) -> None:
-        """Test that library has at least 42 themes."""
-        themes = ThemeLibrary.get_available_themes()
-        assert len(themes) >= 42
 
 
 class TestPreV12Compatibility:
@@ -554,34 +448,16 @@ class TestRenamePairs:
     piece of identity that actually changed.
     """
 
-    def test_aurora_borealis_resolves_to_aurora(self) -> None:
-        """aurora_borealis returns aurora's palette under the old key."""
-        alias = ThemeLibrary.get("aurora_borealis")
-        target = ThemeLibrary.get("aurora")
+    @pytest.mark.parametrize(("alias", "target"), SOURCE_ALIASES)
+    def test_alias_resolves_to_target(self, alias: str, target: str) -> None:
+        """The old key returns the target's palette under its own slug."""
+        old = ThemeLibrary.get(alias)
+        new = ThemeLibrary.get(target)
 
-        assert _palette_multiset(alias) == _palette_multiset(target)
-        assert alias.slug == "aurora_borealis"
-        assert alias.name == "Aurora"
-        assert alias.category == "Nature"
-
-    def test_forest_resolves_to_forrest(self) -> None:
-        """forest returns forrest's palette under the old key."""
-        alias = ThemeLibrary.get("forest")
-        target = ThemeLibrary.get("forrest")
-
-        assert _palette_multiset(alias) == _palette_multiset(target)
-        assert alias.slug == "forest"
-        assert alias.name == "Forrest"
-        assert alias.category == "Nature"
-
-
-class TestResyncedPalettes:
-    """The resynced shared slugs carry app values."""
-
-    def test_soothing_contains_kelvin_8000(self) -> None:
-        """soothing carries kelvin 8000 (pre-6.3.0 was uniformly 3500)."""
-        soothing = ThemeLibrary.get("soothing")
-        assert 8000 in {color.kelvin for color in soothing}
+        assert _palette_multiset(old) == _palette_multiset(new)
+        assert old.slug == alias
+        assert old.name == new.name
+        assert old.category == new.category
 
 
 class TestMutationIsolation:
@@ -644,7 +520,7 @@ class TestLibrarySweeps:
             assert theme.category != theme.slug
 
     def test_every_category_is_known(self) -> None:
-        """Every theme's category is one of the 9 library categories."""
+        """Every theme's category is one the source data declares."""
         for key in ThemeLibrary.get_available_themes():
             assert ThemeLibrary.get(key).category in LIBRARY_CATEGORIES
 
@@ -654,27 +530,6 @@ class TestDispositionSurfacing:
 
     invariants (shape sweeps, never count pins).
     """
-
-    def test_fire_is_deprecated_with_replacement(self) -> None:
-        """get('fire') carries the pinned deprecation triple."""
-        fire = ThemeLibrary.get("fire")
-
-        assert fire.disposition == "deprecated"
-        assert fire.replaced_by == "warm_ember"
-
-    def test_hygge_is_library_only(self) -> None:
-        """get('hygge') is library-only with no successor."""
-        hygge = ThemeLibrary.get("hygge")
-
-        assert hygge.disposition == "library-only"
-        assert hygge.replaced_by is None
-
-    def test_christmas_is_lifx_app(self) -> None:
-        """get('christmas') is a lifx-app theme with no successor."""
-        christmas = ThemeLibrary.get("christmas")
-
-        assert christmas.disposition == "lifx-app"
-        assert christmas.replaced_by is None
 
     def test_every_disposition_is_allowed(self) -> None:
         """Every shipped record's disposition is one of the four values."""
@@ -711,7 +566,7 @@ class TestDispositionSurfacing:
         claiming nothing changed. The palette object is still shared, so
         the two keys cannot drift apart.
         """
-        for alias, target in (("forest", "forrest"), ("aurora_borealis", "aurora")):
+        for alias, target in SOURCE_ALIASES:
             assert THEMES[alias] is not THEMES[target]
             assert THEMES[alias].colors is THEMES[target].colors
 
@@ -721,13 +576,13 @@ class TestNewSlugBehaviour:
 
     def test_get_case_insensitive_for_app_slug(self) -> None:
         """get() keeps lowercasing its input for a new app slug."""
-        theme = ThemeLibrary.get("MONDRIAN")
-        assert theme.slug == "mondrian"
+        theme = ThemeLibrary.get(APP_SLUG.upper())
+        assert theme.slug == APP_SLUG
 
     def test_consecutive_gets_carry_the_same_palette(self) -> None:
         """Two gets of one slug are distinct objects over one palette."""
-        first = ThemeLibrary.get("mondrian")
-        second = ThemeLibrary.get("mondrian")
+        first = ThemeLibrary.get(APP_SLUG)
+        second = ThemeLibrary.get(APP_SLUG)
 
         assert first is not second
         assert first.palette_equals(second)

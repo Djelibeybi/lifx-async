@@ -35,8 +35,8 @@ class TestDeviceGroupApplyTheme:
             await asyncio.sleep(0.1)  # Give time for updates
             device = group.lights[0]
             color, _, _ = await device.get_color()
-            # Evening theme colors are warm (hue 30-40)
-            assert 25 <= color.hue <= 45, f"Hue {color.hue} not in evening theme range"
+            # A single-zone light picks one of the theme's colours.
+            assert color.as_tuple() in {c.as_tuple() for c in theme.colors}
 
     async def test_apply_theme_with_power_on(
         self, emulator_devices: DeviceGroup

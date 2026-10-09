@@ -247,8 +247,8 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         tags = tuple(sorted(raw_tags, key=tag_sort_key))
         if tags:
             lines.append(f"        tags={tags!r},")
-        # Only the 9 deprecated records carry a successor. Emitting
-        # `replaced_by=None` on the other 157 restates the dataclass default
+        # Only deprecated records carry a successor. Emitting
+        # `replaced_by=None` on every other record restates the dataclass default
         # and buries the records that do carry one under a field that is
         # noise everywhere else.
         if replaced_by is not None:
