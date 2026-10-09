@@ -9,7 +9,6 @@ import pytest
 from lifx.theme.schema import (
     DISPOSITIONS,
     RENAMED,
-    canonical_palette,
     load_theme_records,
     validate_key,
     validate_records,
@@ -32,13 +31,6 @@ def test_load_theme_records_pairs_each_record_with_its_line(tmp_path: Path) -> N
 def test_validate_key_rejects_a_python_keyword() -> None:
     assert validate_key("sunrise") is True
     assert validate_key("class") is False
-
-
-def test_canonical_palette_is_stable_under_reordering() -> None:
-    one = [{"hue": 100, "saturation": 1, "brightness": 0.5, "kelvin": 3500}]
-    two = [{"kelvin": 3500, "brightness": 0.5, "saturation": 1, "hue": 100}]
-
-    assert canonical_palette(one) == canonical_palette(two)
 
 
 def test_validate_records_rejects_kelvin_zero() -> None:

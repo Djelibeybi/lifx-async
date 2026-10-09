@@ -111,39 +111,6 @@ def validate_key(key: object) -> bool:
     )
 
 
-def canonical_palette(
-    colors: list[dict[str, float | int]],
-) -> list[dict[str, float | int]]:
-    """Return the palette in canonical order (D-24).
-
-    Sorts stably by the stored ``(hue, saturation, brightness, kelvin)``
-    tuple, preserving duplicates. The app shuffles palette order on every
-    application, so captured order is an accident, not data; sorting a
-    multiset preserves it exactly, so unordered palette comparison is
-    unaffected. The stored tuple is in ``HSBK``'s user-facing units, not
-    protocol uint16.
-
-    That sort order matches ``HSBK.to_protocol()``'s wire order for every
-    hue below 359.99725341796875 -- the point where the wire projection
-    (``round(0x10000 * hue / 360) % 0x10000``) rounds up to 65536 and wraps
-    to wire 0, the same wire colour as hue 0.0. A hue at or above that
-    threshold sorts last here even though it would sort first on the wire.
-    The schema accepts the full closed 0-360 range, hue 360.0 included, so
-    this is a real if narrow divergence, not a theoretical one; nothing in
-    this function or its caller guards against it.
-
-    Args:
-        colors: Stored user-facing HSBK colour objects.
-
-    Returns:
-        A new list sorted by the stored tuple, duplicates preserved.
-    """
-    return sorted(
-        colors,
-        key=lambda c: (c["hue"], c["saturation"], c["brightness"], c["kelvin"]),
-    )
-
-
 def _record_label(record: Any) -> str:
     """Best-effort human-readable identifier for a record in error messages."""
     if isinstance(record, dict):

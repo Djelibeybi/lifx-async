@@ -9,9 +9,9 @@ renamed targets. Every name reports its fate in ``disposition``, including
 the two aliases, which carry ``"renamed"`` and name the canonical key in
 ``replaced_by``.
 
-Palette order carries no meaning: the app shuffles the order on every
-application, so palettes are stored canonically sorted and all palette
-comparison is unordered.
+Colours are stored in source order. For most themes the order carries no
+meaning, but for a grid or stripe theme it is the layout, so it is never
+reordered. Palette comparison (``Theme.palette_equals()``) stays unordered.
 
 Attribution: the 28 ``Library`` records are not app captures. They ship
 byte-identical at uint16 to the palettes this library carried before 6.3.0

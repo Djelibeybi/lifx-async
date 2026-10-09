@@ -647,12 +647,6 @@ class TestLibrarySweeps:
         for key in ThemeLibrary.get_available_themes():
             assert ThemeLibrary.get(key).category in LIBRARY_CATEGORIES
 
-    def test_canonical_palette_order(self) -> None:
-        """Every served palette is sorted by its uint16 tuple."""
-        for key in ThemeLibrary.get_available_themes():
-            palette = [color.as_tuple() for color in ThemeLibrary.get(key)]
-            assert palette == sorted(palette)
-
 
 class TestDispositionSurfacing:
     """Dispositions surface on get() and the shipped data holds its shape

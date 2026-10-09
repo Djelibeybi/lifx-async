@@ -30,7 +30,6 @@ from lifx.color import HSBK
 from lifx.theme.schema import (
     DISPOSITIONS,
     RENAMED,
-    canonical_palette,
     load_theme_records,
     validate_key,
     validate_records,
@@ -70,11 +69,11 @@ def _emit_color(color: dict[str, float | int]) -> str:
 def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
     """Emit the complete source of the generated theme data module.
 
-    Records are emitted sorted by slug; each palette passes through
-    ``canonical_palette()`` (D-24) so even a hand-edited data file cannot
-    ship an uncanonical order. Alias keys are assigned after the dict
-    literal in sorted order, each as its own ``disposition="renamed"``
-    record sharing the target's palette object.
+    Records are emitted sorted by slug. Each record's colours are emitted
+    in file order: order is source data (a grid theme's image, a stripe
+    theme's sequence), never reordered here. Alias keys are assigned after
+    the dict literal in sorted order, each as its own
+    ``disposition="renamed"`` record sharing the target's palette object.
 
     Args:
         records: Validated ``(line_number, record)`` pairs.
@@ -102,11 +101,9 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "Generated from data/themes.jsonl by scripts/generate_theme_data.py",
         "Regenerate with: uv run scripts/generate_theme_data.py",
         "",
-        "Palette order is canonical, not captured: every palette is sorted by",
-        "its normalised (hue, saturation, brightness, kelvin) tuple, in HSBK's",
-        "own user-facing units, duplicates preserved (D-24). The LIFX app",
-        "shuffles palette order on every application, so captured order is an",
-        "accident, not data.",
+        "Colour order is source data, emitted exactly as data/themes.jsonl",
+        "gives it. For a grid theme the order is the image and for a stripe",
+        "theme it is the stripe sequence, so nothing here reorders it.",
         "",
         "Slugs derive from the emoji-stripped display name: NFKD-normalise,",
         "drop non-ASCII, lowercase, collapse every run of non-alphanumeric",
@@ -124,7 +121,7 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "",
         "@dataclass(frozen=True)",
         "class ThemeRecord:",
-        '    """A generated theme: identity metadata plus canonical palette."""',
+        '    """A generated theme: identity metadata plus colours in file order."""',
         "",
         "    slug: str",
         "    name: str",
@@ -173,7 +170,7 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         lines.append(f"        category={category!r},")
         lines.append(f"        disposition={disposition!r},")
         lines.append("        colors=(")
-        for color in canonical_palette(record["colors"]):
+        for color in record["colors"]:
             lines.append(f"            {_emit_color(color)},")
         lines.append("        ),")
         # Only the 9 deprecated records carry a successor. Emitting
