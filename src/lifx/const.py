@@ -128,6 +128,20 @@ KELVIN_SATURATED: Final[int] = 0
 MAX_PALETTE_COLORS: Final[int] = 16
 
 # ============================================================================
+# Moods
+# ============================================================================
+
+# Timings the LIFX app uses when it paints or animates a mood. apply_mood() and
+# animate_mood() take only a theme, so these are the values every mood uses.
+MOOD_FADE_SECONDS: Final[float] = 0.3
+MOOD_MORPH_SPEED_SECONDS: Final[float] = 3.0
+MOOD_MOVE_SECONDS_PER_16_ZONES: Final[float] = 20.0
+MOOD_SCROLL_STEP_SECONDS: Final[float] = 1.25
+MOOD_SCROLL_MAX_FADE_SECONDS: Final[float] = 2.0
+MOOD_BULB_STEP_SECONDS: Final[float] = 1.25
+MOOD_BULB_FADE_SECONDS: Final[float] = 0.5
+
+# ============================================================================
 # Ambient Light Sensor
 # ============================================================================
 

@@ -34,6 +34,7 @@ from __future__ import annotations
 from lifx.theme.data import DynamicMode, StaticMode
 from lifx.theme.generators import (
     MatrixGenerator,
+    MoodGenerator,
     MultiZoneGenerator,
     SingleZoneGenerator,
 )
@@ -50,6 +51,7 @@ from lifx.theme.theme import Theme
 __all__ = [
     "DynamicMode",
     "MatrixGenerator",
+    "MoodGenerator",
     "MultiZoneGenerator",
     "SingleZoneGenerator",
     "StaticMode",

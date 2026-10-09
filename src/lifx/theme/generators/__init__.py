@@ -7,6 +7,7 @@ rendering primitive behind ``MatrixGenerator``.
 
 from __future__ import annotations
 
+from lifx.theme.generators.mood import MoodGenerator
 from lifx.theme.generators.theme import (
     MatrixGenerator,
     MultiZoneGenerator,
@@ -15,6 +16,7 @@ from lifx.theme.generators.theme import (
 
 __all__ = [
     "MatrixGenerator",
+    "MoodGenerator",
     "MultiZoneGenerator",
     "SingleZoneGenerator",
 ]
