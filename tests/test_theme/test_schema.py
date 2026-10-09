@@ -164,3 +164,31 @@ def test_tag_sort_key_is_case_insensitive_then_exact() -> None:
     tags = ["calm", "Bright", "aqua", "Calm"]
 
     assert sorted(tags, key=tag_sort_key) == ["aqua", "Bright", "Calm", "calm"]
+
+
+def test_unicode_name_is_optional() -> None:
+    validate_records([(1, _valid_record())])
+
+
+def test_unicode_name_that_folds_to_name_is_accepted() -> None:
+    validate_records(
+        [(1, _valid_record(slug="curacao", name="Curacao", unicode_name="Curaçao"))]
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        (7, "field 'unicode_name' is not a string"),
+        ("", "field 'unicode_name' is empty"),
+        ("Curacao", "field 'unicode_name' is ASCII"),
+        # Decomposed: "c" plus U+0327 COMBINING CEDILLA, not precomposed "ç".
+        ("Curac\u0327ao", "field 'unicode_name' is not NFC-normalised"),
+        ("Curaçaoo", "field 'unicode_name' does not fold to name"),
+        ("Curaçao 🇨🇼", "field 'unicode_name' does not fold to name"),
+    ],
+)
+def test_invalid_unicode_name_is_rejected(value: object, message: str) -> None:
+    record = _valid_record(slug="curacao", name="Curacao", unicode_name=value)
+    with pytest.raises(RuntimeError, match=message):
+        validate_records([(1, record)])

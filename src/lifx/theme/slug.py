@@ -4,7 +4,8 @@ This module is the one home of the slug rule shared by the theme-data
 generator (``scripts/generate_theme_data.py``, slug validation) and
 :class:`lifx.theme.library.ThemeLibrary` (category-name normalisation) —
 one rule, stated once, so the two sides cannot drift apart. It is a leaf
-module by design: its only import is ``re``, never anything from ``lifx``.
+module by design: it imports only the standard library (``re``,
+``unicodedata``), never anything from ``lifx``.
 
 The D-09 rule has three passes, applied in order: drop apostrophes and
 quotation marks outright, expand ``&`` to the word ``and``, then lowercase
@@ -32,6 +33,7 @@ Internal machinery: :func:`derive_slug` is deliberately absent from
 from __future__ import annotations
 
 import re
+import unicodedata
 
 #: Characters removed outright rather than treated as separators: an
 #: apostrophe or quotation mark sits inside a word, so collapsing it to an
@@ -73,3 +75,26 @@ def derive_slug(name: str) -> str:
     # itself and collapses runs greedily, so two adjacent replacement
     # underscores cannot survive it.
     return _NON_SLUG_RUN.sub("_", expanded.lower()).strip("_")
+
+
+def fold_accents(value: str) -> str:
+    """Fold accented letters to their ASCII base: "Côte d'Ivoire" -> "Cote d'Ivoire".
+
+    The one folding rule behind the authored-record schema: a record's
+    ``unicode_name`` must fold to its ``name``. Canonical decomposition
+    (NFD) splits each accented letter into its base and combining marks,
+    and only the combining marks are dropped. NFKD is deliberately not
+    used: its compatibility mappings would quietly turn "™" into "TM" and
+    "①" into "1". Any other non-ASCII character survives, so an ASCII
+    boundary downstream still rejects it rather than guessing.
+
+    Args:
+        value: Text to fold.
+
+    Returns:
+        The NFC-composed text with every combining mark removed.
+    """
+    decomposed = unicodedata.normalize("NFD", value)
+    return unicodedata.normalize(
+        "NFC", "".join(c for c in decomposed if not unicodedata.combining(c))
+    )

@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import keyword
 import math
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,7 @@ from lifx.const import (
     MAX_KELVIN,
     MIN_KELVIN,
 )
-from lifx.theme.slug import derive_slug
+from lifx.theme.slug import derive_slug, fold_accents
 
 #: Inclusive (min, max) validation range for each user-facing float colour
 #: field. Kelvin is validated separately below: it stays a wire integer with
@@ -42,7 +43,9 @@ _REQUIRED_FIELDS = frozenset(
 )
 
 #: Fields a record may carry in addition to the required set.
-_OPTIONAL_FIELDS = frozenset({"aliases", "replaced_by", "dynamic_mode", "tags"})
+_OPTIONAL_FIELDS = frozenset(
+    {"aliases", "replaced_by", "dynamic_mode", "tags", "unicode_name"}
+)
 
 #: Allowed values of a record's authored ``disposition`` field (COMPAT-04).
 DISPOSITIONS = frozenset({"lifx-app", "library-only", "deprecated"})
@@ -358,6 +361,40 @@ def validate_records(records: list[tuple[int, dict[str, Any]]]) -> None:
                     line_number,
                     record,
                     f"field '{field}' contains non-ASCII characters: {value!r}",
+                )
+        # unicode_name is the correctly spelt display name a Unicode-capable
+        # surface may show. It exists only when it differs from name, and
+        # only through accents: folding it must give back exactly the ASCII
+        # name the slug derives from, so the two can never drift apart.
+        if "unicode_name" in record:
+            unicode_name = record["unicode_name"]
+            if type(unicode_name) is not str:
+                raise _fail(
+                    line_number,
+                    record,
+                    f"field 'unicode_name' is not a string: {unicode_name!r}",
+                )
+            if not unicode_name:
+                raise _fail(line_number, record, "field 'unicode_name' is empty")
+            if unicode_name.isascii():
+                raise _fail(
+                    line_number,
+                    record,
+                    f"field 'unicode_name' is ASCII; omit it when it equals "
+                    f"name: {unicode_name!r}",
+                )
+            if not unicodedata.is_normalized("NFC", unicode_name):
+                raise _fail(
+                    line_number,
+                    record,
+                    f"field 'unicode_name' is not NFC-normalised: {unicode_name!r}",
+                )
+            if fold_accents(unicode_name) != record["name"]:
+                raise _fail(
+                    line_number,
+                    record,
+                    f"field 'unicode_name' does not fold to name "
+                    f"{record['name']!r}: {unicode_name!r}",
                 )
         # disposition is the COMPAT-04 fate of a record: required on every
         # record (D-05), drawn from a closed set.

@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 
 from lifx.theme import ThemeLibrary
-from lifx.theme.slug import derive_slug
+from lifx.theme.slug import derive_slug, fold_accents
 
 
 class TestDeriveSlugDisplayNames:
@@ -181,3 +181,28 @@ class TestDeriveSlugApostrophesAndAmpersand:
         drop pass cannot itself violate that: nothing survives to strip.
         """
         assert derive_slug("'''") == ""
+
+
+class TestFoldAccents:
+    """`fold_accents` drops combining marks only (NFD), never NFKD mappings."""
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("Curaçao", "Curacao"),
+            ("Türkiye", "Turkiye"),
+            ("São Tomé and Príncipe", "Sao Tome and Principe"),
+            ("Côte d'Ivoire", "Cote d'Ivoire"),
+            ("Curaçao", "Curacao"),
+            ("Plain", "Plain"),
+        ],
+    )
+    def test_folds_accented_letters(self, value: str, expected: str) -> None:
+        assert fold_accents(value) == expected
+
+    @pytest.mark.parametrize("value", ["Brand™", "Step ①", "Москва", "✨"])
+    def test_leaves_compatibility_forms_and_other_scripts_alone(
+        self, value: str
+    ) -> None:
+        """NFKD would turn ™ into TM and ① into 1; NFD must not."""
+        assert fold_accents(value) == value
