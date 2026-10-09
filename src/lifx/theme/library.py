@@ -27,7 +27,11 @@ data), which came from two upstream projects:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Literal
+
 from lifx.theme.data import THEMES, ThemeRecord
+from lifx.theme.schema import tag_sort_key
 from lifx.theme.slug import derive_slug
 from lifx.theme.theme import Theme
 
@@ -49,6 +53,12 @@ class ThemeLibrary:
         # Get themes by category
         categories = ThemeLibrary.get_categories()
         holidays = ThemeLibrary.get_by_category("Holidays")
+
+        # Find themes by tag, category and effect mode
+        calm = ThemeLibrary.get_by_tag("Calm")
+        cosy_grids = ThemeLibrary.find(
+            tags=["Calm", "Cozy"], match="any", static_mode="grid_static"
+        )
 
         # Apply to a light
         await light.apply_theme(evening_theme, power_on=True)
@@ -196,6 +206,12 @@ class ThemeLibrary:
                 among the unrecognised: they were never a taxonomy this data
                 carries, and the message lists the categories that exist.
         """
+        slugs = cls._require_category_slugs(category)
+        return {slug: cls.get(slug) for slug in sorted(slugs)}
+
+    @classmethod
+    def _require_category_slugs(cls, category: object) -> set[str]:
+        """Slugs in ``category``, raising the documented ValueError otherwise."""
         if type(category) is not str:
             # derive_slug() would raise AttributeError on a non-string, which
             # contradicts the documented ValueError and reads as a library
@@ -204,14 +220,136 @@ class ThemeLibrary:
                 f"Category must be a string, got {type(category).__name__}. "
                 f"Available categories: {', '.join(cls.get_categories())}"
             )
-
         slugs = cls._slugs_for_category(derive_slug(category))
         if not slugs:
             raise ValueError(
                 f"Category '{category}' is not recognised. "
                 f"Available categories: {', '.join(cls.get_categories())}"
             )
-        return {slug: cls.get(slug) for slug in sorted(slugs)}
+        return slugs
+
+    @classmethod
+    def _records(cls) -> list[ThemeRecord]:
+        """Every record except rename aliases, which would list a theme twice."""
+        return [r for r in cls._THEMES.values() if r.disposition != "renamed"]
+
+    @classmethod
+    def get_tags(cls) -> list[str]:
+        """Get every tag present in the library's data.
+
+        Tags are the LIFX app's search tags, such as ``"Calm"`` or
+        ``"Date night"``. A theme with no app source carries none.
+
+        Returns:
+            Distinct tags, sorted case-insensitively.
+        """
+        return sorted({tag for r in cls._records() for tag in r.tags}, key=tag_sort_key)
+
+    @classmethod
+    def _require_tag_slugs(cls, tag: object) -> set[str]:
+        """Slugs of every theme carrying ``tag``, matched by the slug rule.
+
+        Raises:
+            ValueError: If ``tag`` is not a string or matches no tag.
+        """
+        available = cls.get_tags()
+        if type(tag) is not str:
+            raise ValueError(
+                f"Tag must be a string, got {type(tag).__name__}. "
+                f"Available tags: {', '.join(available)}"
+            )
+        key = derive_slug(tag)
+        matching = {t for t in available if derive_slug(t) == key}
+        if not matching:
+            raise ValueError(
+                f"Tag '{tag}' is not recognised. Available tags: {', '.join(available)}"
+            )
+        return {r.slug for r in cls._records() if matching.intersection(r.tags)}
+
+    @classmethod
+    def get_by_tag(cls, tag: str) -> dict[str, Theme]:
+        """Get all themes carrying a tag.
+
+        Args:
+            tag: Tag name. Matching is case- and punctuation-insensitive:
+                both sides are normalised by the slug rule, so
+                ``"Date night"``, ``"date night"`` and ``"date_night"`` all
+                resolve.
+
+        Returns:
+            Dictionary of Theme objects keyed by slug and sorted by slug.
+
+        Raises:
+            ValueError: If ``tag`` is not a string, or matches no tag in the
+                library. The message lists the tags that exist.
+        """
+        return {slug: cls.get(slug) for slug in sorted(cls._require_tag_slugs(tag))}
+
+    @classmethod
+    def find(
+        cls,
+        *,
+        tags: Iterable[str] = (),
+        match: Literal["all", "any"] = "all",
+        category: str | None = None,
+        static_mode: str | None = None,
+    ) -> dict[str, Theme]:
+        """Find themes by tags, category and static mode together.
+
+        Every given criterion must hold. ``match`` decides only how the
+        tags combine: ``"all"`` requires every tag, ``"any"`` at least one.
+        With no criteria, every theme is returned.
+
+        Args:
+            tags: Tag names, matched as ``get_by_tag()`` matches them.
+            match: ``"all"`` or ``"any"``.
+            category: Category name, matched as ``get_by_category()``
+                matches it.
+            static_mode: Exact static mode, such as ``"grid_static"``.
+
+        Returns:
+            Dictionary of matching Theme objects keyed by slug and sorted by
+            slug; empty when valid criteria select nothing.
+
+        Raises:
+            TypeError: If ``tags`` is a single string rather than an
+                iterable of tags.
+            ValueError: If ``match`` is invalid, or a tag, category or
+                static mode names nothing in the library.
+
+        Example:
+            ```python
+            from lifx.theme import ThemeLibrary
+
+            calm_grids = ThemeLibrary.find(tags=["Calm"], static_mode="grid_static")
+            ```
+        """
+        if isinstance(tags, str):
+            raise TypeError(
+                "tags must be an iterable of tags, not a single string; "
+                "pass ['Calm'] for one tag"
+            )
+        if match not in ("all", "any"):
+            raise ValueError(f"match must be 'all' or 'any', got {match!r}")
+        records = cls._records()
+        selected = {r.slug for r in records}
+        tag_sets = [cls._require_tag_slugs(tag) for tag in tags]
+        if tag_sets:
+            if match == "all":
+                selected &= set.intersection(*tag_sets)
+            else:
+                selected &= set.union(*tag_sets)
+        if category is not None:
+            selected &= cls._require_category_slugs(category)
+        if static_mode is not None:
+            modes = sorted({r.static_mode for r in records})
+            if static_mode not in modes:
+                raise ValueError(
+                    f"static_mode '{static_mode}' is not recognised. "
+                    f"Available static modes: {', '.join(modes)}"
+                )
+            selected &= {r.slug for r in records if r.static_mode == static_mode}
+        return {slug: cls.get(slug) for slug in sorted(selected)}
 
 
 def get_theme(name: str) -> Theme:

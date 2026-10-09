@@ -6,6 +6,7 @@ from collections import Counter
 
 import pytest
 
+from lifx.color import HSBK
 from lifx.const import KELVIN_SATURATED, MAX_KELVIN, MIN_KELVIN
 from lifx.theme import Theme, ThemeLibrary, get_theme
 from lifx.theme.data import THEMES, ThemeRecord
@@ -745,3 +746,166 @@ class TestEffectModesOnGet:
             assert theme.static_mode == record.static_mode, key
             assert theme.dynamic_mode == record.dynamic_mode, key
             assert theme.tags == record.tags, key
+
+
+_BLUE = (HSBK(hue=210, saturation=1.0, brightness=1.0, kelvin=3500),)
+
+
+class TaggedLibrary(ThemeLibrary):
+    """A synthetic library with tags, modes and a tagged rename alias."""
+
+    _THEMES: dict[str, ThemeRecord] = {
+        "calm_sea": ThemeRecord(
+            slug="calm_sea",
+            name="Calm Sea",
+            category="Moods",
+            disposition="lifx-app",
+            colors=_BLUE,
+            static_mode="blended",
+            tags=("Blue", "Calm"),
+        ),
+        "date_night": ThemeRecord(
+            slug="date_night",
+            name="Date Night",
+            category="Moods",
+            disposition="lifx-app",
+            colors=_BLUE,
+            static_mode="blended",
+            dynamic_mode="morph",
+            tags=("Date night", "Romantic"),
+        ),
+        "grid_art": ThemeRecord(
+            slug="grid_art",
+            name="Grid Art",
+            category="Art Series",
+            disposition="lifx-app",
+            colors=_BLUE,
+            static_mode="grid_static",
+            tags=("Multicolour",),
+        ),
+        "plain": ThemeRecord(
+            slug="plain",
+            name="Plain",
+            category="Library",
+            disposition="library-only",
+            colors=_BLUE,
+            static_mode="blended",
+        ),
+        "old_calm": ThemeRecord(
+            slug="old_calm",
+            name="Calm Sea",
+            category="Moods",
+            disposition="renamed",
+            colors=_BLUE,
+            static_mode="blended",
+            tags=("Blue", "Calm"),
+            replaced_by="calm_sea",
+        ),
+    }
+
+
+class TestTagDiscovery:
+    """get_tags() and get_by_tag()."""
+
+    def test_get_tags_lists_every_tag_case_insensitively(self) -> None:
+        assert TaggedLibrary.get_tags() == [
+            "Blue",
+            "Calm",
+            "Date night",
+            "Multicolour",
+            "Romantic",
+        ]
+
+    def test_get_tags_on_an_empty_library(self) -> None:
+        assert EmptyLibrary.get_tags() == []
+
+    @pytest.mark.parametrize(
+        "tag", ["Date night", "date night", "DATE NIGHT", "date_night"]
+    )
+    def test_get_by_tag_matches_normalised(self, tag: str) -> None:
+        themes = TaggedLibrary.get_by_tag(tag)
+
+        assert list(themes) == ["date_night"]
+        assert themes["date_night"].tags == ("Date night", "Romantic")
+        assert themes["date_night"].dynamic_mode == "morph"
+
+    def test_get_by_tag_excludes_rename_aliases(self) -> None:
+        assert list(TaggedLibrary.get_by_tag("Calm")) == ["calm_sea"]
+
+    def test_get_by_tag_unknown_raises(self) -> None:
+        with pytest.raises(ValueError, match="'Spooky' is not recognised.*Blue"):
+            TaggedLibrary.get_by_tag("Spooky")
+
+    def test_get_by_tag_non_string_raises(self) -> None:
+        with pytest.raises(ValueError, match="Tag must be a string, got int"):
+            TaggedLibrary.get_by_tag(3)  # type: ignore[arg-type]
+
+
+class TestFind:
+    """ThemeLibrary.find()."""
+
+    def test_no_criteria_returns_every_non_alias_theme(self) -> None:
+        assert list(TaggedLibrary.find()) == [
+            "calm_sea",
+            "date_night",
+            "grid_art",
+            "plain",
+        ]
+
+    def test_tags_all(self) -> None:
+        assert list(TaggedLibrary.find(tags=["Calm", "Blue"])) == ["calm_sea"]
+        assert TaggedLibrary.find(tags=["Calm", "Romantic"]) == {}
+
+    def test_tags_any(self) -> None:
+        found = TaggedLibrary.find(tags=["Calm", "Romantic"], match="any")
+
+        assert list(found) == ["calm_sea", "date_night"]
+
+    def test_empty_tags_with_any_selects_everything(self) -> None:
+        assert len(TaggedLibrary.find(tags=(), match="any")) == 4
+
+    def test_category_is_normalised(self) -> None:
+        assert list(TaggedLibrary.find(category="art series")) == ["grid_art"]
+
+    def test_static_mode(self) -> None:
+        assert list(TaggedLibrary.find(static_mode="grid_static")) == ["grid_art"]
+
+    def test_criteria_combine_with_and(self) -> None:
+        found = TaggedLibrary.find(
+            tags=["Calm", "Multicolour"],
+            match="any",
+            category="Moods",
+            static_mode="blended",
+        )
+
+        assert list(found) == ["calm_sea"]
+
+    def test_a_bare_string_for_tags_raises(self) -> None:
+        with pytest.raises(TypeError, match="not a single string"):
+            TaggedLibrary.find(tags="Calm")
+
+    def test_unknown_tag_raises(self) -> None:
+        with pytest.raises(ValueError, match="'Spooky' is not recognised"):
+            TaggedLibrary.find(tags=["Spooky"])
+
+    def test_unknown_category_raises(self) -> None:
+        with pytest.raises(ValueError, match="Category 'Sport' is not recognised"):
+            TaggedLibrary.find(category="Sport")
+
+    def test_unknown_static_mode_raises(self) -> None:
+        with pytest.raises(
+            ValueError, match="'solid' is not recognised.*blended, grid_static"
+        ):
+            TaggedLibrary.find(static_mode="solid")
+
+    def test_invalid_match_raises(self) -> None:
+        with pytest.raises(ValueError, match="match must be 'all' or 'any'"):
+            TaggedLibrary.find(tags=["Calm"], match="some")  # type: ignore[arg-type]
+
+    def test_get_by_category_behaviour_is_unchanged(self) -> None:
+        assert list(TaggedLibrary.get_by_category("moods")) == [
+            "calm_sea",
+            "date_night",
+        ]
+        with pytest.raises(ValueError, match="Category must be a string"):
+            TaggedLibrary.get_by_category(3)  # type: ignore[arg-type]
