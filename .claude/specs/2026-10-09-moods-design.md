@@ -84,14 +84,14 @@ A generator class shaped like its siblings, no I/O, exported from
 
 - `MoodGenerator(theme)`: the recipe comes from `theme.static_mode`; `None`
   and any mode with no recipe use `blended`.
-- `get_matrix_colors(width, height, brightness) -> list[HSBK]`: one matrix
-  device: every `has_matrix` light except a multi-tile Tile chain and the
-  Mirror. Today that is Ceiling (every size), Candle, Spot, Path, Tube,
-  Luna and a single Tile.
+- `get_matrix_colors(width, height, brightness, *, vertical=False) ->
+  list[HSBK]`: one matrix device: every `has_matrix` light except a
+  multi-tile Tile chain. Today that is Ceiling (every size), Candle, Spot,
+  Path, Tube, Luna, Mirror and a single Tile. `vertical` turns the stripe
+  modes into bands along the long axis (section 2).
 - `get_chain_colors(tile_count, width, height, brightness) ->
   list[list[HSBK]]`: a Tile chain, one canvas in chain order, sliced per tile.
-- `get_multizone_colors(zone_count, brightness) -> list[HSBK]`: a strip, or one
-  Mirror ring.
+- `get_multizone_colors(zone_count, brightness) -> list[HSBK]`: a strip.
 - `get_bulb_colors(count) -> list[HSBK]`: the distinct colours, shuffled,
   dealt one per bulb.
 - `morph_palette(colors) -> list[HSBK]` (static): the app's run-weighted
@@ -161,9 +161,20 @@ Device specifics:
   deliberately: tiles arranged in an L or a stack show the image in chain
   order, not following their physical arrangement.
   For `blended` each tile is shuffled and blended on its own. *Unverified.*
-- **Mirror.** Best-traced recipe: each ring painted as a 25-zone strip in zone
-  order, through the existing component gather and scatter. *Unverified;
-  section 6 decides.*
+- **Mirror.** The app has no Mirror-specific paint path: it paints the Mirror
+  as any other single matrix light, over its 4x13 Set64 buffer, with one
+  shuffle and one brightness rescale for the whole light. The front and back
+  rings play no part. The app reads the buffer as 16 rows (64 colours / 4)
+  and may fit stripe moods to 16; this library uses the real 13 rows.
+  *Traced in the 4.100 app; hardware check in section 6.*
+- **Vertical-theme products.** The app gives every Candle, the Tube and the
+  Mirror a vertical-theme capability that is not in the products registry:
+  product ids 57, 68, 137, 138, 185, 186, 215, 216, 217, 218, 267 and 268,
+  kept as a hand-maintained set in `lifx/products/quirks.py`. On these, the
+  stripe modes (`solid`, `solid_static`, `solid_loop`) run along the long
+  axis: the colours are stretched to the row count, every row is one colour,
+  and the first colour is on the bottom row. `blended` and `grid_static`
+  ignore the flag.
 - **Candle, Spot, Path, Tube, Luna and the 13x26 Ceiling.** The matrix
   recipe over the geometry the device reports, never an assumed 8x8.
   *Unverified; Luna's known mismatch stands.*
