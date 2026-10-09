@@ -85,7 +85,9 @@ A generator class shaped like its siblings, no I/O, exported from
 - `MoodGenerator(theme)`: the recipe comes from `theme.static_mode`; `None`
   and any mode with no recipe use `blended`.
 - `get_matrix_colors(width, height, brightness) -> list[HSBK]`: one matrix
-  device (a Ceiling, Candle, Luna or single Tile).
+  device: every `has_matrix` light except a multi-tile Tile chain and the
+  Mirror. Today that is Ceiling (every size), Candle, Spot, Path, Tube,
+  Luna and a single Tile.
 - `get_chain_colors(tile_count, width, height, brightness) ->
   list[list[HSBK]]`: a Tile chain, one canvas in chain order, sliced per tile.
 - `get_zone_colors(zone_count, brightness) -> list[HSBK]`: a strip, or one
@@ -161,7 +163,8 @@ Device specifics:
 - **Mirror.** Best-traced recipe: each ring painted as a 25-zone strip in zone
   order, through the existing component gather and scatter. *Unverified;
   section 6 decides.*
-- **Candle (5x6), Luna (7x5).** The matrix recipe over the reported geometry.
+- **Candle, Spot, Path, Tube, Luna and the 13x26 Ceiling.** The matrix
+  recipe over the geometry the device reports, never an assumed 8x8.
   *Unverified; Luna's known mismatch stands.*
 - **Bulb.** `DeviceGroup.apply_mood()` deals the theme's distinct colours,
   shuffled, one per bulb in turn. A lone `Light.apply_mood()` takes the
@@ -193,7 +196,7 @@ at the app's own speed and direction. Stopping is the existing
 | Light | MOVE | MORPH |
 |---|---|---|
 | Strip (any multizone) | mood still, then firmware MOVE, FORWARD, `20 s * zones / 16` | same as MOVE |
-| Matrix (Ceiling, Tile, chain, Candle, Luna) | mood still, then `EffectScroll` | firmware MORPH, 3 s, no pre-paint |
+| Matrix (every `has_matrix` light but the Mirror, chains included) | mood still, then `EffectScroll` | firmware MORPH, 3 s, no pre-paint |
 | Mirror | firmware MORPH | firmware MORPH |
 | Bulb | `EffectColorloop(palette=theme.colors)` | same |
 
