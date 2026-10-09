@@ -24,11 +24,10 @@ from lifx.devices.component.participant import ComponentName, LightComponent
 from lifx.devices.component.state import Pending, hsk_matches, is_dark
 from lifx.devices.effect_runner import effect_runner
 from lifx.devices.light import wait_until_off
-from lifx.devices.matrix import MatrixLight
+from lifx.devices.matrix import MatrixLight, TileInfo
 from lifx.exceptions import LifxError
 
 if TYPE_CHECKING:
-    from lifx.devices.matrix import TileInfo
     from lifx.theme import Theme
 
 _POWER_ON = 65535
