@@ -15,6 +15,7 @@ Terminology:
 from __future__ import annotations
 
 import logging
+import random
 import time
 from dataclasses import InitVar, asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
@@ -27,6 +28,7 @@ from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
+    MAX_PALETTE_COLORS,
 )
 from lifx.devices.component.state import (
     derive_effect_palette,
@@ -1352,8 +1354,11 @@ class MatrixLight(Light):
                 except for COLOR_SWEEP and SKY with a non-zero ``duration``,
                 where 0 plays the effect once across ``duration``
             duration: Total effect duration in nanoseconds (0 for infinite)
-            palette: Color palette for the effect (max 16 colors). An explicit
-                palette is always sent exactly as given, with no extra read.
+            palette: Color palette for the effect. For MORPH, a palette longer
+                than 16 colours is reduced the way the LIFX app reduces a mood:
+                by the area each run of colours covers, then shuffled. Other
+                effects take at most 16. An explicit palette is sent as given (bar
+                that MORPH reduction), with no extra read.
                 ``None`` behaves differently for MORPH: it triggers one
                 ``get_all_tile_colors()`` read of the device's own colours
                 before the effect is sent, a small start-up latency. A
@@ -1444,6 +1449,16 @@ class MatrixLight(Light):
             speed_ms = round(speed * 1000)
         else:
             speed_ms = 3000
+
+        if (
+            effect_type == FirmwareEffect.MORPH
+            and palette is not None
+            and len(palette) > MAX_PALETTE_COLORS
+        ):
+            # The app's rule: pick the colours by run weight, then shuffle.
+            # Selection is deterministic; only the order varies.
+            palette = MoodGenerator.morph_palette(palette)
+            random.shuffle(palette)
 
         # Create and validate MatrixEffect
         effect = MatrixEffect(
