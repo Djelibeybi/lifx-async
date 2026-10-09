@@ -67,6 +67,62 @@ class MoodGenerator:
             colors = self._stretch(self._colors, zone_count)
         return self._rescale(colors, brightness)
 
+    # Interior cells blend their nearest edge cells, as the app does.
+    _NEAREST_EDGE_CELLS = 5
+
+    def get_matrix_colors(
+        self, width: int, height: int, brightness: float
+    ) -> list[HSBK]:
+        """Colours for one matrix light, in row-major order.
+
+        Args:
+            width: Pixels per row, as the device reports
+            height: Rows, as the device reports
+            brightness: The light's current brightness, 0.0 to 1.0
+
+        Returns:
+            ``width * height`` colours
+        """
+        return self._rescale(self._paint(width, height), brightness)
+
+    def get_chain_colors(
+        self, tile_count: int, width: int, height: int, brightness: float
+    ) -> list[list[HSBK]]:
+        """Colours for a Tile chain, laid out in chain order.
+
+        The app ignores where the tiles sit: one canvas ``width * tile_count``
+        wide is painted and sliced per tile. A blended mood paints each tile
+        on its own.
+
+        Args:
+            tile_count: Tiles in the chain
+            width: Pixels per row of one tile
+            height: Rows of one tile
+            brightness: The light's current brightness, 0.0 to 1.0
+
+        Returns:
+            Per tile, ``width * height`` colours in row-major order
+        """
+        if self._mode == "blended":
+            tiles = [
+                self._blended_matrix(self._colors, width, height)
+                for _ in range(tile_count)
+            ]
+        else:
+            canvas_width = width * tile_count
+            canvas = self._paint(canvas_width, height)
+            tiles = [
+                [
+                    canvas[row * canvas_width + tile * width + col]
+                    for row in range(height)
+                    for col in range(width)
+                ]
+                for tile in range(tile_count)
+            ]
+        flat = self._rescale([c for tile in tiles for c in tile], brightness)
+        size = width * height
+        return [flat[i * size : (i + 1) * size] for i in range(tile_count)]
+
     def get_bulb_colors(self, brightnesses: Sequence[float]) -> list[HSBK]:
         """Deal the theme's distinct colours, shuffled, one per bulb in turn.
 
@@ -204,3 +260,62 @@ class MoodGenerator:
         copy = list(colors)
         self._rng.shuffle(copy)
         return copy
+
+    def _paint(self, width: int, height: int) -> list[HSBK]:
+        """The still image for this theme's mode, unscaled."""
+        if self._mode == "blended":
+            return self._blended_matrix(self._colors, width, height)
+        if self._mode == "grid_static":
+            return self._grid(self._colors, width, height)
+        if self._mode == "solid":
+            return self._stripes(
+                self._shuffled(self._distinct(self._colors)), width, height
+            )
+        return self._stripes(self._colors, width, height)
+
+    def _blended_matrix(
+        self, colors: Sequence[HSBK], width: int, height: int
+    ) -> list[HSBK]:
+        """Shuffled gradient round the edge, interior by distance."""
+        if width < 2 or height < 2:
+            # No edge walk on a single row or column: a gradient along it.
+            return self._gradient(self._shuffled(colors), width * height)
+        edge = self._edge_cells(width, height)
+        ramp = self._gradient(self._shuffled(colors), len(edge))
+        painted: dict[tuple[int, int], HSBK] = dict(zip(edge, ramp))
+        for row in range(height):
+            for col in range(width):
+                if (row, col) in painted:
+                    continue
+                nearest = sorted(
+                    ((math.dist((row, col), cell), painted[cell]) for cell in edge),
+                    key=lambda pair: pair[0],
+                )[: self._NEAREST_EDGE_CELLS]
+                total = sum(distance for distance, _ in nearest)
+                weights = [math.floor(total / distance) for distance, _ in nearest]
+                painted[(row, col)] = self._mix([c for _, c in nearest], weights)
+        return [painted[(row, col)] for row in range(height) for col in range(width)]
+
+    @staticmethod
+    def _edge_cells(width: int, height: int) -> list[tuple[int, int]]:
+        """Top row left to right, both sides row by row, bottom row back."""
+        cells = [(0, col) for col in range(width)]
+        for row in range(1, height - 1):
+            cells.extend([(row, 0), (row, width - 1)])
+        cells.extend((height - 1, col) for col in reversed(range(width)))
+        return cells
+
+    @staticmethod
+    def _grid(colors: Sequence[HSBK], width: int, height: int) -> list[HSBK]:
+        """Stretch to every cell, rows laid out serpentine."""
+        cells = MoodGenerator._stretch(colors, width * height)
+        out: list[HSBK] = []
+        for row in range(height):
+            run = cells[row * width : (row + 1) * width]
+            out.extend(run if row % 2 == 0 else reversed(run))
+        return out
+
+    @staticmethod
+    def _stripes(colors: Sequence[HSBK], width: int, height: int) -> list[HSBK]:
+        """Stretch to one row and repeat it on every row."""
+        return MoodGenerator._stretch(colors, width) * height

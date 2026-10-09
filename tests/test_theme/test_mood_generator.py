@@ -172,3 +172,95 @@ class TestMorphPalette:
         palette = [RED] * 48 + [BLUE] * 16
         out = MoodGenerator.morph_palette(palette)
         assert out == [RED] * 12 + [BLUE] * 4
+
+
+class TestMatrixRecipes:
+    def test_grid_is_serpentine(self) -> None:
+        cells = [
+            HSBK(hue=i * 10, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(6)
+        ]
+        out = MoodGenerator._grid(cells, 3, 2)
+        assert [c.hue for c in out] == [0, 10, 20, 50, 40, 30]
+
+    def test_stripes_repeat_one_row(self) -> None:
+        out = MoodGenerator._stripes([RED, GREEN], 4, 3)
+        assert out == [RED, RED, GREEN, GREEN] * 3
+
+    def test_edge_walk_order(self) -> None:
+        cells = MoodGenerator._edge_cells(4, 3)
+        assert cells == [
+            (0, 0),
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 0),
+            (1, 3),
+            (2, 3),
+            (2, 2),
+            (2, 1),
+            (2, 0),
+        ]
+        assert len(cells) == 2 * (4 - 2) + 2 * 3
+
+    def test_blended_matrix_edges_follow_the_gradient(self) -> None:
+        gen = make([RED, BLUE], "blended")
+        out = gen._blended_matrix([RED, BLUE], 4, 4)
+        assert len(out) == 16
+        assert out[0] in (RED, BLUE)
+
+    def test_blended_matrix_interior_is_a_mix(self) -> None:
+        gen = make([RED], "blended")
+        out = gen._blended_matrix([RED], 3, 3)
+        assert out[4].hue == pytest.approx(0, abs=1)
+
+    @pytest.mark.parametrize(("width", "height"), [(1, 5), (5, 1), (1, 1)])
+    def test_blended_matrix_degenerate_geometry(self, width: int, height: int) -> None:
+        out = make([RED, BLUE], "blended")._blended_matrix([RED, BLUE], width, height)
+        assert len(out) == width * height
+
+    def test_get_matrix_colors_grid(self) -> None:
+        out = make([RED, GREEN], "grid_static").get_matrix_colors(2, 2, 1.0)
+        assert out == [RED, RED, GREEN, GREEN]
+
+    def test_get_matrix_colors_solid_static_is_vertical_stripes(self) -> None:
+        out = make([RED, GREEN], "solid_static").get_matrix_colors(2, 2, 1.0)
+        assert out == [RED, GREEN, RED, GREEN]
+
+    def test_get_matrix_colors_solid_loop_matches_solid_static(self) -> None:
+        a = make([RED, GREEN], "solid_loop").get_matrix_colors(4, 2, 1.0)
+        b = make([RED, GREEN], "solid_static").get_matrix_colors(4, 2, 1.0)
+        assert a == b
+
+    def test_get_matrix_colors_solid_uses_distinct(self) -> None:
+        out = make([RED, RED, GREEN], "solid").get_matrix_colors(4, 1, 1.0)
+        assert {c.hue for c in out} == {0, 120}
+
+    def test_get_matrix_colors_blended_size(self) -> None:
+        assert len(make([RED, BLUE]).get_matrix_colors(5, 6, 1.0)) == 30
+
+    def test_get_matrix_colors_one_colour(self) -> None:
+        out = make([RED], "blended").get_matrix_colors(4, 4, 1.0)
+        assert all(c.hue == pytest.approx(0, abs=1) for c in out)
+
+
+class TestChain:
+    def test_grid_spans_the_chain_in_order(self) -> None:
+        cells = [
+            HSBK(hue=i * 20, saturation=1.0, brightness=1.0, kelvin=3500)
+            for i in range(4)
+        ]
+        # 2 tiles of 1x2: canvas is 2 wide, 2 high, serpentine
+        out = make(cells, "grid_static").get_chain_colors(2, 1, 2, 1.0)
+        assert [[c.hue for c in tile] for tile in out] == [[0, 60], [20, 40]]
+
+    def test_blended_paints_each_tile_on_its_own(self) -> None:
+        out = make([RED, BLUE], "blended").get_chain_colors(3, 4, 4, 1.0)
+        assert [len(tile) for tile in out] == [16, 16, 16]
+
+    def test_rescale_spans_the_whole_chain(self) -> None:
+        out = make([RED, DIM_BLUE], "solid_static").get_chain_colors(2, 1, 1, 0.5)
+        assert max(c.brightness for tile in out for c in tile) == pytest.approx(
+            0.5, abs=1e-4
+        )
+        assert out[1][0].brightness == pytest.approx(0.25, abs=1e-4)
