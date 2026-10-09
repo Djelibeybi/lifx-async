@@ -86,9 +86,10 @@ and a geometry and returns colours. Every device path and `EffectScroll` render 
 - `stripes(colors, width, height)`: `stretch` to `width`, the same row on
   every row.
 
-Moods do not go through `MatrixGenerator`, `Canvas` or `lifx.geometry`: they
-work from width, height and chain index and deliberately ignore
-`user_x`/`user_y`.
+Moods do not go through `MatrixGenerator` or `Canvas`, because the app's
+recipes differ from the interpolated gradient those build. Tile positions
+only matter on a multi-tile Tile chain, the one device with more than one
+tile; there a mood follows chain order, as the app does (section 2).
 
 These functions are importable, since the devices, `EffectScroll` and
 `palette_16()` call them, but like `Canvas` none joins `lifx.theme.__all__`
@@ -122,7 +123,9 @@ Device specifics:
 - **Ceiling.** The uplight (zone 63) is grid cell (row 7, column 7) on every
   path. It is not special.
 - **Tile chain.** One canvas `8 * tile_count` wide and 8 tall, ordered by
-  chain index, sliced per tile; `user_x`/`user_y` are ignored, as the app does.
+  chain index, sliced per tile. This is the app's behaviour and is chosen
+  deliberately: tiles arranged in an L or a stack show the image in chain
+  order, not following their physical arrangement.
   For `blended` each tile is shuffled and blended on its own. *Unverified.*
 - **Mirror.** Best-traced recipe: each ring painted as a 25-zone strip in zone
   order, through the existing component gather and scatter. *Unverified;
