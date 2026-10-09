@@ -941,3 +941,60 @@ async def test_colorloop_is_light_compatible_no_color_support() -> None:
     result = await effect.is_light_compatible(light)
 
     assert result is False
+
+
+class TestColorloopPalette:
+    RED = HSBK(hue=0, saturation=1.0, brightness=0.7, kelvin=3500)
+    BLUE = HSBK(hue=240, saturation=1.0, brightness=0.4, kelvin=3500)
+
+    def ctx(self, elapsed: float, device_index: int = 0) -> FrameContext:
+        return FrameContext(
+            elapsed_s=elapsed,
+            device_index=device_index,
+            pixel_count=1,
+            canvas_width=1,
+            canvas_height=1,
+        )
+
+    def test_steps_through_the_palette(self) -> None:
+        effect = EffectColorloop(palette=[self.RED, self.BLUE], period=2.5)
+        assert effect.generate_frame(self.ctx(0.0)) == [self.RED]
+        assert effect.generate_frame(self.ctx(1.25)) == [self.BLUE]
+        assert effect.generate_frame(self.ctx(2.5)) == [self.RED]
+
+    def test_spread_offsets_each_light(self) -> None:
+        effect = EffectColorloop(palette=[self.RED, self.BLUE], period=2.5)
+        assert effect.generate_frame(self.ctx(0.0, device_index=1)) == [self.BLUE]
+
+    def test_synchronized_lights_share_a_colour(self) -> None:
+        effect = EffectColorloop(
+            palette=[self.RED, self.BLUE], period=2.5, synchronized=True
+        )
+        assert effect.generate_frame(self.ctx(0.0, device_index=1)) == [self.RED]
+
+    def test_zero_spread_lights_share_a_colour(self) -> None:
+        effect = EffectColorloop(palette=[self.RED, self.BLUE], period=2.5, spread=0)
+        assert effect.generate_frame(self.ctx(0.0, device_index=1)) == [self.RED]
+
+    def test_fixed_brightness_overrides_the_palette(self) -> None:
+        effect = EffectColorloop(palette=[self.RED], period=1.0, brightness=0.2)
+        assert effect.generate_frame(self.ctx(0.0))[0].brightness == pytest.approx(0.2)
+
+    def test_palette_brightness_is_kept_without_an_override(self) -> None:
+        effect = EffectColorloop(palette=[self.RED], period=1.0)
+        assert effect.generate_frame(self.ctx(0.0))[0].brightness == pytest.approx(0.7)
+
+    def test_empty_palette_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="palette"):
+            EffectColorloop(palette=[])
+
+    def test_change_is_still_validated_with_a_palette(self) -> None:
+        with pytest.raises(ValueError, match="Change"):
+            EffectColorloop(palette=[self.RED], change=200)
+
+    def test_palette_step_sets_the_frame_rate(self) -> None:
+        effect = EffectColorloop(palette=[self.RED, self.BLUE], period=2.5)
+        assert effect._step == pytest.approx(1.25)
+
+    def test_without_palette_behaviour_is_unchanged(self) -> None:
+        assert EffectColorloop().palette is None
