@@ -10,11 +10,14 @@ component methods, go through it.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, ClassVar, Protocol
 
 if TYPE_CHECKING:
+    from lifx.color import HSBK
     from lifx.devices.component.participant import LightComponent
     from lifx.devices.light import Light
+    from lifx.effects.base import LIFXEffect
 
 
 class EffectRunner(Protocol):
@@ -45,6 +48,22 @@ class EffectRunner(Protocol):
 
     def runs_whole_light(self, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light."""
+        ...
+
+    def runs_mood_effect(self, light: Light) -> bool:
+        """Whether a mood software effect runs on a whole light."""
+        ...
+
+    def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> LIFXEffect:
+        """The effect that scrolls a painted matrix mood."""
+        ...
+
+    def palette_effect(self, colors: list[HSBK]) -> LIFXEffect:
+        """The effect that steps bulbs through a mood's colours."""
+        ...
+
+    async def start_together(self, lights: Sequence[Light], effect: object) -> None:
+        """Start one software effect across several lights."""
         ...
 
 

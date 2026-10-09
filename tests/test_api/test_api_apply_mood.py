@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -85,3 +85,23 @@ async def test_running_mood_effect_restarts_instead_of_painting() -> None:
 @pytest.mark.emulator
 async def test_emulator_group_apply_mood(emulator_devices: DeviceGroup) -> None:
     await emulator_devices.apply_mood(THEME)
+
+
+async def test_group_bulbs_share_one_colour_loop() -> None:
+    a, b = bulb("d073d5000a01", on=True), bulb("d073d5000a02", on=True)
+    with patch("lifx.api.effect_runner") as runner:
+        runner.return_value.start_together = AsyncMock()
+        await DeviceGroup([a, b]).animate_mood(THEME)
+    lights = runner.return_value.start_together.await_args.args[0]
+    assert lights == [a, b]
+
+
+async def test_group_animate_mood_starts_other_lights_alone() -> None:
+    strip = fake(MultiZoneLight(serial="d073d5000a03", ip="127.0.0.1"), on=True)
+    strip.animate_mood = AsyncMock()  # type: ignore[method-assign]
+    white = bulb("d073d5000a04", on=True, colour=False)
+    with patch("lifx.api.effect_runner") as runner:
+        runner.return_value.start_together = AsyncMock()
+        await DeviceGroup([strip, white]).animate_mood(THEME)
+    strip.animate_mood.assert_awaited_once_with(THEME)  # type: ignore[attr-defined]
+    assert runner.return_value.start_together.await_args.args[0] == []

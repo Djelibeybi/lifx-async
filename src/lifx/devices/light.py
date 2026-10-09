@@ -1134,8 +1134,19 @@ class Light(Device[LightState]):
         await self._paint_mood(theme, power_on=not is_on, brightness=brightness)
 
     async def animate_mood(self, theme: Theme) -> None:
-        """Start the effect the LIFX app's Dynamic toggle starts for a mood."""
-        raise NotImplementedError
+        """Start the effect the LIFX app's Dynamic toggle starts for a mood.
+
+        A bulb steps through the theme's colours. A strip paints the mood and
+        runs firmware MOVE. A matrix light runs firmware MORPH, or paints the
+        mood and scrolls it for a MOVE mood; a Mirror, Spot or Path always runs
+        MORPH. Stop it with ``stop_effect()``.
+
+        Args:
+            theme: Theme to animate
+        """
+        if not await self._paints_moods():
+            return
+        await self.start_effect(effect_runner().palette_effect(list(theme.colors)))
 
     async def _paints_moods(self) -> bool:
         """Whether this light shows colour, the only kind a mood paints."""
@@ -1149,7 +1160,7 @@ class Light(Device[LightState]):
 
     async def _mood_effect_running(self) -> bool:
         """Whether a mood effect runs here, so a new mood restarts it."""
-        return False
+        return effect_runner().runs_mood_effect(self)
 
     async def _paint_mood(
         self,

@@ -12,8 +12,14 @@ from typing import TYPE_CHECKING, Any
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.packets import MultiZonePacketGenerator, PacketGenerator
 from lifx.color import HSBK
-from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.const import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_REQUEST_TIMEOUT,
+    LIFX_UDP_PORT,
+    MOOD_MOVE_SECONDS_PER_16_ZONES,
+)
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
+from lifx.devices.effect_runner import effect_runner
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import LifxProtocolError, LifxTimeoutError
 from lifx.protocol import packets
@@ -1481,6 +1487,30 @@ class MultiZoneLight(Light):
             power_on,
         )
         return []
+
+    async def animate_mood(self, theme: Theme) -> None:
+        """Paint the mood, then run firmware MOVE at the app's speed.
+
+        Every multizone light runs MOVE for any mood: strips have no MORPH.
+        """
+        if not await self._paints_moods():
+            return
+        await effect_runner().leave_every_run(self, restore_state=False)
+        is_on, brightness = await self._mood_reading()
+        await self._paint_mood(theme, power_on=not is_on, brightness=brightness)
+        zone_count = await self.get_zone_count()
+        await self.set_effect(
+            MultiZoneEffect.move(
+                Direction.FORWARD,
+                MOOD_MOVE_SECONDS_PER_16_ZONES * zone_count / 16,
+            )
+        )
+
+    async def _mood_effect_running(self) -> bool:
+        """Firmware MOVE, or a mood software effect."""
+        if await super()._mood_effect_running():
+            return True
+        return (await self.get_effect()).effect_type == FirmwareEffect.MOVE
 
     def __repr__(self) -> str:
         """String representation of multizone light."""

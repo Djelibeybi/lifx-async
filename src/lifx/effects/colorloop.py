@@ -514,7 +514,9 @@ class EffectColorloop(FrameEffect):
     async def from_poweroff_hsbk(self, _light: Light) -> HSBK:
         """Return startup color when light is powered off.
 
-        For colorloop, start with random hue and target brightness.
+        For colorloop, start with random hue and target brightness. With a
+        ``palette``, start dark on its first colour, so no stray colour
+        flashes before the first step.
 
         Args:
             _light: The device being powered on (unused)
@@ -522,6 +524,14 @@ class EffectColorloop(FrameEffect):
         Returns:
             HSBK color to use as startup color
         """
+        if self.palette is not None:
+            first = self.palette[0]
+            return HSBK(
+                hue=first.hue,
+                saturation=first.saturation,
+                brightness=0.0,
+                kelvin=first.kelvin,
+            )
         return HSBK(
             hue=random.randint(0, 360),
             saturation=random.uniform(self.saturation_min, self.saturation_max),

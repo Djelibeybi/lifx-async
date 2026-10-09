@@ -37,6 +37,7 @@ from lifx.devices import (
     MatrixLight,
     MultiZoneLight,
 )
+from lifx.devices.effect_runner import effect_runner
 from lifx.exceptions import LifxNetworkError
 from lifx.network.address import validate_address, validate_port
 from lifx.network.discovery.mdns.discovery import (
@@ -1029,6 +1030,21 @@ class DeviceGroup:
                 )
                 for light in paint
             ),
+        )
+
+    async def animate_mood(self, theme: Theme) -> None:
+        """Start each light's mood effect; bulbs share one colour loop.
+
+        Args:
+            theme: Theme to animate
+        """
+        paints = await asyncio.gather(*(light._paints_moods() for light in self.lights))
+        lights = [light for light, ok in zip(self.lights, paints) if ok]
+        bulbs = [light for light in lights if _is_bulb(light)]
+        runner = effect_runner()
+        await asyncio.gather(
+            runner.start_together(bulbs, runner.palette_effect(list(theme.colors))),
+            *(light.animate_mood(theme) for light in lights if not _is_bulb(light)),
         )
 
     def invalidate_metadata_cache(self) -> None:

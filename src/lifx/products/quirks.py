@@ -302,6 +302,17 @@ def has_vertical_theme(pid: int) -> bool:
     return pid in VERTICAL_THEME_PRODUCTS
 
 
+#: Matrix products whose MOVE mood runs firmware MORPH instead. The app drops
+#: the Mirror from MOVE; on Spot and Path it runs an undocumented firmware
+#: COLOR_CYCLE, which this library does not send, so MORPH stands in.
+MOVE_AS_MORPH_PRODUCTS: frozenset[int] = frozenset({171, 173, 174, 221, 222, 267, 268})
+
+
+def moves_as_morph(pid: int) -> bool:
+    """Whether a MOVE mood runs firmware MORPH on this matrix product."""
+    return pid in MOVE_AS_MORPH_PRODUCTS
+
+
 def get_ceiling_layout(pid: int) -> CeilingComponentLayout | None:
     """Get component layout for a Ceiling product.
 

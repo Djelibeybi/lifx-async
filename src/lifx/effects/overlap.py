@@ -354,6 +354,15 @@ class OverlapRules:
         return any(light.serial in conductor._running for conductor in cls._live)
 
     @classmethod
+    def _whole_light_effect(cls, light: Light) -> LIFXEffect | None:
+        """The software effect running on a whole light, on any Conductor."""
+        for conductor in list(cls._live):
+            running = conductor._running.get(light.serial)
+            if running is not None:
+                return running.effect
+        return None
+
+    @classmethod
     async def _leave_every_run(
         cls, participant: Participant, *, restore_state: bool = True
     ) -> None:

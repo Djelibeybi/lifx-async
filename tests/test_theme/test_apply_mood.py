@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,6 +12,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.protocol.protocol_types import FirmwareEffect
 from lifx.theme import MoodGenerator, Theme
 from tests.test_theme.conftest import make_tile
 
@@ -28,6 +29,11 @@ def reading(light: Light, *, on: bool, brightness: float) -> None:
             "Test",
         )
     )
+
+
+def idle(light: MultiZoneLight) -> None:
+    """No firmware effect runs, so the mood paints rather than restarts."""
+    light.get_effect = AsyncMock(return_value=MagicMock(effect_type=FirmwareEffect.OFF))
 
 
 class TestBulbApplyMood:
@@ -57,6 +63,7 @@ class TestMultiZoneApplyMood:
         self, multizone_light: MultiZoneLight
     ) -> None:
         reading(multizone_light, on=True, brightness=1.0)
+        idle(multizone_light)
         multizone_light.set_all_color_zones = AsyncMock()
         multizone_light.get_zone_count = AsyncMock(return_value=4)
         await multizone_light.apply_mood(STRIPES)
@@ -69,6 +76,7 @@ class TestMultiZoneApplyMood:
 
     async def test_off_strip_fades_on(self, multizone_light: MultiZoneLight) -> None:
         reading(multizone_light, on=False, brightness=1.0)
+        idle(multizone_light)
         multizone_light.set_all_color_zones = AsyncMock()
         await multizone_light.apply_mood(STRIPES)
         assert multizone_light.set_all_color_zones.await_args.kwargs["duration"] == 0.0

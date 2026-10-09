@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
+from lifx.const import MOOD_BULB_FADE_SECONDS, MOOD_BULB_STEP_SECONDS
 from lifx.devices.component.effect_support import (
     component_writer,
     power_on_component,
@@ -21,6 +22,7 @@ from lifx.devices.component.effect_support import (
 from lifx.devices.component.participant import LightComponent
 from lifx.devices.effect_runner import register_effect_runner
 from lifx.effects.base import LIFXEffect
+from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.const import POWER_ON_TRANSITION_DURATION
 from lifx.effects.frame_effect import (
     FrameEffect,
@@ -44,6 +46,7 @@ from lifx.effects.participants import (
     resolve,
     ring_names,
 )
+from lifx.effects.scroll import EffectScroll
 from lifx.effects.state_manager import DeviceStateManager
 
 if TYPE_CHECKING:
@@ -893,6 +896,35 @@ class _LightEffects:
     def runs_whole_light(self, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light."""
         return Conductor._runs_whole_light(light)
+
+    def runs_mood_effect(self, light: Light) -> bool:
+        """Whether a mood software effect runs on a whole light."""
+        effect = Conductor._whole_light_effect(light)
+        return isinstance(effect, EffectScroll) or (
+            isinstance(effect, EffectColorloop) and effect.palette is not None
+        )
+
+    def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> LIFXEffect:
+        """The effect that scrolls a painted matrix mood."""
+        return EffectScroll(frame=frame, vertical=vertical)
+
+    def palette_effect(self, colors: list[HSBK]) -> LIFXEffect:
+        """Step through a mood's colours at the app's pace."""
+        return EffectColorloop(
+            palette=colors,
+            period=MOOD_BULB_STEP_SECONDS * len(colors),
+            transition=MOOD_BULB_FADE_SECONDS,
+        )
+
+    async def start_together(self, lights: Sequence[Light], effect: object) -> None:
+        """Start one software effect on the first light's Conductor."""
+        if not lights:
+            return
+        if not isinstance(effect, LIFXEffect):
+            raise TypeError(
+                f"start_together() takes a software effect, got {type(effect).__name__}"
+            )
+        await self.conductor_for(lights[0]).start(effect, list(lights))
 
 
 _LIGHT_EFFECTS = _LightEffects()

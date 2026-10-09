@@ -29,19 +29,25 @@ from lifx.const import (
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
     MAX_PALETTE_COLORS,
+    MOOD_MORPH_SPEED_SECONDS,
 )
 from lifx.devices.component.state import (
     derive_effect_palette,
     sample_effect_palette,
     validate_effect_palette,
 )
+from lifx.devices.effect_runner import effect_runner
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR, has_vertical_theme
+from lifx.products import (
+    SKY_EFFECT_MIN_FIRMWARE_MAJOR,
+    has_vertical_theme,
+    moves_as_morph,
+)
 from lifx.products import supports_sky_effect as firmware_supports_sky_effect
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
@@ -1672,6 +1678,47 @@ class MatrixLight(Light):
             await self.set_matrix_colors(
                 tile.tile_index, oriented, duration=round(duration * 1000)
             )
+
+    def _mood_dynamic_mode(self, theme: Theme) -> str:
+        """MOVE for a MOVE mood; MORPH for everything else, as the app does.
+
+        The Mirror, Spot and Path run MORPH for every mood.
+        """
+        if theme.resolved_dynamic_mode != "move":
+            return "morph"
+        if self.version and moves_as_morph(self.version.product):
+            return "morph"
+        return "move"
+
+    async def animate_mood(self, theme: Theme) -> None:
+        """Run firmware MORPH, or paint and scroll a MOVE mood."""
+        if not await self._paints_moods():
+            return
+        await effect_runner().leave_every_run(self, restore_state=False)
+        if self._mood_dynamic_mode(theme) == "morph":
+            await self.set_effect(
+                FirmwareEffect.MORPH,
+                speed=MOOD_MORPH_SPEED_SECONDS,
+                palette=list(theme.colors),
+            )
+            return
+        await self._stop_firmware_effect()
+        is_on, brightness = await self._mood_reading()
+        frames = await self._paint_mood(
+            theme, power_on=not is_on, brightness=brightness
+        )
+        # The app scrolls stripe moods down a vertical-theme light and shifts
+        # everything else sideways.
+        vertical = bool(
+            self.version and has_vertical_theme(self.version.product)
+        ) and theme.static_mode in ("solid", "solid_static", "solid_loop")
+        await self.start_effect(effect_runner().scroll_effect(frames, vertical))
+
+    async def _mood_effect_running(self) -> bool:
+        """Firmware MORPH, or a mood software effect."""
+        if await super()._mood_effect_running():
+            return True
+        return (await self.get_effect()).effect_type == FirmwareEffect.MORPH
 
     @property
     def device_chain(self) -> list[TileInfo] | None:
