@@ -235,8 +235,13 @@ path.
   is the one behaviour change to an existing API. Other effect types keep the
   16-colour limit, and `validate_effect_palette()` is unchanged for them.
 - **`EffectScroll`** (new, registry name `"scroll"`). Matrix lights only.
-  Every 1250 ms it rotates every row one cell toward higher column numbers and
-  writes one Set64 per tile with the step as the fade (capped at 2 s). It
+  Every 1250 ms it moves the image one cell and writes one Set64 per tile
+  with the step as the fade (capped at 2 s). On a vertical-theme light (every
+  Candle, the Tube) it moves whole rows one row toward higher row numbers,
+  down the light, the last row wrapping to the top; on every other matrix
+  light it rotates every row one cell toward higher column numbers. The
+  vertical scroll was observed on a Tube against the app: 5x11, effect OFF
+  (app-driven), one row per ~1.25 s, fading for most of each step. It writes one Set64 per tile with the step as the fade (capped at 2 s). It
   paints nothing itself. Its optional `frame=` keyword takes the per-tile
   colours to scroll; `animate_mood()` passes the `get_matrix_colors()` or
   `get_chain_colors()` output it has just painted, so nothing is read back.
