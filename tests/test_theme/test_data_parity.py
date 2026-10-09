@@ -84,6 +84,7 @@ def test_record_matches_source(slug: str) -> None:
     record = THEMES[slug]
 
     assert record.name == source["name"]
+    assert record.unicode_name == source.get("unicode_name")
     assert record.category == source["category"]
     assert record.disposition == source["disposition"]
     assert record.replaced_by == source.get("replaced_by")
@@ -98,10 +99,13 @@ def test_record_matches_source(slug: str) -> None:
 def test_alias_matches_source(alias: str, target: str) -> None:
     """Each source alias is generated as a rename pointing at its target."""
     record = THEMES[alias]
+    target_source = _BY_SLUG[target]
 
+    assert record.name == target_source["name"]
+    assert record.unicode_name == target_source.get("unicode_name")
     assert record.disposition == "renamed"
     assert record.replaced_by == target
-    assert record.colors == _source_colors(_BY_SLUG[target])
+    assert record.colors == _source_colors(target_source)
 
 
 @pytest.mark.parametrize("slug", sorted(_BY_SLUG))
@@ -112,6 +116,7 @@ def test_library_get_matches_source(slug: str) -> None:
 
     assert theme.slug == slug
     assert theme.name == source["name"]
+    assert theme.unicode_name == source.get("unicode_name", source["name"])
     assert theme.category == source["category"]
     assert theme.disposition == source["disposition"]
     assert theme.replaced_by == source.get("replaced_by")
