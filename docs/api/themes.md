@@ -83,14 +83,17 @@ colour matches the light's brightness.
 | Candle and Tube | Stripe moods paint as bands along the long axis, first colour at the bottom | A MOVE stripe mood scrolls the bands down the light; other moods as for a matrix light |
 
 The Mirror's still image is painted over its 4x13 buffer as a single matrix
-light, not ring by ring, with stripe moods as bands along its long axis. The app runs a firmware effect on Spot and Path that
-this library does not send, so MORPH stands in for it.
+light, not ring by ring, with stripe moods as bands along its long axis. The
+app runs a firmware effect on Spot and Path that this library does not send, so
+MORPH stands in for it.
 
 A Tile chain is painted as one image in chain order, as the app does, so tiles
 arranged in an L or a stack show the image in chain order rather than
 following their arrangement. A Tile whose accelerometer reports a rotation
-(left, right or upside down) is remapped; FaceUp and FaceDown are not. A
-chain scrolls as one canvas, in chain order.
+(left, right or upside down) is remapped; FaceUp and FaceDown are not. Only
+chain-capable products (the Tile) have their reported orientation applied;
+other matrix products, such as the Luna, are fixed panels whose accelerometer
+readings are not used. A chain scrolls as one canvas, in chain order.
 
 If a light is already running a mood effect, `apply_mood()` restarts that
 effect with the new theme instead of painting a still image.
