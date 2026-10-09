@@ -9,7 +9,7 @@ that writes it both import from here, so neither can drift from the other.
 
 Importable but deliberately absent from ``lifx.theme.__all__`` and the published
 API docs, so these signatures can change without a major version. Same treatment
-as ``lifx.theme.canvas.Canvas``.
+as ``lifx.theme.generators.canvas.Canvas``.
 """
 
 from __future__ import annotations

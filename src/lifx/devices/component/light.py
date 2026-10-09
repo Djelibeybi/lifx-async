@@ -24,7 +24,7 @@ from lifx.devices.component.participant import ComponentName, LightComponent
 from lifx.devices.component.state import Pending, hsk_matches, is_dark
 from lifx.devices.effect_runner import effect_runner
 from lifx.devices.light import wait_until_off
-from lifx.devices.matrix import MatrixLight
+from lifx.devices.matrix import MatrixLight, TileInfo
 from lifx.exceptions import LifxError
 
 if TYPE_CHECKING:
@@ -945,3 +945,24 @@ class ComponentMatrixLight(MatrixLight):
             await self.set_power(True, duration)
         else:
             await super().apply_theme(theme, power_on=False, duration=duration)
+
+    async def _mood_reading(self) -> tuple[bool, float]:
+        """Trust a recent power write, as every other write here does."""
+        color, _power, _label = await self.get_color()
+        brightness = await self._shown_brightness(color.brightness)
+        return await self._mood_power(), brightness
+
+    async def _mood_power(self) -> bool:
+        """Trust a recent power write, as every other write here does."""
+        return await self._power_for_update() > 0
+
+    async def _write_mood_frames(
+        self,
+        tiles: list[TileInfo],
+        frames: list[list[HSBK]],
+        duration: float,
+        *,
+        has_chain: bool,
+    ) -> None:
+        """Write the one shared tile through the component-aware path."""
+        await self._write_tile(frames[0], duration)

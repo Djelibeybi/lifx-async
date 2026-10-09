@@ -262,7 +262,7 @@ gh workflow run docs.yml
 
 6. **Effects Layer** (`src/lifx/effects/`)
 
-   - 26 software effects (aurora, flicker, plasma, rainbow, twinkle, etc.)
+   - 27 software effects (aurora, flicker, plasma, rainbow, twinkle, etc.)
    - `base.py`: Base effect class with frame generation interface
    - `registry.py`: Effect registry for discovering available effects by name
    - `state_manager.py`: Effect state management for running effects on devices
@@ -273,8 +273,9 @@ gh workflow run docs.yml
 
    - `theme.py`: Theme definitions (named color palettes)
    - `library.py`: Built-in theme library
-   - `generators.py`: Theme-based color generators for effects
-   - `canvas.py`: Canvas abstraction for applying themes to device layouts
+   - `generators/theme.py`: Gradient generators for `apply_theme()`
+   - `generators/mood.py`: `MoodGenerator`, the LIFX app's mood recipes for `apply_mood()` and `animate_mood()`
+   - `generators/canvas.py`: Internal `Canvas` rendering primitive
 
 8. **Utilities**
 
@@ -336,6 +337,7 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 - **Serial vs MAC**: Serial number usually matches MAC address. The one exception is firmware with `version_major == 3 and version_minor >= 70`, whose MAC is the serial with the final octet incremented (wrapping at 256). Both components are compared as integers: minor `9` is *below* minor `70`, so treating the version as a decimal misclassifies 3.9. Earlier 3.x builds (e.g. 3.50) match their serial. MAC calculation logic is in `devices/base.py` and the rule is pinned by `tests/test_devices/test_mac_address.py`.
 - **HSBK dual formats**: User-facing `HSBK` uses float (hue 0-360, sat/bright 0.0-1.0, kelvin 1500-9000). Protocol/animation layer uses raw uint16 (0-65535 for H/S/B). Don't mix them.
 - **`user_x`/`user_y` are not pixels**: A chain reports tile positions in tile-position units where 1.0 is always **8 pixels** — the width of the original Tile — regardless of the reporting tile's own size. Photons proves the constant twice: `rearrange.py` lays parts out with `user_x += part.width / 8`, and the arranger converts a dragged pixel back with `new_user_x / 8`. Scaling by the tile's own width instead is wrong for any mixed-geometry chain. `user_y` also grows **upwards** while canvas rows grow downwards, so it must be negated. One helper owns both rules — `lifx/geometry.py` (`TILE_POSITION_UNIT_PIXELS`, `tile_position_to_pixels()`, `tile_origin_pixels()`) — used by `MatrixLight.apply_theme()`, `MatrixGenerator.from_tiles()` and `FrameBuffer._for_multi_tile()`. It rounds where photons truncates, deliberately: the value only picks a canvas pixel and never goes on the wire. Halves round away from zero, not to even, so two tiles a pixel apart never collapse onto one origin. Tile *sizes* are equally not-8x8 — Candle is 5x6, Ceiling reports 16x8 — so `Canvas.add_points_for_tile()` and `Canvas.points_for_tile()` require explicit width/height and have no defaults. `Canvas` is an internal rendering primitive: it is importable but deliberately absent from `lifx.theme.__all__` and the published API docs, so its signatures can change without a major version.
+- **Moods**: `apply_mood()` and `animate_mood()` reproduce the LIFX app's mood paint and Dynamic toggle. Two hand-maintained product sets in `lifx/products/quirks.py` steer them: `VERTICAL_THEME_PRODUCTS` (stripe moods paint along the long axis and a MOVE stripe mood scrolls down; every Candle, the Tube and the Mirror) and `MOVE_AS_MORPH_PRODUCTS` (Mirror, Spot and Path run firmware MORPH for MOVE moods). Neither is in `products.json`. Only a chain-capable product (the Tile) has its reported orientation applied; other matrix products' accelerometer readings are not used.
 - **`get_color()` returns a triple**: `(color, power, label)` — most efficient single-request way to get color + power state
 - **Ambient light sensor**: Returns 0.0 for both "no sensor" and "complete darkness". Light must be off for accurate readings.
 - **High-frequency updates**: Use the Animation Layer (`src/lifx/animation/`) for performance-critical frame delivery rather than calling device methods directly.
@@ -364,7 +366,7 @@ The `discover_devices()` function implements DoS protection through:
 - **Network Layer**: 183 tests (transport, discovery, connection, message, mDNS, async generator requests)
 - **Device Layer**: 375 tests (base, light, ceiling, hev, infrared, multizone, matrix, state management, MAC address)
 - **API Layer**: 63 tests (discovery, batch operations, organization, themes, error handling)
-- **Effects Layer**: 1249 tests (26 built-in effects, registry, state manager, integration, capability filtering)
+- **Effects Layer**: 1249 tests (27 built-in effects, registry, state manager, integration, capability filtering)
 - **Theme Layer**: 146 tests (themes, canvas, generators, library, apply_theme)
 - **Animation Layer**: 123 tests (animator, framebuffer, packets, orientation)
 - **Utilities**: 127 tests (color conversion, product registry, RGB roundtrip)

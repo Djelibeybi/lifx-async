@@ -31,12 +31,15 @@ Example:
 
 from __future__ import annotations
 
-from lifx.theme.canvas import Canvas as Canvas  # noqa: PLC0414 (internal re-export)
 from lifx.theme.data import DynamicMode, StaticMode
 from lifx.theme.generators import (
     MatrixGenerator,
+    MoodGenerator,
     MultiZoneGenerator,
     SingleZoneGenerator,
+)
+from lifx.theme.generators.canvas import (
+    Canvas as Canvas,  # noqa: PLC0414 (internal re-export)
 )
 from lifx.theme.library import ThemeLibrary, get_theme
 from lifx.theme.theme import Theme
@@ -48,6 +51,7 @@ from lifx.theme.theme import Theme
 __all__ = [
     "DynamicMode",
     "MatrixGenerator",
+    "MoodGenerator",
     "MultiZoneGenerator",
     "SingleZoneGenerator",
     "StaticMode",

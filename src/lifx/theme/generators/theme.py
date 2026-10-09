@@ -10,7 +10,7 @@ from collections.abc import Iterable
 
 from lifx.color import HSBK
 from lifx.geometry import TilePlacement, tile_origin_pixels
-from lifx.theme.canvas import Canvas
+from lifx.theme.generators.canvas import Canvas
 from lifx.theme.theme import Theme
 
 

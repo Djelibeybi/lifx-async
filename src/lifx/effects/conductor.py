@@ -9,18 +9,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import weakref
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from lifx.animation.animator import AnimatorWriter
 from lifx.color import HSBK
+from lifx.const import MOOD_BULB_FADE_SECONDS, MOOD_BULB_STEP_SECONDS
 from lifx.devices.component.effect_support import (
     component_writer,
     power_on_component,
 )
 from lifx.devices.component.participant import LightComponent
-from lifx.devices.effect_runner import register_effect_runner
+from lifx.devices.effect_runner import PriorState, register_effect_runner
 from lifx.effects.base import LIFXEffect
+from lifx.effects.colorloop import EffectColorloop
 from lifx.effects.const import POWER_ON_TRANSITION_DURATION
 from lifx.effects.frame_effect import (
     FrameEffect,
@@ -44,6 +46,7 @@ from lifx.effects.participants import (
     resolve,
     ring_names,
 )
+from lifx.effects.scroll import EffectScroll
 from lifx.effects.state_manager import DeviceStateManager
 
 if TYPE_CHECKING:
@@ -205,6 +208,31 @@ class Conductor(OverlapRules):
             await conductor.start(effect, group.lights)
             ```
         """
+        await self._start(
+            effect, participants, enable_thread=enable_thread, supplied={}
+        )
+
+    async def _start(
+        self,
+        effect: LIFXEffect,
+        participants: Sequence[Participant],
+        *,
+        enable_thread: bool,
+        supplied: Mapping[ParticipantKey, PreState],
+    ) -> None:
+        """Start an effect, as ``start()`` does, with supplied prior states.
+
+        A participant that inherits no prior state from a run it is already
+        part of takes its supplied one, if any, rather than a capture now.
+        A mood animation supplies the state it captured before painting, so
+        nothing is read back mid-fade.
+
+        Args:
+            effect: The effect instance to execute
+            participants: Lights and light components to apply effect to
+            enable_thread: Stream frames to lights evidenced as Thread anyway
+            supplied: Prior states by participant key
+        """
         _refuse_thread_frames(
             effect, participants, "Conductor.start()", enable_thread=enable_thread
         )
@@ -246,6 +274,8 @@ class Conductor(OverlapRules):
                 key = participant_key(light, component)
                 if key in inherited:
                     prestates[key] = inherited[key]
+                elif key in supplied:
+                    prestates[key] = supplied[key]
                 else:
                     to_capture.append((key, light))
 
@@ -573,6 +603,26 @@ class Conductor(OverlapRules):
         if to_restore:
             await asyncio.gather(*(self._restore(*item) for item in to_restore))
 
+    async def _take_prestate(self, light: Light) -> PreState:
+        """Take a light out of every run, unrestored, and return its prior state.
+
+        As ``start()`` does for a new effect: the light inherits the original
+        prior state of the run it leaves, or has its state captured now, and
+        takes over the original prior state of its light components' runs.
+
+        Args:
+            light: The light leaving its runs
+
+        Returns:
+            The state stopping whatever the light runs next restores
+        """
+        inherited, components = await self._take_over(None, [light])
+        prestates = dict(inherited)
+        if light.serial not in prestates:
+            prestates[light.serial] = await self._state_manager.capture_state(light)
+        inherit_components(prestates, components)
+        return prestates[light.serial]
+
     async def _restore(
         self, light: Light, component: ComponentName | None, prestate: PreState
     ) -> None:
@@ -859,8 +909,11 @@ class _LightEffects:
         effect: object,
         *,
         enable_thread: bool = False,
+        prestate: PriorState | None = None,
     ) -> None:
         """Start a software effect on one light or light component alone.
+
+        ``prestate`` is used only when the participant inherits none.
 
         Raises:
             TypeError: If ``effect`` is not a software effect, or a light
@@ -880,8 +933,13 @@ class _LightEffects:
         _refuse_thread_frames(
             effect, [participant], "start_effect()", enable_thread=enable_thread
         )
-        await self.conductor_for(resolve(participant)[0]).start(
-            effect, [participant], enable_thread=enable_thread
+        supplied = (
+            {key_of(participant): cast("PreState", prestate)}
+            if prestate is not None
+            else {}
+        )
+        await self.conductor_for(resolve(participant)[0])._start(
+            effect, [participant], enable_thread=enable_thread, supplied=supplied
         )
 
     async def leave_every_run(
@@ -890,9 +948,56 @@ class _LightEffects:
         """Remove a light or light component from every run it is part of."""
         await Conductor._leave_every_run(participant, restore_state=restore_state)
 
+    async def take_prestate(self, light: Light) -> PriorState:
+        """Take a light out of every run, unrestored, and return its prior state."""
+        return await self.conductor_for(light)._take_prestate(light)
+
+    async def restore_prestate(self, light: Light, prestate: PriorState) -> None:
+        """Put back a prior state ``take_prestate()`` returned."""
+        await self.conductor_for(light)._restore(
+            light, None, cast("PreState", prestate)
+        )
+
     def runs_whole_light(self, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light."""
         return Conductor._runs_whole_light(light)
+
+    def runs_mood_effect(self, light: Light) -> bool:
+        """Whether a mood software effect runs on a whole light."""
+        effect = Conductor._whole_light_effect(light)
+        return isinstance(effect, EffectScroll) or (
+            isinstance(effect, EffectColorloop) and effect.palette is not None
+        )
+
+    def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> LIFXEffect:
+        """The effect that scrolls a painted matrix mood."""
+        return EffectScroll(frame=frame, vertical=vertical)
+
+    def palette_effect(self, colors: list[HSBK]) -> LIFXEffect:
+        """Step through a mood's colours at the app's pace."""
+        return EffectColorloop(
+            palette=colors,
+            period=MOOD_BULB_STEP_SECONDS * len(colors),
+            transition=MOOD_BULB_FADE_SECONDS,
+        )
+
+    async def start_together(
+        self,
+        lights: Sequence[Light],
+        effect: LIFXEffect,
+        *,
+        prestates: Sequence[PriorState],
+    ) -> None:
+        """Start one software effect on the first light's Conductor."""
+        if not lights:
+            return
+        supplied = {
+            key_of(light): cast("PreState", prestate)
+            for light, prestate in zip(lights, prestates, strict=True)
+        }
+        await self.conductor_for(lights[0])._start(
+            effect, list(lights), enable_thread=False, supplied=supplied
+        )
 
 
 _LIGHT_EFFECTS = _LightEffects()

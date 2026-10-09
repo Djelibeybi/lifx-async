@@ -273,6 +273,67 @@ async def activate_scene(scene: str):
 # await activate_scene("party")
 ```
 
+## Moods: Paint Like the LIFX App
+
+`apply_theme()` renders a theme as a gradient. To get what the LIFX app shows
+for a theme, use `apply_mood()` for the still image and `animate_mood()` for
+the effect the app's Dynamic toggle starts. Both take only the theme.
+
+```python
+from lifx import DeviceGroup
+from lifx.theme import get_theme
+
+group = DeviceGroup(devices)
+van_gogh = get_theme("van_gogh")
+
+await group.apply_mood(van_gogh)    # the still image, as a tap in the app
+await group.animate_mood(van_gogh)  # the Dynamic toggle
+```
+
+Stop the animation by calling `stop_effect()` on each light of the group:
+`DeviceGroup` has no `stop_effect()`. Stopping puts back what each light
+showed before its mood animation started, power included, so a light that was
+off goes back off. Starting another mood on an animating light keeps that
+original state, and a second `stop_effect()` restores nothing more.
+
+```python
+for light in group.lights:
+    await light.stop_effect()
+```
+
+Moods use the app's own timings and rules:
+
+- The change fades in over 0.3 seconds.
+- `apply_mood()` powers lights on only when every targeted light is off.
+  `animate_mood()` turns on every light it targets.
+- The mood is rescaled so its brightest colour matches the light's
+  brightness. So are the colours an animation steps through; bulbs in one
+  `DeviceGroup` share a loop rescaled to the brightest of them.
+- Calling `apply_mood()` on a light that is already running a mood effect
+  restarts that effect with the new theme.
+- `apply_mood()` does not stop an effect that is not a mood, such as firmware
+  FLAME or the software Rainbow, just as `apply_theme()` does not.
+
+What a mood does depends on the light:
+
+- **Bulbs** show one of the theme's colours. Animated, they run a Colour Loop
+  through the theme's colours, and bulbs in one `DeviceGroup` share one loop.
+- **Strips** show the mood across their zones. Animated, they run firmware
+  MOVE after painting the still image.
+- **Matrix lights** show the mood's image. Animated, a MORPH mood runs
+  firmware MORPH and a MOVE mood runs `EffectScroll`, which moves the image
+  one column every 1.25 seconds.
+- **Spot, Path and the Mirror** use firmware MORPH for every mood. The Mirror
+  is painted as a single matrix light over its 4x13 buffer, not ring by ring.
+- **Every Candle, the Tube and the Mirror** paint stripe moods as bands along
+  the long axis, with the first colour at the bottom. On every Candle and the
+  Tube, a MOVE stripe mood scrolls the bands down the light; blended and grid
+  moods scroll sideways. The Mirror runs MORPH instead.
+- **A Tile chain** is painted and scrolled as one canvas in chain order,
+  whatever shape the tiles are arranged in. A Tile whose accelerometer
+  reports a rotation (left, right or upside down) is remapped; FaceUp and
+  FaceDown are not.
+
 ## Custom Themes
 
 ### Create Branded Theme

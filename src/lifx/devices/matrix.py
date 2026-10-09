@@ -15,6 +15,7 @@ Terminology:
 from __future__ import annotations
 
 import logging
+import random
 import time
 from dataclasses import InitVar, asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
@@ -27,19 +28,27 @@ from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
+    MAX_PALETTE_COLORS,
+    MOOD_FADE_SECONDS,
+    MOOD_MORPH_SPEED_SECONDS,
 )
 from lifx.devices.component.state import (
     derive_effect_palette,
     sample_effect_palette,
     validate_effect_palette,
 )
+from lifx.devices.effect_runner import PriorState, effect_runner
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.products import SKY_EFFECT_MIN_FIRMWARE_MAJOR
+from lifx.products import (
+    SKY_EFFECT_MIN_FIRMWARE_MAJOR,
+    has_vertical_theme,
+    moves_as_morph,
+)
 from lifx.products import supports_sky_effect as firmware_supports_sky_effect
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
@@ -53,6 +62,7 @@ from lifx.protocol.protocol_types import (
 from lifx.protocol.protocol_types import (
     TileStateDevice as LifxProtocolTileDevice,
 )
+from lifx.theme.generators.mood import MoodGenerator
 
 if TYPE_CHECKING:
     from lifx.theme import Theme
@@ -732,6 +742,30 @@ class MatrixLight(Light):
 
         return all_colors
 
+    async def _shown_brightness(self, reported: float) -> float:
+        """The brightest pixel on the chain, since GetColor reports pixel 0 alone.
+
+        Only each tile's first ``width * height`` colours count: a tile's
+        buffer can be padded past its pixels (the Mirror's 4x13 is 64 long).
+        """
+        return self._brightest_or(
+            self._shown_colors(await self.get_all_tile_colors()), reported
+        )
+
+    def _prior_brightness(self, prestate: PriorState) -> float:
+        """The brightest pixel shown before the animation."""
+        return self._brightest_or(
+            self._shown_colors(prestate.tile_colors or []), prestate.color.brightness
+        )
+
+    def _shown_colors(self, all_colors: list[list[HSBK]]) -> list[HSBK]:
+        """Each tile's pixels, without the padding past ``width * height``."""
+        return [
+            color
+            for tile, colors in zip(self._device_chain or [], all_colors)
+            for color in colors[: tile.width * tile.height]
+        ]
+
     @staticmethod
     def _can_batch_chain_fetch(device_chain: list[TileInfo]) -> bool:
         """Return whether the whole chain can be read with one Get64.
@@ -1351,8 +1385,11 @@ class MatrixLight(Light):
                 except for COLOR_SWEEP and SKY with a non-zero ``duration``,
                 where 0 plays the effect once across ``duration``
             duration: Total effect duration in nanoseconds (0 for infinite)
-            palette: Color palette for the effect (max 16 colors). An explicit
-                palette is always sent exactly as given, with no extra read.
+            palette: Colour palette for the effect. For MORPH, a palette longer
+                than 16 colours is reduced the way the LIFX app reduces a mood:
+                by the area each run of colours covers, then shuffled. Other
+                effects take at most 16. An explicit palette is sent as given (bar
+                that MORPH reduction), with no extra read.
                 ``None`` behaves differently for MORPH: it triggers one
                 ``get_all_tile_colors()`` read of the device's own colours
                 before the effect is sent, a small start-up latency. A
@@ -1444,6 +1481,16 @@ class MatrixLight(Light):
         else:
             speed_ms = 3000
 
+        if (
+            effect_type == FirmwareEffect.MORPH
+            and palette is not None
+            and len(palette) > MAX_PALETTE_COLORS
+        ):
+            # The app's rule: pick the colours by run weight, then shuffle.
+            # Selection is deterministic; only the order varies.
+            palette = MoodGenerator.morph_palette(palette)
+            random.shuffle(palette)
+
         # Create and validate MatrixEffect
         effect = MatrixEffect(
             effect_type=effect_type,
@@ -1508,12 +1555,13 @@ class MatrixLight(Light):
         Every device is rendered at its own reported pixel geometry, so non-8x8
         products (Candle 5x6, Ceiling 16x8) get the right number of colours.
 
-        Position and orientation are used only on a chain-capable device — the
-        LIFX Tile, the sole product that is arranged into a layout and the sole
-        product with an accelerometer. There, each tile is placed on the canvas
-        with :func:`lifx.geometry.tile_origin_pixels` so it gets a distinct slice
-        of the theme, and a physically rotated panel is remapped to match. Every
-        other matrix device is a single fixed panel, so it renders at the canvas
+        Position and orientation are used only on a chain-capable device: the
+        LIFX Tile, the only product that is arranged into a layout and the only
+        one whose reported orientation is applied. There, each tile is placed
+        on the canvas with :func:`lifx.geometry.tile_origin_pixels` so it gets
+        a distinct slice of the theme, and a physically rotated panel is
+        remapped to match. Every other matrix device is a single fixed panel
+        whose accelerometer readings are not used, so it renders at the canvas
         origin and is never remapped.
 
         Args:
@@ -1537,10 +1585,12 @@ class MatrixLight(Light):
         if not tiles:
             return
 
-        # The LIFX Tile is the only chain-capable product, and the only one with
-        # an accelerometer. Every other matrix device is a single fixed panel: it
-        # is never arranged relative to anything, and it returns whatever its
-        # firmware leaves in the position and accel fields. Reading those as a
+        # The LIFX Tile is the only chain-capable product, and the only one whose
+        # reported orientation is applied. Every other matrix device is a single
+        # fixed panel whose accelerometer readings are not used (a Luna, for
+        # example, reports RotatedLeft when standing upright): it is never
+        # arranged relative to anything, and it returns whatever its firmware
+        # leaves in the position and accel fields. Reading those as a
         # layout or a rotation would scatter and scramble the theme, so both are
         # used only for a chain. FrameBuffer.for_matrix() gates the same way.
         await self.ensure_capabilities()
@@ -1580,9 +1630,10 @@ class MatrixLight(Light):
     def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
         """Remap row-major canvas colours into the tile's physical orientation.
 
-        Only meaningful for chain-capable devices: the LIFX Tile is the sole
-        product with an accelerometer, so it is the only one whose reported
-        orientation is real. Callers must gate on ``has_chain``.
+        Only meaningful for chain-capable devices: the LIFX Tile is the only
+        product whose reported orientation is applied. Other matrix products
+        are fixed panels whose accelerometer readings are not used. Callers
+        must gate on ``has_chain``.
 
         Args:
             tile: Tile the colours are destined for
@@ -1602,6 +1653,150 @@ class MatrixLight(Light):
 
         lut = build_orientation_lut(tile.width, tile.height, orientation)
         return [colors[src_idx] for src_idx in lut]
+
+    @staticmethod
+    def _unorient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Map colours read back from a tile into row-major canvas order.
+
+        The inverse of ``_orient_tile_colors``: a Tile reports its physical
+        buffer, so a rotated Tile's readback is put back into the order a
+        caller painted it in. Callers must gate on ``has_chain``.
+
+        Args:
+            tile: Tile the colours were read from
+            colors: Colours in the tile's physical order, exactly
+                ``width * height`` of them
+
+        Returns:
+            The colours in row-major screen order, or the input unchanged when
+            the tile is upright.
+        """
+        orientation = Orientation.from_string(tile.nearest_orientation)
+        if orientation == Orientation.RIGHT_SIDE_UP:
+            return colors
+
+        lut = build_orientation_lut(tile.width, tile.height, orientation)
+        logical = list(colors)
+        for dst_idx, src_idx in enumerate(lut):
+            logical[src_idx] = colors[dst_idx]
+        return logical
+
+    async def _paint_mood(
+        self,
+        theme: Theme,
+        *,
+        power_on: bool,
+        brightness: float,
+        bulb_color: HSBK | None = None,
+    ) -> list[list[HSBK]]:
+        """Paint the mood across the light's tiles, in chain order.
+
+        A chain is one canvas in chain order, as the app paints it; tile
+        positions are ignored. A physically rotated Tile is still remapped
+        so the image is not turned with it.
+        """
+        tiles = await self.get_device_chain()
+        if not tiles:
+            return []
+        await self.ensure_capabilities()
+        has_chain = bool(self.capabilities and self.capabilities.has_chain)
+        generator = MoodGenerator(theme)
+        if len(tiles) > 1:
+            first = tiles[0]
+            frames = generator.get_chain_colors(
+                len(tiles), first.width, first.height, brightness
+            )
+        else:
+            vertical = bool(self.version and has_vertical_theme(self.version.product))
+            frames = [
+                generator.get_matrix_colors(
+                    tiles[0].width, tiles[0].height, brightness, vertical=vertical
+                )
+            ]
+
+        async def write(duration: float) -> None:
+            await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
+
+        await self._write_mood(write, power_on)
+        return frames
+
+    async def _write_mood_frames(
+        self,
+        tiles: list[TileInfo],
+        frames: list[list[HSBK]],
+        duration: float,
+        *,
+        has_chain: bool,
+    ) -> None:
+        """Write one frame per tile, remapping a rotated Tile."""
+        for tile, colors in zip(tiles, frames, strict=True):
+            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            await self.set_matrix_colors(
+                tile.tile_index, oriented, duration=round(duration * 1000)
+            )
+
+    def _mood_dynamic_mode(self, theme: Theme) -> str:
+        """MOVE for a MOVE mood; MORPH for everything else, as the app does.
+
+        The Mirror, Spot and Path run MORPH for every mood.
+        """
+        if theme.resolved_dynamic_mode != "move":
+            return "morph"
+        if self.version and moves_as_morph(self.version.product):
+            return "morph"
+        return "move"
+
+    async def animate_mood(self, theme: Theme) -> None:
+        """Run firmware MORPH, or paint and scroll a MOVE mood.
+
+        The prior state is captured before anything is painted, and handed to
+        the scroll, so its tiles are never read back mid-fade.
+        """
+        if not await self._paints_moods():
+            return
+        prestate = await self._begin_mood_animation()
+        brightness = self._prior_brightness(prestate)
+        is_on = await self._mood_power()
+        if self._mood_dynamic_mode(theme) == "morph":
+            # Held here, since a firmware effect has no run to hold it.
+            self._mood_prestate = prestate
+            await self.set_effect(
+                FirmwareEffect.MORPH,
+                speed=MOOD_MORPH_SPEED_SECONDS,
+                palette=MoodGenerator(theme).get_palette(brightness),
+            )
+            if not is_on:
+                await self.set_power(True, duration=MOOD_FADE_SECONDS)
+            return
+        await self._stop_firmware_effect()
+        frames = await self._paint_mood(
+            theme, power_on=not is_on, brightness=brightness
+        )
+        if not frames:
+            # A light reporting no tiles has nothing to scroll, but still
+            # turns on, and stop_effect() still restores it.
+            self._mood_prestate = prestate
+            if not is_on:
+                await self.set_power(True, duration=MOOD_FADE_SECONDS)
+            return
+        # The app scrolls stripe moods down a vertical-theme light and shifts
+        # everything else sideways.
+        vertical = bool(
+            self.version and has_vertical_theme(self.version.product)
+        ) and theme.static_mode in ("solid", "solid_static", "solid_loop")
+        runner = effect_runner()
+        await runner.start(
+            self, runner.scroll_effect(frames, vertical), prestate=prestate
+        )
+
+    async def _mood_effect_running(self) -> bool:
+        """Firmware MORPH, or a mood software effect."""
+        if await super()._mood_effect_running():
+            return True
+        try:
+            return (await self.get_effect()).effect_type == FirmwareEffect.MORPH
+        except LifxUnsupportedCommandError:
+            return False  # a light that rejects GetEffect runs no firmware effect
 
     @property
     def device_chain(self) -> list[TileInfo] | None:

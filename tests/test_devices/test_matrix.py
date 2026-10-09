@@ -1679,3 +1679,35 @@ class TestDroppedTileWriteIsRetried:
         assert [c.to_protocol() for c in retrieved] == [
             c.to_protocol() for c in colours
         ]
+
+
+class TestMorphLongPalette:
+    """MORPH reduces a palette over 16 colours the way the LIFX app does."""
+
+    # Product 176 (Ceiling) has the matrix capability.
+    MATRIX_PRODUCT = 176
+
+    @classmethod
+    def _matrix_light(cls, mock_device_factory) -> MatrixLight:
+        matrix = mock_device_factory(MatrixLight)
+        matrix._capabilities = get_product(cls.MATRIX_PRODUCT)
+        return matrix
+
+    async def test_morph_reduces_a_long_palette(self, mock_device_factory) -> None:
+        matrix_light = self._matrix_light(mock_device_factory)
+        red = HSBK(0, 1.0, 1.0, 3500)
+        blue = HSBK(240, 1.0, 1.0, 3500)
+        await matrix_light.set_effect(
+            FirmwareEffect.MORPH, speed=3.0, palette=[red] * 48 + [blue] * 16
+        )
+        effect = matrix_light._tile_effect
+        assert len(effect.palette) == 16
+        assert sorted(c.hue for c in effect.palette) == [0] * 12 + [240] * 4
+
+    async def test_morph_keeps_a_short_palette_in_order(
+        self, mock_device_factory
+    ) -> None:
+        matrix_light = self._matrix_light(mock_device_factory)
+        palette = [HSBK(h, 1.0, 1.0, 3500) for h in (0, 120, 240)]
+        await matrix_light.set_effect(FirmwareEffect.MORPH, speed=3.0, palette=palette)
+        assert matrix_light._tile_effect.palette == palette

@@ -8,7 +8,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import math
 import random
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from lifx.animation.animator import AnimatorWriter
@@ -69,6 +71,11 @@ class EffectColorloop(FrameEffect):
     the firmware follows that fade a step at a time; no write turns colour
     loop's hue further than ``change``.
 
+    With ``palette``, it steps through those colours instead, one per step,
+    each light starting one colour further on unless synchronised. With a
+    palette, ``spread`` acts only as an on/off switch (zero starts every light
+    on the same colour) and ``change`` is ignored.
+
     Attributes:
         period: Seconds per full cycle (default 60)
         change: Hue degrees to shift per step (default 20)
@@ -115,6 +122,7 @@ class EffectColorloop(FrameEffect):
         saturation_max: float = 1.0,
         transition: float | None = None,
         synchronized: bool = False,
+        palette: Sequence[HSBK] | None = None,
     ) -> None:
         """Initialize colorloop effect.
 
@@ -135,6 +143,9 @@ class EffectColorloop(FrameEffect):
                          simultaneously with consistent transitions. When False,
                          lights are spread across the hue spectrum based on
                          'spread' parameter (default False).
+            palette: Colours to step through instead of turning the hue.
+                     ``period`` is then the seconds for one pass through the
+                     palette and ``change`` is ignored.
 
         Raises:
             ValueError: If parameters are out of valid ranges
@@ -164,7 +175,14 @@ class EffectColorloop(FrameEffect):
         # A light gets one write per step, but the loop still runs at 20 FPS
         # at least: it notices each step on time, and a light component that
         # shares its tile with another effect is drawn frame by frame.
-        step = period * change / 360.0
+        if palette is not None and not palette:
+            raise ValueError("palette must contain at least one color")
+        self.palette: list[HSBK] | None = list(palette) if palette is not None else None
+        step = (
+            period / len(self.palette)
+            if self.palette is not None
+            else period * change / 360.0
+        )
         fps = max(20.0, 1.0 / step)
 
         super().__init__(power_on=power_on, fps=fps, duration=None)
@@ -360,6 +378,20 @@ class EffectColorloop(FrameEffect):
         Returns:
             List of HSBK colors (length equals ctx.pixel_count)
         """
+        if self.palette is not None:
+            # A small epsilon keeps a step boundary from reading as the step before.
+            step_index = math.floor(ctx.elapsed_s / self._step + 1e-9)
+            offset = 0 if self.synchronized or not self.spread else ctx.device_index
+            color = self.palette[(step_index + offset) % len(self.palette)]
+            if self.brightness is not None:
+                color = HSBK(
+                    hue=color.hue,
+                    saturation=color.saturation,
+                    brightness=self.brightness,
+                    kelvin=color.kelvin,
+                )
+            return [color] * ctx.pixel_count
+
         if not self._initial_colors:
             # Fallback if setup hasn't run yet
             return [
@@ -484,7 +516,9 @@ class EffectColorloop(FrameEffect):
     async def from_poweroff_hsbk(self, _light: Light) -> HSBK:
         """Return startup color when light is powered off.
 
-        For colorloop, start with random hue and target brightness.
+        For colorloop, start with random hue and target brightness. With a
+        ``palette``, start dark on its first colour, so no stray colour
+        flashes before the first step.
 
         Args:
             _light: The device being powered on (unused)
@@ -492,6 +526,14 @@ class EffectColorloop(FrameEffect):
         Returns:
             HSBK color to use as startup color
         """
+        if self.palette is not None:
+            first = self.palette[0]
+            return HSBK(
+                hue=first.hue,
+                saturation=first.saturation,
+                brightness=0.0,
+                kelvin=first.kelvin,
+            )
         return HSBK(
             hue=random.randint(0, 360),
             saturation=random.uniform(self.saturation_min, self.saturation_max),

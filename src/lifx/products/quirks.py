@@ -282,6 +282,37 @@ def is_mirror_product(pid: int) -> bool:
     return pid in MIRROR_LAYOUTS
 
 
+#: Products the LIFX app paints with its vertical-theme capability, so stripe
+#: moods run along the long axis. The capability lives in the app's own
+#: product table, not in products.json, so this set is maintained by hand.
+VERTICAL_THEME_PRODUCTS: frozenset[int] = frozenset(
+    {57, 68, 137, 138, 185, 186, 215, 216, 217, 218, 267, 268}
+)
+
+
+def has_vertical_theme(pid: int) -> bool:
+    """Whether the LIFX app paints stripe moods along this product's long axis.
+
+    Args:
+        pid: Product ID
+
+    Returns:
+        True for every Candle, the Tube and the Mirror
+    """
+    return pid in VERTICAL_THEME_PRODUCTS
+
+
+#: Matrix products whose MOVE mood runs firmware MORPH instead. The app drops
+#: the Mirror from MOVE; on Spot and Path it runs an undocumented firmware
+#: COLOR_CYCLE, which this library does not send, so MORPH stands in.
+MOVE_AS_MORPH_PRODUCTS: frozenset[int] = frozenset({171, 173, 174, 221, 222, 267, 268})
+
+
+def moves_as_morph(pid: int) -> bool:
+    """Whether a MOVE mood runs firmware MORPH on this matrix product."""
+    return pid in MOVE_AS_MORPH_PRODUCTS
+
+
 def get_ceiling_layout(pid: int) -> CeilingComponentLayout | None:
     """Get component layout for a Ceiling product.
 

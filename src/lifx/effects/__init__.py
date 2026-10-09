@@ -66,6 +66,7 @@ from lifx.effects.registry import (
 from lifx.effects.ripple import EffectRipple
 from lifx.effects.rule30 import EffectRule30
 from lifx.effects.rule_trio import EffectRuleTrio
+from lifx.effects.scroll import EffectScroll
 from lifx.effects.sine import EffectSine
 from lifx.effects.sonar import EffectSonar
 from lifx.effects.spectrum_sweep import EffectSpectrumSweep
@@ -101,6 +102,7 @@ __all__ = [
     "EffectRipple",
     "EffectRule30",
     "EffectRuleTrio",
+    "EffectScroll",
     "EffectSine",
     "EffectSonar",
     "EffectSpectrumSweep",

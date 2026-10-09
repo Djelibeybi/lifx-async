@@ -12,10 +12,20 @@ from typing import TYPE_CHECKING, Any
 from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.packets import MultiZonePacketGenerator, PacketGenerator
 from lifx.color import HSBK
-from lifx.const import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, LIFX_UDP_PORT
+from lifx.const import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_REQUEST_TIMEOUT,
+    LIFX_UDP_PORT,
+    MOOD_MOVE_SECONDS_PER_16_ZONES,
+)
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
+from lifx.devices.effect_runner import PriorState
 from lifx.devices.light import Light, LightState
-from lifx.exceptions import LifxProtocolError, LifxTimeoutError
+from lifx.exceptions import (
+    LifxProtocolError,
+    LifxTimeoutError,
+    LifxUnsupportedCommandError,
+)
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     Direction,
@@ -27,6 +37,7 @@ from lifx.protocol.protocol_types import (
 from lifx.protocol.protocol_types import (
     MultiZoneApplicationRequest as ExtendedAppReq,
 )
+from lifx.theme.generators.mood import MoodGenerator
 
 if TYPE_CHECKING:
     from lifx.theme import Theme
@@ -684,6 +695,14 @@ class MultiZoneLight(Light):
         )
 
         return result
+
+    async def _shown_brightness(self, reported: float) -> float:
+        """The brightest zone, since GetColor reports zone 0 alone."""
+        return self._brightest_or(await self.get_all_color_zones(), reported)
+
+    def _prior_brightness(self, prestate: PriorState) -> float:
+        """The brightest zone shown before the animation."""
+        return self._brightest_or(prestate.zone_colors or [], prestate.color.brightness)
 
     async def get_all_color_zones(self) -> list[HSBK]:
         """Get colors for all zones, automatically using the best method.
@@ -1463,6 +1482,54 @@ class MultiZoneLight(Light):
         else:
             # Light is already on, or we're not turning it on - apply with duration
             await self.set_all_color_zones(colors, duration=duration)
+
+    async def _paint_mood(
+        self,
+        theme: Theme,
+        *,
+        power_on: bool,
+        brightness: float,
+        bulb_color: HSBK | None = None,
+    ) -> list[list[HSBK]]:
+        """Paint the mood across every zone of the strip."""
+        zone_count = await self.get_zone_count()
+        colors = MoodGenerator(theme).get_multizone_colors(zone_count, brightness)
+        await self._write_mood(
+            lambda duration: self.set_all_color_zones(colors, duration=duration),
+            power_on,
+        )
+        return []
+
+    async def animate_mood(self, theme: Theme) -> None:
+        """Paint the mood, then run firmware MOVE at the app's speed.
+
+        Every multizone light runs MOVE for any mood: strips have no MORPH.
+        """
+        if not await self._paints_moods():
+            return
+        # Held here, since a firmware effect has no run to hold it.
+        prestate = self._mood_prestate = await self._begin_mood_animation()
+        await self._paint_mood(
+            theme,
+            power_on=not await self._mood_power(),
+            brightness=self._prior_brightness(prestate),
+        )
+        zone_count = await self.get_zone_count()
+        await self.set_effect(
+            MultiZoneEffect.move(
+                Direction.FORWARD,
+                MOOD_MOVE_SECONDS_PER_16_ZONES * zone_count / 16,
+            )
+        )
+
+    async def _mood_effect_running(self) -> bool:
+        """Firmware MOVE, or a mood software effect."""
+        if await super()._mood_effect_running():
+            return True
+        try:
+            return (await self.get_effect()).effect_type == FirmwareEffect.MOVE
+        except LifxUnsupportedCommandError:
+            return False  # a light that rejects GetEffect runs no firmware effect
 
     def __repr__(self) -> str:
         """String representation of multizone light."""

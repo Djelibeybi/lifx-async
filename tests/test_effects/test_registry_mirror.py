@@ -93,7 +93,7 @@ class TestMirrorDeviceType:
         registry = get_effect_registry()
         matrix = registry.get_effects_for_device_type(DeviceType.MATRIX)
         listed = registry.get_effects_for_device(ceiling.downlight)
-        assert _names(listed) == _names(matrix) - {"pulse"}
+        assert _names(listed) == _names(matrix) - {"pulse", "scroll"}
 
     def test_a_ceiling_uplight_classifies_as_a_single_light(self) -> None:
         ceiling = CeilingLight(serial="d073d5000301", ip="192.0.2.31")

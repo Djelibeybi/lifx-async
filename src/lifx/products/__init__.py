@@ -10,13 +10,17 @@ To update: run `uv run python -m lifx.products.generator`
 """
 
 from lifx.products.quirks import (
+    MOVE_AS_MORPH_PRODUCTS,
     SKY_EFFECT_MIN_FIRMWARE_MAJOR,
+    VERTICAL_THEME_PRODUCTS,
     CeilingComponentLayout,
     MirrorComponentLayout,
     get_ceiling_layout,
     get_mirror_layout,
+    has_vertical_theme,
     is_ceiling_product,
     is_mirror_product,
+    moves_as_morph,
     supports_sky_effect,
 )
 from lifx.products.registry import (
@@ -29,7 +33,9 @@ from lifx.products.registry import (
 )
 
 __all__ = [
+    "MOVE_AS_MORPH_PRODUCTS",
     "SKY_EFFECT_MIN_FIRMWARE_MAJOR",
+    "VERTICAL_THEME_PRODUCTS",
     "CeilingComponentLayout",
     "MirrorComponentLayout",
     "ProductCapability",
@@ -40,7 +46,9 @@ __all__ = [
     "get_mirror_layout",
     "get_product",
     "get_registry",
+    "has_vertical_theme",
     "is_ceiling_product",
+    "moves_as_morph",
     "supports_sky_effect",
     "is_mirror_product",
 ]

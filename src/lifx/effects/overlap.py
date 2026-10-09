@@ -143,7 +143,7 @@ class OverlapRules:
         raise NotImplementedError
 
     async def _take_over(
-        self, effect: LIFXEffect, participants: Sequence[Participant]
+        self, effect: LIFXEffect | None, participants: Sequence[Participant]
     ) -> tuple[dict[ParticipantKey, PreState], TakenComponents]:
         """Stop the software effect each light already runs, on any Conductor.
 
@@ -162,7 +162,8 @@ class OverlapRules:
         inherits the whole light's original prior state.
 
         Args:
-            effect: The effect about to start on the participants
+            effect: The effect about to start on the participants, or None
+                to take them out of every run
             participants: The lights and light components it is about to
                 start on
 
@@ -225,7 +226,7 @@ class OverlapRules:
         return all(run.task.get_loop() is loop for run in self._running.values())
 
     async def _take_components(
-        self, effect: LIFXEffect, light: Light
+        self, effect: LIFXEffect | None, light: Light
     ) -> dict[ComponentName, PreState]:
         """Take a light's light components out of their runs here, unrestored.
 
@@ -234,7 +235,7 @@ class OverlapRules:
         component leaves its run with no restore in between.
 
         Args:
-            effect: The whole-light effect about to start
+            effect: The whole-light effect about to start, or None
             light: The light it is about to start on
 
         Returns:
@@ -352,6 +353,15 @@ class OverlapRules:
     def _runs_whole_light(cls, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light, on any Conductor."""
         return any(light.serial in conductor._running for conductor in cls._live)
+
+    @classmethod
+    def _whole_light_effect(cls, light: Light) -> LIFXEffect | None:
+        """The software effect running on a whole light, on any Conductor."""
+        for conductor in list(cls._live):
+            running = conductor._running.get(light.serial)
+            if running is not None:
+                return running.effect
+        return None
 
     @classmethod
     async def _leave_every_run(

@@ -65,6 +65,54 @@ if {"Calm", "Cozy"} <= set(tags):
     calm_or_cosy = ThemeLibrary.find(tags=["Calm", "Cozy"], match="any")
 ```
 
+## Moods
+
+`apply_mood()` paints a theme the way the LIFX app paints a mood, and
+`animate_mood()` starts the effect the app's Dynamic toggle starts. Both take
+only the theme and use the app's own timings: a 0.3 second fade, and the mood
+rescaled so its brightest colour matches the light's brightness, animated
+palettes included. `apply_mood()` powers lights on only when every targeted
+light is off; `animate_mood()` turns on every light it targets.
+
+`stop_effect()` after `animate_mood()` puts back what the light showed before
+its mood animation started: power, and its colour, zones or tiles. Starting
+another mood on an animating light keeps that state, and it is restored once.
+A `DeviceGroup` has no `stop_effect()`; call it on each light.
+
+| Light | Still image (`apply_mood`) | Effect (`animate_mood`) |
+|---|---|---|
+| Bulb | One of the theme's colours; a `DeviceGroup` deals them one per bulb | `EffectColorloop` through the theme's colours; bulbs in one `DeviceGroup` share one loop |
+| Strip | The mood across the zones | Firmware MOVE, after painting the still image |
+| Matrix light | The mood's image, by `static_mode` | Firmware MORPH for a MORPH mood; `EffectScroll` for a MOVE mood |
+| Spot and Path | The mood's image, painted like any other matrix light | Firmware MORPH for every mood |
+| Mirror | Stripe moods paint as bands along the long axis, first colour at the bottom; other moods as for a matrix light | Firmware MORPH for every mood |
+| Candle and Tube | Stripe moods paint as bands along the long axis, first colour at the bottom | A MOVE stripe mood scrolls the bands down the light; other moods as for a matrix light |
+
+The Mirror's still image is painted over its 4x13 buffer as a single matrix
+light, not ring by ring, with stripe moods as bands along its long axis. The
+app runs a firmware effect on Spot and Path that this library does not send, so
+MORPH stands in for it.
+
+A Tile chain is painted as one image in chain order, as the app does, so tiles
+arranged in an L or a stack show the image in chain order rather than
+following their arrangement. A Tile whose accelerometer reports a rotation
+(left, right or upside down) is remapped; FaceUp and FaceDown are not. Only
+chain-capable products (the Tile) have their reported orientation applied;
+other matrix products, such as the Luna, are fixed panels whose accelerometer
+readings are not used. A chain scrolls as one canvas, in chain order.
+
+If a light is already running a mood effect, `apply_mood()` restarts that
+effect with the new theme instead of painting a still image.
+
+`apply_theme()` is unchanged; use it for the library's own gradients.
+
+::: lifx.theme.MoodGenerator
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+      show_if_no_docstring: false
+
 ## Convenience Function
 
 ::: lifx.theme.get_theme

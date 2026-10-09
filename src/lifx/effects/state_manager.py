@@ -127,10 +127,13 @@ class DeviceStateManager:
             write_colours = await self._wait_until_off(light)
 
         if write_colours:
+            # SetColor paints every zone, so it must never follow zones or
+            # tiles it would flatten; it is only the fallback for a strip
+            # whose zones could not be written.
             if isinstance(light, MultiZoneLight) and prestate.zone_colors:
-                await self._restore_zones(light, prestate.zone_colors)
-
-            if isinstance(light, MatrixLight) and prestate.tile_colors:
+                if not await self._restore_zones(light, prestate.zone_colors):
+                    await self._restore_color(light, prestate.color)
+            elif isinstance(light, MatrixLight) and prestate.tile_colors:
                 await self._restore_tiles(light, prestate.tile_colors)
             else:
                 await self._restore_color(light, prestate.color)
@@ -228,12 +231,15 @@ class DeviceStateManager:
 
     async def _restore_zones(
         self, light: MultiZoneLight, zone_colors: list[HSBK]
-    ) -> None:
+    ) -> bool:
         """Restore multizone colors.
 
         Args:
             light: MultiZoneLight device to restore zones to
             zone_colors: List of zone colors to restore
+
+        Returns:
+            Whether the zones were written
         """
         try:
             _LOGGER.debug(
@@ -261,6 +267,7 @@ class DeviceStateManager:
 
             # Small delay to let zones update
             await asyncio.sleep(ZONE_UPDATE_SETTLE_DELAY)
+            return True
         except Exception as e:
             _LOGGER.warning(
                 {
@@ -271,6 +278,7 @@ class DeviceStateManager:
                     "values": {"serial": light.serial, "zone_count": len(zone_colors)},
                 }
             )
+            return False
 
     async def _capture_tiles(self, light: MatrixLight) -> list[list[HSBK]] | None:
         """Capture the colours of every tile of a matrix light.

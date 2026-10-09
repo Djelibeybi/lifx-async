@@ -262,6 +262,7 @@ def _build_default_registry() -> EffectRegistry:
     from lifx.effects.ripple import EffectRipple
     from lifx.effects.rule30 import EffectRule30
     from lifx.effects.rule_trio import EffectRuleTrio
+    from lifx.effects.scroll import EffectScroll
     from lifx.effects.sine import EffectSine
     from lifx.effects.sonar import EffectSonar
     from lifx.effects.spectrum_sweep import EffectSpectrumSweep
@@ -296,6 +297,20 @@ def _build_default_registry() -> EffectRegistry:
                 DeviceType.MULTIZONE: DeviceSupport.COMPATIBLE,
                 DeviceType.MATRIX: DeviceSupport.COMPATIBLE,
                 DeviceType.MIRROR: DeviceSupport.COMPATIBLE,
+            },
+        )
+    )
+
+    registry.register(
+        EffectInfo(
+            name="scroll",
+            effect_class=EffectScroll,
+            description="Scrolls a painted matrix image one column at a time",
+            device_support={
+                DeviceType.LIGHT: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MULTIZONE: DeviceSupport.NOT_SUPPORTED,
+                DeviceType.MATRIX: DeviceSupport.RECOMMENDED,
+                DeviceType.MIRROR: DeviceSupport.NOT_SUPPORTED,
             },
         )
     )

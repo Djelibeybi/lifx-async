@@ -216,9 +216,11 @@ class FrameBuffer:
             await device.ensure_capabilities()
 
         # Only build canvas mapping for devices with chain capability.
-        # The original LIFX Tile is the only matrix device with accelerometer-based
-        # orientation detection and multi-tile positioning. Other matrix devices
-        # (Ceiling, Luna, Candle, Path, etc.) have fixed positions.
+        # The original LIFX Tile is the only matrix device whose reported
+        # orientation and tile positions are applied. Other matrix devices
+        # (Ceiling, Luna, Candle, Path, etc.) are fixed panels whose
+        # accelerometer readings are not used (a Luna reports RotatedLeft when
+        # standing upright).
         if device.capabilities and device.capabilities.has_chain:
             return cls._for_multi_tile(tiles, pixel_count)
         else:

@@ -498,6 +498,11 @@ All software effect classes, listed alphabetically. Effects adapted from [pkivol
 
 ### EffectColorloop
 
+Pass `palette=` to step through those colours instead of turning the hue;
+`period` then becomes the seconds for one pass through the palette. With a
+palette, `spread` acts only as an on/off switch (non-zero offsets each light's
+starting colour, zero starts them together) and `change` is ignored.
+
 ::: lifx.effects.EffectColorloop
     options:
       show_source: false
@@ -647,6 +652,32 @@ the next major version.
 ### EffectRuleTrio
 
 ::: lifx.effects.EffectRuleTrio
+    options:
+      show_source: false
+      heading_level: 4
+
+---
+
+### EffectScroll
+
+Matrix lights only; the Mirror is not supported. Moves the painted image one
+column every 1.25 seconds, as the LIFX app does for a MOVE mood.
+
+- `frame=` takes per-tile row-major colours in chain order. Without it, the
+  tiles are read once when the effect starts.
+- `vertical=True` moves whole rows down the light instead of shifting each
+  row sideways. The app does this for stripe moods on every Candle and the
+  Tube.
+- A Tile chain scrolls as one canvas in chain order.
+
+```python
+from lifx.effects import EffectScroll
+
+await conductor.start(EffectScroll(), [light])
+await conductor.start(EffectScroll(vertical=True), [tube])
+```
+
+::: lifx.effects.EffectScroll
     options:
       show_source: false
       heading_level: 4
