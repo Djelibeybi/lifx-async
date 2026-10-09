@@ -28,6 +28,7 @@ from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
 
 if TYPE_CHECKING:
+    from lifx.devices.matrix import TileInfo
     from lifx.theme import Theme
 
 _POWER_ON = 65535
@@ -945,3 +946,19 @@ class ComponentMatrixLight(MatrixLight):
             await self.set_power(True, duration)
         else:
             await super().apply_theme(theme, power_on=False, duration=duration)
+
+    async def _mood_reading(self) -> tuple[bool, float]:
+        """Trust a recent power write, as every other write here does."""
+        color, _power, _label = await self.get_color()
+        return await self._power_for_update() > 0, color.brightness
+
+    async def _write_mood_frames(
+        self,
+        tiles: list[TileInfo],
+        frames: list[list[HSBK]],
+        duration: float,
+        *,
+        has_chain: bool,
+    ) -> None:
+        """Write the one shared tile through the component-aware path."""
+        await self._write_tile(frames[0], duration)

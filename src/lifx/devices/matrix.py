@@ -53,6 +53,7 @@ from lifx.protocol.protocol_types import (
 from lifx.protocol.protocol_types import (
     TileStateDevice as LifxProtocolTileDevice,
 )
+from lifx.theme.generators.mood import MoodGenerator
 
 if TYPE_CHECKING:
     from lifx.theme import Theme
@@ -1602,6 +1603,57 @@ class MatrixLight(Light):
 
         lut = build_orientation_lut(tile.width, tile.height, orientation)
         return [colors[src_idx] for src_idx in lut]
+
+    async def _paint_mood(
+        self,
+        theme: Theme,
+        *,
+        power_on: bool,
+        brightness: float,
+        bulb_color: HSBK | None = None,
+    ) -> list[list[HSBK]]:
+        """Paint the mood across the light's tiles, in chain order.
+
+        A chain is one canvas in chain order, as the app paints it; tile
+        positions are ignored. A physically rotated Tile is still remapped
+        so the image is not turned with it.
+        """
+        tiles = await self.get_device_chain()
+        if not tiles:
+            return []
+        await self.ensure_capabilities()
+        has_chain = bool(self.capabilities and self.capabilities.has_chain)
+        generator = MoodGenerator(theme)
+        if len(tiles) > 1:
+            first = tiles[0]
+            frames = generator.get_chain_colors(
+                len(tiles), first.width, first.height, brightness
+            )
+        else:
+            frames = [
+                generator.get_matrix_colors(tiles[0].width, tiles[0].height, brightness)
+            ]
+
+        async def write(duration: float) -> None:
+            await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
+
+        await self._write_mood(write, power_on)
+        return frames
+
+    async def _write_mood_frames(
+        self,
+        tiles: list[TileInfo],
+        frames: list[list[HSBK]],
+        duration: float,
+        *,
+        has_chain: bool,
+    ) -> None:
+        """Write one frame per tile, remapping a rotated Tile."""
+        for tile, colors in zip(tiles, frames, strict=True):
+            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            await self.set_matrix_colors(
+                tile.tile_index, oriented, duration=round(duration * 1000)
+            )
 
     @property
     def device_chain(self) -> list[TileInfo] | None:

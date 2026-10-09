@@ -8,9 +8,12 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.const import MOOD_FADE_SECONDS
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.theme import Theme
+from tests.test_theme.conftest import make_tile
 
 RED = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
 GREEN = HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500)
@@ -72,3 +75,84 @@ class TestMultiZoneApplyMood:
         multizone_light.set_power.assert_awaited_once_with(
             True, duration=MOOD_FADE_SECONDS
         )
+
+
+GRID = Theme([RED, GREEN], static_mode="grid_static")
+
+
+class TestMatrixApplyMood:
+    async def test_single_tile_grid(self, matrix_light: MatrixLight) -> None:
+        reading(matrix_light, on=True, brightness=1.0)
+        matrix_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=2, height=2)]
+        )
+        await matrix_light.apply_mood(GRID)
+        args = matrix_light.set_matrix_colors.await_args
+        assert args.args[0] == 0
+        assert [c.hue for c in args.args[1]] == [0, 0, 120, 120]
+        assert args.kwargs["duration"] == round(MOOD_FADE_SECONDS * 1000)
+
+    async def test_candle_uses_reported_geometry(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        reading(matrix_light, on=True, brightness=1.0)
+        matrix_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=5, height=6)]
+        )
+        await matrix_light.apply_mood(GRID)
+        assert len(matrix_light.set_matrix_colors.await_args.args[1]) == 30
+
+    async def test_chain_is_painted_in_chain_order(
+        self, tile_light: MatrixLight
+    ) -> None:
+        reading(tile_light, on=True, brightness=1.0)
+        # Tile 1 sits left of tile 0 physically; the mood ignores that.
+        tile_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, user_x=1.0), make_tile(1, user_x=0.0)]
+        )
+        await tile_light.apply_mood(Theme([RED, GREEN], static_mode="solid_static"))
+        calls = tile_light.set_matrix_colors.await_args_list
+        assert [call.args[0] for call in calls] == [0, 1]
+        assert {c.hue for c in calls[0].args[1]} == {0}
+        assert {c.hue for c in calls[1].args[1]} == {120}
+
+    async def test_no_tiles_paints_nothing(self, matrix_light: MatrixLight) -> None:
+        reading(matrix_light, on=True, brightness=1.0)
+        await matrix_light.apply_mood(GRID)
+        matrix_light.set_matrix_colors.assert_not_awaited()
+
+    async def test_off_matrix_fades_on(self, matrix_light: MatrixLight) -> None:
+        reading(matrix_light, on=False, brightness=1.0)
+        matrix_light.get_device_chain = AsyncMock(return_value=[make_tile(0)])
+        await matrix_light.apply_mood(GRID)
+        assert matrix_light.set_matrix_colors.await_args.kwargs["duration"] == 0
+        matrix_light.set_power.assert_awaited_once_with(
+            True, duration=MOOD_FADE_SECONDS
+        )
+
+
+class TestCeilingApplyMood:
+    async def test_writes_one_tile_through_the_component_path(
+        self, ceiling_light: CeilingLight
+    ) -> None:
+        reading(ceiling_light, on=True, brightness=1.0)
+        ceiling_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=16, height=8)]
+        )
+        ceiling_light._write_tile = AsyncMock()
+        ceiling_light._power_for_update = AsyncMock(return_value=65535)
+        await ceiling_light.apply_mood(GRID)
+        tile_colors, duration = ceiling_light._write_tile.await_args.args
+        assert len(tile_colors) == 128
+        assert duration == MOOD_FADE_SECONDS
+
+
+@pytest.mark.emulator
+async def test_chain_emulator_paints_every_tile(tile_chain_light: MatrixLight) -> None:
+    async with tile_chain_light:
+        await tile_chain_light.apply_mood(
+            Theme([RED, GREEN], static_mode="grid_static")
+        )
+        colors = await tile_chain_light.get_all_tile_colors()
+    assert len(colors) == 5
+    assert all(len(tile) == 64 for tile in colors)
