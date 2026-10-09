@@ -9,23 +9,25 @@ compatibility and fidelity boundary. Category order is not semantic.
 | Category | Themes |
 | --- | ---: |
 | Archives | 60 |
-| Art Series | 10 |
-| Holidays | 15 |
+| Art Series | 13 |
+| Holidays | 16 |
 | Library | 28 |
-| Moods | 13 |
+| Moods | 15 |
 | Music | 14 |
-| Nature | 8 |
+| Nature | 9 |
 | Play | 7 |
 | Space | 11 |
+| Worldly | 205 |
 
-That is 166 theme records, resolvable under 169 names once the 3 rename aliases are
-counted. 138 records come from the LIFX app and carry the app's own display name and
-category; the remaining 28 sit under `Library` — 19 with no app counterpart, plus 9
-deprecated keys retained so no pre-6.4.0 name stops resolving.
+That is 378 theme records, resolvable under 381 names once the 3 rename aliases are
+counted. 290 records are the themes the LIFX app ships, sport themes excluded, and carry the
+app's own display name and category. The 60 `Archives` themes are no longer offered by the
+app but keep their palettes as library-only themes. The remaining 28 sit under `Library`:
+19 with no app counterpart, plus 9 deprecated keys retained so no pre-6.4.0 name stops
+resolving.
 
 The table is authored from the shipped library. A resync review must update it when category
-membership changes; `tests/test_theme/test_docs_catalogue.py` compares it against the live
-library and fails the suite if the two disagree.
+membership changes.
 
 ### List resolvable themes
 
@@ -74,13 +76,12 @@ blended = ThemeLibrary.find(static_mode="blended")
 ```
 
 Tags and effect modes come from the LIFX app. Themes the app does not ship
-carry no tags and use the `blended` static mode. Tags and the non-`blended`
-static modes arrive with a catalogue resync: today every shipped theme is
-`blended` with no tags, so `get_tags()` returns an empty list. An unknown tag,
-category or static mode (such as `grid_static` today) raises `ValueError`.
-Check `get_tags()` for tags or `get_categories()` for categories first; today
-only `find(static_mode="blended")` matches. Tags are spelt as the app spells
-them (for example `Cozy`) and are matched ignoring case and punctuation.
+carry no tags and use the `blended` static mode. The app's themes use the
+`solid_static`, `blended`, `grid_static`, `solid_loop` and `solid` static modes,
+and 18 of them name a Dynamic effect (MORPH or MOVE). An unknown tag, category or
+static mode raises `ValueError`, so check `get_tags()` for tags or
+`get_categories()` for categories first. Tags are spelt as the app spells them
+(for example `Cozy`) and are matched ignoring case and punctuation.
 
 ## Compatibility and fidelity
 
@@ -90,7 +91,8 @@ use the current category methods above instead of redirecting a retired category
 
 Palettes are stored as the app authors them — user-facing `HSBK` floats, converted to wire
 values at runtime — and are not truncated to the 16 palette slots a firmware effect packet
-carries. 25 themes are longer than 16 colours, up to `independence` at 68.
+carries. 28 themes are longer than 16 colours, up to 68 for `independence`,
+`memorial_day` and `old_glory`.
 
 That length is available to `apply_theme()`, which renders the whole palette across a
 device's zones or pixels. It is *not* available to the firmware effect API: `MatrixEffect`

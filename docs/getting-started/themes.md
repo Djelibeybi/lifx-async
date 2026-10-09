@@ -1,6 +1,6 @@
 # Themes Quick Start
 
-Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library carries 166 themes — 138 from the LIFX app plus 28 carried over from earlier versions of this library — resolvable under 169 names once rename aliases are counted.
+Themes apply professionally-curated color palettes to your LIFX devices with a single command. The library carries 378 themes: 290 from the LIFX app, 60 the app has since dropped, and 28 carried over from earlier versions of this library. They resolve under 381 names once rename aliases are counted.
 
 ## Apply a Theme
 
