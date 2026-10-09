@@ -156,3 +156,48 @@ async def test_chain_emulator_paints_every_tile(tile_chain_light: MatrixLight) -
         colors = await tile_chain_light.get_all_tile_colors()
     assert len(colors) == 5
     assert all(len(tile) == 64 for tile in colors)
+
+
+BLUE = HSBK(hue=240, saturation=1.0, brightness=1.0, kelvin=3500)
+YELLOW = HSBK(hue=60, saturation=1.0, brightness=1.0, kelvin=3500)
+QUADS = Theme([RED, GREEN, BLUE, YELLOW], static_mode="grid_static")
+
+
+class TestCeilingMoodReading:
+    async def test_recent_power_write_wins_over_a_stale_off_reading(
+        self, ceiling_light: CeilingLight
+    ) -> None:
+        # get_color still reports off; _power_for_update knows of a recent
+        # power-on write, so the mood must fade rather than preload dark.
+        reading(ceiling_light, on=False, brightness=1.0)
+        ceiling_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=16, height=8)]
+        )
+        ceiling_light._write_tile = AsyncMock()
+        ceiling_light._power_for_update = AsyncMock(return_value=65535)
+        await ceiling_light.apply_mood(GRID)
+        assert ceiling_light._write_tile.await_args.args[1] == MOOD_FADE_SECONDS
+        ceiling_light.set_power.assert_not_awaited()
+
+
+class TestMoodOrientation:
+    async def test_rotated_tile_is_remapped_on_a_chain(
+        self, tile_light: MatrixLight
+    ) -> None:
+        reading(tile_light, on=True, brightness=1.0)
+        tiles = [make_tile(0), make_tile(1, accel=(1, 0, 0))]
+        tile_light.get_device_chain = AsyncMock(return_value=tiles)
+        frames = await tile_light._paint_mood(QUADS, power_on=False, brightness=1.0)
+        calls = tile_light.set_matrix_colors.await_args_list
+        assert calls[0].args[1] == frames[0]
+        sent = calls[1].args[1]
+        assert sent != frames[1]
+        assert sent == MatrixLight._orient_tile_colors(tiles[1], frames[1])
+
+    async def test_rotation_is_ignored_without_a_chain(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        tile = make_tile(0, accel=(1, 0, 0))
+        matrix_light.get_device_chain = AsyncMock(return_value=[tile])
+        frames = await matrix_light._paint_mood(QUADS, power_on=False, brightness=1.0)
+        assert matrix_light.set_matrix_colors.await_args.args[1] == frames[0]
