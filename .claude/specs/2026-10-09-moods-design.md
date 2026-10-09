@@ -52,9 +52,8 @@ app", not pixel identity.
 6. Strips have no firmware MORPH, so MORPH on a strip runs firmware MOVE.
 7. Bulbs have no firmware effects. Both modes run `EffectColorloop` limited to
    the theme's colours.
-8. Mirror and multi-tile chain recipes are unverified until the hardware check
-   in section 6 passes; they ship with their best-traced recipe and are listed
-   as unverified until then.
+8. The Mirror, Tube and Tile chain recipes were checked against the 4.100 app
+   on hardware (section 6) and match it.
 
 ## Design
 
@@ -160,13 +159,17 @@ Device specifics:
   chain index, sliced per tile. This is the app's behaviour and is chosen
   deliberately: tiles arranged in an L or a stack show the image in chain
   order, not following their physical arrangement.
-  For `blended` each tile is shuffled and blended on its own. *Unverified.*
+  For `blended` each tile is shuffled and blended on its own. A tile whose
+  accelerometer reports a rotation (left, right or upside down) is remapped,
+  as the app does; a tile reporting FaceUp or FaceDown is not.
+  *Verified against the app on two Tile chains.*
 - **Mirror.** The app has no Mirror-specific paint path: it paints the Mirror
   as any other single matrix light, over its 4x13 Set64 buffer, with one
   shuffle and one brightness rescale for the whole light. The front and back
   rings play no part. The app reads the buffer as 16 rows (64 colours / 4)
   and may fit stripe moods to 16; this library uses the real 13 rows.
-  *Traced in the 4.100 app; hardware check in section 6.*
+  *Traced in the 4.100 app and verified on hardware; the 13-row bands match
+  the app.*
 - **Vertical-theme products.** The app gives every Candle, the Tube and the
   Mirror a vertical-theme capability that is not in the products registry:
   product ids 57, 68, 137, 138, 185, 186, 215, 216, 217, 218, 267 and 268,
@@ -174,10 +177,11 @@ Device specifics:
   stripe modes (`solid`, `solid_static`, `solid_loop`) run along the long
   axis: the colours are stretched to the row count, every row is one colour,
   and the first colour is on the bottom row. `blended` and `grid_static`
-  ignore the flag.
+  ignore the flag. *Verified against the app on a Tube and a Mirror.*
 - **Candle, Spot, Path, Tube, Luna and the 13x26 Ceiling.** The matrix
   recipe over the geometry the device reports, never an assumed 8x8.
-  *Unverified; Luna's known mismatch stands.*
+  *Tube verified; Candle, Spot, Path, Luna and the 13x26 Ceiling not checked
+  on hardware. Luna's known mismatch stands.*
 - **Bulb.** `DeviceGroup.apply_mood()` deals the theme's distinct colours,
   shuffled, one per bulb in turn. A lone `Light.apply_mood()` takes the
   first colour of a shuffle.
