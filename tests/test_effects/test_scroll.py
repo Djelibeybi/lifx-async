@@ -55,6 +55,11 @@ class TestScrolled:
         frame = [hues(0, 0, 10, 10, 20, 20)]
         assert scrolled(frame, [2], 3, 3, vertical=True) == frame
 
+    def test_vertical_scrolls_each_tile_of_a_chain_on_its_own(self) -> None:
+        frames = [hues(0, 10, 20), hues(30, 40, 50)]  # two 1x3 tiles
+        out = scrolled(frames, [1, 1], 3, 1, vertical=True)
+        assert [[c.hue for c in t] for t in out] == [[20, 0, 10], [50, 30, 40]]
+
 
 class TestEffectScroll:
     def test_name_and_registry(self) -> None:
@@ -124,6 +129,29 @@ class TestEffectScroll:
         await run_briefly(effect)
         frames = light._write_mood_frames.await_args.args[1]
         assert [c.hue for c in frames[0]] == [20, 0, 10]
+
+    async def test_vertical_runs_on_a_chain(
+        self, tile_chain_light: MatrixLight
+    ) -> None:
+        async with tile_chain_light:
+            tiles = await tile_chain_light.get_device_chain()
+            frame = [
+                hues(*([index * 10] * (tile.width * tile.height)))
+                for index, tile in enumerate(tiles)
+            ]
+            effect = EffectScroll(frame=frame, vertical=True)
+            effect.participants = [tile_chain_light]
+            written: list[list[list[HSBK]]] = []
+            write = tile_chain_light._write_mood_frames
+
+            async def record(tiles_, frames, *args, **kwargs) -> None:
+                written.append(frames)
+                await write(tiles_, frames, *args, **kwargs)
+
+            tile_chain_light._write_mood_frames = record  # type: ignore[method-assign]
+            await run_briefly(effect)
+        assert len(written[0]) == len(tiles)
+        assert written[0] == frame  # one colour per tile scrolls onto itself
 
     async def test_vertical_defaults_off(self, mock_device_factory) -> None:  # noqa: F811
         tube = mock_device_factory(MatrixLight, product=217)

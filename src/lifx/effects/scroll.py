@@ -35,15 +35,19 @@ def scrolled(
         height: Rows per tile
         step: Cells (or rows) to move
         vertical: Move whole rows toward higher row numbers, wrapping to the
-            top. Single tile only.
+            top. Each tile of a chain scrolls on its own.
 
     Returns:
         The scrolled frames, per tile
     """
     if vertical:
-        width = widths[0]
-        rows = [list(frames[0][r * width : (r + 1) * width]) for r in range(height)]
-        return [[color for r in range(height) for color in rows[(r - step) % height]]]
+        out_tiles: list[list[HSBK]] = []
+        for frame, width in zip(frames, widths):
+            rows = [frame[r * width : (r + 1) * width] for r in range(height)]
+            out_tiles.append(
+                [color for r in range(height) for color in rows[(r - step) % height]]
+            )
+        return out_tiles
 
     rows = [
         [
@@ -76,7 +80,7 @@ class EffectScroll(LIFXEffect):
 
     ``vertical`` moves whole rows down the light instead of shifting each row
     sideways, as the LIFX app does for stripe moods on every Candle and the
-    Tube.
+    Tube. On a Tile chain each tile's rows move down that tile.
 
     Example:
         ```python
