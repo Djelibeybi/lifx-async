@@ -238,14 +238,19 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
+        # A firmware mood that ended some other way (another effect, a
+        # reboot, another app) leaves a stale prior state: drop it, so it
+        # neither overwrites what was shown since nor outranks a later run.
+        held = self._mood_prestate
+        if held is not None and not await self._mood_effect_running():
+            held = self._mood_prestate = None
         try:
             await self._stop_firmware_effect()
         finally:
             # A firmware mood's prior state outranks a run started over it.
-            await effect_runner().leave_every_run(
-                self, restore_state=self._mood_prestate is None
-            )
-        held, self._mood_prestate = self._mood_prestate, None
+            await effect_runner().leave_every_run(self, restore_state=held is None)
+        # Kept until the firmware stop succeeds, so a failed stop can retry.
+        self._mood_prestate = None
         if held is not None:
             await effect_runner().restore_prestate(self, held)
 

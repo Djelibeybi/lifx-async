@@ -217,6 +217,9 @@ class StripSim:
         )
         light.get_all_color_zones = AsyncMock(side_effect=lambda: list(self.zones))
         light.set_all_color_zones = AsyncMock(side_effect=self.write)
+        # SetColor paints every zone, so a restore must never follow its
+        # zones with one.
+        light.set_color = AsyncMock(side_effect=self.set_color)
         light.get_color = AsyncMock(side_effect=lambda: (self.zones[0], self.power, ""))
         light.get_power = AsyncMock(side_effect=lambda: self.power)
         light.set_power = AsyncMock(side_effect=self.set_power)
@@ -228,6 +231,9 @@ class StripSim:
     def write(self, colors: list[HSBK], **_kwargs: Any) -> None:
         self.zones = list(colors)
 
+    def set_color(self, color: HSBK, **_kwargs: Any) -> None:
+        self.zones = [color] * len(self.zones)
+
     def set_power(self, level: bool, duration: float = 0.0) -> None:
         self.power = 65535 if level else 0
 
@@ -236,6 +242,19 @@ class StripSim:
 
 
 class TestStrip:
+    async def test_stop_after_the_mood_ended_elsewhere_keeps_the_light(
+        self, mock_device_factory
+    ) -> None:
+        light = mock_device_factory(MultiZoneLight, serial="d073d5000c03", product=32)
+        strip = StripSim(light, on=True)
+        await light.animate_mood(MOVE)
+        strip.effect = FirmwareEffect.OFF  # stopped by another app
+        since = pattern(4, brightness=0.9)
+        strip.zones = list(since)
+        await light.stop_effect()
+        assert strip.zones == since
+        assert light._mood_prestate is None
+
     @pytest.mark.parametrize("on", [True, False])
     async def test_stop_restores_zones_and_power(self, mock_device_factory, on) -> None:
         light = mock_device_factory(MultiZoneLight, serial="d073d5000c03", product=32)
@@ -279,8 +298,9 @@ class TestBulbs:
             await bulb.stop_effect()
             assert await _bulb_state(bulb) == before
 
+    @pytest.mark.parametrize("restart", [False, True], ids=["once", "restarted"])
     async def test_group_bulbs_each_get_their_own_state_back(
-        self, emulator_devices
+        self, emulator_devices, restart: bool
     ) -> None:
         a, b = emulator_devices[0], emulator_devices[1]
         async with a, b:
@@ -292,6 +312,9 @@ class TestBulbs:
             await DeviceGroup([a, b]).animate_mood(MORPH)
             # animate_mood turns on an off light beside one that is on.
             await _turns_on(a)
+            if restart:
+                # The restarted loop keeps each bulb's state from before.
+                await DeviceGroup([a, b]).animate_mood(MOVE)
             await a.stop_effect()
             await b.stop_effect()
             assert [await _bulb_state(a), await _bulb_state(b)] == before

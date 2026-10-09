@@ -363,6 +363,9 @@ class TestStopRestores:
         light = prime(mock_device_factory(MatrixLight), runner)
         original = prior(0.7, power=False)
         light._mood_prestate = original
+        light.get_effect = AsyncMock(
+            return_value=MagicMock(effect_type=FirmwareEffect.MORPH)
+        )
         await light.stop_effect()
         assert runner.log == ["stop-fx", ("leave", False), ("restore", original)]
         runner.log.clear()
@@ -375,6 +378,9 @@ class TestStopRestores:
         light = prime(mock_device_factory(MatrixLight), runner)
         original = prior(0.7)
         light._mood_prestate = original
+        light.get_effect = AsyncMock(
+            return_value=MagicMock(effect_type=FirmwareEffect.MORPH)
+        )
         light._stop_firmware_effect = AsyncMock(side_effect=LifxTimeoutError("no"))
         with pytest.raises(LifxTimeoutError):
             await light.stop_effect()
