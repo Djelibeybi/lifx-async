@@ -31,6 +31,7 @@ from lifx.theme.schema import (
     DISPOSITIONS,
     RENAMED,
     load_theme_records,
+    tag_sort_key,
     validate_key,
     validate_records,
 )
@@ -66,6 +67,11 @@ def _emit_color(color: dict[str, float | int]) -> str:
     )
 
 
+def _emit_literal(name: str, values: list[str]) -> str:
+    """Emit a ``Literal`` alias over already-validated identifier values."""
+    return f"{name} = Literal[{', '.join(repr(value) for value in values)}]"
+
+
 def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
     """Emit the complete source of the generated theme data module.
 
@@ -94,6 +100,26 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         # theme. validate_records() catches this when the documented order is
         # followed; the emit-time backstops exist for when it is not.
         raise RuntimeError("emit-time check failed: duplicate slug in records")
+    # The mode value sets are learned from the data, never hard-coded, so a
+    # new mode from the app flows through a resync with no hand edit.
+    # "blended" is always a static mode (the fallback rendering mode, and it
+    # keeps the Literal non-empty); "morph" and "move" are always dynamic
+    # modes because Theme.resolved_dynamic_mode can return either.
+    # Defence in depth, as for keys below: a mode is interpolated into
+    # source, so it must be a canonical identifier. The check runs before
+    # the sets are built so a non-string or unhashable mode raises the
+    # documented RuntimeError rather than a TypeError from hashing/sorting.
+    for _, record in records:
+        for field in ("static_mode", "dynamic_mode"):
+            if field in record:
+                mode = record[field]
+                if not (type(mode) is str and validate_key(mode)):
+                    raise RuntimeError(f"emit-time check failed: bad mode {mode!r}")
+    static_modes = sorted({"blended"} | {r["static_mode"] for _, r in records})
+    dynamic_modes = sorted(
+        {"morph", "move"}
+        | {r["dynamic_mode"] for _, r in records if "dynamic_mode" in r}
+    )
     lines: list[str] = [
         '"""Generated LIFX theme data.',
         "",
@@ -105,6 +131,10 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "gives it. For a grid theme the order is the image and for a stripe",
         "theme it is the stripe sequence, so nothing here reorders it.",
         "",
+        "StaticMode and DynamicMode are learned from the data: every mode a",
+        "record carries, plus 'blended' (static) and 'morph' and 'move'",
+        "(dynamic), which Theme.resolved_dynamic_mode can return.",
+        "",
         "Slugs derive from the emoji-stripped display name: NFKD-normalise,",
         "drop non-ASCII, lowercase, collapse every run of non-alphanumeric",
         "characters to a single underscore, strip leading and trailing",
@@ -114,9 +144,13 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "from __future__ import annotations",
         "",
         "from dataclasses import dataclass",
+        "from typing import Literal",
         "",
         "from lifx.color import HSBK",
         "from lifx.theme.theme import Disposition",
+        "",
+        _emit_literal("StaticMode", static_modes),
+        _emit_literal("DynamicMode", dynamic_modes),
         "",
         "",
         "@dataclass(frozen=True)",
@@ -128,6 +162,9 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "    category: str",
         "    disposition: Disposition",
         "    colors: tuple[HSBK, ...]",
+        "    static_mode: StaticMode",
+        "    dynamic_mode: DynamicMode | None = None",
+        "    tags: tuple[str, ...] = ()",
         "    replaced_by: str | None = None",
         "",
         "",
@@ -173,6 +210,25 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         for color in record["colors"]:
             lines.append(f"            {_emit_color(color)},")
         lines.append("        ),")
+        lines.append(f"        static_mode={record['static_mode']!r},")
+        if "dynamic_mode" in record:
+            lines.append(f"        dynamic_mode={record['dynamic_mode']!r},")
+        raw_tags = record.get("tags", [])
+        if type(raw_tags) is not list:
+            raise RuntimeError(
+                f"emit-time check failed: bad tags {raw_tags!r} on record {slug!r}"
+            )
+        for tag in raw_tags:
+            if not (type(tag) is str and tag and tag.isascii()):
+                raise RuntimeError(
+                    f"emit-time check failed: bad tag {tag!r} on record {slug!r}"
+                )
+        # The app's tag order is accidental; a stable order keeps
+        # regeneration diffs quiet. tag_sort_key is shared with
+        # ThemeLibrary.get_tags().
+        tags = tuple(sorted(raw_tags, key=tag_sort_key))
+        if tags:
+            lines.append(f"        tags={tags!r},")
         # Only the 9 deprecated records carry a successor. Emitting
         # `replaced_by=None` on the other 157 restates the dataclass default
         # and buries the records that do carry one under a field that is
@@ -196,6 +252,7 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         lines.append("# fate. `slug` is the alias, so following `replaced_by`")
         lines.append("# terminates in one hop; `name` is the target's display")
         lines.append("# name, which is what the theme is actually called now.")
+        lines.append("# Modes and tags are shared with the target the same way.")
         for alias, target, name, category in aliases:
             if not validate_key(alias):
                 raise RuntimeError(f"emit-time check failed: bad key {alias!r}")
@@ -209,6 +266,9 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
             # keys cannot drift and keeps the alias byte-identical by
             # construction rather than by a re-derivation that could differ.
             lines.append(f"    colors=THEMES[{target!r}].colors,")
+            lines.append(f"    static_mode=THEMES[{target!r}].static_mode,")
+            lines.append(f"    dynamic_mode=THEMES[{target!r}].dynamic_mode,")
+            lines.append(f"    tags=THEMES[{target!r}].tags,")
             lines.append(f"    replaced_by={target!r},")
             lines.append(")")
         lines.append("")

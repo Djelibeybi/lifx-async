@@ -8,6 +8,10 @@ Colour order is source data, emitted exactly as data/themes.jsonl
 gives it. For a grid theme the order is the image and for a stripe
 theme it is the stripe sequence, so nothing here reorders it.
 
+StaticMode and DynamicMode are learned from the data: every mode a
+record carries, plus 'blended' (static) and 'morph' and 'move'
+(dynamic), which Theme.resolved_dynamic_mode can return.
+
 Slugs derive from the emoji-stripped display name: NFKD-normalise,
 drop non-ASCII, lowercase, collapse every run of non-alphanumeric
 characters to a single underscore, strip leading and trailing
@@ -17,9 +21,13 @@ underscores (D-09).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from lifx.color import HSBK
 from lifx.theme.theme import Disposition
+
+StaticMode = Literal["blended"]
+DynamicMode = Literal["morph", "move"]
 
 
 @dataclass(frozen=True)
@@ -31,6 +39,9 @@ class ThemeRecord:
     category: str
     disposition: Disposition
     colors: tuple[HSBK, ...]
+    static_mode: StaticMode
+    dynamic_mode: DynamicMode | None = None
+    tags: tuple[str, ...] = ()
     replaced_by: str | None = None
 
 
@@ -45,6 +56,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=209.9981689453125, saturation=0.2, brightness=1.0, kelvin=3500),
             HSBK(hue=215.00244140625, saturation=0.2, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "arlington": ThemeRecord(
         slug="arlington",
@@ -57,6 +69,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=120.0, saturation=0.5, brightness=0.7, kelvin=3000),
             HSBK(hue=210.0, saturation=0.3, brightness=0.85, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "aurora": ThemeRecord(
         slug="aurora",
@@ -73,6 +86,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=275.0, saturation=1.0, brightness=0.15, kelvin=9000),
             HSBK(hue=315.0, saturation=0.8, brightness=0.08, kelvin=9000),
         ),
+        static_mode="blended",
     ),
     "autumn": ThemeRecord(
         slug="autumn",
@@ -105,6 +119,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "autumn_table": ThemeRecord(
         slug="autumn_table",
@@ -119,6 +134,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=95.0, saturation=0.6, brightness=0.35, kelvin=3000),
             HSBK(hue=285.0, saturation=0.35, brightness=0.3, kelvin=2600),
         ),
+        static_mode="blended",
     ),
     "baubles": ThemeRecord(
         slug="baubles",
@@ -147,6 +163,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=320.0, saturation=0.81, brightness=1.0, kelvin=3500),
             HSBK(hue=320.0, saturation=0.82, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "be_my_valentine": ThemeRecord(
         slug="be_my_valentine",
@@ -160,6 +177,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=329.0, saturation=0.62, brightness=0.45, kelvin=3500),
             HSBK(hue=355.0, saturation=0.9, brightness=0.57, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "beach": ThemeRecord(
         slug="beach",
@@ -172,6 +190,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=180.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=220.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "bedroom_glow_up": ThemeRecord(
         slug="bedroom_glow_up",
@@ -186,6 +205,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=325.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=340.0, saturation=0.95, brightness=0.8, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "bias_lighting": ThemeRecord(
         slug="bias_lighting",
@@ -195,6 +215,7 @@ THEMES: dict[str, ThemeRecord] = {
         colors=(
             HSBK(hue=0.0, saturation=0.0, brightness=0.9018997482261387, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "bijutsukai": ThemeRecord(
         slug="bijutsukai",
@@ -264,6 +285,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=358.0, saturation=0.52, brightness=1.0, kelvin=3500),
             HSBK(hue=358.0, saturation=0.52, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "blissful": ThemeRecord(
         slug="blissful",
@@ -279,6 +301,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=303.0, saturation=0.37, brightness=0.18, kelvin=3500),
             HSBK(hue=321.0, saturation=0.39, brightness=0.78, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "blood_moon": ThemeRecord(
         slug="blood_moon",
@@ -292,6 +315,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=20.0, saturation=0.8, brightness=0.5, kelvin=2500),
             HSBK(hue=30.0, saturation=0.7, brightness=0.4, kelvin=2500),
         ),
+        static_mode="blended",
     ),
     "bloodlust": ThemeRecord(
         slug="bloodlust",
@@ -304,6 +328,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=0.01, kelvin=3500),
             HSBK(hue=359.0, saturation=0.98, brightness=0.85, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "book_of_the_dead": ThemeRecord(
         slug="book_of_the_dead",
@@ -316,6 +341,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=265.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=270.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "calaveras": ThemeRecord(
         slug="calaveras",
@@ -327,6 +353,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=270.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=300.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "canada_day": ThemeRecord(
         slug="canada_day",
@@ -344,6 +371,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "candy_cane": ThemeRecord(
         slug="candy_cane",
@@ -370,6 +398,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "candy_cane_twist": ThemeRecord(
         slug="candy_cane_twist",
@@ -380,6 +409,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=3000),
             HSBK(hue=0.0, saturation=1.0, brightness=0.8, kelvin=1500),
         ),
+        static_mode="blended",
     ),
     "cheerful": ThemeRecord(
         slug="cheerful",
@@ -393,6 +423,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=282.0, saturation=1.0, brightness=0.67, kelvin=3500),
             HSBK(hue=310.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "cherry_blossom": ThemeRecord(
         slug="cherry_blossom",
@@ -419,6 +450,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "christmas": ThemeRecord(
         slug="christmas",
@@ -431,6 +463,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=120.0, saturation=0.75, brightness=1.0, kelvin=3500),
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "classic_rock": ThemeRecord(
         slug="classic_rock",
@@ -447,6 +480,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=355.0, saturation=0.8, brightness=0.79, kelvin=3500),
             HSBK(hue=355.0, saturation=0.8, brightness=0.8, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "classical": ThemeRecord(
         slug="classical",
@@ -469,6 +503,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=219.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=219.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "clouds": ThemeRecord(
         slug="clouds",
@@ -541,6 +576,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=209.0, saturation=0.14, brightness=1.0, kelvin=3500),
             HSBK(hue=209.0, saturation=0.14, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "coral_reef": ThemeRecord(
         slug="coral_reef",
@@ -554,6 +590,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=285.0, saturation=1.0, brightness=0.6, kelvin=9000),
             HSBK(hue=330.0, saturation=1.0, brightness=0.8, kelvin=9000),
         ),
+        static_mode="blended",
     ),
     "cranberry_harvest": ThemeRecord(
         slug="cranberry_harvest",
@@ -566,6 +603,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=350.0, saturation=0.18, brightness=0.55, kelvin=3000),
             HSBK(hue=358.0, saturation=0.1, brightness=0.18, kelvin=2200),
         ),
+        static_mode="blended",
     ),
     "crystal_twist": ThemeRecord(
         slug="crystal_twist",
@@ -576,6 +614,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=210.0, saturation=0.2, brightness=0.8, kelvin=5500),
             HSBK(hue=210.0, saturation=0.8, brightness=0.8, kelvin=5000),
         ),
+        static_mode="blended",
     ),
     "cyberpunk": ThemeRecord(
         slug="cyberpunk",
@@ -587,6 +626,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=225.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=299.9981689453125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "dance_pop": ThemeRecord(
         slug="dance_pop",
@@ -602,6 +642,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=220.0, saturation=1.0, brightness=0.7, kelvin=3500),
             HSBK(hue=220.0, saturation=1.0, brightness=0.7, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "deck_the_halls": ThemeRecord(
         slug="deck_the_halls",
@@ -628,6 +669,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=341.0, saturation=0.4, brightness=1.0, kelvin=3500),
             HSBK(hue=341.0, saturation=0.4, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "deep_sea": ThemeRecord(
         slug="deep_sea",
@@ -654,6 +696,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "desert": ThemeRecord(
         slug="desert",
@@ -675,6 +718,7 @@ THEMES: dict[str, ThemeRecord] = {
             ),
             HSBK(hue=45.0, saturation=0.6800030518043794, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "dinner_for_two": ThemeRecord(
         slug="dinner_for_two",
@@ -689,6 +733,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=345.0, saturation=0.9, brightness=0.6, kelvin=3500),
             HSBK(hue=355.0, saturation=0.9, brightness=0.6, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "disco": ThemeRecord(
         slug="disco",
@@ -717,6 +762,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=304.0, saturation=0.5, brightness=0.7, kelvin=3500),
             HSBK(hue=304.0, saturation=0.5, brightness=0.71, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "diwali": ThemeRecord(
         slug="diwali",
@@ -730,6 +776,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=279.0, saturation=0.76, brightness=0.61, kelvin=3500),
             HSBK(hue=324.0, saturation=0.82, brightness=0.96, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "dream": ThemeRecord(
         slug="dream",
@@ -745,6 +792,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=219.0, saturation=0.29, brightness=0.52, kelvin=3500),
             HSBK(hue=223.0, saturation=0.22, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "earth": ThemeRecord(
         slug="earth",
@@ -817,6 +865,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=238.0, saturation=0.89, brightness=0.44, kelvin=3500),
             HSBK(hue=238.0, saturation=0.89, brightness=0.44, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "energising": ThemeRecord(
         slug="energising",
@@ -831,6 +880,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=205.0, saturation=0.47, brightness=1.0, kelvin=3500),
             HSBK(hue=242.0, saturation=1.0, brightness=0.42, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "epic": ThemeRecord(
         slug="epic",
@@ -875,6 +925,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "eternal": ThemeRecord(
         slug="eternal",
@@ -887,6 +938,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=35.0, saturation=1.0, brightness=0.9, kelvin=3000),
             HSBK(hue=55.0, saturation=1.0, brightness=1.0, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "evening": ThemeRecord(
         slug="evening",
@@ -913,6 +965,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "exciting": ThemeRecord(
         slug="exciting",
@@ -928,6 +981,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=271.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=294.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "extraterrestrial": ThemeRecord(
         slug="extraterrestrial",
@@ -941,6 +995,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=155.0, saturation=0.4, brightness=0.3, kelvin=3500),
             HSBK(hue=169.0, saturation=0.7, brightness=0.3, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "fall": ThemeRecord(
         slug="fall",
@@ -955,6 +1010,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=120.0, saturation=1.0, brightness=0.25, kelvin=3500),
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "fantasy": ThemeRecord(
         slug="fantasy",
@@ -967,6 +1023,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=248.0, saturation=1.0, brightness=0.23, kelvin=3500),
             HSBK(hue=300.0, saturation=1.0, brightness=0.87, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "festive": ThemeRecord(
         slug="festive",
@@ -999,6 +1056,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=200.0, saturation=1.0, brightness=1.0, kelvin=7000),
             HSBK(hue=200.0, saturation=1.0, brightness=1.0, kelvin=7000),
         ),
+        static_mode="blended",
     ),
     "fire": ThemeRecord(
         slug="fire",
@@ -1020,6 +1078,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="warm_ember",
     ),
     "focusing": ThemeRecord(
@@ -1049,6 +1108,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="gentle",
     ),
     "forrest": ThemeRecord(
@@ -1067,6 +1127,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=165.0, saturation=1.0, brightness=0.5, kelvin=9000),
             HSBK(hue=165.0, saturation=1.0, brightness=1.0, kelvin=9000),
         ),
+        static_mode="blended",
     ),
     "fright_night": ThemeRecord(
         slug="fright_night",
@@ -1087,6 +1148,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=128.0, saturation=0.6, brightness=0.9, kelvin=3500),
             HSBK(hue=128.0, saturation=0.6, brightness=0.9, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "funk": ThemeRecord(
         slug="funk",
@@ -1103,6 +1165,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=346.0, saturation=0.6, brightness=1.0, kelvin=3500),
             HSBK(hue=359.0, saturation=1.0, brightness=0.84, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "galaxy": ThemeRecord(
         slug="galaxy",
@@ -1129,6 +1192,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "garage_rock": ThemeRecord(
         slug="garage_rock",
@@ -1142,6 +1206,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=339.0, saturation=1.0, brightness=0.99, kelvin=3500),
             HSBK(hue=339.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "gauguin": ThemeRecord(
         slug="gauguin",
@@ -1169,6 +1234,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=354.0, saturation=0.61, brightness=0.6, kelvin=3500),
             HSBK(hue=358.0, saturation=0.72, brightness=0.69, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "gentle": ThemeRecord(
         slug="gentle",
@@ -1182,6 +1248,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=52.0, saturation=0.21, brightness=1.0, kelvin=3500),
             HSBK(hue=338.0, saturation=0.38, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "ghostly": ThemeRecord(
         slug="ghostly",
@@ -1194,6 +1261,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=193.0, saturation=0.9, brightness=0.6, kelvin=3500),
             HSBK(hue=215.0, saturation=0.8, brightness=0.3, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "gold_star": ThemeRecord(
         slug="gold_star",
@@ -1206,6 +1274,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=45.0, saturation=1.0, brightness=0.7, kelvin=3000),
             HSBK(hue=45.0, saturation=1.0, brightness=1.0, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "graveyard_chill": ThemeRecord(
         slug="graveyard_chill",
@@ -1219,6 +1288,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=220.0, saturation=0.5, brightness=1.0, kelvin=7500),
             HSBK(hue=240.0, saturation=0.5, brightness=0.7, kelvin=7000),
         ),
+        static_mode="blended",
     ),
     "halloween": ThemeRecord(
         slug="halloween",
@@ -1233,6 +1303,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=40.0, saturation=1.0, brightness=0.35, kelvin=3500),
             HSBK(hue=46.0, saturation=1.0, brightness=0.35, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "hanukkah": ThemeRecord(
         slug="hanukkah",
@@ -1243,6 +1314,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=6500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "haunted_fog": ThemeRecord(
         slug="haunted_fog",
@@ -1256,6 +1328,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=210.0, saturation=0.2, brightness=0.7, kelvin=6500),
             HSBK(hue=220.0, saturation=0.4, brightness=0.65, kelvin=7500),
         ),
+        static_mode="blended",
     ),
     "hip_hop_rap": ThemeRecord(
         slug="hip_hop_rap",
@@ -1274,6 +1347,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=341.0, saturation=1.0, brightness=0.89, kelvin=3500),
             HSBK(hue=341.0, saturation=1.0, brightness=0.9, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "hokusai": ThemeRecord(
         slug="hokusai",
@@ -1343,6 +1417,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=342.0, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=342.0, saturation=1.0, brightness=1.0, kelvin=4000),
         ),
+        static_mode="blended",
     ),
     "holly": ThemeRecord(
         slug="holly",
@@ -1366,6 +1441,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="christmas",
     ),
     "hygge": ThemeRecord(
@@ -1387,6 +1463,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "independence": ThemeRecord(
         slug="independence",
@@ -1463,6 +1540,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "indie_pop": ThemeRecord(
         slug="indie_pop",
@@ -1483,6 +1561,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=347.0, saturation=0.59, brightness=1.0, kelvin=3500),
             HSBK(hue=347.0, saturation=0.6, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "intense": ThemeRecord(
         slug="intense",
@@ -1515,6 +1594,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="fantasy",
     ),
     "jazz": ThemeRecord(
@@ -1536,6 +1616,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=55.0, saturation=0.8, brightness=1.0, kelvin=3500),
             HSBK(hue=55.0, saturation=0.8, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "jupiter": ThemeRecord(
         slug="jupiter",
@@ -1549,6 +1630,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=25.0, saturation=0.7, brightness=0.85, kelvin=3300),
             HSBK(hue=35.0, saturation=0.4, brightness=0.95, kelvin=4000),
         ),
+        static_mode="blended",
     ),
     "kandinsky": ThemeRecord(
         slug="kandinsky",
@@ -1621,6 +1703,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=340.0, saturation=1.0, brightness=0.5, kelvin=3500),
             HSBK(hue=350.0, saturation=1.0, brightness=0.45, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "klimt": ThemeRecord(
         slug="klimt",
@@ -1691,6 +1774,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=52.0, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=52.0, saturation=1.0, brightness=1.0, kelvin=4000),
         ),
+        static_mode="blended",
     ),
     "kwanzaa": ThemeRecord(
         slug="kwanzaa",
@@ -1701,6 +1785,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "leprechaun_treasure": ThemeRecord(
         slug="leprechaun_treasure",
@@ -1713,6 +1798,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=45.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=5500),
         ),
+        static_mode="blended",
     ),
     "lo_fi": ThemeRecord(
         slug="lo_fi",
@@ -1732,6 +1818,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=298.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=300.0, saturation=0.1, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "love": ThemeRecord(
         slug="love",
@@ -1770,6 +1857,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="romance",
     ),
     "lucky_shamrock": ThemeRecord(
@@ -1783,6 +1871,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=5500),
             HSBK(hue=140.0, saturation=1.0, brightness=1.0, kelvin=5200),
         ),
+        static_mode="blended",
     ),
     "mars": ThemeRecord(
         slug="mars",
@@ -1855,6 +1944,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=29.0, saturation=0.89, brightness=0.71, kelvin=3500),
             HSBK(hue=29.0, saturation=0.89, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "matisse": ThemeRecord(
         slug="matisse",
@@ -1924,6 +2014,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=342.0, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=342.0, saturation=1.0, brightness=1.0, kelvin=4000),
         ),
+        static_mode="blended",
     ),
     "mellow": ThemeRecord(
         slug="mellow",
@@ -1937,6 +2028,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=315.0, saturation=0.24, brightness=1.0, kelvin=3500),
             HSBK(hue=359.0, saturation=0.31, brightness=0.59, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "memorial_day": ThemeRecord(
         slug="memorial_day",
@@ -2013,6 +2105,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "menorah": ThemeRecord(
         slug="menorah",
@@ -2026,6 +2119,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=0.5, brightness=1.0, kelvin=6500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "mercury": ThemeRecord(
         slug="mercury",
@@ -2039,6 +2133,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=210.0, saturation=0.05, brightness=1.0, kelvin=5000),
             HSBK(hue=220.0, saturation=0.1, brightness=0.4, kelvin=4000),
         ),
+        static_mode="blended",
     ),
     "midnight_shadows": ThemeRecord(
         slug="midnight_shadows",
@@ -2052,6 +2147,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=200.0, saturation=0.1, brightness=0.2, kelvin=6000),
             HSBK(hue=240.0, saturation=0.2, brightness=0.3, kelvin=7000),
         ),
+        static_mode="blended",
     ),
     "mistletoe": ThemeRecord(
         slug="mistletoe",
@@ -2092,6 +2188,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=355.0, saturation=1.0, brightness=0.8, kelvin=3500),
             HSBK(hue=355.0, saturation=1.0, brightness=0.8, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "molly_malone": ThemeRecord(
         slug="molly_malone",
@@ -2105,6 +2202,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=160.0, saturation=0.7, brightness=0.8, kelvin=6000),
             HSBK(hue=200.0, saturation=0.5, brightness=0.8, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "mondrian": ThemeRecord(
         slug="mondrian",
@@ -2177,6 +2275,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "monet": ThemeRecord(
         slug="monet",
@@ -2246,6 +2345,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=245.0, saturation=0.28, brightness=1.0, kelvin=9000),
             HSBK(hue=245.0, saturation=0.28, brightness=1.0, kelvin=9000),
         ),
+        static_mode="blended",
     ),
     "moon": ThemeRecord(
         slug="moon",
@@ -2318,6 +2418,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=4628),
             HSBK(hue=0.0, saturation=0.0, brightness=1.0, kelvin=4628),
         ),
+        static_mode="blended",
     ),
     "movie_night_romance": ThemeRecord(
         slug="movie_night_romance",
@@ -2332,6 +2433,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=340.0, saturation=0.6, brightness=0.65, kelvin=3000),
             HSBK(hue=350.0, saturation=0.85, brightness=0.55, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "neon": ThemeRecord(
         slug="neon",
@@ -2343,6 +2445,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=182.999267578125, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=310.001220703125, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "neptune": ThemeRecord(
         slug="neptune",
@@ -2356,6 +2459,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=220.0, saturation=0.8, brightness=0.9, kelvin=6800),
             HSBK(hue=230.0, saturation=0.6, brightness=0.7, kelvin=6000),
         ),
+        static_mode="blended",
     ),
     "ocean": ThemeRecord(
         slug="ocean",
@@ -2369,6 +2473,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=220.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=240.0, saturation=1.0, brightness=0.5, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "oktoberfest": ThemeRecord(
         slug="oktoberfest",
@@ -2399,6 +2504,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=200.0, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=200.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "old_glory": ThemeRecord(
         slug="old_glory",
@@ -2475,6 +2581,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "outback": ThemeRecord(
         slug="outback",
@@ -2489,6 +2596,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=300.0, saturation=0.8, brightness=0.25, kelvin=3500),
             HSBK(hue=345.0, saturation=0.9, brightness=0.45, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "parade": ThemeRecord(
         slug="parade",
@@ -2502,6 +2610,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=0.5, brightness=1.0, kelvin=3500),
             HSBK(hue=240.0, saturation=0.75, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "paranormal": ThemeRecord(
         slug="paranormal",
@@ -2517,6 +2626,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=167.0, saturation=0.19, brightness=0.75, kelvin=3500),
             HSBK(hue=167.0, saturation=0.5, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "party": ThemeRecord(
         slug="party",
@@ -2530,6 +2640,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=265.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=300.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "peaceful": ThemeRecord(
         slug="peaceful",
@@ -2543,6 +2654,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=198.0, saturation=0.48, brightness=0.11, kelvin=3500),
             HSBK(hue=203.0, saturation=0.34, brightness=0.56, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "pine_glow": ThemeRecord(
         slug="pine_glow",
@@ -2556,6 +2668,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=165.0, saturation=0.4, brightness=0.4, kelvin=3500),
             HSBK(hue=165.0, saturation=0.4, brightness=0.4, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "pluto": ThemeRecord(
         slug="pluto",
@@ -2569,6 +2682,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=0.2, brightness=0.4, kelvin=4800),
             HSBK(hue=260.0, saturation=0.3, brightness=0.7, kelvin=5500),
         ),
+        static_mode="blended",
     ),
     "pop": ThemeRecord(
         slug="pop",
@@ -2584,6 +2698,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=348.0, saturation=0.6, brightness=1.0, kelvin=3500),
             HSBK(hue=359.0, saturation=0.4, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "poppy": ThemeRecord(
         slug="poppy",
@@ -2596,6 +2711,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=5.0, saturation=1.0, brightness=0.6, kelvin=3000),
             HSBK(hue=15.0, saturation=1.0, brightness=0.5, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "powerful": ThemeRecord(
         slug="powerful",
@@ -2611,6 +2727,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=59.0, saturation=0.7, brightness=1.0, kelvin=3500),
             HSBK(hue=61.0, saturation=0.44, brightness=0.99, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "pride": ThemeRecord(
         slug="pride",
@@ -2627,6 +2744,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=303.0, saturation=0.2, brightness=1.0, kelvin=3500),
             HSBK(hue=349.0, saturation=0.88, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "proud": ThemeRecord(
         slug="proud",
@@ -2677,6 +2795,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="pride",
     ),
     "psychedelic_rock": ThemeRecord(
@@ -2696,6 +2815,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=338.0, saturation=0.6, brightness=1.0, kelvin=3500),
             HSBK(hue=354.0, saturation=0.7, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "pumpkin": ThemeRecord(
         slug="pumpkin",
@@ -2740,6 +2860,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="pumpkin_spice",
     ),
     "pumpkin_glow": ThemeRecord(
@@ -2754,6 +2875,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=36.0, saturation=1.0, brightness=1.0, kelvin=2700),
             HSBK(hue=40.0, saturation=0.9, brightness=0.6, kelvin=2700),
         ),
+        static_mode="blended",
     ),
     "pumpkin_party": ThemeRecord(
         slug="pumpkin_party",
@@ -2777,6 +2899,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=264.0, saturation=0.7, brightness=0.9, kelvin=3500),
             HSBK(hue=264.0, saturation=0.7, brightness=0.9, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "pumpkin_spice": ThemeRecord(
         slug="pumpkin_spice",
@@ -2791,6 +2914,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=30.0, saturation=1.0, brightness=1.0, kelvin=1500),
             HSBK(hue=30.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "punk": ThemeRecord(
         slug="punk",
@@ -2804,6 +2928,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=207.0, saturation=1.0, brightness=0.6, kelvin=3500),
             HSBK(hue=270.0, saturation=0.8, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "ramadan": ThemeRecord(
         slug="ramadan",
@@ -2818,6 +2943,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=121.0, saturation=0.61, brightness=0.43, kelvin=3500),
             HSBK(hue=132.0, saturation=0.76, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "redrum": ThemeRecord(
         slug="redrum",
@@ -2834,6 +2960,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=359.0, saturation=0.8, brightness=0.4, kelvin=3500),
             HSBK(hue=359.0, saturation=0.8, brightness=0.4, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "relaxing": ThemeRecord(
         slug="relaxing",
@@ -2861,6 +2988,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "romance": ThemeRecord(
         slug="romance",
@@ -2874,6 +3002,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=345.0, saturation=0.76, brightness=1.0, kelvin=3500),
             HSBK(hue=349.0, saturation=0.88, brightness=0.9, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "rousseau": ThemeRecord(
         slug="rousseau",
@@ -2906,6 +3035,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=353.0, saturation=0.44, brightness=0.5, kelvin=3500),
             HSBK(hue=354.0, saturation=0.31, brightness=0.7, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "sage_and_cedar": ThemeRecord(
         slug="sage_and_cedar",
@@ -2918,6 +3048,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=105.0, saturation=0.12, brightness=0.16, kelvin=2600),
             HSBK(hue=110.0, saturation=0.35, brightness=0.8, kelvin=3200),
         ),
+        static_mode="blended",
     ),
     "santa": ThemeRecord(
         slug="santa",
@@ -2940,6 +3071,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="candy_cane",
     ),
     "santas_candy": ThemeRecord(
@@ -2953,6 +3085,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=280.0, saturation=0.5, brightness=0.8, kelvin=3500),
             HSBK(hue=340.0, saturation=0.6, brightness=0.7, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "santas_workshop": ThemeRecord(
         slug="santas_workshop",
@@ -2964,6 +3097,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=135.0, saturation=0.85, brightness=0.7, kelvin=1500),
             HSBK(hue=355.0, saturation=1.0, brightness=1.0, kelvin=1500),
         ),
+        static_mode="blended",
     ),
     "saturn": ThemeRecord(
         slug="saturn",
@@ -2977,6 +3111,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=45.0, saturation=0.5, brightness=0.9, kelvin=3500),
             HSBK(hue=200.0, saturation=0.1, brightness=0.85, kelvin=5000),
         ),
+        static_mode="blended",
     ),
     "sci_fi": ThemeRecord(
         slug="sci_fi",
@@ -2988,6 +3123,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=0.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=240.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "scream_queen": ThemeRecord(
         slug="scream_queen",
@@ -3009,6 +3145,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=347.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=347.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "self_care_sanctuary": ThemeRecord(
         slug="self_care_sanctuary",
@@ -3023,6 +3160,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=160.0, saturation=0.45, brightness=0.65, kelvin=4500),
             HSBK(hue=170.0, saturation=0.5, brightness=0.55, kelvin=5000),
         ),
+        static_mode="blended",
     ),
     "serene": ThemeRecord(
         slug="serene",
@@ -3073,6 +3211,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "shamrock": ThemeRecord(
         slug="shamrock",
@@ -3117,6 +3256,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
         replaced_by="st_patricks_day",
     ),
     "slasher": ThemeRecord(
@@ -3136,6 +3276,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=354.0, saturation=1.0, brightness=0.7, kelvin=3500),
             HSBK(hue=354.0, saturation=1.0, brightness=0.7, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "snake_banisher": ThemeRecord(
         slug="snake_banisher",
@@ -3149,6 +3290,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=110.0, saturation=0.8, brightness=0.7, kelvin=5500),
             HSBK(hue=120.0, saturation=1.0, brightness=0.5, kelvin=5000),
         ),
+        static_mode="blended",
     ),
     "snowflake": ThemeRecord(
         slug="snowflake",
@@ -3170,6 +3312,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=240.0, saturation=0.5, brightness=1.0, kelvin=3500),
             HSBK(hue=240.0, saturation=0.8, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "soothing": ThemeRecord(
         slug="soothing",
@@ -3183,6 +3326,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=335.0, saturation=0.5, brightness=0.67, kelvin=3500),
             HSBK(hue=336.0, saturation=0.18, brightness=0.67, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "spacey": ThemeRecord(
         slug="spacey",
@@ -3193,6 +3337,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=155.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "spiders_lair": ThemeRecord(
         slug="spiders_lair",
@@ -3207,6 +3352,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=270.0, saturation=0.7, brightness=0.5, kelvin=3000),
             HSBK(hue=300.0, saturation=0.8, brightness=0.4, kelvin=4000),
         ),
+        static_mode="blended",
     ),
     "sports": ThemeRecord(
         slug="sports",
@@ -3233,6 +3379,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "spring": ThemeRecord(
         slug="spring",
@@ -3265,6 +3412,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "st_patricks_day": ThemeRecord(
         slug="st_patricks_day",
@@ -3279,6 +3427,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=130.0, saturation=0.85, brightness=0.75, kelvin=3500),
             HSBK(hue=135.0, saturation=0.5, brightness=0.5, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "stardust": ThemeRecord(
         slug="stardust",
@@ -3292,6 +3441,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=209.0, saturation=0.5, brightness=1.0, kelvin=3500),
             HSBK(hue=260.0, saturation=0.3, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "storm_front": ThemeRecord(
         slug="storm_front",
@@ -3305,6 +3455,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=220.0, saturation=1.0, brightness=0.6, kelvin=9000),
             HSBK(hue=240.0, saturation=1.0, brightness=0.4, kelvin=9000),
         ),
+        static_mode="blended",
     ),
     "sun": ThemeRecord(
         slug="sun",
@@ -3377,6 +3528,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=43.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=43.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "synthwave": ThemeRecord(
         slug="synthwave",
@@ -3392,6 +3544,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=267.0, saturation=0.7, brightness=1.0, kelvin=3500),
             HSBK(hue=329.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "taps": ThemeRecord(
         slug="taps",
@@ -3405,6 +3558,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=220.0, saturation=1.0, brightness=0.5, kelvin=3000),
             HSBK(hue=220.0, saturation=1.0, brightness=0.7, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "thanksgiving": ThemeRecord(
         slug="thanksgiving",
@@ -3418,6 +3572,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=35.0, saturation=0.85, brightness=0.65, kelvin=3500),
             HSBK(hue=50.0, saturation=0.81, brightness=0.86, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "the_tricolour": ThemeRecord(
         slug="the_tricolour",
@@ -3429,6 +3584,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=30.0, saturation=1.0, brightness=1.0, kelvin=4000),
             HSBK(hue=120.0, saturation=1.0, brightness=1.0, kelvin=5500),
         ),
+        static_mode="blended",
     ),
     "toxic_cauldron": ThemeRecord(
         slug="toxic_cauldron",
@@ -3442,6 +3598,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=110.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=125.0, saturation=0.9, brightness=0.7, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "tranquil": ThemeRecord(
         slug="tranquil",
@@ -3455,6 +3612,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=205.0, saturation=0.4, brightness=0.96, kelvin=3500),
             HSBK(hue=241.0, saturation=0.5, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "tropical": ThemeRecord(
         slug="tropical",
@@ -3481,6 +3639,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "turkey_dinner": ThemeRecord(
         slug="turkey_dinner",
@@ -3496,6 +3655,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=45.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=120.0, saturation=0.5, brightness=0.5, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "uranus": ThemeRecord(
         slug="uranus",
@@ -3509,6 +3669,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=180.0, saturation=0.5, brightness=0.9, kelvin=6500),
             HSBK(hue=190.0, saturation=0.3, brightness=0.8, kelvin=6200),
         ),
+        static_mode="blended",
     ),
     "valentines": ThemeRecord(
         slug="valentines",
@@ -3521,6 +3682,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=329.0, saturation=0.62, brightness=0.45, kelvin=3500),
             HSBK(hue=355.0, saturation=0.9, brightness=0.57, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "vampires_den": ThemeRecord(
         slug="vampires_den",
@@ -3534,6 +3696,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=20.0, saturation=0.5, brightness=0.5, kelvin=2500),
             HSBK(hue=240.0, saturation=0.1, brightness=0.5, kelvin=2700),
         ),
+        static_mode="blended",
     ),
     "van_gogh": ThemeRecord(
         slug="van_gogh",
@@ -3606,6 +3769,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=224.0, saturation=0.46, brightness=0.43, kelvin=3500),
             HSBK(hue=226.0, saturation=0.49, brightness=0.38, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "vaporwave": ThemeRecord(
         slug="vaporwave",
@@ -3627,6 +3791,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "venus": ThemeRecord(
         slug="venus",
@@ -3640,6 +3805,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=40.0, saturation=0.8, brightness=0.85, kelvin=3300),
             HSBK(hue=50.0, saturation=0.8, brightness=0.9, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "warm_ember": ThemeRecord(
         slug="warm_ember",
@@ -3651,6 +3817,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=40.0, saturation=0.9, brightness=1.0, kelvin=3500),
             HSBK(hue=350.0, saturation=0.9, brightness=0.9, kelvin=1500),
         ),
+        static_mode="blended",
     ),
     "warming": ThemeRecord(
         slug="warming",
@@ -3665,6 +3832,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=51.0, saturation=0.85, brightness=0.59, kelvin=3500),
             HSBK(hue=355.0, saturation=0.81, brightness=0.56, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "water": ThemeRecord(
         slug="water",
@@ -3691,6 +3859,7 @@ THEMES: dict[str, ThemeRecord] = {
                 kelvin=3500,
             ),
         ),
+        static_mode="blended",
     ),
     "whats_the_craic": ThemeRecord(
         slug="whats_the_craic",
@@ -3704,6 +3873,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=210.0, saturation=1.0, brightness=1.0, kelvin=6000),
             HSBK(hue=280.0, saturation=1.0, brightness=1.0, kelvin=6500),
         ),
+        static_mode="blended",
     ),
     "wheat_glow": ThemeRecord(
         slug="wheat_glow",
@@ -3716,6 +3886,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=48.0, saturation=0.45, brightness=1.0, kelvin=2700),
             HSBK(hue=55.0, saturation=0.25, brightness=0.75, kelvin=3000),
         ),
+        static_mode="blended",
     ),
     "winter_night": ThemeRecord(
         slug="winter_night",
@@ -3728,6 +3899,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=225.0, saturation=0.95, brightness=0.6, kelvin=1500),
             HSBK(hue=265.0, saturation=0.6, brightness=0.9, kelvin=1500),
         ),
+        static_mode="blended",
     ),
     "winter_wonderland": ThemeRecord(
         slug="winter_wonderland",
@@ -3751,6 +3923,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=338.0, saturation=1.0, brightness=1.0, kelvin=3500),
             HSBK(hue=338.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "witchs_ritual": ThemeRecord(
         slug="witchs_ritual",
@@ -3764,6 +3937,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=180.0, saturation=0.7, brightness=0.5, kelvin=4000),
             HSBK(hue=300.0, saturation=0.8, brightness=0.5, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "witchy": ThemeRecord(
         slug="witchy",
@@ -3776,6 +3950,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=222.0, saturation=1.0, brightness=0.25, kelvin=3500),
             HSBK(hue=268.0, saturation=1.0, brightness=1.0, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "zombie": ThemeRecord(
         slug="zombie",
@@ -3789,6 +3964,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=270.0, saturation=1.0, brightness=0.4, kelvin=3500),
             HSBK(hue=281.0, saturation=1.0, brightness=0.2, kelvin=3500),
         ),
+        static_mode="blended",
     ),
     "zombie_apocalypse": ThemeRecord(
         slug="zombie_apocalypse",
@@ -3802,6 +3978,7 @@ THEMES: dict[str, ThemeRecord] = {
             HSBK(hue=110.0, saturation=0.8, brightness=1.0, kelvin=4000),
             HSBK(hue=130.0, saturation=0.7, brightness=0.8, kelvin=3500),
         ),
+        static_mode="blended",
     ),
 }
 
@@ -3813,12 +3990,16 @@ THEMES: dict[str, ThemeRecord] = {
 # fate. `slug` is the alias, so following `replaced_by`
 # terminates in one hop; `name` is the target's display
 # name, which is what the theme is actually called now.
+# Modes and tags are shared with the target the same way.
 THEMES["aurora_borealis"] = ThemeRecord(
     slug="aurora_borealis",
     name="Aurora",
     category="Nature",
     disposition="renamed",
     colors=THEMES["aurora"].colors,
+    static_mode=THEMES["aurora"].static_mode,
+    dynamic_mode=THEMES["aurora"].dynamic_mode,
+    tags=THEMES["aurora"].tags,
     replaced_by="aurora",
 )
 THEMES["energizing"] = ThemeRecord(
@@ -3827,6 +4008,9 @@ THEMES["energizing"] = ThemeRecord(
     category="Moods",
     disposition="renamed",
     colors=THEMES["energising"].colors,
+    static_mode=THEMES["energising"].static_mode,
+    dynamic_mode=THEMES["energising"].dynamic_mode,
+    tags=THEMES["energising"].tags,
     replaced_by="energising",
 )
 THEMES["forest"] = ThemeRecord(
@@ -3835,5 +4019,8 @@ THEMES["forest"] = ThemeRecord(
     category="Nature",
     disposition="renamed",
     colors=THEMES["forrest"].colors,
+    static_mode=THEMES["forrest"].static_mode,
+    dynamic_mode=THEMES["forrest"].dynamic_mode,
+    tags=THEMES["forrest"].tags,
     replaced_by="forrest",
 )

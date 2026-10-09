@@ -31,7 +31,7 @@ import os
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import generate_theme_data as generator_module
 import pytest
@@ -1017,3 +1017,98 @@ class TestMainAtomicWrite:
             main()
 
         assert list(out_dir.iterdir()) == []
+
+
+class TestModesAndTagsEmission:
+    """The generator emits effect modes, tags and the learned Literal types."""
+
+    def test_static_mode_literal_is_learned_from_the_data(self) -> None:
+        records = _pairs(
+            _record(slug="a_theme", name="A Theme", static_mode="grid_static"),
+            _record(slug="b_theme", name="B Theme", static_mode="solid_static"),
+        )
+
+        namespace = _exec_module(emit_data_module(records))
+
+        assert get_args(namespace["StaticMode"]) == (
+            "blended",
+            "grid_static",
+            "solid_static",
+        )
+        assert namespace["THEMES"]["a_theme"].static_mode == "grid_static"
+
+    def test_a_new_well_formed_mode_flows_through(self) -> None:
+        record = _record(static_mode="aurora_wash", dynamic_mode="shimmer")
+
+        namespace = _exec_module(emit_data_module(_pairs(record)))
+
+        assert "aurora_wash" in get_args(namespace["StaticMode"])
+        assert "shimmer" in get_args(namespace["DynamicMode"])
+        theme = namespace["THEMES"]["test_theme"]
+        assert theme.static_mode == "aurora_wash"
+        assert theme.dynamic_mode == "shimmer"
+
+    def test_dynamic_mode_literal_always_has_morph_and_move(self) -> None:
+        namespace = _exec_module(emit_data_module(_pairs(_record())))
+
+        assert get_args(namespace["DynamicMode"]) == ("morph", "move")
+        assert namespace["THEMES"]["test_theme"].dynamic_mode is None
+
+    def test_tags_are_emitted_case_insensitively_sorted(self) -> None:
+        record = _record(tags=["calm", "Bright", "Aqua"])
+
+        namespace = _exec_module(emit_data_module(_pairs(record)))
+
+        assert namespace["THEMES"]["test_theme"].tags == ("Aqua", "Bright", "calm")
+
+    def test_default_fields_are_not_emitted(self) -> None:
+        source = emit_data_module(_pairs(_record()))
+
+        assert "dynamic_mode=" not in source
+        assert "tags=" not in source
+        assert "static_mode='blended'" in source
+
+    def test_alias_copies_target_modes_and_tags(self) -> None:
+        record = _record(
+            slug="alpha_theme",
+            name="Alpha Theme",
+            aliases=["old_alpha"],
+            static_mode="grid_static",
+            dynamic_mode="move",
+            tags=["Calm"],
+        )
+
+        themes = _exec_module(emit_data_module(_pairs(record)))["THEMES"]
+
+        alias = themes["old_alpha"]
+        assert alias.static_mode == "grid_static"
+        assert alias.dynamic_mode == "move"
+        assert alias.tags is themes["alpha_theme"].tags
+
+    @pytest.mark.parametrize("field", ["static_mode", "dynamic_mode"])
+    def test_emit_time_backstop_rejects_a_bad_mode(self, field: str) -> None:
+        record = _record(**{field: "Bad-Mode"})
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad mode"):
+            emit_data_module(_pairs(record))
+
+    @pytest.mark.parametrize("tag", ["", 3, "Café"])
+    def test_emit_time_backstop_rejects_a_bad_tag(self, tag: object) -> None:
+        record = _record(tags=[tag])
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad tag"):
+            emit_data_module(_pairs(record))
+
+    @pytest.mark.parametrize("field", ["static_mode", "dynamic_mode"])
+    @pytest.mark.parametrize("mode", [3, ["x"]])
+    def test_backstop_rejects_a_non_string_mode(self, field: str, mode: object) -> None:
+        record = _record(**{field: mode})
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad mode"):
+            emit_data_module(_pairs(record))
+
+    def test_emit_time_backstop_rejects_a_non_list_tags(self) -> None:
+        record = _record(tags="calm")
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad tags"):
+            emit_data_module(_pairs(record))
