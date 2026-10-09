@@ -385,3 +385,35 @@ async def test_restore_to_off_writes_no_colours_unless_off_is_confirmed(
     mock_light.set_power.assert_called_once_with(False, duration=0.0)
     mock_light.set_color.assert_not_called()
     assert "_wait_until_off" in caplog.text
+
+
+async def test_restore_state_multizone_keeps_its_zones(state_manager) -> None:
+    """Restoring a strip writes its zones and never one colour over them.
+
+    SetColor paints every zone, so a single-colour write after the zones
+    would flatten the strip back to one colour.
+    """
+    light = MultiZoneLight(serial="d073d5abcdef", ip="192.168.1.100")
+    light._capabilities = MagicMock()
+    light._capabilities.has_extended_multizone = True
+    light._zone_count = 4
+    zone_colors = [
+        HSBK(hue=i * 90, saturation=1.0, brightness=0.8, kelvin=3500) for i in range(4)
+    ]
+    shown: list[HSBK] = []
+
+    async def set_zones(_index: int, colors: list[HSBK], **_kwargs: object) -> None:
+        shown[:] = list(colors)
+
+    async def set_color(color: HSBK, **_kwargs: object) -> None:
+        shown[:] = [color] * 4
+
+    light.set_extended_color_zones = AsyncMock(side_effect=set_zones)
+    light.set_color = AsyncMock(side_effect=set_color)
+    light.set_power = AsyncMock()
+
+    prestate = PreState(power=True, color=zone_colors[0], zone_colors=zone_colors)
+    await state_manager.restore_state(light, prestate)
+
+    assert shown == zone_colors
+    light.set_color.assert_not_awaited()
