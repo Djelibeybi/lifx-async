@@ -32,6 +32,7 @@ Example:
 from __future__ import annotations
 
 from lifx.theme.canvas import Canvas as Canvas  # noqa: PLC0414 (internal re-export)
+from lifx.theme.data import DynamicMode, StaticMode
 from lifx.theme.generators import (
     MatrixGenerator,
     MultiZoneGenerator,
@@ -45,9 +46,11 @@ from lifx.theme.theme import Theme
 # `from lifx.theme import Canvas` working, but it is not advertised and its
 # signatures may change without a major version.
 __all__ = [
+    "DynamicMode",
     "MatrixGenerator",
     "MultiZoneGenerator",
     "SingleZoneGenerator",
+    "StaticMode",
     "Theme",
     "ThemeLibrary",
     "get_theme",

@@ -10,7 +10,7 @@ Tests cover:
 - Key collision aborts naming both display names
 - Colour range validation (kelvin 0 is inbound-only and rejected here);
   palettes longer than a 16-slot MORPH wire palette are valid themes
-- Canonical palette ordering with duplicates preserved
+- Colour order preserved exactly as the data file gives it
 - Alias expansion binding the target's own record
 - Transcription exactness of emitted HSBK literals (stored values are
   already HSBK's user-facing units; no protocol round-trip involved) and
@@ -31,7 +31,7 @@ import os
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import generate_theme_data as generator_module
 import pytest
@@ -40,7 +40,6 @@ from generate_theme_data import emit_data_module, main
 import lifx.theme.schema
 import lifx.theme.slug
 from lifx.theme.schema import (
-    canonical_palette,
     load_theme_records,
     validate_key,
     validate_records,
@@ -74,6 +73,7 @@ def _record(**overrides: Any) -> dict[str, Any]:
         "name": "Test Theme",
         "category": "Test",
         "disposition": "lifx-app",
+        "static_mode": "blended",
         "colors": [_color()],
     }
     record.update(overrides)
@@ -195,42 +195,6 @@ class TestDeriveSlug:
         identity — not equality — proves there is exactly one implementation.
         """
         assert lifx.theme.schema.derive_slug is lifx.theme.slug.derive_slug
-
-
-# ============================================================================
-# Tests for canonical_palette()
-# ============================================================================
-
-
-class TestCanonicalPalette:
-    """Tests for canonical palette ordering."""
-
-    def test_sorts_by_stored_tuple(self) -> None:
-        """Palettes sort by (hue, saturation, brightness, kelvin)."""
-        c1 = _color(hue=100)
-        c2 = _color(hue=200)
-        c3 = _color(hue=300)
-
-        assert canonical_palette([c3, c1, c2]) == [c1, c2, c3]
-
-    def test_duplicates_preserved(self) -> None:
-        """Sorting a multiset preserves it — duplicates survive."""
-        c1 = _color(hue=100)
-        c2 = _color(hue=200)
-
-        result = canonical_palette([c2, c1, c2])
-
-        assert result == [c1, c2, c2]
-        assert len(result) == 3
-
-    def test_input_not_mutated(self) -> None:
-        """The original list is left untouched."""
-        original = [_color(hue=300), _color(hue=100)]
-        snapshot = list(original)
-
-        canonical_palette(original)
-
-        assert original == snapshot
 
 
 # ============================================================================
@@ -746,9 +710,13 @@ class TestEmitDataModule:
         themes = namespace["THEMES"]
         assert themes["old_alpha"].colors is themes["alpha_theme"].colors
 
-    def test_palette_emitted_canonically_sorted(self) -> None:
-        """A record whose colours arrive unsorted is emitted sorted by its
-        stored tuple, with a duplicated colour surviving in both positions."""
+    def test_palette_emitted_in_file_order(self) -> None:
+        """Colours are emitted exactly as the data file orders them.
+
+        Order is source data: for a grid theme it is the image and for a
+        stripe theme it is the stripe sequence, so the generator must never
+        reorder it. A duplicated colour survives in both of its positions.
+        """
         c1 = _color(hue=100)
         c2 = _color(hue=200)
         c3 = _color(hue=300)
@@ -760,9 +728,12 @@ class TestEmitDataModule:
             (c.hue, c.saturation, c.brightness, c.kelvin)
             for c in namespace["THEMES"]["test_theme"].colors
         ]
-        assert emitted == sorted(emitted)
-        assert len(emitted) == 4
-        assert emitted.count((100, 1, 1, 3500)) == 2
+        assert emitted == [
+            (300, 1, 1, 3500),
+            (100, 1, 1, 3500),
+            (200, 1, 1, 3500),
+            (100, 1, 1, 3500),
+        ]
 
     @pytest.mark.parametrize(
         "color",
@@ -1046,3 +1017,98 @@ class TestMainAtomicWrite:
             main()
 
         assert list(out_dir.iterdir()) == []
+
+
+class TestModesAndTagsEmission:
+    """The generator emits effect modes, tags and the learned Literal types."""
+
+    def test_static_mode_literal_is_learned_from_the_data(self) -> None:
+        records = _pairs(
+            _record(slug="a_theme", name="A Theme", static_mode="grid_static"),
+            _record(slug="b_theme", name="B Theme", static_mode="solid_static"),
+        )
+
+        namespace = _exec_module(emit_data_module(records))
+
+        assert get_args(namespace["StaticMode"]) == (
+            "blended",
+            "grid_static",
+            "solid_static",
+        )
+        assert namespace["THEMES"]["a_theme"].static_mode == "grid_static"
+
+    def test_a_new_well_formed_mode_flows_through(self) -> None:
+        record = _record(static_mode="aurora_wash", dynamic_mode="shimmer")
+
+        namespace = _exec_module(emit_data_module(_pairs(record)))
+
+        assert "aurora_wash" in get_args(namespace["StaticMode"])
+        assert "shimmer" in get_args(namespace["DynamicMode"])
+        theme = namespace["THEMES"]["test_theme"]
+        assert theme.static_mode == "aurora_wash"
+        assert theme.dynamic_mode == "shimmer"
+
+    def test_dynamic_mode_literal_always_has_morph_and_move(self) -> None:
+        namespace = _exec_module(emit_data_module(_pairs(_record())))
+
+        assert get_args(namespace["DynamicMode"]) == ("morph", "move")
+        assert namespace["THEMES"]["test_theme"].dynamic_mode is None
+
+    def test_tags_are_emitted_case_insensitively_sorted(self) -> None:
+        record = _record(tags=["calm", "Bright", "Aqua"])
+
+        namespace = _exec_module(emit_data_module(_pairs(record)))
+
+        assert namespace["THEMES"]["test_theme"].tags == ("Aqua", "Bright", "calm")
+
+    def test_default_fields_are_not_emitted(self) -> None:
+        source = emit_data_module(_pairs(_record()))
+
+        assert "dynamic_mode=" not in source
+        assert "tags=" not in source
+        assert "static_mode='blended'" in source
+
+    def test_alias_copies_target_modes_and_tags(self) -> None:
+        record = _record(
+            slug="alpha_theme",
+            name="Alpha Theme",
+            aliases=["old_alpha"],
+            static_mode="grid_static",
+            dynamic_mode="move",
+            tags=["Calm"],
+        )
+
+        themes = _exec_module(emit_data_module(_pairs(record)))["THEMES"]
+
+        alias = themes["old_alpha"]
+        assert alias.static_mode == "grid_static"
+        assert alias.dynamic_mode == "move"
+        assert alias.tags is themes["alpha_theme"].tags
+
+    @pytest.mark.parametrize("field", ["static_mode", "dynamic_mode"])
+    def test_emit_time_backstop_rejects_a_bad_mode(self, field: str) -> None:
+        record = _record(**{field: "Bad-Mode"})
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad mode"):
+            emit_data_module(_pairs(record))
+
+    @pytest.mark.parametrize("tag", ["", 3, "Café", "Calm ", " Calm", "Ca\tlm"])
+    def test_emit_time_backstop_rejects_a_bad_tag(self, tag: object) -> None:
+        record = _record(tags=[tag])
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad tag"):
+            emit_data_module(_pairs(record))
+
+    @pytest.mark.parametrize("field", ["static_mode", "dynamic_mode"])
+    @pytest.mark.parametrize("mode", [3, ["x"]])
+    def test_backstop_rejects_a_non_string_mode(self, field: str, mode: object) -> None:
+        record = _record(**{field: mode})
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad mode"):
+            emit_data_module(_pairs(record))
+
+    def test_emit_time_backstop_rejects_a_non_list_tags(self) -> None:
+        record = _record(tags="calm")
+
+        with pytest.raises(RuntimeError, match="emit-time check failed: bad tags"):
+            emit_data_module(_pairs(record))

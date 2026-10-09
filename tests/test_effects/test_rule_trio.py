@@ -71,12 +71,11 @@ def test_rule_trio_custom_parameters() -> None:
 def test_rule_trio_default_theme_is_exciting() -> None:
     """Test that default theme uses 'exciting' from ThemeLibrary.
 
-    The literal uint16 trio is the committed regression gate for the
-    canonical palette ordering: under the canonical sort, exciting's
-    leading colours are uint16 hues 0, 7282 and 10923 (0deg, 40deg and
-    60deg), so this positional consumer is behaviourally unchanged on
-    the wire. Dropping the canonical sort resurfaces the captured order
-    (271deg leading) and fails this pin.
+    The literal uint16 trio pins the default theme's stored colour order:
+    exciting's leading colours are uint16 hues 0, 7282 and 10923 (0deg,
+    40deg and 60deg), which is what this positional consumer puts on the
+    wire. A future catalogue resync may change that stored order, in which
+    case this pin is expected to change with it.
     """
     effect = EffectRuleTrio()
     assert len(effect._theme_colors) == 3
@@ -208,8 +207,8 @@ def test_rule_trio_duplicate_leading_colors_skipped() -> None:
     """Leading duplicates do not collapse the primaries to one colour.
 
     The app pads short palettes up to the 16-slot wire array by repeating
-    colours, and the canonical sort clusters those repeats at the
-    front — `independence` is stored as 4 white + 8 red + 4 blue, so a
+    colours, and the stored order can cluster those repeats at the
+    front: `independence` is stored as 4 white + 8 red + 4 blue, so a
     positional slice would render it monochrome white.
     """
     white = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=6500)

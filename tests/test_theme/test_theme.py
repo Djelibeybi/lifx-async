@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
+import lifx.theme
 from lifx.color import HSBK, Colors
-from lifx.theme import Theme
+from lifx.theme import DynamicMode, StaticMode, Theme
 from lifx.theme.library import ThemeLibrary
 
 
@@ -496,3 +499,89 @@ class TestPaletteThemes:
         """Palette names should not collide with existing themes."""
         all_names = ThemeLibrary.get_available_themes()
         assert len(all_names) == len(set(all_names))
+
+
+class TestThemeEffectModesAndTags:
+    """Effect modes and tags on Theme."""
+
+    def test_defaults_for_a_caller_theme(self) -> None:
+        theme = Theme([Colors.RED])
+
+        assert theme.static_mode is None
+        assert theme.dynamic_mode is None
+        assert theme.tags == ()
+
+    def test_fields_are_stored(self) -> None:
+        theme = Theme(
+            [Colors.RED],
+            static_mode="grid_static",
+            dynamic_mode="morph",
+            tags=["Calm", "Blue"],
+        )
+
+        assert theme.static_mode == "grid_static"
+        assert theme.dynamic_mode == "morph"
+        assert theme.tags == ("Calm", "Blue")
+
+    @pytest.mark.parametrize("field", ["static_mode", "dynamic_mode"])
+    @pytest.mark.parametrize("value", ["Blended", "grid-static", ""])
+    def test_a_malformed_mode_raises(self, field: str, value: str) -> None:
+        with pytest.raises(ValueError, match=f"{field} .* is not a canonical"):
+            Theme([Colors.RED], **{field: value})
+
+    def test_a_bare_string_for_tags_raises(self) -> None:
+        with pytest.raises(TypeError, match="not a single string"):
+            Theme([Colors.RED], tags="Calm")
+
+    @pytest.mark.parametrize("tags", [[1, 2], ["Calm", None], [b"Calm"]])
+    def test_non_string_tags_raise(self, tags: list[object]) -> None:
+        with pytest.raises(TypeError, match="only strings"):
+            Theme([Colors.RED], tags=tags)  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize(
+        ("static_mode", "dynamic_mode", "expected"),
+        [
+            (None, None, "morph"),
+            ("blended", None, "morph"),
+            ("grid_static", None, "move"),
+            ("solid_loop", None, "move"),
+            ("blended", "twinkle", "twinkle"),
+            ("grid_static", "morph", "morph"),
+        ],
+    )
+    def test_resolved_dynamic_mode(
+        self, static_mode: str | None, dynamic_mode: str | None, expected: str
+    ) -> None:
+        theme = Theme([Colors.RED], static_mode=static_mode, dynamic_mode=dynamic_mode)
+
+        assert theme.resolved_dynamic_mode == expected
+
+    def test_shuffled_drops_modes_and_tags(self) -> None:
+        theme = Theme(
+            [Colors.RED, Colors.BLUE],
+            static_mode="grid_static",
+            dynamic_mode="move",
+            tags=["Calm"],
+        )
+
+        shuffled = theme.shuffled()
+
+        assert shuffled.static_mode is None
+        assert shuffled.dynamic_mode is None
+        assert shuffled.tags == ()
+
+    def test_palette_equals_ignores_modes_and_tags(self) -> None:
+        a = Theme([Colors.RED], static_mode="grid_static", tags=["Calm"])
+        b = Theme([Colors.RED])
+
+        assert a.palette_equals(b)
+
+
+class TestModeTypeExports:
+    """The generated mode types are part of the public theme API."""
+
+    def test_mode_types_are_exported(self) -> None:
+        assert "StaticMode" in lifx.theme.__all__
+        assert "DynamicMode" in lifx.theme.__all__
+        assert "blended" in get_args(StaticMode)
+        assert {"morph", "move"} <= set(get_args(DynamicMode))

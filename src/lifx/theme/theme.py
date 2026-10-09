@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import random
 from collections import Counter
-from collections.abc import Iterator
-from typing import Literal
+from collections.abc import Iterable, Iterator
+from typing import TYPE_CHECKING, Literal
 
 from lifx.color import HSBK, Colors
+from lifx.theme.schema import validate_key
+
+if TYPE_CHECKING:
+    # data.py imports Disposition from this module, so the generated mode
+    # types are imported for type checking only; annotations are strings
+    # under `from __future__ import annotations`.
+    from lifx.theme.data import DynamicMode, StaticMode
 
 #: The recorded fate of a library theme. ``"lifx-app"`` is a palette the LIFX
 #: app ships today; ``"library-only"`` is a pre-6.3.0 key this library keeps
@@ -42,11 +49,20 @@ class Theme:
             ``ThemeLibrary``; None unless ``disposition`` is
             ``"deprecated"`` or ``"renamed"`` (and None for a
             caller-constructed theme)
+        static_mode: Still-image mode the LIFX app paints this theme with,
+            such as ``"blended"`` or ``"grid_static"`` (None for a
+            caller-constructed theme, which renders as blended)
+        dynamic_mode: Effect the app's Dynamic toggle starts, when the
+            theme names one; see ``resolved_dynamic_mode`` for the effect
+            used when it does not
+        tags: The app's search tags for this theme, such as ``"Calm"``
+            (empty for a caller-constructed theme)
 
     Note:
         ``shuffled()`` returns an identity-less copy: slug, name, category,
-        disposition and replaced_by do not propagate. This is a known
-        deferred limitation of the identity round-trip guarantee.
+        disposition, replaced_by, static_mode, dynamic_mode and tags do not
+        propagate. This is a known deferred limitation of the identity
+        round-trip guarantee.
         (``random()`` returns a single ``HSBK``, not a Theme, so it carries
         no identity to begin with.)
 
@@ -87,6 +103,9 @@ class Theme:
         category: str | None = None,
         disposition: Disposition | None = None,
         replaced_by: str | None = None,
+        static_mode: StaticMode | None = None,
+        dynamic_mode: DynamicMode | None = None,
+        tags: Iterable[str] = (),
     ) -> None:
         """Create a new theme with the given colors.
 
@@ -100,6 +119,14 @@ class Theme:
             replaced_by: Successor key of a deprecated or renamed theme
                 (attached by ``ThemeLibrary``); None unless ``disposition``
                 is ``"deprecated"`` or ``"renamed"``
+            static_mode: Still-image mode (attached by ``ThemeLibrary``)
+            dynamic_mode: Dynamic effect mode, when the theme names one
+                (attached by ``ThemeLibrary``)
+            tags: Search tags (attached by ``ThemeLibrary``)
+
+        Raises:
+            ValueError: If a mode is not a canonical identifier.
+            TypeError: If ``tags`` is a single string.
 
         Example:
             ```python
@@ -110,6 +137,22 @@ class Theme:
             theme = Theme()
             ```
         """
+        for field, mode in (
+            ("static_mode", static_mode),
+            ("dynamic_mode", dynamic_mode),
+        ):
+            if mode is not None and not validate_key(mode):
+                raise ValueError(
+                    f"{field} {mode!r} is not a canonical identifier "
+                    f"(non-empty, ASCII, lowercase, valid identifier)"
+                )
+        if isinstance(tags, str):
+            # A str is itself an iterable of str; storing it letter by letter
+            # would be silent nonsense.
+            raise TypeError("tags must be an iterable of tags, not a single string")
+        tags = tuple(tags)
+        if not all(type(tag) is str for tag in tags):
+            raise TypeError("tags must contain only strings")
         if colors and len(colors) > 0:
             # Copied, never aliased: a Theme built over a caller's list would
             # otherwise mutate that list through add_color(), and a Theme
@@ -125,6 +168,9 @@ class Theme:
         self.category = category
         self.disposition = disposition
         self.replaced_by = replaced_by
+        self.static_mode: StaticMode | None = static_mode
+        self.dynamic_mode: DynamicMode | None = dynamic_mode
+        self.tags: tuple[str, ...] = tags
 
     def add_color(self, color: HSBK) -> None:
         """Add a color to the theme.
@@ -200,6 +246,24 @@ class Theme:
                 HSBK(hue=0, saturation=0, brightness=1.0, kelvin=3500)
             )  # pragma: no cover
 
+    @property
+    def resolved_dynamic_mode(self) -> DynamicMode:
+        """The effect the LIFX app's Dynamic toggle starts for this theme.
+
+        ``dynamic_mode`` when the theme names one. Otherwise the app's rule:
+        MORPH for a ``blended`` theme (or one with no static mode) and MOVE
+        for every other static mode. Substituting MORPH on a light that
+        cannot run MOVE depends on the device and is left to the renderer.
+
+        Returns:
+            The dynamic mode to start.
+        """
+        if self.dynamic_mode is not None:
+            return self.dynamic_mode
+        if self.static_mode is None or self.static_mode == "blended":
+            return "morph"
+        return "move"
+
     def __len__(self) -> int:
         """Get the number of colors in the theme."""
         return len(self.colors)
@@ -249,11 +313,12 @@ class Theme:
     def palette_equals(self, other: Theme) -> bool:
         """Check whether two themes carry the same palette.
 
-        Order is never compared because the app shuffles palette order on
-        every application, so two orderings of one palette are the same
-        palette. Identity (slug, name, category, disposition and
-        replaced_by) is excluded too: an identity-bearing library theme and
-        a caller-built theme with the same colors have the same palette.
+        This compares palettes, not layouts, so order is never compared: two
+        orderings of one palette are the same palette. For an ordered
+        comparison, use ``a.colors == b.colors``. Identity (slug, name,
+        category, disposition and replaced_by) is excluded too: an
+        identity-bearing library theme and a caller-built theme with the
+        same colors have the same palette.
         Colors compare at uint16 (protocol) granularity via HSBK equality,
         and duplicate counts matter — a multiset comparison, not a set
         comparison.

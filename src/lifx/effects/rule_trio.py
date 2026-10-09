@@ -77,11 +77,11 @@ def _select_primaries(colors: list[HSBK]) -> list[HSBK]:
 
     Distinct colours are taken in palette order, then cycled if the palette
     holds fewer than three of them. Both rules matter for library themes:
-    the app pads short palettes up to the 16-slot wire array by repeating
-    colours and the canonical D-24 sort clusters those repeats at the front,
-    so a positional ``colors[:3]`` slice renders 19 built-in themes
-    monochrome. Cycling also keeps a two-colour theme usable instead of
-    raising, since a palette's length is captured data, not a caller error.
+    some built-in palettes repeat a colour several times, and a positional
+    ``colors[:3]`` slice over such a palette can pick one colour three
+    times and render monochrome. Cycling also keeps a two-colour theme
+    usable instead of raising, since a palette's length is captured data,
+    not a caller error.
 
     Args:
         colors: Palette colours in any order and of any length.
