@@ -46,6 +46,13 @@ from lifx.products import get_ceiling_layout, is_ceiling_product
 _LOGGER = logging.getLogger(__name__)
 
 
+def _first_color(color: HSBK | list[HSBK] | None) -> HSBK | None:
+    """Return the single uplight colour from a colour, a list of them or None."""
+    if isinstance(color, list):
+        return color[0] if color else None
+    return color
+
+
 @dataclass
 class CeilingLightState(MatrixLightState):
     """Ceiling light device state with uplight/downlight component control.
@@ -655,7 +662,7 @@ class CeilingLight(ComponentMatrixLight):
         await self._set_component_colors("downlight", colors, duration)
 
     async def turn_uplight_on(
-        self, color: HSBK | None = None, duration: float = 0.0
+        self, color: HSBK | list[HSBK] | None = None, duration: float = 0.0
     ) -> None:
         """Turn uplight component on.
 
@@ -664,29 +671,31 @@ class CeilingLight(ComponentMatrixLight):
         the target color instead of flashing to its previous state.
 
         Args:
-            color: Optional HSBK color. If provided:
+            color: Optional HSBK color, or a list whose first item is used.
+                If provided:
 
                 - Uses this color immediately
                 - Updates stored state
 
-                If None, uses brightness determination logic
+                If None or an empty list, uses brightness determination logic
             duration: Transition duration in seconds (default 0.0)
 
         Raises:
             ValueError: If color.brightness == 0
             LifxTimeoutError: Device did not respond
         """
-        await self._turn_component_on("uplight", color, duration)
+        await self._turn_component_on("uplight", _first_color(color), duration)
 
     async def turn_uplight_off(
-        self, color: HSBK | None = None, duration: float = 0.0
+        self, color: HSBK | list[HSBK] | None = None, duration: float = 0.0
     ) -> None:
         """Turn uplight component off.
 
         Args:
-            color: Optional HSBK color to store for future turn_on.
-                If provided, stores this color (with brightness=0 on the device).
-                If None, stores current color from device before turning off.
+            color: Optional HSBK color, or a list whose first item is used, to
+                store for future turn_on. If provided, stores this color (with
+                brightness=0 on the device). If None or an empty list, stores
+                current color from device before turning off.
             duration: Transition duration in seconds (default 0.0)
 
         Raises:
@@ -700,7 +709,7 @@ class CeilingLight(ComponentMatrixLight):
             a later set_power(True) brings the uplight back rather than turning
             on a light with every zone at zero brightness.
         """
-        await self._turn_component_off("uplight", color, duration)
+        await self._turn_component_off("uplight", _first_color(color), duration)
 
     async def turn_downlight_on(
         self, colors: HSBK | list[HSBK] | None = None, duration: float = 0.0
