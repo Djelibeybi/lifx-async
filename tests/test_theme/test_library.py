@@ -751,6 +751,47 @@ class TestEffectModesOnGet:
 _BLUE = (HSBK(hue=210, saturation=1.0, brightness=1.0, kelvin=3500),)
 
 
+class AccentedLibrary(ThemeLibrary):
+    """A synthetic library with one accented theme and one plain theme."""
+
+    _THEMES: dict[str, ThemeRecord] = {
+        "curacao": ThemeRecord(
+            slug="curacao",
+            name="Curacao",
+            unicode_name="Cura\u00e7ao",
+            category="Worldly",
+            disposition="lifx-app",
+            colors=_BLUE,
+            static_mode="blended",
+        ),
+        "plain": ThemeRecord(
+            slug="plain",
+            name="Plain",
+            category="Library",
+            disposition="library-only",
+            colors=_BLUE,
+            static_mode="blended",
+        ),
+    }
+
+
+class TestUnicodeName:
+    """Theme.unicode_name is the stored spelling, else the ASCII name."""
+
+    def test_accented_theme_reports_its_unicode_name(self) -> None:
+        theme = AccentedLibrary.get("curacao")
+        assert theme.unicode_name == "Cura\u00e7ao"
+        assert theme.name == "Curacao"
+
+    def test_plain_theme_falls_back_to_name(self) -> None:
+        assert AccentedLibrary.get("plain").unicode_name == "Plain"
+
+    def test_shipped_themes_always_have_a_display_string(self) -> None:
+        for slug in ThemeLibrary.get_available_themes():
+            theme = ThemeLibrary.get(slug)
+            assert theme.unicode_name
+
+
 class TaggedLibrary(ThemeLibrary):
     """A synthetic library with tags, modes and a tagged rename alias."""
 

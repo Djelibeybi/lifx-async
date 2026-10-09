@@ -135,10 +135,11 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "record carries, plus 'blended' (static) and 'morph' and 'move'",
         "(dynamic), which Theme.resolved_dynamic_mode can return.",
         "",
-        "Slugs derive from the emoji-stripped display name: NFKD-normalise,",
-        "drop non-ASCII, lowercase, collapse every run of non-alphanumeric",
-        "characters to a single underscore, strip leading and trailing",
-        "underscores (D-09).",
+        "Slugs derive from the ASCII display name (D-09): drop apostrophes",
+        "and quotation marks, expand '&' to 'and', lowercase, collapse every",
+        "run of non-alphanumeric characters to a single underscore, and strip",
+        "leading and trailing underscores. unicode_name, when present, is",
+        "the accented spelling of the name and folds back to it exactly.",
         '"""',
         "",
         "from __future__ import annotations",
@@ -166,6 +167,7 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         "    dynamic_mode: DynamicMode | None = None",
         "    tags: tuple[str, ...] = ()",
         "    replaced_by: str | None = None",
+        "    unicode_name: str | None = None",
         "",
         "",
         "THEMES: dict[str, ThemeRecord] = {",
@@ -201,9 +203,19 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
                 f"emit-time check failed: bad replaced_by {replaced_by!r} "
                 f"on record {slug!r}"
             )
+        unicode_name = record.get("unicode_name")
+        if unicode_name is not None and not (
+            type(unicode_name) is str and unicode_name and not unicode_name.isascii()
+        ):
+            raise RuntimeError(
+                f"emit-time check failed: bad unicode_name {unicode_name!r} "
+                f"on record {slug!r}"
+            )
         lines.append(f"    {slug!r}: ThemeRecord(")
         lines.append(f"        slug={slug!r},")
         lines.append(f"        name={name!r},")
+        if unicode_name is not None:
+            lines.append(f"        unicode_name={unicode_name!r},")
         lines.append(f"        category={category!r},")
         lines.append(f"        disposition={disposition!r},")
         lines.append("        colors=(")
@@ -245,7 +257,13 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
     lines.append("}")
     lines.append("")
     aliases = sorted(
-        (alias, record["slug"], record["name"], record["category"])
+        (
+            alias,
+            record["slug"],
+            record["name"],
+            record.get("unicode_name"),
+            record["category"],
+        )
         for _, record in records
         for alias in record.get("aliases", [])
     )
@@ -259,12 +277,14 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
         lines.append("# terminates in one hop; `name` is the target's display")
         lines.append("# name, which is what the theme is actually called now.")
         lines.append("# Modes and tags are shared with the target the same way.")
-        for alias, target, name, category in aliases:
+        for alias, target, name, unicode_name, category in aliases:
             if not validate_key(alias):
                 raise RuntimeError(f"emit-time check failed: bad key {alias!r}")
             lines.append(f"THEMES[{alias!r}] = ThemeRecord(")
             lines.append(f"    slug={alias!r},")
             lines.append(f"    name={name!r},")
+            if unicode_name is not None:
+                lines.append(f"    unicode_name={unicode_name!r},")
             lines.append(f"    category={category!r},")
             lines.append(f"    disposition={RENAMED!r},")
             # The palette is shared, not re-emitted: ThemeRecord is frozen and

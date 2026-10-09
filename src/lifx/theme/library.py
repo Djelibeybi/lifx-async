@@ -106,6 +106,7 @@ class ThemeLibrary:
             list(record.colors),
             slug=record.slug,
             name=record.name,
+            unicode_name=record.unicode_name or record.name,
             category=record.category,
             disposition=record.disposition,
             replaced_by=record.replaced_by,
