@@ -1530,12 +1530,13 @@ class MatrixLight(Light):
         Every device is rendered at its own reported pixel geometry, so non-8x8
         products (Candle 5x6, Ceiling 16x8) get the right number of colours.
 
-        Position and orientation are used only on a chain-capable device — the
-        LIFX Tile, the sole product that is arranged into a layout and the sole
-        product with an accelerometer. There, each tile is placed on the canvas
-        with :func:`lifx.geometry.tile_origin_pixels` so it gets a distinct slice
-        of the theme, and a physically rotated panel is remapped to match. Every
-        other matrix device is a single fixed panel, so it renders at the canvas
+        Position and orientation are used only on a chain-capable device: the
+        LIFX Tile, the only product that is arranged into a layout and the only
+        one whose reported orientation is applied. There, each tile is placed
+        on the canvas with :func:`lifx.geometry.tile_origin_pixels` so it gets
+        a distinct slice of the theme, and a physically rotated panel is
+        remapped to match. Every other matrix device is a single fixed panel
+        whose accelerometer readings are not used, so it renders at the canvas
         origin and is never remapped.
 
         Args:
@@ -1559,10 +1560,12 @@ class MatrixLight(Light):
         if not tiles:
             return
 
-        # The LIFX Tile is the only chain-capable product, and the only one with
-        # an accelerometer. Every other matrix device is a single fixed panel: it
-        # is never arranged relative to anything, and it returns whatever its
-        # firmware leaves in the position and accel fields. Reading those as a
+        # The LIFX Tile is the only chain-capable product, and the only one whose
+        # reported orientation is applied. Every other matrix device is a single
+        # fixed panel whose accelerometer readings are not used (a Luna, for
+        # example, reports RotatedLeft when standing upright): it is never
+        # arranged relative to anything, and it returns whatever its firmware
+        # leaves in the position and accel fields. Reading those as a
         # layout or a rotation would scatter and scramble the theme, so both are
         # used only for a chain. FrameBuffer.for_matrix() gates the same way.
         await self.ensure_capabilities()
@@ -1602,9 +1605,10 @@ class MatrixLight(Light):
     def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
         """Remap row-major canvas colours into the tile's physical orientation.
 
-        Only meaningful for chain-capable devices: the LIFX Tile is the sole
-        product with an accelerometer, so it is the only one whose reported
-        orientation is real. Callers must gate on ``has_chain``.
+        Only meaningful for chain-capable devices: the LIFX Tile is the only
+        product whose reported orientation is applied. Other matrix products
+        are fixed panels whose accelerometer readings are not used. Callers
+        must gate on ``has_chain``.
 
         Args:
             tile: Tile the colours are destined for

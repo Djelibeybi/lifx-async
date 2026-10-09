@@ -20,7 +20,7 @@ These effects are designed for LED strips and beams. Most also work on single-bu
 
     ![Colorloop](../assets/effects/colorloop.gif)
 
-    Continuous hue rotation through the color spectrum.
+    Continuous hue rotation through the color spectrum, or through your own `palette=`.
 
     **Class:** `EffectColorloop` · **Best on:** Light
 
@@ -208,6 +208,12 @@ These effects are designed for LIFX Tile, Candle, and Ceiling devices.
     Same effect spanning a 40×8 multi-tile canvas — each tile shows a different part of the continuous pattern.
 
     **Class:** `EffectPlasma2D` · **Best on:** Matrix
+
+-   ### Scroll
+
+    Moves a painted image one column every 1.25 seconds, as the LIFX app does for a MOVE mood. Pass `vertical=True` to move whole rows down the light instead.
+
+    **Class:** `EffectScroll` · **Best on:** Matrix (not the Mirror)
 
 </div>
 

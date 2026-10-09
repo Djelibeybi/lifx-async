@@ -71,6 +71,9 @@ class EffectScroll(LIFXEffect):
     read straight after a fade can catch colours mid-fade, so pass the frame
     when you have it. It streams no frames, so it runs on Thread lights.
 
+    Matrix lights only (not the Mirror). It moves the image one column every
+    1.25 seconds, and a Tile chain scrolls as one canvas in chain order.
+
     ``vertical`` moves whole rows down the light instead of shifting each row
     sideways, as the LIFX app does for stripe moods on every Candle and the
     Tube.

@@ -72,7 +72,9 @@ class EffectColorloop(FrameEffect):
     loop's hue further than ``change``.
 
     With ``palette``, it steps through those colours instead, one per step,
-    each light starting one colour further on unless synchronised.
+    each light starting one colour further on unless synchronised. With a
+    palette, ``spread`` acts only as an on/off switch (zero starts every light
+    on the same colour) and ``change`` is ignored.
 
     Attributes:
         period: Seconds per full cycle (default 60)
