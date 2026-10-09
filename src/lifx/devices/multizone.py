@@ -27,6 +27,7 @@ from lifx.protocol.protocol_types import (
 from lifx.protocol.protocol_types import (
     MultiZoneApplicationRequest as ExtendedAppReq,
 )
+from lifx.theme.generators.mood import MoodGenerator
 
 if TYPE_CHECKING:
     from lifx.theme import Theme
@@ -1463,6 +1464,23 @@ class MultiZoneLight(Light):
         else:
             # Light is already on, or we're not turning it on - apply with duration
             await self.set_all_color_zones(colors, duration=duration)
+
+    async def _paint_mood(
+        self,
+        theme: Theme,
+        *,
+        power_on: bool,
+        brightness: float,
+        bulb_color: HSBK | None = None,
+    ) -> list[list[HSBK]]:
+        """Paint the mood across every zone of the strip."""
+        zone_count = await self.get_zone_count()
+        colors = MoodGenerator(theme).get_multizone_colors(zone_count, brightness)
+        await self._write_mood(
+            lambda duration: self.set_all_color_zones(colors, duration=duration),
+            power_on,
+        )
+        return []
 
     def __repr__(self) -> str:
         """String representation of multizone light."""

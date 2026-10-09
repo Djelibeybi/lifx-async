@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
@@ -22,6 +23,7 @@ from lifx.const import (
     MIN_HUE,
     MIN_KELVIN,
     MIN_SATURATION,
+    MOOD_FADE_SECONDS,
 )
 from lifx.devices.base import (
     Device,
@@ -32,6 +34,7 @@ from lifx.devices.effect_runner import effect_runner
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
+from lifx.theme.generators.mood import MoodGenerator
 
 if TYPE_CHECKING:
     from lifx.effects.base import LIFXEffect
@@ -1103,6 +1106,84 @@ class Light(Device[LightState]):
         else:
             # Light is already on, or we're not turning it on - apply with duration
             await self.set_color(color, duration=duration)
+
+    async def apply_mood(self, theme: Theme) -> None:
+        """Paint a theme the way the LIFX app paints a mood.
+
+        The recipe comes from ``theme.static_mode``. The mood is rescaled so
+        its brightest colour matches the light's current brightness, fades in
+        over 0.3 seconds, and turns the light on only when it is off. If a
+        mood effect is already running, it restarts with this theme instead.
+        A bulb shows one of the theme's colours. Use ``DeviceGroup`` to deal
+        the colours across several bulbs.
+
+        Args:
+            theme: Theme to paint
+
+        Example:
+            ```python
+            await light.apply_mood(get_theme("van_gogh"))
+            ```
+        """
+        if not await self._paints_moods():
+            return
+        if await self._mood_effect_running():
+            # animate_mood() arrives with the mood effects task.
+            await self.animate_mood(theme)  # pyright: ignore[reportAttributeAccessIssue]
+            return
+        is_on, brightness = await self._mood_reading()
+        await self._paint_mood(theme, power_on=not is_on, brightness=brightness)
+
+    async def _paints_moods(self) -> bool:
+        """Whether this light shows colour, the only kind a mood paints."""
+        await self.ensure_capabilities()
+        return bool(self.capabilities and self.capabilities.has_color)
+
+    async def _mood_reading(self) -> tuple[bool, float]:
+        """The light's power and brightness, from one GetColor."""
+        color, power, _label = await self.get_color()
+        return power > 0, color.brightness
+
+    async def _mood_effect_running(self) -> bool:
+        """Whether a mood effect runs here, so a new mood restarts it."""
+        return False
+
+    async def _paint_mood(
+        self,
+        theme: Theme,
+        *,
+        power_on: bool,
+        brightness: float,
+        bulb_color: HSBK | None = None,
+    ) -> list[list[HSBK]]:
+        """Paint the mood's still image.
+
+        Args:
+            theme: Theme to paint
+            power_on: Turn the light on after painting it dark
+            brightness: The light's current brightness
+            bulb_color: The colour ``DeviceGroup`` dealt this bulb, if any
+
+        Returns:
+            The frames painted, per tile; empty for a light without tiles
+        """
+        color = bulb_color
+        if color is None:
+            color = MoodGenerator(theme).get_bulb_colors([brightness])[0]
+        await self._write_mood(
+            lambda duration: self.set_color(color, duration=duration), power_on
+        )
+        return []
+
+    async def _write_mood(
+        self, write: Callable[[float], Awaitable[None]], power_on: bool
+    ) -> None:
+        """Write a mood with the app's fade, fading power up if it was off."""
+        if power_on:
+            await write(0.0)
+            await self.set_power(True, duration=MOOD_FADE_SECONDS)
+        else:
+            await write(MOOD_FADE_SECONDS)
 
     def __repr__(self) -> str:
         """String representation of light."""
