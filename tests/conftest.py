@@ -312,43 +312,6 @@ class EmulatorRunner:
             self._thread.join(timeout=5.0)
 
 
-class _Ipv6EmulatedLifxServer(EmulatedLifxServer):
-    """An emulator server that creates and configures its own ``::1`` socket.
-
-    ``IPV6_V6ONLY`` can only be set on an unbound socket: setting it after a
-    bind raises ``OSError: [Errno 22] Invalid argument`` on macOS, verified
-    on this project's development machine. The stock
-    ``EmulatedLifxServer.start()`` binds inside itself, by handing
-    ``local_addr=`` to ``create_datagram_endpoint``, so there is no moment
-    between socket creation and bind for a caller to reach.
-
-    Owning socket creation here is therefore the only way to set the option
-    explicitly rather than trusting the platform default, which is what this
-    phase asked for as hygiene against a future wildcard bind. ``stop()`` is
-    inherited unchanged: it closes the transport, and the transport owns the
-    adopted socket.
-    """
-
-    async def start(self) -> None:
-        """Bind a V6ONLY ``AF_INET6`` socket and hand it to asyncio."""
-        loop = asyncio.get_running_loop()
-        sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-        try:
-            # Before the bind. The option is immutable once the socket is
-            # bound, so this ordering is the whole point of the subclass.
-            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-            sock.bind((self.bind_address, self.port))
-            sock.setblocking(False)
-            self.transport, _ = await loop.create_datagram_endpoint(
-                lambda: self.LifxProtocol(self), sock=sock
-            )
-        except Exception:
-            # Nothing has taken ownership of the descriptor yet, so a
-            # partway failure has to close it here or it leaks.
-            sock.close()
-            raise
-
-
 @pytest.fixture(scope="session")
 def emulator_enabled(request: pytest.FixtureRequest) -> bool:
     """Decide whether the normal embedded-emulator suite is enabled.
@@ -604,17 +567,23 @@ IPV6_DEVICE_SERIAL = "d073d5000301"
 def _running_ipv6_emulator() -> Generator[tuple[int, EmulatedLifxServer]]:
     """Run one emulator bound to ``::1`` for an owning fixture.
 
-    Every other emulator fixture binds ``127.0.0.1``, so nothing else in the
-    suite exercises an ``AF_INET6`` socket. This runs its own server on the
-    IPv6 loopback with its own port, which leaves ``emulator_server`` and the
-    seven devices the rest of the suite iterates completely untouched.
+    The suite's tests address every other emulator fixture over
+    ``127.0.0.1``. This runs its own server with its own port for the tests
+    that address ``::1``, which leaves ``emulator_server`` and the seven
+    devices the rest of the suite iterates completely untouched.
     Parameterising the shared server over both families was rejected: it
     would roughly double the emulator suite's runtime on every CI job.
 
-    The server is a :class:`_Ipv6EmulatedLifxServer` so ``IPV6_V6ONLY`` is
-    set before the bind; the option is read back here afterwards. Reading the
-    option is legal on a bound socket where setting it is not, which is why
-    the set lives in the subclass and only the read-back lives here.
+    The stock ``EmulatedLifxServer.start()`` binds an IPv4 and an IPv6
+    endpoint on one port, and sets ``IPV6_V6ONLY`` on the ``AF_INET6``
+    socket before binding it to ``ipv6_bind_address`` (``::1`` by default).
+    Port ``0`` lets it pick a port that is free in both families and retry a
+    collision itself. The IPv6 endpoint must come from that ``start()``: a
+    server that binds its own socket leaves the emulator's endpoint records
+    empty, so ``stop()`` reads the transport's close as an unexpected
+    endpoint loss and schedules recovery on a loop the runner is about to
+    close, which leaves the coroutine ``_handle_endpoint_loss`` never
+    awaited.
 
     Its single device is a matrix-capable Tile rather than a plain colour
     light. It answers the Light commands the control tests use exactly as a
@@ -626,7 +595,7 @@ def _running_ipv6_emulator() -> Generator[tuple[int, EmulatedLifxServer]]:
 
     Yields:
         Tuple of (port, server) where:
-        - port: UDP port the IPv6 emulator is listening on
+        - port: UDP port the emulator's ``::1`` endpoint is listening on
         - server: the server itself, so a test can read emulated device
           state back and prove a frame actually landed
     """
@@ -639,29 +608,24 @@ def _running_ipv6_emulator() -> Generator[tuple[int, EmulatedLifxServer]]:
         )
     ]
 
-    port = get_free_port6()
-    server = _Ipv6EmulatedLifxServer(
+    server = EmulatedLifxServer(
         devices=devices,
         device_manager=DeviceManager(DeviceRepository()),
-        bind_address="::1",
-        port=port,
+        port=0,
         scenario_manager=scenario_manager,
+        ipv6_bind_address="::1",
     )
 
     runner = EmulatorRunner(server)
     try:
         runner.start()
 
-        serving_socket = (
-            server.transport.get_extra_info("socket")
-            if server.transport is not None
-            else None
-        )
-        assert serving_socket is not None, (
+        endpoint = server.ipv6_endpoint
+        assert endpoint is not None, (
             "the ::1 emulator did not finish starting within the runner timeout"
         )
-        assert serving_socket.family == socket.AF_INET6
-        assert serving_socket.getsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY) == 1
+        host, port = endpoint
+        assert host == "::1"
 
         yield port, server
     finally:
