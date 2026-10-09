@@ -585,3 +585,8 @@ class TestModeTypeExports:
         assert "DynamicMode" in lifx.theme.__all__
         assert "blended" in get_args(StaticMode)
         assert {"morph", "move"} <= set(get_args(DynamicMode))
+
+
+def test_caller_constructed_theme_has_no_unicode_name() -> None:
+    assert Theme().unicode_name is None
+    assert Theme(name="Mine", unicode_name="M\u00efne").unicode_name == "M\u00efne"

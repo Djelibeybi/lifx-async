@@ -12,10 +12,11 @@ StaticMode and DynamicMode are learned from the data: every mode a
 record carries, plus 'blended' (static) and 'morph' and 'move'
 (dynamic), which Theme.resolved_dynamic_mode can return.
 
-Slugs derive from the emoji-stripped display name: NFKD-normalise,
-drop non-ASCII, lowercase, collapse every run of non-alphanumeric
-characters to a single underscore, strip leading and trailing
-underscores (D-09).
+Slugs derive from the ASCII display name (D-09): drop apostrophes
+and quotation marks, expand '&' to 'and', lowercase, collapse every
+run of non-alphanumeric characters to a single underscore, and strip
+leading and trailing underscores. unicode_name, when present, is
+the accented spelling of the name and folds back to it exactly.
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ class ThemeRecord:
     dynamic_mode: DynamicMode | None = None
     tags: tuple[str, ...] = ()
     replaced_by: str | None = None
+    unicode_name: str | None = None
 
 
 THEMES: dict[str, ThemeRecord] = {

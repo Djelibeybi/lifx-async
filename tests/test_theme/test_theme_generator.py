@@ -695,6 +695,35 @@ class TestEmitDataModule:
         assert alias.disposition == "renamed"
         assert alias.replaced_by == "alpha_theme"
 
+    def test_unicode_name_emitted_only_when_present(self) -> None:
+        """An accented record carries unicode_name; a plain one stays default."""
+        accented = _record(slug="curacao", name="Curacao", unicode_name="Cura\u00e7ao")
+        plain = _record(slug="plain_theme", name="Plain Theme")
+
+        source = emit_data_module(_pairs(accented, plain))
+        themes = _exec_module(source)["THEMES"]
+
+        assert themes["curacao"].unicode_name == "Cura\u00e7ao"
+        assert themes["plain_theme"].unicode_name is None
+        assert source.count("unicode_name=") == 1
+
+    def test_alias_of_an_accented_theme_shares_its_unicode_name(self) -> None:
+        record = _record(
+            slug="curacao",
+            name="Curacao",
+            unicode_name="Cura\u00e7ao",
+            aliases=["curazao"],
+        )
+
+        themes = _exec_module(emit_data_module(_pairs(record)))["THEMES"]
+
+        assert themes["curazao"].unicode_name == "Cura\u00e7ao"
+        assert themes["curazao"].name == "Curacao"
+
+    def test_docstring_describes_the_current_slug_rule(self) -> None:
+        source = emit_data_module(_pairs(_record()))
+        assert "NFKD" not in source
+
     def test_alias_shares_the_target_palette_object(self) -> None:
         """The alias reuses the target's colours rather than re-emitting them.
 
@@ -794,6 +823,8 @@ class TestEmitDataModule:
                 _record(replaced_by="Bad-Key"),
                 r"bad replaced_by 'Bad-Key'",
             ),
+            (_record(unicode_name=7), r"bad unicode_name 7"),
+            (_record(unicode_name="Plain"), r"bad unicode_name 'Plain'"),
         ],
     )
     def test_emit_time_backstops_reject_unvalidated_records(

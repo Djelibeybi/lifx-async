@@ -41,6 +41,9 @@ class Theme:
             caller-constructed theme)
         name: Display name for a theme from ``ThemeLibrary`` (None for a
             caller-constructed theme)
+        unicode_name: Correctly spelt display name for a theme from
+            ``ThemeLibrary`` -- the accented form where one exists, else
+            the same as ``name`` (None for a caller-constructed theme)
         category: Category for a theme from ``ThemeLibrary`` (None for a
             caller-constructed theme)
         disposition: Recorded fate of a theme from ``ThemeLibrary`` (None
@@ -100,6 +103,7 @@ class Theme:
         *,
         slug: str | None = None,
         name: str | None = None,
+        unicode_name: str | None = None,
         category: str | None = None,
         disposition: Disposition | None = None,
         replaced_by: str | None = None,
@@ -113,6 +117,7 @@ class Theme:
             colors: List of HSBK colors (defaults to white if None or empty)
             slug: Library key for the theme (attached by ``ThemeLibrary``)
             name: Display name for the theme (attached by ``ThemeLibrary``)
+            unicode_name: Display name with accents (attached by ``ThemeLibrary``)
             category: Category for the theme (attached by ``ThemeLibrary``)
             disposition: Recorded fate of the theme (attached by
                 ``ThemeLibrary``)
@@ -165,6 +170,7 @@ class Theme:
             self.colors = [Colors.WHITE_NEUTRAL]
         self.slug = slug
         self.name = name
+        self.unicode_name = unicode_name
         self.category = category
         self.disposition = disposition
         self.replaced_by = replaced_by
