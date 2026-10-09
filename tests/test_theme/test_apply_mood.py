@@ -201,3 +201,17 @@ class TestMoodOrientation:
         matrix_light.get_device_chain = AsyncMock(return_value=[tile])
         frames = await matrix_light._paint_mood(QUADS, power_on=False, brightness=1.0)
         assert matrix_light.set_matrix_colors.await_args.args[1] == frames[0]
+
+
+@pytest.mark.emulator
+async def test_mirror_paints_each_ring_in_zone_order(mirror_device) -> None:
+    async with mirror_device:
+        await mirror_device.apply_mood(Theme([RED, GREEN], static_mode="solid_static"))
+        front = await mirror_device.get_front_colors()
+        back = await mirror_device.get_back_colors()
+    assert len(front) == len(back) == 25
+    # A 2-colour stripe mood stretched over 25 zones: each ceil(12.5) = 13
+    # run is trimmed once from the front, leaving 12 red then 13 green.
+    expected = [0] * 12 + [120] * 13
+    assert [round(c.hue) for c in front] == expected
+    assert [round(c.hue) for c in back] == expected
