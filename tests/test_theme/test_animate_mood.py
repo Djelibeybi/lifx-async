@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -203,3 +203,20 @@ class TestRejectedGetEffect:
         light = mock_device_factory(MatrixLight)
         light.get_effect = AsyncMock(side_effect=LifxUnsupportedCommandError("no"))
         assert not await light._mood_effect_running()
+
+
+class TestSoftwareMoodEffectFirst:
+    """A running mood software effect answers before any GetEffect is sent."""
+
+    @pytest.mark.parametrize(
+        ("cls", "product"), [(MultiZoneLight, 32), (MatrixLight, 55)]
+    )
+    async def test_skips_get_effect(self, mock_device_factory, cls, product) -> None:
+        light = mock_device_factory(cls, product=product)
+        light.get_effect = AsyncMock()
+        runner = MagicMock()
+        runner.runs_mood_effect.return_value = True
+        with patch("lifx.devices.light.effect_runner", return_value=runner):
+            assert await light._mood_effect_running()
+        runner.runs_mood_effect.assert_called_once_with(light)
+        light.get_effect.assert_not_awaited()
