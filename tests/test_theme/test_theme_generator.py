@@ -18,9 +18,9 @@ Tests cover:
 - Deterministic emission
 - Atomic write via a uniquely named temp file
 
-All tests run against fixture data in tmp_path — never against the committed
-data/themes.jsonl (the data file is the record of what should exist; no
-drift check, no count assertions against real data).
+All tests run against fixture data in tmp_path, never against the committed
+data/themes.jsonl. The committed file is compared with the generated module
+in test_data_parity, which reads every expected value from the data file.
 """
 
 from __future__ import annotations

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from generate_theme_data import DATA_FILE
 
 from lifx.devices.base import DeviceVersion
 from lifx.devices.ceiling import CeilingLight
@@ -12,6 +14,21 @@ from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight, TileInfo
 from lifx.devices.multizone import MultiZoneLight
 from lifx.products import get_product
+from lifx.theme.schema import load_theme_records
+
+# The committed source records. The library is regenerated from this file
+# whenever LIFX change the app's themes, so tests that need a theme count,
+# category or palette read it from here rather than pinning a literal.
+SOURCE_RECORDS: list[dict[str, Any]] = [
+    record for _, record in load_theme_records(DATA_FILE)
+]
+
+# (alias, target) for every rename alias the source data declares.
+SOURCE_ALIASES: list[tuple[str, str]] = sorted(
+    (alias, record["slug"])
+    for record in SOURCE_RECORDS
+    for alias in record.get("aliases", ())
+)
 
 
 def make_tile(
