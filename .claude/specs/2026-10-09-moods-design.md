@@ -47,8 +47,11 @@ app", not pixel identity.
    light, as the app does.
 4. Firmware does the work wherever the light has the effect. Every multizone
    light has firmware MOVE. Matrix lights have firmware MORPH and no MOVE.
-5. A matrix light's MOVE is app-driven: the new `EffectScroll` rotates the
-   painted rows. The Mirror gets firmware MORPH instead of MOVE, as in the app.
+5. A matrix light's MOVE is app-driven: the new `EffectScroll` moves the
+   painted image. The Mirror gets firmware MORPH instead of MOVE, as in the
+   app. Spot and Path (171, 173, 174, 221, 222) also get firmware MORPH: the
+   app runs an undocumented firmware COLOR_CYCLE there, which this library
+   does not send. Both sets live in `lifx/products/quirks.py`.
 6. Strips have no firmware MORPH, so MORPH on a strip runs firmware MOVE.
 7. Bulbs have no firmware effects. Both modes run `EffectColorloop` limited to
    the theme's colours.
@@ -213,7 +216,7 @@ at the app's own speed and direction. Stopping is the existing
 |---|---|---|
 | Strip (any multizone) | mood still, then firmware MOVE, FORWARD, `20 s * zones / 16` | same as MOVE |
 | Matrix (every `has_matrix` light but the Mirror, chains included) | mood still, then `EffectScroll(frame=<that still>)` | firmware MORPH, 3 s, no pre-paint |
-| Mirror | firmware MORPH | firmware MORPH |
+| Mirror, Spot, Path | firmware MORPH | firmware MORPH |
 | Bulb | `EffectColorloop(palette=theme.colors)` | same |
 
 The strip path paints with `apply_mood()` then sends the raw
