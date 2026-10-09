@@ -730,3 +730,18 @@ class TestNewSlugBehaviour:
 
         assert first is not second
         assert first.palette_equals(second)
+
+
+class TestEffectModesOnGet:
+    """ThemeLibrary.get() carries a record's modes and tags."""
+
+    def test_library_theme_always_has_a_static_mode(self) -> None:
+        for key in ThemeLibrary.get_available_themes():
+            assert ThemeLibrary.get(key).static_mode is not None, key
+
+    def test_get_passes_the_record_fields_through(self) -> None:
+        for key, record in THEMES.items():
+            theme = ThemeLibrary.get(key)
+            assert theme.static_mode == record.static_mode, key
+            assert theme.dynamic_mode == record.dynamic_mode, key
+            assert theme.tags == record.tags, key

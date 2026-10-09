@@ -98,6 +98,9 @@ class ThemeLibrary:
             category=record.category,
             disposition=record.disposition,
             replaced_by=record.replaced_by,
+            static_mode=record.static_mode,
+            dynamic_mode=record.dynamic_mode,
+            tags=record.tags,
         )
 
     @classmethod
