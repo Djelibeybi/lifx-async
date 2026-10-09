@@ -163,6 +163,17 @@ class TestBulbs:
         assert make([RED]).get_bulb_colors([]) == []
 
 
+class TestPalette:
+    def test_keeps_order_and_rescales_to_the_brightness(self) -> None:
+        palette = make([RED, DIM_BLUE]).get_palette(0.4)
+        assert [c.hue for c in palette] == [0, 240]
+        assert [c.brightness for c in palette] == pytest.approx([0.4, 0.2])
+
+    def test_zero_brightness_leaves_the_palette_unchanged(self) -> None:
+        colors = [RED, DIM_BLUE]
+        assert make(colors).get_palette(0.0) == colors
+
+
 class TestMorphPalette:
     def test_sixteen_or_fewer_is_unchanged(self) -> None:
         palette = [RED, GREEN, BLUE]

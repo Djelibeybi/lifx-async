@@ -30,7 +30,7 @@ from lifx.devices.base import (
     DeviceState,
     WifiInfo,
 )
-from lifx.devices.effect_runner import effect_runner
+from lifx.devices.effect_runner import PriorState, effect_runner
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
@@ -123,6 +123,9 @@ class Light(Device[LightState]):
 
     _discovery_snapshot: _DiscoveryLightSnapshot | None = None
     _animator: Animator | None = None
+    # What the light showed before a firmware mood animation started, which
+    # stop_effect() restores. A software mood's run holds it instead.
+    _mood_prestate: PriorState | None = None
 
     @property
     def animator(self) -> Animator:
@@ -226,6 +229,10 @@ class Light(Device[LightState]):
         the light is one participant of a multi-light run, it leaves that run
         and the other participants carry on.
 
+        After ``animate_mood()``, the light gets back what it showed before
+        its mood animation started, once: a second call restores nothing
+        more.
+
         Example:
             ```python
             await light.stop_effect()
@@ -234,7 +241,13 @@ class Light(Device[LightState]):
         try:
             await self._stop_firmware_effect()
         finally:
-            await effect_runner().leave_every_run(self)
+            # A firmware mood's prior state outranks a run started over it.
+            await effect_runner().leave_every_run(
+                self, restore_state=self._mood_prestate is None
+            )
+        held, self._mood_prestate = self._mood_prestate, None
+        if held is not None:
+            await effect_runner().restore_prestate(self, held)
 
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect; a plain light has none to stop."""
@@ -1139,14 +1152,48 @@ class Light(Device[LightState]):
         A bulb steps through the theme's colours. A strip paints the mood and
         runs firmware MOVE. A matrix light runs firmware MORPH, or paints the
         mood and scrolls it for a MOVE mood; a Mirror, Spot or Path always runs
-        MORPH. Stop it with ``stop_effect()``.
+        MORPH. The colours are rescaled to the light's brightness, and the
+        light is turned on if it is off.
+
+        Stop it with ``stop_effect()``, which puts back what the light showed
+        before its mood animation started. Starting another mood keeps that
+        state rather than capturing the animation.
 
         Args:
             theme: Theme to animate
         """
         if not await self._paints_moods():
             return
-        await self.start_effect(effect_runner().palette_effect(list(theme.colors)))
+        prestate = await self._begin_mood_animation()
+        palette = MoodGenerator(theme).get_palette(self._prior_brightness(prestate))
+        runner = effect_runner()
+        await runner.start(self, runner.palette_effect(palette), prestate=prestate)
+
+    async def _begin_mood_animation(self) -> PriorState:
+        """Take the light out of its runs; return the state stopping restores.
+
+        It is captured once, before anything is painted or powered on. A
+        restart keeps the state from before the first mood animation, held
+        here for a firmware mood or by the run for a software one. A held
+        state whose firmware mood no longer runs is dropped for a new capture.
+        """
+        held, self._mood_prestate = self._mood_prestate, None
+        if held is not None and await self._mood_effect_running():
+            await effect_runner().leave_every_run(self, restore_state=False)
+            return held
+        return await effect_runner().take_prestate(self)
+
+    def _prior_brightness(self, prestate: PriorState) -> float:
+        """The brightness an animated mood rescales to, from its prior state.
+
+        Read from what the light showed before the animation, so a restart
+        does not rescale to a dimmer frame of the running animation.
+        """
+        return prestate.color.brightness
+
+    async def _mood_power(self) -> bool:
+        """Whether the light is on, for turning it on under an animation."""
+        return await self.get_power() > 0
 
     async def _paints_moods(self) -> bool:
         """Whether this light shows colour, the only kind a mood paints."""

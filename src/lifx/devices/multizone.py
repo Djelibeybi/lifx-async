@@ -19,7 +19,7 @@ from lifx.const import (
     MOOD_MOVE_SECONDS_PER_16_ZONES,
 )
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
-from lifx.devices.effect_runner import effect_runner
+from lifx.devices.effect_runner import PriorState
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import (
     LifxProtocolError,
@@ -699,6 +699,10 @@ class MultiZoneLight(Light):
     async def _shown_brightness(self, reported: float) -> float:
         """The brightest zone, since GetColor reports zone 0 alone."""
         return self._brightest_or(await self.get_all_color_zones(), reported)
+
+    def _prior_brightness(self, prestate: PriorState) -> float:
+        """The brightest zone shown before the animation."""
+        return self._brightest_or(prestate.zone_colors or [], prestate.color.brightness)
 
     async def get_all_color_zones(self) -> list[HSBK]:
         """Get colors for all zones, automatically using the best method.
@@ -1503,9 +1507,13 @@ class MultiZoneLight(Light):
         """
         if not await self._paints_moods():
             return
-        await effect_runner().leave_every_run(self, restore_state=False)
-        is_on, brightness = await self._mood_reading()
-        await self._paint_mood(theme, power_on=not is_on, brightness=brightness)
+        # Held here, since a firmware effect has no run to hold it.
+        prestate = self._mood_prestate = await self._begin_mood_animation()
+        await self._paint_mood(
+            theme,
+            power_on=not await self._mood_power(),
+            brightness=self._prior_brightness(prestate),
+        )
         zone_count = await self.get_zone_count()
         await self.set_effect(
             MultiZoneEffect.move(

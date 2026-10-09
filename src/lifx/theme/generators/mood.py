@@ -27,10 +27,15 @@ _MIN_VISIBLE = 0.01
 class MoodGenerator:
     """Turn a theme into the colours the LIFX app paints for it.
 
+    The ``get_*_colors()`` methods paint a still image; ``get_palette()``
+    gives the colours an animated mood steps through. Each is rescaled so its
+    brightest colour matches the light's brightness.
+
     Example:
         ```python
         generator = MoodGenerator(get_theme("van_gogh"))
         colors = generator.get_matrix_colors(8, 8, brightness=0.6)
+        palette = generator.get_palette(brightness=0.6)
         ```
     """
 
@@ -48,7 +53,7 @@ class MoodGenerator:
         self._rng = rng if rng is not None else random.Random()
 
     def get_multizone_colors(self, zone_count: int, brightness: float) -> list[HSBK]:
-        """Colours for a strip, or for one Mirror ring.
+        """Colours for a strip, one per zone.
 
         Args:
             zone_count: Number of zones to fill
@@ -141,6 +146,21 @@ class MoodGenerator:
             # brightness, then take this bulb's card.
             dealt.append(self._rescale(deck, brightness)[index % len(deck)])
         return dealt
+
+    def get_palette(self, brightness: float) -> list[HSBK]:
+        """The theme's colours, in order, rescaled to the light's brightness.
+
+        An animated mood steps through these: a bulb's colour loop and a
+        matrix light's firmware MORPH, as the app rescales them.
+
+        Args:
+            brightness: The light's brightness, 0.0 to 1.0. At 0.0 the
+                colours are returned unchanged.
+
+        Returns:
+            One colour per theme colour, the brightest at ``brightness``
+        """
+        return self._rescale(self._colors, brightness)
 
     @staticmethod
     def morph_palette(colors: Sequence[HSBK]) -> list[HSBK]:

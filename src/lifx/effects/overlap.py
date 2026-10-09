@@ -143,7 +143,7 @@ class OverlapRules:
         raise NotImplementedError
 
     async def _take_over(
-        self, effect: LIFXEffect, participants: Sequence[Participant]
+        self, effect: LIFXEffect | None, participants: Sequence[Participant]
     ) -> tuple[dict[ParticipantKey, PreState], TakenComponents]:
         """Stop the software effect each light already runs, on any Conductor.
 
@@ -162,7 +162,8 @@ class OverlapRules:
         inherits the whole light's original prior state.
 
         Args:
-            effect: The effect about to start on the participants
+            effect: The effect about to start on the participants, or None
+                to take them out of every run
             participants: The lights and light components it is about to
                 start on
 
@@ -225,7 +226,7 @@ class OverlapRules:
         return all(run.task.get_loop() is loop for run in self._running.values())
 
     async def _take_components(
-        self, effect: LIFXEffect, light: Light
+        self, effect: LIFXEffect | None, light: Light
     ) -> dict[ComponentName, PreState]:
         """Take a light's light components out of their runs here, unrestored.
 
@@ -234,7 +235,7 @@ class OverlapRules:
         component leaves its run with no restore in between.
 
         Args:
-            effect: The whole-light effect about to start
+            effect: The whole-light effect about to start, or None
             light: The light it is about to start on
 
         Returns:

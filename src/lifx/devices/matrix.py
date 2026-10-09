@@ -29,6 +29,7 @@ from lifx.const import (
     DEFAULT_REQUEST_TIMEOUT,
     LIFX_UDP_PORT,
     MAX_PALETTE_COLORS,
+    MOOD_FADE_SECONDS,
     MOOD_MORPH_SPEED_SECONDS,
 )
 from lifx.devices.component.state import (
@@ -36,7 +37,7 @@ from lifx.devices.component.state import (
     sample_effect_palette,
     validate_effect_palette,
 )
-from lifx.devices.effect_runner import effect_runner
+from lifx.devices.effect_runner import PriorState, effect_runner
 from lifx.devices.light import Light, LightState
 from lifx.exceptions import (
     LifxProtocolError,
@@ -747,13 +748,23 @@ class MatrixLight(Light):
         Only each tile's first ``width * height`` colours count: a tile's
         buffer can be padded past its pixels (the Mirror's 4x13 is 64 long).
         """
-        all_colors = await self.get_all_tile_colors()
-        shown = [
+        return self._brightest_or(
+            self._shown_colors(await self.get_all_tile_colors()), reported
+        )
+
+    def _prior_brightness(self, prestate: PriorState) -> float:
+        """The brightest pixel shown before the animation."""
+        return self._brightest_or(
+            self._shown_colors(prestate.tile_colors or []), prestate.color.brightness
+        )
+
+    def _shown_colors(self, all_colors: list[list[HSBK]]) -> list[HSBK]:
+        """Each tile's pixels, without the padding past ``width * height``."""
+        return [
             color
             for tile, colors in zip(self._device_chain or [], all_colors)
             for color in colors[: tile.width * tile.height]
         ]
-        return self._brightest_or(shown, reported)
 
     @staticmethod
     def _can_batch_chain_fetch(device_chain: list[TileInfo]) -> bool:
@@ -1374,7 +1385,7 @@ class MatrixLight(Light):
                 except for COLOR_SWEEP and SKY with a non-zero ``duration``,
                 where 0 plays the effect once across ``duration``
             duration: Total effect duration in nanoseconds (0 for infinite)
-            palette: Color palette for the effect. For MORPH, a palette longer
+            palette: Colour palette for the effect. For MORPH, a palette longer
                 than 16 colours is reduced the way the LIFX app reduces a mood:
                 by the area each run of colours covers, then shuffled. Other
                 effects take at most 16. An explicit palette is sent as given (bar
@@ -1709,28 +1720,47 @@ class MatrixLight(Light):
         return "move"
 
     async def animate_mood(self, theme: Theme) -> None:
-        """Run firmware MORPH, or paint and scroll a MOVE mood."""
+        """Run firmware MORPH, or paint and scroll a MOVE mood.
+
+        The prior state is captured before anything is painted, and handed to
+        the scroll, so its tiles are never read back mid-fade.
+        """
         if not await self._paints_moods():
             return
-        await effect_runner().leave_every_run(self, restore_state=False)
+        prestate = await self._begin_mood_animation()
+        brightness = self._prior_brightness(prestate)
+        is_on = await self._mood_power()
         if self._mood_dynamic_mode(theme) == "morph":
+            # Held here, since a firmware effect has no run to hold it.
+            self._mood_prestate = prestate
             await self.set_effect(
                 FirmwareEffect.MORPH,
                 speed=MOOD_MORPH_SPEED_SECONDS,
-                palette=list(theme.colors),
+                palette=MoodGenerator(theme).get_palette(brightness),
             )
+            if not is_on:
+                await self.set_power(True, duration=MOOD_FADE_SECONDS)
             return
         await self._stop_firmware_effect()
-        is_on, brightness = await self._mood_reading()
         frames = await self._paint_mood(
             theme, power_on=not is_on, brightness=brightness
         )
+        if not frames:
+            # A light reporting no tiles has nothing to scroll, but still
+            # turns on, and stop_effect() still restores it.
+            self._mood_prestate = prestate
+            if not is_on:
+                await self.set_power(True, duration=MOOD_FADE_SECONDS)
+            return
         # The app scrolls stripe moods down a vertical-theme light and shifts
         # everything else sideways.
         vertical = bool(
             self.version and has_vertical_theme(self.version.product)
         ) and theme.static_mode in ("solid", "solid_static", "solid_loop")
-        await self.start_effect(effect_runner().scroll_effect(frames, vertical))
+        runner = effect_runner()
+        await runner.start(
+            self, runner.scroll_effect(frames, vertical), prestate=prestate
+        )
 
     async def _mood_effect_running(self) -> bool:
         """Firmware MORPH, or a mood software effect."""

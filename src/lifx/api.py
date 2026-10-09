@@ -1035,6 +1035,10 @@ class DeviceGroup:
     async def animate_mood(self, theme: Theme) -> None:
         """Start each light's mood effect; bulbs share one colour loop.
 
+        Every light is turned on if it is off. The bulbs' loop is rescaled to
+        the brightest bulb. Stop the animation with ``stop_effect()`` on each
+        light, which puts back what that light showed before it started.
+
         Args:
             theme: Theme to animate
         """
@@ -1048,8 +1052,23 @@ class DeviceGroup:
         """Start mood effects: one colour loop for the bulbs, the rest alone."""
         runner = effect_runner()
         bulbs = [light for light in lights if _is_bulb(light)]
+        # Each bulb keeps its own prior state; the shared loop is rescaled to
+        # the brightest of them.
+        prestates = await asyncio.gather(
+            *(bulb._begin_mood_animation() for bulb in bulbs)
+        )
+        brightness = max(
+            (
+                bulb._prior_brightness(prestate)
+                for bulb, prestate in zip(bulbs, prestates)
+            ),
+            default=0.0,
+        )
+        palette = MoodGenerator(theme).get_palette(brightness)
         await asyncio.gather(
-            runner.start_together(bulbs, runner.palette_effect(list(theme.colors))),
+            runner.start_together(
+                bulbs, runner.palette_effect(palette), prestates=prestates
+            ),
             *(light.animate_mood(theme) for light in lights if not _is_bulb(light)),
         )
 

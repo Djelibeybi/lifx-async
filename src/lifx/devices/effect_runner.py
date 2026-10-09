@@ -20,6 +20,33 @@ if TYPE_CHECKING:
     from lifx.effects.base import LIFXEffect
 
 
+class PriorState(Protocol):
+    """What a light showed before an effect: the state stopping it restores.
+
+    The effects package captures it; a light only holds it and reads it.
+    """
+
+    @property
+    def power(self) -> bool:
+        """Whether the light was on."""
+        ...
+
+    @property
+    def color(self) -> HSBK:
+        """The colour GetColor reported."""
+        ...
+
+    @property
+    def zone_colors(self) -> list[HSBK] | None:
+        """Every zone's colour, for a multizone light."""
+        ...
+
+    @property
+    def tile_colors(self) -> list[list[HSBK]] | None:
+        """Every tile's colours, for a matrix light."""
+        ...
+
+
 class EffectRunner(Protocol):
     """What a light asks of the software effects package."""
 
@@ -29,8 +56,12 @@ class EffectRunner(Protocol):
         effect: object,
         *,
         enable_thread: bool = False,
+        prestate: PriorState | None = None,
     ) -> None:
         """Start a software effect on one light or light component alone.
+
+        ``prestate`` is the state stopping the effect restores, used only
+        when the participant inherits none from a run it is already part of.
 
         Raises:
             TypeError: If ``effect`` is not a software effect the participant
@@ -44,6 +75,19 @@ class EffectRunner(Protocol):
         self, participant: Light | LightComponent, *, restore_state: bool = True
     ) -> None:
         """Remove a light or light component from every run it is part of."""
+        ...
+
+    async def take_prestate(self, light: Light) -> PriorState:
+        """Take a light out of every run, unrestored, and return its prior state.
+
+        The original prior state of the run the light leaves is returned, so a
+        restart keeps what was there before any effect; a light in no run has
+        its state captured now.
+        """
+        ...
+
+    async def restore_prestate(self, light: Light, prestate: PriorState) -> None:
+        """Put back a prior state ``take_prestate()`` returned."""
         ...
 
     def runs_whole_light(self, light: Light) -> bool:
@@ -62,8 +106,18 @@ class EffectRunner(Protocol):
         """The effect that steps bulbs through a mood's colours."""
         ...
 
-    async def start_together(self, lights: Sequence[Light], effect: object) -> None:
-        """Start one software effect across several lights."""
+    async def start_together(
+        self,
+        lights: Sequence[Light],
+        effect: LIFXEffect,
+        *,
+        prestates: Sequence[PriorState],
+    ) -> None:
+        """Start one software effect across several lights.
+
+        ``prestates`` gives each light's prior state, in light order, used
+        only when the light inherits none from a run it is already part of.
+        """
         ...
 
 

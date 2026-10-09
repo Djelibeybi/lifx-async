@@ -11,6 +11,7 @@ from lifx.color import HSBK
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
+from lifx.effects.models import PreState
 from lifx.theme import Theme
 from tests.test_theme.conftest import make_tile
 
@@ -24,6 +25,9 @@ def fake(light: Light, *, on: bool, colour: bool = True) -> Light:
     light._mood_effect_running = AsyncMock(return_value=False)  # type: ignore[method-assign]
     light._mood_reading = AsyncMock(return_value=(on, 1.0))  # type: ignore[method-assign]
     light._paint_mood = AsyncMock(return_value=[])  # type: ignore[method-assign]
+    light._begin_mood_animation = AsyncMock(  # type: ignore[method-assign]
+        return_value=PreState(power=on, color=RED)
+    )
     return light
 
 
