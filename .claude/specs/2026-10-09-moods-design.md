@@ -129,7 +129,8 @@ only matter on a multi-tile Tile chain, the one device with more than one
 tile; there a mood follows chain order, as the app does (section 2).
 
 New public API: `apply_mood()`, `animate_mood()`, `MoodGenerator` (its public
-methods only), `EffectScroll` and `EffectColorloop(palette=...)`.
+methods only), `EffectScroll` (with `frame=`) and
+`EffectColorloop(palette=...)`.
 
 ### 2. `apply_mood(theme)`
 
@@ -196,7 +197,7 @@ at the app's own speed and direction. Stopping is the existing
 | Light | MOVE | MORPH |
 |---|---|---|
 | Strip (any multizone) | mood still, then firmware MOVE, FORWARD, `20 s * zones / 16` | same as MOVE |
-| Matrix (every `has_matrix` light but the Mirror, chains included) | mood still, then `EffectScroll` | firmware MORPH, 3 s, no pre-paint |
+| Matrix (every `has_matrix` light but the Mirror, chains included) | mood still, then `EffectScroll(frame=<that still>)` | firmware MORPH, 3 s, no pre-paint |
 | Mirror | firmware MORPH | firmware MORPH |
 | Bulb | `EffectColorloop(palette=theme.colors)` | same |
 
@@ -221,9 +222,14 @@ path.
 - **`EffectScroll`** (new, registry name `"scroll"`). Matrix lights only.
   Every 1250 ms it rotates every row one cell toward higher column numbers and
   writes one Set64 per tile with the step as the fade (capped at 2 s). It
-  reads the painted tiles once when it starts, then rotates that frame; it
-  paints nothing itself. It streams no frames,
-  so like `EffectColorloop` it runs on Thread lights without `enable_thread`.
+  paints nothing itself. Its optional `frame=` keyword takes the per-tile
+  colours to scroll; `animate_mood()` passes the `get_matrix_colors()` or
+  `get_chain_colors()` output it has just painted, so nothing is read back.
+  Without `frame=`, it reads the tiles once when it starts. Readback is the
+  fallback only: Get64 trails a Set64 by roughly 130 to 225 ms and reports
+  in-flight colours during a fade, which the emulator does not reproduce.
+  It streams no frames, so like `EffectColorloop` it runs on Thread lights
+  without `enable_thread`.
   A strip or bulb participant is rejected. The step is the effect's own,
   matching the app; the frame-paced 1500/fps transition of other frame effects
   is not changed.
@@ -259,7 +265,8 @@ If the hardware disagrees, the recipe changes before release.
   segment allocation in `_gradient`, edge order in `_blended_matrix`,
   serpentine rows in `_grid`, repeated rows in `_stripes`, and
   `morph_palette()`. Private steps are tested through the public methods
-  where that pins the behaviour, directly where it does not. Nothing pinned to live catalogue data.
+  where that pins the behaviour, directly where it does not. Nothing is
+  pinned to live catalogue data.
 - **apply_mood().** Emulator tests per device kind and `static_mode`, a lone
   bulb and a `DeviceGroup` of bulbs, the power rule, the 300 ms fade,
   brightness rescale and the restart rule. Chains use the `tile_chain_light`
@@ -268,6 +275,7 @@ If the hardware disagrees, the recipe changes before release.
   substitution and the strip MORPH-to-MOVE path.
 - **Restructure.** The existing suite passes with only import paths changed.
 - **Effects.** MORPH reduction of a 64-entry grid to 16; `EffectScroll`'s
-  step and rejection of non-matrix participants; Colour Loop with a palette.
+  step, its `frame=` path, its readback fallback and rejection of non-matrix
+  participants; Colour Loop with a palette.
 - **apply_theme().** Existing tests pass unchanged.
 - **Coverage.** 100% branch patch coverage.
