@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from lifx.color import Colors
-from lifx.theme.canvas import Canvas
+from lifx.theme.generators.canvas import Canvas
 from lifx.theme.theme import Theme
 
 

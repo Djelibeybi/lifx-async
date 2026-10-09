@@ -242,7 +242,7 @@ async with Light(serial, ip) as light:
 
 - `theme/theme.py` - Theme definitions
 - `theme/library.py` - Built-in themes
-- `theme/generators.py` - Theme-based color generators
+- `theme/generators/` - Colour generators: `theme.py` (gradient generators for `apply_theme()`), `mood.py` (`MoodGenerator` for `apply_mood()`), `canvas.py` (internal `Canvas`)
 
 ### Layer 8: High-Level API
 
