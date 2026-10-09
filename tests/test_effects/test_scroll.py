@@ -177,3 +177,51 @@ class TestEffectScroll:
         effect.participants = [bulb, matrix]
         await run_briefly(effect)
         matrix._write_mood_frames.assert_awaited()
+
+
+class TestReadbackOrientation:
+    """A frame read back from a rotated Tile is physical; it scrolls as logical."""
+
+    @pytest.mark.parametrize("accel", [(0, 0, 0), (1, 0, 0), (-1, 0, 0), (0, 1, 0)])
+    async def test_readback_scrolls_like_the_logical_frame(
+        self,
+        mock_device_factory,  # noqa: F811
+        accel: tuple[int, int, int],
+    ) -> None:
+        tile = make_tile(0, width=2, height=2, accel=accel)
+        logical = hues(0, 10, 20, 30)
+        physical = MatrixLight._orient_tile_colors(tile, logical)
+        # A rotated tile really moves cells; an upright one leaves them.
+        assert (physical == logical) == (accel == (0, 0, 0))
+
+        written: dict[str, list[int]] = {}
+        for label, effect, readback in (
+            ("given", EffectScroll(frame=[logical]), None),
+            ("read", EffectScroll(), [physical]),
+        ):
+            light = mock_device_factory(MatrixLight, product=55)
+            light.get_device_chain = AsyncMock(return_value=[tile])
+            light.get_all_tile_colors = AsyncMock(return_value=readback)
+            light.set_matrix_colors = AsyncMock()
+            effect.participants = [light]
+            await run_briefly(effect)
+            written[label] = [
+                c.hue for c in light.set_matrix_colors.await_args_list[0].args[1]
+            ]
+        assert written["read"] == written["given"]
+
+    async def test_readback_ignores_buffer_padding(
+        self,
+        mock_device_factory,  # noqa: F811
+    ) -> None:
+        light = mock_device_factory(MatrixLight)
+        light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=2, height=1)]
+        )
+        light.get_all_tile_colors = AsyncMock(return_value=[hues(0, 10, 99, 99)])
+        light._write_mood_frames = AsyncMock()
+        effect = EffectScroll()
+        effect.participants = [light]
+        await run_briefly(effect)
+        frames = light._write_mood_frames.await_args.args[1]
+        assert [c.hue for c in frames[0]] == [10, 0]

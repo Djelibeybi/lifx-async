@@ -127,11 +127,24 @@ class EffectScroll(LIFXEffect):
                 continue
             matrix = light
             tiles = await matrix.get_device_chain()
-            frames = (
-                self.frame
-                if self.frame is not None
-                else await matrix.get_all_tile_colors()
-            )
+            await matrix.ensure_capabilities()
+            has_chain = bool(matrix.capabilities and matrix.capabilities.has_chain)
+            if self.frame is not None:
+                frames = self.frame
+            else:
+                # A readback is the physical buffer, padded past the tile's
+                # own cells; the scroll and its writes work in the logical
+                # canvas, so trim it and undo a rotated Tile's orientation.
+                frames = [
+                    matrix._unorient_tile_colors(
+                        tile, colors[: tile.width * tile.height]
+                    )
+                    if has_chain
+                    else colors[: tile.width * tile.height]
+                    for tile, colors in zip(
+                        tiles, await matrix.get_all_tile_colors(), strict=False
+                    )
+                ]
             if len(frames) != len(tiles) or any(
                 len(colors) != tile.width * tile.height
                 for colors, tile in zip(frames, tiles)
@@ -139,8 +152,6 @@ class EffectScroll(LIFXEffect):
                 raise ValueError(
                     f"frame does not match {matrix.label or matrix.serial}'s tiles"
                 )
-            await matrix.ensure_capabilities()
-            has_chain = bool(matrix.capabilities and matrix.capabilities.has_chain)
             plans.append((matrix, tiles, frames, has_chain))
 
         fade = min(MOOD_SCROLL_STEP_SECONDS, MOOD_SCROLL_MAX_FADE_SECONDS)

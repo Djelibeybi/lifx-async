@@ -1654,6 +1654,33 @@ class MatrixLight(Light):
         lut = build_orientation_lut(tile.width, tile.height, orientation)
         return [colors[src_idx] for src_idx in lut]
 
+    @staticmethod
+    def _unorient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Map colours read back from a tile into row-major canvas order.
+
+        The inverse of ``_orient_tile_colors``: a Tile reports its physical
+        buffer, so a rotated Tile's readback is put back into the order a
+        caller painted it in. Callers must gate on ``has_chain``.
+
+        Args:
+            tile: Tile the colours were read from
+            colors: Colours in the tile's physical order, exactly
+                ``width * height`` of them
+
+        Returns:
+            The colours in row-major screen order, or the input unchanged when
+            the tile is upright.
+        """
+        orientation = Orientation.from_string(tile.nearest_orientation)
+        if orientation == Orientation.RIGHT_SIDE_UP:
+            return colors
+
+        lut = build_orientation_lut(tile.width, tile.height, orientation)
+        logical = list(colors)
+        for dst_idx, src_idx in enumerate(lut):
+            logical[src_idx] = colors[dst_idx]
+        return logical
+
     async def _paint_mood(
         self,
         theme: Theme,
